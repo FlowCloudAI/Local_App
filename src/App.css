@@ -5,6 +5,10 @@
   text-align: center;
 }
 
+button:focus {
+    outline: none;  /* ✅ 移除边框 */
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

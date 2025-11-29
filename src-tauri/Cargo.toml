@@ -19,7 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 log = "0.4"
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-log = "2"
 rusqlite = { version = "0.37", features = ["bundled"] }
 reqwest = { version = "0.12", features = ["json"] }

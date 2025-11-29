@@ -28,4 +28,5 @@ export class ResultAPI {
 
 export const api = {
     testCommand: () => ResultAPI.invoke<string>('test_command'),
+    showWindow: () => ResultAPI.invoke<void>('show_main_window'),
 } as const
