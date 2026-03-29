@@ -20,6 +20,8 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 /idea/*
+/src-tauri/icons
+/src-tauri/icons/*
 .DS_Store
 *.suo
 *.ntvs*

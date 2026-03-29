@@ -1,6 +1,6 @@
 import './App.css'
 import "./api"
-import {Button, Tabs} from 'flowcloudai-ui'
+import {Button, TabBar} from 'flowcloudai-ui'
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import MDEditor from '@uiw/react-md-editor'
 import {useState} from "react";
@@ -59,7 +59,7 @@ function App() {
                     </svg>
                 </button>
                 <div className="top-bar-title" data-tauri-drag-region>流云AI</div>
-                <Tabs
+                <TabBar
                     data-tauri-drag-region
                     radius="md"
                     closable
@@ -78,8 +78,7 @@ function App() {
                         console.log('新增标签页');
                         handleAdd();
                     }}
-                >
-                </Tabs>
+                />
                 <div className="top-bar-actions">
                     <Button variant="ghost" onClick={() => win.minimize()}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
