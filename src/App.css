@@ -40,9 +40,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1rem;
-  height: 5rem;
-  background: var(--bg-surface);
+  padding: 0.2rem;
+  height: 3rem;
+  background: var(--fc-color-bg-secondary);
   border-bottom: 0.1rem solid var(--border);
   flex-shrink: 0;
   user-select: none;
@@ -55,13 +55,20 @@ body {
 }
 
 
-.top-bar-actions {
+.tab-bar-wrapper {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
 }
 
-.fc-btn.close-btn:hover {
-  background: #f00;
+.top-bar-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .menu-btn {

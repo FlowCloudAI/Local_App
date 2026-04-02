@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "流云AI",
   "version": "0.1.0",
-  "identifier": "com.tauri.flowcloudai",
+  "identifier": "cn.flowcloudai.www",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:5173",
@@ -22,28 +22,21 @@
         "zoomHotkeysEnabled": true,
         "fullscreen": false,
         "visible": false,
-        "backgroundColor": [0,0,0],
         "transparent": true,
         "decorations": false,
         "center": true,
-        "incognito": true,
-        "additionalBrowserArgs": "--disable-extensions --disable-background-networking --disable-sync --metrics-recording-only --disable-features=Spellcheck,AutofillServerCommunication,Translate --disable-component-update --disable-default-apps --disable-domain-reliability --no-first-run --disable-gpu --disable-features=AudioServiceOutOfProcess --js-flags=\"--max-old-space-size=128\" --renderer-process-limit=1 --disable-renderer-backgrounding --disable-backgrounding-occluded-windows"
+        "additionalBrowserArgs": "--disable-extensions --disable-background-networking --disable-sync --metrics-recording-only --disable-features=Spellcheck,AutofillServerCommunication,Translate --disable-component-update --disable-default-apps --disable-domain-reliability --no-first-run --disable-features=AudioServiceOutOfProcess --js-flags=\"--max-old-space-size=128\" --disable-backgrounding-occluded-windows"
       }
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://asset.localhost",
-      "capabilities": ["default"]
+      "capabilities": [
+        "default"
+      ]
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
+    "targets": "all"
   }
 }
