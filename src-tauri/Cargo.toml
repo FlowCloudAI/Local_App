@@ -15,17 +15,19 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.3", features = [] }
 
 [dependencies]
-log = "0.4.29"
+log = "0.4"
 tauri = { version = "2", features = ["unstable"] }
-tokio = { version = "1.50.0", features = ["full"] }
-serde_json = "1.0.145"
-futures = "0.3.31"
+tokio = { version = "1.50", features = ["full"] }
+serde_json = "1.0"
+futures = "0.3"
 tauri-plugin-single-instance = "2"
 tauri-plugin-log = "2"
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 keyring = "3"
 anyhow = "1"
 worldflow_core = { git = "ssh://git@github.com/FlowCloudAI/Worldflow_Core", branch = "main" }
 flowcloudai_client = { git = "ssh://git@github.com/FlowCloudAI/AI_Client_Core", branch = "main" }
-tauri-plugin-dialog = "2.6.0"
-tauri-plugin-opener = "2.5.3"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+base64 = "0.22.1"
+quick-xml = "0.39"

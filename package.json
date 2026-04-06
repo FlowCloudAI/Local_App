@@ -18,7 +18,7 @@
     "@tauri-apps/plugin-sql": "^2.3.1",
     "@uiw/react-md-editor": "^4.0.11",
     "classnames": "^2.5.1",
-    "flowcloudai-ui": "^0.1.5",
+    "flowcloudai-ui": "^0.1.12",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

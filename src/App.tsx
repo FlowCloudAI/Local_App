@@ -1,8 +1,8 @@
 import './App.css'
 import "./api"
-import {Button, SideBar, type SideBarItem, TabBar} from 'flowcloudai-ui'
+import {Button, SideBar, type SideBarItem, TabBar, type TabItem} from 'flowcloudai-ui'
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {type CSSProperties, useState, useEffect, type ReactNode} from "react";
+import {type CSSProperties, useState, useEffect} from "react";
 
 function App() {
     const win = getCurrentWindow();
@@ -16,12 +16,6 @@ function App() {
         };
     }, [win]);
 
-    interface TabItem {
-        key: string;
-        label: string;
-        content: ReactNode;
-    }
-
     // Tabs 相关状态
     const [tabs, setTabs] = useState<TabItem[]>([]);
     const [activeKey, setActiveKey] = useState('1');
@@ -34,7 +28,7 @@ function App() {
             {
                 key: newKey,
                 label: `标签${newKey}`,
-                content: <div>新增内容{newKey}</div>
+                closable: true,
             }
         ]);
         setActiveKey(newKey);
@@ -112,11 +106,14 @@ function App() {
                         variant={"floating"}
                         tabRadius={"md"}
                         closable
+                        draggable
                         addable
-                        minTabWidth={8}
-                        maxTabWidth={12}
+                        fillWidth={false}
+                        tauriDragRegion
+                        minTabWidth={"10rem"}
                         items={tabs}
                         activeKey={activeKey}
+                        onReorder={setTabs}
                         onChange={(key) => {
                             console.log('切换到:', key);
                             setActiveKey(key);
@@ -154,7 +151,7 @@ function App() {
                             {isMaximized ? (
                                 <>
                                     <rect x="2" y="6" width="16" height="12" rx="2"/>
-                                    <path d="M 5 2 L 22 2 A 2 2 0 0 1 22 4 L 22 15" strokeLinecap="round"/>
+                                    <path d="M 6 2 L 20 2 A 2 2 0 0 1 22 4 L 22 13"/>
                                 </>
                             ) : (
                                 <rect x="3" y="4.5" width="18" height="15" rx="3"/>
@@ -181,6 +178,7 @@ function App() {
                     bottomItems={bottomItems}
                     selectedKey={selectedKey}
                     collapsed={collapsed}
+                    width={150}
                     onSelect={setSelectedKey}
                     onCollapse={setCollapsed}
                 />
