@@ -1,0 +1,70 @@
+{
+  "settings": {
+    "title": "设置",
+    "storage": {
+      "title": "存储",
+      "mediaDir": "媒体文件根目录",
+      "browse": "浏览",
+      "useDefault": "使用默认目录"
+    },
+    "appearance": {
+      "title": "外观",
+      "theme": "主题",
+      "language": "语言",
+      "fontSize": "字体大小",
+      "themes": {
+        "system": "跟随系统",
+        "light": "浅色",
+        "dark": "深色"
+      }
+    },
+    "editor": {
+      "title": "编辑器行为",
+      "autoSaveInterval": "自动保存间隔(分)",
+      "defaultEntryType": "默认词条类型",
+      "noDefault": "无默认"
+    },
+    "llm": {
+      "title": "LLM 默认配置",
+      "plugin": "插件",
+      "model": "模型",
+      "notSelected": "未选择",
+      "selectPluginFirst": "请先选择插件"
+    },
+    "image": {
+      "title": "图片生成默认配置",
+      "plugin": "插件",
+      "model": "模型",
+      "notSelected": "未选择",
+      "selectPluginFirst": "请先选择插件"
+    },
+    "tts": {
+      "title": "TTS 默认配置",
+      "plugin": "插件",
+      "model": "模型",
+      "notSelected": "未选择",
+      "selectPluginFirst": "请先选择插件"
+    },
+    "apiKey": {
+      "title": "API Key 管理",
+      "configured": "✓ 已配置",
+      "delete": "删除",
+      "configure": "配置",
+      "inputPrompt": "请输入 {{pluginId}} 的 API Key:"
+    },
+    "actions": {
+      "reset": "重置为默认",
+      "resetSuccess": "已重置为默认设置",
+      "saveSuccess": "设置已保存",
+      "saveFailed": "保存失败: {{error}}",
+      "loadFailed": "加载设置失败: {{error}}",
+      "apiKeySaved": "API Key 已保存",
+      "apiKeyDeleted": "API Key 已删除"
+    }
+  },
+  "common": {
+    "loading": "加载中...",
+    "cancel": "取消",
+    "confirm": "确认"
+  }
+}

@@ -19,8 +19,11 @@
     "@uiw/react-md-editor": "^4.0.11",
     "classnames": "^2.5.1",
     "flowcloudai-ui": "^0.1.12",
+    "i18next": "^26.0.3",
+    "i18next-browser-languagedetector": "^8.2.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-i18next": "^17.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

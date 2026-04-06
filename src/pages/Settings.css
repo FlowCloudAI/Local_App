@@ -1,0 +1,80 @@
+.settings-container {
+  max-width: 50rem;
+  margin: 0 auto;
+}
+
+.settings-title {
+  margin-bottom: 2rem;
+}
+
+.settings-section {
+  margin-bottom: 2rem;
+  padding: 1.6rem;
+  gap: 1rem;
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-md);
+}
+
+.settings-section-title {
+  color: var(--fc-color-primary);
+  font-size: 18px;
+  margin-bottom: 2rem;
+}
+
+.settings-row {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-label {
+  width: 5rem;
+}
+
+.settings-label-wide {
+  width: 5rem;
+}
+
+.settings-input-small {
+  width: 4rem;
+}
+
+.settings-span {
+  width: 1rem;
+}
+
+.settings-api-key-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-md);
+}
+
+.settings-api-key-name {
+  font-weight: 500;
+}
+
+.settings-api-key-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-api-key-status {
+  color: var(--fc-color-success);
+}
+
+.settings-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--fc-color-border);
+}

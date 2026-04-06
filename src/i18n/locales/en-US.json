@@ -1,0 +1,70 @@
+{
+  "settings": {
+    "title": "Settings",
+    "storage": {
+      "title": "Storage",
+      "mediaDir": "Media Files Root Directory",
+      "browse": "Browse",
+      "useDefault": "Use Default Directory"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "language": "Language",
+      "fontSize": "Font Size",
+      "themes": {
+        "system": "System",
+        "light": "Light",
+        "dark": "Dark"
+      }
+    },
+    "editor": {
+      "title": "Editor Behavior",
+      "autoSaveInterval": "Auto-save Interval (min)",
+      "defaultEntryType": "Default Entry Type",
+      "noDefault": "No Default"
+    },
+    "llm": {
+      "title": "LLM Default Configuration",
+      "plugin": "Plugin",
+      "model": "Model",
+      "notSelected": "Not Selected",
+      "selectPluginFirst": "Please select a plugin first"
+    },
+    "image": {
+      "title": "Image Generation Default Configuration",
+      "plugin": "Plugin",
+      "model": "Model",
+      "notSelected": "Not Selected",
+      "selectPluginFirst": "Please select a plugin first"
+    },
+    "tts": {
+      "title": "TTS Default Configuration",
+      "plugin": "Plugin",
+      "model": "Model",
+      "notSelected": "Not Selected",
+      "selectPluginFirst": "Please select a plugin first"
+    },
+    "apiKey": {
+      "title": "API Key Management",
+      "configured": "✓ Configured",
+      "delete": "Delete",
+      "configure": "Configure",
+      "inputPrompt": "Please enter API Key for {{pluginId}}:"
+    },
+    "actions": {
+      "reset": "Reset to Defaults",
+      "resetSuccess": "Reset to default settings",
+      "saveSuccess": "Settings saved",
+      "saveFailed": "Save failed: {{error}}",
+      "loadFailed": "Failed to load settings: {{error}}",
+      "apiKeySaved": "API Key saved",
+      "apiKeyDeleted": "API Key deleted"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  }
+}
