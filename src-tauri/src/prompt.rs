@@ -1,5 +1,5 @@
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 
@@ -22,101 +22,143 @@ impl XmlPrompt {
     /// 序列化为 XML 字符串
     pub fn to_xml(&self) -> Result<String, String> {
         let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
-        
+
         // <prompt>
-        writer.write_event(Event::Start(BytesStart::new("prompt"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("prompt")))
+            .map_err(|e| e.to_string())?;
+
         // <task>
         self.write_task(&mut writer)?;
-        
+
         // <subject>
         if let Some(subject) = &self.subject {
             self.write_entry_block(&mut writer, subject, "subject")?;
         }
-        
+
         // <entries>
         if !self.entries.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("entries"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("entries")))
+                .map_err(|e| e.to_string())?;
             for entry in &self.entries {
                 self.write_entry_block(&mut writer, entry, "entry")?;
             }
-            writer.write_event(Event::End(BytesEnd::new("entries"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("entries")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <context>
         if !self.context.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("context"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("context")))
+                .map_err(|e| e.to_string())?;
             for ctx in &self.context {
                 self.write_context_entry(&mut writer, ctx)?;
             }
-            writer.write_event(Event::End(BytesEnd::new("context"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("context")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <inspiration>
         if let Some(insp) = &self.inspiration {
             self.write_inspiration(&mut writer, insp)?;
         }
-        
+
         // <project>
         if let Some(proj) = &self.project {
             self.write_project(&mut writer, proj)?;
         }
-        
+
         // <style_config>
         if let Some(style) = &self.style_config {
             self.write_style_config(&mut writer, style)?;
         }
-        
+
         // <image_backend>
         if let Some(backend) = &self.image_backend {
             self.write_image_backend(&mut writer, backend)?;
         }
-        
+
         // </prompt>
-        writer.write_event(Event::End(BytesEnd::new("prompt"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::End(BytesEnd::new("prompt")))
+            .map_err(|e| e.to_string())?;
+
         let result = writer.into_inner().into_inner();
         String::from_utf8(result).map_err(|e| e.to_string())
     }
-    
+
     fn write_task<W: std::io::Write>(&self, writer: &mut Writer<W>) -> Result<(), String> {
         let mut task_start = BytesStart::new("task");
         task_start.push_attribute(("type", self.task.task_type.as_str()));
-        writer.write_event(Event::Start(task_start)).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(task_start))
+            .map_err(|e| e.to_string())?;
+
         // <instruction>
-        writer.write_event(Event::Start(BytesStart::new("instruction"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(&self.task.instruction))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("instruction"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("instruction")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(&self.task.instruction)))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("instruction")))
+            .map_err(|e| e.to_string())?;
+
         // <output_format>
-        writer.write_event(Event::Start(BytesStart::new("output_format"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(self.task.output_format.as_str()))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("output_format"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("output_format")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(
+                self.task.output_format.as_str(),
+            )))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("output_format")))
+            .map_err(|e| e.to_string())?;
+
         // <language>
         if let Some(lang) = &self.task.language {
-            writer.write_event(Event::Start(BytesStart::new("language"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(lang))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("language"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("language")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(lang)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("language")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <constraints>
         if !self.task.constraints.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("constraints"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("constraints")))
+                .map_err(|e| e.to_string())?;
             for (key, value) in &self.task.constraints {
                 let mut item = BytesStart::new("item");
                 item.push_attribute(("key", key.as_str()));
                 item.push_attribute(("value", value.as_str()));
-                writer.write_event(Event::Empty(item)).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Empty(item))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("constraints"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("constraints")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new("task"))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new("task")))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     fn write_entry_block<W: std::io::Write>(
         &self,
         writer: &mut Writer<W>,
@@ -130,50 +172,84 @@ impl XmlPrompt {
         if tag_name == "entry" && !entry.id.is_empty() {
             start.push_attribute(("id", entry.id.as_str()));
         }
-        writer.write_event(Event::Start(start)).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(start))
+            .map_err(|e| e.to_string())?;
+
         // <title>
-        writer.write_event(Event::Start(BytesStart::new("title"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(&entry.title))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("title"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("title")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(&entry.title)))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("title")))
+            .map_err(|e| e.to_string())?;
+
         // <type>
         if let Some(entry_type) = &entry.entry_type {
-            writer.write_event(Event::Start(BytesStart::new("type"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(entry_type))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("type"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("type")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(entry_type)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("type")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <summary>
         if let Some(summary) = &entry.summary {
-            writer.write_event(Event::Start(BytesStart::new("summary"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(summary))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("summary"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("summary")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(summary)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("summary")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <content>
         if let Some(content) = &entry.content {
-            writer.write_event(Event::Start(BytesStart::new("content"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(content))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("content"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("content")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(content)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("content")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <tags>
         if !entry.tags.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("tags")))
+                .map_err(|e| e.to_string())?;
             for tag in &entry.tags {
                 let mut tag_elem = BytesStart::new("tag");
                 tag_elem.push_attribute(("name", tag.name.as_str()));
                 tag_elem.push_attribute(("value", tag.value.as_str()));
-                writer.write_event(Event::Empty(tag_elem)).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Empty(tag_elem))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("tags")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new(tag_name))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new(tag_name)))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     fn write_context_entry<W: std::io::Write>(
         &self,
         writer: &mut Writer<W>,
@@ -185,214 +261,394 @@ impl XmlPrompt {
         if let Some(relation) = &ctx.relation {
             entry_start.push_attribute(("relation", relation.as_str()));
         }
-        writer.write_event(Event::Start(entry_start)).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(entry_start))
+            .map_err(|e| e.to_string())?;
+
         // <title>
-        writer.write_event(Event::Start(BytesStart::new("title"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(&ctx.entry.title))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("title"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("title")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(&ctx.entry.title)))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("title")))
+            .map_err(|e| e.to_string())?;
+
         // <summary>
         if let Some(summary) = &ctx.entry.summary {
-            writer.write_event(Event::Start(BytesStart::new("summary"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(summary))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("summary"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("summary")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(summary)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("summary")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new("entry"))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new("entry")))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     fn write_inspiration<W: std::io::Write>(
         &self,
         writer: &mut Writer<W>,
         insp: &InspirationBlock,
     ) -> Result<(), String> {
-        writer.write_event(Event::Start(BytesStart::new("inspiration"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("inspiration")))
+            .map_err(|e| e.to_string())?;
+
         // <note>
-        writer.write_event(Event::Start(BytesStart::new("note"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(&insp.note))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("note"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("note")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(&insp.note)))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("note")))
+            .map_err(|e| e.to_string())?;
+
         // <keywords>
         if !insp.keywords.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("keywords"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("keywords")))
+                .map_err(|e| e.to_string())?;
             for keyword in &insp.keywords {
-                writer.write_event(Event::Start(BytesStart::new("keyword"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(keyword))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("keyword"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("keyword")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(keyword)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("keyword")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("keywords"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("keywords")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <category_hint>
         if let Some(hint) = &insp.category_hint {
-            writer.write_event(Event::Start(BytesStart::new("category_hint"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(hint))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("category_hint"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("category_hint")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(hint)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("category_hint")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new("inspiration"))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new("inspiration")))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     fn write_project<W: std::io::Write>(
         &self,
         writer: &mut Writer<W>,
         proj: &ProjectBlock,
     ) -> Result<(), String> {
-        writer.write_event(Event::Start(BytesStart::new("project"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("project")))
+            .map_err(|e| e.to_string())?;
+
         // <project_id>
-        writer.write_event(Event::Start(BytesStart::new("project_id"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(&proj.project_id))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("project_id"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("project_id")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(&proj.project_id)))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("project_id")))
+            .map_err(|e| e.to_string())?;
+
         // <project_name>
         if let Some(name) = &proj.project_name {
-            writer.write_event(Event::Start(BytesStart::new("project_name"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(name))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("project_name"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("project_name")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(name)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("project_name")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <genre>
         if let Some(genre) = &proj.genre {
-            writer.write_event(Event::Start(BytesStart::new("genre"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(genre))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("genre"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("genre")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(genre)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("genre")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <entry_types>
         if !proj.entry_types.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("entry_types"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("entry_types")))
+                .map_err(|e| e.to_string())?;
             for etype in &proj.entry_types {
-                writer.write_event(Event::Start(BytesStart::new("type"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(etype))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("type"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("type")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(etype)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("type")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("entry_types"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("entry_types")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <extra>
         if !proj.extra.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("extra"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("extra")))
+                .map_err(|e| e.to_string())?;
             for (key, value) in &proj.extra {
                 let mut item = BytesStart::new("item");
                 item.push_attribute(("key", key.as_str()));
                 item.push_attribute(("value", value.as_str()));
-                writer.write_event(Event::Empty(item)).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Empty(item))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("extra"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("extra")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new("project"))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new("project")))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     fn write_style_config<W: std::io::Write>(
         &self,
         writer: &mut Writer<W>,
         style: &StyleConfigBlock,
     ) -> Result<(), String> {
-        writer.write_event(Event::Start(BytesStart::new("style_config"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("style_config")))
+            .map_err(|e| e.to_string())?;
+
         // <art_style>
         if let Some(art_style) = &style.art_style {
-            writer.write_event(Event::Start(BytesStart::new("art_style"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(art_style))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("art_style"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("art_style")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(art_style)))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("art_style")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <character_tags>
         if !style.character_tags.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("character_tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("character_tags")))
+                .map_err(|e| e.to_string())?;
             for tag in &style.character_tags {
-                writer.write_event(Event::Start(BytesStart::new("tag"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(tag))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("tag"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("tag")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(tag)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("tag")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("character_tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("character_tags")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <style_tags>
         if !style.style_tags.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("style_tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("style_tags")))
+                .map_err(|e| e.to_string())?;
             for tag in &style.style_tags {
-                writer.write_event(Event::Start(BytesStart::new("tag"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(tag))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("tag"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("tag")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(tag)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("tag")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("style_tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("style_tags")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <quality_tags>
         if !style.quality_tags.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("quality_tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("quality_tags")))
+                .map_err(|e| e.to_string())?;
             for tag in &style.quality_tags {
-                writer.write_event(Event::Start(BytesStart::new("tag"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(tag))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("tag"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("tag")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(tag)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("tag")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("quality_tags"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("quality_tags")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <banned_elements>
         if !style.banned_elements.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("banned_elements"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("banned_elements")))
+                .map_err(|e| e.to_string())?;
             for elem in &style.banned_elements {
-                writer.write_event(Event::Start(BytesStart::new("element"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(elem))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("element"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("element")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(elem)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("element")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("banned_elements"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("banned_elements")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new("style_config"))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new("style_config")))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
-    
+
     fn write_image_backend<W: std::io::Write>(
         &self,
         writer: &mut Writer<W>,
         backend: &ImageBackendBlock,
     ) -> Result<(), String> {
-        writer.write_event(Event::Start(BytesStart::new("image_backend"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("image_backend")))
+            .map_err(|e| e.to_string())?;
+
         // <supports_negative_prompt>
-        writer.write_event(Event::Start(BytesStart::new("supports_negative_prompt"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(if backend.supports_negative_prompt { "true" } else { "false" }))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("supports_negative_prompt"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("supports_negative_prompt")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(
+                if backend.supports_negative_prompt {
+                    "true"
+                } else {
+                    "false"
+                },
+            )))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("supports_negative_prompt")))
+            .map_err(|e| e.to_string())?;
+
         // <supports_image_to_image>
-        writer.write_event(Event::Start(BytesStart::new("supports_image_to_image"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(if backend.supports_image_to_image { "true" } else { "false" }))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("supports_image_to_image"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("supports_image_to_image")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(
+                if backend.supports_image_to_image {
+                    "true"
+                } else {
+                    "false"
+                },
+            )))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("supports_image_to_image")))
+            .map_err(|e| e.to_string())?;
+
         // <max_prompt_length>
         if let Some(max_len) = backend.max_prompt_length {
-            writer.write_event(Event::Start(BytesStart::new("max_prompt_length"))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::Text(BytesText::new(&max_len.to_string()))).map_err(|e| e.to_string())?;
-            writer.write_event(Event::End(BytesEnd::new("max_prompt_length"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("max_prompt_length")))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Text(BytesText::new(&max_len.to_string())))
+                .map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("max_prompt_length")))
+                .map_err(|e| e.to_string())?;
         }
-        
+
         // <style_format>
-        writer.write_event(Event::Start(BytesStart::new("style_format"))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::Text(BytesText::new(backend.style_format.as_str()))).map_err(|e| e.to_string())?;
-        writer.write_event(Event::End(BytesEnd::new("style_format"))).map_err(|e| e.to_string())?;
-        
+        writer
+            .write_event(Event::Start(BytesStart::new("style_format")))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::Text(BytesText::new(backend.style_format.as_str())))
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_event(Event::End(BytesEnd::new("style_format")))
+            .map_err(|e| e.to_string())?;
+
         // <supported_sizes>
         if !backend.supported_sizes.is_empty() {
-            writer.write_event(Event::Start(BytesStart::new("supported_sizes"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::Start(BytesStart::new("supported_sizes")))
+                .map_err(|e| e.to_string())?;
             for size in &backend.supported_sizes {
-                writer.write_event(Event::Start(BytesStart::new("size"))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::Text(BytesText::new(size))).map_err(|e| e.to_string())?;
-                writer.write_event(Event::End(BytesEnd::new("size"))).map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Start(BytesStart::new("size")))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::Text(BytesText::new(size)))
+                    .map_err(|e| e.to_string())?;
+                writer
+                    .write_event(Event::End(BytesEnd::new("size")))
+                    .map_err(|e| e.to_string())?;
             }
-            writer.write_event(Event::End(BytesEnd::new("supported_sizes"))).map_err(|e| e.to_string())?;
+            writer
+                .write_event(Event::End(BytesEnd::new("supported_sizes")))
+                .map_err(|e| e.to_string())?;
         }
-        
-        writer.write_event(Event::End(BytesEnd::new("image_backend"))).map_err(|e| e.to_string())?;
+
+        writer
+            .write_event(Event::End(BytesEnd::new("image_backend")))
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -413,10 +669,10 @@ pub struct TaskBlock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskType {
-    Enrich,               // 设定补全
-    ConsistencyCheck,     // 一致性检测
-    ExpandInspiration,    // 灵感便签扩展
-    GenerateImagePrompt,  // 图像提示词生成
+    Enrich,              // 设定补全
+    ConsistencyCheck,    // 一致性检测
+    ExpandInspiration,   // 灵感便签扩展
+    GenerateImagePrompt, // 图像提示词生成
 }
 
 impl TaskType {
@@ -465,9 +721,9 @@ pub struct EntryBlock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum InclusionLevel {
-    Full,       // title + summary + content + tags
-    Brief,      // title + summary + tags
-    TitleOnly,  // 只有 title
+    Full,      // title + summary + content + tags
+    Brief,     // title + summary + tags
+    TitleOnly, // 只有 title
 }
 
 impl InclusionLevel {
@@ -554,7 +810,7 @@ impl StyleFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_xml_serialization() {
         let prompt = XmlPrompt {
@@ -572,8 +828,14 @@ mod tests {
                 summary: Some("封印了冰霜之神意志的上古宝剑".to_string()),
                 content: None,
                 tags: vec![
-                    TagItem { name: "品级".to_string(), value: "神器".to_string() },
-                    TagItem { name: "属性".to_string(), value: "冰".to_string() },
+                    TagItem {
+                        name: "品级".to_string(),
+                        value: "神器".to_string(),
+                    },
+                    TagItem {
+                        name: "属性".to_string(),
+                        value: "冰".to_string(),
+                    },
                 ],
                 level: InclusionLevel::Full,
             }),
@@ -601,10 +863,10 @@ mod tests {
             style_config: None,
             image_backend: None,
         };
-        
+
         let xml = prompt.to_xml().unwrap();
         println!("{}", xml);
-        
+
         // 验证关键标签存在
         assert!(xml.contains("<prompt>"));
         assert!(xml.contains("task type=\"enrich\""));

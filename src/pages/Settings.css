@@ -56,20 +56,102 @@
   padding: 12px;
   border: 1px solid var(--fc-color-border);
   border-radius: var(--fc-radius-md);
+  background: var(--fc-color-bg);
 }
 
 .settings-api-key-name {
   font-weight: 500;
 }
 
+.settings-api-key-card {
+  border-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-bg) 92%, var(--fc-color-primary) 8%);
+  overflow: hidden;
+}
+
+.settings-api-key-card.is-expanded .settings-api-key-item {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.settings-api-key-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-api-key-plugin-id {
+  font-size: 12px;
+  color: var(--fc-color-secondary);
+}
+
 .settings-api-key-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .settings-api-key-status {
   color: var(--fc-color-success);
+}
+
+.settings-api-key-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: grid-template-rows 220ms ease, opacity 220ms ease, transform 220ms ease;
+}
+
+.settings-api-key-drawer.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.settings-api-key-drawer-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-api-key-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--fc-color-border);
+  border-top: none;
+  border-bottom-left-radius: var(--fc-radius-md);
+  border-bottom-right-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-bg) 96%, var(--fc-color-primary) 4%);
+}
+
+.settings-api-key-form-label {
+  min-width: 4.5rem;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.settings-api-key-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .settings-api-key-item,
+  .settings-api-key-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-api-key-actions,
+  .settings-api-key-form-actions {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
 }
 
 .settings-footer {

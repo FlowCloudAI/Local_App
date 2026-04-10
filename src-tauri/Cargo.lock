@@ -12,6 +12,7 @@ dependencies = [
  "futures",
  "keyring",
  "log",
+ "petgraph",
  "quick-xml 0.39.2",
  "reqwest 0.12.28",
  "serde",

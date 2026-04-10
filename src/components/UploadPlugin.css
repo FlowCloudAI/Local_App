@@ -1,0 +1,118 @@
+.upload-plugin-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.upload-plugin-dialog {
+    width: min(100%, 30rem);
+    display: flex;
+    flex-direction: column;
+    border-radius: 1.25rem;
+    border: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
+}
+
+.upload-plugin-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.4rem 0;
+}
+
+.upload-plugin-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fc-color-text);
+    letter-spacing: 0.01em;
+}
+
+.upload-plugin-close {
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.upload-plugin-close:hover:not(:disabled) {
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+}
+
+.upload-plugin-close:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.upload-plugin-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+}
+
+.upload-plugin-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.38rem;
+}
+
+.upload-plugin-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--fc-color-text-secondary, var(--fc-color-text));
+}
+
+.upload-plugin-required {
+    color: var(--fc-color-danger, #e53e3e);
+}
+
+.upload-plugin-file-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.upload-plugin-file-input {
+    flex: 1;
+}
+
+.upload-plugin-api-error {
+    margin: 0;
+    padding: 0.55rem 0.8rem;
+    border-radius: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e53e3e) 28%, transparent);
+    background: color-mix(in srgb, var(--fc-color-danger, #e53e3e) 8%, transparent);
+    font-size: 0.82rem;
+    color: var(--fc-color-danger, #e53e3e);
+}
+
+.upload-plugin-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0 1.4rem 1.2rem;
+}
+
+@media (max-width: 640px) {
+    .upload-plugin-file-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

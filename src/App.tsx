@@ -1,15 +1,23 @@
 import './App.css'
 import "./api"
-import {Button, SideBar, type SideBarItem, TabBar, type TabItem} from 'flowcloudai-ui'
+import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {type CSSProperties, useState, useEffect} from "react";
-import ProjectSelection from "./pages/ProjectSelection";
-import ProjectEditing from "./pages/ProjectEditing";
+import {type CSSProperties, useCallback, useEffect, useState} from "react";
+import ProjectList from "./pages/ProjectList.tsx";
+import ProjectEditor from "./pages/ProjectEditor";
 import Settings from "./pages/Settings";
 import Plugins from "./pages/Plugins";
+import type {Project} from "./api";
+import RelationDemo from "./components/RelationDemo";
+
+type EntryTabMeta = {
+    projectId: string
+    entryId: string
+}
 
 function App() {
     const win = getCurrentWindow();
+    const {showAlert} = useAlert()
 
     const [isMaximized, setIsMaximized] = useState(false);
     useEffect(() => {
@@ -22,35 +30,138 @@ function App() {
 
     // Tabs 相关状态
     const [tabs, setTabs] = useState<TabItem[]>([]);
-    const [activeKey, setActiveKey] = useState('1');
+    const [activeKey, setActiveKey] = useState('');
+    // projectTabMap: tabKey → projectId（仅项目标签页）
+    const [projectTabMap, setProjectTabMap] = useState<Record<string, string>>({});
+    const [entryTabMap, setEntryTabMap] = useState<Record<string, EntryTabMeta>>({});
+    const [entryDirtyMap, setEntryDirtyMap] = useState<Record<string, boolean>>({});
 
-    // 新增标签
-    const handleAdd = () => {
-        const newKey = String(tabs.length + 1);
-        setTabs([
-            ...tabs,
-            {
-                key: newKey,
-                label: `标签${newKey}`,
-                closable: true,
-            }
-        ]);
+    const [selectedKey, setSelectedKey] = useState('home')
+    const [collapsed, setCollapsed] = useState(false)
+
+    // 新增标签（通用）
+    const handleAdd = useCallback(() => {
+        const newKey = `tab-${Date.now()}`;
+        setTabs(prev => [...prev, {key: newKey, label: `新标签`, closable: true}]);
         setActiveKey(newKey);
-    };
+    }, []);
+
+    // 打开项目标签页
+    const handleOpenProject = useCallback((project: Project) => {
+        const tabKey = `proj-${project.id}`;
+        setTabs(prev => prev.find(t => t.key === tabKey)
+            ? prev
+            : [...prev, {key: tabKey, label: project.name, closable: true}]
+        );
+        setProjectTabMap(prev => prev[tabKey] === project.id ? prev : {...prev, [tabKey]: project.id});
+        setActiveKey(tabKey);
+        setSelectedKey('home');
+        setCollapsed(true);
+    }, []);
+
+    const handleOpenEntry = useCallback((projectId: string, entry: { id: string; title: string }) => {
+        const tabKey = `entry-${projectId}-${entry.id}`;
+        setTabs(prev => prev.find(t => t.key === tabKey)
+            ? prev.map(tab => tab.key === tabKey ? {...tab, label: entry.title} : tab)
+            : [...prev, {key: tabKey, label: entry.title, closable: true}]
+        );
+        setEntryTabMap(prev => ({
+            ...prev,
+            [tabKey]: {
+                projectId,
+                entryId: entry.id,
+            },
+        }));
+        setActiveKey(tabKey);
+        setSelectedKey('home');
+        setCollapsed(true);
+    }, []);
+
+    const handleEntryTitleChange = useCallback((projectId: string, entry: { id: string; title: string }) => {
+        const tabKey = `entry-${projectId}-${entry.id}`;
+        setTabs(prev => prev.map(tab => tab.key === tabKey ? {...tab, label: entry.title} : tab));
+    }, []);
+
+    const handleEntryDirtyChange = useCallback((projectId: string, entryId: string, dirty: boolean) => {
+        const tabKey = `entry-${projectId}-${entryId}`
+        setEntryDirtyMap(prev => {
+            if (!dirty) {
+                if (!prev[tabKey]) return prev
+                const next = {...prev}
+                delete next[tabKey]
+                return next
+            }
+            if (prev[tabKey]) return prev
+            return {...prev, [tabKey]: true}
+        })
+    }, [])
+
+    const handleBackToProject = useCallback(async (projectId: string) => {
+        const entryTabKey = activeKey
+        if (entryTabMap[entryTabKey]?.projectId === projectId && entryDirtyMap[entryTabKey]) {
+            const res = await showAlert('当前词条有未保存更改，返回会丢失这些修改。是否继续返回？', 'warning', 'confirm')
+            if (res !== 'yes') return
+        }
+        setActiveKey(`proj-${projectId}`);
+        setSelectedKey('home');
+        setCollapsed(true);
+    }, [activeKey, entryDirtyMap, entryTabMap, showAlert]);
+
+    const handleTabChange = useCallback((key: string) => {
+        if (key === activeKey) return
+        setActiveKey(key);
+    }, [activeKey])
 
     // 删除标签
-    const handleClose = (key: string) => {
-        const newTabs = tabs.filter(tab => tab.key !== key);
+    const handleClose = useCallback(async (key: string) => {
+        const closingProjectId = projectTabMap[key];
+        const relatedEntryKeys = closingProjectId
+            ? Object.entries(entryTabMap)
+                .filter(([, meta]) => meta.projectId === closingProjectId)
+                .map(([entryKey]) => entryKey)
+            : [];
+        const keysToRemove = new Set([key, ...relatedEntryKeys]);
+        const dirtyEntryKeys = [...keysToRemove].filter(tabKey => entryDirtyMap[tabKey])
+        if (dirtyEntryKeys.length > 0) {
+            const message = dirtyEntryKeys.length === 1
+                ? '当前词条有未保存更改，关闭标签页会丢失这些修改。是否继续关闭？'
+                : `有 ${dirtyEntryKeys.length} 个词条标签存在未保存更改，关闭后会丢失这些修改。是否继续关闭？`
+            const res = await showAlert(message, 'warning', 'confirm')
+            if (res !== 'yes') return
+        }
+        const newTabs = tabs.filter(tab => !keysToRemove.has(tab.key));
         setTabs(newTabs);
-
-        if (activeKey === key) {
+        setProjectTabMap(prev => {
+            const next = {...prev};
+            for (const removedKey of keysToRemove) {
+                delete next[removedKey];
+            }
+            return next;
+        });
+        setEntryTabMap(prev => {
+            const next = {...prev};
+            for (const removedKey of keysToRemove) {
+                delete next[removedKey];
+            }
+            return next;
+        });
+        setEntryDirtyMap(prev => {
+            const next = {...prev}
+            for (const removedKey of keysToRemove) {
+                delete next[removedKey]
+            }
+            return next
+        })
+        if (keysToRemove.has(activeKey)) {
             const closedIndex = tabs.findIndex(tab => tab.key === key);
             const nextTab = newTabs[closedIndex] || newTabs[closedIndex - 1];
-            if (nextTab) {
-                setActiveKey(nextTab.key);
-            }
+            setActiveKey(nextTab?.key ?? '');
         }
-    };
+    }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, tabs]);
+
+    const activeHomeProjectId = projectTabMap[activeKey] ?? entryTabMap[activeKey]?.projectId ?? ''
+    const activeEntryMeta = entryTabMap[activeKey] ?? null
+    const projectTabs = tabs.filter(tab => Boolean(projectTabMap[tab.key]))
 
     // 侧边栏相关状态
     const HomeIcon = (
@@ -58,10 +169,21 @@ function App() {
             <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1V9.5z" strokeWidth="1.5"
                   strokeLinecap="round" strokeLinejoin="round"/>
         </svg>)
-    const SearchIcon = (
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="11" cy="11" r="7" strokeWidth="1.5"/>
-            <path d="M16.5 16.5L21 21" strokeWidth="1.5" strokeLinecap="round"/>
+    const IdeaIcon = (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <defs>
+                <linearGradient id="ideaGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+                    <stop offset="0" stopColor="#0DBDED"/>
+                    <stop offset="1" stopColor="#9C1FED"/>
+                </linearGradient>
+            </defs>
+            <path
+                d="M12 3C14 8 16 10 21 12C16 14 14 16 12 21C10 16 8 14 3 12C8 10 10 8 12 3Z"
+                stroke="url(#ideaGrad)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
         </svg>)
 
     const PluginsIcon = (
@@ -69,6 +191,20 @@ function App() {
             <path
                 d="M702.836 1021.673H104.727c-53.527 0-95.418-44.218-95.418-95.418V779.636c0-11.636 4.655-20.945 13.964-27.927 9.309-6.982 20.945-9.309 30.254-6.982 11.637 2.328 23.273 4.655 32.582 4.655 67.491 0 123.346-55.855 123.346-123.346S153.6 502.691 86.109 502.691c-9.309 0-20.945 2.327-32.582 4.654-11.636 2.328-20.945 0-30.254-6.981S9.309 484.073 9.309 472.436V325.818c0-53.527 44.218-95.418 95.418-95.418h107.055c-2.327-11.636-2.327-23.273-2.327-34.91 0-107.054 86.109-193.163 193.163-193.163s193.164 86.11 193.164 193.164c0 11.636 0 23.273-2.327 34.909h107.054c53.527 0 95.418 44.218 95.418 95.418v107.055h20.946c107.054 0 193.163 86.109 193.163 193.163S923.927 819.2 816.873 819.2h-20.946v107.055c4.655 51.2-39.563 95.418-93.09 95.418zM79.127 819.2v104.727c0 13.964 11.637 25.6 25.6 25.6h598.11c13.963 0 25.6-11.636 25.6-25.6V772.655c0-11.637 4.654-23.273 13.963-27.928 9.31-6.982 20.945-6.982 32.582-4.654 13.963 4.654 27.927 9.309 41.89 9.309 67.492 0 123.346-55.855 123.346-123.346s-55.854-123.345-123.345-123.345c-13.964 0-27.928 2.327-41.891 9.309-11.637 4.655-23.273 2.327-32.582-4.655-9.31-6.981-13.964-16.29-13.964-27.927v-153.6c0-13.963-11.636-25.6-25.6-25.6H546.91c-11.636 0-23.273-6.982-30.254-16.29-6.982-9.31-6.982-23.273-2.328-32.583 9.31-18.618 11.637-34.909 11.637-53.527 0-67.49-55.855-123.345-123.346-123.345s-123.345 55.854-123.345 123.345c0 18.618 4.654 37.237 11.636 53.527 4.655 11.637 4.655 23.273-2.327 32.582-6.982 9.31-18.618 16.291-30.255 16.291h-153.6c-13.963 0-25.6 11.637-25.6 25.6v104.727c109.382-4.654 200.146 83.782 200.146 193.164 0 107.055-86.11 193.164-193.164 193.164-2.327 2.327-4.654 2.327-6.982 2.327z"
                 fill="currentColor"
+            />
+        </svg>)
+
+    const RelationIcon = (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <circle cx="5" cy="6" r="2.25" stroke="currentColor" strokeWidth="1.5"/>
+            <circle cx="18.5" cy="5" r="2.25" stroke="currentColor" strokeWidth="1.5"/>
+            <circle cx="12" cy="18" r="2.25" stroke="currentColor" strokeWidth="1.5"/>
+            <path
+                d="M7.1 7.05l9.3-1.1M6.8 7.8l4.8 8M17.1 7l-3.9 8.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
             />
         </svg>)
 
@@ -82,15 +218,13 @@ function App() {
 
     const menuItems: SideBarItem[] = [
         {key: 'home', label: '首页', icon: HomeIcon},
-        {key: 'search', label: '搜索', icon: SearchIcon},
+        {key: 'idea', label: '灵感便签', icon: IdeaIcon},
+        {key: 'relation', label: '关系图谱', icon: RelationIcon},
         {key: 'plugins', label: '插件管理', icon: PluginsIcon},
     ]
     const bottomItems: SideBarItem[] = [
         {key: 'settings', label: '设置', icon: SettingsIcon},
     ]
-
-    const [selectedKey, setSelectedKey] = useState('home')
-    const [collapsed, setCollapsed] = useState(false)
 
     return (
         <div className="app-layout">
@@ -106,8 +240,8 @@ function App() {
                             <linearGradient id="linear_fill_jAZk9lqyiGGO3cP1dJ5WO" x1="94.38400268554688"
                                             y1="140.4921875"
                                             x2="417.6159973144531" y2="371.5078125" gradientUnits="userSpaceOnUse">
-                                <stop offset="0" stop-color="#0DBDED"/>
-                                <stop offset="1" stop-color="#9C1FED"/>
+                                <stop offset="0" stopColor="#0DBDED"/>
+                                <stop offset="1" stopColor="#9C1FED"/>
                             </linearGradient>
                         </defs>
                     </svg>
@@ -128,7 +262,7 @@ function App() {
                         onReorder={setTabs}
                         onChange={(key) => {
                             console.log('切换到:', key);
-                            setActiveKey(key);
+                            void handleTabChange(key);
                         }}
                         onClose={(key) => {
                             console.log('关闭:', key);
@@ -191,19 +325,46 @@ function App() {
                     bottomItems={bottomItems}
                     selectedKey={selectedKey}
                     collapsed={collapsed}
-                    width={150}
+                    width={180}
                     onSelect={setSelectedKey}
                     onCollapse={setCollapsed}
                 />
                 <div className="page-container">
                     <div className={`page-wrapper ${selectedKey === 'home' ? 'active' : ''}`}>
-                        <ProjectSelection/>
-                    </div>
-                    <div className={`page-wrapper ${selectedKey === 'search' ? 'active' : ''}`}>
-                        <ProjectEditing/>
+                        <div className="home-page-stack">
+                            <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
+                                <ProjectList onOpenProject={handleOpenProject}/>
+                            </div>
+                            {projectTabs.map(tab => {
+                                const projectId = projectTabMap[tab.key]
+                                if (!projectId) return null
+
+                                return (
+                                    <div
+                                        key={tab.key}
+                                        className={`home-page-layer ${activeHomeProjectId === projectId ? 'active' : ''}`}
+                                    >
+                                        <ProjectEditor
+                                            projectId={projectId}
+                                            activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
+                                            openEntryIds={Object.values(entryTabMap)
+                                                .filter(meta => meta.projectId === projectId)
+                                                .map(meta => meta.entryId)}
+                                            onOpenEntry={handleOpenEntry}
+                                            onEntryTitleChange={handleEntryTitleChange}
+                                            onBackToProject={handleBackToProject}
+                                            onEntryDirtyChange={handleEntryDirtyChange}
+                                        />
+                                    </div>
+                                )
+                            })}
+                        </div>
                     </div>
                     <div className={`page-wrapper ${selectedKey === 'plugins' ? 'active' : ''}`}>
                         <Plugins/>
+                    </div>
+                    <div className={`page-wrapper ${selectedKey === 'relation' ? 'active' : ''}`}>
+                        <RelationDemo/>
                     </div>
                     <div className={`page-wrapper ${selectedKey === 'settings' ? 'active' : ''}`}>
                         <Settings/>

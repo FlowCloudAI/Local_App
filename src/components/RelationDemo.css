@@ -1,0 +1,221 @@
+.relation-demo {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    height: 100%;
+    padding: 1rem;
+    overflow: auto;
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-primary) 12%, transparent), transparent 30%),
+        linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-secondary) 82%, transparent), var(--fc-color-bg));
+}
+
+.relation-demo--embedded {
+    padding: 1.1rem 1.15rem;
+    background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--fc-color-primary) 10%, transparent), transparent 28%),
+        linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-secondary) 74%, transparent), var(--fc-color-bg));
+}
+
+.relation-demo__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 90%, transparent);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.relation-demo__eyebrow {
+    margin: 0 0 0.35rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fc-color-primary);
+}
+
+.relation-demo__title {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--fc-color-text);
+}
+
+.relation-demo__description {
+    max-width: 46rem;
+    margin: 0.5rem 0 0;
+    color: var(--fc-color-text-secondary);
+    line-height: 1.6;
+}
+
+.relation-demo__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.relation-demo__meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.relation-demo__meta-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+}
+
+.relation-demo__meta-card--wide {
+    grid-column: span 2;
+}
+
+.relation-demo__meta-label {
+    font-size: 0.78rem;
+    color: var(--fc-color-text-secondary);
+}
+
+.relation-demo__meta-value {
+    font-size: 0.96rem;
+    font-weight: 600;
+    color: var(--fc-color-text);
+}
+
+.relation-demo__meta-value--mono {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: "JetBrains Mono", "Microsoft YaHei", monospace;
+    font-size: 0.88rem;
+}
+
+.relation-demo__error {
+    padding: 0.85rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e5484d) 28%, transparent);
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--fc-color-danger, #e5484d) 8%, transparent);
+    color: var(--fc-color-danger, #e5484d);
+}
+
+.relation-demo__graph-shell {
+    min-height: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, transparent);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.relation-demo__graph-shell .fc-rg {
+    border-radius: 0.8rem;
+    overflow: hidden;
+}
+
+.relation-demo-node {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.8rem;
+    width: 264px;
+    min-height: 88px;
+    padding: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    border-radius: 1rem;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-elevated) 98%, white 2%), var(--fc-color-bg-elevated)),
+        radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-primary) 10%, transparent), transparent 55%);
+    box-shadow: 0 10px 24px color-mix(in srgb, black 10%, transparent);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.relation-demo-node--selected {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 65%, white 8%);
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--fc-color-primary) 30%, transparent),
+        0 14px 28px color-mix(in srgb, black 16%, transparent);
+    transform: translateY(-1px);
+}
+
+.relation-demo-node__cover-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 0.8rem;
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 88%, transparent);
+}
+
+.relation-demo-node__cover {
+    width: 64px;
+    height: 64px;
+    display: block;
+    object-fit: cover;
+}
+
+.relation-demo-node__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.relation-demo-node__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fc-color-text);
+    font-size: 0.98rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.relation-demo-node__summary {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: var(--fc-color-text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 960px) {
+    .relation-demo__header {
+        flex-direction: column;
+    }
+
+    .relation-demo__actions {
+        justify-content: flex-start;
+    }
+
+    .relation-demo__meta {
+        grid-template-columns: 1fr;
+    }
+
+    .relation-demo__meta-card--wide {
+        grid-column: auto;
+    }
+
+    .relation-demo-node {
+        width: 236px;
+        grid-template-columns: 56px minmax(0, 1fr);
+        gap: 0.7rem;
+    }
+
+    .relation-demo-node__cover {
+        width: 56px;
+        height: 56px;
+    }
+}

@@ -1,0 +1,349 @@
+/* ── Backdrop ──────────────────────────────────────────────────────────────── */
+
+.tag-creator-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* ── Dialog ────────────────────────────────────────────────────────────────── */
+
+.tag-creator-dialog {
+    width: min(100%, 38rem);
+    max-height: min(90vh, 52rem);
+    display: flex;
+    flex-direction: column;
+    border-radius: 1.25rem;
+    border: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.tag-creator-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.4rem 0;
+}
+
+.tag-creator-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fc-color-text);
+    letter-spacing: 0.01em;
+}
+
+.tag-creator-close {
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.tag-creator-close:hover:not(:disabled) {
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+}
+
+.tag-creator-close:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ── Body ──────────────────────────────────────────────────────────────────── */
+
+.tag-creator-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.1rem 1.4rem;
+    overflow-y: auto;
+}
+
+.tag-creator-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.38rem;
+}
+
+.tag-creator-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.tag-creator-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--fc-color-text-secondary, var(--fc-color-text));
+}
+
+.tag-creator-required {
+    color: var(--fc-color-danger, #e53e3e);
+}
+
+.tag-creator-mini-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tag-creator-mini-action {
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 0.76rem;
+    color: var(--fc-color-primary);
+    cursor: pointer;
+}
+
+.tag-creator-mini-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* ── Native inputs ─────────────────────────────────────────────────────────── */
+
+.tag-creator-input,
+.tag-creator-textarea {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md, 0.5rem);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    font-family: var(--fc-font-family, inherit);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+
+.tag-creator-input:focus,
+.tag-creator-textarea:focus {
+    border-color: var(--fc-color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+}
+
+.tag-creator-input:disabled,
+.tag-creator-textarea:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.tag-creator-input::placeholder,
+.tag-creator-textarea::placeholder {
+    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
+    opacity: 0.7;
+}
+
+.tag-creator-textarea {
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 4.8rem;
+}
+
+/* ── Type options ──────────────────────────────────────────────────────────── */
+
+.tag-creator-option-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem;
+}
+
+.tag-creator-option-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+    padding: 0.8rem 0.85rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.9rem;
+    background: var(--fc-color-bg);
+    text-align: left;
+    color: var(--fc-color-text);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.tag-creator-option-card:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 50%, var(--fc-color-border));
+    transform: translateY(-1px);
+}
+
+.tag-creator-option-card.active {
+    border-color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, var(--fc-color-bg));
+}
+
+.tag-creator-option-card:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.tag-creator-option-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.tag-creator-option-description {
+    font-size: 0.76rem;
+    color: var(--fc-color-text-secondary, var(--fc-color-text));
+    opacity: 0.82;
+    line-height: 1.45;
+}
+
+/* ── Target chips ──────────────────────────────────────────────────────────── */
+
+.tag-creator-target-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.tag-creator-target-chip,
+.tag-creator-bool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--fc-color-border);
+    background: transparent;
+    color: var(--fc-color-text);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.tag-creator-target-chip:hover:not(:disabled),
+.tag-creator-bool-chip:hover:not(:disabled) {
+    background: var(--fc-color-bg-secondary);
+}
+
+.tag-creator-target-chip.active {
+    background: color-mix(in srgb, var(--tag-creator-chip-color, var(--fc-color-primary)) 15%, transparent);
+    border-color: var(--tag-creator-chip-color, var(--fc-color-primary));
+    color: var(--tag-creator-chip-color, var(--fc-color-primary));
+}
+
+.tag-creator-bool-chip.active {
+    background: color-mix(in srgb, var(--fc-color-primary) 15%, transparent);
+    border-color: var(--fc-color-primary);
+    color: var(--fc-color-primary);
+}
+
+.tag-creator-target-chip:disabled,
+.tag-creator-bool-chip:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.tag-creator-target-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05em;
+    height: 1.05em;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.tag-creator-target-icon svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.tag-creator-bool-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* ── Range row ─────────────────────────────────────────────────────────────── */
+
+.tag-creator-range-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.6rem;
+    align-items: center;
+}
+
+.tag-creator-range-sep {
+    font-size: 0.82rem;
+    color: var(--fc-color-text-secondary, var(--fc-color-text));
+    opacity: 0.7;
+}
+
+/* ── Helper and error text ─────────────────────────────────────────────────── */
+
+.tag-creator-field-hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--fc-color-text-secondary);
+}
+
+.tag-creator-field-hint.error {
+    color: var(--fc-color-danger, #e53e3e);
+}
+
+.tag-creator-api-error {
+    margin: 0;
+    padding: 0.55rem 0.8rem;
+    border-radius: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e53e3e) 28%, transparent);
+    background: color-mix(in srgb, var(--fc-color-danger, #e53e3e) 8%, transparent);
+    font-size: 0.82rem;
+    color: var(--fc-color-danger, #e53e3e);
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+.tag-creator-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0 1.4rem 1.2rem;
+}
+
+@media (max-width: 640px) {
+    .tag-creator-dialog {
+        width: min(100%, 32rem);
+        max-height: 92vh;
+    }
+
+    .tag-creator-option-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tag-creator-label-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .tag-creator-range-row {
+        grid-template-columns: 1fr;
+    }
+
+    .tag-creator-range-sep {
+        display: none;
+    }
+}

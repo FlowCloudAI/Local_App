@@ -1,0 +1,74 @@
+.project-relation-graph {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    width: 100%;
+    height: 100%;
+    padding: 1rem 1.1rem 1.1rem;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--fc-color-primary) 10%, transparent), transparent 28%),
+        linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-secondary) 74%, transparent), var(--fc-color-bg));
+}
+
+.project-relation-graph__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.project-relation-graph__toolbar-left,
+.project-relation-graph__toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.project-relation-graph__back-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.95rem;
+    height: 0.95rem;
+    margin-right: 0.18rem;
+    flex-shrink: 0;
+}
+
+.project-relation-graph__back-icon svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.project-relation-graph__meta {
+    padding: 0 0.1rem;
+    font-size: 0.76rem;
+    color: var(--fc-color-text-secondary);
+    opacity: 0.82;
+    line-height: 1.5;
+}
+
+.project-relation-graph__error {
+    padding: 0.7rem 0.85rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e5484d) 28%, transparent);
+    border-radius: 0.8rem;
+    background: color-mix(in srgb, var(--fc-color-danger, #e5484d) 8%, transparent);
+    color: var(--fc-color-danger, #e5484d);
+    font-size: 0.84rem;
+}
+
+.project-relation-graph__shell {
+    flex: 1;
+    min-height: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, transparent);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.project-relation-graph__shell .fc-rg {
+    border-radius: 0.8rem;
+    overflow: hidden;
+}

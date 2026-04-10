@@ -116,6 +116,26 @@ body {
     z-index: 1;
 }
 
+.home-page-stack {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.home-page-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.home-page-layer.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
 .side-bar {
     user-select: none;
 }

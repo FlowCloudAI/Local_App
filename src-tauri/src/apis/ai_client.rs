@@ -50,6 +50,8 @@ pub struct PluginInfo {
     pub id: String,
     pub name: String,
     pub kind: String,
+    pub models: Vec<String>,
+    pub default_model: Option<String>,
 }
 
 /// 列出指定类型的可用插件；kind 为 "llm" / "image" / "tts"
@@ -73,6 +75,8 @@ pub async fn ai_list_plugins(
             id: id.clone(),
             name: meta.name.clone(),
             kind: kind.clone(),
+            models: meta.models().to_vec(),
+            default_model: meta.default_model().map(str::to_string),
         })
         .collect();
 

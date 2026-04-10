@@ -10,10 +10,6 @@ import './index.css'
 import './i18n' // 初始化 i18n
 
 
-const result = showWindow().then()
-result.then(console.log)
-result.catch(console.error)
-
 // 异步初始化主题
 const initApp = async () => {
     let initialTheme = 'system'
@@ -37,6 +33,10 @@ const initApp = async () => {
             </ThemeProvider>
         </StrictMode>,
     )
+
+    const result = showWindow().then()
+    result.then(console.log)
+    result.catch(console.error)
 }
 
 initApp().catch(console.error)

@@ -1,4 +1,5 @@
 mod apis;
+mod layout;
 mod prompt;
 mod settings;
 mod state;
@@ -9,8 +10,10 @@ pub use state::*;
 
 use apis::ai_client::*;
 use apis::app_settings::*;
-use apis::worldflow::*;
+use apis::layout::*;
 use apis::plugins::*;
+use apis::worldflow::*;
+use layout::cache::LayoutCacheState;
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
@@ -49,6 +52,7 @@ pub fn run() {
 
             // HTTP 客户端（连接池在进程生命周期内共享）
             app.manage(NetworkState::new());
+            app.manage(LayoutCacheState::new());
 
             // 加载设置
             let settings_path = app_handle
@@ -78,8 +82,8 @@ pub fn run() {
             });
 
             // 异步初始化数据库
-            let db_path =
-                prepare_db_path(&app_handle, &resolved_db_path).unwrap_or_else(|e| fatal(&app_handle, &e.to_string()));
+            let db_path = prepare_db_path(&app_handle, &resolved_db_path)
+                .unwrap_or_else(|e| fatal(&app_handle, &e.to_string()));
 
             tauri::async_runtime::spawn(async move {
                 match init_db(&db_path).await {
@@ -157,6 +161,13 @@ pub fn run() {
             db_update_relation,
             db_delete_relation,
             db_delete_relations_between,
+            // Entry Types
+            db_list_all_entry_types,
+            db_list_custom_entry_types,
+            db_create_entry_type,
+            db_get_entry_type,
+            db_update_entry_type,
+            db_delete_entry_type,
             // AI Client
             ai_list_plugins,
             ai_create_llm_session,
@@ -188,6 +199,7 @@ pub fn run() {
             plugin_market_upload,
             plugin_market_update,
             plugin_market_delete,
+            compute_layout,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

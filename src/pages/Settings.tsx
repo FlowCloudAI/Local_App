@@ -34,9 +34,29 @@ export default function Settings() {
     const [ttsPlugins, setTtsPlugins] = useState<PluginInfo[]>([])
     const [mediaDir, setMediaDir] = useState<string>('')
     const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
+    const [expandedApiKeyPluginId, setExpandedApiKeyPluginId] = useState<string | null>(null)
+    const [apiKeyDraft, setApiKeyDraft] = useState('')
+    const [savingApiKeyPluginId, setSavingApiKeyPluginId] = useState<string | null>(null)
     const [defaultPaths, setDefaultPaths] = useState<{ db_path: string; plugins_path: string } | null>(null)
 
     const {setTheme} = useTheme();
+
+    const getPluginsForType = useCallback((type: 'llm' | 'image' | 'tts') => {
+        if (type === 'llm') return llmPlugins
+        if (type === 'image') return imagePlugins
+        return ttsPlugins
+    }, [imagePlugins, llmPlugins, ttsPlugins])
+
+    const getPluginById = useCallback((type: 'llm' | 'image' | 'tts', pluginId: string | null) => {
+        if (!pluginId) return null
+        return getPluginsForType(type).find(plugin => plugin.id === pluginId) ?? null
+    }, [getPluginsForType])
+
+    const resolveDefaultModel = useCallback((type: 'llm' | 'image' | 'tts', pluginId: string | null) => {
+        const plugin = getPluginById(type, pluginId)
+        if (!plugin) return null
+        return plugin.default_model ?? plugin.models[0] ?? null
+    }, [getPluginById])
 
     // 初始化加载
     const loadData = useCallback(async () => {
@@ -75,6 +95,43 @@ export default function Settings() {
     useEffect(() => {
         loadData().catch(console.error)
     }, [loadData])
+
+    useEffect(() => {
+        if (!settings || loading) return
+
+        setSettings(prev => {
+            if (!prev) return null
+
+            const normalizeAiConfig = <T extends 'llm' | 'image' | 'tts'>(type: T) => {
+                const plugin = getPluginById(type, prev[type].plugin_id)
+                if (!plugin) return prev[type]
+
+                const currentModel = prev[type].default_model
+                const hasCurrentModel = currentModel ? plugin.models.includes(currentModel) : false
+                if (hasCurrentModel) return prev[type]
+
+                const nextDefaultModel = resolveDefaultModel(type, prev[type].plugin_id)
+                if (currentModel === nextDefaultModel) return prev[type]
+
+                return {
+                    ...prev[type],
+                    default_model: nextDefaultModel
+                }
+            }
+
+            const nextLlm = normalizeAiConfig('llm')
+            const nextImage = normalizeAiConfig('image')
+            const nextTts = normalizeAiConfig('tts')
+            const changed = nextLlm !== prev.llm || nextImage !== prev.image || nextTts !== prev.tts
+
+            return changed ? {
+                ...prev,
+                llm: nextLlm,
+                image: nextImage,
+                tts: nextTts
+            } : prev
+        })
+    }, [getPluginById, loading, resolveDefaultModel, settings])
 
     // 自动保存设置
     useEffect(() => {
@@ -192,25 +249,38 @@ export default function Settings() {
         setSettings(prev => {
             if (!prev) return null
             const aiConfig = {...prev[type], [field]: value}
-            // 如果改变了插件，清空模型选择
+            // 如果改变了插件，优先回填插件自身默认模型，再回退到首个模型
             if (field === 'plugin_id') {
-                aiConfig.default_model = null
+                aiConfig.default_model = resolveDefaultModel(type, value)
             }
             return {...prev, [type]: aiConfig}
         })
     }
 
     // API Key 管理
-    const handleConfigureApiKey = async (pluginId: string) => {
-        const apiKey = prompt(`请输入 ${pluginId} 的 API Key:`)
-        if (apiKey) {
-            try {
-                await setting_set_api_key(pluginId, apiKey)
-                setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
-                void showAlert('API Key 已保存', 'success')
-            } catch (error) {
-                void showAlert('保存失败: ' + error, 'error')
-            }
+    const handleConfigureApiKey = (pluginId: string) => {
+        setExpandedApiKeyPluginId(current => current === pluginId ? null : pluginId)
+        setApiKeyDraft('')
+    }
+
+    const handleSaveApiKey = async (pluginId: string) => {
+        const nextApiKey = apiKeyDraft.trim()
+        if (!nextApiKey) {
+            void showAlert('请输入 API Key', 'error')
+            return
+        }
+
+        try {
+            setSavingApiKeyPluginId(pluginId)
+            await setting_set_api_key(pluginId, nextApiKey)
+            setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
+            setExpandedApiKeyPluginId(null)
+            setApiKeyDraft('')
+            void showAlert('API Key 已保存', 'success')
+        } catch (error) {
+            void showAlert('保存失败: ' + error, 'error')
+        } finally {
+            setSavingApiKeyPluginId(null)
         }
     }
 
@@ -218,6 +288,10 @@ export default function Settings() {
         try {
             await setting_delete_api_key(pluginId)
             setApiKeyStatus(prev => ({...prev, [pluginId]: false}))
+            if (expandedApiKeyPluginId === pluginId) {
+                setExpandedApiKeyPluginId(null)
+                setApiKeyDraft('')
+            }
             void showAlert('API Key 已删除', 'success')
         } catch (error) {
             void showAlert('删除失败: ' + error, 'error')
@@ -246,7 +320,7 @@ export default function Settings() {
     ]
 
     const getPluginOptions = (type: 'llm' | 'image' | 'tts') => {
-        const plugins = type === 'llm' ? llmPlugins : type === 'image' ? imagePlugins : ttsPlugins
+        const plugins = getPluginsForType(type)
         return [
             {value: '', label: '未选择'},
             ...plugins.map(p => ({value: p.id, label: p.name}))
@@ -254,9 +328,7 @@ export default function Settings() {
     }
 
     const getModelOptions = (type: 'llm' | 'image' | 'tts') => {
-        const plugins = type === 'llm' ? llmPlugins : type === 'image' ? imagePlugins : ttsPlugins
-        const pluginId = settings[type].plugin_id
-        const plugin = plugins.find(p => p.id === pluginId)
+        const plugin = getPluginById(type, settings[type].plugin_id)
         if (!plugin) return [{value: '', label: '请先选择插件'}]
 
         return [
@@ -264,6 +336,8 @@ export default function Settings() {
             ...plugin.models.map(m => ({value: m, label: m}))
         ]
     }
+
+    const allPlugins = [...llmPlugins, ...imagePlugins, ...ttsPlugins]
 
     return (
         <RollingBox style={{padding: '1rem'} as CSSProperties} thumbSize="thin">
@@ -472,41 +546,99 @@ export default function Settings() {
                 <section className="settings-section">
                     <h2 className="settings-section-title">API Key 管理</h2>
                     <div className="settings-row">
-                        {[...llmPlugins, ...imagePlugins, ...ttsPlugins].length === 0 ? (
+                        {allPlugins.length === 0 ? (
                             <div style={{padding: '20px', textAlign: 'center', color: 'var(--fc-color-tertiary)'}}>
                                 没有安装插件
                             </div>
                         ) : (
-                            [...llmPlugins, ...imagePlugins, ...ttsPlugins].map(plugin => (
-                                <div
-                                    key={plugin.id}
-                                    className="settings-api-key-item"
-                                >
-                                    <span className="settings-api-key-name">{plugin.name}</span>
-                                    <div className="settings-api-key-actions">
-                                        {apiKeyStatus[plugin.id] ? (
-                                            <>
-                                                <span className="settings-api-key-status">✓ 已配置</span>
-                                                <Button
-                                                    variant="danger"
-                                                    size="sm"
-                                                    onClick={() => handleDeleteApiKey(plugin.id)}
+                            allPlugins.map(plugin => {
+                                const isExpanded = expandedApiKeyPluginId === plugin.id
+                                const isSaving = savingApiKeyPluginId === plugin.id
+
+                                return (
+                                    <div
+                                        key={plugin.id}
+                                        className={`settings-api-key-card${isExpanded ? ' is-expanded' : ''}`}
+                                    >
+                                        <div className="settings-api-key-item">
+                                            <div className="settings-api-key-meta">
+                                                <span className="settings-api-key-name">{plugin.name}</span>
+                                                <span className="settings-api-key-plugin-id">{plugin.id}</span>
+                                            </div>
+                                            <div className="settings-api-key-actions">
+                                                {apiKeyStatus[plugin.id] ? (
+                                                    <>
+                                                        <span className="settings-api-key-status">已配置</span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleConfigureApiKey(plugin.id)}
+                                                        >
+                                                            重新配置
+                                                        </Button>
+                                                        <Button
+                                                            variant="danger"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteApiKey(plugin.id)}
+                                                        >
+                                                            删除
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleConfigureApiKey(plugin.id)}
+                                                    >
+                                                        配置
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className={`settings-api-key-drawer${isExpanded ? ' is-open' : ''}`}>
+                                            <div className="settings-api-key-drawer-inner">
+                                                <form
+                                                    className="settings-api-key-form"
+                                                    onSubmit={(event) => {
+                                                        event.preventDefault()
+                                                        void handleSaveApiKey(plugin.id)
+                                                    }}
                                                 >
-                                                    删除
-                                                </Button>
-                                            </>
-                                        ) : (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handleConfigureApiKey(plugin.id)}
-                                            >
-                                                配置
-                                            </Button>
-                                        )}
+                                                    <label className="settings-api-key-form-label">API Key</label>
+                                                    <Input
+                                                        type="password"
+                                                        value={isExpanded ? apiKeyDraft : ''}
+                                                        onChange={(value) => setApiKeyDraft(String(value))}
+                                                        placeholder={`请输入 ${plugin.name} 的 API Key`}
+                                                        style={{flex: 1}}
+                                                    />
+                                                    <div className="settings-api-key-form-actions">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setExpandedApiKeyPluginId(null)
+                                                                setApiKeyDraft('')
+                                                            }}
+                                                            disabled={isSaving}
+                                                        >
+                                                            取消
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            type="submit"
+                                                            disabled={isSaving}
+                                                        >
+                                                            {isSaving ? '保存中...' : '保存'}
+                                                        </Button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            ))
+                                )
+                            })
                         )}
                     </div>
                 </section>

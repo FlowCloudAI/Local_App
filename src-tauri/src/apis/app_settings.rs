@@ -31,26 +31,26 @@ pub async fn setting_get_settings(
     state: State<'_, SettingsState>,
 ) -> Result<AppSettings, String> {
     let mut settings = state.settings.lock().await;
-    
+
     // 检查是否需要填充默认路径
     let data_root = default_data_root(&app);
     let mut need_save = false;
-    
+
     if settings.db_path.is_none() {
         settings.db_path = Some(data_root.join("db").to_string_lossy().to_string());
         need_save = true;
     }
-    
+
     if settings.plugins_path.is_none() {
         settings.plugins_path = Some(data_root.join("plugins").to_string_lossy().to_string());
         need_save = true;
     }
-    
+
     // 如果填充了默认值，立即保存
     if need_save {
         settings.save(&state.path).map_err(|e| e.to_string())?;
     }
-    
+
     Ok(settings.clone())
 }
 

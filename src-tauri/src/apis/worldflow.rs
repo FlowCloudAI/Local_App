@@ -1,8 +1,12 @@
 use crate::AppState;
+use std::collections::BTreeSet;
 use std::env;
+use std::sync::Arc;
 use tauri::{State, Window};
+use tokio::sync::Mutex;
 use worldflow_core::{
-    CategoryOps, EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps, models::*,
+    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, SqliteDb, TagSchemaOps,
+    models::*,
 };
 
 // ============ Logging & Window ============
@@ -35,15 +39,29 @@ pub fn show_main_window(window: Window) -> Result<&'static str, &'static str> {
     Ok("open the window")
 }
 
+async fn touch_project_updated_at(db: &SqliteDb, project_id: &str) -> Result<(), String> {
+    db.update_project(
+        project_id,
+        UpdateProject {
+            name: None,
+            description: None,
+        },
+    )
+    .await
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
 // ============ Projects ============
 
 /// 创建项目
 #[tauri::command]
 pub async fn db_create_project(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     name: String,
     description: Option<String>,
 ) -> Result<Project, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.create_project(CreateProject { name, description })
         .await
@@ -52,14 +70,21 @@ pub async fn db_create_project(
 
 /// 查询单个项目
 #[tauri::command]
-pub async fn db_get_project(state: State<'_, AppState>, id: String) -> Result<Project, String> {
+pub async fn db_get_project(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<Project, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.get_project(&id).await.map_err(|e| e.to_string())
 }
 
 /// 查询所有项目列表
 #[tauri::command]
-pub async fn db_list_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String> {
+pub async fn db_list_projects(
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<Vec<Project>, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.list_projects().await.map_err(|e| e.to_string())
 }
@@ -67,11 +92,12 @@ pub async fn db_list_projects(state: State<'_, AppState>) -> Result<Vec<Project>
 /// 更新项目信息
 #[tauri::command]
 pub async fn db_update_project(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     id: String,
     name: Option<String>,
     description: Option<String>,
 ) -> Result<Project, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.update_project(&id, UpdateProject { name, description })
         .await
@@ -80,7 +106,11 @@ pub async fn db_update_project(
 
 /// 删除项目（级联删除所有分类、词条、标签定义、关系）
 #[tauri::command]
-pub async fn db_delete_project(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn db_delete_project(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.delete_project(&id).await.map_err(|e| e.to_string())
 }
@@ -90,26 +120,35 @@ pub async fn db_delete_project(state: State<'_, AppState>, id: String) -> Result
 /// 创建分类；parent_id 为 None 时创建根节点
 #[tauri::command]
 pub async fn db_create_category(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     parent_id: Option<String>,
     name: String,
     sort_order: Option<i64>,
 ) -> Result<Category, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.create_category(CreateCategory {
-        project_id,
-        parent_id,
-        name,
-        sort_order,
-    })
-    .await
-    .map_err(|e| e.to_string())
+    let category = db
+        .create_category(CreateCategory {
+            project_id,
+            parent_id,
+            name,
+            sort_order,
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &category.project_id).await?;
+    Ok(category)
 }
 
 /// 查询单个分类
 #[tauri::command]
-pub async fn db_get_category(state: State<'_, AppState>, id: String) -> Result<Category, String> {
+pub async fn db_get_category(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<Category, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.get_category(&id).await.map_err(|e| e.to_string())
 }
@@ -117,9 +156,10 @@ pub async fn db_get_category(state: State<'_, AppState>, id: String) -> Result<C
 /// 查询项目下所有分类（按树序排列）
 #[tauri::command]
 pub async fn db_list_categories(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
 ) -> Result<Vec<Category>, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.list_categories(&project_id)
         .await
@@ -129,30 +169,41 @@ pub async fn db_list_categories(
 /// 更新分类；parent_id: Some(Some(id)) = 移到新父节点，Some(None) = 移到根节点，None = 不变
 #[tauri::command]
 pub async fn db_update_category(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     id: String,
     parent_id: Option<Option<String>>,
     name: Option<String>,
     sort_order: Option<i64>,
 ) -> Result<Category, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.update_category(
-        &id,
-        UpdateCategory {
-            parent_id,
-            name,
-            sort_order,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
+    let category = db
+        .update_category(
+            &id,
+            UpdateCategory {
+                parent_id,
+                name,
+                sort_order,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &category.project_id).await?;
+    Ok(category)
 }
 
 /// 删除分类
 #[tauri::command]
-pub async fn db_delete_category(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn db_delete_category(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.delete_category(&id).await.map_err(|e| e.to_string())
+    let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
+    db.delete_category(&id).await.map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &category.project_id).await
 }
 
 // ============ Entries ============
@@ -160,7 +211,7 @@ pub async fn db_delete_category(state: State<'_, AppState>, id: String) -> Resul
 /// 创建词条
 #[tauri::command]
 pub async fn db_create_entry(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     category_id: Option<String>,
     title: String,
@@ -170,24 +221,33 @@ pub async fn db_create_entry(
     tags: Option<Vec<EntryTag>>,
     images: Option<Vec<FCImage>>,
 ) -> Result<Entry, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.create_entry(CreateEntry {
-        project_id,
-        category_id,
-        title,
-        summary,
-        content,
-        r#type,
-        tags,
-        images,
-    })
-    .await
-    .map_err(|e| e.to_string())
+    let entry = db
+        .create_entry(CreateEntry {
+            project_id,
+            category_id,
+            title,
+            summary,
+            content,
+            r#type,
+            tags,
+            images,
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &entry.project_id).await?;
+    Ok(entry)
 }
 
 /// 获取完整词条（含 content、tags、images）
 #[tauri::command]
-pub async fn db_get_entry(state: State<'_, AppState>, id: String) -> Result<Entry, String> {
+pub async fn db_get_entry(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<Entry, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.get_entry(&id).await.map_err(|e| e.to_string())
 }
@@ -195,13 +255,14 @@ pub async fn db_get_entry(state: State<'_, AppState>, id: String) -> Result<Entr
 /// 分页列出词条简报（不含 content）；可按分类和词条类型过滤
 #[tauri::command]
 pub async fn db_list_entries(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     category_id: Option<String>,
     entry_type: Option<String>,
     limit: usize,
     offset: usize,
 ) -> Result<Vec<EntryBrief>, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.list_entries(
         &project_id,
@@ -219,13 +280,14 @@ pub async fn db_list_entries(
 /// 全文搜索词条（FTS）；可按分类和词条类型过滤
 #[tauri::command]
 pub async fn db_search_entries(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     query: String,
     category_id: Option<String>,
     entry_type: Option<String>,
     limit: usize,
 ) -> Result<Vec<EntryBrief>, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.search_entries(
         &project_id,
@@ -243,11 +305,12 @@ pub async fn db_search_entries(
 /// 统计词条数量；可按分类和词条类型过滤
 #[tauri::command]
 pub async fn db_count_entries(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     category_id: Option<String>,
     entry_type: Option<String>,
 ) -> Result<i64, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.count_entries(
         &project_id,
@@ -263,7 +326,7 @@ pub async fn db_count_entries(
 /// 更新词条；仅传入需要修改的字段，None 表示不变
 #[tauri::command]
 pub async fn db_update_entry(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     id: String,
     category_id: Option<String>,
     title: Option<String>,
@@ -273,45 +336,70 @@ pub async fn db_update_entry(
     tags: Option<Vec<EntryTag>>,
     images: Option<Vec<FCImage>>,
 ) -> Result<Entry, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.update_entry(
-        &id,
-        UpdateEntry {
-            category_id: Some(category_id),
-            title,
-            summary,
-            content,
-            r#type: Some(r#type),
-            tags,
-            images,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
+    let entry = db
+        .update_entry(
+            &id,
+            UpdateEntry {
+                category_id: Some(category_id),
+                title,
+                summary,
+                content,
+                r#type: Some(r#type),
+                tags,
+                images,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &entry.project_id).await?;
+    Ok(entry)
 }
 
 /// 删除词条
 #[tauri::command]
-pub async fn db_delete_entry(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn db_delete_entry(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.delete_entry(&id).await.map_err(|e| e.to_string())
+    let entry = db.get_entry(&id).await.map_err(|e| e.to_string())?;
+    db.delete_entry(&id).await.map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &entry.project_id).await
 }
 
 /// 批量创建词条；返回成功插入的条数
 #[tauri::command]
 pub async fn db_create_entries_bulk(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     entries: Vec<CreateEntry>,
 ) -> Result<usize, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.create_entries_bulk(entries)
+    let project_ids = entries
+        .iter()
+        .map(|entry| entry.project_id.clone())
+        .collect::<BTreeSet<_>>();
+
+    let count = db
+        .create_entries_bulk(entries)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    for project_id in project_ids {
+        touch_project_updated_at(&db, &project_id).await?;
+    }
+
+    Ok(count)
 }
 
 /// 优化 FTS 索引，消除碎片；建议在 create_entries_bulk 后调用
 #[tauri::command]
-pub async fn db_optimize_fts(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn db_optimize_fts(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.optimize_fts().await.map_err(|e| e.to_string())
 }
@@ -321,7 +409,7 @@ pub async fn db_optimize_fts(state: State<'_, AppState>) -> Result<(), String> {
 /// 创建标签定义；type 可为 "number" / "string" / "boolean"
 #[tauri::command]
 pub async fn db_create_tag_schema(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     name: String,
     description: Option<String>,
@@ -332,63 +420,10 @@ pub async fn db_create_tag_schema(
     range_max: Option<f64>,
     sort_order: Option<i64>,
 ) -> Result<TagSchema, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.create_tag_schema(CreateTagSchema {
-        project_id,
-        name,
-        description,
-        r#type,
-        target,
-        default_val,
-        range_min,
-        range_max,
-        sort_order,
-    })
-    .await
-    .map_err(|e| e.to_string())
-}
-
-/// 查询单个标签定义
-#[tauri::command]
-pub async fn db_get_tag_schema(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<TagSchema, String> {
-    let db = state.sqlite_db.lock().await;
-    db.get_tag_schema(&id).await.map_err(|e| e.to_string())
-}
-
-/// 查询项目下所有标签定义
-#[tauri::command]
-pub async fn db_list_tag_schemas(
-    state: State<'_, AppState>,
-    project_id: String,
-) -> Result<Vec<TagSchema>, String> {
-    let db = state.sqlite_db.lock().await;
-    db.list_tag_schemas(&project_id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// 更新标签定义（全量替换）
-#[tauri::command]
-pub async fn db_update_tag_schema(
-    state: State<'_, AppState>,
-    id: String,
-    project_id: String,
-    name: String,
-    description: Option<String>,
-    r#type: String,
-    target: Vec<String>,
-    default_val: Option<String>,
-    range_min: Option<f64>,
-    range_max: Option<f64>,
-    sort_order: Option<i64>,
-) -> Result<TagSchema, String> {
-    let db = state.sqlite_db.lock().await;
-    db.update_tag_schema(
-        &id,
-        CreateTagSchema {
+    let schema = db
+        .create_tag_schema(CreateTagSchema {
             project_id,
             name,
             description,
@@ -398,17 +433,88 @@ pub async fn db_update_tag_schema(
             range_min,
             range_max,
             sort_order,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &schema.project_id).await?;
+    Ok(schema)
+}
+
+/// 查询单个标签定义
+#[tauri::command]
+pub async fn db_get_tag_schema(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<TagSchema, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.get_tag_schema(&id).await.map_err(|e| e.to_string())
+}
+
+/// 查询项目下所有标签定义
+#[tauri::command]
+pub async fn db_list_tag_schemas(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+) -> Result<Vec<TagSchema>, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.list_tag_schemas(&project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 更新标签定义（全量替换）
+#[tauri::command]
+pub async fn db_update_tag_schema(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+    project_id: String,
+    name: String,
+    description: Option<String>,
+    r#type: String,
+    target: Vec<String>,
+    default_val: Option<String>,
+    range_min: Option<f64>,
+    range_max: Option<f64>,
+    sort_order: Option<i64>,
+) -> Result<TagSchema, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    let schema = db
+        .update_tag_schema(
+            &id,
+            CreateTagSchema {
+                project_id,
+                name,
+                description,
+                r#type,
+                target,
+                default_val,
+                range_min,
+                range_max,
+                sort_order,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &schema.project_id).await?;
+    Ok(schema)
 }
 
 /// 删除标签定义
 #[tauri::command]
-pub async fn db_delete_tag_schema(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn db_delete_tag_schema(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.delete_tag_schema(&id).await.map_err(|e| e.to_string())
+    let schema = db.get_tag_schema(&id).await.map_err(|e| e.to_string())?;
+    db.delete_tag_schema(&id).await.map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &schema.project_id).await
 }
 
 // ============ Entry Relations ============
@@ -416,31 +522,37 @@ pub async fn db_delete_tag_schema(state: State<'_, AppState>, id: String) -> Res
 /// 创建词条关系；relation 为 "OneWay"（单向）或 "TwoWay"（双向）
 #[tauri::command]
 pub async fn db_create_relation(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     a_id: String,
     b_id: String,
     relation: RelationDirection,
     content: String,
 ) -> Result<EntryRelation, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.create_relation(CreateEntryRelation {
-        project_id,
-        a_id,
-        b_id,
-        relation,
-        content,
-    })
-    .await
-    .map_err(|e| e.to_string())
+    let relation = db
+        .create_relation(CreateEntryRelation {
+            project_id,
+            a_id,
+            b_id,
+            relation,
+            content,
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &relation.project_id).await?;
+    Ok(relation)
 }
 
 /// 查询单条词条关系
 #[tauri::command]
 pub async fn db_get_relation(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     id: String,
 ) -> Result<EntryRelation, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.get_relation(&id).await.map_err(|e| e.to_string())
 }
@@ -448,9 +560,10 @@ pub async fn db_get_relation(
 /// 查询某词条的所有关系（含双向）
 #[tauri::command]
 pub async fn db_list_relations_for_entry(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     entry_id: String,
 ) -> Result<Vec<EntryRelation>, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.list_relations_for_entry(&entry_id)
         .await
@@ -460,9 +573,10 @@ pub async fn db_list_relations_for_entry(
 /// 查询项目下所有词条关系（用于构建关系图）
 #[tauri::command]
 pub async fn db_list_relations_for_project(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
 ) -> Result<Vec<EntryRelation>, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     db.list_relations_for_project(&project_id)
         .await
@@ -472,33 +586,161 @@ pub async fn db_list_relations_for_project(
 /// 更新词条关系的方向或描述内容
 #[tauri::command]
 pub async fn db_update_relation(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     id: String,
     relation: Option<RelationDirection>,
     content: Option<String>,
 ) -> Result<EntryRelation, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.update_relation(&id, UpdateEntryRelation { relation, content })
+    let relation = db
+        .update_relation(&id, UpdateEntryRelation { relation, content })
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &relation.project_id).await?;
+    Ok(relation)
 }
 
 /// 删除单条词条关系
 #[tauri::command]
-pub async fn db_delete_relation(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub async fn db_delete_relation(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.delete_relation(&id).await.map_err(|e| e.to_string())
+    let relation = db.get_relation(&id).await.map_err(|e| e.to_string())?;
+    db.delete_relation(&id).await.map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &relation.project_id).await
 }
 
 /// 删除两个词条之间的所有关系；返回删除的条数
 #[tauri::command]
 pub async fn db_delete_relations_between(
-    state: State<'_, AppState>,
+    state: State<'_, Arc<Mutex<AppState>>>,
     entry_a_id: String,
     entry_b_id: String,
 ) -> Result<u64, String> {
+    let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.delete_relations_between(&entry_a_id, &entry_b_id)
+    let entry = db.get_entry(&entry_a_id).await.map_err(|e| e.to_string())?;
+    let deleted = db
+        .delete_relations_between(&entry_a_id, &entry_b_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if deleted > 0 {
+        touch_project_updated_at(&db, &entry.project_id).await?;
+    }
+
+    Ok(deleted)
+}
+
+// ============ Entry Types ============
+
+/// 列出项目内所有词条类型（9 个内置 + 自定义）
+#[tauri::command]
+pub async fn db_list_all_entry_types(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+) -> Result<Vec<EntryTypeView>, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.list_all_entry_types(&project_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// 列出项目内自定义词条类型
+#[tauri::command]
+pub async fn db_list_custom_entry_types(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+) -> Result<Vec<CustomEntryType>, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.list_custom_entry_types(&project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 创建自定义词条类型
+#[tauri::command]
+pub async fn db_create_entry_type(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+    name: String,
+    description: Option<String>,
+    icon: Option<String>,
+    color: Option<String>,
+) -> Result<CustomEntryType, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    let entry_type = db
+        .create_entry_type(CreateCustomEntryType {
+            project_id,
+            name,
+            description,
+            icon,
+            color,
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &entry_type.project_id).await?;
+    Ok(entry_type)
+}
+
+/// 获取单个自定义词条类型
+#[tauri::command]
+pub async fn db_get_entry_type(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<CustomEntryType, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.get_entry_type(&id).await.map_err(|e| e.to_string())
+}
+
+/// 更新自定义词条类型；description/icon/color 使用 Option<Option<T>> 模式（None=不更新，Some(None)=清空）
+#[tauri::command]
+pub async fn db_update_entry_type(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+    name: Option<String>,
+    description: Option<Option<String>>,
+    icon: Option<Option<String>>,
+    color: Option<Option<String>>,
+) -> Result<CustomEntryType, String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    let entry_type = db
+        .update_entry_type(
+            &id,
+            UpdateCustomEntryType {
+                name,
+                description,
+                icon,
+                color,
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    touch_project_updated_at(&db, &entry_type.project_id).await?;
+    Ok(entry_type)
+}
+
+/// 删除自定义词条类型（有词条引用时拒绝删除）
+#[tauri::command]
+pub async fn db_delete_entry_type(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    let entry_type = db.get_entry_type(&id).await.map_err(|e| e.to_string())?;
+    db.delete_entry_type(&id).await.map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &entry_type.project_id).await
 }

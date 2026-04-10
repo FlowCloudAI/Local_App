@@ -1,7 +1,9 @@
 import {useState, useEffect, useCallback, type CSSProperties} from 'react'
+import {open} from '@tauri-apps/plugin-dialog'
 import {Button, Input, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     plugin_list_local,
+    plugin_install_from_file,
     plugin_uninstall,
     plugin_market_list,
     plugin_market_install,
@@ -9,6 +11,7 @@ import {
     type RemotePluginInfo,
 } from '../api'
 import {LocalPluginCard, MarketPluginCard} from '../components/PluginCard'
+import UploadPlugin from '../components/UploadPlugin'
 import './Plugins.css'
 
 export default function Plugins() {
@@ -18,6 +21,8 @@ export default function Plugins() {
     const [marketPlugins, setMarketPlugins] = useState<RemotePluginInfo[]>([])
     const [loadingLocal, setLoadingLocal] = useState(false)
     const [loadingMarket, setLoadingMarket] = useState(false)
+    const [installingLocalFile, setInstallingLocalFile] = useState(false)
+    const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
     const [localError, setLocalError] = useState<string | null>(null)
     const [marketError, setMarketError] = useState<string | null>(null)
 
@@ -76,14 +81,48 @@ export default function Plugins() {
         }
     }
 
+    const handleInstallFromFile = async () => {
+        const selected = await open({
+            multiple: false,
+            directory: false,
+            title: '选择本地插件包',
+            filters: [
+                {
+                    name: 'FlowCloudAI 插件包',
+                    extensions: ['fcplug'],
+                },
+            ],
+        })
+        if (!selected || Array.isArray(selected)) return
+
+        setInstallingLocalFile(true)
+        try {
+            const info = await plugin_install_from_file(selected)
+            setLocalPlugins(prev => {
+                const exists = prev.some(p => p.id === info.id)
+                return exists
+                    ? prev.map(p => (p.id === info.id ? info : p))
+                    : [...prev, info]
+            })
+            void showAlert(`${info.name} 安装成功`, 'success')
+        } catch (e) {
+            void showAlert('本地插件安装失败: ' + e, 'error')
+        } finally {
+            setInstallingLocalFile(false)
+        }
+    }
+
+    const handleUploadLocalPlugin = () => {
+        setUploadDialogOpen(true)
+    }
+
     const handleUninstall = async (pluginId: string) => {
-        const res = await showAlert('确定卸载此插件？', 'warning', 'confirm')
+        const res = await showAlert('确认删除', 'warning', 'confirm')
         if (res !== 'yes') return
         setUninstallingId(pluginId)
         try {
             await plugin_uninstall(pluginId)
             setLocalPlugins(prev => prev.filter(p => p.id !== pluginId))
-            void showAlert('卸载成功', 'success')
         } catch (e) {
             void showAlert('卸载失败: ' + e, 'error')
         } finally {
@@ -104,6 +143,13 @@ export default function Plugins() {
         <RollingBox style={{padding: '1rem'} as CSSProperties} thumbSize="thin">
             <div className="plugins-container">
                 <h1 className="plugins-title">插件管理</h1>
+                <UploadPlugin
+                    open={uploadDialogOpen}
+                    onClose={() => setUploadDialogOpen(false)}
+                    onUploaded={() => {
+                        void loadMarket()
+                    }}
+                />
 
                 {/* 已安装 */}
                 <section className="plugins-section">
@@ -141,14 +187,30 @@ export default function Plugins() {
                 <section className="plugins-section">
                     <div className="plugins-section-header">
                         <h2 className="plugins-section-title">插件库</h2>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={loadingMarket}
-                            onClick={loadMarket}
-                        >
-                            {loadingMarket ? '加载中…' : '刷新'}
-                        </Button>
+                        <div className="plugins-section-actions">
+                            <Button
+                                size="sm"
+                                disabled={installingLocalFile}
+                                onClick={handleInstallFromFile}
+                            >
+                                {installingLocalFile ? '安装中…' : '安装本地插件'}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleUploadLocalPlugin}
+                            >
+                                上传本地插件
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={loadingMarket}
+                                onClick={loadMarket}
+                            >
+                                {loadingMarket ? '加载中…' : '刷新'}
+                            </Button>
+                        </div>
                     </div>
 
                     <div className="plugins-filter-bar">

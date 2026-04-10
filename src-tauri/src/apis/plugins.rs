@@ -1,6 +1,7 @@
-use crate::{AiState, NetworkState};
 use crate::state::PathsState;
+use crate::{AiState, NetworkState};
 use flowcloudai_client::plugin::types::PluginMeta;
+use reqwest::multipart;
 use serde::{Deserialize, Serialize};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
@@ -117,32 +118,41 @@ async fn require_no_active_sessions(ai_state: &AiState) -> Result<(), String> {
 // ============ 官方市场 HTTP 客户端函数 ============
 
 async fn market_list(client: &reqwest::Client) -> anyhow::Result<serde_json::Value> {
-    let res = client
-        .get(MARKET_BASE)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let res = client.get(MARKET_BASE).send().await?.json().await?;
     Ok(res)
 }
 
-async fn market_upload(client: &reqwest::Client, path: &Path) -> anyhow::Result<serde_json::Value> {
+async fn market_upload(
+    client: &reqwest::Client,
+    path: &Path,
+    password: &str,
+) -> anyhow::Result<serde_json::Value> {
     let bytes = fs::read(path).await?;
     let filename = path
         .file_name()
         .ok_or_else(|| anyhow::anyhow!("无效文件名"))?
         .to_string_lossy()
         .to_string();
-    let part = reqwest::multipart::Part::bytes(bytes).file_name(filename);
-    let form = reqwest::multipart::Form::new().part("file", part);
-    let res = client
-        .post(MARKET_BASE)
-        .multipart(form)
-        .send()
-        .await?
-        .json()
-        .await?;
-    Ok(res)
+    let part = multipart::Part::bytes(bytes)
+        .file_name(filename)
+        .mime_str("application/octet-stream")?;
+    let form = multipart::Form::new()
+        .text("password", password.to_string())
+        .part("file", part);
+    let res = client.post(MARKET_BASE).multipart(form).send().await?;
+
+    let status = res.status();
+    if !status.is_success() {
+        let body = res.text().await.unwrap_or_default();
+        let msg = if body.trim().is_empty() {
+            format!("HTTP {}", status)
+        } else {
+            format!("HTTP {}: {}", status, body)
+        };
+        return Err(anyhow::anyhow!(msg));
+    }
+
+    Ok(res.json().await?)
 }
 
 async fn market_update(
@@ -230,7 +240,9 @@ pub async fn plugin_uninstall(
 ) -> Result<(), String> {
     require_no_active_sessions(&ai_state).await?;
     let mut client = ai_state.client.lock().await;
-    client.uninstall_plugin(&plugin_id).map_err(|e| e.to_string())
+    client
+        .uninstall_plugin(&plugin_id)
+        .map_err(|e| e.to_string())
 }
 
 // ============ Tauri Commands — 通用远程注册表 ============
@@ -265,10 +277,8 @@ pub async fn plugin_check_updates(
     registry_url: String,
 ) -> Result<Vec<PluginUpdateInfo>, String> {
     let remote = plugin_fetch_remote(net, registry_url).await?;
-    let remote_map: std::collections::HashMap<_, _> = remote
-        .into_iter()
-        .map(|p| (p.id, p.version))
-        .collect();
+    let remote_map: std::collections::HashMap<_, _> =
+        remote.into_iter().map(|p| (p.id, p.version)).collect();
 
     let client = ai_state.client.lock().await;
     let result = client
@@ -292,9 +302,7 @@ pub async fn plugin_check_updates(
 
 /// 获取官方市场插件列表
 #[tauri::command]
-pub async fn plugin_market_list(
-    net: State<'_, NetworkState>,
-) -> Result<serde_json::Value, String> {
+pub async fn plugin_market_list(net: State<'_, NetworkState>) -> Result<serde_json::Value, String> {
     market_list(&net.client).await.map_err(|e| e.to_string())
 }
 
@@ -332,9 +340,10 @@ pub async fn plugin_market_install(
 pub async fn plugin_market_upload(
     net: State<'_, NetworkState>,
     file_path: String,
+    password: String,
 ) -> Result<serde_json::Value, String> {
     let path = PathBuf::from(&file_path);
-    market_upload(&net.client, &path)
+    market_upload(&net.client, &path, &password)
         .await
         .map_err(|e| e.to_string())
 }
