@@ -6,6 +6,7 @@ import {
     db_search_entries,
     entryTypeKey,
     type EntryBrief,
+    type TagSchema,
     type EntryTypeView,
 } from '../../api'
 import EntryCreator from '../EntryCreator'
@@ -69,11 +70,12 @@ interface CategoryViewProps {
     categoryId: string
     projectId: string
     entryTypes: EntryTypeView[]
+    tagSchemas: TagSchema[]
     onEntryCreated?: () => void | Promise<void>
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
-function CategoryView({categoryId, projectId, entryTypes, onEntryCreated, onOpenEntry}: CategoryViewProps) {
+function CategoryView({categoryId, projectId, entryTypes, tagSchemas, onEntryCreated, onOpenEntry}: CategoryViewProps) {
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [loading, setLoading] = useState(false)
     const [searchText, setSearchText] = useState('')
@@ -266,6 +268,7 @@ function CategoryView({categoryId, projectId, entryTypes, onEntryCreated, onOpen
                 projectId={projectId}
                 categoryId={categoryId}
                 entryTypes={entryTypes}
+                tagSchemas={tagSchemas}
                 onClose={() => setCreatorOpen(false)}
                 onCreated={async (createdEntry) => {
                     await loadEntries(searchText, typeFilter)

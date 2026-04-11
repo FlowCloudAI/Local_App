@@ -5,8 +5,10 @@ import {
     db_create_entry,
     entryTypeKey,
     type Entry,
+    type TagSchema,
     type EntryTypeView,
 } from '../api'
+import {buildEntryTagsPayload, ensureTypeTargetTagValues} from './entryTagUtils'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryCreator.css'
 
@@ -15,6 +17,7 @@ interface EntryCreatorProps {
     projectId: string
     categoryId?: string | null
     entryTypes: EntryTypeView[]
+    tagSchemas: TagSchema[]
     onClose: () => void
     onCreated?: (entry: Entry) => void | Promise<void>
 }
@@ -24,6 +27,7 @@ export default function EntryCreator({
     projectId,
     categoryId = null,
     entryTypes,
+    tagSchemas,
     onClose,
     onCreated,
 }: EntryCreatorProps) {
@@ -75,6 +79,7 @@ export default function EntryCreator({
         setApiError(null)
 
         try {
+            const initialTags = ensureTypeTargetTagValues({}, tagSchemas, selectedType).tags
             const entry = await db_create_entry({
                 projectId,
                 categoryId,
@@ -82,7 +87,7 @@ export default function EntryCreator({
                 summary: trimmedSummary || null,
                 content: trimmedContent || null,
                 type: selectedType,
-                tags: null,
+                tags: buildEntryTagsPayload(initialTags, tagSchemas),
                 images: null,
             })
             void showAlert('词条已创建', 'success', 'toast', 1000)

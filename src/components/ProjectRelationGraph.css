@@ -68,6 +68,19 @@
     box-shadow: var(--fc-shadow-sm);
 }
 
+.project-relation-graph__notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 16rem;
+    padding: 1.25rem;
+    text-align: center;
+    color: var(--fc-color-text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
 .project-relation-graph__shell .fc-rg {
     border-radius: 0.8rem;
     overflow: hidden;

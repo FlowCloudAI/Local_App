@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {
     db_create_entry_type,
+    db_delete_entry_type,
     db_update_entry_type,
     type CustomEntryType,
 } from '../api'
@@ -21,6 +22,7 @@ interface EntryTypeCreatorProps {
     existingNames?: string[]
     onClose: () => void
     onSaved?: (entryType: CustomEntryType) => void
+    onDeleted?: (entryTypeId: string) => void
 }
 
 export default function EntryTypeCreator({
@@ -30,6 +32,7 @@ export default function EntryTypeCreator({
     existingNames = [],
     onClose,
     onSaved,
+    onDeleted,
 }: EntryTypeCreatorProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
@@ -98,6 +101,26 @@ export default function EntryTypeCreator({
                 })
             void showAlert(isEditMode ? '词条类型已更新' : '词条类型已创建', 'success', 'toast', 1000)
             onSaved?.(entryType)
+            onClose()
+        } catch (e) {
+            setApiError(String(e))
+            setSubmitting(false)
+        }
+    }
+
+    async function handleDelete() {
+        if (!initialEntryType || submitting) return
+
+        const confirmed = await showAlert(`确认删除词条类型“${initialEntryType.name}”？`, 'warning', 'confirm')
+        if (!confirmed) return
+
+        setSubmitting(true)
+        setApiError(null)
+
+        try {
+            await db_delete_entry_type(initialEntryType.id)
+            void showAlert('词条类型已删除', 'success', 'toast', 1000)
+            onDeleted?.(initialEntryType.id)
             onClose()
         } catch (e) {
             setApiError(String(e))
@@ -234,12 +257,21 @@ export default function EntryTypeCreator({
                 </div>
 
                 <div className="entry-type-creator-footer">
-                    <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
-                        取消
-                    </Button>
-                    <Button size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
-                        {submitting ? (isEditMode ? '保存中…' : '创建中…') : (isEditMode ? '保存' : '创建')}
-                    </Button>
+                    {isEditMode ? (
+                        <Button variant="ghost" size="sm" onClick={() => void handleDelete()} disabled={submitting}>
+                            删除
+                        </Button>
+                    ) : (
+                        <span />
+                    )}
+                    <div className="entry-type-creator-footer__actions">
+                        <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+                            取消
+                        </Button>
+                        <Button size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+                            {submitting ? (isEditMode ? '保存中…' : '创建中…') : (isEditMode ? '保存' : '创建')}
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>,

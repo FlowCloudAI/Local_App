@@ -1,8 +1,18 @@
 .entry-editor-page {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+}
+
+.entry-editor-page__scroll {
     flex: 1;
     min-height: 0;
-    overflow: auto;
-    background: var(--fc-color-bg);
+    width: 100%;
+    height: 100%;
 }
 
 .entry-editor-shell {
@@ -10,6 +20,7 @@
     flex-direction: column;
     width: 100%;
     min-height: 100%;
+    padding-bottom: 1.2rem;
 }
 
 .entry-editor-hero,
@@ -255,6 +266,20 @@
     min-width: 14rem;
 }
 
+.entry-editor-select .fc-select__search {
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 2%);
+}
+
+.entry-editor-select .fc-select__search-input {
+    background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
+    color: var(--fc-color-text);
+    caret-color: var(--fc-color-primary);
+}
+
+.entry-editor-select .fc-select__search-input::placeholder {
+    color: var(--fc-color-text-secondary);
+}
+
 .entry-editor-title-input,
 .entry-editor-summary-input {
     width: 100%;
@@ -288,20 +313,23 @@
 .entry-editor-tags-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.55rem;
+    gap: 0.7rem;
 }
 
 .entry-editor-tag-card {
     display: inline-flex;
     flex-direction: column;
     gap: 0.3rem;
+    min-width: 0;
 }
 
 .entry-editor-tag-card.is-implanted {
-    padding: 0.35rem;
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-color-primary) 24%, transparent);
+    padding: 0.45rem;
+    border-radius: 1.2rem;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--fc-color-primary) 10%, transparent), transparent);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--fc-color-primary) 24%, transparent),
+        0 10px 24px color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
 }
 
 .entry-editor-tag-card__badge {
@@ -370,6 +398,10 @@
     border-bottom: 1px solid var(--fc-color-border);
 }
 
+.entry-editor-workspace.is-editing {
+    flex: 0 0 auto;
+}
+
 .entry-editor-workspace__header {
     display: flex;
     justify-content: space-between;
@@ -407,6 +439,10 @@
     padding: 0.85rem 1.5rem 1.2rem;
 }
 
+.entry-editor-workspace.is-editing .entry-editor-workspace__body {
+    flex: 0 0 auto;
+}
+
 .entry-editor-meta-layout {
     display: grid;
     grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
@@ -420,10 +456,18 @@
     flex: 1;
 }
 
+.entry-editor-workspace.is-editing .entry-editor-markdown {
+    flex: 0 0 auto;
+}
+
 .entry-editor-markdown-anchor {
     position: relative;
     min-height: 0;
     height: 100%;
+}
+
+.entry-editor-workspace.is-editing .entry-editor-markdown-anchor {
+    height: auto;
 }
 
 .entry-editor-preview {
@@ -514,9 +558,7 @@
 
 .entry-editor-wikilink-popover,
 .entry-editor-link-preview {
-    position: absolute;
     z-index: 4;
-    width: min(24rem, calc(100% - 2rem));
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     border-radius: 1rem;
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 3%);
@@ -525,7 +567,16 @@
 }
 
 .entry-editor-wikilink-popover {
+    position: absolute;
     max-width: min(24rem, calc(100% - 1.5rem));
+    width: min(24rem, calc(100% - 2rem));
+}
+
+.entry-editor-link-preview {
+    position: fixed;
+    width: min(24rem, calc(100vw - 1.5rem));
+    max-height: min(28rem, calc(100vh - 1.5rem));
+    z-index: 12;
 }
 
 .entry-editor-wikilink-popover__header,

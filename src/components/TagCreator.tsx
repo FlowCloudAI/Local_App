@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {
     db_create_tag_schema,
+    db_delete_tag_schema,
     db_update_tag_schema,
     entryTypeKey,
     type EntryTypeView,
@@ -53,6 +54,7 @@ interface TagCreatorProps {
     existingCount?: number
     onClose: () => void
     onSaved?: (schema: TagSchema) => void
+    onDeleted?: (schemaId: string) => void
 }
 
 export default function TagCreator({
@@ -64,6 +66,7 @@ export default function TagCreator({
     existingCount = 0,
     onClose,
     onSaved,
+    onDeleted,
 }: TagCreatorProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
@@ -194,6 +197,26 @@ export default function TagCreator({
                 : await db_create_tag_schema(payload)
             void showAlert(isEditMode ? '标签已更新' : '标签已创建', 'success', 'toast', 1000)
             onSaved?.(schema)
+            onClose()
+        } catch (e) {
+            setApiError(String(e))
+            setSubmitting(false)
+        }
+    }
+
+    async function handleDelete() {
+        if (!initialTag || submitting) return
+
+        const confirmed = await showAlert(`确认删除标签“${initialTag.name}”？`, 'warning', 'confirm')
+        if (!confirmed) return
+
+        setSubmitting(true)
+        setApiError(null)
+
+        try {
+            await db_delete_tag_schema(initialTag.id)
+            void showAlert('标签已删除', 'success', 'toast', 1000)
+            onDeleted?.(initialTag.id)
             onClose()
         } catch (e) {
             setApiError(String(e))
@@ -425,12 +448,21 @@ export default function TagCreator({
                 </div>
 
                 <div className="tag-creator-footer">
-                    <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
-                        取消
-                    </Button>
-                    <Button size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
-                        {submitting ? (isEditMode ? '保存中…' : '创建中…') : (isEditMode ? '保存' : '创建')}
-                    </Button>
+                    {isEditMode ? (
+                        <Button variant="ghost" size="sm" onClick={() => void handleDelete()} disabled={submitting}>
+                            删除
+                        </Button>
+                    ) : (
+                        <span />
+                    )}
+                    <div className="tag-creator-footer__actions">
+                        <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+                            取消
+                        </Button>
+                        <Button size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+                            {submitting ? (isEditMode ? '保存中…' : '创建中…') : (isEditMode ? '保存' : '创建')}
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>,

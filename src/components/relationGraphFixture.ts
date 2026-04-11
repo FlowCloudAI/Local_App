@@ -1,3 +1,4 @@
+import { convertFileSrc } from '@tauri-apps/api/core'
 import type { RelationEdgeInput, RelationNodeInput } from 'flowcloudai-ui'
 import type { EntryBrief, EntryRelation, RelationDirection } from '../api'
 
@@ -8,6 +9,12 @@ export type RelationDemoNode = RelationNodeInput & {
     title: string
     summary: string
     cover_image: string
+}
+
+function toEntryCoverSrc(cover?: string | null): string | undefined {
+    if (!cover) return undefined
+    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(cover)) return cover
+    return convertFileSrc(String(cover), 'fcimg')
 }
 
 function createCoverImage(seed: string, accent: string, text: string): string {
@@ -183,7 +190,7 @@ export function toRelationNodes(entries: EntryBrief[]): RelationDemoNode[] {
         label: entry.title,
         title: entry.title,
         summary: entry.summary ?? '暂无摘要',
-        cover_image: entry.cover ?? createCoverImage(entry.id, '#64748b', entry.title.slice(0, 2)),
+        cover_image: toEntryCoverSrc(entry.cover) ?? createCoverImage(entry.id, '#64748b', entry.title.slice(0, 2)),
     }))
 }
 

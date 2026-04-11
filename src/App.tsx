@@ -2,7 +2,7 @@ import './App.css'
 import "./api"
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {type CSSProperties, useCallback, useEffect, useState} from "react";
+import {type CSSProperties, useCallback, useEffect, useMemo, useState} from "react";
 import ProjectList from "./pages/ProjectList.tsx";
 import ProjectEditor from "./pages/ProjectEditor";
 import Settings from "./pages/Settings";
@@ -35,9 +35,22 @@ function App() {
     const [projectTabMap, setProjectTabMap] = useState<Record<string, string>>({});
     const [entryTabMap, setEntryTabMap] = useState<Record<string, EntryTabMeta>>({});
     const [entryDirtyMap, setEntryDirtyMap] = useState<Record<string, boolean>>({});
+    const [recentPageKeys, setRecentPageKeys] = useState<string[]>([])
 
     const [selectedKey, setSelectedKey] = useState('home')
     const [collapsed, setCollapsed] = useState(false)
+
+    const showHomeWorkspace = useCallback(() => {
+        setSelectedKey('home')
+        setCollapsed(true)
+    }, [])
+
+    const touchRecentPage = useCallback((tabKey: string) => {
+        setRecentPageKeys((prev) => {
+            const next = [...prev.filter((key) => key !== tabKey), tabKey]
+            return next.slice(-10)
+        })
+    }, [])
 
     // 新增标签（通用）
     const handleAdd = useCallback(() => {
@@ -49,22 +62,24 @@ function App() {
     // 打开项目标签页
     const handleOpenProject = useCallback((project: Project) => {
         const tabKey = `proj-${project.id}`;
-        setTabs(prev => prev.find(t => t.key === tabKey)
-            ? prev
-            : [...prev, {key: tabKey, label: project.name, closable: true}]
-        );
+        setTabs((prev) => {
+            const index = prev.findIndex((tab) => tab.key === tabKey)
+            if (index === -1) return [...prev, {key: tabKey, label: project.name, closable: true}]
+            return prev.map((tab) => tab.key === tabKey ? {...tab, label: project.name, closable: true} : tab)
+        });
         setProjectTabMap(prev => prev[tabKey] === project.id ? prev : {...prev, [tabKey]: project.id});
         setActiveKey(tabKey);
-        setSelectedKey('home');
-        setCollapsed(true);
-    }, []);
+        touchRecentPage(tabKey)
+        showHomeWorkspace();
+    }, [showHomeWorkspace, touchRecentPage]);
 
     const handleOpenEntry = useCallback((projectId: string, entry: { id: string; title: string }) => {
         const tabKey = `entry-${projectId}-${entry.id}`;
-        setTabs(prev => prev.find(t => t.key === tabKey)
-            ? prev.map(tab => tab.key === tabKey ? {...tab, label: entry.title} : tab)
-            : [...prev, {key: tabKey, label: entry.title, closable: true}]
-        );
+        setTabs((prev) => {
+            const index = prev.findIndex((tab) => tab.key === tabKey)
+            if (index === -1) return [...prev, {key: tabKey, label: entry.title, closable: true}]
+            return prev.map((tab) => tab.key === tabKey ? {...tab, label: entry.title, closable: true} : tab)
+        });
         setEntryTabMap(prev => ({
             ...prev,
             [tabKey]: {
@@ -73,9 +88,9 @@ function App() {
             },
         }));
         setActiveKey(tabKey);
-        setSelectedKey('home');
-        setCollapsed(true);
-    }, []);
+        touchRecentPage(tabKey)
+        showHomeWorkspace();
+    }, [showHomeWorkspace, touchRecentPage]);
 
     const handleEntryTitleChange = useCallback((projectId: string, entry: { id: string; title: string }) => {
         const tabKey = `entry-${projectId}-${entry.id}`;
@@ -96,21 +111,37 @@ function App() {
         })
     }, [])
 
+    const activateProjectTab = useCallback((projectId: string) => {
+        const tabKey = `proj-${projectId}`
+        setActiveKey(tabKey);
+        touchRecentPage(tabKey)
+        showHomeWorkspace();
+    }, [showHomeWorkspace, touchRecentPage]);
+
     const handleBackToProject = useCallback(async (projectId: string) => {
         const entryTabKey = activeKey
         if (entryTabMap[entryTabKey]?.projectId === projectId && entryDirtyMap[entryTabKey]) {
             const res = await showAlert('当前词条有未保存更改，返回会丢失这些修改。是否继续返回？', 'warning', 'confirm')
             if (res !== 'yes') return
         }
-        setActiveKey(`proj-${projectId}`);
-        setSelectedKey('home');
-        setCollapsed(true);
-    }, [activeKey, entryDirtyMap, entryTabMap, showAlert]);
+        activateProjectTab(projectId);
+    }, [activeKey, activateProjectTab, entryDirtyMap, entryTabMap, showAlert]);
 
     const handleTabChange = useCallback((key: string) => {
-        if (key === activeKey) return
+        const shouldShowHomeWorkspace = Boolean(projectTabMap[key] || entryTabMap[key])
+        if (key === activeKey) {
+            if (shouldShowHomeWorkspace && selectedKey !== 'home') {
+                touchRecentPage(key)
+                showHomeWorkspace()
+            }
+            return
+        }
         setActiveKey(key);
-    }, [activeKey])
+        if (shouldShowHomeWorkspace) {
+            touchRecentPage(key)
+            showHomeWorkspace()
+        }
+    }, [activeKey, entryTabMap, projectTabMap, selectedKey, showHomeWorkspace, touchRecentPage])
 
     // 删除标签
     const handleClose = useCallback(async (key: string) => {
@@ -152,16 +183,46 @@ function App() {
             }
             return next
         })
+        setRecentPageKeys(prev => prev.filter((tabKey) => !keysToRemove.has(tabKey)))
         if (keysToRemove.has(activeKey)) {
             const closedIndex = tabs.findIndex(tab => tab.key === key);
             const nextTab = newTabs[closedIndex] || newTabs[closedIndex - 1];
+            if (nextTab?.key) {
+                if (projectTabMap[nextTab.key] || entryTabMap[nextTab.key]) {
+                    touchRecentPage(nextTab.key)
+                    showHomeWorkspace()
+                }
+            } else {
+                setSelectedKey('home')
+            }
             setActiveKey(nextTab?.key ?? '');
         }
-    }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, tabs]);
+    }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, showHomeWorkspace, tabs, touchRecentPage]);
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
-    const projectTabs = tabs.filter(tab => Boolean(projectTabMap[tab.key]))
+    const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
+    const recentProjectIds = useMemo(() => new Set(
+        recentPageKeys
+            .map((key) => projectTabMap[key] ?? entryTabMap[key]?.projectId ?? null)
+            .filter((projectId): projectId is string => Boolean(projectId))
+    ), [entryTabMap, projectTabMap, recentPageKeys])
+    const projectTabs = useMemo(() => tabs.filter((tab) => {
+        const projectId = projectTabMap[tab.key]
+        return Boolean(projectId && recentProjectIds.has(projectId))
+    }), [projectTabMap, recentProjectIds, tabs])
+    const openEntryIdsByProject = useMemo(() => {
+        const next: Record<string, string[]> = {}
+        for (const item of tabs) {
+            const entryMeta = entryTabMap[item.key]
+            if (!entryMeta || !recentPageKeySet.has(item.key)) continue
+            if (!next[entryMeta.projectId]) {
+                next[entryMeta.projectId] = []
+            }
+            next[entryMeta.projectId].push(entryMeta.entryId)
+        }
+        return next
+    }, [entryTabMap, recentPageKeySet, tabs])
 
     // 侧边栏相关状态
     const HomeIcon = (
@@ -258,6 +319,7 @@ function App() {
                         tauriDragRegion
                         minTabWidth={"10rem"}
                         items={tabs}
+                        placement={"right"}
                         activeKey={activeKey}
                         onReorder={setTabs}
                         onChange={(key) => {
@@ -266,7 +328,7 @@ function App() {
                         }}
                         onClose={(key) => {
                             console.log('关闭:', key);
-                            handleClose(key);
+                            handleClose(key).then();
                         }}
                         onAdd={() => {
                             console.log('新增标签页');
@@ -347,9 +409,7 @@ function App() {
                                         <ProjectEditor
                                             projectId={projectId}
                                             activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
-                                            openEntryIds={Object.values(entryTabMap)
-                                                .filter(meta => meta.projectId === projectId)
-                                                .map(meta => meta.entryId)}
+                                            openEntryIds={openEntryIdsByProject[projectId] ?? []}
                                             onOpenEntry={handleOpenEntry}
                                             onEntryTitleChange={handleEntryTitleChange}
                                             onBackToProject={handleBackToProject}

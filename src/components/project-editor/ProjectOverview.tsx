@@ -85,10 +85,19 @@ function normalizeTagTargets(target: TagSchema['target'] | string | null | undef
     }
 }
 
-function formatTagTargets(tag: TagSchema, entryTypeNameMap: Map<string, string>): string {
-    const targets = normalizeTagTargets(tag.target)
-    if (!targets.length) return '未设置植入类型'
-    return targets.map(target => entryTypeNameMap.get(target) ?? target).join('、')
+function getTagTargetLabels(tag: TagSchema, entryTypeNameMap: Map<string, string>): string[] {
+    return normalizeTagTargets(tag.target).map(target => entryTypeNameMap.get(target) ?? target)
+}
+
+function getCompactTagTargetLabels(tag: TagSchema, entryTypeNameMap: Map<string, string>): string[] {
+    const labels = getTagTargetLabels(tag, entryTypeNameMap)
+    if (labels.length <= 3) return labels
+    return [...labels.slice(0, 2), `+${labels.length - 2}`]
+}
+
+function getTagDefaultValue(tag: TagSchema): string | null {
+    if (tag.default_val == null || tag.default_val === '') return null
+    return String(tag.default_val)
 }
 
 function RelationGraphIcon() {
@@ -301,45 +310,48 @@ function ProjectOverview({
                         <div>
                             <h2 className="pe-feature-section__title">词条类型</h2>
                             <p className="pe-feature-section__desc">
-                                查看所有可用词条类型，自定义类型支持直接进入编辑。
+                                浏览全部词条类型；自定义类型可直接编辑。
                             </p>
                         </div>
                         <Button variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
                     </div>
 
-                    <RollingBox className="pe-config-list" thumbSize="thin">
-                        <div className="pe-config-list__inner">
+                    <RollingBox className="pe-config-list pe-config-list--entry-types" thumbSize="thin">
+                        <div className="pe-config-list__inner pe-entry-type-grid">
                             {entryTypes.map(entryType => {
                                 const isBuiltin = entryType.kind === 'builtin'
                                 return (
                                     <article
                                         key={entryTypeKey(entryType)}
-                                        className="pe-config-item"
+                                        className="pe-entry-type-item"
                                         style={{'--pe-config-color': entryType.color} as CSSProperties}
                                     >
-                                        <div className="pe-config-item__main">
-                                            <div className="pe-config-item__title-row">
-                                                <span className="pe-config-item__icon">
-                                                    <EntryTypeIcon entryType={entryType} className="pe-config-item__entry-icon"/>
-                                                </span>
-                                                <span className="pe-config-item__title">{entryType.name}</span>
-                                                <span className="pe-config-item__badge">
-                                                    {isBuiltin ? '内置' : '自定义'}
-                                                </span>
+                                        <div className="pe-entry-type-item__main">
+                                            <div className="pe-entry-type-item__header">
+                                                <div className="pe-entry-type-item__title-row">
+                                                    <span className="pe-entry-type-item__icon">
+                                                        <EntryTypeIcon entryType={entryType} className="pe-config-item__entry-icon"/>
+                                                    </span>
+                                                    <span className="pe-config-item__title">{entryType.name}</span>
+                                                    <span className="pe-config-item__badge">
+                                                        {isBuiltin ? '内置' : '自定义'}
+                                                    </span>
+                                                </div>
+                                                {!isBuiltin && onEditEntryType && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => onEditEntryType(entryType)}
+                                                    >
+                                                        编辑
+                                                    </Button>
+                                                )}
                                             </div>
-                                            <p className="pe-config-item__desc">
-                                                {entryType.description || '暂无描述'}
-                                            </p>
                                         </div>
-
-                                        {!isBuiltin && onEditEntryType && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => onEditEntryType(entryType)}
-                                            >
-                                                编辑
-                                            </Button>
+                                        {entryType.description && (
+                                            <p className="pe-entry-type-item__desc">
+                                                {entryType.description}
+                                            </p>
                                         )}
                                     </article>
                                 )
@@ -353,40 +365,62 @@ function ProjectOverview({
                         <div>
                             <h2 className="pe-feature-section__title">标签</h2>
                             <p className="pe-feature-section__desc">
-                                管理标签类型、默认值以及它们适用的词条范围。
+                                管理标签类型、默认值和默认植入范围。
                             </p>
                         </div>
                         <Button variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
                     </div>
 
-                    <RollingBox className="pe-config-list" thumbSize="thin">
-                        <div className="pe-config-list__inner">
-                            {tagSchemas.map(tag => (
-                                <article key={tag.id} className="pe-config-item is-tag">
-                                    <div className="pe-config-item__main">
-                                        <div className="pe-config-item__title-row">
-                                            <span className="pe-config-item__title">{tag.name}</span>
-                                            <span className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
+                    <RollingBox className="pe-config-list pe-config-list--tags" thumbSize="thin">
+                        <div className="pe-config-list__inner pe-entry-type-grid">
+                            {tagSchemas.map(tag => {
+                                const compactTargets = getCompactTagTargetLabels(tag, entryTypeNameMap)
+                                const defaultValue = getTagDefaultValue(tag)
+                                const hasDescription = Boolean(tag.description?.trim())
+                                return (
+                                    <article key={tag.id} className="pe-entry-type-item pe-entry-type-item--tag">
+                                        <div className="pe-entry-type-item__main">
+                                            <div className="pe-entry-type-item__header">
+                                                <div className="pe-entry-type-item__title-row">
+                                                    <span className="pe-entry-type-item__icon pe-entry-type-item__icon--tag">
+                                                        #
+                                                    </span>
+                                                    <span className="pe-config-item__title">{tag.name}</span>
+                                                    <span className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
+                                                </div>
+                                                {onEditTag && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => onEditTag(tag)}
+                                                    >
+                                                        编辑
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="pe-tag-config-item__meta-row">
+                                                {defaultValue && (
+                                                    <span className="pe-config-item__badge is-muted">默认值：{defaultValue}</span>
+                                                )}
+                                                {compactTargets.length > 0 ? (
+                                                    compactTargets.map(target => (
+                                                        <span key={`${tag.id}-${target}`} className="pe-tag-target-chip">
+                                                            {target}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="pe-tag-target-chip is-free">自由标签</span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <p className="pe-config-item__desc">
-                                            {tag.description || '暂无描述'}
-                                        </p>
-                                        <p className="pe-config-item__meta">
-                                            植入类型：{formatTagTargets(tag, entryTypeNameMap)}
-                                        </p>
-                                    </div>
-
-                                    {onEditTag && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => onEditTag(tag)}
-                                        >
-                                            编辑
-                                        </Button>
-                                    )}
-                                </article>
-                            ))}
+                                        {hasDescription && (
+                                            <p className="pe-entry-type-item__desc">
+                                                {tag.description}
+                                            </p>
+                                        )}
+                                    </article>
+                                )
+                            })}
                         </div>
                     </RollingBox>
                 </section>

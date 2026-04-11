@@ -206,6 +206,10 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
             setSelection({kind: 'category', id: key})
             setProjectPanel('overview')
         }
+
+        if (activeEntryId) {
+            void onBackToProject?.(projectId)
+        }
     }
 
     const handleRename = async (key: string, newName: string) => {
@@ -358,6 +362,9 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
         return flatToTree(flatRows)
     }, [project?.name, categories])
 
+    const visibleEntryIds = useMemo(() => openEntryIds.slice(-10), [openEntryIds])
+    const hasActiveEntry = Boolean(activeEntryId)
+
     if (!project) {
         return <div className="pe-loading">加载中…</div>
     }
@@ -407,80 +414,95 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
             </div>
 
             <div className="pe-content">
-                {activeEntryId ? (
-                    <EntryEditor
-                        entryId={activeEntryId}
-                        projectId={projectId}
-                        projectName={project.name}
-                        categories={categories}
-                        entryTypes={entryTypes}
-                        tagSchemas={tagSchemas}
-                        openEntryIds={openEntryIds}
-                        onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                        onTitleChange={async (updatedEntry) => {
-                            onEntryTitleChange?.(projectId, {
-                                id: updatedEntry.id,
-                                title: updatedEntry.title,
-                            })
-                        }}
-                        onSaved={async () => {
-                            touchProjectUpdatedAt()
-                        }}
-                        onTagSchemasChange={async (schemas) => {
-                            setTagSchemas(schemas)
-                            await refreshProject()
-                            touchProjectUpdatedAt()
-                        }}
-                        onBack={() => onBackToProject?.(projectId)}
-                        onDirtyChange={(dirty) => {
-                            onEntryDirtyChange?.(projectId, activeEntryId, dirty)
-                        }}
-                    />
-                ) : selection.kind === 'project' ? (
-                    projectPanel === 'overview' ? (
-                        <ProjectOverview
-                            project={project}
-                            categories={categories}
+                <div className={`pe-project-view${hasActiveEntry ? '' : ' active'}`}>
+                    {selection.kind === 'project' ? (
+                        projectPanel === 'overview' ? (
+                            <ProjectOverview
+                                project={project}
+                                categories={categories}
+                                entryTypes={entryTypes}
+                                tagSchemas={tagSchemas}
+                                entryCount={entryCount}
+                                tagCount={tagSchemas.length}
+                                onCreateTag={() => {
+                                    setEditingTag(null)
+                                    setTagCreatorOpen(true)
+                                }}
+                                onCreateEntryType={() => {
+                                    setEditingEntryType(null)
+                                    setEntryTypeCreatorOpen(true)
+                                }}
+                                onEditTag={(tag) => {
+                                    setEditingTag(tag)
+                                    setTagCreatorOpen(true)
+                                }}
+                                onEditEntryType={(entryType) => {
+                                    setEditingEntryType(entryType)
+                                    setEntryTypeCreatorOpen(true)
+                                }}
+                                onOpenRelationGraph={() => setProjectPanel('relation-graph')}
+                            />
+                        ) : (
+                            <div className="pe-project-panel">
+                                <ProjectRelationGraph
+                                    projectId={projectId}
+                                    onBack={() => setProjectPanel('overview')}
+                                />
+                            </div>
+                        )
+                    ) : (
+                        <CategoryView
+                            key={selection.id}
+                            categoryId={selection.id}
+                            projectId={projectId}
                             entryTypes={entryTypes}
                             tagSchemas={tagSchemas}
-                            entryCount={entryCount}
-                            tagCount={tagSchemas.length}
-                            onCreateTag={() => {
-                                setEditingTag(null)
-                                setTagCreatorOpen(true)
+                            onEntryCreated={async () => {
+                                setEntryCount(count => count + 1)
+                                touchProjectUpdatedAt()
                             }}
-                            onCreateEntryType={() => {
-                                setEditingEntryType(null)
-                                setEntryTypeCreatorOpen(true)
-                            }}
-                            onEditTag={(tag) => {
-                                setEditingTag(tag)
-                                setTagCreatorOpen(true)
-                            }}
-                            onEditEntryType={(entryType) => {
-                                setEditingEntryType(entryType)
-                                setEntryTypeCreatorOpen(true)
-                            }}
-                            onOpenRelationGraph={() => setProjectPanel('relation-graph')}
+                            onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                         />
-                    ) : (
-                        <div className="pe-project-panel">
-                            <ProjectRelationGraph onBack={() => setProjectPanel('overview')}/>
+                    )}
+                </div>
+
+                <div className={`pe-entry-stack${hasActiveEntry ? ' active' : ''}`}>
+                    {visibleEntryIds.map((entryId) => (
+                        <div
+                            key={entryId}
+                            className={`pe-entry-layer${entryId === activeEntryId ? ' active' : ''}`}
+                        >
+                            <EntryEditor
+                                entryId={entryId}
+                                projectId={projectId}
+                                projectName={project.name}
+                                categories={categories}
+                                entryTypes={entryTypes}
+                                tagSchemas={tagSchemas}
+                                openEntryIds={visibleEntryIds}
+                                onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
+                                onTitleChange={async (updatedEntry) => {
+                                    onEntryTitleChange?.(projectId, {
+                                        id: updatedEntry.id,
+                                        title: updatedEntry.title,
+                                    })
+                                }}
+                                onSaved={async () => {
+                                    touchProjectUpdatedAt()
+                                }}
+                                onTagSchemasChange={async (schemas) => {
+                                    setTagSchemas(schemas)
+                                    await refreshProject()
+                                    touchProjectUpdatedAt()
+                                }}
+                                onBack={() => onBackToProject?.(projectId)}
+                                onDirtyChange={(dirty) => {
+                                    onEntryDirtyChange?.(projectId, entryId, dirty)
+                                }}
+                            />
                         </div>
-                    )
-                ) : (
-                    <CategoryView
-                        key={selection.id}
-                        categoryId={selection.id}
-                        projectId={projectId}
-                        entryTypes={entryTypes}
-                        onEntryCreated={async () => {
-                            setEntryCount(count => count + 1)
-                            touchProjectUpdatedAt()
-                        }}
-                        onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                    />
-                )}
+                    ))}
+                </div>
             </div>
 
             <TagCreator
@@ -500,6 +522,13 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                         if (index === -1) return [...prev, schema]
                         return prev.map(item => item.id === schema.id ? schema : item)
                     })
+                    await refreshProject()
+                    touchProjectUpdatedAt()
+                }}
+                onDeleted={async (schemaId) => {
+                    setTagSchemas(prev => prev.filter(item => item.id !== schemaId))
+                    setTagCreatorOpen(false)
+                    setEditingTag(null)
                     await refreshProject()
                     touchProjectUpdatedAt()
                 }}
@@ -523,6 +552,13 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                             item.kind === 'custom' && item.id === entryType.id ? nextEntryType : item
                         )
                     })
+                    await refreshProject()
+                    touchProjectUpdatedAt()
+                }}
+                onDeleted={async (entryTypeId) => {
+                    setEntryTypes(prev => prev.filter(item => !(item.kind === 'custom' && item.id === entryTypeId)))
+                    setEntryTypeCreatorOpen(false)
+                    setEditingEntryType(null)
                     await refreshProject()
                     touchProjectUpdatedAt()
                 }}

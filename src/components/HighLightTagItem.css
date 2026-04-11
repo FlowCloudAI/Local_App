@@ -1,0 +1,170 @@
+.highlight-tag-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    min-width: min(100%, 18rem);
+    padding: 0.95rem 1rem;
+    border-radius: 1.15rem;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 14%, transparent), transparent 58%),
+        color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 3%);
+    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
+    box-shadow:
+        0 14px 36px color-mix(in srgb, var(--fc-color-primary) 12%, transparent),
+        inset 0 1px 0 color-mix(in srgb, white 45%, transparent);
+}
+
+.highlight-tag-item__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.8rem;
+    align-items: flex-start;
+}
+
+.highlight-tag-item__title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.highlight-tag-item__eyebrow {
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    color: var(--fc-color-primary);
+}
+
+.highlight-tag-item__title {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.25;
+    color: var(--fc-color-text);
+}
+
+.highlight-tag-item__type {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    padding: 0.28rem 0.58rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
+    color: var(--fc-color-primary);
+    font-size: 0.72rem;
+    line-height: 1;
+}
+
+.highlight-tag-item__type.is-number {
+    background: color-mix(in srgb, #f59e0b 16%, transparent);
+    color: #b45309;
+}
+
+.highlight-tag-item__type.is-boolean {
+    background: color-mix(in srgb, #10b981 16%, transparent);
+    color: #047857;
+}
+
+.highlight-tag-item__hint {
+    margin: 0;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--fc-color-text-secondary);
+}
+
+.highlight-tag-item__value {
+    min-height: 3.4rem;
+    display: flex;
+    align-items: center;
+    padding: 0.78rem 0.9rem;
+    border-radius: 0.95rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 90%, white 4%);
+    color: var(--fc-color-text);
+    font-size: 0.94rem;
+    line-height: 1.5;
+    font-weight: 600;
+}
+
+.highlight-tag-item__value.is-empty {
+    color: var(--fc-color-text-secondary);
+    font-weight: 500;
+}
+
+.highlight-tag-item__editor {
+    display: flex;
+    gap: 0.55rem;
+    align-items: stretch;
+}
+
+.highlight-tag-item__input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.76rem 0.88rem;
+    border-radius: 0.95rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 20%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-bg) 90%, white 4%);
+    color: var(--fc-color-text);
+    font-size: 0.9rem;
+}
+
+.highlight-tag-item__input:focus {
+    outline: none;
+    border-color: var(--fc-color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
+}
+
+.highlight-tag-item__clear,
+.highlight-tag-item__bool-chip {
+    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 18%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
+    color: var(--fc-color-text);
+    cursor: pointer;
+    transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.highlight-tag-item__clear {
+    flex-shrink: 0;
+    padding: 0 0.9rem;
+    border-radius: 0.95rem;
+    font-size: 0.82rem;
+}
+
+.highlight-tag-item__clear:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.highlight-tag-item__bool-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+}
+
+.highlight-tag-item__bool-chip {
+    min-height: 3rem;
+    padding: 0.62rem 0.75rem;
+    border-radius: 0.95rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.highlight-tag-item__bool-chip.active,
+.highlight-tag-item__clear:not(:disabled):hover,
+.highlight-tag-item__bool-chip:hover {
+    border-color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+    color: var(--fc-color-primary);
+}
+
+@media (max-width: 720px) {
+    .highlight-tag-item {
+        min-width: 100%;
+    }
+
+    .highlight-tag-item__editor {
+        flex-direction: column;
+    }
+
+    .highlight-tag-item__clear {
+        min-height: 2.75rem;
+    }
+}

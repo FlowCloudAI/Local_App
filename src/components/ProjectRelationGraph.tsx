@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
     Button,
     RelationGraph,
@@ -8,10 +8,14 @@ import {
     type RelationLayoutState,
     type RelationNodeInput,
 } from 'flowcloudai-ui'
-import { compute_layout } from '../api'
 import {
-    DEMO_ENTRIES,
-    DEMO_RELATIONS,
+    compute_layout,
+    db_list_entries,
+    db_list_relations_for_project,
+    type EntryBrief,
+    type EntryRelation,
+} from '../api'
+import {
     type RelationDemoNode,
     toRelationEdges,
     toRelationNodes,
@@ -20,6 +24,7 @@ import './RelationDemo.css'
 import './ProjectRelationGraph.css'
 
 interface ProjectRelationGraphProps {
+    projectId: string
     onBack?: () => void
 }
 
@@ -51,15 +56,46 @@ const INITIAL_LAYOUT_STATE: RelationLayoutState = {
     layoutError: null,
 }
 
-export default function ProjectRelationGraph({onBack}: ProjectRelationGraphProps) {
+function normalizeError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(typeof error === 'string' ? error : '未知错误')
+}
+
+export default function ProjectRelationGraph({projectId, onBack}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
+    const [entries, setEntries] = useState<EntryBrief[]>([])
+    const [relations, setRelations] = useState<EntryRelation[]>([])
+    const [dataLoading, setDataLoading] = useState(false)
+    const [dataError, setDataError] = useState<Error | null>(null)
     const [layoutState, setLayoutState] = useState<RelationLayoutState>(INITIAL_LAYOUT_STATE)
 
-    const entries = useMemo(() => DEMO_ENTRIES, [])
-    const relations = useMemo(() => DEMO_RELATIONS, [])
     const nodes = useMemo(() => toRelationNodes(entries), [entries])
     const nodeIds = useMemo(() => new Set(entries.map((entry) => entry.id)), [entries])
     const edges = useMemo(() => toRelationEdges(relations, nodeIds), [nodeIds, relations])
+
+    const loadGraphData = useCallback(async () => {
+        setDataLoading(true)
+        setDataError(null)
+
+        try {
+            const [nextEntries, nextRelations] = await Promise.all([
+                db_list_entries({projectId, limit: 1000, offset: 0}),
+                db_list_relations_for_project(projectId),
+            ])
+
+            setEntries(nextEntries)
+            setRelations(nextRelations)
+            setLayoutState(INITIAL_LAYOUT_STATE)
+            setGraphKey((prev) => prev + 1)
+        } catch (error) {
+            setDataError(normalizeError(error))
+        } finally {
+            setDataLoading(false)
+        }
+    }, [projectId])
+
+    useEffect(() => {
+        void loadGraphData()
+    }, [loadGraphData])
 
     const layoutFn = useCallback<LayoutFunction>(async (request: LayoutRequest): Promise<LayoutResponse> => {
         const response = await compute_layout({
@@ -76,9 +112,8 @@ export default function ProjectRelationGraph({onBack}: ProjectRelationGraphProps
     }, [])
 
     const handleRefresh = useCallback(() => {
-        setLayoutState(INITIAL_LAYOUT_STATE)
-        setGraphKey((prev) => prev + 1)
-    }, [])
+        void loadGraphData()
+    }, [loadGraphData])
 
     const renderNode = useCallback((data: RelationNodeInput, selected: boolean) => {
         const node = data as RelationDemoNode
@@ -118,17 +153,25 @@ export default function ProjectRelationGraph({onBack}: ProjectRelationGraphProps
                     )}
                 </div>
                 <div className="project-relation-graph__toolbar-right">
-                    <Button size="sm" variant="outline" onClick={handleRefresh}>
-                        刷新
+                    <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
+                        {dataLoading ? '刷新中' : '刷新'}
                     </Button>
                 </div>
             </div>
 
             <div className="project-relation-graph__meta">
                 业务数据：{entries.length} 个词条，{relations.length} 条关系
+                {dataLoading && ' · 数据加载中'}
+                {dataError && ' · 数据加载失败'}
                 {layoutState.layoutLoading && ' · 布局计算中'}
                 {layoutState.layoutError && ' · 布局失败'}
             </div>
+
+            {dataError && (
+                <div className="project-relation-graph__error">
+                    数据加载失败：{dataError.message}
+                </div>
+            )}
 
             {layoutState.layoutError && (
                 <div className="project-relation-graph__error">
@@ -137,17 +180,25 @@ export default function ProjectRelationGraph({onBack}: ProjectRelationGraphProps
             )}
 
             <div className="project-relation-graph__shell">
-                <RelationGraph
-                    key={graphKey}
-                    nodes={nodes}
-                    edges={edges}
-                    layoutFn={layoutFn}
-                    renderNode={renderNode}
-                    height={720}
-                    fitPadding={0.12}
-                    fitDuration={500}
-                    onLayoutStateChange={setLayoutState}
-                />
+                {dataLoading && entries.length === 0 ? (
+                    <div className="project-relation-graph__notice">正在加载项目关系数据…</div>
+                ) : dataError ? (
+                    <div className="project-relation-graph__notice">无法展示关系图，请先处理数据加载错误。</div>
+                ) : entries.length === 0 ? (
+                    <div className="project-relation-graph__notice">当前项目还没有词条，暂时无法生成关系图。</div>
+                ) : (
+                    <RelationGraph
+                        key={graphKey}
+                        nodes={nodes}
+                        edges={edges}
+                        layoutFn={layoutFn}
+                        renderNode={renderNode}
+                        height={720}
+                        fitPadding={0.12}
+                        fitDuration={500}
+                        onLayoutStateChange={setLayoutState}
+                    />
+                )}
             </div>
         </div>
     )

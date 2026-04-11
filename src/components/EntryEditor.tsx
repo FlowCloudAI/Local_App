@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog'
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, MarkdownEditor, Select, TagItem, useAlert } from 'flowcloudai-ui'
+import { Button, MarkdownEditor, RollingBox, Select, TagItem, useAlert } from 'flowcloudai-ui'
 import {
     db_create_entry,
     db_get_entry,
@@ -12,13 +12,17 @@ import {
     type Category,
     type Entry,
     type EntryBrief,
-    type EntryTag,
     type EntryTypeView,
     type FCImage,
     type TagSchema,
 } from '../api'
 import EntryImageLightbox from './EntryImageLightbox'
+import HighLightTagItem from './HighLightTagItem'
 import TagCreator from './TagCreator'
+import {
+    buildEntryTagsPayload,
+    ensureTypeTargetTagValues,
+} from './entryTagUtils'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryEditor.css'
 
@@ -33,6 +37,11 @@ type WikiDraft = {
 type LinkPreviewState = {
     title: string
     entryId: string | null
+}
+
+type LinkPreviewPosition = {
+    top: number
+    left: number
 }
 
 type WikiPopoverPosition = {
@@ -224,6 +233,10 @@ function buildMarkdownPreviewSource(content: string): string {
     })
 }
 
+function normalizeEntryLookupTitle(value?: string | null): string {
+    return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
 function resolveActiveWikiDraft(value: string, cursor: number | null): WikiDraft | null {
     if (cursor == null) return null
     const beforeCursor = value.slice(0, cursor)
@@ -301,23 +314,6 @@ function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
             && image.alt === target.alt
             && Boolean(image.is_cover) === Boolean(target.is_cover)
     })
-}
-
-function buildSavedTags(
-    draftTags: Record<string, string | number | boolean | null>,
-    tagSchemas: TagSchema[],
-    originalTags?: EntryTag[] | null,
-): EntryTag[] | null {
-    const schemaIds = new Set(tagSchemas.map((schema) => schema.id))
-    const preservedExtras = (originalTags ?? []).filter((tag) => !tag.schema_id || !schemaIds.has(tag.schema_id))
-    const schemaTags = tagSchemas
-        .map((schema) => ({
-            schema_id: schema.id,
-            value: draftTags[schema.id] ?? draftTags[schema.name] ?? null,
-        }))
-        .filter((tag) => tag.value !== null && tag.value !== '')
-    const merged = [...preservedExtras, ...schemaTags]
-    return merged.length ? merged : null
 }
 
 function mergeUniqueStringValues(values: string[]): string[] {
@@ -407,6 +403,7 @@ export default function EntryEditor({
     const [wikiPopoverPosition, setWikiPopoverPosition] = useState<WikiPopoverPosition>({ top: 16, left: 16 })
     const [projectDataLoading, setProjectDataLoading] = useState(false)
     const [linkPreview, setLinkPreview] = useState<LinkPreviewState | null>(null)
+    const [linkPreviewPosition, setLinkPreviewPosition] = useState<LinkPreviewPosition>({ top: 16, left: 16 })
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [localTagSchemas, setLocalTagSchemas] = useState<TagSchema[]>(tagSchemas)
     const [pinnedTagSchemaIds, setPinnedTagSchemaIds] = useState<string[]>([])
@@ -417,11 +414,13 @@ export default function EntryEditor({
     const entryCacheRef = useRef<Record<string, EntryEditorCache>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
+    const previewContainerRef = useRef<HTMLDivElement | null>(null)
     const prevWikiDraftRef = useRef<WikiDraft | null>(null)
     const onDirtyChangeRef = useRef(onDirtyChange)
     const projectEntriesRef = useRef(projectEntries)
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
     const projectEntryDetailsStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
+    const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     projectEntriesRef.current = projectEntries
     onDirtyChangeRef.current = onDirtyChange
     const { showAlert } = useAlert()
@@ -434,6 +433,10 @@ export default function EntryEditor({
         setPinnedTagSchemaIds([])
         setTagSchemaPickerValue(undefined)
     }, [entryId])
+
+    const closeLinkPreview = useCallback(() => {
+        setLinkPreview(null)
+    }, [])
 
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
@@ -453,7 +456,7 @@ export default function EntryEditor({
         setLoading(true)
         setSaving(false)
         setError(null)
-        setLinkPreview(null)
+        closeLinkPreview()
         setWikiDraft(null)
 
         if (cachedState) {
@@ -486,12 +489,14 @@ export default function EntryEditor({
         return () => {
             cancelled = true
         }
-    }, [entryId])
+    }, [closeLinkPreview, entryId])
 
     // projectId 变化时重置词条列表状态
     useEffect(() => {
         projectEntriesStatusRef.current = 'idle'
         projectEntryDetailsStatusRef.current = 'idle'
+        projectEntriesLoadPromiseRef.current = null
+        projectEntriesRef.current = []
         setProjectEntries([])
     }, [projectId])
 
@@ -530,27 +535,32 @@ export default function EntryEditor({
 
     // 按需加载：进入编辑模式或需要双链时调用
     const ensureProjectEntriesLoaded = useCallback(async () => {
-        if (projectEntriesStatusRef.current !== 'idle') return
+        if (projectEntriesStatusRef.current === 'loaded') return
+        if (projectEntriesLoadPromiseRef.current) return projectEntriesLoadPromiseRef.current
+
         projectEntriesStatusRef.current = 'loading'
-        setProjectDataLoading(true)
-        try {
-            const briefs = await db_list_entries({ projectId, limit: 1000, offset: 0 })
-            setProjectEntries(briefs)
-            projectEntriesStatusRef.current = 'loaded'
-            void ensureProjectEntryDetailsLoaded(briefs)
-        } catch {
-            projectEntriesStatusRef.current = 'idle'
-        } finally {
-            setProjectDataLoading(false)
-        }
+        projectEntriesLoadPromiseRef.current = (async () => {
+            setProjectDataLoading(true)
+            try {
+                const briefs = await db_list_entries({ projectId, limit: 1000, offset: 0 })
+                projectEntriesRef.current = briefs
+                setProjectEntries(briefs)
+                projectEntriesStatusRef.current = 'loaded'
+                void ensureProjectEntryDetailsLoaded(briefs)
+            } catch {
+                projectEntriesStatusRef.current = 'idle'
+            } finally {
+                setProjectDataLoading(false)
+                projectEntriesLoadPromiseRef.current = null
+            }
+        })()
+
+        return projectEntriesLoadPromiseRef.current
     }, [ensureProjectEntryDetailsLoaded, projectId])
 
-    // 进入编辑模式时触发词条列表加载（用于双链联想）
     useEffect(() => {
-        if (editorMode === 'edit') {
-            void ensureProjectEntriesLoaded()
-        }
-    }, [editorMode, ensureProjectEntriesLoaded])
+        void ensureProjectEntriesLoaded()
+    }, [ensureProjectEntriesLoaded])
 
     useEffect(() => {
         return () => {
@@ -608,6 +618,17 @@ export default function EntryEditor({
             cancelled = true
         }
     }, [linkPreview?.entryId])
+
+    useEffect(() => {
+        if (!linkPreview) return
+        const handleViewportChange = () => closeLinkPreview()
+        window.addEventListener('resize', handleViewportChange)
+        window.addEventListener('scroll', handleViewportChange, true)
+        return () => {
+            window.removeEventListener('resize', handleViewportChange)
+            window.removeEventListener('scroll', handleViewportChange, true)
+        }
+    }, [closeLinkPreview, linkPreview])
 
     const typeOptions = useMemo(
         () => entryTypes.map((entryType) => ({
@@ -682,22 +703,22 @@ export default function EntryEditor({
     const projectEntriesLowerMap = useMemo(() => {
         const map = new Map<string, EntryBrief>()
         for (const item of projectEntries) {
-            map.set(item.title.trim().toLowerCase(), item)
+            map.set(normalizeEntryLookupTitle(item.title), item)
         }
         return map
     }, [projectEntries])
 
     const filteredLinkSuggestions = useMemo(() => {
         if (!wikiDraft) return []
-        const query = wikiDraft.query.trim().toLowerCase()
+        const query = normalizeEntryLookupTitle(wikiDraft.query)
         return projectEntries
             .filter((item) => item.id !== entryId)
-            .filter((item) => !query || item.title.toLowerCase().includes(query))
+            .filter((item) => !query || normalizeEntryLookupTitle(item.title).includes(query))
             .slice(0, 8)
     }, [wikiDraft, projectEntries, entryId])
 
     const hasExactSuggestion = useMemo(() => {
-        const query = wikiDraft?.query.trim().toLowerCase()
+        const query = normalizeEntryLookupTitle(wikiDraft?.query)
         if (!query) return false
         const match = projectEntriesLowerMap.get(query)
         return Boolean(match && match.id !== entryId)
@@ -718,14 +739,17 @@ export default function EntryEditor({
 
     // 预览源码缓存：draft.content 不变时不重算
     const previewContent = useMemo(() => buildMarkdownPreviewSource(draft.content), [draft.content])
+    const normalizedCurrentTitle = useMemo(() => normalizeEntryLookupTitle(trimmedTitle), [trimmedTitle])
 
     const backlinks = useMemo(() => {
-        if (!trimmedTitle) return []
+        if (!normalizedCurrentTitle) return []
         return Object.values(entryCache)
             .filter((item) => item.id !== entryId)
-            .filter((item) => extractWikiLinks(item.content).includes(trimmedTitle))
+            .filter((item) => extractWikiLinks(item.content).some((linkTitle) => (
+                normalizeEntryLookupTitle(linkTitle) === normalizedCurrentTitle
+            )))
             .sort((left, right) => parseDateValue(right.updated_at as string | null | undefined) - parseDateValue(left.updated_at as string | null | undefined))
-    }, [entryCache, entryId, trimmedTitle])
+    }, [entryCache, entryId, normalizedCurrentTitle])
 
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
     const isBrowseMode = editorMode === 'browse'
@@ -733,7 +757,10 @@ export default function EntryEditor({
     const linkPreviewEntry = useMemo(() => {
         if (!linkPreview) return null
         if (linkPreview.entryId) return entryCache[linkPreview.entryId] ?? null
-        return Object.values(entryCache).find((item) => item.title === linkPreview.title) ?? null
+        const normalizedLinkTitle = normalizeEntryLookupTitle(linkPreview.title)
+        return Object.values(entryCache).find((item) => (
+            normalizeEntryLookupTitle(item.title) === normalizedLinkTitle
+        )) ?? null
     }, [entryCache, linkPreview])
     const autoVisibleTagSchemaIds = useMemo(
         () => buildAutoVisibleTagSchemaIds(localTagSchemas, draft.tags, draft.type),
@@ -769,13 +796,11 @@ export default function EntryEditor({
         () => buildEntryPath(projectName, categories, entry?.category_id ?? null, infoTitle),
         [projectName, categories, entry?.category_id, infoTitle],
     )
-    const readonlyTags = useMemo(
-        () => visibleTagSchemas.flatMap((schema) => {
-            const value = getComparableTagValue(draft.tags, schema)
-            if (value === null) return []
-            return [{ schema, value }] as const
-        }),
-        [draft.tags, visibleTagSchemas],
+    const browseVisibleTagSchemas = useMemo(
+        () => visibleTagSchemas.filter((schema) => (
+            implantedTagSchemaIdSet.has(schema.id) || getComparableTagValue(draft.tags, schema) !== null
+        )),
+        [draft.tags, implantedTagSchemaIdSet, visibleTagSchemas],
     )
     const entryCreatedAtText = formatDate(entry?.['created_at'] as string | null | undefined)
     const entryUpdatedAtText = formatDate(entry?.updated_at as string | null | undefined)
@@ -788,6 +813,18 @@ export default function EntryEditor({
             return next.length === current.length && next.every((item, index) => item === current[index]) ? current : next
         })
     }, [autoVisibleTagSchemaIds])
+
+    useEffect(() => {
+        setDraft((current) => {
+            const { tags: nextTags } = ensureTypeTargetTagValues(current.tags, localTagSchemas, current.type)
+            return nextTags === current.tags
+                ? current
+                : {
+                    ...current,
+                    tags: nextTags,
+                }
+        })
+    }, [entryId, localTagSchemas, draft.type])
 
     async function handleSave() {
         if (!entry || !canSave) return
@@ -803,24 +840,28 @@ export default function EntryEditor({
                 summary: trimmedSummary || null,
                 content: normalizedContent === '' ? null : normalizedContent,
                 type: draft.type,
-                tags: buildSavedTags(draft.tags, localTagSchemas, entry.tags),
+                tags: buildEntryTagsPayload(draft.tags, localTagSchemas, entry.tags),
                 images: draft.images,
             })
             const refreshed = await db_get_entry(updated.id)
             setEntry(refreshed)
             setDraft(buildDraft(refreshed))
             setEntryCache((current) => ({ ...current, [refreshed.id]: refreshed }))
-            setProjectEntries((current) => current.map((item) => (
-                item.id === refreshed.id
-                    ? {
-                        ...item,
-                        title: refreshed.title,
-                        summary: refreshed.summary ?? null,
-                        type: refreshed.type ?? null,
-                        updated_at: String(refreshed.updated_at ?? ''),
-                    }
-                    : item
-            )))
+            setProjectEntries((current) => {
+                const next = current.map((item) => (
+                    item.id === refreshed.id
+                        ? {
+                            ...item,
+                            title: refreshed.title,
+                            summary: refreshed.summary ?? null,
+                            type: refreshed.type ?? null,
+                            updated_at: String(refreshed.updated_at ?? ''),
+                        }
+                        : item
+                ))
+                projectEntriesRef.current = next
+                return next
+            })
             if (refreshed.title !== entry.title) {
                 await onTitleChange?.(refreshed)
             }
@@ -868,7 +909,11 @@ export default function EntryEditor({
                 cover: null,
                 updated_at: String(created.updated_at ?? ''),
             }
-            setProjectEntries((current) => [brief, ...current])
+            setProjectEntries((current) => {
+                const next = [brief, ...current]
+                projectEntriesRef.current = next
+                return next
+            })
             setEntryCache((current) => ({ ...current, [created.id]: created }))
             applyWikiLink(created.title)
             void showAlert('已创建并插入双链', 'success', 'toast', 1000)
@@ -972,12 +1017,54 @@ export default function EntryEditor({
     }
 
     function handleOpenLinkedEntryByTitle(title: string) {
-        const target = projectEntriesRef.current.find((item) => item.title === title)
+        const normalizedTitle = normalizeEntryLookupTitle(title)
+        const target = projectEntriesRef.current.find((item) => (
+            normalizeEntryLookupTitle(item.title) === normalizedTitle
+        ))
         if (!target) {
             setLinkPreview({ title, entryId: null })
             return
         }
         onOpenEntry?.({ id: target.id, title: target.title })
+    }
+
+    function updateLinkPreviewPosition(anchor: HTMLAnchorElement) {
+        const gap = 12
+        const viewportPadding = 12
+        const anchorRect = anchor.getBoundingClientRect()
+        const viewportWidth = window.innerWidth
+        const viewportHeight = window.innerHeight
+        const panelWidth = Math.min(384, Math.max(280, viewportWidth - viewportPadding * 2))
+        const panelHeight = 320
+        const preferRight = anchorRect.right + gap + panelWidth <= viewportWidth - viewportPadding
+        const nextLeft = preferRight
+            ? anchorRect.right + gap
+            : Math.max(viewportPadding, anchorRect.left - panelWidth - gap)
+        const preferBelow = anchorRect.bottom + gap + panelHeight <= viewportHeight - viewportPadding
+        const centeredTop = anchorRect.top + anchorRect.height / 2 - panelHeight / 2
+        const nextTop = preferBelow
+            ? anchorRect.bottom + gap
+            : Math.min(
+                Math.max(viewportPadding, centeredTop),
+                Math.max(viewportPadding, viewportHeight - panelHeight - viewportPadding),
+            )
+
+        setLinkPreviewPosition((current) => (
+            current.left === nextLeft && current.top === nextTop
+                ? current
+                : { left: nextLeft, top: nextTop }
+        ))
+    }
+
+    function openLinkPreview(anchor: HTMLAnchorElement, title: string) {
+        updateLinkPreviewPosition(anchor)
+        void ensureProjectEntriesLoaded().then(() => {
+            const normalizedTitle = normalizeEntryLookupTitle(title)
+            const target = projectEntriesRef.current.find((item) => (
+                normalizeEntryLookupTitle(item.title) === normalizedTitle
+            ))
+            setLinkPreview({ title, entryId: target?.id ?? null })
+        })
     }
 
     function handleAddVisibleTagSchema(schemaId: string) {
@@ -1004,8 +1091,9 @@ export default function EntryEditor({
 
     return (
         <div className="entry-editor-page">
-            <div className="entry-editor-shell">
-                <section className="entry-editor-workspace">
+            <RollingBox className="entry-editor-page__scroll" thumbSize="thin">
+                <div className="entry-editor-shell">
+                <section className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}>
                     <div className="entry-editor-workspace__header">
                         <div className="entry-editor-workspace__toolbar">
                             <button
@@ -1194,6 +1282,7 @@ export default function EntryEditor({
                                                 <div className="entry-editor-custom-type">
                                                     <label className="entry-editor-field-label">自定义类型</label>
                                                     <Select
+                                                        className="entry-editor-select"
                                                         options={customTypeOptions}
                                                         value={draft.type && customTypeOptions.some(option => option.value === draft.type) ? draft.type : undefined}
                                                         onChange={(value) => setDraft((current) => {
@@ -1221,6 +1310,7 @@ export default function EntryEditor({
                                                 {availableTagSchemaOptions.length > 0 && (
                                                     <div className="entry-editor-tag-picker">
                                                         <Select
+                                                            className="entry-editor-select"
                                                             options={availableTagSchemaOptions}
                                                             value={tagSchemaPickerValue}
                                                             onChange={(value) => {
@@ -1246,29 +1336,47 @@ export default function EntryEditor({
                                     {localTagSchemas.length === 0 ? (
                                         <div className="entry-editor-empty-tip">当前项目还没有标签定义，先创建一个再给词条填写。</div>
                                     ) : isBrowseMode ? (
-                                        readonlyTags.length > 0 ? (
+                                        browseVisibleTagSchemas.length > 0 ? (
                                             <div className="entry-editor-tags-grid">
-                                                {readonlyTags.map(({ schema, value }) => (
-                                                    <div
-                                                        key={`${entryId}-${schema.id}`}
-                                                        className={`entry-editor-tag-card${implantedTagSchemaIdSet.has(schema.id) ? ' is-implanted' : ''}`}
-                                                    >
-                                                        {implantedTagSchemaIdSet.has(schema.id) && (
-                                                            <span className="entry-editor-tag-card__badge">植入</span>
-                                                        )}
-                                                        <TagItem
-                                                            schema={{
-                                                                id: schema.id,
-                                                                name: schema.name,
-                                                                type: schema.type as 'number' | 'string' | 'boolean',
-                                                                range_min: schema.range_min ?? null,
-                                                                range_max: schema.range_max ?? null,
-                                                            }}
-                                                            value={value}
-                                                            mode="show"
-                                                        />
-                                                    </div>
-                                                ))}
+                                                {browseVisibleTagSchemas.map((schema) => {
+                                                    const value = getComparableTagValue(draft.tags, schema)
+                                                    const isImplanted = implantedTagSchemaIdSet.has(schema.id)
+                                                    return (
+                                                        <div
+                                                            key={`${entryId}-${schema.id}`}
+                                                            className={`entry-editor-tag-card${isImplanted ? ' is-implanted' : ''}`}
+                                                        >
+                                                            {isImplanted && (
+                                                                <span className="entry-editor-tag-card__badge">植入</span>
+                                                            )}
+                                                            {isImplanted ? (
+                                                                <HighLightTagItem
+                                                                    schema={{
+                                                                        id: schema.id,
+                                                                        name: schema.name,
+                                                                        type: schema.type as 'number' | 'string' | 'boolean',
+                                                                        range_min: schema.range_min ?? null,
+                                                                        range_max: schema.range_max ?? null,
+                                                                    }}
+                                                                    value={value}
+                                                                    mode="show"
+                                                                />
+                                                            ) : (
+                                                                <TagItem
+                                                                    schema={{
+                                                                        id: schema.id,
+                                                                        name: schema.name,
+                                                                        type: schema.type as 'number' | 'string' | 'boolean',
+                                                                        range_min: schema.range_min ?? null,
+                                                                        range_max: schema.range_max ?? null,
+                                                                    }}
+                                                                    value={value ?? undefined}
+                                                                    mode="show"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                         ) : (
                                             <div className="entry-editor-empty-tip">当前词条还没有标签值。</div>
@@ -1284,29 +1392,55 @@ export default function EntryEditor({
                                                         {implantedTagSchemaIdSet.has(schema.id) && (
                                                             <span className="entry-editor-tag-card__badge">植入</span>
                                                         )}
-                                                        <TagItem
-                                                            schema={{
-                                                                id: schema.id,
-                                                                name: schema.name,
-                                                                type: schema.type as 'number' | 'string' | 'boolean',
-                                                                range_min: schema.range_min ?? null,
-                                                                range_max: schema.range_max ?? null,
-                                                            }}
-                                                            value={draft.tags[schema.id] ?? undefined}
-                                                            mode="edit"
-                                                            onChange={(value) => setDraft((current) => {
-                                                                const nextValue = normalizeComparableTagValue(value)
-                                                                const currentValue = getComparableTagValue(current.tags, schema)
-                                                                if (currentValue === nextValue) return current
-                                                                return {
-                                                                    ...current,
-                                                                    tags: {
-                                                                        ...current.tags,
-                                                                        [schema.id]: nextValue,
-                                                                    },
-                                                                }
-                                                            })}
-                                                        />
+                                                        {implantedTagSchemaIdSet.has(schema.id) ? (
+                                                            <HighLightTagItem
+                                                                schema={{
+                                                                    id: schema.id,
+                                                                    name: schema.name,
+                                                                    type: schema.type as 'number' | 'string' | 'boolean',
+                                                                    range_min: schema.range_min ?? null,
+                                                                    range_max: schema.range_max ?? null,
+                                                                }}
+                                                                value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? null}
+                                                                mode="edit"
+                                                                onChange={(value) => setDraft((current) => {
+                                                                    const nextValue = normalizeComparableTagValue(value)
+                                                                    const currentValue = getComparableTagValue(current.tags, schema)
+                                                                    if (currentValue === nextValue) return current
+                                                                    return {
+                                                                        ...current,
+                                                                        tags: {
+                                                                            ...current.tags,
+                                                                            [schema.id]: nextValue,
+                                                                        },
+                                                                    }
+                                                                })}
+                                                            />
+                                                        ) : (
+                                                            <TagItem
+                                                                schema={{
+                                                                    id: schema.id,
+                                                                    name: schema.name,
+                                                                    type: schema.type as 'number' | 'string' | 'boolean',
+                                                                    range_min: schema.range_min ?? null,
+                                                                    range_max: schema.range_max ?? null,
+                                                                }}
+                                                                value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? undefined}
+                                                                mode="edit"
+                                                                onChange={(value) => setDraft((current) => {
+                                                                    const nextValue = normalizeComparableTagValue(value)
+                                                                    const currentValue = getComparableTagValue(current.tags, schema)
+                                                                    if (currentValue === nextValue) return current
+                                                                    return {
+                                                                        ...current,
+                                                                        tags: {
+                                                                            ...current.tags,
+                                                                            [schema.id]: nextValue,
+                                                                        },
+                                                                    }
+                                                                })}
+                                                            />
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -1411,18 +1545,16 @@ export default function EntryEditor({
                             </div>
                         ) : (
                             <div
+                                ref={previewContainerRef}
                                 className="entry-editor-preview"
                                 onClick={(e) => {
-                                    const anchor = (e.target as Element).closest('a')
+                                    const anchor = (e.target as Element).closest('a') as HTMLAnchorElement | null
                                     if (!anchor) return
                                     const href = anchor.getAttribute('href') ?? ''
                                     if (href.startsWith('entry://')) {
                                         e.preventDefault()
                                         const title = decodeURIComponent(href.slice('entry://'.length))
-                                        void ensureProjectEntriesLoaded().then(() => {
-                                            const target = projectEntriesRef.current.find((item) => item.title === title)
-                                            setLinkPreview({ title, entryId: target?.id ?? null })
-                                        })
+                                        openLinkPreview(anchor, title)
                                     }
                                 }}
                                 onDoubleClick={(e) => {
@@ -1437,22 +1569,31 @@ export default function EntryEditor({
                                         })
                                     }
                                 }}
+                                onScroll={closeLinkPreview}
                             >
                                 <MarkdownEditor
                                     mode="preview"
                                     value={previewContent}
+                                    minHeight={250}
                                     onChange={() => {}}
                                     background={"transparent"}
+                                    autoHeight
                                 />
 
                                 {linkPreview && (
-                                    <div className="entry-editor-link-preview">
+                                    <div
+                                        className="entry-editor-link-preview"
+                                        style={{
+                                            top: `${linkPreviewPosition.top}px`,
+                                            left: `${linkPreviewPosition.left}px`,
+                                        }}
+                                    >
                                         <div className="entry-editor-link-preview__header">
                                             <span>双链预览</span>
                                             <button
                                                 type="button"
                                                 className="entry-editor-link-preview__close"
-                                                onClick={() => setLinkPreview(null)}
+                                                onClick={closeLinkPreview}
                                             >
                                                 关闭
                                             </button>
@@ -1537,12 +1678,13 @@ export default function EntryEditor({
                     )}
                 </section>
 
-                {(error || loading) && (
-                    <div className={`entry-editor-feedback ${error ? 'is-error' : ''}`}>
-                        {error || '正在加载词条…'}
-                    </div>
-                )}
-            </div>
+                    {(error || loading) && (
+                        <div className={`entry-editor-feedback ${error ? 'is-error' : ''}`}>
+                            {error || '正在加载词条…'}
+                        </div>
+                    )}
+                </div>
+            </RollingBox>
 
             <EntryImageLightbox
                 open={lightboxOpen}
