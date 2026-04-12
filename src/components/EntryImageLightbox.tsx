@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from 'react'
-import { Button, RollingBox, useAlert } from 'flowcloudai-ui'
-import { open_entry_image_path } from '../api/worldflow'
+import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'react'
+import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
+import {open_entry_image_path} from '../api/worldflow'
 import './EntryImageLightbox.css'
 
 type LightboxImage = {
@@ -74,17 +74,17 @@ export default function EntryImageLightbox({
     }
 
     useEffect(() => {
-        if (open) setViewMode('preview')
+        if (open) queueMicrotask(() => setViewMode('preview'))
     }, [open])
 
     useEffect(() => {
         if (!open) return
-        resetPreviewTransform()
+        queueMicrotask(() => resetPreviewTransform())
     }, [open, currentIndex])
 
     useEffect(() => {
         if (viewMode !== 'preview') {
-            resetPreviewTransform()
+            queueMicrotask(() => resetPreviewTransform())
         }
     }, [viewMode])
 

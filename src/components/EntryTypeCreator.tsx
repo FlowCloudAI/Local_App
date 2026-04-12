@@ -1,12 +1,7 @@
 import {type CSSProperties, useEffect, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {
-    db_create_entry_type,
-    db_delete_entry_type,
-    db_update_entry_type,
-    type CustomEntryType,
-} from '../api'
+import {type CustomEntryType, db_create_entry_type, db_delete_entry_type, db_update_entry_type,} from '../api'
 import './EntryTypeCreator.css'
 
 const DEFAULT_COLOR = '#6B7280'
@@ -45,12 +40,14 @@ export default function EntryTypeCreator({
 
     useEffect(() => {
         if (open) {
-            setName(initialEntryType?.name ?? '')
-            setDescription(initialEntryType?.description ?? '')
-            setIcon(initialEntryType?.icon ?? '')
-            setColor(initialEntryType?.color ?? DEFAULT_COLOR)
-            setApiError(null)
-            setSubmitting(false)
+            queueMicrotask(() => {
+                setName(initialEntryType?.name ?? '')
+                setDescription(initialEntryType?.description ?? '')
+                setIcon(initialEntryType?.icon ?? '')
+                setColor(initialEntryType?.color ?? DEFAULT_COLOR)
+                setApiError(null)
+                setSubmitting(false)
+            })
         }
     }, [open, initialEntryType])
 

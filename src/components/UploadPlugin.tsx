@@ -20,10 +20,12 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
 
     useEffect(() => {
         if (!open) return
-        setFilePath('')
-        setPassword('')
-        setSubmitting(false)
-        setApiError(null)
+        queueMicrotask(() => {
+            setFilePath('')
+            setPassword('')
+            setSubmitting(false)
+            setApiError(null)
+        })
     }, [open])
 
     useEffect(() => {

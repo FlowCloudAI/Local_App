@@ -87,15 +87,17 @@ export default function TagCreator({
 
     useEffect(() => {
         if (open) {
-            setName(initialTag?.name ?? '')
-            setDescription(initialTag?.description ?? '')
-            setValueType((initialTag?.type as TagValueType | undefined) ?? 'string')
-            setDefaultValue(initialTag?.default_val ?? '')
-            setRangeMin(initialTag?.range_min != null ? String(initialTag.range_min) : '')
-            setRangeMax(initialTag?.range_max != null ? String(initialTag.range_max) : '')
-            setSelectedTargets(normalizeTagTargets(initialTag?.target))
-            setApiError(null)
-            setSubmitting(false)
+            queueMicrotask(() => {
+                setName(initialTag?.name ?? '')
+                setDescription(initialTag?.description ?? '')
+                setValueType((initialTag?.type as TagValueType | undefined) ?? 'string')
+                setDefaultValue(initialTag?.default_val ?? '')
+                setRangeMin(initialTag?.range_min != null ? String(initialTag.range_min) : '')
+                setRangeMax(initialTag?.range_max != null ? String(initialTag.range_max) : '')
+                setSelectedTargets(normalizeTagTargets(initialTag?.target))
+                setApiError(null)
+                setSubmitting(false)
+            })
         }
     }, [open, initialTag, allTargetKeys])
 

@@ -1,13 +1,7 @@
 import {type CSSProperties, useEffect, useMemo, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {
-    db_create_entry,
-    entryTypeKey,
-    type Entry,
-    type TagSchema,
-    type EntryTypeView,
-} from '../api'
+import {db_create_entry, type Entry, entryTypeKey, type EntryTypeView, type TagSchema,} from '../api'
 import {buildEntryTagsPayload, ensureTypeTargetTagValues} from './entryTagUtils'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryCreator.css'
@@ -49,12 +43,14 @@ export default function EntryCreator({
 
     useEffect(() => {
         if (open) {
-            setTitle('')
-            setSummary('')
-            setContent('')
-            setSelectedType(null)
-            setSubmitting(false)
-            setApiError(null)
+            queueMicrotask(() => {
+                setTitle('')
+                setSummary('')
+                setContent('')
+                setSelectedType(null)
+                setSubmitting(false)
+                setApiError(null)
+            })
         }
     }, [open])
 

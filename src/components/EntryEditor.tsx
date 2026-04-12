@@ -989,7 +989,7 @@ export default function EntryEditor({
         })
     }, [entryId, localTagSchemas, draft.type])
 
-    async function handleSave() {
+    const handleSave = useCallback(async () => {
         if (!entry || !canSave) return
 
         setSaving(true)
@@ -1056,7 +1056,7 @@ export default function EntryEditor({
         } finally {
             setSaving(false)
         }
-    }
+    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, localTagSchemas, projectId, onTitleChange, onSaved, showAlert])
 
     useEffect(() => {
         canSaveRef.current = canSave

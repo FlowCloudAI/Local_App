@@ -20,10 +20,12 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
 
     useEffect(() => {
         if (open) {
-            setName('')
-            setDescription('')
-            setApiError(null)
-            setSubmitting(false)
+            queueMicrotask(() => {
+                setName('')
+                setDescription('')
+                setApiError(null)
+                setSubmitting(false)
+            })
         }
     }, [open])
 

@@ -122,12 +122,13 @@
 }
 
 .relation-demo-node {
-    display: grid;
-    grid-template-columns: 64px minmax(0, 1fr);
-    align-items: stretch;
-    gap: 0.8rem;
-    width: 264px;
-    min-height: 88px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 160px;
+    height: 160px;
     padding: 0.75rem;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     border-radius: 1rem;
@@ -209,9 +210,9 @@
     }
 
     .relation-demo-node {
-        width: 236px;
-        grid-template-columns: 56px minmax(0, 1fr);
-        gap: 0.7rem;
+        width: 140px;
+        height: 140px;
+        gap: 0.4rem;
     }
 
     .relation-demo-node__cover {
