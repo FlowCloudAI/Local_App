@@ -50,9 +50,10 @@ export default function HighLightTagItem({
     onChange,
 }: HighLightTagItemProps) {
     const rangeText = getRangeText(schema)
+    const isEditMode = mode === 'edit'
 
     return (
-        <div className={`highlight-tag-item${mode === 'edit' ? ' is-edit' : ' is-show'}`}>
+        <div className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}`}>
             <div className="highlight-tag-item__header">
                 <div className="highlight-tag-item__title-group">
                     <span className="highlight-tag-item__title">{schema.name}</span>
@@ -65,9 +66,9 @@ export default function HighLightTagItem({
                 <p className="highlight-tag-item__hint">{rangeText}</p>
             )}
 
-            {mode === 'edit' ? (
+            {isEditMode ? (
                 schema.type === 'boolean' ? (
-                    <div className="highlight-tag-item__bool-group">
+                    <div className="highlight-tag-item__bool-group highlight-tag-item__bool-group--edit">
                         <button
                             type="button"
                             className={`highlight-tag-item__bool-chip${value == null ? ' active' : ''}`}
@@ -91,7 +92,7 @@ export default function HighLightTagItem({
                         </button>
                     </div>
                 ) : (
-                    <div className="highlight-tag-item__editor">
+                    <div className="highlight-tag-item__editor highlight-tag-item__editor--edit">
                         <input
                             className="highlight-tag-item__input"
                             type={schema.type === 'number' ? 'number' : 'text'}
@@ -127,7 +128,8 @@ export default function HighLightTagItem({
                     </div>
                 )
             ) : (
-                <div className={`highlight-tag-item__value${value == null || value === '' ? ' is-empty' : ''}`}>
+                <div
+                    className={`highlight-tag-item__value highlight-tag-item__value--show${value == null || value === '' ? ' is-empty' : ''}`}>
                     {formatValue(value)}
                 </div>
             )}

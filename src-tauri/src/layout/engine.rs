@@ -8,7 +8,7 @@
 //!   连通分量成员由本模块自行稳定遍历收集。
 
 use crate::layout::cluster::{
-    ClusterBox, ClusterPlacement, ConnectedComponentSpec, decompose_component, layout_cluster_graph,
+    decompose_component, layout_cluster_graph, ClusterBox, ClusterPlacement, ConnectedComponentSpec,
 };
 use crate::layout::component_graph::{
     component_key_from_node_indices, component_seed, split_connected_components,
@@ -19,14 +19,12 @@ use crate::layout::constants::{
     FINAL_COLLISION_SALT, ISOLATED_NODE_HORIZONTAL_GAP, MIN_DISTANCE,
     POST_LAYOUT_COMPACTION_PASSES, SHELF_ROW_MAX_WIDTH,
 };
-use crate::layout::math::{Vec2, deterministic_unit, safe_direction, unit_angle};
-use crate::layout::params::{AdaptiveComponentConfig, build_adaptive_component_config};
-pub use crate::layout::prepare::{PreparedLayoutRequest, cache_key, prepare_request};
+use crate::layout::math::{deterministic_unit, safe_direction, unit_angle, Vec2};
+use crate::layout::params::{build_adaptive_component_config, AdaptiveComponentConfig};
+pub use crate::layout::prepare::{cache_key, prepare_request, PreparedLayoutRequest};
 pub(crate) use crate::layout::prepare::{LayoutEdge, LayoutNode};
-use crate::layout::topology::{UndirectedTopology, build_undirected_topology};
-use crate::layout::types::{
-    LayoutBounds, LayoutPosition, LayoutResponse,
-};
+use crate::layout::topology::{build_undirected_topology, UndirectedTopology};
+use crate::layout::types::{LayoutBounds, LayoutPosition, LayoutResponse};
 use std::collections::{BTreeMap, HashMap};
 use std::f64::consts::TAU;
 
@@ -514,8 +512,10 @@ fn build_local_topology(
     node_count: usize,
     local_edges: &[LocalEdgeLayout],
 ) -> LocalComponentTopology {
-    let UndirectedTopology { neighbors, degrees } =
-        build_undirected_topology(node_count, local_edges.iter().map(|edge| (edge.source, edge.target)));
+    let UndirectedTopology { neighbors, degrees } = build_undirected_topology(
+        node_count,
+        local_edges.iter().map(|edge| (edge.source, edge.target)),
+    );
     LocalComponentTopology { neighbors, degrees }
 }
 
@@ -852,12 +852,11 @@ fn component_key(prepared: &PreparedLayoutRequest, component: &ComponentLayout) 
     component_key_from_node_indices(prepared, &component.node_indices)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
-        Vec2, build_local_topology, cache_key, compact_component_shape, compute_layout,
-        prepare_request, principal_axis_signature,
+        build_local_topology, cache_key, compact_component_shape, compute_layout, prepare_request,
+        principal_axis_signature, Vec2,
     };
     use crate::layout::cache::LayoutCache;
     use crate::layout::constants::COLLISION_PADDING;

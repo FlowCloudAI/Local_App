@@ -3,8 +3,8 @@ use crate::layout::constants::{
     CLUSTER_REPULSION_SOFT, CLUSTER_TEMPERATURE_DECAY, CLUSTER_TEMPERATURE_INITIAL,
     CLUSTER_TWO_WAY_BONUS, FIXED_RANDOM_SEED, MIN_DISTANCE,
 };
-use crate::layout::math::{Vec2, deterministic_unit, fnv64, safe_direction, unit_angle};
-use crate::layout::topology::{UndirectedTopology, build_node_slot_map, build_undirected_topology};
+use crate::layout::math::{deterministic_unit, fnv64, safe_direction, unit_angle, Vec2};
+use crate::layout::topology::{build_node_slot_map, build_undirected_topology, UndirectedTopology};
 use std::collections::{BTreeMap, VecDeque};
 use std::f64::consts::TAU;
 
@@ -367,15 +367,18 @@ fn collect_mask_components(neighbors: &[Vec<usize>], mask: &[bool]) -> Vec<Vec<u
 
 fn build_topology(component_nodes: &[usize], edges: &[ClusterEdgeRef]) -> UndirectedTopology {
     let slot_by_node = build_node_slot_map(component_nodes);
-    build_undirected_topology(component_nodes.len(), edges.iter().map(|edge| {
-        let source_slot = *slot_by_node
-            .get(&edge.source)
-            .expect("component edge source should exist");
-        let target_slot = *slot_by_node
-            .get(&edge.target)
-            .expect("component edge target should exist");
-        (source_slot, target_slot)
-    }))
+    build_undirected_topology(
+        component_nodes.len(),
+        edges.iter().map(|edge| {
+            let source_slot = *slot_by_node
+                .get(&edge.source)
+                .expect("component edge source should exist");
+            let target_slot = *slot_by_node
+                .get(&edge.target)
+                .expect("component edge target should exist");
+            (source_slot, target_slot)
+        }),
+    )
 }
 
 fn pick_main_cluster(boxes: &[ClusterBox], cluster_ids: &[String]) -> usize {
@@ -581,8 +584,8 @@ fn hash_pair(component_id: &str, left: usize, right: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusterBox, ClusterEdgeRef, ConnectedComponentSpec, decompose_component,
-        layout_cluster_graph,
+        decompose_component, layout_cluster_graph, ClusterBox, ClusterEdgeRef,
+        ConnectedComponentSpec,
     };
 
     #[test]

@@ -9,6 +9,7 @@ import Settings from "./pages/Settings";
 import Plugins from "./pages/Plugins";
 import type {Project} from "./api";
 import RelationDemo from "./components/RelationDemo";
+import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
 
 type EntryTabMeta = {
     projectId: string
@@ -269,6 +270,22 @@ function App() {
             />
         </svg>)
 
+    const MapIcon = (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <path
+                d="M3.75 5.5 8.5 3.75l7 2.5 4.75-1.75v14l-4.75 1.75-7-2.5-4.75 1.75v-14Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M8.5 3.75v14m7-11.5v14"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+            />
+        </svg>)
+
     const SettingsIcon = (
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <circle cx="12" cy="12" r="3" strokeWidth="1.5"/>
@@ -281,6 +298,7 @@ function App() {
         {key: 'home', label: '首页', icon: HomeIcon},
         {key: 'idea', label: '灵感便签', icon: IdeaIcon},
         {key: 'relation', label: '关系图谱', icon: RelationIcon},
+        {key: 'map-editor', label: '地图编辑', icon: MapIcon},
         {key: 'plugins', label: '插件管理', icon: PluginsIcon},
     ]
     const bottomItems: SideBarItem[] = [
@@ -414,6 +432,9 @@ function App() {
                     </div>
                     <div className={`page-wrapper ${selectedKey === 'relation' ? 'active' : ''}`}>
                         <RelationDemo/>
+                    </div>
+                    <div className={`page-wrapper ${selectedKey === 'map-editor' ? 'active' : ''}`}>
+                        <MapShapeEditorDemo/>
                     </div>
                     <div className={`page-wrapper ${selectedKey === 'settings' ? 'active' : ''}`}>
                         <Settings/>

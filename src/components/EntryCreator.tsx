@@ -1,7 +1,7 @@
 import {type CSSProperties, useEffect, useMemo, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {db_create_entry, type Entry, entryTypeKey, type EntryTypeView, type TagSchema,} from '../api'
+import {db_create_entry, db_list_entries, type Entry, entryTypeKey, type EntryTypeView, type TagSchema,} from '../api'
 import {buildEntryTagsPayload, ensureTypeTargetTagValues, isSchemaImplantedForType} from './entryTagUtils'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryCreator.css'
@@ -109,6 +109,21 @@ export default function EntryCreator({
         })
 
         try {
+            const entriesInCategory = await db_list_entries({
+                projectId,
+                categoryId,
+                limit: 1000,
+                offset: 0,
+            })
+            const duplicatedEntry = entriesInCategory.find((entry) => entry.title.trim() === trimmedTitle)
+            if (duplicatedEntry) {
+                const message = '当前分类下已存在同名词条，请更换标题。'
+                setApiError(message)
+                void showAlert(message, 'warning', 'toast', 1800)
+                setSubmitting(false)
+                return
+            }
+
             const entry = await db_create_entry({
                 projectId,
                 categoryId,

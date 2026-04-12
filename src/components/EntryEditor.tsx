@@ -476,6 +476,25 @@ function buildEntryPath(projectName: string, categories: Category[], categoryId:
     return path.join('-')
 }
 
+async function findCategoryDuplicatedEntry(
+    projectId: string,
+    categoryId: string | null | undefined,
+    title: string,
+    excludeEntryId?: string,
+): Promise<EntryBrief | null> {
+    const entries = await db_list_entries({
+        projectId,
+        categoryId: categoryId ?? null,
+        limit: 1000,
+        offset: 0,
+    })
+    const normalizedTitle = normalizeComparableText(title)
+    return entries.find((item) => (
+        item.id !== excludeEntryId
+        && normalizeComparableText(item.title) === normalizedTitle
+    )) ?? null
+}
+
 function buildRelationDraft(entryId: string, relation: EntryRelation): EntryRelationDraft {
     if (relation.relation === 'two_way') {
         return {
@@ -953,15 +972,6 @@ export default function EntryEditor({
         src: toEntryImageSrc(image),
     })), [draft.images])
 
-    // 标题小写 Map，用于 O(1) 精确匹配，避免每次 [[联想 都线性扫描
-    const projectEntriesLowerMap = useMemo(() => {
-        const map = new Map<string, EntryBrief>()
-        for (const item of projectEntries) {
-            map.set(normalizeEntryLookupTitle(item.title), item)
-        }
-        return map
-    }, [projectEntries])
-
     const filteredLinkSuggestions = useMemo(() => {
         if (!wikiDraft) return []
         const query = normalizeEntryLookupTitle(wikiDraft.query)
@@ -971,12 +981,15 @@ export default function EntryEditor({
             .slice(0, 8)
     }, [wikiDraft, projectEntries, entryId])
 
-    const hasExactSuggestion = useMemo(() => {
+    const hasExactCategorySuggestion = useMemo(() => {
         const query = normalizeEntryLookupTitle(wikiDraft?.query)
         if (!query) return false
-        const match = projectEntriesLowerMap.get(query)
-        return Boolean(match && match.id !== entryId)
-    }, [wikiDraft, projectEntriesLowerMap, entryId])
+        return projectEntries.some((item) => (
+            item.id !== entryId
+            && (item.category_id ?? null) === (entry?.category_id ?? null)
+            && normalizeEntryLookupTitle(item.title) === query
+        ))
+    }, [wikiDraft, projectEntries, entryId, entry?.category_id])
 
     const wikiLinkOptions = useMemo<WikiLinkOption[]>(() => {
         const options: WikiLinkOption[] = filteredLinkSuggestions.map((item) => ({
@@ -985,20 +998,20 @@ export default function EntryEditor({
             title: item.title,
             categoryId: item.category_id ?? null,
         }))
-        if (!hasExactSuggestion && wikiDraft?.query.trim()) {
+        if (!hasExactCategorySuggestion && wikiDraft?.query.trim()) {
             options.push({
                 kind: 'create',
                 title: wikiDraft.query.trim(),
             })
         }
         return options
-    }, [filteredLinkSuggestions, hasExactSuggestion, wikiDraft])
+    }, [filteredLinkSuggestions, hasExactCategorySuggestion, wikiDraft])
 
     useEffect(() => {
         if (!wikiDraft) return
         const rafId = requestAnimationFrame(() => updateWikiPopoverPosition())
         return () => cancelAnimationFrame(rafId)
-    }, [filteredLinkSuggestions.length, hasExactSuggestion, updateWikiPopoverPosition, wikiDraft])
+    }, [filteredLinkSuggestions.length, hasExactCategorySuggestion, updateWikiPopoverPosition, wikiDraft])
 
     useEffect(() => {
         if (!wikiDraft) return
@@ -1121,6 +1134,14 @@ export default function EntryEditor({
         setError(null)
 
         try {
+            const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, entry.category_id ?? null, trimmedTitle, entry.id)
+            if (duplicatedEntry) {
+                const message = '当前分类下已存在同名词条，请更换标题。'
+                setError(message)
+                void showAlert(message, 'warning', 'toast', 1800)
+                return
+            }
+
             const updated = await db_update_entry({
                 id: entry.id,
                 categoryId: entry.category_id ?? null,
@@ -1270,9 +1291,16 @@ export default function EntryEditor({
 
     async function handleCreateLinkedEntry() {
         const title = wikiDraft?.query.trim()
-        if (!title || hasExactSuggestion) return
+        if (!title || hasExactCategorySuggestion) return
         setCreatingLinkedEntry(true)
         try {
+            const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, entry?.category_id ?? null, title)
+            if (duplicatedEntry) {
+                await showAlert('当前分类下已存在同名词条，请直接选择已有词条。', 'warning', 'toast', 1800)
+                setActiveWikiOptionIndex(0)
+                return
+            }
+
             const created = await db_create_entry({
                 projectId,
                 categoryId: entry?.category_id ?? null,
@@ -1780,7 +1808,7 @@ export default function EntryEditor({
                                         <div className="entry-editor-empty-tip">当前项目还没有标签定义，先创建一个再给词条填写。</div>
                                     ) : isBrowseMode ? (
                                         browseVisibleTagSchemas.length > 0 ? (
-                                            <div className="entry-editor-tags-grid">
+                                            <div className="entry-editor-tags-grid entry-editor-tags-grid--browse">
                                                 {browseVisibleTagSchemas.map((schema) => {
                                                     const value = getComparableTagValue(draft.tags, schema)
                                                     const isImplanted = implantedTagSchemaIdSet.has(schema.id)
@@ -1824,7 +1852,7 @@ export default function EntryEditor({
                                         )
                                     ) : (
                                         visibleTagSchemas.length > 0 ? (
-                                            <div className="entry-editor-tags-grid">
+                                            <div className="entry-editor-tags-grid entry-editor-tags-grid--edit">
                                                 {visibleTagSchemas.map((schema) => (
                                                     <div
                                                         key={`${entryId}-${schema.id}`}
@@ -1982,7 +2010,7 @@ export default function EntryEditor({
                                                     )
                                                 ))}
 
-                                                {!wikiLinkOptions.length && (hasExactSuggestion || !wikiDraft.query.trim()) && (
+                                                {!wikiLinkOptions.length && (hasExactCategorySuggestion || !wikiDraft.query.trim()) && (
                                                     <div className="entry-editor-wikilink-empty">
                                                         {wikiDraft.query.trim() ? '没有更多匹配项' : '继续输入词条名以搜索'}
                                                     </div>

@@ -1,5 +1,6 @@
 mod apis;
 mod layout;
+mod map;
 mod prompt;
 mod settings;
 mod state;
@@ -11,6 +12,7 @@ pub use state::*;
 use apis::ai_client::*;
 use apis::app_settings::*;
 use apis::layout::*;
+use apis::map::*;
 use apis::plugins::*;
 use apis::worldflow::*;
 use layout::cache::LayoutCacheState;
@@ -20,8 +22,8 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use tauri::{
-    AppHandle, Manager, Runtime, UriSchemeContext, WindowBuilder,
-    http::{Response, StatusCode, header::CONTENT_TYPE},
+    http::{header::CONTENT_TYPE, Response, StatusCode}, AppHandle, Manager, Runtime, UriSchemeContext,
+    WindowBuilder,
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log;
@@ -211,6 +213,7 @@ pub fn run() {
             plugin_market_upload,
             plugin_market_update,
             plugin_market_delete,
+            map_save_scene,
             compute_layout,
         ])
         .run(tauri::generate_context!())
