@@ -20,7 +20,6 @@
     flex-direction: column;
     width: 100%;
     min-height: 100%;
-    padding-bottom: 1.2rem;
 }
 
 .entry-editor-hero,
@@ -574,8 +573,8 @@
 
 .entry-editor-link-preview {
     position: fixed;
-    width: min(24rem, calc(100vw - 1.5rem));
-    max-height: min(28rem, calc(100vh - 1.5rem));
+    width: min(20rem, calc(100vw - 1.5rem));
+    max-height: min(22rem, calc(100vh - 1.5rem));
     z-index: 12;
 }
 
@@ -584,17 +583,11 @@
     display: flex;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.8rem 0.9rem;
+    align-items: center;
+    padding: 0.7rem 0.8rem;
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     color: var(--fc-color-text-secondary);
-}
-
-.entry-editor-link-preview__close {
-    border: none;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
 }
 
 .entry-editor-wikilink-popover__query {
@@ -605,6 +598,11 @@
 .entry-editor-backlinks__list {
     display: flex;
     flex-direction: column;
+}
+
+.entry-editor-wikilink-popover__list {
+    max-height: 18rem;
+    overflow-y: auto;
 }
 
 .entry-editor-wikilink-option,
@@ -624,6 +622,7 @@
 }
 
 .entry-editor-wikilink-option:hover,
+.entry-editor-wikilink-option.is-active,
 .entry-editor-backlinks__item:hover {
     background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
 }
@@ -654,15 +653,15 @@
 
 .entry-editor-link-preview__body {
     display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr);
-    gap: 0.9rem;
-    padding: 0.95rem;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.8rem;
 }
 
 .entry-editor-link-preview__media {
     width: 100%;
     aspect-ratio: 4 / 5;
-    border-radius: 0.9rem;
+    border-radius: 0.75rem;
     overflow: hidden;
     background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
 }
@@ -678,25 +677,34 @@
     display: grid;
     place-items: center;
     color: var(--fc-color-primary);
-    font-size: 2rem;
+    font-size: 1.7rem;
 }
 
 .entry-editor-link-preview__content h3 {
     margin: 0;
-    font-size: 0.96rem;
+    font-size: 0.9rem;
     color: var(--fc-color-text);
 }
 
 .entry-editor-link-preview__summary,
 .entry-editor-link-preview__empty {
-    margin: 0.35rem 0 0;
-    font-size: 0.78rem;
-    line-height: 1.6;
+    margin: 0.3rem 0 0;
+    font-size: 0.74rem;
+    line-height: 1.55;
     color: var(--fc-color-text-secondary);
 }
 
-.entry-editor-link-preview__actions {
-    margin-top: 0.75rem;
+.entry-editor-link-preview__empty {
+    padding: 0.95rem 1rem 1.05rem;
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--fc-color-text);
+}
+
+.entry-editor-link-preview__hint {
+    margin: 0.45rem 0 0;
+    font-size: 0.7rem;
+    color: var(--fc-color-text-secondary);
 }
 
 .entry-editor-backlinks {

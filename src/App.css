@@ -144,6 +144,37 @@ body {
     z-index: 1;
 }
 
+.is-tauri .fc-roll {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+
+.is-tauri .fc-roll.fc-roll--size-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.is-tauri .fc-roll.fc-roll--size-thick::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.is-tauri .fc-roll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.is-tauri .fc-roll::-webkit-scrollbar-thumb {
+    background-color: var(--fc-color-text-tertiary);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.is-tauri .fc-roll:hover::-webkit-scrollbar-thumb,
+.is-tauri .fc-roll.fc-roll--scrolling::-webkit-scrollbar-thumb {
+    background-color: var(--fc-color-text-secondary);
+}
+
 .side-bar {
     user-select: none;
 }

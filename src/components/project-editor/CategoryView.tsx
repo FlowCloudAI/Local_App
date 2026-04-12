@@ -15,8 +15,8 @@ import EntryTypeIcon from './EntryTypeIcon'
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
 
 const SORT_OPTIONS: Array<{key: Exclude<SortMode, 'name-asc' | 'name-desc'>; label: string}> = [
-    {key: 'updated-desc', label: '最近更新'},
-    {key: 'updated-asc', label: '最早更新'},
+    {key: 'updated-desc', label: '更新时间'},
+    {key: 'updated-asc', label: '创建时间'},
 ]
 
 function parseDateMs(s?: string | null): number {
@@ -71,11 +71,12 @@ interface CategoryViewProps {
     projectId: string
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
+    refreshToken?: number
     onEntryCreated?: () => void | Promise<void>
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
-function CategoryView({categoryId, projectId, entryTypes, tagSchemas, onEntryCreated, onOpenEntry}: CategoryViewProps) {
+function CategoryView({categoryId, projectId, entryTypes, tagSchemas, refreshToken = 0, onEntryCreated, onOpenEntry}: CategoryViewProps) {
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [loading, setLoading] = useState(false)
     const [searchText, setSearchText] = useState('')
@@ -115,7 +116,7 @@ function CategoryView({categoryId, projectId, entryTypes, tagSchemas, onEntryCre
 
     useEffect(() => {
         void loadEntries(searchText, typeFilter)
-    }, [categoryId, typeFilter, loadEntries, searchText])
+    }, [categoryId, typeFilter, loadEntries, refreshToken, searchText])
 
     useEffect(() => () => {
         if (searchTimer.current) clearTimeout(searchTimer.current)

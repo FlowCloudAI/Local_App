@@ -1,6 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog'
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, MarkdownEditor, RollingBox, Select, TagItem, useAlert } from 'flowcloudai-ui'
 import {
     db_create_entry,
@@ -52,6 +53,15 @@ type WikiPopoverPosition = {
 type EntryImage = FCImage & {
     is_cover?: boolean
 }
+
+type InternalEntryLink = {
+    entryId: string | null
+    title: string
+}
+
+type WikiLinkOption =
+    | { kind: 'entry'; id: string; title: string; categoryId: string | null }
+    | { kind: 'create'; title: string }
 
 type EntryEditorCache = {
     entry: Entry
@@ -220,16 +230,47 @@ function buildExcerpt(value?: string | null, maxLength = 120): string {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
 }
 
-function extractWikiLinks(content?: string | null): string[] {
+const INTERNAL_ENTRY_HREF_PREFIX = 'entry://'
+const LEGACY_ENTRY_HREF_PREFIX = 'entry-title://'
+
+function buildInternalEntryHref(entryId: string): string {
+    return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(entryId)}`
+}
+
+function buildLegacyEntryHref(title: string): string {
+    return `${LEGACY_ENTRY_HREF_PREFIX}${encodeURIComponent(title)}`
+}
+
+function buildInternalEntryMarkdown(title: string, entryId: string): string {
+    return `[${title}](${buildInternalEntryHref(entryId)})`
+}
+
+function parseInternalEntryLinks(content?: string | null): InternalEntryLink[] {
     if (!content) return []
-    const matches = content.matchAll(/\[\[([^[\]\n]+?)]]/g)
-    return [...new Set([...matches].map((match) => match[1].trim()).filter(Boolean))]
+
+    const links: InternalEntryLink[] = []
+    const markdownMatches = content.matchAll(/\[([^\]\n]+?)]\(entry:\/\/([^)]+)\)/g)
+    for (const match of markdownMatches) {
+        const title = String(match[1] ?? '').trim()
+        const entryId = decodeURIComponent(String(match[2] ?? '').trim())
+        if (!title || !entryId) continue
+        links.push({ title, entryId })
+    }
+
+    const wikiMatches = content.matchAll(/\[\[([^[\]\n]+?)]]/g)
+    for (const match of wikiMatches) {
+        const title = String(match[1] ?? '').trim()
+        if (!title) continue
+        links.push({ title, entryId: null })
+    }
+
+    return links
 }
 
 function buildMarkdownPreviewSource(content: string): string {
     return content.replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
         const title = String(rawTitle).trim()
-        return `[${title}](entry://${encodeURIComponent(title)})`
+        return `[${title}](${buildLegacyEntryHref(title)})`
     })
 }
 
@@ -253,6 +294,37 @@ function resolveActiveWikiDraft(value: string, cursor: number | null): WikiDraft
 
 function replaceRange(value: string, start: number, end: number, nextText: string): string {
     return `${value.slice(0, start)}${nextText}${value.slice(end)}`
+}
+
+function resolveMarkdownAnchor(target: EventTarget | null): HTMLAnchorElement | null {
+    if (!(target instanceof Element)) return null
+    return target.closest('a') as HTMLAnchorElement | null
+}
+
+function isSafeExternalHref(href: string): boolean {
+    return /^(https?:|mailto:|tel:)/i.test(href)
+}
+
+function parseInternalEntryHref(href: string, fallbackTitle = ''): InternalEntryLink | null {
+    if (href.startsWith(INTERNAL_ENTRY_HREF_PREFIX)) {
+        const entryId = decodeURIComponent(href.slice(INTERNAL_ENTRY_HREF_PREFIX.length)).trim()
+        if (!entryId) return null
+        return {
+            entryId,
+            title: fallbackTitle.trim(),
+        }
+    }
+
+    if (href.startsWith(LEGACY_ENTRY_HREF_PREFIX)) {
+        const title = decodeURIComponent(href.slice(LEGACY_ENTRY_HREF_PREFIX.length)).trim()
+        if (!title) return null
+        return {
+            entryId: null,
+            title,
+        }
+    }
+
+    return null
 }
 
 function getTextareaCaretOffset(textarea: HTMLTextAreaElement, cursor: number): { left: number; top: number; lineHeight: number } {
@@ -396,6 +468,7 @@ export default function EntryEditor({
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
     const [wikiDraft, setWikiDraft] = useState<WikiDraft | null>(null)
+    const [activeWikiOptionIndex, setActiveWikiOptionIndex] = useState(0)
     const [creatingLinkedEntry, setCreatingLinkedEntry] = useState(false)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
@@ -415,12 +488,18 @@ export default function EntryEditor({
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
     const previewContainerRef = useRef<HTMLDivElement | null>(null)
+    const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
+    const wikiOptionRefs = useRef<Record<number, HTMLButtonElement | null>>({})
+    const linkPreviewCloseTimerRef = useRef<number | null>(null)
+    const linkPreviewAnchorRef = useRef<HTMLAnchorElement | null>(null)
     const prevWikiDraftRef = useRef<WikiDraft | null>(null)
     const onDirtyChangeRef = useRef(onDirtyChange)
     const projectEntriesRef = useRef(projectEntries)
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
     const projectEntryDetailsStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
+    const canSaveRef = useRef(false)
+    const saveActionRef = useRef<(() => void) | null>(null)
     projectEntriesRef.current = projectEntries
     onDirtyChangeRef.current = onDirtyChange
     const { showAlert } = useAlert()
@@ -434,9 +513,27 @@ export default function EntryEditor({
         setTagSchemaPickerValue(undefined)
     }, [entryId])
 
-    const closeLinkPreview = useCallback(() => {
-        setLinkPreview(null)
+    const clearLinkPreviewCloseTimer = useCallback(() => {
+        if (linkPreviewCloseTimerRef.current !== null) {
+            window.clearTimeout(linkPreviewCloseTimerRef.current)
+            linkPreviewCloseTimerRef.current = null
+        }
     }, [])
+
+    const closeLinkPreview = useCallback(() => {
+        clearLinkPreviewCloseTimer()
+        linkPreviewAnchorRef.current = null
+        setLinkPreview(null)
+    }, [clearLinkPreviewCloseTimer])
+
+    const scheduleLinkPreviewClose = useCallback(() => {
+        clearLinkPreviewCloseTimer()
+        linkPreviewCloseTimerRef.current = window.setTimeout(() => {
+            linkPreviewAnchorRef.current = null
+            setLinkPreview(null)
+            linkPreviewCloseTimerRef.current = null
+        }, 90)
+    }, [clearLinkPreviewCloseTimer])
 
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
@@ -566,6 +663,9 @@ export default function EntryEditor({
         return () => {
             if (wikiDraftRetainTimerRef.current) {
                 window.clearTimeout(wikiDraftRetainTimerRef.current)
+            }
+            if (linkPreviewCloseTimerRef.current !== null) {
+                window.clearTimeout(linkPreviewCloseTimerRef.current)
             }
             if (cursorSyncRafRef.current !== null) {
                 cancelAnimationFrame(cursorSyncRafRef.current)
@@ -724,6 +824,22 @@ export default function EntryEditor({
         return Boolean(match && match.id !== entryId)
     }, [wikiDraft, projectEntriesLowerMap, entryId])
 
+    const wikiLinkOptions = useMemo<WikiLinkOption[]>(() => {
+        const options: WikiLinkOption[] = filteredLinkSuggestions.map((item) => ({
+            kind: 'entry',
+            id: item.id,
+            title: item.title,
+            categoryId: item.category_id ?? null,
+        }))
+        if (!hasExactSuggestion && wikiDraft?.query.trim()) {
+            options.push({
+                kind: 'create',
+                title: wikiDraft.query.trim(),
+            })
+        }
+        return options
+    }, [filteredLinkSuggestions, hasExactSuggestion, wikiDraft])
+
     useEffect(() => {
         if (!wikiDraft) return
         const rafId = requestAnimationFrame(() => updateWikiPopoverPosition())
@@ -737,16 +853,38 @@ export default function EntryEditor({
         return () => window.removeEventListener('resize', handleResize)
     }, [updateWikiPopoverPosition, wikiDraft])
 
+    useEffect(() => {
+        if (!wikiDraft) {
+            setActiveWikiOptionIndex(0)
+            wikiOptionRefs.current = {}
+            return
+        }
+        setActiveWikiOptionIndex((current) => {
+            if (wikiLinkOptions.length <= 0) return 0
+            return Math.min(current, wikiLinkOptions.length - 1)
+        })
+    }, [wikiDraft, wikiLinkOptions.length])
+
+    useEffect(() => {
+        if (!wikiDraft) return
+        if (wikiLinkOptions.length <= 0) return
+        const activeElement = wikiOptionRefs.current[activeWikiOptionIndex]
+        if (!activeElement) return
+        activeElement.scrollIntoView({
+            block: 'nearest',
+        })
+    }, [activeWikiOptionIndex, wikiDraft, wikiLinkOptions.length])
+
     // 预览源码缓存：draft.content 不变时不重算
     const previewContent = useMemo(() => buildMarkdownPreviewSource(draft.content), [draft.content])
     const normalizedCurrentTitle = useMemo(() => normalizeEntryLookupTitle(trimmedTitle), [trimmedTitle])
 
     const backlinks = useMemo(() => {
-        if (!normalizedCurrentTitle) return []
         return Object.values(entryCache)
             .filter((item) => item.id !== entryId)
-            .filter((item) => extractWikiLinks(item.content).some((linkTitle) => (
-                normalizeEntryLookupTitle(linkTitle) === normalizedCurrentTitle
+            .filter((item) => parseInternalEntryLinks(item.content).some((link) => (
+                link.entryId === entryId
+                || (!link.entryId && normalizedCurrentTitle && normalizeEntryLookupTitle(link.title) === normalizedCurrentTitle)
             )))
             .sort((left, right) => parseDateValue(right.updated_at as string | null | undefined) - parseDateValue(left.updated_at as string | null | undefined))
     }, [entryCache, entryId, normalizedCurrentTitle])
@@ -874,9 +1012,32 @@ export default function EntryEditor({
         }
     }
 
-    function applyWikiLink(title: string) {
+    useEffect(() => {
+        canSaveRef.current = canSave
+        saveActionRef.current = () => {
+            void handleSave()
+        }
+    }, [canSave, handleSave])
+
+    useEffect(() => {
+        function handleSaveShortcut(event: KeyboardEvent) {
+            if (event.defaultPrevented || event.repeat) return
+            if (!(event.ctrlKey || event.metaKey)) return
+            if (event.key.toLowerCase() !== 's') return
+            event.preventDefault()
+            if (!canSaveRef.current) return
+            saveActionRef.current?.()
+        }
+
+        window.addEventListener('keydown', handleSaveShortcut)
+        return () => {
+            window.removeEventListener('keydown', handleSaveShortcut)
+        }
+    }, [])
+
+    function applyWikiLink(linkedEntry: { title: string; id: string }) {
         if (!wikiDraft) return
-        const inserted = `[[${title}]]`
+        const inserted = buildInternalEntryMarkdown(linkedEntry.title, linkedEntry.id)
         setDraft((current) => ({
             ...current,
             content: replaceRange(current.content, wikiDraft.start, wikiDraft.end, inserted),
@@ -915,12 +1076,50 @@ export default function EntryEditor({
                 return next
             })
             setEntryCache((current) => ({ ...current, [created.id]: created }))
-            applyWikiLink(created.title)
+            applyWikiLink({ title: created.title, id: created.id })
             void showAlert('已创建并插入双链', 'success', 'toast', 1000)
         } catch (e) {
             setError(String(e))
         } finally {
             setCreatingLinkedEntry(false)
+        }
+    }
+
+    function handleWikiOptionCommit(option: WikiLinkOption | undefined) {
+        if (!option) return
+        if (option.kind === 'entry') {
+            applyWikiLink({ title: option.title, id: option.id })
+            return
+        }
+        if (creatingLinkedEntry) return
+        void handleCreateLinkedEntry()
+    }
+
+    function handleWikiKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+        if (!wikiDraft || !wikiLinkOptions.length) return
+        if (event.nativeEvent.isComposing) return
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setActiveWikiOptionIndex((current) => (current + 1) % wikiLinkOptions.length)
+            return
+        }
+
+        if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            setActiveWikiOptionIndex((current) => (current - 1 + wikiLinkOptions.length) % wikiLinkOptions.length)
+            return
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault()
+            handleWikiOptionCommit(wikiLinkOptions[activeWikiOptionIndex])
+            return
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault()
+            setWikiDraft(null)
         }
     }
 
@@ -1016,16 +1215,37 @@ export default function EntryEditor({
         setLightboxIndex((current) => Math.min(current, Math.max(0, draft.images.length - 2)))
     }
 
-    function handleOpenLinkedEntryByTitle(title: string) {
-        const normalizedTitle = normalizeEntryLookupTitle(title)
-        const target = projectEntriesRef.current.find((item) => (
+    function findProjectEntry(link: InternalEntryLink): EntryBrief | undefined {
+        if (link.entryId) {
+            const targetById = projectEntriesRef.current.find((item) => item.id === link.entryId)
+            if (targetById) return targetById
+        }
+        const normalizedTitle = normalizeEntryLookupTitle(link.title)
+        if (!normalizedTitle) return undefined
+        return projectEntriesRef.current.find((item) => (
             normalizeEntryLookupTitle(item.title) === normalizedTitle
         ))
+    }
+
+    function handleOpenLinkedEntry(link: InternalEntryLink) {
+        const target = findProjectEntry(link)
         if (!target) {
-            setLinkPreview({ title, entryId: null })
+            setLinkPreview({ title: link.title, entryId: null })
             return
         }
         onOpenEntry?.({ id: target.id, title: target.title })
+    }
+
+    function resolveEntryAnchor(target: EventTarget | null): HTMLAnchorElement | null {
+        const anchor = resolveMarkdownAnchor(target)
+        if (!anchor) return null
+        const href = anchor.getAttribute('href') ?? ''
+        return parseInternalEntryHref(href, anchor.textContent ?? '') ? anchor : null
+    }
+
+    function getEntryLinkFromAnchor(anchor: HTMLAnchorElement): InternalEntryLink | null {
+        const href = anchor.getAttribute('href') ?? ''
+        return parseInternalEntryHref(href, anchor.textContent ?? '')
     }
 
     function updateLinkPreviewPosition(anchor: HTMLAnchorElement) {
@@ -1034,8 +1254,8 @@ export default function EntryEditor({
         const anchorRect = anchor.getBoundingClientRect()
         const viewportWidth = window.innerWidth
         const viewportHeight = window.innerHeight
-        const panelWidth = Math.min(384, Math.max(280, viewportWidth - viewportPadding * 2))
-        const panelHeight = 320
+        const panelWidth = Math.min(320, Math.max(260, viewportWidth - viewportPadding * 2))
+        const panelHeight = 260
         const preferRight = anchorRect.right + gap + panelWidth <= viewportWidth - viewportPadding
         const nextLeft = preferRight
             ? anchorRect.right + gap
@@ -1056,14 +1276,14 @@ export default function EntryEditor({
         ))
     }
 
-    function openLinkPreview(anchor: HTMLAnchorElement, title: string) {
+    function openLinkPreview(anchor: HTMLAnchorElement, link: InternalEntryLink) {
+        clearLinkPreviewCloseTimer()
+        linkPreviewAnchorRef.current = anchor
         updateLinkPreviewPosition(anchor)
         void ensureProjectEntriesLoaded().then(() => {
-            const normalizedTitle = normalizeEntryLookupTitle(title)
-            const target = projectEntriesRef.current.find((item) => (
-                normalizeEntryLookupTitle(item.title) === normalizedTitle
-            ))
-            setLinkPreview({ title, entryId: target?.id ?? null })
+            if (linkPreviewAnchorRef.current !== anchor) return
+            const target = findProjectEntry(link)
+            setLinkPreview({ title: target?.title ?? link.title, entryId: target?.id ?? null })
         })
     }
 
@@ -1471,6 +1691,7 @@ export default function EntryEditor({
                                         minHeight={720}
                                         placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
                                         textareaProps={{
+                                            onKeyDown: (event) => handleWikiKeyDown(event),
                                             onKeyUp: (event) => handleMarkdownCursorSync(event.currentTarget),
                                             onClick: (event) => handleMarkdownCursorSync(event.currentTarget),
                                             onSelect: (event) => handleMarkdownCursorSync(event.currentTarget),
@@ -1501,39 +1722,48 @@ export default function EntryEditor({
                                             </div>
 
                                             <div className="entry-editor-wikilink-popover__list">
-                                                {filteredLinkSuggestions.map((item) => (
-                                                    <button
-                                                        key={item.id}
-                                                        type="button"
-                                                        className="entry-editor-wikilink-option"
-                                                        onMouseDown={(event) => event.preventDefault()}
-                                                        onClick={() => applyWikiLink(item.title)}
-                                                    >
-                                                        <span className="entry-editor-wikilink-option__title">{item.title}</span>
-                                                        <span className="entry-editor-wikilink-option__meta">
-                                                            {getCategoryName(categories, item.category_id)}
-                                                        </span>
-                                                    </button>
+                                                {wikiLinkOptions.map((option, optionIndex) => (
+                                                    option.kind === 'entry' ? (
+                                                        <button
+                                                            key={option.id}
+                                                            type="button"
+                                                            className={`entry-editor-wikilink-option${optionIndex === activeWikiOptionIndex ? ' is-active' : ''}`}
+                                                            ref={(element) => {
+                                                                wikiOptionRefs.current[optionIndex] = element
+                                                            }}
+                                                            onMouseDown={(event) => event.preventDefault()}
+                                                            onMouseEnter={() => setActiveWikiOptionIndex(optionIndex)}
+                                                            onClick={() => handleWikiOptionCommit(option)}
+                                                        >
+                                                            <span className="entry-editor-wikilink-option__title">{option.title}</span>
+                                                            <span className="entry-editor-wikilink-option__meta">
+                                                                {getCategoryName(categories, option.categoryId)}
+                                                            </span>
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            key={`create-${option.title}`}
+                                                            type="button"
+                                                            className={`entry-editor-wikilink-option is-create${optionIndex === activeWikiOptionIndex ? ' is-active' : ''}`}
+                                                            ref={(element) => {
+                                                                wikiOptionRefs.current[optionIndex] = element
+                                                            }}
+                                                            onMouseDown={(event) => event.preventDefault()}
+                                                            onMouseEnter={() => setActiveWikiOptionIndex(optionIndex)}
+                                                            onClick={() => handleWikiOptionCommit(option)}
+                                                            disabled={creatingLinkedEntry}
+                                                        >
+                                                            <span className="entry-editor-wikilink-option__title">
+                                                                {creatingLinkedEntry ? '创建中…' : `创建新词条：${option.title}`}
+                                                            </span>
+                                                            <span className="entry-editor-wikilink-option__meta">
+                                                                创建后会立即插入双链
+                                                            </span>
+                                                        </button>
+                                                    )
                                                 ))}
 
-                                                {!hasExactSuggestion && wikiDraft.query.trim() && (
-                                                    <button
-                                                        type="button"
-                                                        className="entry-editor-wikilink-option is-create"
-                                                        onMouseDown={(event) => event.preventDefault()}
-                                                        onClick={() => void handleCreateLinkedEntry()}
-                                                        disabled={creatingLinkedEntry}
-                                                    >
-                                                        <span className="entry-editor-wikilink-option__title">
-                                                            {creatingLinkedEntry ? '创建中…' : `创建新词条：${wikiDraft.query.trim()}`}
-                                                        </span>
-                                                        <span className="entry-editor-wikilink-option__meta">
-                                                            创建后会立即插入双链
-                                                        </span>
-                                                    </button>
-                                                )}
-
-                                                {!filteredLinkSuggestions.length && (hasExactSuggestion || !wikiDraft.query.trim()) && (
+                                                {!wikiLinkOptions.length && (hasExactSuggestion || !wikiDraft.query.trim()) && (
                                                     <div className="entry-editor-wikilink-empty">
                                                         {wikiDraft.query.trim() ? '没有更多匹配项' : '继续输入词条名以搜索'}
                                                     </div>
@@ -1548,33 +1778,55 @@ export default function EntryEditor({
                                 ref={previewContainerRef}
                                 className="entry-editor-preview"
                                 onClick={(e) => {
-                                    const anchor = (e.target as Element).closest('a') as HTMLAnchorElement | null
+                                    const anchor = resolveMarkdownAnchor(e.target)
                                     if (!anchor) return
+                                    e.preventDefault()
                                     const href = anchor.getAttribute('href') ?? ''
-                                    if (href.startsWith('entry://')) {
-                                        e.preventDefault()
-                                        const title = decodeURIComponent(href.slice('entry://'.length))
-                                        openLinkPreview(anchor, title)
-                                    }
-                                }}
-                                onDoubleClick={(e) => {
-                                    const anchor = (e.target as Element).closest('a')
-                                    if (!anchor) return
-                                    const href = anchor.getAttribute('href') ?? ''
-                                    if (href.startsWith('entry://')) {
-                                        e.preventDefault()
-                                        const title = decodeURIComponent(href.slice('entry://'.length))
+                                    const internalLink = getEntryLinkFromAnchor(anchor)
+                                    if (internalLink) {
                                         void ensureProjectEntriesLoaded().then(() => {
-                                            handleOpenLinkedEntryByTitle(title)
+                                            handleOpenLinkedEntry(internalLink)
                                         })
+                                        return
                                     }
+                                    if (isSafeExternalHref(href)) {
+                                        void openUrl(href).catch((error) => {
+                                            console.error('open external link failed', error)
+                                            void showAlert('打开链接失败', 'error', 'toast', 1500)
+                                        })
+                                        return
+                                    }
+                                    void showAlert('无效链接，已阻止跳转', 'warning', 'toast', 1500)
+                                }}
+                                onMouseOver={(e) => {
+                                    const anchor = resolveEntryAnchor(e.target)
+                                    if (!anchor) return
+                                    const internalLink = getEntryLinkFromAnchor(anchor)
+                                    if (!internalLink) return
+                                    if (linkPreviewAnchorRef.current === anchor) {
+                                        clearLinkPreviewCloseTimer()
+                                        updateLinkPreviewPosition(anchor)
+                                        return
+                                    }
+                                    openLinkPreview(anchor, internalLink)
+                                }}
+                                onMouseOut={(e) => {
+                                    const anchor = resolveEntryAnchor(e.target)
+                                    if (!anchor) return
+                                    const relatedTarget = e.relatedTarget
+                                    if (
+                                        relatedTarget instanceof Node
+                                        && (anchor.contains(relatedTarget) || linkPreviewPanelRef.current?.contains(relatedTarget))
+                                    ) {
+                                        return
+                                    }
+                                    scheduleLinkPreviewClose()
                                 }}
                                 onScroll={closeLinkPreview}
                             >
                                 <MarkdownEditor
                                     mode="preview"
                                     value={previewContent}
-                                    minHeight={250}
                                     onChange={() => {}}
                                     background={"transparent"}
                                     autoHeight
@@ -1582,21 +1834,27 @@ export default function EntryEditor({
 
                                 {linkPreview && (
                                     <div
+                                        ref={linkPreviewPanelRef}
                                         className="entry-editor-link-preview"
                                         style={{
                                             top: `${linkPreviewPosition.top}px`,
                                             left: `${linkPreviewPosition.left}px`,
                                         }}
+                                        onMouseEnter={clearLinkPreviewCloseTimer}
+                                        onMouseLeave={(e) => {
+                                            const relatedTarget = e.relatedTarget
+                                            if (
+                                                relatedTarget instanceof Node
+                                                && linkPreviewAnchorRef.current?.contains(relatedTarget)
+                                            ) {
+                                                return
+                                            }
+                                            scheduleLinkPreviewClose()
+                                        }}
                                     >
                                         <div className="entry-editor-link-preview__header">
                                             <span>双链预览</span>
-                                            <button
-                                                type="button"
-                                                className="entry-editor-link-preview__close"
-                                                onClick={closeLinkPreview}
-                                            >
-                                                关闭
-                                            </button>
+                                            <span>单击相关词条以进入</span>
                                         </div>
 
                                         {linkPreviewEntry ? (
@@ -1618,14 +1876,7 @@ export default function EntryEditor({
                                                     <p className="entry-editor-link-preview__summary">
                                                         {linkPreviewEntry.summary || '暂无摘要'}
                                                     </p>
-                                                    <div className="entry-editor-link-preview__actions">
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleOpenLinkedEntryByTitle(linkPreviewEntry.title)}
-                                                        >
-                                                            在页签中打开
-                                                        </Button>
-                                                    </div>
+                                                    <p className="entry-editor-link-preview__hint">单击相关词条以进入</p>
                                                 </div>
                                             </div>
                                         ) : (

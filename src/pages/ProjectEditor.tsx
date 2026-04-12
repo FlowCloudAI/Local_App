@@ -54,6 +54,7 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
     const [categories, setCategories] = useState<Category[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [entryCount, setEntryCount] = useState(0)
+    const [categoryEntryRefreshToken, setCategoryEntryRefreshToken] = useState(0)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [entryTypeCreatorOpen, setEntryTypeCreatorOpen] = useState(false)
@@ -398,6 +399,7 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                         onDelete={handleDelete}
                         onMove={handleMove}
                         searchable
+                        collapseDuration={0.13}
                     />
                 </div>
             </div>
@@ -457,6 +459,7 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                             projectId={projectId}
                             entryTypes={entryTypes}
                             tagSchemas={tagSchemas}
+                            refreshToken={categoryEntryRefreshToken}
                             onEntryCreated={async () => {
                                 setEntryCount(count => count + 1)
                                 touchProjectUpdatedAt()
@@ -488,6 +491,7 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                                     })
                                 }}
                                 onSaved={async () => {
+                                    setCategoryEntryRefreshToken(current => current + 1)
                                     touchProjectUpdatedAt()
                                 }}
                                 onTagSchemasChange={async (schemas) => {

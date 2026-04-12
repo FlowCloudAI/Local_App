@@ -319,7 +319,6 @@ function App() {
                         tauriDragRegion
                         minTabWidth={"10rem"}
                         items={tabs}
-                        placement={"right"}
                         activeKey={activeKey}
                         onReorder={setTabs}
                         onChange={(key) => {
@@ -381,16 +380,6 @@ function App() {
                 </div>
             </div>
             <div className="main-content">
-                <SideBar
-                    className={"side-bar"}
-                    items={menuItems}
-                    bottomItems={bottomItems}
-                    selectedKey={selectedKey}
-                    collapsed={collapsed}
-                    width={180}
-                    onSelect={setSelectedKey}
-                    onCollapse={setCollapsed}
-                />
                 <div className="page-container">
                     <div className={`page-wrapper ${selectedKey === 'home' ? 'active' : ''}`}>
                         <div className="home-page-stack">
@@ -430,6 +419,18 @@ function App() {
                         <Settings/>
                     </div>
                 </div>
+                <SideBar
+                    className={"side-bar"}
+                    items={menuItems}
+                    bottomItems={bottomItems}
+                    selectedKey={selectedKey}
+                    collapsed={collapsed}
+                    width={150}
+                    collapsedWidth={50}
+                    onSelect={setSelectedKey}
+                    onCollapse={setCollapsed}
+                    placement={"right"}
+                />
             </div>
         </div>
     )

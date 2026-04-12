@@ -9,6 +9,11 @@ import 'flowcloudai-ui/style';
 import './index.css'
 import './i18n' // 初始化 i18n
 
+function isTauriRuntime(): boolean {
+    return typeof window !== 'undefined'
+        && (Object.prototype.hasOwnProperty.call(window, '__TAURI_INTERNALS__')
+            || Object.prototype.hasOwnProperty.call(window, '__TAURI__'))
+}
 
 // 异步初始化主题
 const initApp = async () => {
@@ -20,6 +25,11 @@ const initApp = async () => {
         }
     } catch (error) {
         console.warn('Failed to load settings, using default theme:', error)
+    }
+
+    if (isTauriRuntime()) {
+        document.documentElement.classList.add('is-tauri')
+        document.body.classList.add('is-tauri')
     }
 
     createRoot(document.getElementById('root')!).render(
