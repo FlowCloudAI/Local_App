@@ -487,7 +487,7 @@ export default function EntryEditor({
     const [projectDataLoading, setProjectDataLoading] = useState(false)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
-    const [linksLoading, setLinksLoading] = useState(false)
+    const [, setLinksLoading] = useState(false)
     const [linkPreview, setLinkPreview] = useState<LinkPreviewState | null>(null)
     const [linkPreviewPosition, setLinkPreviewPosition] = useState<LinkPreviewPosition>({ top: 16, left: 16 })
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
@@ -554,10 +554,9 @@ export default function EntryEditor({
 
     useEffect(() => {
         const openEntryIdSet = new Set(openEntryIds)
-        const nextCache = Object.fromEntries(
+        entryCacheRef.current = Object.fromEntries(
             Object.entries(entryCacheRef.current).filter(([cachedEntryId]) => openEntryIdSet.has(cachedEntryId)),
         )
-        entryCacheRef.current = nextCache
     }, [openEntryIds])
 
     useEffect(() => {
@@ -907,7 +906,6 @@ export default function EntryEditor({
 
     // 预览源码缓存：draft.content 不变时不重算
     const previewContent = useMemo(() => buildMarkdownPreviewSource(draft.content), [draft.content])
-    const normalizedCurrentTitle = useMemo(() => normalizeEntryLookupTitle(trimmedTitle), [trimmedTitle])
 
     const backlinks = useMemo(() => {
         const linkedEntryIds = new Set(incomingLinks.map((link) => link.a_id))
