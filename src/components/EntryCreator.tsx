@@ -2,7 +2,7 @@ import {type CSSProperties, useEffect, useMemo, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {db_create_entry, type Entry, entryTypeKey, type EntryTypeView, type TagSchema,} from '../api'
-import {buildEntryTagsPayload, ensureTypeTargetTagValues} from './entryTagUtils'
+import {buildEntryTagsPayload, ensureTypeTargetTagValues, isSchemaImplantedForType} from './entryTagUtils'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryCreator.css'
 
@@ -40,6 +40,29 @@ export default function EntryCreator({
         })),
         [entryTypes]
     )
+    const autoTargetTagSchemas = useMemo(
+        () => tagSchemas.filter(schema => isSchemaImplantedForType(schema, selectedType)),
+        [selectedType, tagSchemas]
+    )
+    const initialTags = useMemo(
+        () => ensureTypeTargetTagValues({}, tagSchemas, selectedType).tags,
+        [selectedType, tagSchemas]
+    )
+    const initialTagPayload = useMemo(
+        () => buildEntryTagsPayload(initialTags, tagSchemas),
+        [initialTags, tagSchemas]
+    )
+
+    useEffect(() => {
+        if (!open) return
+        console.log('[EntryCreator] 当前类型变化', {
+            selectedType,
+            autoTargetTagSchemaIds: autoTargetTagSchemas.map(schema => schema.id),
+            autoTargetTagSchemaNames: autoTargetTagSchemas.map(schema => schema.name),
+            initialTags,
+            initialTagPayload,
+        })
+    }, [open, selectedType, autoTargetTagSchemas, initialTags, initialTagPayload])
 
     useEffect(() => {
         if (open) {
@@ -74,8 +97,18 @@ export default function EntryCreator({
         setSubmitting(true)
         setApiError(null)
 
+        console.log('[EntryCreator] 准备创建词条', {
+            projectId,
+            categoryId,
+            title: trimmedTitle,
+            selectedType,
+            autoTargetTagSchemaIds: autoTargetTagSchemas.map(schema => schema.id),
+            autoTargetTagSchemaNames: autoTargetTagSchemas.map(schema => schema.name),
+            initialTags,
+            initialTagPayload,
+        })
+
         try {
-            const initialTags = ensureTypeTargetTagValues({}, tagSchemas, selectedType).tags
             const entry = await db_create_entry({
                 projectId,
                 categoryId,
@@ -83,13 +116,19 @@ export default function EntryCreator({
                 summary: trimmedSummary || null,
                 content: trimmedContent || null,
                 type: selectedType,
-                tags: buildEntryTagsPayload(initialTags, tagSchemas),
+                tags: initialTagPayload,
                 images: null,
+            })
+            console.log('[EntryCreator] 创建词条成功', {
+                entryId: entry.id,
+                entryType: entry.type,
+                entryTags: entry.tags,
             })
             void showAlert('词条已创建', 'success', 'toast', 1000)
             await onCreated?.(entry)
             onClose()
         } catch (e) {
+            console.error('[EntryCreator] 创建词条失败', e)
             setApiError(String(e))
             setSubmitting(false)
         }
@@ -166,6 +205,9 @@ export default function EntryCreator({
                         </div>
                         <p className="entry-creator-field-hint">
                             先把词条放进当前分类，类型可以现在定，也可以之后慢慢整理。
+                            {selectedType && autoTargetTagSchemas.length > 0
+                                ? ` 创建时会自动补上 ${autoTargetTagSchemas.length} 个面向当前类型的标签。`
+                                : ''}
                         </p>
                     </div>
 

@@ -1,0 +1,197 @@
+.entry-relation-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem 1.5rem 1.2rem;
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.entry-relation-editor__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.entry-relation-editor__title {
+    margin: 0;
+    font-size: 0.96rem;
+    color: var(--fc-color-text);
+}
+
+.entry-relation-editor__desc,
+.entry-relation-editor__count,
+.entry-relation-editor__label,
+.entry-relation-editor__field-note {
+    margin: 0.22rem 0 0;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--fc-color-text-secondary);
+}
+
+.entry-relation-editor__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.1rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
+    color: var(--fc-color-primary);
+    white-space: nowrap;
+}
+
+.entry-relation-editor__empty,
+.entry-relation-editor__error {
+    padding: 0.8rem 0.95rem;
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
+    color: var(--fc-color-text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+.entry-relation-editor__error {
+    color: var(--fc-color-danger, #e53e3e);
+    background: color-mix(in srgb, var(--fc-color-danger, #e53e3e) 8%, transparent);
+}
+
+.entry-relation-editor__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.entry-relation-editor__item,
+.entry-relation-editor__viewer-item {
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 94%, white 2%);
+}
+
+.entry-relation-editor__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 0.9rem;
+}
+
+.entry-relation-editor__row {
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+}
+
+.entry-relation-editor__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.entry-relation-editor__field--entry,
+.entry-relation-editor__field--content {
+    flex: 1 1 0;
+}
+
+.entry-relation-editor__field--direction {
+    width: 12rem;
+    flex: 0 0 12rem;
+}
+
+.entry-relation-editor__input {
+    width: 100%;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.8rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
+    color: var(--fc-color-text);
+    font: inherit;
+    padding: 0.72rem 0.9rem;
+    outline: none;
+}
+
+.entry-relation-editor__input:focus {
+    border-color: var(--fc-color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+}
+
+.entry-relation-editor__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-left: auto;
+    padding-top: 1.5rem;
+}
+
+.entry-relation-editor__viewer-item {
+    width: 100%;
+    padding: 0.9rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+}
+
+.entry-relation-editor__viewer-item:disabled {
+    cursor: default;
+}
+
+.entry-relation-editor__viewer-item:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+}
+
+.entry-relation-editor__viewer-main {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.entry-relation-editor__viewer-title {
+    font-size: 0.88rem;
+    color: var(--fc-color-text);
+}
+
+.entry-relation-editor__viewer-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.16rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
+    color: var(--fc-color-primary);
+    font-size: 0.72rem;
+}
+
+.entry-relation-editor__viewer-meta,
+.entry-relation-editor__viewer-content {
+    margin-top: 0.24rem;
+    font-size: 0.76rem;
+    line-height: 1.55;
+    color: var(--fc-color-text-secondary);
+}
+
+.entry-relation-editor__viewer-content {
+    color: var(--fc-color-text);
+}
+
+@media (max-width: 720px) {
+    .entry-relation-editor {
+        padding: 0.75rem 1rem 1rem;
+    }
+
+    .entry-relation-editor__row,
+    .entry-relation-editor__header {
+        flex-direction: column;
+    }
+
+    .entry-relation-editor__field--direction {
+        width: 100%;
+        flex-basis: auto;
+    }
+
+    .entry-relation-editor__actions {
+        width: 100%;
+        margin-left: 0;
+        padding-top: 0;
+        justify-content: flex-end;
+    }
+}

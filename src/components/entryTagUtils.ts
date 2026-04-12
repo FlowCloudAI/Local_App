@@ -16,16 +16,52 @@ function hasSchemaTagKey(
         || Object.prototype.hasOwnProperty.call(tags, schema.name)
 }
 
-export function normalizeTagTargets(target?: TagSchema['target'] | null): string[] {
-    return Array.isArray(target)
-        ? [...new Set(target.map(item => item.trim()).filter(Boolean))]
-        : []
+export function normalizeTagTargets(target?: TagSchema['target'] | string | null): string[] {
+    if (Array.isArray(target)) {
+        return [...new Set(target.map(item => item.trim()).filter(Boolean))]
+    }
+
+    if (typeof target !== 'string') return []
+
+    const trimmed = target.trim()
+    if (!trimmed) return []
+
+    try {
+        const parsed = JSON.parse(trimmed) as unknown
+        if (Array.isArray(parsed)) {
+            return [...new Set(parsed.map((item: unknown) => String(item).trim()).filter(Boolean))]
+        }
+        if (typeof parsed === 'string') {
+            const parsedValue = parsed.trim()
+            return parsedValue ? [parsedValue] : []
+        }
+    } catch {
+        // 兼容历史上可能直接存成逗号分隔字符串的情况
+    }
+
+    return [...new Set(trimmed.split(',').map((item: string) => item.trim()).filter(Boolean))]
 }
 
 export function isSchemaImplantedForType(schema: TagSchema, entryType?: string | null): boolean {
     const normalizedType = normalizeEntryType(entryType)
-    if (!normalizedType) return false
-    return normalizeTagTargets(schema.target).includes(normalizedType)
+    if (!normalizedType) {
+        console.log('[entryTagUtils] 未设置词条类型，跳过 target 匹配', {
+            schemaId: schema.id,
+            schemaName: schema.name,
+            schemaTarget: schema.target,
+        })
+        return false
+    }
+    const normalizedTargets = normalizeTagTargets(schema.target)
+    const matched = normalizedTargets.includes(normalizedType)
+    console.log('[entryTagUtils] target 匹配结果', {
+        schemaId: schema.id,
+        schemaName: schema.name,
+        normalizedType,
+        normalizedTargets,
+        matched,
+    })
+    return matched
 }
 
 export function normalizeEntryTagValue(value: unknown): EntryTagRuntimeValue {
@@ -76,6 +112,12 @@ export function ensureTypeTargetTagValues(
     addedSchemaIds: string[]
 } {
     const targetSchemas = tagSchemas.filter(schema => isSchemaImplantedForType(schema, entryType))
+    console.log('[entryTagUtils] 开始补齐类型目标标签', {
+        entryType,
+        existingTagKeys: Object.keys(tags),
+        targetSchemaIds: targetSchemas.map(schema => schema.id),
+        targetSchemaNames: targetSchemas.map(schema => schema.name),
+    })
     if (targetSchemas.length === 0) {
         return {
             tags,
@@ -87,14 +129,30 @@ export function ensureTypeTargetTagValues(
     const addedSchemaIds: string[] = []
 
     targetSchemas.forEach(schema => {
-        if (hasSchemaTagKey(nextTags, schema)) return
+        if (hasSchemaTagKey(nextTags, schema)) {
+            console.log('[entryTagUtils] 标签已存在，跳过自动补齐', {
+                schemaId: schema.id,
+                schemaName: schema.name,
+            })
+            return
+        }
         if (nextTags === tags) {
             nextTags = {...tags}
         }
         nextTags[schema.id] = getSchemaDefaultValue(schema)
         addedSchemaIds.push(schema.id)
+        console.log('[entryTagUtils] 自动补齐标签', {
+            schemaId: schema.id,
+            schemaName: schema.name,
+            defaultValue: nextTags[schema.id],
+        })
     })
 
+    console.log('[entryTagUtils] 类型目标标签补齐完成', {
+        entryType,
+        addedSchemaIds,
+        nextTags,
+    })
     return {
         tags: nextTags,
         addedSchemaIds,
@@ -130,5 +188,11 @@ export function buildEntryTagsPayload(
         }]
     })
     const merged = [...preservedExtras, ...schemaTags]
+    console.log('[entryTagUtils] 生成词条标签 payload', {
+        draftTags,
+        schemaTagCount: schemaTags.length,
+        preservedExtraCount: preservedExtras.length,
+        merged,
+    })
     return merged.length ? merged : null
 }

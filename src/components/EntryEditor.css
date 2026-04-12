@@ -322,26 +322,6 @@
     min-width: 0;
 }
 
-.entry-editor-tag-card.is-implanted {
-    padding: 0.45rem;
-    border-radius: 1.2rem;
-    background: linear-gradient(180deg, color-mix(in srgb, var(--fc-color-primary) 10%, transparent), transparent);
-    box-shadow:
-        inset 0 0 0 1px color-mix(in srgb, var(--fc-color-primary) 24%, transparent),
-        0 10px 24px color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-}
-
-.entry-editor-tag-card__badge {
-    display: inline-flex;
-    align-self: flex-start;
-    padding: 0.16rem 0.46rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
-    color: var(--fc-color-primary);
-    font-size: 0.7rem;
-    line-height: 1;
-}
-
 .entry-editor-type-chip {
     display: inline-flex;
     align-items: center;

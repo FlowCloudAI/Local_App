@@ -14,25 +14,33 @@ import {Button, MarkdownEditor, RollingBox, Select, TagItem, useAlert} from 'flo
 import {
     type Category,
     db_create_entry,
+    db_create_relation,
+    db_delete_relation,
     db_get_entry,
     db_list_entries,
     db_list_incoming_links,
     db_list_outgoing_links,
+    db_list_relations_for_entry,
     db_replace_outgoing_links,
     db_update_entry,
+    db_update_relation,
     type Entry,
     type EntryBrief,
     type EntryLink,
+    type EntryRelation,
     entryTypeKey,
     type EntryTypeView,
     type FCImage,
     import_entry_images,
+    type RelationDirection,
     type TagSchema,
 } from '../api'
 import EntryImageLightbox from './EntryImageLightbox'
 import HighLightTagItem from './HighLightTagItem'
 import TagCreator from './TagCreator'
 import {buildEntryTagsPayload, ensureTypeTargetTagValues,} from './entryTagUtils'
+import EntryRelationCreator, {type EntryRelationDraft} from './project-editor/EntryRelationCreator'
+import EntryRelationViewer from './project-editor/EntryRelationViewer'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryEditor.css'
 
@@ -76,6 +84,8 @@ type EntryEditorCache = {
     entry: Entry
     draft: EntryDraft
     editorMode: EditorMode
+    relations: EntryRelation[]
+    relationDrafts: EntryRelationDraft[]
 }
 
 interface EntryEditorProps {
@@ -401,10 +411,30 @@ function mergeUniqueStringValues(values: string[]): string[] {
     return [...new Set(values.filter(Boolean))]
 }
 
-function normalizeTagTargets(target?: TagSchema['target'] | null): string[] {
-    return Array.isArray(target)
-        ? target.map((item) => item.trim()).filter(Boolean)
-        : []
+function normalizeTagTargets(target?: TagSchema['target'] | string | null): string[] {
+    if (Array.isArray(target)) {
+        return [...new Set(target.map((item) => item.trim()).filter(Boolean))]
+    }
+
+    if (typeof target !== 'string') return []
+
+    const trimmed = target.trim()
+    if (!trimmed) return []
+
+    try {
+        const parsed = JSON.parse(trimmed) as unknown
+        if (Array.isArray(parsed)) {
+            return [...new Set(parsed.map((item: unknown) => String(item).trim()).filter(Boolean))]
+        }
+        if (typeof parsed === 'string') {
+            const parsedValue = parsed.trim()
+            return parsedValue ? [parsedValue] : []
+        }
+    } catch {
+        // 兼容历史上可能直接存成逗号分隔字符串的情况
+    }
+
+    return [...new Set(trimmed.split(',').map((item: string) => item.trim()).filter(Boolean))]
 }
 
 function isSchemaImplantedForType(schema: TagSchema, entryType?: string | null): boolean {
@@ -444,6 +474,77 @@ function buildEntryPath(projectName: string, categories: Category[], categoryId:
 
     path.unshift(projectName)
     return path.join('-')
+}
+
+function buildRelationDraft(entryId: string, relation: EntryRelation): EntryRelationDraft {
+    if (relation.relation === 'two_way') {
+        return {
+            id: relation.id,
+            otherEntryId: relation.a_id === entryId ? relation.b_id : relation.a_id,
+            direction: 'two_way',
+            content: relation.content ?? '',
+        }
+    }
+
+    return {
+        id: relation.id,
+        otherEntryId: relation.a_id === entryId ? relation.b_id : relation.a_id,
+        direction: relation.a_id === entryId ? 'outgoing' : 'incoming',
+        content: relation.content ?? '',
+    }
+}
+
+function buildComparableRelationDrafts(drafts: EntryRelationDraft[]): string[] {
+    return drafts
+        .map((draft) => [
+            draft.id ?? '',
+            draft.otherEntryId ?? '',
+            draft.direction,
+            normalizeComparableText(draft.content),
+        ].join('|'))
+        .sort()
+}
+
+function areRelationDraftsEqual(left: EntryRelationDraft[], right: EntryRelationDraft[]): boolean {
+    if (left.length !== right.length) return false
+    const leftComparable = buildComparableRelationDrafts(left)
+    const rightComparable = buildComparableRelationDrafts(right)
+    return leftComparable.every((item, index) => item === rightComparable[index])
+}
+
+function hasInvalidRelationDraft(draft: EntryRelationDraft, entryId: string): boolean {
+    return !draft.otherEntryId || draft.otherEntryId === entryId
+}
+
+function resolveRelationPayload(
+    entryId: string,
+    draft: EntryRelationDraft,
+): { aId: string; bId: string; relation: RelationDirection; content: string } {
+    const otherEntryId = draft.otherEntryId ?? ''
+    if (draft.direction === 'incoming') {
+        return {
+            aId: otherEntryId,
+            bId: entryId,
+            relation: 'one_way',
+            content: normalizeComparableText(draft.content),
+        }
+    }
+
+    if (draft.direction === 'two_way') {
+        return {
+            aId: entryId,
+            bId: otherEntryId,
+            relation: 'two_way',
+            content: normalizeComparableText(draft.content),
+        }
+    }
+
+    return {
+        aId: entryId,
+        bId: otherEntryId,
+        relation: 'one_way',
+        content: normalizeComparableText(draft.content),
+    }
 }
 
 export default function EntryEditor({
@@ -487,6 +588,8 @@ export default function EntryEditor({
     const [projectDataLoading, setProjectDataLoading] = useState(false)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
+    const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
+    const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
     const [, setLinksLoading] = useState(false)
     const [linkPreview, setLinkPreview] = useState<LinkPreviewState | null>(null)
     const [linkPreviewPosition, setLinkPreviewPosition] = useState<LinkPreviewPosition>({ top: 16, left: 16 })
@@ -569,11 +672,15 @@ export default function EntryEditor({
         setWikiDraft(null)
         setOutgoingLinks([])
         setIncomingLinks([])
+        setEntryRelations([])
+        setRelationDrafts([])
 
         if (cachedState) {
             setEntry(cachedState.entry)
             setDraft(cachedState.draft)
             setEditorMode(cachedState.editorMode)
+            setEntryRelations(cachedState.relations)
+            setRelationDrafts(cachedState.relationDrafts)
             setLoading(false)
             return () => {
                 cancelled = true
@@ -601,11 +708,14 @@ export default function EntryEditor({
         Promise.all([
             db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
             db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
         ])
-            .then(([outgoing, incoming]) => {
+            .then(([outgoing, incoming, relations]) => {
                 if (cancelled) return
                 setOutgoingLinks(outgoing)
                 setIncomingLinks(incoming)
+                setEntryRelations(relations)
+                setRelationDrafts(relations.map((relation) => buildRelationDraft(entryId, relation)))
             })
             .finally(() => {
                 if (cancelled) return
@@ -781,6 +891,10 @@ export default function EntryEditor({
     const trimmedSummary = useMemo(() => normalizeComparableText(draft.summary), [draft.summary])
     const normalizedContent = useMemo(() => normalizeComparableContent(draft.content), [draft.content])
     const initialDraft = useMemo(() => (entry ? buildDraft(entry) : null), [entry])
+    const initialRelationDrafts = useMemo(
+        () => entryRelations.map((relation) => buildRelationDraft(entryId, relation)),
+        [entryId, entryRelations],
+    )
     const comparableInitial = useMemo(() => {
         if (!initialDraft) return null
         return {
@@ -792,6 +906,14 @@ export default function EntryEditor({
             images: initialDraft.images,
         }
     }, [initialDraft])
+    const hasRelationChanges = useMemo(
+        () => !areRelationDraftsEqual(relationDrafts, initialRelationDrafts),
+        [initialRelationDrafts, relationDrafts],
+    )
+    const hasInvalidRelationDrafts = useMemo(
+        () => relationDrafts.some((item) => hasInvalidRelationDraft(item, entryId)),
+        [entryId, relationDrafts],
+    )
     const hasChanges = Boolean(
         comparableInitial && (
             trimmedTitle !== comparableInitial.title
@@ -800,9 +922,10 @@ export default function EntryEditor({
             || normalizeComparableType(draft.type) !== comparableInitial.type
             || !areTagMapsEqual(draft.tags, comparableInitial.tags, localTagSchemas)
             || !areImagesEqual(draft.images, comparableInitial.images)
+            || hasRelationChanges
         ),
     )
-    const canSave = Boolean(entry && trimmedTitle && hasChanges && !loading && !saving)
+    const canSave = Boolean(entry && trimmedTitle && hasChanges && !hasInvalidRelationDrafts && !loading && !saving)
 
     useEffect(() => {
         onDirtyChangeRef.current?.(hasChanges)
@@ -815,11 +938,13 @@ export default function EntryEditor({
                 entry,
                 draft,
                 editorMode,
+                relations: entryRelations,
+                relationDrafts,
             }
             return
         }
         delete entryCacheRef.current[entryId]
-    }, [draft, editorMode, entry, entryId, hasChanges])
+    }, [draft, editorMode, entry, entryId, entryRelations, hasChanges, relationDrafts])
 
     const coverImage = useMemo(() => getCoverImage(draft.images), [draft.images])
     const coverSrc = useMemo(() => toEntryImageSrc(coverImage), [coverImage])
@@ -1027,9 +1152,61 @@ export default function EntryEditor({
             const newLinks = await db_replace_outgoing_links(projectId, entry.id, uniqueTargetIds)
             setOutgoingLinks(newLinks)
 
+            const currentRelationMap = new Map(entryRelations.map((relation) => [relation.id, relation]))
+            const nextRelationIds = new Set(relationDrafts.map((item) => item.id).filter(Boolean) as string[])
+
+            for (const draftRelation of relationDrafts) {
+                if (hasInvalidRelationDraft(draftRelation, entry.id)) {
+                    throw new Error('存在未完成的词条关系，请先选择目标词条。')
+                }
+
+                const payload = resolveRelationPayload(entry.id, draftRelation)
+                const existing = draftRelation.id ? currentRelationMap.get(draftRelation.id) : undefined
+
+                if (!existing) {
+                    await db_create_relation({
+                        projectId,
+                        aId: payload.aId,
+                        bId: payload.bId,
+                        relation: payload.relation,
+                        content: payload.content,
+                    })
+                    continue
+                }
+
+                const endpointChanged = existing.a_id !== payload.aId || existing.b_id !== payload.bId
+                if (endpointChanged) {
+                    await db_delete_relation(existing.id)
+                    await db_create_relation({
+                        projectId,
+                        aId: payload.aId,
+                        bId: payload.bId,
+                        relation: payload.relation,
+                        content: payload.content,
+                    })
+                    continue
+                }
+
+                if (existing.relation !== payload.relation || normalizeComparableText(existing.content ?? '') !== payload.content) {
+                    await db_update_relation({
+                        id: existing.id,
+                        relation: payload.relation,
+                        content: payload.content,
+                    })
+                }
+            }
+
+            for (const existingRelation of entryRelations) {
+                if (nextRelationIds.has(existingRelation.id)) continue
+                await db_delete_relation(existingRelation.id)
+            }
+
             const refreshed = await db_get_entry(updated.id)
+            const refreshedRelations = await db_list_relations_for_entry(updated.id)
             setEntry(refreshed)
             setDraft(buildDraft(refreshed))
+            setEntryRelations(refreshedRelations)
+            setRelationDrafts(refreshedRelations.map((relation) => buildRelationDraft(updated.id, relation)))
             setEntryCache((current) => ({ ...current, [refreshed.id]: refreshed }))
             setProjectEntries((current) => {
                 const next = current.map((item) => (
@@ -1056,7 +1233,7 @@ export default function EntryEditor({
         } finally {
             setSaving(false)
         }
-    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, localTagSchemas, projectId, onTitleChange, onSaved, showAlert])
+    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, localTagSchemas, projectId, entryRelations, relationDrafts, onTitleChange, onSaved, showAlert])
 
     useEffect(() => {
         canSaveRef.current = canSave
@@ -1610,11 +1787,8 @@ export default function EntryEditor({
                                                     return (
                                                         <div
                                                             key={`${entryId}-${schema.id}`}
-                                                            className={`entry-editor-tag-card${isImplanted ? ' is-implanted' : ''}`}
+                                                            className="entry-editor-tag-card"
                                                         >
-                                                            {isImplanted && (
-                                                                <span className="entry-editor-tag-card__badge">植入</span>
-                                                            )}
                                                             {isImplanted ? (
                                                                 <HighLightTagItem
                                                                     schema={{
@@ -1625,6 +1799,7 @@ export default function EntryEditor({
                                                                         range_max: schema.range_max ?? null,
                                                                     }}
                                                                     value={value}
+                                                                    implanted
                                                                     mode="show"
                                                                 />
                                                             ) : (
@@ -1653,11 +1828,8 @@ export default function EntryEditor({
                                                 {visibleTagSchemas.map((schema) => (
                                                     <div
                                                         key={`${entryId}-${schema.id}`}
-                                                        className={`entry-editor-tag-card${implantedTagSchemaIdSet.has(schema.id) ? ' is-implanted' : ''}`}
+                                                        className="entry-editor-tag-card"
                                                     >
-                                                        {implantedTagSchemaIdSet.has(schema.id) && (
-                                                            <span className="entry-editor-tag-card__badge">植入</span>
-                                                        )}
                                                         {implantedTagSchemaIdSet.has(schema.id) ? (
                                                             <HighLightTagItem
                                                                 schema={{
@@ -1668,6 +1840,7 @@ export default function EntryEditor({
                                                                     range_max: schema.range_max ?? null,
                                                                 }}
                                                                 value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? null}
+                                                                implanted
                                                                 mode="edit"
                                                                 onChange={(value) => setDraft((current) => {
                                                                     const nextValue = normalizeComparableTagValue(value)
@@ -1936,6 +2109,27 @@ export default function EntryEditor({
                         )}
                     </div>
                 </section>
+
+                    <section className="entry-editor-relations">
+                        {isBrowseMode ? (
+                            <EntryRelationViewer
+                                drafts={relationDrafts}
+                                entries={projectEntries}
+                                categories={categories}
+                                onOpenEntry={onOpenEntry}
+                            />
+                        ) : (
+                            <EntryRelationCreator
+                                drafts={relationDrafts}
+                                entries={projectEntries}
+                                categories={categories}
+                                currentEntryId={entryId}
+                                disabled={saving || projectDataLoading}
+                                onChange={setRelationDrafts}
+                                onOpenEntry={onOpenEntry}
+                            />
+                        )}
+                    </section>
 
                     <section className={`entry-editor-outgoing-links ${outgoingLinksExpanded ? 'is-expanded' : ''}`}>
                         <button

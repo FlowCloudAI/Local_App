@@ -15,6 +15,7 @@ interface HighLightTagSchema {
 interface HighLightTagItemProps {
     schema: HighLightTagSchema
     value?: HighLightTagValue
+    implanted?: boolean
     mode?: 'show' | 'edit'
     onChange?: (value: HighLightTagValue) => void
 }
@@ -44,6 +45,7 @@ function formatValue(value?: HighLightTagValue): string {
 export default function HighLightTagItem({
     schema,
     value = null,
+                                             implanted = false,
     mode = 'show',
     onChange,
 }: HighLightTagItemProps) {
@@ -52,9 +54,9 @@ export default function HighLightTagItem({
     return (
         <div className={`highlight-tag-item${mode === 'edit' ? ' is-edit' : ' is-show'}`}>
             <div className="highlight-tag-item__header">
-                <div className="highlight-tag-item__title-wrap">
-                    <span className="highlight-tag-item__eyebrow">类型对应标签</span>
-                    <h4 className="highlight-tag-item__title">{schema.name}</h4>
+                <div className="highlight-tag-item__title-group">
+                    <span className="highlight-tag-item__title">{schema.name}</span>
+                    {implanted && <span className="highlight-tag-item__badge">植入</span>}
                 </div>
                 <span className={`highlight-tag-item__type is-${schema.type}`}>{getTypeLabel(schema.type)}</span>
             </div>

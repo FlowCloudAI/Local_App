@@ -1,3 +1,5 @@
 export { default as CategoryView } from './CategoryView'
+export {default as EntryRelationCreator} from './EntryRelationCreator'
+export {default as EntryRelationViewer} from './EntryRelationViewer'
 export { default as EntryTypeIcon } from './EntryTypeIcon'
 export { default as ProjectOverview } from './ProjectOverview'
