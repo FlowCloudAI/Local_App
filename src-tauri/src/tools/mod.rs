@@ -1,4 +1,5 @@
 use crate::AppState;
+use uuid::Uuid;
 use worldflow_core::{EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps, models::*};
 
 pub mod registry;
@@ -87,6 +88,11 @@ pub mod format {
             return "该词条没有任何关系".to_string();
         }
 
+        let current_id = match Uuid::parse_str(current_entry_id) {
+            Ok(id) => id,
+            Err(_) => return "当前词条 ID 格式无效".to_string(),
+        };
+
         let mut result = String::from("词条关系网络：\n\n");
         for rel in relations {
             let direction = match rel.relation {
@@ -94,22 +100,15 @@ pub mod format {
                 RelationDirection::TwoWay => "↔",
             };
 
-            // 确定对端词条 ID（仅用于显示）
-            let _other_id = if rel.a_id == current_entry_id {
-                &rel.b_id
-            } else {
-                &rel.a_id
-            };
-
             result.push_str(&format!(
                 "- {} {} {}\n  关系描述：{}\n\n",
-                if rel.a_id == current_entry_id {
+                if rel.a_id == current_id {
                     "我"
                 } else {
                     "对方"
                 },
                 direction,
-                if rel.a_id == current_entry_id {
+                if rel.a_id == current_id {
                     "对方"
                 } else {
                     "我"
@@ -158,9 +157,10 @@ pub async fn search_entries(
     entry_type: Option<&str>,
     limit: usize,
 ) -> Result<Vec<EntryBrief>, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
     db.search_entries(
-        project_id,
+        &project_id,
         query,
         EntryFilter {
             category_id: None,
@@ -174,8 +174,9 @@ pub async fn search_entries(
 
 /// 获取词条完整内容
 pub async fn get_entry(state: &AppState, entry_id: &str) -> Result<Entry, String> {
+    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    db.get_entry(entry_id).await.map_err(|e| e.to_string())
+    db.get_entry(&entry_id).await.map_err(|e| e.to_string())
 }
 
 /// 列出指定类型的词条简报
@@ -185,9 +186,10 @@ pub async fn list_entries_by_type(
     entry_type: &str,
     limit: usize,
 ) -> Result<Vec<EntryBrief>, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
     db.list_entries(
-        project_id,
+        &project_id,
         EntryFilter {
             category_id: None,
             entry_type: Some(entry_type),
@@ -204,8 +206,9 @@ pub async fn list_tag_schemas(
     state: &AppState,
     project_id: &str,
 ) -> Result<Vec<TagSchema>, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    db.list_tag_schemas(project_id)
+    db.list_tag_schemas(&project_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -215,8 +218,9 @@ pub async fn get_entry_relations(
     state: &AppState,
     entry_id: &str,
 ) -> Result<Vec<EntryRelation>, String> {
+    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    db.list_relations_for_entry(entry_id)
+    db.list_relations_for_entry(&entry_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -226,11 +230,12 @@ pub async fn get_project_summary(
     state: &AppState,
     project_id: &str,
 ) -> Result<(Project, std::collections::HashMap<String, i64>), String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
 
     // 获取项目信息
     let project = db
-        .get_project(project_id)
+        .get_project(&project_id)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -241,7 +246,7 @@ pub async fn get_project_summary(
     for entry_type in entry_types {
         let count = db
             .count_entries(
-                project_id,
+                &project_id,
                 EntryFilter {
                     category_id: None,
                     entry_type: Some(entry_type),

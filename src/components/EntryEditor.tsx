@@ -1,29 +1,38 @@
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { open as openFileDialog } from '@tauri-apps/plugin-dialog'
-import { openUrl } from '@tauri-apps/plugin-opener'
-import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, MarkdownEditor, RollingBox, Select, TagItem, useAlert } from 'flowcloudai-ui'
+import {convertFileSrc} from '@tauri-apps/api/core'
+import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {openUrl} from '@tauri-apps/plugin-opener'
 import {
+    type CSSProperties,
+    type KeyboardEvent as ReactKeyboardEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from 'react'
+import {Button, MarkdownEditor, RollingBox, Select, TagItem, useAlert} from 'flowcloudai-ui'
+import {
+    type Category,
     db_create_entry,
     db_get_entry,
     db_list_entries,
+    db_list_incoming_links,
+    db_list_outgoing_links,
+    db_replace_outgoing_links,
     db_update_entry,
-    entryTypeKey,
-    import_entry_images,
-    type Category,
     type Entry,
     type EntryBrief,
+    type EntryLink,
+    entryTypeKey,
     type EntryTypeView,
     type FCImage,
+    import_entry_images,
     type TagSchema,
 } from '../api'
 import EntryImageLightbox from './EntryImageLightbox'
 import HighLightTagItem from './HighLightTagItem'
 import TagCreator from './TagCreator'
-import {
-    buildEntryTagsPayload,
-    ensureTypeTargetTagValues,
-} from './entryTagUtils'
+import {buildEntryTagsPayload, ensureTypeTargetTagValues,} from './entryTagUtils'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryEditor.css'
 
@@ -473,8 +482,12 @@ export default function EntryEditor({
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
     const [backlinksExpanded, setBacklinksExpanded] = useState(false)
+    const [outgoingLinksExpanded, setOutgoingLinksExpanded] = useState(false)
     const [wikiPopoverPosition, setWikiPopoverPosition] = useState<WikiPopoverPosition>({ top: 16, left: 16 })
     const [projectDataLoading, setProjectDataLoading] = useState(false)
+    const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
+    const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
+    const [linksLoading, setLinksLoading] = useState(false)
     const [linkPreview, setLinkPreview] = useState<LinkPreviewState | null>(null)
     const [linkPreviewPosition, setLinkPreviewPosition] = useState<LinkPreviewPosition>({ top: 16, left: 16 })
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
@@ -555,6 +568,8 @@ export default function EntryEditor({
         setError(null)
         closeLinkPreview()
         setWikiDraft(null)
+        setOutgoingLinks([])
+        setIncomingLinks([])
 
         if (cachedState) {
             setEntry(cachedState.entry)
@@ -581,6 +596,21 @@ export default function EntryEditor({
             .finally(() => {
                 if (cancelled) return
                 setLoading(false)
+            })
+
+        setLinksLoading(true)
+        Promise.all([
+            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
+        ])
+            .then(([outgoing, incoming]) => {
+                if (cancelled) return
+                setOutgoingLinks(outgoing)
+                setIncomingLinks(incoming)
+            })
+            .finally(() => {
+                if (cancelled) return
+                setLinksLoading(false)
             })
 
         return () => {
@@ -880,14 +910,11 @@ export default function EntryEditor({
     const normalizedCurrentTitle = useMemo(() => normalizeEntryLookupTitle(trimmedTitle), [trimmedTitle])
 
     const backlinks = useMemo(() => {
+        const linkedEntryIds = new Set(incomingLinks.map((link) => link.a_id))
         return Object.values(entryCache)
-            .filter((item) => item.id !== entryId)
-            .filter((item) => parseInternalEntryLinks(item.content).some((link) => (
-                link.entryId === entryId
-                || (!link.entryId && normalizedCurrentTitle && normalizeEntryLookupTitle(link.title) === normalizedCurrentTitle)
-            )))
+            .filter((item) => item.id !== entryId && linkedEntryIds.has(item.id))
             .sort((left, right) => parseDateValue(right.updated_at as string | null | undefined) - parseDateValue(left.updated_at as string | null | undefined))
-    }, [entryCache, entryId, normalizedCurrentTitle])
+    }, [entryCache, entryId, incomingLinks])
 
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
     const isBrowseMode = editorMode === 'browse'
@@ -981,6 +1008,27 @@ export default function EntryEditor({
                 tags: buildEntryTagsPayload(draft.tags, localTagSchemas, entry.tags),
                 images: draft.images,
             })
+
+            // 同步出链：将正文中的内部链接替换到 entry_links 表
+            const internalLinks = parseInternalEntryLinks(normalizedContent)
+            const targetIds: string[] = []
+            for (const link of internalLinks) {
+                if (link.entryId) {
+                    targetIds.push(link.entryId)
+                } else {
+                    const normalizedTitle = normalizeEntryLookupTitle(link.title)
+                    const matched = projectEntriesRef.current.find(
+                        (item) => normalizeEntryLookupTitle(item.title) === normalizedTitle,
+                    )
+                    if (matched) {
+                        targetIds.push(matched.id)
+                    }
+                }
+            }
+            const uniqueTargetIds = [...new Set(targetIds)]
+            const newLinks = await db_replace_outgoing_links(projectId, entry.id, uniqueTargetIds)
+            setOutgoingLinks(newLinks)
+
             const refreshed = await db_get_entry(updated.id)
             setEntry(refreshed)
             setDraft(buildDraft(refreshed))
@@ -1891,6 +1939,50 @@ export default function EntryEditor({
                     </div>
                 </section>
 
+                    <section className={`entry-editor-outgoing-links ${outgoingLinksExpanded ? 'is-expanded' : ''}`}>
+                        <button
+                            type="button"
+                            className="entry-editor-outgoing-links__toggle"
+                            onClick={() => setOutgoingLinksExpanded((current) => !current)}
+                        >
+                            <span>正向链接</span>
+                            <span className="entry-editor-outgoing-links__count">{outgoingLinks.length}</span>
+                        </button>
+
+                        {outgoingLinksExpanded && (
+                            <div className="entry-editor-outgoing-links__body">
+                                {outgoingLinks.length === 0 ? (
+                                    <div className="entry-editor-empty-tip">
+                                        当前词条正文还没有通过 [[ ]] 引用其他词条。
+                                    </div>
+                                ) : (
+                                    <div className="entry-editor-outgoing-links__list">
+                                        {outgoingLinks.map((link) => {
+                                            const target = entryCache[link.b_id] ?? projectEntriesRef.current.find((item) => item.id === link.b_id)
+                                            return (
+                                                <button
+                                                    key={link.id}
+                                                    type="button"
+                                                    className="entry-editor-outgoing-links__item"
+                                                    onClick={() => onOpenEntry?.({
+                                                        id: link.b_id,
+                                                        title: target?.title ?? '未命名词条'
+                                                    })}
+                                                >
+                                                    <span
+                                                        className="entry-editor-outgoing-links__item-title">{target?.title ?? '未命名词条'}</span>
+                                                    <span className="entry-editor-outgoing-links__item-meta">
+                                                    {target ? getCategoryName(categories, target.category_id) : ''}
+                                                </span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </section>
+
                 <section className={`entry-editor-backlinks ${backlinksExpanded ? 'is-expanded' : ''}`}>
                     <button
                         type="button"
@@ -1905,7 +1997,7 @@ export default function EntryEditor({
                         <div className="entry-editor-backlinks__body">
                             {backlinks.length === 0 ? (
                                 <div className="entry-editor-empty-tip">
-                                    目前还没有其他词条通过 `[[{infoTitle}]]` 引用它。
+                                    目前还没有其他词条通过 [[ ]] 引用它。
                                 </div>
                             ) : (
                                 <div className="entry-editor-backlinks__list">

@@ -87,6 +87,15 @@ export interface TagSchema {
 
 export type RelationDirection = 'one_way' | 'two_way'
 
+export interface EntryLink {
+    id: string
+    project_id: string
+    a_id: string
+    b_id: string
+
+    [key: string]: unknown
+}
+
 export interface EntryRelation {
     id: string
     project_id: string
@@ -183,6 +192,12 @@ export interface CreateTagSchemaInput {
 
 export interface UpdateTagSchemaInput extends CreateTagSchemaInput {
     id: string
+}
+
+export interface CreateEntryLinkInput {
+    projectId: string
+    aId: string
+    bId: string
 }
 
 export interface CreateRelationInput {
@@ -416,6 +431,21 @@ export const db_delete_relation = (id: string) =>
 
 export const db_delete_relations_between = (entryAId: string, entryBId: string) =>
     command<number>('db_delete_relations_between', {entryAId, entryBId})
+
+export const db_create_entry_link = ({projectId, aId, bId}: CreateEntryLinkInput) =>
+    command<EntryLink>('db_create_entry_link', {projectId, aId, bId})
+
+export const db_list_outgoing_links = (entryId: string) =>
+    command<EntryLink[]>('db_list_outgoing_links', {entryId})
+
+export const db_list_incoming_links = (entryId: string) =>
+    command<EntryLink[]>('db_list_incoming_links', {entryId})
+
+export const db_delete_links_from_entry = (entryId: string) =>
+    command<number>('db_delete_links_from_entry', {entryId})
+
+export const db_replace_outgoing_links = (projectId: string, entryId: string, linkedEntryIds: string[]) =>
+    command<EntryLink[]>('db_replace_outgoing_links', {projectId, entryId, linkedEntryIds})
 
 // ── Entry Types ────────────────────────────────────────────────────────────────
 

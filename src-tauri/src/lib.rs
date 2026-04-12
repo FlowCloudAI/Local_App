@@ -39,9 +39,7 @@ pub struct SettingsState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .register_uri_scheme_protocol("fcimg", |ctx, request| {
-            handle_fcimg_request(ctx, request)
-        })
+        .register_uri_scheme_protocol("fcimg", |ctx, request| handle_fcimg_request(ctx, request))
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
             log::info!("Single instance detected, quitting.");
             exit(0);
@@ -176,6 +174,12 @@ pub fn run() {
             db_get_entry_type,
             db_update_entry_type,
             db_delete_entry_type,
+            // Entry Links
+            db_create_entry_link,
+            db_list_outgoing_links,
+            db_list_incoming_links,
+            db_delete_links_from_entry,
+            db_replace_outgoing_links,
             // AI Client
             ai_list_plugins,
             ai_create_llm_session,
@@ -273,20 +277,17 @@ fn handle_fcimg_request<R: Runtime>(
             StatusCode::SERVICE_UNAVAILABLE,
             b"paths state unavailable".to_vec(),
             Some("text/plain; charset=utf-8"),
-        )
+        );
     };
 
     let raw_uri = request.uri().to_string();
-    let encoded_path = request
-        .uri()
-        .path()
-        .trim_start_matches('/');
+    let encoded_path = request.uri().path().trim_start_matches('/');
     if encoded_path.is_empty() {
         return build_fcimg_response(
             StatusCode::BAD_REQUEST,
             b"missing image path".to_vec(),
             Some("text/plain; charset=utf-8"),
-        )
+        );
     }
 
     let decoded_path = match urlencoding::decode(encoded_path) {
@@ -296,7 +297,7 @@ fn handle_fcimg_request<R: Runtime>(
                 StatusCode::BAD_REQUEST,
                 format!("invalid image path: {}", raw_uri).into_bytes(),
                 Some("text/plain; charset=utf-8"),
-            )
+            );
         }
     };
 
@@ -308,7 +309,7 @@ fn handle_fcimg_request<R: Runtime>(
                 StatusCode::NOT_FOUND,
                 b"image not found".to_vec(),
                 Some("text/plain; charset=utf-8"),
-            )
+            );
         }
     };
 
@@ -317,7 +318,7 @@ fn handle_fcimg_request<R: Runtime>(
             StatusCode::INTERNAL_SERVER_ERROR,
             b"invalid db path".to_vec(),
             Some("text/plain; charset=utf-8"),
-        )
+        );
     };
     let images_root = db_dir.join("images");
     let canonical_images_root = match std::fs::canonicalize(&images_root) {
@@ -327,7 +328,7 @@ fn handle_fcimg_request<R: Runtime>(
                 StatusCode::NOT_FOUND,
                 b"images root not found".to_vec(),
                 Some("text/plain; charset=utf-8"),
-            )
+            );
         }
     };
 
@@ -336,7 +337,7 @@ fn handle_fcimg_request<R: Runtime>(
             StatusCode::FORBIDDEN,
             b"forbidden".to_vec(),
             Some("text/plain; charset=utf-8"),
-        )
+        );
     }
 
     let bytes = match std::fs::read(&canonical_requested) {
@@ -346,7 +347,7 @@ fn handle_fcimg_request<R: Runtime>(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 b"failed to read image".to_vec(),
                 Some("text/plain; charset=utf-8"),
-            )
+            );
         }
     };
     let mime = mime_guess::from_path(&canonical_requested)

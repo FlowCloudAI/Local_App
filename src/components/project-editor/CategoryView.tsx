@@ -1,13 +1,13 @@
-import { convertFileSrc } from '@tauri-apps/api/core'
-import { memo, type CSSProperties, useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Card, Input, RollingBox } from 'flowcloudai-ui'
+import {convertFileSrc} from '@tauri-apps/api/core'
+import {type CSSProperties, memo, useCallback, useEffect, useRef, useState} from 'react'
+import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {
     db_list_entries,
     db_search_entries,
-    entryTypeKey,
     type EntryBrief,
-    type TagSchema,
+    entryTypeKey,
     type EntryTypeView,
+    type TagSchema,
 } from '../../api'
 import EntryCreator from '../EntryCreator'
 import EntryTypeIcon from './EntryTypeIcon'
@@ -116,7 +116,9 @@ function CategoryView({categoryId, projectId, entryTypes, tagSchemas, refreshTok
 
     useEffect(() => {
         void loadEntries(searchText, typeFilter)
-    }, [categoryId, typeFilter, loadEntries, refreshToken, searchText])
+        // searchText changes are handled by handleSearchChange debounce
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [categoryId, typeFilter, refreshToken, loadEntries])
 
     useEffect(() => () => {
         if (searchTimer.current) clearTimeout(searchTimer.current)
