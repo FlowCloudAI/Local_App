@@ -7,6 +7,7 @@ import ProjectList from "./pages/ProjectList.tsx";
 import ProjectEditor from "./pages/ProjectEditor";
 import Settings from "./pages/Settings";
 import Plugins from "./pages/Plugins";
+import Idea from "./pages/Idea";
 import type {Project} from "./api";
 import RelationDemo from "./components/RelationDemo";
 import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
@@ -436,6 +437,9 @@ function App() {
                                 )
                             })}
                         </div>
+                    </div>
+                    <div className={`page-wrapper ${selectedKey === 'idea' ? 'active' : ''}`}>
+                        <Idea/>
                     </div>
                     <div className={`page-wrapper ${selectedKey === 'plugins' ? 'active' : ''}`}>
                         <Plugins/>
