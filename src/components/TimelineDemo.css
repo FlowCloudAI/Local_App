@@ -90,7 +90,6 @@
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 0.9fr);
     gap: 1rem;
-    min-height: 30rem;
 }
 
 .timeline-demo__timeline-panel,
@@ -143,6 +142,8 @@
     border: 1px solid var(--fc-color-border);
     border-radius: 0.5rem;
     background: var(--fc-color-bg);
+    overflow: hidden;
+    position: relative;
 }
 
 .timeline-demo__timeline-shell--compact {
@@ -158,8 +159,8 @@
 .timeline-demo__detail-empty {
     display: flex;
     flex-direction: column;
+    height: 100%;
     gap: 0.75rem;
-    min-height: 100%;
     padding: 1rem;
     border: 1px solid var(--fc-color-border);
     border-radius: 0.5rem;

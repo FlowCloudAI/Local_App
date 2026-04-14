@@ -1,6 +1,6 @@
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {Button, MarkdownEditor, RollingBox, useAlert} from 'flowcloudai-ui'
+import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     type Category,
     db_create_entry,
@@ -52,6 +52,7 @@ import {
     hasInvalidRelationDraft,
     resolveRelationPayload,
 } from './utils/entryRelation'
+import {useUndoRedo} from './hooks/useUndoRedo'
 import {
     buildTagValueMap,
     findCategoryDuplicatedEntry,
@@ -96,6 +97,11 @@ interface EntryDraft {
     type: string | null
     tags: Record<string, string | number | boolean | null>
     images: EntryImage[]
+}
+
+interface EditorHistory {
+    draft: EntryDraft
+    relationDrafts: EntryRelationDraft[]
 }
 
 function buildDraft(entry: Entry): EntryDraft {
@@ -172,6 +178,11 @@ export default function EntryEditor({
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     const canSaveRef = useRef(false)
     const saveActionRef = useRef<(() => void) | null>(null)
+    const editorRef = useRef<MarkdownEditorRef>(null)
+    const isApplyingHistoryRef = useRef(false)
+    const historyInitializedRef = useRef<string | null>(null)
+
+    const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     projectEntriesRef.current = projectEntries
     onDirtyChangeRef.current = onDirtyChange
     const { showAlert } = useAlert()
@@ -248,7 +259,13 @@ export default function EntryEditor({
 
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
-    }, [entryId])
+        // Reset history tracking when switching entries
+        historyInitializedRef.current = null
+        undoRedo.reset({
+            draft: {title: '', summary: '', content: '', type: null, tags: {}, images: []},
+            relationDrafts: []
+        })
+    }, [entryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         const openEntryIdSet = new Set(openEntryIds)
@@ -337,6 +354,25 @@ export default function EntryEditor({
         const initialVisibleTagSchemaIds = buildAutoVisibleTagSchemaIds(entryTags.localTagSchemas, initialDraftState.tags, initialDraftState.type)
         entryTags.setPinnedTagSchemaIds((current) => (current.length === 0 ? initialVisibleTagSchemaIds : current))
     }, [entry, entryId, entryTags.localTagSchemas, entryTags.setPinnedTagSchemaIds])
+
+    // Initialize history once per entry load (fires when both entry and relations are ready)
+    useEffect(() => {
+        if (!entry || entry.id !== entryId) return
+        if (historyInitializedRef.current === entryId) return
+        historyInitializedRef.current = entryId
+        undoRedo.reset({draft, relationDrafts})
+    }, [entry, entryId, draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Auto-push history snapshot on draft/relation changes (debounced to avoid per-keystroke entries)
+    useEffect(() => {
+        if (!entry || entry.id !== entryId) return
+        if (historyInitializedRef.current !== entryId) return
+        if (isApplyingHistoryRef.current) {
+            isApplyingHistoryRef.current = false
+            return
+        }
+        undoRedo.pushDebounced({draft, relationDrafts})
+    }, [draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const ensureProjectEntryDetailsLoaded = useCallback(async (briefs: EntryBrief[]) => {
         if (!briefs.length || projectEntryDetailsStatusRef.current !== 'idle') return
@@ -629,13 +665,16 @@ export default function EntryEditor({
                 await onTitleChange?.(refreshed)
             }
             await onSaved?.(refreshed)
+            const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(updated.id, relation))
+            historyInitializedRef.current = null
+            undoRedo.reset({draft: buildDraft(refreshed), relationDrafts: savedRelationDrafts})
             void showAlert('词条已保存', 'success', 'toast', 1000)
         } catch (e) {
             setError(String(e))
         } finally {
             setSaving(false)
         }
-    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, entryTags.localTagSchemas, projectId, entryRelations, relationDrafts, onTitleChange, onSaved, showAlert])
+    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, entryTags.localTagSchemas, projectId, entryRelations, relationDrafts, onTitleChange, onSaved, showAlert, undoRedo])
 
     useEffect(() => {
         canSaveRef.current = canSave
@@ -644,21 +683,57 @@ export default function EntryEditor({
         }
     }, [canSave, handleSave])
 
+    const applyHistory = useCallback((history: EditorHistory) => {
+        isApplyingHistoryRef.current = true
+        setDraft(history.draft)
+        setRelationDrafts(history.relationDrafts)
+    }, [])
+
+    const handleUndo = useCallback(() => {
+        const prev = undoRedo.undo()
+        if (prev) applyHistory(prev)
+    }, [undoRedo, applyHistory])
+
+    const handleRedo = useCallback(() => {
+        const next = undoRedo.redo()
+        if (next) applyHistory(next)
+    }, [undoRedo, applyHistory])
+
     useEffect(() => {
-        function handleSaveShortcut(event: KeyboardEvent) {
+        function handleKeyShortcut(event: KeyboardEvent) {
             if (event.defaultPrevented || event.repeat) return
             if (!(event.ctrlKey || event.metaKey)) return
-            if (event.key.toLowerCase() !== 's') return
-            event.preventDefault()
-            if (!canSaveRef.current) return
-            saveActionRef.current?.()
+
+            const key = event.key.toLowerCase()
+
+            if (key === 's') {
+                event.preventDefault()
+                if (!canSaveRef.current) return
+                saveActionRef.current?.()
+                return
+            }
+
+            // Undo/redo — only when focus is NOT inside the MarkdownEditor textarea
+            // (the textarea handles its own Ctrl+Z via onKeyDown)
+            const textarea = editorRef.current?.getTextareaElement()
+            if (textarea && document.activeElement === textarea) return
+
+            if (key === 'z' && !event.shiftKey) {
+                event.preventDefault()
+                handleUndo()
+                return
+            }
+            if ((key === 'z' && event.shiftKey) || key === 'y') {
+                event.preventDefault()
+                handleRedo()
+            }
         }
 
-        window.addEventListener('keydown', handleSaveShortcut)
+        window.addEventListener('keydown', handleKeyShortcut)
         return () => {
-            window.removeEventListener('keydown', handleSaveShortcut)
+            window.removeEventListener('keydown', handleKeyShortcut)
         }
-    }, [])
+    }, [handleUndo, handleRedo])
 
 
 
@@ -816,6 +891,7 @@ export default function EntryEditor({
                             <div className="entry-editor-markdown">
                                 <div ref={markdownContainerRef} className="entry-editor-markdown-anchor">
                                     <MarkdownEditor
+                                        ref={editorRef}
                                         key={entryId}
                                         value={draft.content}
                                         onChange={(value) => setDraft((current) => (
@@ -825,6 +901,17 @@ export default function EntryEditor({
                                         ))}
                                         minHeight={720}
                                         placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
+                                        onKeyDown={(event) => {
+                                            if (!(event.ctrlKey || event.metaKey) || event.repeat) return
+                                            const key = event.key.toLowerCase()
+                                            if (key === 'z' && !event.shiftKey) {
+                                                event.preventDefault()
+                                                handleUndo()
+                                            } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+                                                event.preventDefault()
+                                                handleRedo()
+                                            }
+                                        }}
                                         textareaProps={{
                                             onKeyDown: (event) => wikiLink.handleWikiKeyDown(event),
                                             onKeyUp: (event) => wikiLink.handleMarkdownCursorSync(event.currentTarget),
