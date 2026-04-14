@@ -1,4 +1,5 @@
 use crate::AiState;
+use crate::ApiKeyStore;
 use flowcloudai_client::{
     AudioDecoder, AudioSource, ImageSession, PluginKind, SessionEvent, TurnStatus,
 };
@@ -26,6 +27,22 @@ struct EventToolCall {
 struct EventTurnEnd {
     session_id: String,
     status: String, // "ok" | "cancelled" | "interrupted" | "error:<msg>"
+    node_id: u64,
+}
+
+#[derive(Serialize, Clone)]
+struct EventTurnBegin {
+    session_id: String,
+    turn_id: u64,
+    node_id: u64,
+}
+
+#[derive(Serialize, Clone)]
+struct EventToolResult {
+    session_id: String,
+    index: usize,
+    output: String,
+    is_error: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -106,7 +123,6 @@ pub async fn ai_create_llm_session(
     temperature: Option<f64>,
     max_tokens: Option<i64>,
 ) -> Result<(), String> {
-    use crate::ApiKeyStore;
     let api_key = ApiKeyStore::get(&plugin_id)
         .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
 
@@ -125,9 +141,10 @@ pub async fn ai_create_llm_session(
     if let Some(n) = max_tokens {
         session.set_max_tokens(n).await;
     }
+    session.set_stream(true).await;
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, _handle) = session.run(input_rx, None);
+    let (event_stream, handle) = session.run(input_rx, None);
 
     // 启动后台事件循环
     let sid = session_id.clone();
@@ -138,6 +155,18 @@ pub async fn ai_create_llm_session(
             match ev {
                 SessionEvent::NeedInput => {
                     app_clone.emit("ai:ready", &sid).ok();
+                }
+                SessionEvent::TurnBegin { turn_id, node_id } => {
+                    app_clone
+                        .emit(
+                            "ai:turn_begin",
+                            EventTurnBegin {
+                                session_id: sid.clone(),
+                                turn_id,
+                                node_id,
+                            },
+                        )
+                        .ok();
                 }
                 SessionEvent::ContentDelta(text) => {
                     app_clone
@@ -173,13 +202,31 @@ pub async fn ai_create_llm_session(
                         )
                         .ok();
                 }
-                SessionEvent::TurnEnd { status } => {
+                SessionEvent::ToolResult {
+                    index,
+                    output,
+                    is_error,
+                } => {
+                    app_clone
+                        .emit(
+                            "ai:tool_result",
+                            EventToolResult {
+                                session_id: sid.clone(),
+                                index,
+                                output,
+                                is_error,
+                            },
+                        )
+                        .ok();
+                }
+                SessionEvent::TurnEnd { status, node_id } => {
                     app_clone
                         .emit(
                             "ai:turn_end",
                             EventTurnEnd {
                                 session_id: sid.clone(),
                                 status: turn_status_str(&status),
+                                node_id,
                             },
                         )
                         .ok();
@@ -196,7 +243,6 @@ pub async fn ai_create_llm_session(
                         .ok();
                     break;
                 }
-                _ => {}
             }
         }
 
@@ -213,7 +259,132 @@ pub async fn ai_create_llm_session(
         .sessions
         .lock()
         .await
-        .insert(session_id, crate::SessionEntry { input_tx });
+        .insert(session_id, crate::SessionEntry { input_tx, handle });
+
+    Ok(())
+}
+
+/// 将消息树 head 移动到指定节点（重说 / 分支 / 历史回退）
+///
+/// node_id 来自 `ai:turn_begin` 或 `ai:turn_end` 事件中的 `node_id` 字段。
+/// 在会话等待用户输入期间生效：
+/// - 目标节点 role 为 "user" → drive loop 立即继续（免去下一次输入）
+/// - 目标节点 role 为 "assistant" → drive loop 继续等待用户输入
+#[tauri::command]
+pub async fn ai_checkout(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+    node_id: u64,
+) -> Result<(), String> {
+    let sessions = ai_state.sessions.lock().await;
+    let entry = sessions
+        .get(&session_id)
+        .ok_or_else(|| format!("Session '{}' 不存在", session_id))?;
+
+    entry.handle.checkout(node_id).await
+}
+
+/// 切换会话使用的插件（下一轮对话生效）
+#[tauri::command]
+pub async fn ai_switch_plugin(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+    plugin_id: String,
+) -> Result<(), String> {
+    let api_key = ApiKeyStore::get(&plugin_id)
+        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
+
+    let sessions = ai_state.sessions.lock().await;
+    let entry = sessions
+        .get(&session_id)
+        .ok_or_else(|| format!("Session '{}' 不存在", session_id))?;
+
+    entry.handle.switch_plugin(&plugin_id, &api_key).await
+}
+
+/// 运行时会话参数更新（所有字段可选，只更新传入的字段）
+#[derive(serde::Deserialize)]
+pub struct UpdateSessionParams {
+    pub model: Option<String>,
+    pub temperature: Option<f64>,
+    pub max_tokens: Option<i64>,
+    pub stream: Option<bool>,
+    pub thinking: Option<bool>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
+    pub top_p: Option<f64>,
+    pub stop: Option<Vec<String>>,
+    pub response_format: Option<serde_json::Value>,
+    pub n: Option<i32>,
+    pub tool_choice: Option<String>,
+    pub logprobs: Option<bool>,
+    pub top_logprobs: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn ai_update_session(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+    params: UpdateSessionParams,
+) -> Result<(), String> {
+    use flowcloudai_client::ThinkingType;
+
+    let sessions = ai_state.sessions.lock().await;
+    let entry = sessions
+        .get(&session_id)
+        .ok_or_else(|| format!("Session '{}' 不存在", session_id))?;
+
+    entry
+        .handle
+        .update(|req| {
+            if let Some(v) = params.model {
+                req.model = v;
+            }
+            if let Some(v) = params.temperature {
+                req.temperature = Some(v);
+            }
+            if let Some(v) = params.max_tokens {
+                req.max_tokens = Some(v);
+            }
+            if let Some(v) = params.stream {
+                req.stream = Some(v);
+            }
+            if let Some(v) = params.thinking {
+                req.thinking = Some(if v {
+                    ThinkingType::enabled()
+                } else {
+                    ThinkingType::disabled()
+                });
+            }
+            if let Some(v) = params.frequency_penalty {
+                req.frequency_penalty = Some(v);
+            }
+            if let Some(v) = params.presence_penalty {
+                req.presence_penalty = Some(v);
+            }
+            if let Some(v) = params.top_p {
+                req.top_p = Some(v);
+            }
+            if let Some(v) = params.stop {
+                req.stop = Some(v);
+            }
+            if let Some(v) = params.response_format {
+                req.response_format = Some(v);
+            }
+            if let Some(v) = params.n {
+                req.n = Some(v);
+            }
+            if let Some(v) = params.tool_choice {
+                req.tool_choice = Some(v);
+            }
+            if let Some(v) = params.logprobs {
+                req.logprobs = Some(v);
+            }
+            if let Some(v) = params.top_logprobs {
+                req.top_logprobs = Some(v);
+            }
+        })
+        .await;
 
     Ok(())
 }
@@ -303,14 +474,12 @@ pub struct ImageData {
     pub size: Option<String>,
 }
 
-async fn make_image_session(
-    ai_state: &AiState,
-    plugin_id: &str,
-    api_key: &str,
-) -> Result<ImageSession, String> {
+async fn make_image_session(ai_state: &AiState, plugin_id: &str) -> Result<ImageSession, String> {
+    let api_key = ApiKeyStore::get(plugin_id)
+        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
     let client = ai_state.client.lock().await;
     client
-        .create_image_session(plugin_id, api_key)
+        .create_image_session(plugin_id, &api_key)
         .map_err(|e| e.to_string())
 }
 
@@ -319,11 +488,10 @@ async fn make_image_session(
 pub async fn ai_text_to_image(
     ai_state: State<'_, AiState>,
     plugin_id: String,
-    api_key: String,
     model: String,
     prompt: String,
 ) -> Result<Vec<ImageData>, String> {
-    let session = make_image_session(&ai_state, &plugin_id, &api_key).await?;
+    let session = make_image_session(&ai_state, &plugin_id).await?;
     let result = session
         .text_to_image(&model, &prompt)
         .await
@@ -344,12 +512,11 @@ pub async fn ai_text_to_image(
 pub async fn ai_edit_image(
     ai_state: State<'_, AiState>,
     plugin_id: String,
-    api_key: String,
     model: String,
     prompt: String,
     image_url: String,
 ) -> Result<Vec<ImageData>, String> {
-    let session = make_image_session(&ai_state, &plugin_id, &api_key).await?;
+    let session = make_image_session(&ai_state, &plugin_id).await?;
     let result = session
         .edit_image(&model, &prompt, &image_url)
         .await
@@ -370,12 +537,11 @@ pub async fn ai_edit_image(
 pub async fn ai_merge_images(
     ai_state: State<'_, AiState>,
     plugin_id: String,
-    api_key: String,
     model: String,
     prompt: String,
     image_urls: Vec<String>,
 ) -> Result<Vec<ImageData>, String> {
-    let session = make_image_session(&ai_state, &plugin_id, &api_key).await?;
+    let session = make_image_session(&ai_state, &plugin_id).await?;
     let result = session
         .merge_images(&model, &prompt, image_urls)
         .await
@@ -405,11 +571,12 @@ pub struct TtsResult {
 pub async fn ai_speak(
     ai_state: State<'_, AiState>,
     plugin_id: String,
-    api_key: String,
     model: String,
     text: String,
     voice_id: String,
 ) -> Result<TtsResult, String> {
+    let api_key = ApiKeyStore::get(&plugin_id)
+        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
     let client = ai_state.client.lock().await;
     let session = client
         .create_tts_session(&plugin_id, &api_key)
@@ -431,16 +598,17 @@ pub async fn ai_speak(
     })
 }
 
-/// 文本转语音并直接播放（通过系统音频设备）
+/// 文本转语音并直接播放（通过系统音频设备，后台播放，立即返回）
 #[tauri::command]
 pub async fn ai_play_tts(
     ai_state: State<'_, AiState>,
     plugin_id: String,
-    api_key: String,
     model: String,
     text: String,
     voice_id: String,
 ) -> Result<(), String> {
+    let api_key = ApiKeyStore::get(&plugin_id)
+        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
     let client = ai_state.client.lock().await;
     let session = client
         .create_tts_session(&plugin_id, &api_key)
@@ -452,8 +620,12 @@ pub async fn ai_play_tts(
         .await
         .map_err(|e| e.to_string())?;
 
-    let source = AudioSource::Raw(result.audio);
-    AudioDecoder::play_source(&source, Some(&result.format))
-        .await
-        .map_err(|e| e.to_string())
+    tauri::async_runtime::spawn(async move {
+        let source = AudioSource::Raw(result.audio);
+        if let Err(e) = AudioDecoder::play_source(&source, Some(&result.format)).await {
+            log::warn!("ai_play_tts 播放失败: {}", e);
+        }
+    });
+
+    Ok(())
 }

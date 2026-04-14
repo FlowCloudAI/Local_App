@@ -1768,7 +1768,7 @@ dependencies = [
 [[package]]
 name = "flowcloudai_client"
 version = "0.1.0"
-source = "git+ssh://git@github.com/FlowCloudAI/AI_Client_Core?branch=main#73848e2f157d332d88a3d474b399518f226836a5"
+source = "git+ssh://git@github.com/FlowCloudAI/AI_Client_Core?branch=main#ae4ac426b5609e62894937176df77417b105dae3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4386,7 +4386,7 @@ dependencies = [
  "bytes",
  "getrandom 0.3.4",
  "lru-slab",
-    "rand 0.9.3",
+    "rand 0.9.4",
  "ring",
  "rustc-hash",
  "rustls",
@@ -4466,9 +4466,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ec095654a25171c2124e9e3393a930bddbffdc939556c914957a4c3e0a87166"
+checksum = "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -4566,9 +4566,9 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "rayon"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368f01d005bf8fd9b1206fb6fa653e6c4a81ceb1466406b81792d87c5677a58f"
+checksum = "fb39b166781f92d482534ef4b4b1b2568f42613b53e5b6c160e24cfbfa30926d"
 dependencies = [
  "either",
  "rayon-core",

@@ -1,6 +1,4 @@
-import {convertFileSrc} from '@tauri-apps/api/core'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
-import {openUrl} from '@tauri-apps/plugin-opener'
 import {
     type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,
@@ -30,19 +28,58 @@ import {
     type EntryRelation,
     entryTypeKey,
     type EntryTypeView,
-    type FCImage,
     import_entry_images,
-    type RelationDirection,
     type TagSchema,
 } from '../api'
+import {openUrl} from '@tauri-apps/plugin-opener'
+import EntryEditorSidebar from './EntryEditorSidebar'
 import EntryImageLightbox from './EntryImageLightbox'
 import HighLightTagItem from './HighLightTagItem'
 import TagCreator from './TagCreator'
 import {buildEntryTagsPayload, ensureTypeTargetTagValues, getSchemaDefaultValue} from './entryTagUtils'
-import EntryRelationCreator, {type EntryRelationDraft} from './project-editor/EntryRelationCreator'
-import EntryRelationViewer from './project-editor/EntryRelationViewer'
 import EntryTypeIcon from './project-editor/EntryTypeIcon'
 import './EntryEditor.css'
+import {
+    buildInternalEntryMarkdown,
+    buildMarkdownPreviewSource,
+    type InternalEntryLink,
+    isSafeExternalHref,
+    parseInternalEntryHref,
+    parseInternalEntryLinks,
+    resolveMarkdownAnchor,
+} from './utils/entryMarkdown'
+import {type EntryImage, getCoverImage, normalizeEntryImages, toEntryImageSrc,} from './utils/entryImage'
+import {
+    areTagMapsEqual,
+    buildAutoVisibleTagSchemaIds,
+    getComparableTagValue,
+    isSchemaImplantedForType,
+    mergeUniqueStringValues,
+    normalizeComparableTagValue,
+} from './utils/entryTag'
+import {
+    areRelationDraftsEqual,
+    buildRelationDraft,
+    hasInvalidRelationDraft,
+    resolveRelationPayload,
+} from './utils/entryRelation'
+import {
+    buildEntryPath,
+    buildTagValueMap,
+    findCategoryDuplicatedEntry,
+    formatDate,
+    getCategoryName,
+    getTextareaCaretOffset,
+    normalizeComparableContent,
+    normalizeComparableText,
+    normalizeComparableType,
+    normalizeEntryContent,
+    normalizeEntryLookupTitle,
+    parseDateValue,
+    replaceRange,
+    resolveActiveWikiDraft,
+} from './utils/entryCommon'
+import type {EntryRelationDraft} from "./project-editor/EntryRelationCreator.tsx";
 
 type EditorMode = 'edit' | 'browse'
 
@@ -65,15 +102,6 @@ type LinkPreviewPosition = {
 type WikiPopoverPosition = {
     top: number
     left: number
-}
-
-type EntryImage = FCImage & {
-    is_cover?: boolean
-}
-
-type InternalEntryLink = {
-    entryId: string | null
-    title: string
 }
 
 type WikiLinkOption =
@@ -113,62 +141,6 @@ interface EntryDraft {
     images: EntryImage[]
 }
 
-function normalizeEntryImages(images?: FCImage[] | null): EntryImage[] {
-    if (!images?.length) return []
-
-    const normalized = images.map((image) => ({
-        ...image,
-        is_cover: Boolean((image as EntryImage).is_cover),
-    }))
-
-    if (!normalized.some((image) => image.is_cover)) {
-        normalized[0] = {
-            ...normalized[0],
-            is_cover: true,
-        }
-    }
-
-    return normalized
-}
-
-function toEntryImageSrc(image?: FCImage | null): string | undefined {
-    const raw = image?.url || image?.path
-    if (!raw) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(raw)) return raw
-    return convertFileSrc(String(raw), 'fcimg')
-}
-
-function getCoverImage(images: EntryImage[]): EntryImage | null {
-    return images.find((image) => image.is_cover) || images[0] || null
-}
-
-function buildTagValueMap(entry: Entry): Record<string, string | number | boolean | null> {
-    return Object.fromEntries((entry.tags ?? []).map((tag) => [tag.schema_id ?? tag.name ?? '', normalizeTagRuntimeValue(tag.value)]))
-}
-
-function normalizeTagRuntimeValue(value: unknown): string | number | boolean | null {
-    if (value == null) return null
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        return value
-    }
-    if (Array.isArray(value)) return null
-
-    if (typeof value === 'object') {
-        const record = value as Record<string, unknown>
-        if (typeof record.value === 'string' || typeof record.value === 'number' || typeof record.value === 'boolean') {
-            return record.value
-        }
-    }
-
-    return null
-}
-
-function normalizeEntryContent(entry: Entry): string {
-    if (typeof entry.content === 'string') return entry.content
-    const rawContent = entry['content']
-    return typeof rawContent === 'string' ? rawContent : ''
-}
-
 function buildDraft(entry: Entry): EntryDraft {
     return {
         title: entry.title ?? '',
@@ -180,222 +152,6 @@ function buildDraft(entry: Entry): EntryDraft {
     }
 }
 
-function normalizeComparableText(value: string): string {
-    return value.replace(/\r\n?/g, '\n').trim()
-}
-
-function normalizeComparableContent(value: string): string {
-    return value.replace(/\r\n?/g, '\n')
-}
-
-function normalizeComparableType(value?: string | null): string | null {
-    if (typeof value !== 'string') return null
-    const normalized = value.trim()
-    return normalized ? normalized : null
-}
-
-function normalizeComparableTagValue(value: unknown): string | number | boolean | null {
-    const normalized = normalizeTagRuntimeValue(value)
-    if (typeof normalized === 'string') {
-        const trimmed = normalized.trim()
-        return trimmed ? trimmed : null
-    }
-    return normalized
-}
-
-function getComparableTagValue(
-    tags: Record<string, string | number | boolean | null>,
-    schema: TagSchema,
-): string | number | boolean | null {
-    return normalizeComparableTagValue(tags[schema.id] ?? tags[schema.name] ?? null)
-}
-
-function parseDateValue(value?: string | null): number {
-    if (!value) return 0
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const timestamp = new Date(withTimezone).getTime()
-    return Number.isNaN(timestamp) ? 0 : timestamp
-}
-
-const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-})
-
-function formatDate(value?: string | null): string {
-    const timestamp = parseDateValue(value)
-    if (!timestamp) return '未知'
-    return DATE_FORMATTER.format(timestamp)
-}
-
-function stripMarkdown(value: string): string {
-    return value
-        .replace(/```[\s\S]*?```/g, ' ')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/!\[[^\]]*]\([^)]+\)/g, ' ')
-        .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
-        .replace(/[#>*_~-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-}
-
-function buildExcerpt(value?: string | null, maxLength = 120): string {
-    const normalized = stripMarkdown(value ?? '')
-    if (!normalized) return '暂无正文'
-    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
-}
-
-const INTERNAL_ENTRY_HREF_PREFIX = 'entry://'
-const LEGACY_ENTRY_HREF_PREFIX = 'entry-title://'
-
-function buildInternalEntryHref(entryId: string): string {
-    return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(entryId)}`
-}
-
-function buildLegacyEntryHref(title: string): string {
-    return `${LEGACY_ENTRY_HREF_PREFIX}${encodeURIComponent(title)}`
-}
-
-function buildInternalEntryMarkdown(title: string, entryId: string): string {
-    return `[${title}](${buildInternalEntryHref(entryId)})`
-}
-
-function parseInternalEntryLinks(content?: string | null): InternalEntryLink[] {
-    if (!content) return []
-
-    const links: InternalEntryLink[] = []
-    const markdownMatches = content.matchAll(/\[([^\]\n]+?)]\(entry:\/\/([^)]+)\)/g)
-    for (const match of markdownMatches) {
-        const title = String(match[1] ?? '').trim()
-        const entryId = decodeURIComponent(String(match[2] ?? '').trim())
-        if (!title || !entryId) continue
-        links.push({ title, entryId })
-    }
-
-    const wikiMatches = content.matchAll(/\[\[([^[\]\n]+?)]]/g)
-    for (const match of wikiMatches) {
-        const title = String(match[1] ?? '').trim()
-        if (!title) continue
-        links.push({ title, entryId: null })
-    }
-
-    return links
-}
-
-function buildMarkdownPreviewSource(content: string): string {
-    return content.replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
-        const title = String(rawTitle).trim()
-        return `[${title}](${buildLegacyEntryHref(title)})`
-    })
-}
-
-function normalizeEntryLookupTitle(value?: string | null): string {
-    return typeof value === 'string' ? value.trim().toLowerCase() : ''
-}
-
-function resolveActiveWikiDraft(value: string, cursor: number | null): WikiDraft | null {
-    if (cursor == null) return null
-    const beforeCursor = value.slice(0, cursor)
-    const start = beforeCursor.lastIndexOf('[[')
-    if (start === -1) return null
-    const tail = beforeCursor.slice(start + 2)
-    if (tail.includes(']]') || /[\r\n]/.test(tail)) return null
-    return {
-        start,
-        end: cursor,
-        query: tail,
-    }
-}
-
-function replaceRange(value: string, start: number, end: number, nextText: string): string {
-    return `${value.slice(0, start)}${nextText}${value.slice(end)}`
-}
-
-function resolveMarkdownAnchor(target: EventTarget | null): HTMLAnchorElement | null {
-    if (!(target instanceof Element)) return null
-    return target.closest('a') as HTMLAnchorElement | null
-}
-
-function isSafeExternalHref(href: string): boolean {
-    return /^(https?:|mailto:|tel:)/i.test(href)
-}
-
-function parseInternalEntryHref(href: string, fallbackTitle = ''): InternalEntryLink | null {
-    if (href.startsWith(INTERNAL_ENTRY_HREF_PREFIX)) {
-        const entryId = decodeURIComponent(href.slice(INTERNAL_ENTRY_HREF_PREFIX.length)).trim()
-        if (!entryId) return null
-        return {
-            entryId,
-            title: fallbackTitle.trim(),
-        }
-    }
-
-    if (href.startsWith(LEGACY_ENTRY_HREF_PREFIX)) {
-        const title = decodeURIComponent(href.slice(LEGACY_ENTRY_HREF_PREFIX.length)).trim()
-        if (!title) return null
-        return {
-            entryId: null,
-            title,
-        }
-    }
-
-    return null
-}
-
-function getTextareaCaretOffset(textarea: HTMLTextAreaElement, cursor: number): { left: number; top: number; lineHeight: number } {
-    const styles = window.getComputedStyle(textarea)
-    const mirror = document.createElement('div')
-    const marker = document.createElement('span')
-
-    mirror.style.position = 'absolute'
-    mirror.style.visibility = 'hidden'
-    mirror.style.pointerEvents = 'none'
-    mirror.style.top = '0'
-    mirror.style.left = '0'
-    mirror.style.boxSizing = styles.boxSizing
-    mirror.style.width = `${textarea.clientWidth}px`
-    mirror.style.padding = styles.padding
-    mirror.style.border = styles.border
-    mirror.style.font = styles.font
-    mirror.style.lineHeight = styles.lineHeight
-    mirror.style.letterSpacing = styles.letterSpacing
-    mirror.style.textTransform = styles.textTransform
-    mirror.style.textIndent = styles.textIndent
-    mirror.style.textAlign = styles.textAlign as 'start'
-    mirror.style.tabSize = styles.tabSize
-    mirror.style.whiteSpace = 'pre-wrap'
-    mirror.style.wordBreak = 'break-word'
-    mirror.style.overflowWrap = 'break-word'
-
-    mirror.textContent = textarea.value.slice(0, cursor)
-    marker.textContent = textarea.value.slice(cursor, cursor + 1) || '\u200b'
-    mirror.appendChild(marker)
-    document.body.appendChild(mirror)
-
-    const lineHeight = Number.parseFloat(styles.lineHeight) || Number.parseFloat(styles.fontSize) * 1.4 || 20
-    const left = marker.offsetLeft - textarea.scrollLeft
-    const top = marker.offsetTop - textarea.scrollTop
-
-    document.body.removeChild(mirror)
-
-    return { left, top, lineHeight }
-}
-
-function areTagMapsEqual(
-    left: Record<string, string | number | boolean | null>,
-    right: Record<string, string | number | boolean | null>,
-    schemas: TagSchema[],
-): boolean {
-    for (const schema of schemas) {
-        if (getComparableTagValue(left, schema) !== getComparableTagValue(right, schema)) return false
-    }
-    return true
-}
-
 function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
     if (left.length !== right.length) return false
     return left.every((image, index) => {
@@ -405,165 +161,6 @@ function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
             && image.alt === target.alt
             && Boolean(image.is_cover) === Boolean(target.is_cover)
     })
-}
-
-function mergeUniqueStringValues(values: string[]): string[] {
-    return [...new Set(values.filter(Boolean))]
-}
-
-function normalizeTagTargets(target?: TagSchema['target'] | string | null): string[] {
-    if (Array.isArray(target)) {
-        return [...new Set(target.map((item) => item.trim()).filter(Boolean))]
-    }
-
-    if (typeof target !== 'string') return []
-
-    const trimmed = target.trim()
-    if (!trimmed) return []
-
-    try {
-        const parsed = JSON.parse(trimmed) as unknown
-        if (Array.isArray(parsed)) {
-            return [...new Set(parsed.map((item: unknown) => String(item).trim()).filter(Boolean))]
-        }
-        if (typeof parsed === 'string') {
-            const parsedValue = parsed.trim()
-            return parsedValue ? [parsedValue] : []
-        }
-    } catch {
-        // 兼容历史上可能直接存成逗号分隔字符串的情况
-    }
-
-    return [...new Set(trimmed.split(',').map((item: string) => item.trim()).filter(Boolean))]
-}
-
-function isSchemaImplantedForType(schema: TagSchema, entryType?: string | null): boolean {
-    const normalizedType = normalizeComparableType(entryType)
-    if (!normalizedType) return false
-    return normalizeTagTargets(schema.target).includes(normalizedType)
-}
-
-function buildAutoVisibleTagSchemaIds(
-    tagSchemas: TagSchema[],
-    draftTags: Record<string, string | number | boolean | null>,
-    entryType?: string | null,
-): string[] {
-    return tagSchemas.flatMap((schema) => {
-        const hasValue = getComparableTagValue(draftTags, schema) !== null
-        if (!hasValue && !isSchemaImplantedForType(schema, entryType)) return []
-        return [schema.id]
-    })
-}
-
-function getCategoryName(categories: Category[], categoryId?: string | null): string {
-    if (!categoryId) return '未分类'
-    return categories.find((category) => category.id === categoryId)?.name ?? '未分类'
-}
-
-function buildEntryPath(projectName: string, categories: Category[], categoryId: string | null | undefined, entryTitle: string): string {
-    const categoryMap = new Map(categories.map(category => [category.id, category]))
-    const path: string[] = [entryTitle]
-    let currentId = categoryId ?? null
-
-    while (currentId) {
-        const current = categoryMap.get(currentId)
-        if (!current) break
-        path.unshift(current.name)
-        currentId = current.parent_id ?? null
-    }
-
-    path.unshift(projectName)
-    return path.join('-')
-}
-
-async function findCategoryDuplicatedEntry(
-    projectId: string,
-    categoryId: string | null | undefined,
-    title: string,
-    excludeEntryId?: string,
-): Promise<EntryBrief | null> {
-    const entries = await db_list_entries({
-        projectId,
-        categoryId: categoryId ?? null,
-        limit: 1000,
-        offset: 0,
-    })
-    const normalizedTitle = normalizeComparableText(title)
-    return entries.find((item) => (
-        item.id !== excludeEntryId
-        && normalizeComparableText(item.title) === normalizedTitle
-    )) ?? null
-}
-
-function buildRelationDraft(entryId: string, relation: EntryRelation): EntryRelationDraft {
-    if (relation.relation === 'two_way') {
-        return {
-            id: relation.id,
-            otherEntryId: relation.a_id === entryId ? relation.b_id : relation.a_id,
-            direction: 'two_way',
-            content: relation.content ?? '',
-        }
-    }
-
-    return {
-        id: relation.id,
-        otherEntryId: relation.a_id === entryId ? relation.b_id : relation.a_id,
-        direction: relation.a_id === entryId ? 'outgoing' : 'incoming',
-        content: relation.content ?? '',
-    }
-}
-
-function buildComparableRelationDrafts(drafts: EntryRelationDraft[]): string[] {
-    return drafts
-        .map((draft) => [
-            draft.id ?? '',
-            draft.otherEntryId ?? '',
-            draft.direction,
-            normalizeComparableText(draft.content),
-        ].join('|'))
-        .sort()
-}
-
-function areRelationDraftsEqual(left: EntryRelationDraft[], right: EntryRelationDraft[]): boolean {
-    if (left.length !== right.length) return false
-    const leftComparable = buildComparableRelationDrafts(left)
-    const rightComparable = buildComparableRelationDrafts(right)
-    return leftComparable.every((item, index) => item === rightComparable[index])
-}
-
-function hasInvalidRelationDraft(draft: EntryRelationDraft, entryId: string): boolean {
-    return !draft.otherEntryId || draft.otherEntryId === entryId
-}
-
-function resolveRelationPayload(
-    entryId: string,
-    draft: EntryRelationDraft,
-): { aId: string; bId: string; relation: RelationDirection; content: string } {
-    const otherEntryId = draft.otherEntryId ?? ''
-    if (draft.direction === 'incoming') {
-        return {
-            aId: otherEntryId,
-            bId: entryId,
-            relation: 'one_way',
-            content: normalizeComparableText(draft.content),
-        }
-    }
-
-    if (draft.direction === 'two_way') {
-        return {
-            aId: entryId,
-            bId: otherEntryId,
-            relation: 'two_way',
-            content: normalizeComparableText(draft.content),
-        }
-    }
-
-    return {
-        aId: entryId,
-        bId: otherEntryId,
-        relation: 'one_way',
-        content: normalizeComparableText(draft.content),
-    }
 }
 
 export default function EntryEditor({
@@ -601,9 +198,7 @@ export default function EntryEditor({
     const [creatingLinkedEntry, setCreatingLinkedEntry] = useState(false)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
-    const [backlinksExpanded, setBacklinksExpanded] = useState(false)
-    const [outgoingLinksExpanded, setOutgoingLinksExpanded] = useState(false)
-    const [relationsExpanded, setRelationsExpanded] = useState(false)
+
     const [wikiPopoverPosition, setWikiPopoverPosition] = useState<WikiPopoverPosition>({ top: 16, left: 16 })
     const [projectDataLoading, setProjectDataLoading] = useState(false)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
@@ -1055,6 +650,17 @@ export default function EntryEditor({
         return Object.values(entryCache)
             .filter((item) => item.id !== entryId && linkedEntryIds.has(item.id))
             .sort((left, right) => parseDateValue(right.updated_at as string | null | undefined) - parseDateValue(left.updated_at as string | null | undefined))
+            .map((item) => ({
+                id: item.id,
+                project_id: item.project_id,
+                category_id: item.category_id ?? null,
+                title: item.title,
+                summary: item.summary ?? null,
+                type: item.type ?? null,
+                cover: null,
+                updated_at: String(item.updated_at ?? ''),
+                content: item.content,
+            }))
     }, [entryCache, entryId, incomingLinks])
 
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
@@ -2178,143 +1784,21 @@ export default function EntryEditor({
                     </div>
                 </section>
 
-                    <section className={`entry-editor-relations ${relationsExpanded ? 'is-expanded' : ''}`}>
-                        <button
-                            type="button"
-                            className="entry-editor-relations__toggle"
-                            onClick={() => setRelationsExpanded((current) => !current)}
-                        >
-                            <svg className="entry-editor-toggle__arrow" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" strokeWidth="2"
-                                      strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            <span>词条关系</span>
-                            <span className="entry-editor-relations__count">{relationDrafts.length}</span>
-                        </button>
-
-                        {relationsExpanded && (
-                            <div className="entry-editor-relations__body">
-                                {isBrowseMode ? (
-                                    <EntryRelationViewer
-                                        drafts={relationDrafts}
-                                        entries={projectEntries}
-                                        categories={categories}
-                                        currentEntryTitle={entry?.title ?? '本词条'}
-                                        onOpenEntry={onOpenEntry}
-                                    />
-                                ) : (
-                                    <EntryRelationCreator
-                                        drafts={relationDrafts}
-                                        entries={projectEntries}
-                                        categories={categories}
-                                        currentEntryId={entryId}
-                                        disabled={saving || projectDataLoading}
-                                        onChange={setRelationDrafts}
-                                        onOpenEntry={onOpenEntry}
-                                    />
-                                )}
-                            </div>
-                        )}
-                    </section>
-
-                    <section className={`entry-editor-outgoing-links ${outgoingLinksExpanded ? 'is-expanded' : ''}`}>
-                        <button
-                            type="button"
-                            className="entry-editor-outgoing-links__toggle"
-                            onClick={() => setOutgoingLinksExpanded((current) => !current)}
-                        >
-                            <svg className="entry-editor-toggle__arrow" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" strokeWidth="2"
-                                      strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                            <span>正向链接</span>
-                            <span className="entry-editor-outgoing-links__count">{outgoingLinks.length}</span>
-                        </button>
-
-                        {outgoingLinksExpanded && (
-                            <div className="entry-editor-outgoing-links__body">
-                                {outgoingLinks.length === 0 ? (
-                                    <div className="entry-editor-empty-tip">
-                                        当前词条正文还没有通过 [[ ]] 引用其他词条。
-                                    </div>
-                                ) : (
-                                    <div className="entry-editor-outgoing-links__list">
-                                        {outgoingLinks.map((link) => {
-                                            const target = entryCache[link.b_id] ?? projectEntriesRef.current.find((item) => item.id === link.b_id)
-                                            return (
-                                                <button
-                                                    key={link.id}
-                                                    type="button"
-                                                    className="entry-editor-link-card"
-                                                    onClick={() => onOpenEntry?.({
-                                                        id: link.b_id,
-                                                        title: target?.title ?? '未命名词条'
-                                                    })}
-                                                >
-                                                    <div className="entry-editor-link-card__content">
-                                                        <span
-                                                            className="entry-editor-link-card__title">{target?.title ?? '未命名词条'}</span>
-                                                        <span className="entry-editor-link-card__meta">
-                                                            {target ? getCategoryName(categories, target.category_id) : ''}
-                                                        </span>
-                                                        {target?.summary ? (
-                                                            <span
-                                                                className="entry-editor-link-card__excerpt">{buildExcerpt(target.summary, 60)}</span>
-                                                        ) : null}
-                                                    </div>
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </section>
-
-                <section className={`entry-editor-backlinks ${backlinksExpanded ? 'is-expanded' : ''}`}>
-                    <button
-                        type="button"
-                        className="entry-editor-backlinks__toggle"
-                        onClick={() => setBacklinksExpanded((current) => !current)}
-                    >
-                        <svg className="entry-editor-toggle__arrow" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" strokeWidth="2"
-                                  strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span>反向链接</span>
-                        <span className="entry-editor-backlinks__count">{backlinks.length}</span>
-                    </button>
-
-                    {backlinksExpanded && (
-                        <div className="entry-editor-backlinks__body">
-                            {backlinks.length === 0 ? (
-                                <div className="entry-editor-empty-tip">
-                                    目前还没有其他词条通过 [[ ]] 引用它。
-                                </div>
-                            ) : (
-                                <div className="entry-editor-backlinks__list">
-                                    {backlinks.map((item) => (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            className="entry-editor-link-card"
-                                            onClick={() => onOpenEntry?.({ id: item.id, title: item.title })}
-                                        >
-                                            <div className="entry-editor-link-card__content">
-                                                <span className="entry-editor-link-card__title">{item.title}</span>
-                                                <span className="entry-editor-link-card__meta">
-                                                    {getCategoryName(categories, item.category_id)} · {formatDate(item.updated_at as string | null | undefined)}
-                                                </span>
-                                                <span
-                                                    className="entry-editor-link-card__excerpt">{buildExcerpt(item.content, 60)}</span>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </section>
+                    <EntryEditorSidebar
+                        entryId={entryId}
+                        entry={entry}
+                        editorMode={editorMode}
+                        saving={saving}
+                        projectDataLoading={projectDataLoading}
+                        relationDrafts={relationDrafts}
+                        outgoingLinks={outgoingLinks}
+                        backlinks={backlinks}
+                        projectEntries={projectEntries}
+                        entryCache={entryCache}
+                        categories={categories}
+                        onOpenEntry={onOpenEntry}
+                        onRelationDraftsChange={setRelationDrafts}
+                    />
 
                     {(error || loading) && (
                         <div className={`entry-editor-feedback ${error ? 'is-error' : ''}`}>

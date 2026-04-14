@@ -1,5 +1,5 @@
 use anyhow::Result;
-use flowcloudai_client::FlowCloudAIClient;
+use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -41,6 +41,7 @@ pub struct AppState {
 /// LLM 会话的内部句柄（通过 channel 向后台事件循环发送用户消息）
 pub(crate) struct SessionEntry {
     pub(crate) input_tx: mpsc::Sender<String>,
+    pub(crate) handle: SessionHandle,
 }
 
 /// AI 客户端全局状态（插件注册中心 + 活跃 LLM 会话）

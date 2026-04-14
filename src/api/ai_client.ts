@@ -25,7 +25,6 @@ export interface ImageData {
 
 export interface AiImageParams {
   pluginId: string
-  apiKey: string
   model: string
   prompt: string
 }
@@ -46,7 +45,6 @@ export interface TtsResult {
 
 export interface AiSpeakParams {
   pluginId: string
-  apiKey: string
   model: string
   text: string
   voiceId: string
@@ -61,6 +59,11 @@ export interface AiEventDelta {
   text: string
 }
 
+export interface AiEventReasoning {
+  session_id: string
+  text: string
+}
+
 export interface AiEventToolCall {
   session_id: string
   index: number
@@ -70,6 +73,20 @@ export interface AiEventToolCall {
 export interface AiEventTurnEnd {
   session_id: string
   status: string
+  node_id: number
+}
+
+export interface AiEventTurnBegin {
+  session_id: string
+  turn_id: number
+  node_id: number
+}
+
+export interface AiEventToolResult {
+  session_id: string
+  index: number
+  output: string
+  is_error: boolean
 }
 
 export interface AiEventError {
@@ -80,7 +97,9 @@ export interface AiEventError {
 export const AI_EVENT_READY = 'ai:ready'
 export const AI_EVENT_DELTA = 'ai:delta'
 export const AI_EVENT_REASONING = 'ai:reasoning'
+export const AI_EVENT_TURN_BEGIN = 'ai:turn_begin'
 export const AI_EVENT_TOOL_CALL = 'ai:tool_call'
+export const AI_EVENT_TOOL_RESULT = 'ai:tool_result'
 export const AI_EVENT_TURN_END = 'ai:turn_end'
 export const AI_EVENT_ERROR = 'ai:error'
 
@@ -113,44 +132,56 @@ export const ai_send_message = (sessionId: string, message: string) =>
 export const ai_close_session = (sessionId: string) =>
   command<void>('ai_close_session', { sessionId })
 
-export const ai_text_to_image = ({ pluginId, apiKey, model, prompt }: AiImageParams) =>
-  command<ImageData[]>('ai_text_to_image', { pluginId, apiKey, model, prompt })
+export const ai_checkout = (sessionId: string, nodeId: number) =>
+    command<void>('ai_checkout', {sessionId, nodeId})
+
+export const ai_switch_plugin = (sessionId: string, pluginId: string) =>
+    command<void>('ai_switch_plugin', {sessionId, pluginId})
+
+export interface UpdateSessionParams {
+  model?: string
+  temperature?: number
+  maxTokens?: number
+  stream?: boolean
+  thinking?: boolean
+  frequencyPenalty?: number
+  presencePenalty?: number
+  topP?: number
+  stop?: string[]
+  responseFormat?: Record<string, unknown>
+  n?: number
+  toolChoice?: string
+  logprobs?: boolean
+  topLogprobs?: number
+}
+
+export const ai_update_session = (sessionId: string, params: UpdateSessionParams) =>
+    command<void>('ai_update_session', {sessionId, params})
+
+export const ai_text_to_image = ({pluginId, model, prompt}: AiImageParams) =>
+    command<ImageData[]>('ai_text_to_image', {pluginId, model, prompt})
 
 export const ai_edit_image = ({
   pluginId,
-  apiKey,
   model,
   prompt,
   imageUrl,
 }: AiEditImageParams) =>
-  command<ImageData[]>('ai_edit_image', {
-    pluginId,
-    apiKey,
-    model,
-    prompt,
-    imageUrl,
-  })
+    command<ImageData[]>('ai_edit_image', {pluginId, model, prompt, imageUrl})
 
 export const ai_merge_images = ({
   pluginId,
-  apiKey,
   model,
   prompt,
   imageUrls,
 }: AiMergeImagesParams) =>
-  command<ImageData[]>('ai_merge_images', {
-    pluginId,
-    apiKey,
-    model,
-    prompt,
-    imageUrls,
-  })
+    command<ImageData[]>('ai_merge_images', {pluginId, model, prompt, imageUrls})
 
-export const ai_speak = ({ pluginId, apiKey, model, text, voiceId }: AiSpeakParams) =>
-  command<TtsResult>('ai_speak', { pluginId, apiKey, model, text, voiceId })
+export const ai_speak = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
+    command<TtsResult>('ai_speak', {pluginId, model, text, voiceId})
 
-export const ai_play_tts = ({ pluginId, apiKey, model, text, voiceId }: AiSpeakParams) =>
-  command<void>('ai_play_tts', { pluginId, apiKey, model, text, voiceId })
+export const ai_play_tts = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
+    command<void>('ai_play_tts', {pluginId, model, text, voiceId})
 
 // ── 工具管理 ──────────────────────────────────────────────────────────────────
 
