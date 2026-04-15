@@ -1,5 +1,5 @@
 // cSpell:ignore msword openxmlformats officedocument wordprocessingml
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {Button, Select, TagItem, useAlert} from 'flowcloudai-ui'
 import {List, type ListImperativeAPI} from 'react-window'
 import {ai_close_session, ai_list_plugins, type PluginInfo,} from '../api'
@@ -22,7 +22,6 @@ interface Message {
     content: string
     timestamp: number
     attachments?: Attachment[]
-    /** 助手消息对应的后端节点 ID（来自 TurnEnd），用于重说 / 分支 */
     nodeId?: number
 }
 
@@ -59,11 +58,12 @@ export default function AIChat() {
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
+    const [attachments, setAttachments] = useState<Attachment[]>([])
+
     const activeConversation = conversations.find(c => c.id === activeConversationId)
     const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation])
 
     const [inputValue, setInputValue] = useState('')
-    const [attachments, setAttachments] = useState<Attachment[]>([])
 
     const listRef = useRef<ListImperativeAPI>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -72,7 +72,6 @@ export default function AIChat() {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [containerHeight, setContainerHeight] = useState(400)
 
-    // 用于在事件回调中访问最新的 activeConversationId，避免 stale closure
     const activeConversationIdRef = useRef(activeConversationId)
     useEffect(() => {
         activeConversationIdRef.current = activeConversationId
@@ -118,12 +117,14 @@ export default function AIChat() {
             const plugin = plugins.find(p => p.id === selectedPlugin)
             if (plugin) {
                 const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
-                if (defaultModel) setSelectedModel(defaultModel)
+                if (defaultModel) {
+                    setTimeout(() => setSelectedModel(defaultModel), 0)
+                }
             }
         }
     }, [selectedPlugin, plugins, selectedModel])
 
-    // ── 插件 / 模型变化同步到后端（会话存在时） ───────────────
+    // ── 插件 / 模型变化同步到后端 ───────────────
 
     const prevPluginRef = useRef('')
     useEffect(() => {
@@ -131,7 +132,7 @@ export default function AIChat() {
             void session.switchPlugin(selectedPlugin)
         }
         prevPluginRef.current = selectedPlugin
-    }, [selectedPlugin, session.sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [selectedPlugin, session])
 
     const prevModelRef = useRef('')
     useEffect(() => {
@@ -139,9 +140,9 @@ export default function AIChat() {
             void session.updateModel(selectedModel)
         }
         prevModelRef.current = selectedModel
-    }, [selectedModel, session.sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [selectedModel, session])
 
-    // ── 监听容器高度（虚拟列表） ──────────────────────────────
+    // ── 监听容器高度 ──────────────────────────────
 
     useEffect(() => {
         const el = messagesContainerRef.current
@@ -158,17 +159,26 @@ export default function AIChat() {
     useEffect(() => {
         if (!session.isStreaming && listRef.current && messages.length > 0) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ;(listRef.current as any).scrollToRow({index: messages.length - 1, align: 'end'})
+            const list = listRef.current as any
+            list.scrollToRow({index: messages.length - 1, align: 'end'})
         }
     }, [messages, session.isStreaming])
 
     // ── 输入框自动高度 ────────────────────────────────────────
+    // 【修复】使用 requestAnimationFrame 避免同步 setState
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const ta = textareaRef.current
         if (!ta) return
-        ta.style.height = 'auto'
-        ta.style.height = ta.scrollHeight + 'px'
+
+        // 使用 requestAnimationFrame 延迟执行，避免同步 setState
+        requestAnimationFrame(() => {
+            const scrollTop = ta.scrollTop
+            ta.style.height = 'auto'
+            const newHeight = Math.min(Math.max(ta.scrollHeight, 60), 200)
+            ta.style.height = newHeight + 'px'
+            ta.scrollTop = scrollTop
+        })
     }, [inputValue])
 
     // ── 加载/初始化历史对话 ───────────────────────────────────
@@ -194,27 +204,37 @@ export default function AIChat() {
     }, [session, selectedPlugin, selectedModel, sidebarCollapsed])
 
     useEffect(() => {
+        let mounted = true
         const stored = localStorage.getItem(STORAGE_KEY)
         if (stored) {
             try {
                 const parsed: Conversation[] = JSON.parse(stored)
-                setConversations(parsed)
-                if (parsed.length > 0) {
-                    const latest = [...parsed].sort((a, b) => b.timestamp - a.timestamp)[0]
-                    setActiveConversationId(latest.id)
-                    setSelectedPlugin(latest.pluginId)
-                    setSelectedModel(latest.model)
-                } else {
-                    handleNewConversation()
-                }
+                setTimeout(() => {
+                    if (!mounted) return
+                    setConversations(parsed)
+                    if (parsed.length > 0) {
+                        const latest = [...parsed].sort((a, b) => b.timestamp - a.timestamp)[0]
+                        setActiveConversationId(latest.id)
+                        setSelectedPlugin(latest.pluginId)
+                        setSelectedModel(latest.model)
+                    } else {
+                        handleNewConversation()
+                    }
+                }, 0)
             } catch {
-                handleNewConversation()
+                setTimeout(() => {
+                    if (mounted) handleNewConversation()
+                }, 0)
             }
         } else {
-            handleNewConversation()
+            setTimeout(() => {
+                if (mounted) handleNewConversation()
+            }, 0)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+        return () => {
+            mounted = false
+        }
+    }, [handleNewConversation])
 
     // ── 持久化到 localStorage ─────────────────────────────────
 
@@ -243,7 +263,6 @@ export default function AIChat() {
     const handleDeleteConversation = useCallback(async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation()
         const conv = conversations.find(c => c.id === convId)
-        // 直接关闭该对话的后端会话（可能不是当前活跃会话）
         if (conv?.sessionId) {
             await ai_close_session(conv.sessionId).catch(console.error)
         }
@@ -268,7 +287,6 @@ export default function AIChat() {
         if (!currentSid) {
             currentSid = await session.createSession(selectedPlugin, selectedModel)
             if (!currentSid) return
-            // 记录后端会话 ID 到对话对象（供删除时关闭）
             setConversations(prev => prev.map(c =>
                 c.id === activeConversationId ? {...c, sessionId: currentSid!} : c
             ))
@@ -303,54 +321,6 @@ export default function AIChat() {
         await session.sendMessage(content, currentSid)
     }, [inputValue, attachments, session, activeConversationId, selectedPlugin, selectedModel, showAlert])
 
-    // ── 重新生成 ──────────────────────────────────────────────
-
-    const handleRegenerate = useCallback(async () => {
-        if (!activeConversationId || messages.length < 2) return
-        const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
-        if (!lastUserMsg) return
-
-        // 从显示中移除最后一条助手消息
-        setConversations(prev => prev.map(c =>
-            c.id === activeConversationId
-                ? {...c, messages: c.messages.slice(0, -1)}
-                : c
-        ))
-
-        const userNodeId = session.lastUserNodeIdRef.current
-
-        if (session.sessionId && userNodeId !== null) {
-            // 有活跃会话：checkout 到用户节点，drive loop 自动重跑无需发消息
-            const ok = await session.checkout(userNodeId)
-            if (!ok) void showAlert('重新生成失败', 'error', 'toast', 3000)
-        } else {
-            // 无活跃会话：创建新会话，重发上一条用户消息
-            let currentSid = session.sessionId
-            if (!currentSid) {
-                currentSid = await session.createSession(selectedPlugin, selectedModel)
-                if (!currentSid) return
-                setConversations(prev => prev.map(c =>
-                    c.id === activeConversationId ? {...c, sessionId: currentSid!} : c
-                ))
-            }
-            await session.sendMessage(lastUserMsg.content, currentSid)
-        }
-    }, [activeConversationId, messages, session, selectedPlugin, selectedModel, showAlert])
-
-    // ── 停止生成 ──────────────────────────────────────────────
-
-    const handleStopGeneration = useCallback(async () => {
-        await session.closeSession()
-    }, [session])
-
-    // ── 复制 ─────────────────────────────────────────────────
-
-    const copyMessage = (content: string) => {
-        navigator.clipboard.writeText(content)
-            .then(() => void showAlert('已复制到剪贴板', 'success', 'toast', 1500))
-            .catch(() => void showAlert('复制失败', 'error', 'toast', 1500))
-    }
-
     // ── 键盘 / 输入 ───────────────────────────────────────────
 
     const handleKeyDown = useCallback(
@@ -381,30 +351,30 @@ export default function AIChat() {
         return (
             <div style={style}>
                 <div className={`ai-message ai-message--${message.role}`}>
-                    <div className="ai-message-avatar">
-                        {message.role === 'user' ? '👤' : '🤖'}
-                    </div>
                     <div className="ai-message-content">
                         <div className="ai-message-text">{message.content}</div>
                         {message.attachments && message.attachments.length > 0 && (
                             <div className="ai-attachments">
                                 {message.attachments.map(att => (
                                     <div key={att.id} className="ai-attachment-tag">
-                                        {att.type === 'image' ? '🖼️' : '📎'} {att.name}
+                                        {att.type === 'image' ? (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
+                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                <polyline points="21 15 16 10 5 21"/>
+                                            </svg>
+                                        ) : (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                <polyline points="14 2 14 8 20 8"/>
+                                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                                <line x1="16" y1="17" x2="8" y2="17"/>
+                                                <polyline points="10 9 9 9 8 9"/>
+                                            </svg>
+                                        )}
+                                        {att.name}
                                     </div>
                                 ))}
-                            </div>
-                        )}
-                        {message.role === 'assistant' && (
-                            <div className="ai-message-actions">
-                                <button className="ai-action-btn" onClick={() => copyMessage(message.content)}
-                                        title="复制">
-                                    📋
-                                </button>
-                                <button className="ai-action-btn" onClick={() => void handleRegenerate()}
-                                        title="重新生成">
-                                    🔄
-                                </button>
                             </div>
                         )}
                     </div>
@@ -420,7 +390,6 @@ export default function AIChat() {
 
     return (
         <div className={`ai-chat-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-            {/* 左侧边栏 */}
             <aside className="ai-sidebar">
                 <div className="ai-sidebar-header">
                     {!sidebarCollapsed && (
@@ -474,9 +443,7 @@ export default function AIChat() {
                 )}
             </aside>
 
-            {/* 右侧主区域 */}
             <main className="ai-main">
-                {/* 配置面板 */}
                 <div className="ai-config-panel">
                     <div className="ai-config-body">
                         <div className="ai-config-field">
@@ -504,11 +471,14 @@ export default function AIChat() {
                     </div>
                 </div>
 
-                {/* 消息区域 */}
                 <div className="ai-messages-container" ref={messagesContainerRef}>
                     {!activeConversationId && (
                         <div className="ai-empty-state">
-                            <div className="ai-empty-icon">💬</div>
+                            <div className="ai-empty-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                                </svg>
+                            </div>
                             <p className="ai-empty-text">开始新的对话</p>
                             <p className="ai-empty-hint">点击左侧"新对话"按钮开始聊天</p>
                         </div>
@@ -526,7 +496,6 @@ export default function AIChat() {
                     )}
                     {session.currentText && (
                         <div className="ai-message ai-message--assistant ai-streaming-message">
-                            <div className="ai-message-avatar">🤖</div>
                             <div className="ai-message-content">
                                 {session.currentReasoning && (
                                     <div className="ai-message-reasoning">
@@ -561,51 +530,34 @@ export default function AIChat() {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* 悬浮输入框 */}
                 <div className="ai-floating-input-wrapper">
-                    <div className="ai-floating-input-container">
-                        <div className="ai-floating-input-inner">
-                            <textarea
-                                ref={node => {
-                                    inputRef.current = node
-                                    textareaRef.current = node
-                                }}
-                                className="ai-floating-textarea"
-                                value={inputValue}
-                                onChange={handleInputChange}
-                                onKeyDown={handleKeyDown}
-                                placeholder={activeConversationId ? '请输入消息...' : '请先创建新对话'}
-                                disabled={session.isStreaming || !activeConversationId}
-                                rows={1}
-                            />
-                            <div className="ai-floating-actions">
-                                {showCharHint && (
-                                    <span className="ai-floating-char-count">{charCount}/{MAX_CHARS}</span>
-                                )}
-                                {session.isStreaming ? (
-                                    <button
-                                        className="ai-floating-stop-btn"
-                                        onClick={() => void handleStopGeneration()}
-                                        title="停止生成"
-                                    >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                            <rect x="6" y="6" width="12" height="12" rx="2" />
-                                        </svg>
-                                    </button>
-                                ) : (
-                                    <button
-                                        className="ai-floating-send-btn"
-                                        onClick={() => void handleSend()}
-                                        disabled={!inputValue.trim() || !activeConversationId}
-                                        title="发送"
-                                    >
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <line x1="12" y1="19" x2="12" y2="5"/>
-                                            <polyline points="5 12 12 5 19 12"/>
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
+                    <div className="ai-floating-input-inner">
+                        <textarea
+                            ref={node => {
+                                inputRef.current = node
+                                textareaRef.current = node
+                            }}
+                            className="ai-floating-textarea"
+                            value={inputValue}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder={activeConversationId ? '请输入消息...' : '请先创建新对话'}
+                            disabled={session.isStreaming || !activeConversationId}
+                        />
+                        <div className="ai-floating-actions">
+                            {showCharHint && (
+                                <span className="ai-floating-char-count">{charCount}/{MAX_CHARS}</span>
+                            )}
+                            <button
+                                className="ai-floating-send-btn"
+                                onClick={() => void handleSend()}
+                                disabled={!inputValue.trim() || !activeConversationId || session.isStreaming}
+                                title="发送"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>
