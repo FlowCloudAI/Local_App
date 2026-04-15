@@ -1,8 +1,7 @@
-// cSpell:ignore msword openxmlformats officedocument wordprocessingml
-import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
-import {Button, Select, TagItem, useAlert} from 'flowcloudai-ui'
-import {ai_close_session, ai_list_plugins, type PluginInfo,} from '../api'
-import {type SessionMessage, type ToolCallInfo, useAiSession} from '../hooks/useAiSession'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Select, TagItem, useAlert } from 'flowcloudai-ui'
+import { ai_close_session, ai_list_plugins, type PluginInfo } from '../api'
+import { type SessionMessage, type ToolCallInfo, useAiSession } from '../hooks/useAiSession'
 import './AI.css'
 
 // ── 类型 ─────────────────────────────────────────────────────
@@ -36,8 +35,8 @@ interface Conversation {
 
 // ── 常量 ─────────────────────────────────────────────────────
 
-const MAX_CHARS = 10000
-const SHOW_HINT_THRESHOLD = 9000
+const MAX_CHARS = 4000
+const SHOW_HINT_THRESHOLD = 3500
 const STORAGE_KEY = 'ai-conversations'
 
 const generateTitleFromMessage = (content: string): string => {
@@ -59,13 +58,11 @@ export default function AIChat() {
 
     // 视图模式: 'full' 全屏 | 'right' 右侧面板
     const [viewMode, setViewMode] = useState<'full' | 'right'>('right')
-    // 右侧面板宽度(可拖拽调整)
-    const [panelWidth, setPanelWidth] = useState(420)
-    // 拖拽状态
-    const [isResizing, setIsResizing] = useState(false)
-    // 鼠标是否悬停在拖拽区域
-    const [isHoveringResize, setIsHoveringResize] = useState(false)
-
+    
+    // 切换视图模式
+    useCallback(() => {
+        setViewMode(prev => prev === 'full' ? 'right' : 'full')
+    }, []);
     const [attachments, setAttachments] = useState<Attachment[]>([])
 
     const activeConversation = conversations.find(c => c.id === activeConversationId)
@@ -73,7 +70,6 @@ export default function AIChat() {
 
     const [inputValue, setInputValue] = useState('')
 
-    const inputRef = useRef<HTMLTextAreaElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -83,27 +79,7 @@ export default function AIChat() {
         activeConversationIdRef.current = activeConversationId
     }, [activeConversationId])
 
-    // 从 localStorage 加载视图模式和面板宽度
-    useEffect(() => {
-        // const savedMode = localStorage.getItem('ai-view-mode') as 'full' | 'right' | null
-        const savedWidth = localStorage.getItem('ai-panel-width')
-        // 使用 setTimeout 避免同步 setState
-        setTimeout(() => {
-            // if (savedMode) setViewMode(savedMode)  // 注释掉,强制默认右侧面板
-            if (savedWidth) {
-                const width = parseInt(savedWidth, 10)
-                if (width >= 320 && width <= 600) setPanelWidth(width)
-            }
-        }, 0)
-    }, [])
-
-    // 持久化视图模式和面板宽度
-    useEffect(() => {
-        localStorage.setItem('ai-view-mode', viewMode)
-        localStorage.setItem('ai-panel-width', String(panelWidth))
-    }, [viewMode, panelWidth])
-
-    const {showAlert} = useAlert()
+    const { showAlert } = useAlert()
 
     // ── useAiSession ─────────────────────────────────────────
 
@@ -119,7 +95,7 @@ export default function AIChat() {
         }
         setConversations(prev => prev.map(conv =>
             conv.id === convId
-                ? {...conv, messages: [...conv.messages, message]}
+                ? { ...conv, messages: [...conv.messages, message] }
                 : conv
         ))
     }, [])
@@ -128,7 +104,9 @@ export default function AIChat() {
         void showAlert(msg, 'error', 'toast', 3000)
     }, [showAlert])
 
-    const session = useAiSession({onMessage, onError})
+    const session = useAiSession({ onMessage, onError })
+
+    const abortControllerRef = useRef<AbortController | null>(null)
 
     // ── 初始化插件列表 ────────────────────────────────────────
 
@@ -144,13 +122,14 @@ export default function AIChat() {
             if (plugin) {
                 const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
                 if (defaultModel) {
-                    setTimeout(() => setSelectedModel(defaultModel), 0)
+                    const timer = setTimeout(() => setSelectedModel(defaultModel), 0)
+                    return () => clearTimeout(timer)
                 }
             }
         }
     }, [selectedPlugin, plugins, selectedModel])
 
-    // ── 插件 / 模型变化同步到后端 ───────────────
+    // ── 插件 / 模型变化同步到后端 ─────────────────────────────
 
     const prevPluginRef = useRef('')
     useEffect(() => {
@@ -168,22 +147,21 @@ export default function AIChat() {
         prevModelRef.current = selectedModel
     }, [selectedModel, session])
 
-    // ── 自动滚动到底部 ────────────────────────────────────
+    // ── 自动滚动到底部 ────────────────────────────────────────
 
     useEffect(() => {
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+            requestAnimationFrame(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+            })
         }
-    }, [messages, session.currentText])
+    }, [messages.length, session.currentText])
 
     // ── 输入框自动高度 ────────────────────────────────────────
-    // 【修复】使用 requestAnimationFrame 避免同步 setState
 
     useLayoutEffect(() => {
         const ta = textareaRef.current
         if (!ta) return
-
-        // 使用 requestAnimationFrame 延迟执行，避免同步 setState
         requestAnimationFrame(() => {
             const scrollTop = ta.scrollTop
             ta.style.height = 'auto'
@@ -193,10 +171,13 @@ export default function AIChat() {
         })
     }, [inputValue])
 
-    // ── 加载/初始化历史对话 ───────────────────────────────────
+    // ── 创建新对话 ────────────────────────────────────────────
 
-    const handleNewConversation = useCallback(() => {
-        void session.closeSession()
+    const handleNewConversation = useCallback(async () => {
+        if (session.isStreaming) {
+            abortControllerRef.current?.abort()
+        }
+        await session.closeSession()
 
         const newId = `conv_${Date.now()}`
         const newConversation: Conversation = {
@@ -215,13 +196,16 @@ export default function AIChat() {
         if (sidebarCollapsed) setSidebarCollapsed(false)
     }, [session, selectedPlugin, selectedModel, sidebarCollapsed])
 
+    // ── 加载历史对话 ──────────────────────────────────────────
+
     useEffect(() => {
         let mounted = true
         const stored = localStorage.getItem(STORAGE_KEY)
-        if (stored) {
-            try {
-                const parsed: Conversation[] = JSON.parse(stored)
-                setTimeout(() => {
+
+        const initializeConversations = async () => {
+            if (stored) {
+                try {
+                    const parsed: Conversation[] = JSON.parse(stored)
                     if (!mounted) return
                     setConversations(parsed)
                     if (parsed.length > 0) {
@@ -230,25 +214,60 @@ export default function AIChat() {
                         setSelectedPlugin(latest.pluginId)
                         setSelectedModel(latest.model)
                     } else {
-                        handleNewConversation()
+                        const newId = `conv_${Date.now()}`
+                        const newConv: Conversation = {
+                            id: newId,
+                            title: '新对话',
+                            messages: [],
+                            pluginId: selectedPlugin,
+                            model: selectedModel,
+                            sessionId: null,
+                            timestamp: Date.now(),
+                        }
+                        setConversations([newConv])
+                        setActiveConversationId(newId)
                     }
-                }, 0)
-            } catch {
-                setTimeout(() => {
-                    if (mounted) handleNewConversation()
-                }, 0)
+                } catch {
+                    const newId = `conv_${Date.now()}`
+                    const newConv: Conversation = {
+                        id: newId,
+                        title: '新对话',
+                        messages: [],
+                        pluginId: selectedPlugin,
+                        model: selectedModel,
+                        sessionId: null,
+                        timestamp: Date.now(),
+                    }
+                    setConversations([newConv])
+                    setActiveConversationId(newId)
+                }
+            } else {
+                const newId = `conv_${Date.now()}`
+                const newConv: Conversation = {
+                    id: newId,
+                    title: '新对话',
+                    messages: [],
+                    pluginId: selectedPlugin,
+                    model: selectedModel,
+                    sessionId: null,
+                    timestamp: Date.now(),
+                }
+                setConversations([newConv])
+                setActiveConversationId(newId)
             }
-        } else {
-            setTimeout(() => {
-                if (mounted) handleNewConversation()
-            }, 0)
         }
+
+        const timer = setTimeout(() => {
+            void initializeConversations()
+        }, 0)
+
         return () => {
             mounted = false
+            clearTimeout(timer)
         }
-    }, [handleNewConversation])
+    }, [selectedPlugin, selectedModel])
 
-    // ── 持久化到 localStorage ─────────────────────────────────
+    // ── 持久化 ────────────────────────────────────────────────
 
     useEffect(() => {
         if (conversations.length > 0) {
@@ -260,7 +279,12 @@ export default function AIChat() {
 
     const handleSwitchConversation = useCallback(async (convId: string) => {
         if (convId === activeConversationId) return
+
+        if (session.isStreaming) {
+            abortControllerRef.current?.abort()
+        }
         await session.closeSession()
+
         setActiveConversationId(convId)
         setAttachments([])
         const targetConv = conversations.find(c => c.id === convId)
@@ -275,10 +299,17 @@ export default function AIChat() {
     const handleDeleteConversation = useCallback(async (convId: string, e: React.MouseEvent) => {
         e.stopPropagation()
         const conv = conversations.find(c => c.id === convId)
+
+        if (activeConversationId === convId && session.isStreaming) {
+            abortControllerRef.current?.abort()
+        }
+
         if (conv?.sessionId) {
             await ai_close_session(conv.sessionId).catch(console.error)
         }
+
         setConversations(prev => prev.filter(c => c.id !== convId))
+
         if (activeConversationId === convId) {
             await session.closeSession()
             setActiveConversationId(null)
@@ -295,12 +326,14 @@ export default function AIChat() {
             return
         }
 
+        abortControllerRef.current = new AbortController()
+
         let currentSid = session.sessionId
         if (!currentSid) {
             currentSid = await session.createSession(selectedPlugin, selectedModel)
             if (!currentSid) return
             setConversations(prev => prev.map(c =>
-                c.id === activeConversationId ? {...c, sessionId: currentSid!} : c
+                c.id === activeConversationId ? { ...c, sessionId: currentSid! } : c
             ))
         }
 
@@ -330,8 +363,13 @@ export default function AIChat() {
 
         setInputValue('')
         setAttachments([])
+
         await session.sendMessage(content, currentSid)
     }, [inputValue, attachments, session, activeConversationId, selectedPlugin, selectedModel, showAlert])
+
+    const handleStop = useCallback(() => {
+        abortControllerRef.current?.abort()
+    }, [])
 
     // ── 键盘 / 输入 ───────────────────────────────────────────
 
@@ -355,83 +393,25 @@ export default function AIChat() {
     const selectedPluginInfo = plugins.find(p => p.id === selectedPlugin)
     const toggleSidebar = () => setSidebarCollapsed(prev => !prev)
 
-    // 切换视图模式
     const toggleViewMode = useCallback(() => {
         setViewMode(prev => prev === 'full' ? 'right' : 'full')
     }, [])
 
-    // 处理拖拽调整宽度
-    const handleResizeStart = useCallback((e: React.MouseEvent) => {
-        e.preventDefault()
-        e.stopPropagation()
-        setIsResizing(true)
-    }, [])
-
-    const handleResizeEnter = useCallback(() => {
-        setIsHoveringResize(true)
-    }, [])
-
-    const handleResizeLeave = useCallback(() => {
-        if (!isResizing) {
-            setIsHoveringResize(false)
-        }
-    }, [isResizing])
-
-    useEffect(() => {
-        if (!isResizing) return
-
-        const handleMouseMove = (e: MouseEvent) => {
-            const newWidth = window.innerWidth - e.clientX
-            
-            // 如果拖拽超过600px,自动切换全屏
-            if (newWidth > 600 && viewMode === 'right') {
-                setViewMode('full')
-                setIsResizing(false)
-                setIsHoveringResize(false)
-                return
-            }
-            
-            // 限制宽度范围 320px - 600px
-            const clampedWidth = Math.min(Math.max(newWidth, 320), 600)
-            setPanelWidth(clampedWidth)
-        }
-
-        const handleMouseUp = () => {
-            setIsResizing(false)
-            setIsHoveringResize(false)
-        }
-
-        document.addEventListener('mousemove', handleMouseMove)
-        document.addEventListener('mouseup', handleMouseUp)
-
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove)
-            document.removeEventListener('mouseup', handleMouseUp)
-        }
-    }, [isResizing, viewMode])
-
     // ── 渲染 ─────────────────────────────────────────────────
 
     return (
-        <div 
-            className={`ai-chat-layout ai-chat-layout--${viewMode} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
-            style={viewMode === 'right' ? { 
-                width: `${panelWidth}px`,
-                maxWidth: '600px',
-                minWidth: '320px'
-            } : undefined}
-        >
+        <div className={`ai-chat-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
             <aside className="ai-sidebar">
                 <div className="ai-sidebar-header">
                     {!sidebarCollapsed && (
                         <>
-                            <Button size="sm" className="ai-new-chat-btn" onClick={handleNewConversation}>
+                            <button className="ai-new-chat-btn" onClick={handleNewConversation}>
                                 <span className="ai-new-chat-icon">+</span>
                                 <span className="ai-new-chat-text">新对话</span>
-                            </Button>
+                            </button>
                             <button className="ai-sidebar-toggle" onClick={toggleSidebar} title="收起侧边栏">
                                 <span className="ai-toggle-icon">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <path d="M10 3L5 8L10 13" />
                                     </svg>
                                 </span>
@@ -441,7 +421,7 @@ export default function AIChat() {
                     {sidebarCollapsed && (
                         <button className="ai-sidebar-toggle" onClick={toggleSidebar} title="展开侧边栏">
                             <span className="ai-toggle-icon">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                                     <path d="M6 3L11 8L6 13" />
                                 </svg>
                             </span>
@@ -499,18 +479,19 @@ export default function AIChat() {
                                 />
                             </div>
                         )}
-                        {/* 视图模式切换按钮(仅全屏模式显示) */}
-                        {viewMode === 'full' && (
-                            <button 
-                                className="ai-view-mode-toggle" 
-                                onClick={toggleViewMode}
-                                title="切换至右侧面板"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <button
+                            className="ai-view-mode-toggle"
+                            onClick={toggleViewMode}
+                            title={viewMode === 'full' ? '切换至右侧面板' : '切换至全屏'}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                {viewMode === 'full' ? (
                                     <path d="M11 3L6 8L11 13" />
-                                </svg>
-                            </button>
-                        )}
+                                ) : (
+                                    <path d="M5 3L10 8L5 13" />
+                                )}
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -518,85 +499,78 @@ export default function AIChat() {
                     {!activeConversationId && (
                         <div className="ai-empty-state">
                             <div className="ai-empty-icon">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
                                 </svg>
                             </div>
                             <p className="ai-empty-text">开始新的对话</p>
-                            <p className="ai-empty-hint">点击左侧"新对话"按钮开始聊天</p>
+                            <p className="ai-empty-hint">点击左侧「新对话」按钮开始聊天</p>
                         </div>
                     )}
-                    {messages.map(message => (
-                        <div key={message.id} className={`ai-message ai-message--${message.role}`}>
-                            <div className="ai-message-content">
-                                <div className="ai-message-text">{message.content}</div>
-                                {message.attachments && message.attachments.length > 0 && (
-                                    <div className="ai-attachments">
-                                        {message.attachments.map((att: Attachment) => (
-                                            <div key={att.id} className="ai-attachment-tag">
-                                                {att.type === 'image' ? (
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
-                                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                                                        <polyline points="21 15 16 10 5 21"/>
-                                                    </svg>
-                                                ) : (
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                                        <polyline points="14 2 14 8 20 8"/>
-                                                    </svg>
-                                                )}
-                                                {att.name}
+                    {activeConversationId && messages.length > 0 && (
+                        <div className="ai-messages-list">
+                            {messages.map((message) => (
+                                <div key={message.id} className={`ai-message ai-message--${message.role}`}>
+                                    <div className="ai-message-content">
+                                        <div className="ai-message-text">{message.content}</div>
+                                        {message.attachments && message.attachments.length > 0 && (
+                                            <div className="ai-attachments">
+                                                {message.attachments.map((att: Attachment) => (
+                                                    <div key={att.id} className="ai-attachment-tag">
+                                                        {att.type === 'image' ? '🖼️' : '📎'} {att.name}
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                    {session.currentText && (
-                        <div className="ai-message ai-message--assistant ai-streaming-message">
-                            <div className="ai-message-content">
-                                {session.currentReasoning && (
-                                    <div className="ai-message-reasoning">
-                                        {session.currentReasoning}
-                                    </div>
-                                )}
-                                <div className="ai-message-text ai-message-text--streaming">
-                                    {session.currentText}
-                                    <span className="ai-cursor" />
                                 </div>
-                                {session.toolCalls.length > 0 && (
-                                    <div className="ai-tool-calls">
-                                        {session.toolCalls.map((tool: ToolCallInfo, idx: number) => (
-                                            <TagItem
-                                                key={idx}
-                                                schema={{
-                                                    id: `tool-${idx}`,
-                                                    name: tool.name,
-                                                    type: 'string',
-                                                    range_min: null,
-                                                    range_max: null
-                                                }}
-                                                value={tool.status === 'calling' ? '调用中' : '已完成'}
-                                                mode="show"
-                                            />
-                                        ))}
+                            ))}
+                            {session.currentText && (
+                                <div className="ai-message ai-message--assistant ai-streaming-message">
+                                    <div className="ai-message-content">
+                                        {session.currentReasoning && (
+                                            <div className="ai-message-reasoning">
+                                                {session.currentReasoning}
+                                            </div>
+                                        )}
+                                        <div className="ai-message-text ai-message-text--streaming">
+                                            {session.currentText}
+                                            <span className="ai-cursor" />
+                                        </div>
+                                        {session.toolCalls.length > 0 && (
+                                            <div className="ai-tool-calls">
+                                                {session.toolCalls.map((tool: ToolCallInfo, idx: number) => (
+                                                    <TagItem
+                                                        key={idx}
+                                                        schema={{
+                                                            id: `tool-${idx}`,
+                                                            name: tool.name,
+                                                            type: 'string',
+                                                            range_min: null,
+                                                            range_max: null
+                                                        }}
+                                                        value={tool.status === 'calling' ? '调用中' : '已完成'}
+                                                        mode="show"
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     )}
                     <div ref={messagesEndRef} />
                 </div>
 
-                <div className="ai-floating-input-wrapper">
-                    <div className="ai-floating-input-inner">
+                {/* 悬浮输入框 */}
+                <div className={`ai-floating-input-wrapper ai-floating-input-wrapper--${viewMode}`}>
+                    <div 
+                        className="ai-floating-input-inner"
+                        onClick={() => textareaRef.current?.focus()}
+                    >
                         <textarea
-                            ref={node => {
-                                inputRef.current = node
-                                textareaRef.current = node
-                            }}
+                            ref={textareaRef}
                             className="ai-floating-textarea"
                             value={inputValue}
                             onChange={handleInputChange}
@@ -608,31 +582,28 @@ export default function AIChat() {
                             {showCharHint && (
                                 <span className="ai-floating-char-count">{charCount}/{MAX_CHARS}</span>
                             )}
-                            <button
-                                className="ai-floating-send-btn"
-                                onClick={() => void handleSend()}
-                                disabled={!inputValue.trim() || !activeConversationId || session.isStreaming}
-                                title="发送"
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-                                </svg>
-                            </button>
+                            {session.isStreaming ? (
+                                <button className="ai-floating-stop-btn" onClick={(e) => { e.stopPropagation(); handleStop(); }} title="停止生成">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                        <rect x="6" y="6" width="12" height="12" />
+                                    </svg>
+                                </button>
+                            ) : (
+                                <button
+                                    className="ai-floating-send-btn"
+                                    onClick={(e) => { e.stopPropagation(); void handleSend(); }}
+                                    disabled={!inputValue.trim() || !activeConversationId}
+                                    title="发送"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
             </main>
-
-            {/* 右侧面板模式的拖拽手柄 */}
-            {viewMode === 'right' && (isResizing || isHoveringResize) && (
-                <div 
-                    className="ai-resize-handle"
-                    onMouseDown={handleResizeStart}
-                    onMouseEnter={handleResizeEnter}
-                    onMouseLeave={handleResizeLeave}
-                    title="拖拽调整宽度(超过600px自动全屏)"
-                />
-            )}
         </div>
     )
 }
