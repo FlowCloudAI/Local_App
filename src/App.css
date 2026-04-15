@@ -177,4 +177,6 @@ body {
 
 .side-bar {
     user-select: none;
+    z-index: 1001;  /* 高于 AI 右侧面板的 1000 */
+    position: relative;  /* 确保 z-index 生效 */
 }

@@ -26,13 +26,40 @@
 .ai-chat-layout {
     display: flex;
     height: 100%;
-    width: 100%;
     background: var(--fc-color-bg);
+}
+
+/* 全屏模式(默认) */
+.ai-chat-layout--full {
+    position: relative;
+    width: 100%;
+}
+
+/* 右侧面板模式 */
+.ai-chat-layout--right {
+    position: fixed;  /* 改回 fixed,不占据文档流 */
+    top: 3rem;  /* 避开顶栏高度 */
+    right: 150px;  /* 紧靠右侧工具栏 */
+    bottom: 0;
+    width: 420px !important;
+    max-width: 600px !important;
+    min-width: 320px !important;
+    z-index: 1000;
+    background: var(--fc-color-bg);
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+    transition: width 0.3s ease;
+    overflow: hidden;  /* 防止内容溢出 */
+    pointer-events: auto;  /* 确保可以接收事件 */
 }
 
 .ai-chat-layout.sidebar-collapsed .ai-sidebar {
     width: 40px;
     min-width: 40px;
+}
+
+/* 右侧面板模式下隐藏左侧边栏 */
+.ai-chat-layout--right .ai-sidebar {
+    display: none;
 }
 
 /* ========== 左侧边栏 ========== */
@@ -295,9 +322,20 @@
 /* ========== 消息容器 ========== */
 .ai-messages-container {
     flex: 1;
-    overflow: auto;
-    padding: 0.75rem 1.5rem 140px;
+    overflow-y: auto;  /* 只允许垂直滚动 */
+    overflow-x: hidden;
+    padding: 0.75rem 1.5rem 120px;  /* 底部留出输入框空间 */
     position: relative;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.ai-messages-container::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari */
+}
+
+.ai-messages-container {
+    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;  /* IE, Edge */
 }
 
 .ai-drop-overlay {
@@ -429,21 +467,66 @@
     gap: 0.35rem;
 }
 
+/* ========== 视图模式切换按钮 ========== */
+.ai-view-mode-toggle {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    margin-left: auto;
+}
+
+.ai-view-mode-toggle:hover {
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+    border-color: var(--fc-color-primary);
+}
+
+/* ========== 拖拽手柄 ========== */
+.ai-resize-handle {
+    position: absolute;
+    top: 0;
+    left: -2px;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 1;
+    background: transparent;
+    transition: background-color 0.2s;
+}
+
+.ai-resize-handle:hover {
+    background: var(--fc-color-primary);
+    opacity: 0.3;
+}
+
 /* ========== 悬浮输入框 ========== */
 .ai-floating-input-wrapper {
     position: fixed;
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    width: 800px;
-    max-width: calc(100vw - 40px);
+    width: min(700px, calc(100vw - 40px));
     z-index: 100;
+    transition: all 0.3s ease;
 }
 
-@media (max-width: 900px) {
-    .ai-floating-input-wrapper {
-        width: 95%;
-    }
+/* 右侧面板模式下的悬浮输入框适配 */
+.ai-chat-layout--right .ai-floating-input-wrapper {
+    position: absolute;  /* 相对于 AI 面板定位 */
+    left: 20px;
+    right: 20px;
+    bottom: 16px;  /* 调整底部距离 */
+    transform: none;
+    width: auto;  /* 自动填充左右间距 */
 }
 
 .ai-floating-input-inner {

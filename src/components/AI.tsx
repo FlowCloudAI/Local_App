@@ -1,7 +1,6 @@
 // cSpell:ignore msword openxmlformats officedocument wordprocessingml
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {Button, Select, TagItem, useAlert} from 'flowcloudai-ui'
-import {List, type ListImperativeAPI} from 'react-window'
 import {ai_close_session, ai_list_plugins, type PluginInfo,} from '../api'
 import {type SessionMessage, type ToolCallInfo, useAiSession} from '../hooks/useAiSession'
 import './AI.css'
@@ -58,6 +57,15 @@ export default function AIChat() {
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
+    // 视图模式: 'full' 全屏 | 'right' 右侧面板
+    const [viewMode, setViewMode] = useState<'full' | 'right'>('right')
+    // 右侧面板宽度(可拖拽调整)
+    const [panelWidth, setPanelWidth] = useState(420)
+    // 拖拽状态
+    const [isResizing, setIsResizing] = useState(false)
+    // 鼠标是否悬停在拖拽区域
+    const [isHoveringResize, setIsHoveringResize] = useState(false)
+
     const [attachments, setAttachments] = useState<Attachment[]>([])
 
     const activeConversation = conversations.find(c => c.id === activeConversationId)
@@ -65,17 +73,35 @@ export default function AIChat() {
 
     const [inputValue, setInputValue] = useState('')
 
-    const listRef = useRef<ListImperativeAPI>(null)
-    const messagesContainerRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const [containerHeight, setContainerHeight] = useState(400)
+    const messagesContainerRef = useRef<HTMLDivElement>(null)
 
     const activeConversationIdRef = useRef(activeConversationId)
     useEffect(() => {
         activeConversationIdRef.current = activeConversationId
     }, [activeConversationId])
+
+    // 从 localStorage 加载视图模式和面板宽度
+    useEffect(() => {
+        // const savedMode = localStorage.getItem('ai-view-mode') as 'full' | 'right' | null
+        const savedWidth = localStorage.getItem('ai-panel-width')
+        // 使用 setTimeout 避免同步 setState
+        setTimeout(() => {
+            // if (savedMode) setViewMode(savedMode)  // 注释掉,强制默认右侧面板
+            if (savedWidth) {
+                const width = parseInt(savedWidth, 10)
+                if (width >= 320 && width <= 600) setPanelWidth(width)
+            }
+        }, 0)
+    }, [])
+
+    // 持久化视图模式和面板宽度
+    useEffect(() => {
+        localStorage.setItem('ai-view-mode', viewMode)
+        localStorage.setItem('ai-panel-width', String(panelWidth))
+    }, [viewMode, panelWidth])
 
     const {showAlert} = useAlert()
 
@@ -142,27 +168,13 @@ export default function AIChat() {
         prevModelRef.current = selectedModel
     }, [selectedModel, session])
 
-    // ── 监听容器高度 ──────────────────────────────
+    // ── 自动滚动到底部 ────────────────────────────────────
 
     useEffect(() => {
-        const el = messagesContainerRef.current
-        if (!el) return
-        const observer = new ResizeObserver(entries => {
-            for (const entry of entries) setContainerHeight(entry.contentRect.height)
-        })
-        observer.observe(el)
-        return () => observer.disconnect()
-    }, [])
-
-    // ── 流式消息完成后滚动 ────────────────────────────────────
-
-    useEffect(() => {
-        if (!session.isStreaming && listRef.current && messages.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const list = listRef.current as any
-            list.scrollToRow({index: messages.length - 1, align: 'end'})
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
         }
-    }, [messages, session.isStreaming])
+    }, [messages, session.currentText])
 
     // ── 输入框自动高度 ────────────────────────────────────────
     // 【修复】使用 requestAnimationFrame 避免同步 setState
@@ -340,56 +352,75 @@ export default function AIChat() {
     const charCount = inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
 
-    // ── 虚拟列表行 ────────────────────────────────────────────
-
-    const Row = ({index, style, data}: {
-        index: number
-        style: React.CSSProperties
-        data: { messages: Message[] }
-    }) => {
-        const message = data.messages[index]
-        return (
-            <div style={style}>
-                <div className={`ai-message ai-message--${message.role}`}>
-                    <div className="ai-message-content">
-                        <div className="ai-message-text">{message.content}</div>
-                        {message.attachments && message.attachments.length > 0 && (
-                            <div className="ai-attachments">
-                                {message.attachments.map(att => (
-                                    <div key={att.id} className="ai-attachment-tag">
-                                        {att.type === 'image' ? (
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
-                                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                                <polyline points="21 15 16 10 5 21"/>
-                                            </svg>
-                                        ) : (
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
-                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                                <polyline points="14 2 14 8 20 8"/>
-                                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                                <line x1="16" y1="17" x2="8" y2="17"/>
-                                                <polyline points="10 9 9 9 8 9"/>
-                                            </svg>
-                                        )}
-                                        {att.name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
     const selectedPluginInfo = plugins.find(p => p.id === selectedPlugin)
     const toggleSidebar = () => setSidebarCollapsed(prev => !prev)
+
+    // 切换视图模式
+    const toggleViewMode = useCallback(() => {
+        setViewMode(prev => prev === 'full' ? 'right' : 'full')
+    }, [])
+
+    // 处理拖拽调整宽度
+    const handleResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsResizing(true)
+    }, [])
+
+    const handleResizeEnter = useCallback(() => {
+        setIsHoveringResize(true)
+    }, [])
+
+    const handleResizeLeave = useCallback(() => {
+        if (!isResizing) {
+            setIsHoveringResize(false)
+        }
+    }, [isResizing])
+
+    useEffect(() => {
+        if (!isResizing) return
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const newWidth = window.innerWidth - e.clientX
+            
+            // 如果拖拽超过600px,自动切换全屏
+            if (newWidth > 600 && viewMode === 'right') {
+                setViewMode('full')
+                setIsResizing(false)
+                setIsHoveringResize(false)
+                return
+            }
+            
+            // 限制宽度范围 320px - 600px
+            const clampedWidth = Math.min(Math.max(newWidth, 320), 600)
+            setPanelWidth(clampedWidth)
+        }
+
+        const handleMouseUp = () => {
+            setIsResizing(false)
+            setIsHoveringResize(false)
+        }
+
+        document.addEventListener('mousemove', handleMouseMove)
+        document.addEventListener('mouseup', handleMouseUp)
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove)
+            document.removeEventListener('mouseup', handleMouseUp)
+        }
+    }, [isResizing, viewMode])
 
     // ── 渲染 ─────────────────────────────────────────────────
 
     return (
-        <div className={`ai-chat-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+        <div 
+            className={`ai-chat-layout ai-chat-layout--${viewMode} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+            style={viewMode === 'right' ? { 
+                width: `${panelWidth}px`,
+                maxWidth: '600px',
+                minWidth: '320px'
+            } : undefined}
+        >
             <aside className="ai-sidebar">
                 <div className="ai-sidebar-header">
                     {!sidebarCollapsed && (
@@ -468,6 +499,18 @@ export default function AIChat() {
                                 />
                             </div>
                         )}
+                        {/* 视图模式切换按钮(仅全屏模式显示) */}
+                        {viewMode === 'full' && (
+                            <button 
+                                className="ai-view-mode-toggle" 
+                                onClick={toggleViewMode}
+                                title="切换至右侧面板"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 3L6 8L11 13" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -483,17 +526,34 @@ export default function AIChat() {
                             <p className="ai-empty-hint">点击左侧"新对话"按钮开始聊天</p>
                         </div>
                     )}
-                    {messages.length > 0 && (
-                        <List<{ data: { messages: Message[] } }>
-                            listRef={listRef}
-                            rowCount={messages.length}
-                            rowHeight={120}
-                            className="ai-virtual-list"
-                            style={{ height: containerHeight }}
-                            rowComponent={Row}
-                            rowProps={{ data: { messages } }}
-                        />
-                    )}
+                    {messages.map(message => (
+                        <div key={message.id} className={`ai-message ai-message--${message.role}`}>
+                            <div className="ai-message-content">
+                                <div className="ai-message-text">{message.content}</div>
+                                {message.attachments && message.attachments.length > 0 && (
+                                    <div className="ai-attachments">
+                                        {message.attachments.map((att: Attachment) => (
+                                            <div key={att.id} className="ai-attachment-tag">
+                                                {att.type === 'image' ? (
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
+                                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                        <polyline points="21 15 16 10 5 21"/>
+                                                    </svg>
+                                                ) : (
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight: '4px', verticalAlign: 'middle'}}>
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                                        <polyline points="14 2 14 8 20 8"/>
+                                                    </svg>
+                                                )}
+                                                {att.name}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                     {session.currentText && (
                         <div className="ai-message ai-message--assistant ai-streaming-message">
                             <div className="ai-message-content">
@@ -562,6 +622,17 @@ export default function AIChat() {
                     </div>
                 </div>
             </main>
+
+            {/* 右侧面板模式的拖拽手柄 */}
+            {viewMode === 'right' && (isResizing || isHoveringResize) && (
+                <div 
+                    className="ai-resize-handle"
+                    onMouseDown={handleResizeStart}
+                    onMouseEnter={handleResizeEnter}
+                    onMouseLeave={handleResizeLeave}
+                    title="拖拽调整宽度(超过600px自动全屏)"
+                />
+            )}
         </div>
     )
 }
