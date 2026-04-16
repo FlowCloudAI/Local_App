@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
-import {MessageBox, RollingBox, Select, useAlert} from 'flowcloudai-ui'
+import {MessageBox, RollingBox, Select, useAlert, type MessageBoxBlock} from 'flowcloudai-ui'
 import {
     ai_close_session,
     ai_delete_conversation,
@@ -14,7 +14,7 @@ import {
     type StoredMessage,
     type ToolStatus,
 } from '../api'
-import {type SessionMessage, type ToolCallInfo as SessionToolCallInfo, useAiSession} from '../hooks/useAiSession'
+import {type SessionMessage, useAiSession} from '../hooks/useAiSession'
 import './AI.css'
 
 // ── 类型 ─────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ interface Message {
     content: string
     timestamp: number
     reasoning?: string
+    blocks?: MessageBoxBlock[]
     attachments?: Attachment[]
     nodeId?: number
 }
@@ -76,13 +77,46 @@ const generateTitleFromMessage = (content: string): string => {
     return cleaned.slice(0, 20) + '...'
 }
 
-const storedToMessage = (m: StoredMessage, index: number): Message => ({
-    id: `loaded_${index}_${Date.now()}`,
-    role: m.role as 'user' | 'assistant',
-    content: m.content ?? '',
-    reasoning: m.reasoning || undefined,
-    timestamp: new Date(m.timestamp).getTime(),
-})
+const storedToMessage = (m: StoredMessage, index: number): Message => {
+    const base: Message = {
+        id: `loaded_${index}_${Date.now()}`,
+        role: m.role as 'user' | 'assistant',
+        content: m.content ?? '',
+        reasoning: m.reasoning || undefined,
+        timestamp: new Date(m.timestamp).getTime(),
+    }
+    // 旧格式转 blocks
+    if (m.role === 'assistant') {
+        const blocks: MessageBoxBlock[] = []
+        if (m.reasoning) {
+            blocks.push({type: 'reasoning', content: m.reasoning})
+        }
+        if (m.tool_calls && m.tool_calls.length > 0) {
+            m.tool_calls.forEach(tc => {
+                blocks.push({
+                    type: 'tool',
+                    tool: {
+                        index: tc.index,
+                        name: tc.name,
+                        args: tc.arguments,
+                        result: tc.result,
+                        isError: tc.is_error,
+                    },
+                    detail: 'verbose',
+                })
+            })
+        }
+        if (m.content) {
+            blocks.push({type: 'content', content: m.content, markdown: true})
+        }
+        if (blocks.length > 0) {
+            base.blocks = blocks
+        }
+    } else if (m.content) {
+        base.blocks = [{type: 'content', content: m.content}]
+    }
+    return base
+}
 
 // ── 组件 ─────────────────────────────────────────────────────
 
@@ -142,6 +176,7 @@ export default function AIChat() {
             content: msg.content,
             timestamp: msg.timestamp,
             reasoning: msg.reasoning,
+            blocks: msg.blocks,
             nodeId: msg.nodeId,
         }
         // 按 sessionId 路由，并在用户已切走时顺手清掉 sessionId
@@ -266,7 +301,7 @@ export default function AIChat() {
             const scrollContainer = roll || container
             scrollContainer.scrollTop = scrollContainer.scrollHeight
         })
-    }, [messages.length, session.currentText, autoScroll])
+    }, [messages.length, session.blocks, autoScroll])
 
     const handleMessagesScroll = useCallback(() => {
         const container = messagesContainerRef.current
@@ -801,6 +836,7 @@ export default function AIChat() {
                                 <MessageBox
                                     key={message.id}
                                     role={message.role}
+                                    blocks={message.blocks}
                                     content={message.content}
                                     toolCallDetail={'verbose'}
                                     markdown={message.role === 'assistant'}
@@ -814,21 +850,13 @@ export default function AIChat() {
                                         : undefined}
                                 />
                             ))}
-                            {(session.currentText || session.currentReasoning || session.toolCalls.length > 0)
+                            {session.blocks.length > 0
                                 && session.sessionId === activeConversation?.sessionId && (
                                     <MessageBox
                                         role="assistant"
-                                        content={session.currentText}
+                                        blocks={session.blocks}
                                         streaming
                                         markdown
-                                        reasoning={session.currentReasoning || undefined}
-                                        reasoningStreaming={!!session.currentReasoning && !session.currentText}
-                                        toolCalls={session.toolCalls.map((tool: SessionToolCallInfo) => ({
-                                            index: tool.index,
-                                            name: tool.name,
-                                            result: tool.status !== 'calling' ? (tool.status === 'error' ? '调用失败' : '已完成') : undefined,
-                                            isError: tool.status === 'error',
-                                        }))}
                                         toolCallDetail={'verbose'}
                                     />
                                 )}

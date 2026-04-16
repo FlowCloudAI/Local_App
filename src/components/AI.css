@@ -478,7 +478,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-width: 50rem;
+    max-width: min(700px, calc(100vw - 40px));
     margin: 0 auto 220px;
 }
 
@@ -664,17 +664,12 @@
 
 /* ========== 悬浮输入框（根据视图模式切换定位方式） ========== */
 .ai-floating-input-wrapper {
-    z-index: 100;
-    margin-left: 1rem;
-    margin-right: 1rem;
-}
-
-.ai-floating-input-wrapper {
-    position: fixed;
+    position: absolute;
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    width: min(700px, calc(100vw - 40px));
+    width: min(700px, calc(100% - 40px));
+    z-index: 100;
 }
 
 .ai-floating-input-inner {
@@ -686,8 +681,8 @@
     border: 1px solid var(--fc-color-border);
     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
     transition: border-color 0.15s, box-shadow 0.15s;
-    max-width: 53rem;
-    margin: 0 auto 24px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .ai-floating-input-inner:focus-within {

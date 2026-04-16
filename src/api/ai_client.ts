@@ -68,6 +68,7 @@ export interface AiEventToolCall {
   session_id: string
   index: number
   name: string
+  arguments?: string
 }
 
 export interface AiEventTurnEnd {
@@ -86,6 +87,7 @@ export interface AiEventToolResult {
   session_id: string
   index: number
   output: string
+  result?: string
   is_error: boolean
 }
 
@@ -199,6 +201,13 @@ export interface StoredMessage {
   content: string | null
   reasoning: string | null
   timestamp: string
+  tool_calls?: {
+    index: number
+    name: string
+    arguments?: string
+    result?: string
+    is_error?: boolean
+  }[]
 }
 
 export interface StoredConversation extends ConversationMeta {

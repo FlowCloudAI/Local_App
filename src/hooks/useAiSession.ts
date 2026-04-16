@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
+import {type MessageBoxBlock} from 'flowcloudai-ui'
 import {
     ai_checkout,
     ai_close_session,
@@ -25,16 +26,11 @@ export interface SessionMessage {
     content: string
     timestamp: number
     reasoning?: string
+    blocks?: MessageBoxBlock[]
     /** 产生此消息的 session ID，用于跨对话路由 */
     sessionId: string
     /** TurnEnd 事件携带的助手消息节点 ID，用于 checkout / 重说 */
     nodeId?: number
-}
-
-export interface ToolCallInfo {
-    index: number
-    name: string
-    status: 'calling' | 'completed' | 'error'
 }
 
 // ── Hook ─────────────────────────────────────────────────────
@@ -49,14 +45,10 @@ interface UseAiSessionOptions {
 export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [isStreaming, setIsStreaming] = useState(false)
-    const [currentText, setCurrentText] = useState('')
-    const [currentReasoning, setCurrentReasoning] = useState('')
-    const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([])
+    const [blocks, setBlocks] = useState<MessageBoxBlock[]>([])
     const [lastUserNodeId, setLastUserNodeId] = useState<number | null>(null)
 
     // 内部缓冲
-    const accumulatedRef = useRef('')
-    const reasoningRef = useRef('')
     const messageQueueRef = useRef<SessionMessage[]>([])
 
     // 每个用户轮次（非工具续轮）的起始节点 ID
@@ -90,74 +82,109 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenDelta = listen<AiEventDelta>('ai:delta', event => {
-            accumulatedRef.current += event.payload.text
-            requestAnimationFrame(() => setCurrentText(accumulatedRef.current))
+            setBlocks(prev => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+                if (last && last.type === 'content') {
+                    last.content += event.payload.text
+                } else {
+                    next.push({type: 'content', content: event.payload.text, markdown: true, streaming: true})
+                }
+                return next
+            })
         })
 
         const unlistenReasoning = listen<AiEventReasoning>('ai:reasoning', event => {
-            reasoningRef.current += event.payload.text
-            requestAnimationFrame(() => setCurrentReasoning(reasoningRef.current))
+            setBlocks(prev => {
+                const next = [...prev]
+                const last = next[next.length - 1]
+                if (last && last.type === 'reasoning') {
+                    last.content += event.payload.text
+                } else {
+                    next.push({type: 'reasoning', content: event.payload.text, streaming: true})
+                }
+                return next
+            })
         })
 
         const unlistenToolCall = listen<AiEventToolCall>('ai:tool_call', event => {
             console.log('[ai:tool_call]', event.payload.session_id, event.payload)
-            setToolCalls(prev => [
+            setBlocks(prev => [
                 ...prev,
-                {index: event.payload.index, name: event.payload.name, status: 'calling'},
+                {
+                    type: 'tool',
+                    tool: {
+                        index: event.payload.index,
+                        name: event.payload.name,
+                        args: event.payload.arguments,
+                    },
+                    detail: 'verbose',
+                },
             ])
         })
 
         const unlistenToolResult = listen<AiEventToolResult>('ai:tool_result', event => {
             console.log('[ai:tool_result]', event.payload.session_id, event.payload)
-            setToolCalls(prev => prev.map(t =>
-                t.index === event.payload.index
-                    ? {...t, status: event.payload.is_error ? 'error' : 'completed'}
-                    : t
-            ))
+            setBlocks(prev => prev.map(b => {
+                if (b.type !== 'tool' || b.tool.index !== event.payload.index) return b
+                return {
+                    ...b,
+                    tool: {
+                        ...b.tool,
+                        result: event.payload.result,
+                        isError: event.payload.is_error,
+                    },
+                }
+            }))
         })
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
             const {status, node_id} = event.payload
             if (status === 'ok') {
-                if (accumulatedRef.current) {
-                    messageQueueRef.current.push({
-                        id: Date.now().toString(),
-                        role: 'assistant',
-                        content: accumulatedRef.current,
-                        timestamp: Date.now(),
-                        reasoning: reasoningRef.current || undefined,
-                        sessionId: event.payload.session_id,
-                        nodeId: node_id,
+                setBlocks(prev => {
+                    const finalBlocks = prev.map(b => {
+                        if (b.type === 'reasoning' || b.type === 'content') {
+                            return {...b, streaming: false}
+                        }
+                        return b
                     })
-                }
+                    const contentText = finalBlocks
+                        .filter(b => b.type === 'content')
+                        .map(b => (b as {content: string}).content)
+                        .join('')
+                    const reasoningText = finalBlocks
+                        .filter(b => b.type === 'reasoning')
+                        .map(b => (b as {content: string}).content)
+                        .join('')
+                    if (contentText || reasoningText || finalBlocks.length > 0) {
+                        messageQueueRef.current.push({
+                            id: Date.now().toString(),
+                            role: 'assistant',
+                            content: contentText,
+                            timestamp: Date.now(),
+                            reasoning: reasoningText || undefined,
+                            blocks: finalBlocks,
+                            sessionId: event.payload.session_id,
+                            nodeId: node_id,
+                        })
+                    }
+                    return []
+                })
                 setTimeout(() => {
                     const queued = [...messageQueueRef.current]
                     messageQueueRef.current = []
                     queued.forEach(m => onMessageRef.current(m))
-                    setCurrentText('')
-                    accumulatedRef.current = ''
-                    setCurrentReasoning('')
-                    reasoningRef.current = ''
                     setIsStreaming(false)
-                    setToolCalls([])
                 }, 0)
             } else if (status.startsWith('error:')) {
                 onErrorRef.current(`对话失败: ${status.slice(6)}`)
                 setTimeout(() => {
-                    setCurrentText('')
-                    accumulatedRef.current = ''
-                    setCurrentReasoning('')
-                    reasoningRef.current = ''
-                    setToolCalls([])
+                    setBlocks([])
                     setIsStreaming(false)
                 }, 0)
             } else if (status === 'cancelled' || status === 'interrupted') {
                 setTimeout(() => {
-                    setCurrentText('')
-                    accumulatedRef.current = ''
-                    setCurrentReasoning('')
-                    reasoningRef.current = ''
-                    setToolCalls([])
+                    setBlocks([])
                     setIsStreaming(false)
                 }, 0)
             }
@@ -168,10 +195,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             onErrorRef.current(`AI 错误: ${event.payload.error}`)
             setTimeout(() => {
                 setIsStreaming(false)
-                setCurrentText('')
-                accumulatedRef.current = ''
-                setCurrentReasoning('')
-                reasoningRef.current = ''
+                setBlocks([])
             }, 0)
         })
 
@@ -213,22 +237,14 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         }
         setSessionId(null)
         lastUserNodeIdRef.current = null
-        setCurrentText('')
-        accumulatedRef.current = ''
-        setCurrentReasoning('')
-        reasoningRef.current = ''
-        setToolCalls([])
+        setBlocks([])
         setIsStreaming(false)
     }, [sessionId])
 
     const sendMessage = useCallback(async (content: string, sid: string) => {
         expectUserTurnRef.current = true
         setIsStreaming(true)
-        setCurrentText('')
-        accumulatedRef.current = ''
-        setCurrentReasoning('')
-        reasoningRef.current = ''
-        setToolCalls([])
+        setBlocks([])
         try {
             await ai_send_message(sid, content)
         } catch (e) {
@@ -249,11 +265,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             await ai_checkout(sessionId, nodeId)
             expectUserTurnRef.current = true
             setIsStreaming(true)
-            setCurrentText('')
-            accumulatedRef.current = ''
-            setCurrentReasoning('')
-            reasoningRef.current = ''
-            setToolCalls([])
+            setBlocks([])
             return true
         } catch {
             return false
@@ -269,11 +281,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         try {
             await ai_checkout(sessionId, nodeId)
             expectUserTurnRef.current = true
-            setCurrentText('')
-            accumulatedRef.current = ''
-            setCurrentReasoning('')
-            reasoningRef.current = ''
-            setToolCalls([])
+            setBlocks([])
             return true
         } catch {
             return false
@@ -295,9 +303,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
     return {
         sessionId,
         isStreaming,
-        currentText,
-        currentReasoning,
-        toolCalls,
+        blocks,
         /** 当前用户轮次的起始节点 ID（用于 checkout / 重说），state 版本供 effect 依赖 */
         lastUserNodeId,
         lastUserNodeIdRef,
