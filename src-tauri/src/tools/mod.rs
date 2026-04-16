@@ -1,6 +1,8 @@
 use crate::AppState;
 use uuid::Uuid;
-use worldflow_core::{EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps, models::*};
+use worldflow_core::{
+    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps, models::*,
+};
 
 pub mod edit_tools;
 pub mod entry_tools;
@@ -73,8 +75,8 @@ pub mod format {
         let mut result = String::from("项目标签定义：\n\n");
         for schema in schemas {
             result.push_str(&format!(
-                "- **{}** (类型: {}, 目标: {})\n",
-                schema.name, schema.r#type, schema.target
+                "- **{}** (schema_id: `{}`, 类型: {}, 目标: {})\n",
+                schema.name, schema.id, schema.r#type, schema.target
             ));
             if let Some(desc) = &schema.description {
                 result.push_str(&format!("  描述：{}\n", desc));
@@ -87,7 +89,12 @@ pub mod format {
     }
 
     /// 格式化词条关系列表（用于 get_entry_relations 返回）
-    pub fn format_relations(relations: &[EntryRelation], current_entry_id: &str) -> String {
+    /// entry_names: 关系中出现的所有词条 id → title 映射（含当前词条自身）
+    pub fn format_relations(
+        relations: &[EntryRelation],
+        current_entry_id: &str,
+        entry_names: &std::collections::HashMap<String, String>,
+    ) -> String {
         if relations.is_empty() {
             return "该词条没有任何关系".to_string();
         }
@@ -97,27 +104,27 @@ pub mod format {
             Err(_) => return "当前词条 ID 格式无效".to_string(),
         };
 
+        let name = |id: &Uuid| -> String {
+            entry_names
+                .get(&id.to_string())
+                .cloned()
+                .unwrap_or_else(|| id.to_string())
+        };
+
         let mut result = String::from("词条关系网络：\n\n");
         for rel in relations {
             let direction = match rel.relation {
                 RelationDirection::OneWay => "→",
                 RelationDirection::TwoWay => "↔",
             };
-
+            let (from, to) = if rel.a_id == current_id {
+                (name(&rel.a_id), name(&rel.b_id))
+            } else {
+                (name(&rel.a_id), name(&rel.b_id))
+            };
             result.push_str(&format!(
-                "- {} {} {}\n  关系描述：{}\n\n",
-                if rel.a_id == current_id {
-                    "我"
-                } else {
-                    "对方"
-                },
-                direction,
-                if rel.a_id == current_id {
-                    "对方"
-                } else {
-                    "我"
-                },
-                rel.content
+                "- **{}** {} **{}**\n  关系描述：{}\n\n",
+                from, direction, to, rel.content
             ));
         }
         result
@@ -171,9 +178,60 @@ pub mod format {
         }
         result
     }
+    /// 格式化分类列表（用于 list_categories 返回）
+    pub fn format_categories(categories: &[Category]) -> String {
+        if categories.is_empty() {
+            return "该项目暂无分类".to_string();
+        }
+
+        let mut result = String::from("分类列表：\n\n");
+        for cat in categories {
+            let indent = if cat.parent_id.is_some() {
+                "  └─ "
+            } else {
+                "- "
+            };
+            result.push_str(&format!("{}**{}** (ID: {})\n", indent, cat.name, cat.id));
+        }
+        result
+    }
 }
 
 // ============ 内部工具函数（不暴露给前端） ============
+
+/// 创建词条
+pub async fn create_entry(
+    state: &AppState,
+    project_id: &str,
+    title: String,
+    entry_type: Option<String>,
+    summary: Option<String>,
+    content: Option<String>,
+) -> Result<Entry, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.create_entry(CreateEntry {
+        project_id,
+        category_id: None,
+        title,
+        summary,
+        content,
+        r#type: entry_type,
+        tags: None,
+        images: None,
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// 列出项目分类
+pub async fn list_categories(state: &AppState, project_id: &str) -> Result<Vec<Category>, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.list_categories(&project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
 
 /// 搜索词条（FTS）
 pub async fn search_entries(
@@ -181,15 +239,19 @@ pub async fn search_entries(
     project_id: &str,
     query: &str,
     entry_type: Option<&str>,
+    category_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<EntryBrief>, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let category_id = category_id
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
     let db = state.sqlite_db.lock().await;
     db.search_entries(
         &project_id,
         query,
         EntryFilter {
-            category_id: None,
+            category_id: category_id.as_ref(),
             entry_type,
         },
         limit,
@@ -205,23 +267,54 @@ pub async fn get_entry(state: &AppState, entry_id: &str) -> Result<Entry, String
     db.get_entry(&entry_id).await.map_err(|e| e.to_string())
 }
 
+/// 列出项目内所有词条简报（不限类型）
+pub async fn list_all_entries(
+    state: &AppState,
+    project_id: &str,
+    category_id: Option<&str>,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<EntryBrief>, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let category_id = category_id
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = state.sqlite_db.lock().await;
+    db.list_entries(
+        &project_id,
+        EntryFilter {
+            category_id: category_id.as_ref(),
+            entry_type: None,
+        },
+        limit,
+        offset,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// 列出指定类型的词条简报
 pub async fn list_entries_by_type(
     state: &AppState,
     project_id: &str,
     entry_type: &str,
+    category_id: Option<&str>,
     limit: usize,
+    offset: usize,
 ) -> Result<Vec<EntryBrief>, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let category_id = category_id
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
     let db = state.sqlite_db.lock().await;
     db.list_entries(
         &project_id,
         EntryFilter {
-            category_id: None,
+            category_id: category_id.as_ref(),
             entry_type: Some(entry_type),
         },
         limit,
-        0,
+        offset,
     )
     .await
     .map_err(|e| e.to_string())
@@ -243,12 +336,79 @@ pub async fn list_tag_schemas(
 pub async fn get_entry_relations(
     state: &AppState,
     entry_id: &str,
-) -> Result<Vec<EntryRelation>, String> {
+) -> Result<
+    (
+        Vec<EntryRelation>,
+        std::collections::HashMap<String, String>,
+    ),
+    String,
+> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    db.list_relations_for_entry(&entry_id)
+    let relations = db
+        .list_relations_for_entry(&entry_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // 收集关系中出现的所有词条 ID，查出名称
+    let mut names: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut seen: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+    for rel in &relations {
+        seen.insert(rel.a_id);
+        seen.insert(rel.b_id);
+    }
+    for id in seen {
+        if let Ok(entry) = db.get_entry(&id).await {
+            names.insert(id.to_string(), entry.title);
+        }
+    }
+
+    Ok((relations, names))
+}
+
+/// 创建词条关系
+pub async fn create_relation(
+    state: &AppState,
+    project_id: &str,
+    a_id: &str,
+    b_id: &str,
+    relation: RelationDirection,
+    content: String,
+) -> Result<EntryRelation, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let a_id = Uuid::parse_str(a_id).map_err(|e| e.to_string())?;
+    let b_id = Uuid::parse_str(b_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.create_relation(CreateEntryRelation {
+        project_id,
+        a_id,
+        b_id,
+        relation,
+        content,
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// 更新词条关系
+pub async fn update_relation(
+    state: &AppState,
+    relation_id: &str,
+    relation: Option<RelationDirection>,
+    content: Option<String>,
+) -> Result<EntryRelation, String> {
+    let id = Uuid::parse_str(relation_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.update_relation(&id, UpdateEntryRelation { relation, content })
         .await
         .map_err(|e| e.to_string())
+}
+
+/// 删除词条关系
+pub async fn delete_relation(state: &AppState, relation_id: &str) -> Result<(), String> {
+    let id = Uuid::parse_str(relation_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.delete_relation(&id).await.map_err(|e| e.to_string())
 }
 
 /// 获取项目统计信息
@@ -265,24 +425,32 @@ pub async fn get_project_summary(
         .await
         .map_err(|e| e.to_string())?;
 
-    // 统计各类型词条数量
-    let entry_types = vec!["character", "item", "location", "event", "faction"];
-    let mut counts = std::collections::HashMap::new();
+    // 查出项目实际存在的所有词条类型，再分别统计数量
+    let all_types = db
+        .list_all_entry_types(&project_id)
+        .await
+        .map_err(|e| e.to_string())?;
 
-    for entry_type in entry_types {
+    let mut counts = std::collections::HashMap::new();
+    for et in &all_types {
+        // builtin 以 key 作为 Entry.type 的值；custom 以 id（UUID string）作为值
+        let (type_key, display_name): (String, String) = match et {
+            EntryTypeView::Builtin { key, name, .. } => (key.to_string(), name.to_string()),
+            EntryTypeView::Custom(c) => (c.id.to_string(), c.name.clone()),
+        };
         let count = db
             .count_entries(
                 &project_id,
                 EntryFilter {
                     category_id: None,
-                    entry_type: Some(entry_type),
+                    entry_type: Some(type_key.as_str()),
                 },
             )
             .await
             .map_err(|e| e.to_string())?;
 
         if count > 0 {
-            counts.insert(entry_type.to_string(), count);
+            counts.insert(display_name, count);
         }
     }
 
@@ -293,6 +461,36 @@ pub async fn get_project_summary(
 pub async fn list_projects(state: &AppState) -> Result<Vec<Project>, String> {
     let db = state.sqlite_db.lock().await;
     db.list_projects().await.map_err(|e| e.to_string())
+}
+
+/// 更新词条基本字段（标题、摘要、类型，均可选）
+/// - title:      Some(s)       更新标题
+/// - summary:    Some(s)       更新摘要；Some("") 或 None 沿用原值
+///   （与 update_entry_summary 语义一致：空字符串 = 清空）
+/// - entry_type: Some(Some(s)) 更新类型；Some(None) 清空类型；None 不更新
+pub async fn update_entry_fields(
+    state: &AppState,
+    entry_id: &str,
+    title: Option<String>,
+    summary: Option<String>,
+    entry_type: Option<Option<String>>,
+) -> Result<Entry, String> {
+    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.update_entry(
+        &entry_id,
+        UpdateEntry {
+            category_id: None,
+            title,
+            summary,
+            content: None,
+            r#type: entry_type,
+            tags: None,
+            images: None,
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// 更新词条标题
@@ -306,11 +504,11 @@ pub async fn update_entry_title(
     db.update_entry(
         &entry_id,
         UpdateEntry {
-            category_id: Some(None),
+            category_id: None,
             title: Some(title),
             summary: None,
             content: None,
-            r#type: Some(None),
+            r#type: None,
             tags: None,
             images: None,
         },
@@ -330,11 +528,11 @@ pub async fn update_entry_summary(
     db.update_entry(
         &entry_id,
         UpdateEntry {
-            category_id: Some(None),
+            category_id: None,
             title: None,
             summary,
             content: None,
-            r#type: Some(None),
+            r#type: None,
             tags: None,
             images: None,
         },
@@ -354,11 +552,11 @@ pub async fn update_entry_content(
     db.update_entry(
         &entry_id,
         UpdateEntry {
-            category_id: Some(None),
+            category_id: None,
             title: None,
             summary: None,
             content,
-            r#type: Some(None),
+            r#type: None,
             tags: None,
             images: None,
         },
@@ -378,12 +576,91 @@ pub async fn update_entry_type(
     db.update_entry(
         &entry_id,
         UpdateEntry {
-            category_id: Some(None),
+            category_id: None,
             title: None,
             summary: None,
             content: None,
             r#type: Some(entry_type),
             tags: None,
+            images: None,
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// 向词条添加单个标签（如 schema_id 已存在则覆盖其 value）
+pub async fn add_entry_tag(
+    state: &AppState,
+    entry_id: &str,
+    schema_id: &str,
+    value: String,
+) -> Result<Entry, String> {
+    let entry_id_uuid = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
+    let schema_id_uuid = Uuid::parse_str(schema_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    let entry = db
+        .get_entry(&entry_id_uuid)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut tags = entry.tags.0;
+    // 若已有同 schema_id 的标签则覆盖，否则追加
+    if let Some(existing) = tags.iter_mut().find(|t| t.schema_id == schema_id_uuid) {
+        existing.value = serde_json::Value::String(value);
+    } else {
+        tags.push(EntryTag {
+            schema_id: schema_id_uuid,
+            value: serde_json::Value::String(value),
+        });
+    }
+
+    db.update_entry(
+        &entry_id_uuid,
+        UpdateEntry {
+            category_id: None,
+            title: None,
+            summary: None,
+            content: None,
+            r#type: None,
+            tags: Some(tags),
+            images: None,
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// 从词条移除指定 schema_id 的标签
+pub async fn remove_entry_tag(
+    state: &AppState,
+    entry_id: &str,
+    schema_id: &str,
+) -> Result<Entry, String> {
+    let entry_id_uuid = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
+    let schema_id_uuid = Uuid::parse_str(schema_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    let entry = db
+        .get_entry(&entry_id_uuid)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let tags: Vec<EntryTag> = entry
+        .tags
+        .0
+        .into_iter()
+        .filter(|t| t.schema_id != schema_id_uuid)
+        .collect();
+
+    db.update_entry(
+        &entry_id_uuid,
+        UpdateEntry {
+            category_id: None,
+            title: None,
+            summary: None,
+            content: None,
+            r#type: None,
+            tags: Some(tags),
             images: None,
         },
     )
@@ -402,11 +679,11 @@ pub async fn update_entry_tags(
     db.update_entry(
         &entry_id,
         UpdateEntry {
-            category_id: Some(None),
+            category_id: None,
             title: None,
             summary: None,
             content: None,
-            r#type: Some(None),
+            r#type: None,
             tags: Some(tags),
             images: None,
         },

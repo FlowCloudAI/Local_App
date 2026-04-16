@@ -610,6 +610,49 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
+/* ========== 编辑模式指示条 ========== */
+.ai-edit-indicator {
+    z-index: 101;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 1.25rem;
+    font-size: 0.8rem;
+    color: var(--ai-plugin-primary);
+    background: rgba(59, 130, 246, 0.08);
+    border-top: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.ai-edit-indicator--full {
+    position: fixed;
+    bottom: calc(24px + 130px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(700px, calc(100vw - 40px));
+    border-radius: 8px 8px 0 0;
+}
+
+.ai-edit-indicator--right {
+    position: absolute;
+    bottom: 130px;
+    left: 0;
+    right: 0;
+}
+
+.ai-edit-indicator button {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.78rem;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    border-radius: var(--ai-plugin-radius-sm);
+    background: transparent;
+    color: var(--ai-plugin-primary);
+    cursor: pointer;
+}
+
+.ai-edit-indicator button:hover {
+    background: rgba(59, 130, 246, 0.12);
+}
+
 /* ========== 悬浮输入框（根据视图模式切换定位方式） ========== */
 .ai-floating-input-wrapper {
     z-index: 100;

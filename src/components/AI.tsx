@@ -101,6 +101,8 @@ export default function AIChat() {
     const [autoScroll, setAutoScroll] = useState(true)
     const [sessionParams, setSessionParams] = useState<SessionParams>(DEFAULT_SESSION_PARAMS)
     const [paramsExpanded, setParamsExpanded] = useState(false)
+    // 编辑模式：记录正在编辑的 user 消息 id
+    const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
     const [tools, setTools] = useState<ToolStatus[]>([])
     const [webSearchEnabled, setWebSearchEnabled] = useState(false)
     const [editModeEnabled, setEditModeEnabled] = useState(false)
@@ -195,6 +197,32 @@ export default function AIChat() {
             }
         }
     }, [selectedPlugin, plugins, selectedModel])
+
+    // ── 将 turn_begin nodeId 反填到对应的 user 消息 ──────────
+    // 这样 user 消息的 nodeId = 该轮的 turn_begin node，
+    // checkout 到它时 backend 会自动重跑该消息（用于重说）
+
+    useEffect(() => {
+        if (!session.lastUserNodeId || !session.sessionId) return
+
+        // 使用 requestAnimationFrame 延迟状态更新，避免级联渲染
+        const frameId = requestAnimationFrame(() => {
+            setConversations(prev => prev.map(conv => {
+                if (conv.sessionId !== session.sessionId) return conv
+                // 找最后一条还没有 nodeId 的 user 消息
+                const idx = conv.messages.reduceRight<number>(
+                    (found, m, i) => found === -1 && m.role === 'user' && !m.nodeId ? i : found,
+                    -1,
+                )
+                if (idx === -1) return conv
+                const msgs = [...conv.messages]
+                msgs[idx] = {...msgs[idx], nodeId: session.lastUserNodeId!}
+                return {...conv, messages: msgs}
+            }))
+        })
+
+        return () => cancelAnimationFrame(frameId)
+    }, [session.lastUserNodeId, session.sessionId])
 
     // ── 会话参数同步到后端 ────────────────────────────────────
 
@@ -313,6 +341,7 @@ export default function AIChat() {
             if (!mounted) return
 
             if (metas.length > 0) {
+                // 先创建基础对话列表
                 const convs: Conversation[] = metas.map(m => ({
                     id: m.id,
                     title: m.title,
@@ -322,19 +351,23 @@ export default function AIChat() {
                     sessionId: null,
                     timestamp: new Date(m.updated_at).getTime(),
                 }))
+
+                // 加载第一条对话的消息
+                const stored = await ai_get_conversation(convs[0].id).catch(() => null)
+                if (!mounted) return
+
+                // 如果有消息数据，直接初始化时带上
+                if (stored) {
+                    convs[0] = {
+                        ...convs[0],
+                        messages: stored.messages.map(storedToMessage),
+                    }
+                }
+                
                 setConversations(convs)
                 setActiveConversationId(convs[0].id)
                 setSelectedPlugin(convs[0].pluginId)
                 setSelectedModel(convs[0].model)
-
-                // 加载第一条对话的消息
-                const stored = await ai_get_conversation(convs[0].id).catch(() => null)
-                if (!mounted || !stored) return
-                setConversations(prev => prev.map(c =>
-                    c.id === convs[0].id
-                        ? {...c, messages: stored.messages.map(storedToMessage)}
-                        : c
-                ))
             } else {
                 const newId = `conv_${Date.now()}`
                 setConversations([{
@@ -411,12 +444,40 @@ export default function AIChat() {
     const handleSend = useCallback(async () => {
         const trimmed = inputValue.trim()
         if ((!trimmed && attachments.length === 0) || session.isStreaming) return
-        if (!activeConversationId) {
+
+        // 使用 ref 获取最新的 activeConversationId，避免依赖不稳定
+        const currentConvId = activeConversationRef.current?.id
+        if (!currentConvId) {
             void showAlert('请先创建新对话', 'warning', 'toast', 2000)
             return
         }
 
         abortControllerRef.current = new AbortController()
+
+        // ── 编辑模式：处理消息裁剪 + checkout ─────────────────
+        if (editingMessageId) {
+            const conv = activeConversationRef.current
+            if (conv) {
+                const editIdx = conv.messages.findIndex(m => m.id === editingMessageId)
+                if (editIdx !== -1) {
+                    // 裁掉从编辑消息开始的所有内容
+                    setConversations(prev => prev.map(c =>
+                        c.id === currentConvId
+                            ? {...c, messages: c.messages.slice(0, editIdx)}
+                            : c
+                    ))
+                    const precedingMsg = editIdx > 0 ? conv.messages[editIdx - 1] : null
+                    if (precedingMsg?.nodeId && conv.sessionId === session.sessionId) {
+                        // 有前驱 assistant 节点且 session 存活：checkout 后继续走下方 sendMessage 流程
+                        await session.checkoutForEdit(precedingMsg.nodeId)
+                    } else {
+                        // 第一条消息 或 session 已过期：关闭旧 session，走重建流程
+                        if (session.sessionId) await session.closeSession()
+                    }
+                }
+            }
+            setEditingMessageId(null)
+        }
 
         // 若当前 session 属于另一个对话（后台残留），先关掉再为本对话新建
         const sessionBelongsHere = session.sessionId != null
@@ -428,11 +489,11 @@ export default function AIChat() {
         let currentSid = sessionBelongsHere ? session.sessionId : null
         // effectiveConvId 跟踪「此次发送」实际操作的对话 ID，
         // 因为 pending 对话在创建 session 后 id 会变，不能再用 activeConversationId（stale）
-        let effectiveConvId = activeConversationId!
+        let effectiveConvId = currentConvId
         if (!currentSid) {
             currentSid = await session.createSession(selectedPlugin, selectedModel)
             if (!currentSid) return
-            const oldId = activeConversationId
+            const oldId = currentConvId
             if (oldId?.startsWith('conv_')) {
                 // pending 对话：将 id 提升为 session_id，使本地 id === 后端文件名
                 effectiveConvId = currentSid
@@ -442,7 +503,7 @@ export default function AIChat() {
                 setActiveConversationId(currentSid!)
             } else {
                 setConversations(prev => prev.map(c =>
-                    c.id === activeConversationId ? {...c, sessionId: currentSid!} : c
+                    c.id === currentConvId ? {...c, sessionId: currentSid!} : c
                 ))
             }
         }
@@ -475,12 +536,51 @@ export default function AIChat() {
         setAttachments([])
 
         await session.sendMessage(content, currentSid)
-    }, [inputValue, attachments, session, activeConversationId, selectedPlugin, selectedModel, showAlert])
+    }, [inputValue, attachments, session, selectedPlugin, selectedModel, showAlert, editingMessageId])
 
 
     const handleStop = useCallback(() => {
         abortControllerRef.current?.abort()
     }, [])
+
+    // ── 重说 ──────────────────────────────────────────────────
+
+    const handleRegenerate = useCallback(async (messageId: string) => {
+        if (session.isStreaming) return
+        const conv = conversations.find(c => c.id === activeConversationId)
+        if (!conv || conv.sessionId !== session.sessionId) {
+            void showAlert('会话已过期，无法重说', 'warning', 'toast', 2000)
+            return
+        }
+        const msgIdx = conv.messages.findIndex(m => m.id === messageId)
+        if (msgIdx === -1) return
+
+        // 找到该 assistant 消息前的最近一条 user 消息及其 nodeId
+        const precedingUserMsg = conv.messages.slice(0, msgIdx).reverse().find(m => m.role === 'user')
+        if (!precedingUserMsg?.nodeId) {
+            void showAlert('找不到对应节点，无法重说', 'warning', 'toast', 2000)
+            return
+        }
+
+        // 删掉该 assistant 消息及其之后所有消息
+        setConversations(prev => prev.map(c =>
+            c.id === activeConversationId ? {...c, messages: c.messages.slice(0, msgIdx)} : c
+        ))
+        setAutoScroll(true)
+        // checkout 到 user 节点 → backend 自动重跑，无需再 sendMessage
+        await session.checkout(precedingUserMsg.nodeId)
+    }, [activeConversationId, conversations, session, showAlert])
+
+    // ── 编辑 user 消息 ────────────────────────────────────────
+
+    const handleEditMessage = useCallback((messageId: string) => {
+        const conv = conversations.find(c => c.id === activeConversationId)
+        const msg = conv?.messages.find(m => m.id === messageId)
+        if (!msg || msg.role !== 'user') return
+        setInputValue(msg.content)
+        setEditingMessageId(messageId)
+        textareaRef.current?.focus()
+    }, [activeConversationId, conversations])
 
     // ── 键盘 / 输入 ───────────────────────────────────────────
 
@@ -706,6 +806,12 @@ export default function AIChat() {
                                     markdown={message.role === 'assistant'}
                                     reasoning={message.reasoning || undefined}
                                     onCopy={() => navigator.clipboard.writeText(message.content)}
+                                    onEdit={message.role === 'user'
+                                        ? () => handleEditMessage(message.id)
+                                        : undefined}
+                                    onRegenerate={message.role === 'assistant'
+                                        ? () => void handleRegenerate(message.id)
+                                        : undefined}
                                 />
                             ))}
                             {(session.currentText || session.currentReasoning || session.toolCalls.length > 0)
@@ -740,6 +846,18 @@ export default function AIChat() {
                     )}
                     <div ref={messagesEndRef} />
                 </RollingBox>
+
+                {/* 编辑模式指示条 */}
+                {editingMessageId && (
+                    <div className={`ai-edit-indicator ai-edit-indicator--${viewMode}`}>
+                        <span>编辑模式</span>
+                        <button onClick={() => {
+                            setEditingMessageId(null);
+                            setInputValue('')
+                        }}>取消
+                        </button>
+                    </div>
+                )}
 
                 {/* 悬浮输入框 */}
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">

@@ -52,6 +52,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
     const [currentText, setCurrentText] = useState('')
     const [currentReasoning, setCurrentReasoning] = useState('')
     const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([])
+    const [lastUserNodeId, setLastUserNodeId] = useState<number | null>(null)
 
     // 内部缓冲
     const accumulatedRef = useRef('')
@@ -83,6 +84,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         const unlistenTurnBegin = listen<AiEventTurnBegin>('ai:turn_begin', event => {
             if (expectUserTurnRef.current) {
                 lastUserNodeIdRef.current = event.payload.node_id
+                setLastUserNodeId(event.payload.node_id)
                 expectUserTurnRef.current = false
             }
         })
@@ -258,6 +260,26 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         }
     }, [sessionId])
 
+    /**
+     * 编辑模式专用 checkout：checkout 到 assistant 节点，让 session 等待新输入。
+     * 不设 isStreaming=true，避免 UI 提前进入流式状态。
+     */
+    const checkoutForEdit = useCallback(async (nodeId: number): Promise<boolean> => {
+        if (!sessionId) return false
+        try {
+            await ai_checkout(sessionId, nodeId)
+            expectUserTurnRef.current = true
+            setCurrentText('')
+            accumulatedRef.current = ''
+            setCurrentReasoning('')
+            reasoningRef.current = ''
+            setToolCalls([])
+            return true
+        } catch {
+            return false
+        }
+    }, [sessionId])
+
     /** 切换插件（下一轮对话生效） */
     const switchPlugin = useCallback(async (pluginId: string) => {
         if (!sessionId) return
@@ -276,12 +298,14 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         currentText,
         currentReasoning,
         toolCalls,
-        /** 当前用户轮次的起始节点 ID（用于 checkout / 重说） */
+        /** 当前用户轮次的起始节点 ID（用于 checkout / 重说），state 版本供 effect 依赖 */
+        lastUserNodeId,
         lastUserNodeIdRef,
         createSession,
         closeSession,
         sendMessage,
         checkout,
+        checkoutForEdit,
         switchPlugin,
         updateModel,
     }

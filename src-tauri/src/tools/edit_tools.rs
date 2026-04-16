@@ -11,20 +11,23 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
     // ⑬ edit_entry_content_lines - 按行编辑词条正文（需用户确认）
     registry.register_async::<WorldflowToolState, _>(
         "edit_entry_content_lines",
-        "按行范围替换词条正文中的指定内容；修改会发送给用户预览，用户确认后才写入",
+        "对词条正文按行进行替换、删除或插入；修改会发送给用户预览，用户确认后才写入。\
+         替换：start_line ≤ end_line，new_content 为新内容；\
+         删除：start_line ≤ end_line，new_content 为空字符串；\
+         在第 N 行前插入：end_line = start_line - 1，new_content 为要插入的内容",
         vec![
             ToolFunctionArg::new("entry_id", "string")
                 .required(true)
                 .desc("词条ID"),
             ToolFunctionArg::new("start_line", "integer")
                 .required(true)
-                .desc("起始行号（从 1 开始，含）"),
+                .desc("起始行号（从 1 开始，含）；插入时表示在该行前插入"),
             ToolFunctionArg::new("end_line", "integer")
                 .required(true)
-                .desc("结束行号（含）；若与 start_line 相同则替换单行"),
+                .desc("结束行号（含）；设为 start_line - 1 表示纯插入（不替换任何行）"),
             ToolFunctionArg::new("new_content", "string")
                 .required(true)
-                .desc("替换后的新内容（可以是多行文本，也可以是空字符串表示删除该区间）"),
+                .desc("新内容（支持多行）；空字符串表示删除 start_line 到 end_line 的区间"),
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
@@ -47,8 +50,13 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                 if start_line == 0 {
                     anyhow::bail!("start_line 必须从 1 开始");
                 }
-                if end_line < start_line {
-                    anyhow::bail!("end_line 不能小于 start_line");
+                // end_line == start_line - 1 是合法的"纯插入"语义，比该值更小才是错误
+                if end_line + 1 < start_line {
+                    anyhow::bail!(
+                        "end_line ({}) 无效：最小可为 start_line - 1 ({})（纯插入模式）",
+                        end_line,
+                        start_line - 1
+                    );
                 }
 
                 // 1. 读取词条当前内容，然后立即释放锁
