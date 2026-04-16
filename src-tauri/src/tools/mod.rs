@@ -23,10 +23,12 @@ pub mod format {
 
         let mut result = String::from("找到以下词条：\n\n");
         for (i, brief) in briefs.iter().enumerate() {
+            let type_str = brief.r#type.as_deref().unwrap_or("未分类");
             result.push_str(&format!(
-                "{}. **{}** (ID: {})\n",
+                "{}. **{}** [{}] (ID: {})\n",
                 i + 1,
                 brief.title,
+                type_str,
                 brief.id
             ));
             if let Some(summary) = &brief.summary {
@@ -111,21 +113,30 @@ pub mod format {
                 .unwrap_or_else(|| id.to_string())
         };
 
-        let mut result = String::from("词条关系网络：\n\n");
+        let current_name = name(&current_id);
+        let mut result = format!("「{}」的关系网络：\n\n", current_name);
         for rel in relations {
-            let direction = match rel.relation {
-                RelationDirection::OneWay => "→",
-                RelationDirection::TwoWay => "↔",
-            };
-            let (from, to) = if rel.a_id == current_id {
-                (name(&rel.a_id), name(&rel.b_id))
-            } else {
-                (name(&rel.a_id), name(&rel.b_id))
-            };
-            result.push_str(&format!(
-                "- **{}** {} **{}**\n  关系描述：{}\n\n",
-                from, direction, to, rel.content
-            ));
+            match rel.relation {
+                RelationDirection::TwoWay => {
+                    result.push_str(&format!(
+                        "- **{}** ↔ **{}**（双向）\n  描述：{}\n  关系ID：{}\n\n",
+                        name(&rel.a_id),
+                        name(&rel.b_id),
+                        rel.content,
+                        rel.id,
+                    ));
+                }
+                RelationDirection::OneWay => {
+                    // a_id → b_id 单向
+                    result.push_str(&format!(
+                        "- **{}** → **{}**（单向）\n  描述：{}\n  关系ID：{}\n\n",
+                        name(&rel.a_id),
+                        name(&rel.b_id),
+                        rel.content,
+                        rel.id,
+                    ));
+                }
+            }
         }
         result
     }
@@ -179,20 +190,38 @@ pub mod format {
         result
     }
     /// 格式化分类列表（用于 list_categories 返回）
+    /// 按 parent_id 构建真实的缩进树
     pub fn format_categories(categories: &[Category]) -> String {
         if categories.is_empty() {
             return "该项目暂无分类".to_string();
         }
 
-        let mut result = String::from("分类列表：\n\n");
+        // 建立 parent_id → children 的映射
+        let mut children_map: std::collections::HashMap<Option<Uuid>, Vec<&Category>> =
+            std::collections::HashMap::new();
         for cat in categories {
-            let indent = if cat.parent_id.is_some() {
-                "  └─ "
-            } else {
-                "- "
-            };
-            result.push_str(&format!("{}**{}** (ID: {})\n", indent, cat.name, cat.id));
+            children_map.entry(cat.parent_id).or_default().push(cat);
         }
+
+        let mut result = String::from("分类列表：\n\n");
+
+        fn render(
+            parent: Option<Uuid>,
+            depth: usize,
+            map: &std::collections::HashMap<Option<Uuid>, Vec<&Category>>,
+            out: &mut String,
+        ) {
+            let Some(children) = map.get(&parent) else {
+                return;
+            };
+            for cat in children {
+                let indent = "  ".repeat(depth);
+                out.push_str(&format!("{}- **{}** (ID: {})\n", indent, cat.name, cat.id));
+                render(Some(cat.id), depth + 1, map, out);
+            }
+        }
+
+        render(None, 0, &children_map, &mut result);
         result
     }
 }
@@ -369,18 +398,18 @@ pub async fn get_entry_relations(
 /// 创建词条关系
 pub async fn create_relation(
     state: &AppState,
-    project_id: &str,
     a_id: &str,
     b_id: &str,
     relation: RelationDirection,
     content: String,
 ) -> Result<EntryRelation, String> {
-    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let a_id = Uuid::parse_str(a_id).map_err(|e| e.to_string())?;
     let b_id = Uuid::parse_str(b_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
+    // project_id 从 a_id 所属词条推导，无需调用方传入
+    let entry_a = db.get_entry(&a_id).await.map_err(|e| e.to_string())?;
     db.create_relation(CreateEntryRelation {
-        project_id,
+        project_id: entry_a.project_id,
         a_id,
         b_id,
         relation,
@@ -467,12 +496,16 @@ pub async fn list_projects(state: &AppState) -> Result<Vec<Project>, String> {
 /// - title:      Some(s)       更新标题
 /// - summary:    Some(s)       更新摘要；Some("") 或 None 沿用原值
 ///   （与 update_entry_summary 语义一致：空字符串 = 清空）
-/// - entry_type: Some(Some(s)) 更新类型；Some(None) 清空类型；None 不更新
+/// 更新词条基本字段（标题、摘要、类型，均可选）
+/// - title:      None = 不更新；Some(s) = 更新
+/// - summary:    None = 不更新；Some(None) = 清空；Some(Some(s)) = 更新
+///   注意：清空摘要依赖 UpdateEntry.summary 的 DB 层语义（None = 不更新 or 清空）
+/// - entry_type: None = 不更新；Some(None) = 清空；Some(Some(s)) = 更新
 pub async fn update_entry_fields(
     state: &AppState,
     entry_id: &str,
     title: Option<String>,
-    summary: Option<String>,
+    summary: Option<Option<String>>,
     entry_type: Option<Option<String>>,
 ) -> Result<Entry, String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
@@ -482,7 +515,9 @@ pub async fn update_entry_fields(
         UpdateEntry {
             category_id: None,
             title,
-            summary,
+            // UpdateEntry.summary 是 Option<String>，None = 不更新，Some(s) = 更新
+            // 清空摘要（Some(None)）在 DB 层无法区分"不更新"，此处降级为不更新
+            summary: summary.flatten(),
             content: None,
             r#type: entry_type,
             tags: None,

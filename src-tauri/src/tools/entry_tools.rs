@@ -412,13 +412,13 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
     registry.register_async::<WorldflowToolState, _>(
         "update_entry",
         "更新词条的标题、摘要或类型；三个字段均可选，但至少需提供一个。\
-         传入空字符串可清空摘要；entry_type 传空字符串可清空类型",
+         entry_type 传空字符串可清空类型",
         vec![
             ToolFunctionArg::new("entry_id", "string")
                 .required(true)
                 .desc("词条ID"),
             ToolFunctionArg::new("title", "string").desc("新标题"),
-            ToolFunctionArg::new("summary", "string").desc("新摘要；空字符串表示清空"),
+            ToolFunctionArg::new("summary", "string").desc("新摘要内容"),
             ToolFunctionArg::new("entry_type", "string")
                 .desc("新类型（如 character, item, location）；空字符串表示清空"),
         ],
@@ -433,11 +433,15 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
 
-                // summary: None = 不更新；Some(s) = 更新（空字符串由 DB 层处理为清空）
-                let summary: Option<String> = args
-                    .get("summary")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
+                // summary: 字段未传 = None（不更新）；传空字符串 = Some(None)（清空）；传非空 = Some(Some(s))
+                let summary: Option<Option<String>> =
+                    args.get("summary").and_then(|v| v.as_str()).map(|s| {
+                        if s.is_empty() {
+                            None
+                        } else {
+                            Some(s.to_string())
+                        }
+                    });
 
                 // entry_type: None = 不更新；Some(None) = 清空；Some(Some(s)) = 更新
                 let entry_type: Option<Option<String>> =
@@ -569,9 +573,6 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         "create_relation",
         "在两个词条之间创建关系；one_way 表示 a → b 单向，two_way 表示双向",
         vec![
-            ToolFunctionArg::new("project_id", "string")
-                .required(true)
-                .desc("项目ID"),
             ToolFunctionArg::new("a_id", "string")
                 .required(true)
                 .desc("关系起点词条ID"),
@@ -588,7 +589,6 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
             Box::pin(async move {
-                let project_id = arg_str(args, "project_id")?;
                 let a_id = arg_str(args, "a_id")?;
                 let b_id = arg_str(args, "b_id")?;
                 let relation_str = arg_str(args, "relation")?;
@@ -599,7 +599,6 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 let app_state_guard = app_state.lock().await;
                 let rel = tools::create_relation(
                     &*app_state_guard,
-                    project_id,
                     a_id,
                     b_id,
                     relation,

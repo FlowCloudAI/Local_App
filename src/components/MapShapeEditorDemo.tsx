@@ -616,7 +616,7 @@ export default function MapShapeEditorDemo() {
                         </div>
                     </section>
 
-                    <div className="map-shape-editor-demo__sidebar-scroll">
+                    <RollingBox className="map-shape-editor-demo__sidebar-scroll" thumbSize="thin">
                         <section className="map-shape-editor-demo__panel map-shape-editor-demo__params-panel">
                         <div className="map-shape-editor-demo__panel-header">
                             <h3 className="map-shape-editor-demo__panel-title">海岸线参数</h3>
@@ -1144,7 +1144,7 @@ export default function MapShapeEditorDemo() {
                             )}
                         </div>
                     </section>
-                    </div>
+                    </RollingBox>
                 </div>
 
             </div>
