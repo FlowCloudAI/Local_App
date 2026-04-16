@@ -121,10 +121,28 @@ pub fn run() {
                                 plugins_path: resolved_plugins_path.clone(),
                             });
 
+                            // 创建待确认编辑请求状态（AI 工具和 confirm command 共享同一个 Arc）
+                            let pending_edits = std::sync::Arc::new(tokio::sync::Mutex::new(
+                                std::collections::HashMap::<
+                                    String,
+                                    tokio::sync::oneshot::Sender<bool>,
+                                >::new(),
+                            ));
+                            app.manage(PendingEditsState {
+                                pending: pending_edits.clone(),
+                            });
+
                             // 再初始化 AI 客户端（需要 AppState）
                             std::fs::create_dir_all(&resolved_plugins_path).ok();
-                            match AiState::new(resolved_plugins_path, app_state, search_engine_arc)
-                            {
+                            let chats_path = db_path.parent().map(|p| p.join("chats"));
+                            match AiState::new(
+                                resolved_plugins_path,
+                                chats_path,
+                                app_state,
+                                search_engine_arc,
+                                app.clone(),
+                                pending_edits,
+                            ) {
                                 Ok(ai_state) => {
                                     app.manage(ai_state);
                                 }
@@ -213,6 +231,11 @@ pub fn run() {
             ai_disable_tool,
             ai_is_enabled,
             ai_list_tools,
+            ai_list_conversations,
+            ai_get_conversation,
+            ai_delete_conversation,
+            ai_rename_conversation,
+            confirm_entry_edit,
             // App Settings
             setting_get_settings,
             setting_update_settings,

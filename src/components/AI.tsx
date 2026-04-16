@@ -1,7 +1,18 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Select, TagItem, useAlert } from 'flowcloudai-ui'
-import { ai_close_session, ai_list_plugins, type PluginInfo } from '../api'
-import { type SessionMessage, type ToolCallInfo, useAiSession } from '../hooks/useAiSession'
+import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {MessageBox, RollingBox, Select, useAlert} from 'flowcloudai-ui'
+import {
+    ai_close_session,
+    ai_delete_conversation,
+    ai_get_conversation,
+    ai_list_conversations,
+    ai_list_plugins,
+    ai_list_tools,
+    ai_update_session,
+    type PluginInfo,
+    type StoredMessage,
+    type ToolStatus,
+} from '../api'
+import {type SessionMessage, type ToolCallInfo as SessionToolCallInfo, useAiSession} from '../hooks/useAiSession'
 import './AI.css'
 
 // ── 类型 ─────────────────────────────────────────────────────
@@ -19,8 +30,27 @@ interface Message {
     role: 'user' | 'assistant'
     content: string
     timestamp: number
+    reasoning?: string
     attachments?: Attachment[]
     nodeId?: number
+}
+
+interface SessionParams {
+    thinking: boolean
+    temperature: string       // 空字符串 = 使用模型默认值
+    maxTokens: string
+    topP: string
+    frequencyPenalty: string
+    presencePenalty: string
+}
+
+const DEFAULT_SESSION_PARAMS: SessionParams = {
+    thinking: false,
+    temperature: '',
+    maxTokens: '',
+    topP: '',
+    frequencyPenalty: '',
+    presencePenalty: '',
 }
 
 interface Conversation {
@@ -37,13 +67,20 @@ interface Conversation {
 
 const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
-const STORAGE_KEY = 'ai-conversations'
 
 const generateTitleFromMessage = (content: string): string => {
     const cleaned = content.trim().replace(/\s+/g, ' ')
     if (cleaned.length <= 20) return cleaned
     return cleaned.slice(0, 20) + '...'
 }
+
+const storedToMessage = (m: StoredMessage, index: number): Message => ({
+    id: `loaded_${index}_${Date.now()}`,
+    role: m.role as 'user' | 'assistant',
+    content: m.content ?? '',
+    reasoning: m.reasoning || undefined,
+    timestamp: new Date(m.timestamp).getTime(),
+})
 
 // ── 组件 ─────────────────────────────────────────────────────
 
@@ -59,11 +96,11 @@ export default function AIChat() {
     // 视图模式: 'full' 全屏 | 'right' 右侧面板
     const [viewMode, setViewMode] = useState<'full' | 'right'>('right')
     
-    // 切换视图模式
-    useCallback(() => {
-        setViewMode(prev => prev === 'full' ? 'right' : 'full')
-    }, []);
     const [attachments, setAttachments] = useState<Attachment[]>([])
+    const [autoScroll, setAutoScroll] = useState(true)
+    const [sessionParams, setSessionParams] = useState<SessionParams>(DEFAULT_SESSION_PARAMS)
+    const [paramsExpanded, setParamsExpanded] = useState(false)
+    const [tools, setTools] = useState<ToolStatus[]>([])
 
     const activeConversation = conversations.find(c => c.id === activeConversationId)
     const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation])
@@ -73,31 +110,50 @@ export default function AIChat() {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const lastScrollTopRef = useRef(0)
 
-    const activeConversationIdRef = useRef(activeConversationId)
+    const {showAlert} = useAlert()
+
+    // 稳定追踪当前活跃对话的 sessionId，供异步回调读取
+    const activeSessionIdRef = useRef<string | null>(null)
     useEffect(() => {
-        activeConversationIdRef.current = activeConversationId
-    }, [activeConversationId])
+        activeSessionIdRef.current = activeConversation?.sessionId ?? null
+    }, [activeConversation?.sessionId])
 
-    const { showAlert } = useAlert()
+    // 稳定追踪当前活跃对话，避免 useCallback 依赖频繁变化
+    const activeConversationRef = useRef(activeConversation)
+    useEffect(() => {
+        activeConversationRef.current = activeConversation
+    }, [activeConversation])
 
     // ── useAiSession ─────────────────────────────────────────
 
     const onMessage = useCallback((msg: SessionMessage) => {
-        const convId = activeConversationIdRef.current
-        if (!convId) return
+        const userSwitchedAway = activeSessionIdRef.current !== msg.sessionId
+
         const message: Message = {
             id: msg.id,
             role: msg.role,
             content: msg.content,
             timestamp: msg.timestamp,
+            reasoning: msg.reasoning,
             nodeId: msg.nodeId,
         }
-        setConversations(prev => prev.map(conv =>
-            conv.id === convId
-                ? { ...conv, messages: [...conv.messages, message] }
-                : conv
-        ))
+        // 按 sessionId 路由，并在用户已切走时顺手清掉 sessionId
+        setConversations(prev => prev.map(conv => {
+            if (conv.sessionId !== msg.sessionId) return conv
+            return {
+                ...conv,
+                messages: [...conv.messages, message],
+                // 用户切走了：清掉 sessionId，下次续聊会重建 session
+                sessionId: userSwitchedAway ? null : conv.sessionId,
+            }
+        }))
+
+        // TurnEnd 后用户不在场 → kill session 释放后端资源
+        if (userSwitchedAway) {
+            void ai_close_session(msg.sessionId).catch(console.error)
+        }
     }, [])
 
     const onError = useCallback((msg: string) => {
@@ -112,6 +168,7 @@ export default function AIChat() {
 
     useEffect(() => {
         ai_list_plugins('llm').then(setPlugins).catch(console.error)
+        ai_list_tools().then(setTools).catch(console.error)
     }, [])
 
     // ── 自动选择默认模型 ──────────────────────────────────────
@@ -128,6 +185,19 @@ export default function AIChat() {
             }
         }
     }, [selectedPlugin, plugins, selectedModel])
+
+    // ── 会话参数同步到后端 ────────────────────────────────────
+
+    useEffect(() => {
+        if (!session.sessionId) return
+        const p: Record<string, unknown> = {thinking: sessionParams.thinking}
+        if (sessionParams.temperature !== '') p.temperature = parseFloat(sessionParams.temperature)
+        if (sessionParams.maxTokens !== '') p.maxTokens = parseInt(sessionParams.maxTokens, 10)
+        if (sessionParams.topP !== '') p.topP = parseFloat(sessionParams.topP)
+        if (sessionParams.frequencyPenalty !== '') p.frequencyPenalty = parseFloat(sessionParams.frequencyPenalty)
+        if (sessionParams.presencePenalty !== '') p.presencePenalty = parseFloat(sessionParams.presencePenalty)
+        void ai_update_session(session.sessionId, p).catch(console.error)
+    }, [sessionParams, session.sessionId])
 
     // ── 插件 / 模型变化同步到后端 ─────────────────────────────
 
@@ -150,12 +220,38 @@ export default function AIChat() {
     // ── 自动滚动到底部 ────────────────────────────────────────
 
     useEffect(() => {
-        if (messagesEndRef.current) {
-            requestAnimationFrame(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-            })
+        if (!autoScroll) return
+        requestAnimationFrame(() => {
+            const container = messagesContainerRef.current
+            if (!container) return
+            const roll = container.querySelector('.fc-roll') as HTMLElement | null
+            const scrollContainer = roll || container
+            scrollContainer.scrollTop = scrollContainer.scrollHeight
+        })
+    }, [messages.length, session.currentText, autoScroll])
+
+    const handleMessagesScroll = useCallback(() => {
+        const container = messagesContainerRef.current
+        if (!container) return
+        const roll = container.querySelector('.fc-roll') as HTMLElement | null
+        const scrollContainer = roll || container
+        const {scrollTop, scrollHeight, clientHeight} = scrollContainer
+        if (scrollTop < lastScrollTopRef.current && scrollHeight - scrollTop - clientHeight > 50) {
+            setAutoScroll(false)
         }
-    }, [messages.length, session.currentText])
+        lastScrollTopRef.current = scrollTop
+    }, [])
+
+    const scrollToBottom = useCallback(() => {
+        setAutoScroll(true)
+        requestAnimationFrame(() => {
+            const container = messagesContainerRef.current
+            if (!container) return
+            const roll = container.querySelector('.fc-roll') as HTMLElement | null
+            const scrollContainer = roll || container
+            scrollContainer.scrollTop = scrollContainer.scrollHeight
+        })
+    }, [])
 
     // ── 输入框自动高度 ────────────────────────────────────────
 
@@ -193,106 +289,86 @@ export default function AIChat() {
         setConversations(prev => [newConversation, ...prev])
         setActiveConversationId(newId)
         setAttachments([])
+        setAutoScroll(true)
         if (sidebarCollapsed) setSidebarCollapsed(false)
     }, [session, selectedPlugin, selectedModel, sidebarCollapsed])
 
-    // ── 加载历史对话 ──────────────────────────────────────────
+    // ── 从后端加载历史对话 ────────────────────────────────────
 
     useEffect(() => {
         let mounted = true
-        const stored = localStorage.getItem(STORAGE_KEY)
 
-        const initializeConversations = async () => {
-            if (stored) {
-                try {
-                    const parsed: Conversation[] = JSON.parse(stored)
-                    if (!mounted) return
-                    setConversations(parsed)
-                    if (parsed.length > 0) {
-                        const latest = [...parsed].sort((a, b) => b.timestamp - a.timestamp)[0]
-                        setActiveConversationId(latest.id)
-                        setSelectedPlugin(latest.pluginId)
-                        setSelectedModel(latest.model)
-                    } else {
-                        const newId = `conv_${Date.now()}`
-                        const newConv: Conversation = {
-                            id: newId,
-                            title: '新对话',
-                            messages: [],
-                            pluginId: selectedPlugin,
-                            model: selectedModel,
-                            sessionId: null,
-                            timestamp: Date.now(),
-                        }
-                        setConversations([newConv])
-                        setActiveConversationId(newId)
-                    }
-                } catch {
-                    const newId = `conv_${Date.now()}`
-                    const newConv: Conversation = {
-                        id: newId,
-                        title: '新对话',
-                        messages: [],
-                        pluginId: selectedPlugin,
-                        model: selectedModel,
-                        sessionId: null,
-                        timestamp: Date.now(),
-                    }
-                    setConversations([newConv])
-                    setActiveConversationId(newId)
-                }
+        const init = async () => {
+            const metas = await ai_list_conversations().catch(() => [] as Awaited<ReturnType<typeof ai_list_conversations>>)
+            if (!mounted) return
+
+            if (metas.length > 0) {
+                const convs: Conversation[] = metas.map(m => ({
+                    id: m.id,
+                    title: m.title,
+                    messages: [],
+                    pluginId: m.plugin_id,
+                    model: m.model,
+                    sessionId: null,
+                    timestamp: new Date(m.updated_at).getTime(),
+                }))
+                setConversations(convs)
+                setActiveConversationId(convs[0].id)
+                setSelectedPlugin(convs[0].pluginId)
+                setSelectedModel(convs[0].model)
+
+                // 加载第一条对话的消息
+                const stored = await ai_get_conversation(convs[0].id).catch(() => null)
+                if (!mounted || !stored) return
+                setConversations(prev => prev.map(c =>
+                    c.id === convs[0].id
+                        ? {...c, messages: stored.messages.map(storedToMessage)}
+                        : c
+                ))
             } else {
                 const newId = `conv_${Date.now()}`
-                const newConv: Conversation = {
-                    id: newId,
-                    title: '新对话',
-                    messages: [],
-                    pluginId: selectedPlugin,
-                    model: selectedModel,
-                    sessionId: null,
-                    timestamp: Date.now(),
-                }
-                setConversations([newConv])
+                setConversations([{
+                    id: newId, title: '新对话', messages: [],
+                    pluginId: '', model: '', sessionId: null, timestamp: Date.now(),
+                }])
                 setActiveConversationId(newId)
             }
         }
 
-        const timer = setTimeout(() => {
-            void initializeConversations()
-        }, 0)
-
+        void init()
         return () => {
             mounted = false
-            clearTimeout(timer)
         }
-    }, [selectedPlugin, selectedModel])
-
-    // ── 持久化 ────────────────────────────────────────────────
-
-    useEffect(() => {
-        if (conversations.length > 0) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
-        }
-    }, [conversations])
+    }, []) // 仅挂载时执行一次
 
     // ── 切换对话 ──────────────────────────────────────────────
 
     const handleSwitchConversation = useCallback(async (convId: string) => {
         if (convId === activeConversationId) return
 
-        if (session.isStreaming) {
-            abortControllerRef.current?.abort()
-        }
-        await session.closeSession()
-
+        // 不关闭当前 session：让后台继续跑完，onMessage 会按 sessionId 路由到正确对话
         setActiveConversationId(convId)
         setAttachments([])
+        setAutoScroll(true)
+
         const targetConv = conversations.find(c => c.id === convId)
         if (targetConv) {
             setSelectedPlugin(targetConv.pluginId)
             setSelectedModel(targetConv.model)
+
+            // 懒加载：只有尚未加载过消息的对话才从后端拉取
+            if (targetConv.messages.length === 0 && !targetConv.id.startsWith('conv_')) {
+                const stored = await ai_get_conversation(targetConv.id).catch(() => null)
+                if (stored) {
+                    setConversations(prev => prev.map(c =>
+                        c.id === convId
+                            ? {...c, messages: stored.messages.map(storedToMessage)}
+                            : c
+                    ))
+                }
+            }
         }
-    }, [activeConversationId, session, conversations])
+    }, [activeConversationId, conversations])
 
     // ── 删除对话 ──────────────────────────────────────────────
 
@@ -307,12 +383,16 @@ export default function AIChat() {
         if (conv?.sessionId) {
             await ai_close_session(conv.sessionId).catch(console.error)
         }
+        if (conv && !conv.id.startsWith('conv_')) {
+            await ai_delete_conversation(conv.id).catch(console.error)
+        }
 
         setConversations(prev => prev.filter(c => c.id !== convId))
 
         if (activeConversationId === convId) {
             await session.closeSession()
             setActiveConversationId(null)
+            setAutoScroll(true)
         }
     }, [conversations, activeConversationId, session])
 
@@ -328,13 +408,33 @@ export default function AIChat() {
 
         abortControllerRef.current = new AbortController()
 
-        let currentSid = session.sessionId
+        // 若当前 session 属于另一个对话（后台残留），先关掉再为本对话新建
+        const sessionBelongsHere = session.sessionId != null
+            && session.sessionId === activeConversationRef.current?.sessionId
+        if (session.sessionId && !sessionBelongsHere) {
+            await session.closeSession()
+        }
+
+        let currentSid = sessionBelongsHere ? session.sessionId : null
+        // effectiveConvId 跟踪「此次发送」实际操作的对话 ID，
+        // 因为 pending 对话在创建 session 后 id 会变，不能再用 activeConversationId（stale）
+        let effectiveConvId = activeConversationId!
         if (!currentSid) {
             currentSid = await session.createSession(selectedPlugin, selectedModel)
             if (!currentSid) return
-            setConversations(prev => prev.map(c =>
-                c.id === activeConversationId ? { ...c, sessionId: currentSid! } : c
-            ))
+            const oldId = activeConversationId
+            if (oldId?.startsWith('conv_')) {
+                // pending 对话：将 id 提升为 session_id，使本地 id === 后端文件名
+                effectiveConvId = currentSid
+                setConversations(prev => prev.map(c =>
+                    c.id === oldId ? {...c, id: currentSid!, sessionId: currentSid!} : c
+                ))
+                setActiveConversationId(currentSid!)
+            } else {
+                setConversations(prev => prev.map(c =>
+                    c.id === activeConversationId ? {...c, sessionId: currentSid!} : c
+                ))
+            }
         }
 
         let content = trimmed
@@ -352,7 +452,7 @@ export default function AIChat() {
         }
 
         setConversations(prev => prev.map(conv => {
-            if (conv.id !== activeConversationId) return conv
+            if (conv.id !== effectiveConvId) return conv
             const isFirstMessage = conv.messages.length === 0
             return {
                 ...conv,
@@ -366,6 +466,7 @@ export default function AIChat() {
 
         await session.sendMessage(content, currentSid)
     }, [inputValue, attachments, session, activeConversationId, selectedPlugin, selectedModel, showAlert])
+
 
     const handleStop = useCallback(() => {
         abortControllerRef.current?.abort()
@@ -493,9 +594,117 @@ export default function AIChat() {
                             </svg>
                         </button>
                     </div>
+
+                    {/* 会话参数行 */}
+                    <div className="ai-params-row">
+                        <button
+                            className={`ai-param-chip ${sessionParams.thinking ? 'active' : ''}`}
+                            onClick={() => setSessionParams(prev => ({...prev, thinking: !prev.thinking}))}
+                            title="深度思考（需要模型支持）"
+                        >
+                            深度思考
+                        </button>
+                        <button
+                            className="ai-param-expand-btn"
+                            onClick={() => setParamsExpanded(p => !p)}
+                            title="高级参数"
+                        >
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5"
+                                 style={{
+                                     transform: paramsExpanded ? 'rotate(180deg)' : undefined,
+                                     transition: 'transform 0.15s'
+                                 }}>
+                                <path d="M2 4l4 4 4-4"/>
+                            </svg>
+                            高级
+                        </button>
+                        {paramsExpanded && (
+                            <>
+                                <div className="ai-param-field">
+                                    <label>已注册工具 ({tools.length})</label>
+                                    <div className="ai-tools-list"
+                                         style={{maxHeight: 120, overflow: 'auto', fontSize: 12}}>
+                                        {tools.map(t => (
+                                            <div key={t.name} style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                padding: '2px 0'
+                                            }}>
+                                                <span>{t.name}</span>
+                                                <span
+                                                    style={{color: t.enabled ? '#22c55e' : '#ef4444'}}>{t.enabled ? '启用' : '禁用'}</span>
+                                            </div>
+                                        ))}
+                                        {tools.length === 0 && <span style={{color: '#888'}}>无工具</span>}
+                                    </div>
+                                </div>
+                                <div className="ai-param-field">
+                                    <label>温度</label>
+                                    <input
+                                        type="number" min="0" max="2" step="0.05"
+                                        className="ai-param-input"
+                                        value={sessionParams.temperature}
+                                        onChange={e => setSessionParams(prev => ({
+                                            ...prev,
+                                            temperature: e.target.value
+                                        }))}
+                                        placeholder="默认"
+                                    />
+                                </div>
+                                <div className="ai-param-field">
+                                    <label>最大 Token</label>
+                                    <input
+                                        type="number" min="1" step="256"
+                                        className="ai-param-input"
+                                        value={sessionParams.maxTokens}
+                                        onChange={e => setSessionParams(prev => ({...prev, maxTokens: e.target.value}))}
+                                        placeholder="默认"
+                                    />
+                                </div>
+                                <div className="ai-param-field">
+                                    <label>Top P</label>
+                                    <input
+                                        type="number" min="0" max="1" step="0.05"
+                                        className="ai-param-input"
+                                        value={sessionParams.topP}
+                                        onChange={e => setSessionParams(prev => ({...prev, topP: e.target.value}))}
+                                        placeholder="默认"
+                                    />
+                                </div>
+                                <div className="ai-param-field">
+                                    <label>频率惩罚</label>
+                                    <input
+                                        type="number" min="-2" max="2" step="0.1"
+                                        className="ai-param-input"
+                                        value={sessionParams.frequencyPenalty}
+                                        onChange={e => setSessionParams(prev => ({
+                                            ...prev,
+                                            frequencyPenalty: e.target.value
+                                        }))}
+                                        placeholder="默认"
+                                    />
+                                </div>
+                                <div className="ai-param-field">
+                                    <label>存在惩罚</label>
+                                    <input
+                                        type="number" min="-2" max="2" step="0.1"
+                                        className="ai-param-input"
+                                        value={sessionParams.presencePenalty}
+                                        onChange={e => setSessionParams(prev => ({
+                                            ...prev,
+                                            presencePenalty: e.target.value
+                                        }))}
+                                        placeholder="默认"
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
 
-                <div className="ai-messages-container" ref={messagesContainerRef}>
+                <RollingBox className="ai-messages-container" ref={messagesContainerRef} onScroll={handleMessagesScroll}
+                            thumbSize={'thin'}>
                     {!activeConversationId && (
                         <div className="ai-empty-state">
                             <div className="ai-empty-icon">
@@ -510,58 +719,48 @@ export default function AIChat() {
                     {activeConversationId && messages.length > 0 && (
                         <div className="ai-messages-list">
                             {messages.map((message) => (
-                                <div key={message.id} className={`ai-message ai-message--${message.role}`}>
-                                    <div className="ai-message-content">
-                                        <div className="ai-message-text">{message.content}</div>
-                                        {message.attachments && message.attachments.length > 0 && (
-                                            <div className="ai-attachments">
-                                                {message.attachments.map((att: Attachment) => (
-                                                    <div key={att.id} className="ai-attachment-tag">
-                                                        {att.type === 'image' ? '🖼️' : '📎'} {att.name}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                <MessageBox
+                                    key={message.id}
+                                    role={message.role}
+                                    content={message.content}
+                                    toolCallDetail={'verbose'}
+                                    markdown={message.role === 'assistant'}
+                                    reasoning={message.reasoning || undefined}
+                                    onCopy={() => navigator.clipboard.writeText(message.content)}
+                                />
                             ))}
-                            {session.currentText && (
-                                <div className="ai-message ai-message--assistant ai-streaming-message">
-                                    <div className="ai-message-content">
-                                        {session.currentReasoning && (
-                                            <div className="ai-message-reasoning">
-                                                {session.currentReasoning}
-                                            </div>
-                                        )}
-                                        <div className="ai-message-text ai-message-text--streaming">
-                                            {session.currentText}
-                                            <span className="ai-cursor" />
-                                        </div>
-                                        {session.toolCalls.length > 0 && (
-                                            <div className="ai-tool-calls">
-                                                {session.toolCalls.map((tool: ToolCallInfo, idx: number) => (
-                                                    <TagItem
-                                                        key={idx}
-                                                        schema={{
-                                                            id: `tool-${idx}`,
-                                                            name: tool.name,
-                                                            type: 'string',
-                                                            range_min: null,
-                                                            range_max: null
-                                                        }}
-                                                        value={tool.status === 'calling' ? '调用中' : '已完成'}
-                                                        mode="show"
-                                                    />
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            {(session.currentText || session.currentReasoning || session.toolCalls.length > 0)
+                                && session.sessionId === activeConversation?.sessionId && (
+                                    <MessageBox
+                                        role="assistant"
+                                        content={session.currentText}
+                                        streaming
+                                        markdown
+                                        reasoning={session.currentReasoning || undefined}
+                                        reasoningStreaming={!!session.currentReasoning && !session.currentText}
+                                        toolCalls={session.toolCalls.map((tool: SessionToolCallInfo) => ({
+                                            index: tool.index,
+                                            name: tool.name,
+                                            result: tool.status !== 'calling' ? (tool.status === 'error' ? '调用失败' : '已完成') : undefined,
+                                            isError: tool.status === 'error',
+                                        }))}
+                                        toolCallDetail={'verbose'}
+                                    />
+                                )}
+                        </div>
+                    )}
+                    {activeConversationId && messages.length > 0 && !autoScroll && (
+                        <div className="ai-scroll-to-bottom-sticky">
+                            <button className="ai-scroll-to-bottom-btn" onClick={scrollToBottom} title="滚动到底部">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                     strokeWidth="1.8">
+                                    <path d="M3 6l5 5 5-5"/>
+                                </svg>
+                            </button>
                         </div>
                     )}
                     <div ref={messagesEndRef} />
-                </div>
+                </RollingBox>
 
                 {/* 悬浮输入框 */}
                 <div className={`ai-floating-input-wrapper ai-floating-input-wrapper--${viewMode}`}>

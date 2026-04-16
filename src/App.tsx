@@ -12,6 +12,7 @@ import type {Project} from "./api";
 import RelationDemo from "./components/RelationDemo";
 import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
 import TimelineDemo from "./components/TimelineDemo";
+import EntryEditModal from "./components/EntryEditModal";
 
 type EntryTabMeta = {
     projectId: string
@@ -470,6 +471,7 @@ function App() {
                     placement={"right"}
                 />
             </div>
+            <EntryEditModal/>
         </div>
     )
 }

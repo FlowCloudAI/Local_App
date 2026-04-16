@@ -183,6 +183,55 @@ export const ai_speak = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
 export const ai_play_tts = ({pluginId, model, text, voiceId}: AiSpeakParams) =>
     command<void>('ai_play_tts', {pluginId, model, text, voiceId})
 
+// ── 对话历史管理 ──────────────────────────────────────────────────────────────
+
+export interface ConversationMeta {
+  id: string
+  title: string
+  plugin_id: string
+  model: string
+  created_at: string
+  updated_at: string
+}
+
+export interface StoredMessage {
+  role: string
+  content: string | null
+  reasoning: string | null
+  timestamp: string
+}
+
+export interface StoredConversation extends ConversationMeta {
+  messages: StoredMessage[]
+}
+
+export const ai_list_conversations = () =>
+    command<ConversationMeta[]>('ai_list_conversations')
+
+export const ai_get_conversation = (id: string) =>
+    command<StoredConversation | null>('ai_get_conversation', {id})
+
+export const ai_delete_conversation = (id: string) =>
+    command<void>('ai_delete_conversation', {id})
+
+export const ai_rename_conversation = (id: string, title: string) =>
+    command<void>('ai_rename_conversation', {id, title})
+
+// ── 编辑确认 ──────────────────────────────────────────────────────────────────
+
+export interface EntryEditRequestEvent {
+  request_id: string
+  entry_id: string
+  entry_title: string
+  before_content: string
+  after_content: string
+}
+
+export const ENTRY_EDIT_REQUEST = 'entry:edit-request'
+
+export const confirm_entry_edit = (requestId: string, confirmed: boolean) =>
+    command<void>('confirm_entry_edit', {requestId, confirmed})
+
 // ── 工具管理 ──────────────────────────────────────────────────────────────────
 
 export const ai_enable_tool = (name: string) =>

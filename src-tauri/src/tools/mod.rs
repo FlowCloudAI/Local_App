@@ -2,7 +2,11 @@ use crate::AppState;
 use uuid::Uuid;
 use worldflow_core::{EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps, models::*};
 
+pub mod edit_tools;
+pub mod entry_tools;
 pub mod registry;
+pub mod state;
+pub mod web_tools;
 pub use registry::register_worldflow_tools;
 
 /// 工具返回结果格式化辅助
@@ -145,6 +149,28 @@ pub mod format {
 
         result
     }
+
+    /// 格式化项目列表（用于 list_projects 返回）
+    pub fn format_projects(projects: &[Project]) -> String {
+        if projects.is_empty() {
+            return "暂无任何项目".to_string();
+        }
+
+        let mut result = String::from("项目列表：\n\n");
+        for (i, project) in projects.iter().enumerate() {
+            result.push_str(&format!(
+                "{}. **{}** (ID: {})\n",
+                i + 1,
+                project.name,
+                project.id
+            ));
+            if let Some(desc) = &project.description {
+                result.push_str(&format!("   描述：{}\n", desc));
+            }
+            result.push('\n');
+        }
+        result
+    }
 }
 
 // ============ 内部工具函数（不暴露给前端） ============
@@ -261,6 +287,12 @@ pub async fn get_project_summary(
     }
 
     Ok((project, counts))
+}
+
+/// 列出所有项目
+pub async fn list_projects(state: &AppState) -> Result<Vec<Project>, String> {
+    let db = state.sqlite_db.lock().await;
+    db.list_projects().await.map_err(|e| e.to_string())
 }
 
 /// 更新词条标题

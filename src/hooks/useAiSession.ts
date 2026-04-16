@@ -24,6 +24,9 @@ export interface SessionMessage {
     role: 'user' | 'assistant'
     content: string
     timestamp: number
+    reasoning?: string
+    /** 产生此消息的 session ID，用于跨对话路由 */
+    sessionId: string
     /** TurnEnd 事件携带的助手消息节点 ID，用于 checkout / 重说 */
     nodeId?: number
 }
@@ -95,6 +98,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenToolCall = listen<AiEventToolCall>('ai:tool_call', event => {
+            console.log('[ai:tool_call]', event.payload.session_id, event.payload)
             setToolCalls(prev => [
                 ...prev,
                 {index: event.payload.index, name: event.payload.name, status: 'calling'},
@@ -102,6 +106,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenToolResult = listen<AiEventToolResult>('ai:tool_result', event => {
+            console.log('[ai:tool_result]', event.payload.session_id, event.payload)
             setToolCalls(prev => prev.map(t =>
                 t.index === event.payload.index
                     ? {...t, status: event.payload.is_error ? 'error' : 'completed'}
@@ -118,6 +123,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                         role: 'assistant',
                         content: accumulatedRef.current,
                         timestamp: Date.now(),
+                        reasoning: reasoningRef.current || undefined,
+                        sessionId: event.payload.session_id,
                         nodeId: node_id,
                     })
                 }
@@ -155,6 +162,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenError = listen<AiEventError>('ai:error', event => {
+            console.log('[ai:error]', event.payload.session_id, event.payload)
             onErrorRef.current(`AI 错误: ${event.payload.error}`)
             setTimeout(() => {
                 setIsStreaming(false)

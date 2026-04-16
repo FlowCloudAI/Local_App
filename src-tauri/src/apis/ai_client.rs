@@ -1,7 +1,9 @@
 use crate::AiState;
 use crate::ApiKeyStore;
+use crate::PendingEditsState;
 use flowcloudai_client::{
-    AudioDecoder, AudioSource, ImageSession, PluginKind, SessionEvent, TurnStatus,
+    AudioDecoder, AudioSource, ConversationMeta, ImageSession, PluginKind, SessionEvent,
+    StoredConversation, TurnStatus,
 };
 use futures::StreamExt;
 use serde::Serialize;
@@ -191,6 +193,12 @@ pub async fn ai_create_llm_session(
                         .ok();
                 }
                 SessionEvent::ToolCall { index, name } => {
+                    log::info!(
+                        "[ai:tool_call] session={} index={} name={}",
+                        sid,
+                        index,
+                        name
+                    );
                     app_clone
                         .emit(
                             "ai:tool_call",
@@ -207,13 +215,20 @@ pub async fn ai_create_llm_session(
                     output,
                     is_error,
                 } => {
+                    log::info!(
+                        "[ai:tool_result] session={} index={} is_error={} output={}",
+                        sid,
+                        index,
+                        is_error,
+                        output
+                    );
                     app_clone
                         .emit(
                             "ai:tool_result",
                             EventToolResult {
                                 session_id: sid.clone(),
                                 index,
-                                output,
+                                output: output.clone(),
                                 is_error,
                             },
                         )
@@ -628,4 +643,71 @@ pub async fn ai_play_tts(
     });
 
     Ok(())
+}
+
+// ============ 对话历史管理 ============
+
+/// 列出所有已保存对话的元信息，按 updated_at 降序
+#[tauri::command]
+pub async fn ai_list_conversations(
+    ai_state: State<'_, AiState>,
+) -> Result<Vec<ConversationMeta>, String> {
+    let client = ai_state.client.lock().await;
+    Ok(client.ai_list_conversations())
+}
+
+/// 返回完整对话（元信息 + 消息列表）
+#[tauri::command]
+pub async fn ai_get_conversation(
+    ai_state: State<'_, AiState>,
+    id: String,
+) -> Result<Option<StoredConversation>, String> {
+    let client = ai_state.client.lock().await;
+    Ok(client.ai_get_conversation(&id))
+}
+
+/// 删除指定对话文件
+#[tauri::command]
+pub async fn ai_delete_conversation(
+    ai_state: State<'_, AiState>,
+    id: String,
+) -> Result<(), String> {
+    let client = ai_state.client.lock().await;
+    client
+        .ai_delete_conversation(&id)
+        .map_err(|e| e.to_string())
+}
+
+/// 修改对话标题
+#[tauri::command]
+pub async fn ai_rename_conversation(
+    ai_state: State<'_, AiState>,
+    id: String,
+    title: String,
+) -> Result<(), String> {
+    let client = ai_state.client.lock().await;
+    client
+        .ai_rename_conversation(&id, title)
+        .map_err(|e| e.to_string())
+}
+
+// ============ 编辑确认 ============
+
+/// 响应 AI 工具发起的编辑确认请求。
+/// confirmed=true 表示用户确认，false 表示取消。
+#[tauri::command]
+pub async fn confirm_entry_edit(
+    pending_edits: State<'_, PendingEditsState>,
+    request_id: String,
+    confirmed: bool,
+) -> Result<(), String> {
+    let mut map = pending_edits.pending.lock().await;
+    match map.remove(&request_id) {
+        Some(tx) => {
+            // send 失败说明 handler 已超时取消，静默忽略
+            let _ = tx.send(confirmed);
+            Ok(())
+        }
+        None => Err(format!("编辑请求 '{}' 不存在或已超时", request_id)),
+    }
 }
