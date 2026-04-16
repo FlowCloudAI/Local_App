@@ -93,8 +93,7 @@ export default function AIChat() {
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-    // 视图模式: 'full' 全屏 | 'right' 右侧面板
-    const [viewMode, setViewMode] = useState<'full' | 'right'>('right')
+
     
     const [attachments, setAttachments] = useState<Attachment[]>([])
     const [autoScroll, setAutoScroll] = useState(true)
@@ -494,9 +493,7 @@ export default function AIChat() {
     const selectedPluginInfo = plugins.find(p => p.id === selectedPlugin)
     const toggleSidebar = () => setSidebarCollapsed(prev => !prev)
 
-    const toggleViewMode = useCallback(() => {
-        setViewMode(prev => prev === 'full' ? 'right' : 'full')
-    }, [])
+
 
     // ── 渲染 ─────────────────────────────────────────────────
 
@@ -504,55 +501,44 @@ export default function AIChat() {
         <div className={`ai-chat-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
             <aside className="ai-sidebar">
                 <div className="ai-sidebar-header">
-                    {!sidebarCollapsed && (
-                        <>
-                            <button className="ai-new-chat-btn" onClick={handleNewConversation}>
-                                <span className="ai-new-chat-icon">+</span>
-                                <span className="ai-new-chat-text">新对话</span>
-                            </button>
-                            <button className="ai-sidebar-toggle" onClick={toggleSidebar} title="收起侧边栏">
-                                <span className="ai-toggle-icon">
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                        <path d="M10 3L5 8L10 13" />
-                                    </svg>
-                                </span>
-                            </button>
-                        </>
-                    )}
-                    {sidebarCollapsed && (
-                        <button className="ai-sidebar-toggle" onClick={toggleSidebar} title="展开侧边栏">
-                            <span className="ai-toggle-icon">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <button className="ai-new-chat-btn" onClick={handleNewConversation}>
+                        <span className="ai-new-chat-icon">+</span>
+                        <span className="ai-new-chat-text">新对话</span>
+                    </button>
+                    <button className="ai-sidebar-toggle" onClick={toggleSidebar} title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}>
+                        <span className="ai-toggle-icon">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                {sidebarCollapsed ? (
                                     <path d="M6 3L11 8L6 13" />
-                                </svg>
-                            </span>
-                        </button>
-                    )}
+                                ) : (
+                                    <path d="M10 3L5 8L10 13" />
+                                )}
+                            </svg>
+                        </span>
+                    </button>
                 </div>
-                {!sidebarCollapsed && (
-                    <div className="ai-conversations-list">
-                        {conversations.length === 0 && (
-                            <div className="ai-empty-history"><p>暂无历史对话</p></div>
-                        )}
-                        {conversations.map(conv => (
-                            <div
-                                key={conv.id}
-                                className={`ai-conversation-item ${conv.id === activeConversationId ? 'active' : ''}`}
-                                onClick={() => void handleSwitchConversation(conv.id)}
-                            >
-                                <div className="ai-conversation-info">
-                                    <div className="ai-conversation-title" title={conv.title}>{conv.title}</div>
-                                </div>
-                                <button className="ai-conversation-delete"
-                                        onClick={e => void handleDeleteConversation(conv.id, e)}>
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                        <path d="M2 3.5h10M4.5 3.5V2a1 1 0 011-1h3a1 1 0 011 1v1.5m-7 0v8a1.5 1.5 0 001.5 1.5h5a1.5 1.5 0 001.5-1.5v-8M5.5 6v4M8.5 6v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                </button>
+                <div className="ai-conversations-list">
+                    {conversations.length === 0 && (
+                        <div className="ai-empty-history"><p>暂无历史对话</p></div>
+                    )}
+                    {conversations.map(conv => (
+                        <div
+                            key={conv.id}
+                            className={`ai-conversation-item ${conv.id === activeConversationId ? 'active' : ''}`}
+                            onClick={() => void handleSwitchConversation(conv.id)}
+                        >
+                            <div className="ai-conversation-info">
+                                <div className="ai-conversation-title" title={conv.title}>{conv.title}</div>
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <button className="ai-conversation-delete"
+                                    onClick={e => void handleDeleteConversation(conv.id, e)}>
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                    <path d="M2 3.5h10M4.5 3.5V2a1 1 0 011-1h3a1 1 0 011 1v1.5m-7 0v8a1.5 1.5 0 001.5 1.5h5a1.5 1.5 0 001.5-1.5v-8M5.5 6v4M8.5 6v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </button>
+                        </div>
+                    ))}
+                </div>
             </aside>
 
             <main className="ai-main">
@@ -580,19 +566,6 @@ export default function AIChat() {
                                 />
                             </div>
                         )}
-                        <button
-                            className="ai-view-mode-toggle"
-                            onClick={toggleViewMode}
-                            title={viewMode === 'full' ? '切换至右侧面板' : '切换至全屏'}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                {viewMode === 'full' ? (
-                                    <path d="M11 3L6 8L11 13" />
-                                ) : (
-                                    <path d="M5 3L10 8L5 13" />
-                                )}
-                            </svg>
-                        </button>
                     </div>
 
                     {/* 会话参数行 */}
@@ -763,7 +736,7 @@ export default function AIChat() {
                 </RollingBox>
 
                 {/* 悬浮输入框 */}
-                <div className={`ai-floating-input-wrapper ai-floating-input-wrapper--${viewMode}`}>
+                <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
                     <div 
                         className="ai-floating-input-inner"
                         onClick={() => textareaRef.current?.focus()}
