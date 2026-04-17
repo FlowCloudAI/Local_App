@@ -179,6 +179,8 @@ pub fn run() {
             db_create_entry,
             db_get_entry,
             db_list_entries,
+            db_list_timeline_events,
+            db_get_project_stats,
             db_search_entries,
             db_count_entries,
             db_update_entry,
@@ -214,6 +216,12 @@ pub fn run() {
             db_list_incoming_links,
             db_delete_links_from_entry,
             db_replace_outgoing_links,
+            // Idea Notes
+            db_create_idea_note,
+            db_get_idea_note,
+            db_list_idea_notes,
+            db_update_idea_note,
+            db_delete_idea_note,
             // AI Client
             ai_list_plugins,
             ai_create_llm_session,

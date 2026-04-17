@@ -8,8 +8,11 @@ import {
     ai_list_conversations,
     ai_list_plugins,
     ai_list_tools,
+    ai_rename_conversation,
     ai_update_session,
+    type PluginInfo,
     type StoredMessage,
+    type ToolStatus,
 } from '../api'
 import {type SessionMessage, useAiSession} from '../hooks/useAiSession'
 import type {AiContextValue, Conversation, Message, SessionParams} from './AiContextTypes'
@@ -352,12 +355,20 @@ export function AiProvider({children}: { children: React.ReactNode }) {
 
         setConversations(prev => prev.filter(c => c.id !== convId))
 
+
         if (activeConversationIdRef.current === convId) {
             await session.closeSession()
             setActiveConversationId(null)
             setAutoScroll(true)
         }
     }, [conversations, session])
+
+    const renameConversation = useCallback(async (convId: string, title: string) => {
+        const trimmed = title.trim()
+        if (!trimmed) return
+        setConversations(prev => prev.map(c => c.id === convId ? {...c, title: trimmed} : c))
+        await ai_rename_conversation(convId, trimmed).catch(console.error)
+    }, [])
 
     const sendMessage = useCallback(async (content: string) => {
         const trimmed = content.trim()
@@ -551,6 +562,7 @@ export function AiProvider({children}: { children: React.ReactNode }) {
         createNewConversation,
         switchConversation,
         deleteConversation,
+        renameConversation,
         activeConversation,
     }), [
         plugins, selectedPlugin, selectedModel, conversations, activeConversationId,
@@ -558,6 +570,7 @@ export function AiProvider({children}: { children: React.ReactNode }) {
         sessionParams, session.isStreaming, session.blocks, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
+        renameConversation,
     ])
 
     return <AiContext.Provider value={value}>{children}</AiContext.Provider>

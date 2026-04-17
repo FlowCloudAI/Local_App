@@ -270,7 +270,12 @@ export interface EntryEditRequestEvent {
   after_content: string
 }
 
+export interface EntryUpdatedEvent {
+  entry_id: string
+}
+
 export const ENTRY_EDIT_REQUEST = 'entry:edit-request'
+export const ENTRY_UPDATED = 'entry:updated'
 
 export const confirm_entry_edit = (requestId: string, confirmed: boolean) =>
     command<void>('confirm_entry_edit', {requestId, confirmed})

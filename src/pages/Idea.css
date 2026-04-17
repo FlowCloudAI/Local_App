@@ -1,0 +1,384 @@
+.idea-page {
+    display: grid;
+    grid-template-columns: 19rem minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+        "toolbar toolbar"
+        "sidebar editor";
+    gap: 1rem;
+    height: 100%;
+    min-height: 0;
+    padding: 1rem;
+    color: var(--fc-color-text);
+    background: var(--fc-color-bg);
+}
+
+.idea-page__toolbar,
+.idea-page__sidebar,
+.idea-page__editor {
+    border: 1px solid var(--fc-color-border);
+    border-radius: 1rem;
+    background: var(--fc-color-bg-secondary);
+}
+
+.idea-page__toolbar {
+    grid-area: toolbar;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+}
+
+.idea-page__toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.idea-page__toolbar-group--project {
+    margin-left: auto;
+}
+
+.idea-page__toolbar-label {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--fc-color-text-secondary);
+}
+
+.idea-page__segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.22rem;
+    border-radius: 0.75rem;
+    background: var(--fc-color-bg);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 90%, transparent);
+}
+
+.idea-page__segmented--compact {
+    flex-wrap: wrap;
+}
+
+.idea-page__segmented-item {
+    border: 0;
+    padding: 0.48rem 0.82rem;
+    border-radius: 0.58rem;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    font-size: 0.82rem;
+    line-height: 1;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.idea-page__segmented-item:hover:not(:disabled) {
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+}
+
+.idea-page__segmented-item.is-active {
+    background: color-mix(in srgb, var(--fc-color-primary) 14%, var(--fc-color-bg));
+    color: var(--fc-color-primary);
+}
+
+.idea-page__segmented-item:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.idea-page__project-select {
+    min-width: 13rem;
+}
+
+.idea-page__sidebar {
+    grid-area: sidebar;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.idea-page__editor {
+    grid-area: editor;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.idea-page__sidebar-header,
+.idea-page__editor-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.idea-page__title,
+.idea-page__editor-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--fc-color-text);
+}
+
+.idea-page__subtitle,
+.idea-page__status {
+    margin: 0.35rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: var(--fc-color-text-secondary);
+}
+
+.idea-page__status--saving {
+    color: var(--fc-color-primary);
+}
+
+.idea-page__status--saved {
+    color: var(--fc-color-success, #2f9e44);
+}
+
+.idea-page__status--error {
+    color: var(--fc-color-danger, #dc2626);
+}
+
+.idea-page__list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+
+.idea-page__empty {
+    display: grid;
+    place-items: center;
+    min-height: 9rem;
+    padding: 1rem;
+    border: 1px dashed color-mix(in srgb, var(--fc-color-border) 90%, transparent);
+    border-radius: 0.9rem;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text-secondary);
+    text-align: center;
+    line-height: 1.6;
+    font-size: 0.86rem;
+}
+
+.idea-page__item {
+    width: 100%;
+    margin: 0 0 0.65rem;
+    padding: 0.9rem 0.95rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 90%, transparent);
+    border-radius: 0.9rem;
+    background: var(--fc-color-bg);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.idea-page__item:hover {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 36%, var(--fc-color-border));
+    background: var(--fc-color-bg-elevated);
+}
+
+.idea-page__item.is-active {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 50%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-primary) 8%, var(--fc-color-bg));
+}
+
+.idea-page__item-top,
+.idea-page__item-meta,
+.idea-page__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.idea-page__item-title {
+    display: block;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--fc-color-text);
+    word-break: break-word;
+}
+
+.idea-page__item-pin {
+    flex-shrink: 0;
+    padding: 0.14rem 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+    color: var(--fc-color-primary);
+    font-size: 0.7rem;
+    line-height: 1.2;
+}
+
+.idea-page__item-preview {
+    margin-top: 0.45rem;
+    color: var(--fc-color-text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.idea-page__item-meta {
+    margin-top: 0.55rem;
+    color: var(--fc-color-text-secondary);
+    opacity: 0.78;
+    font-size: 0.72rem;
+}
+
+.idea-page__editor-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+}
+
+.idea-page__meta-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.7rem;
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    background: var(--fc-color-bg);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 90%, transparent);
+    color: var(--fc-color-text-secondary);
+    font-size: 0.76rem;
+}
+
+.idea-page__editor-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem;
+}
+
+.idea-page__editor-tools,
+.idea-page__quick-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.idea-page__title-input,
+.idea-page__content-input {
+    width: 100%;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.9rem;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.idea-page__title-input {
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.idea-page__content-input {
+    flex: 1;
+    min-height: 20rem;
+    resize: none;
+    padding: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+}
+
+.idea-page__title-input:hover,
+.idea-page__content-input:hover {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 28%, var(--fc-color-border));
+}
+
+.idea-page__title-input:focus,
+.idea-page__content-input:focus {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 55%, var(--fc-color-border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+}
+
+.idea-page__title-input::placeholder,
+.idea-page__content-input::placeholder {
+    color: color-mix(in srgb, var(--fc-color-text-secondary) 82%, transparent);
+}
+
+@media (max-width: 960px) {
+    .idea-page {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "toolbar"
+            "sidebar"
+            "editor";
+    }
+
+    .idea-page__toolbar,
+    .idea-page__editor-tools,
+    .idea-page__quick-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .idea-page__toolbar-group {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .idea-page__toolbar-group--project {
+        margin-left: 0;
+    }
+
+    .idea-page__project-select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .idea-page__sidebar {
+        max-height: 18rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .idea-page {
+        padding: 0.75rem;
+        gap: 0.75rem;
+    }
+
+    .idea-page__sidebar-header,
+    .idea-page__editor-header,
+    .idea-page__editor-body,
+    .idea-page__toolbar {
+        padding: 0.85rem;
+    }
+
+    .idea-page__title,
+    .idea-page__editor-title {
+        font-size: 1rem;
+    }
+
+    .idea-page__segmented {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .idea-page__segmented-item {
+        flex: 1;
+        text-align: center;
+    }
+}

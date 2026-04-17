@@ -76,5 +76,6 @@ export interface AiContextValue {
     createNewConversation: () => Promise<void>
     switchConversation: (convId: string) => Promise<void>
     deleteConversation: (convId: string, e?: React.MouseEvent) => Promise<void>
+    renameConversation: (convId: string, title: string) => Promise<void>
     activeConversation: Conversation | undefined
 }

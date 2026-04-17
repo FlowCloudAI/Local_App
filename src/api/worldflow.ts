@@ -70,6 +70,34 @@ export interface EntryBrief {
     [key: string]: unknown
 }
 
+export interface ProjectTimelineEvent {
+    id: string
+    title: string
+    startTime: number
+    endTime?: number | null
+    description?: string | null
+    parentId?: string | null
+    entryType?: string | null
+    categoryId?: string | null
+
+    [key: string]: unknown
+}
+
+export interface ProjectStats {
+    imageCount: number
+    wordCount: number
+}
+
+export interface ProjectTimelineData {
+    events: ProjectTimelineEvent[]
+    yearStart?: number | null
+    yearEnd?: number | null
+    scannedEntryCount: number
+    matchedEntryCount: number
+
+    [key: string]: unknown
+}
+
 export interface TagSchema {
     id: string
     project_id: string
@@ -295,6 +323,12 @@ export const db_list_entries = ({
         limit,
         offset,
     })
+
+export const db_list_timeline_events = (projectId: string) =>
+    command<ProjectTimelineData>('db_list_timeline_events', {projectId})
+
+export const db_get_project_stats = (projectId: string) =>
+    command<ProjectStats>('db_get_project_stats', {projectId})
 
 export const db_search_entries = ({
                                       projectId,

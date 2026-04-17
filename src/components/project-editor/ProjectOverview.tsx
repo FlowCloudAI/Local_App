@@ -46,11 +46,14 @@ interface ProjectOverviewProps {
     tagSchemas: TagSchema[]
     entryCount: number
     tagCount: number
+    imageCount?: number | null
+    wordCount?: number | null
     onCreateTag?: () => void
     onCreateEntryType?: () => void
     onEditTag?: (tag: TagSchema) => void
     onEditEntryType?: (entryType: CustomEntryType) => void
     onOpenRelationGraph?: () => void
+    onOpenTimeline?: () => void
 }
 
 function getTagTypeLabel(type: string): string {
@@ -230,11 +233,14 @@ function ProjectOverview({
     tagSchemas,
     entryCount,
     tagCount,
+                             imageCount,
+                             wordCount,
     onCreateTag,
     onCreateEntryType,
     onEditTag,
     onEditEntryType,
     onOpenRelationGraph,
+                             onOpenTimeline,
 }: ProjectOverviewProps) {
     const entryTypeNameMap = getEntryTypeNameMap(entryTypes)
 
@@ -255,8 +261,8 @@ function ProjectOverview({
                 <StatCard label="分类数" value={categories.length}/>
                 <StatCard label="词条类型" value={entryTypes.length}/>
                 <StatCard label="标签数" value={tagCount}/>
-                <StatCard label="图片数" value="--"/>
-                <StatCard label="总字数" value="--"/>
+                <StatCard label="图片数" value={imageCount ?? '--'}/>
+                <StatCard label="总字数" value={wordCount ?? '--'}/>
             </div>
 
             <section className="pe-feature-section">
@@ -280,8 +286,8 @@ function ProjectOverview({
                     <FeatureEntry
                         title="时间线"
                         description="按事件顺序梳理世界进程、角色行动和关键转折节点。"
-                        badge="待开放"
-                        disabled
+                        badge="已接数据"
+                        onClick={onOpenTimeline}
                     >
                         <TimelineIcon/>
                     </FeatureEntry>

@@ -1,5 +1,6 @@
 export * from './ai_client'
 export * from './app_settings'
+export * from './idea_note'
 export * from './layout'
 export * from './map'
 export * from './plugins'

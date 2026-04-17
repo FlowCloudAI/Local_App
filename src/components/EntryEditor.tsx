@@ -1,4 +1,5 @@
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {listen} from '@tauri-apps/api/event'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
@@ -15,11 +16,13 @@ import {
     db_update_entry,
     db_update_relation,
     type Entry,
+    ENTRY_UPDATED,
     type EntryBrief,
     type EntryLink,
     type EntryRelation,
     entryTypeKey,
     type EntryTypeView,
+    type EntryUpdatedEvent,
     import_entry_images,
     type TagSchema,
 } from '../api'
@@ -181,10 +184,17 @@ export default function EntryEditor({
     const editorRef = useRef<MarkdownEditorRef>(null)
     const isApplyingHistoryRef = useRef(false)
     const historyInitializedRef = useRef<string | null>(null)
+    const entryRef = useRef<Entry | null>(null)
+    const hasChangesRef = useRef(false)
+    const onSavedRef = useRef(onSaved)
+    const onTitleChangeRef = useRef(onTitleChange)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     projectEntriesRef.current = projectEntries
     onDirtyChangeRef.current = onDirtyChange
+    entryRef.current = entry
+    onSavedRef.current = onSaved
+    onTitleChangeRef.current = onTitleChange
     const { showAlert } = useAlert()
 
     const entryTags = useEntryTags({
@@ -491,6 +501,7 @@ export default function EntryEditor({
         ),
     )
     const canSave = Boolean(entry && trimmedTitle && hasChanges && !hasInvalidRelationDrafts && !loading && !saving)
+    hasChangesRef.current = hasChanges
 
     useEffect(() => {
         onDirtyChangeRef.current?.(hasChanges)
@@ -541,6 +552,74 @@ export default function EntryEditor({
 
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
 
+    const reloadEntryFromDatabase = useCallback(async (reason: 'external' | 'save' = 'external') => {
+        const [refreshed, refreshedOutgoing, refreshedIncoming, refreshedRelations] = await Promise.all([
+            db_get_entry(entryId),
+            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
+        ])
+
+        const previousEntry = entryRef.current
+
+        setEntry(refreshed)
+        setDraft(buildDraft(refreshed))
+        setOutgoingLinks(refreshedOutgoing)
+        setIncomingLinks(refreshedIncoming)
+        setEntryRelations(refreshedRelations)
+        setRelationDrafts(refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation)))
+        setEntryCache((current) => ({...current, [refreshed.id]: refreshed}))
+        setProjectEntries((current) => {
+            const next = current.map((item) => (
+                item.id === refreshed.id
+                    ? {
+                        ...item,
+                        title: refreshed.title,
+                        summary: refreshed.summary ?? null,
+                        type: refreshed.type ?? null,
+                        updated_at: String(refreshed.updated_at ?? ''),
+                    }
+                    : item
+            ))
+            projectEntriesRef.current = next
+            return next
+        })
+
+        const savedDraft = buildDraft(refreshed)
+        const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation))
+        historyInitializedRef.current = null
+        undoRedo.reset({draft: savedDraft, relationDrafts: savedRelationDrafts})
+
+        if (reason === 'external') {
+            if (previousEntry && previousEntry.title !== refreshed.title) {
+                await onTitleChangeRef.current?.(refreshed)
+            }
+            await onSavedRef.current?.(refreshed)
+        }
+
+        return refreshed
+    }, [entryId, undoRedo])
+
+    useEffect(() => {
+        const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
+            if (event.payload.entry_id !== entryId) return
+
+            if (hasChangesRef.current) {
+                void showAlert('词条已被 AI 在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'toast', 2200)
+                return
+            }
+
+            void reloadEntryFromDatabase('external').catch((e) => {
+                console.error('reload entry after AI update failed', e)
+                void showAlert('词条已更新，但页面刷新失败，请手动重新打开词条。', 'warning', 'toast', 2200)
+            })
+        })
+
+        return () => {
+            unlisten.then((fn) => fn())
+        }
+    }, [entryId, reloadEntryFromDatabase, showAlert])
+
 
     const handleSave = useCallback(async () => {
         if (!entry || !canSave) return
@@ -557,7 +636,7 @@ export default function EntryEditor({
                 return
             }
 
-            const updated = await db_update_entry({
+            await db_update_entry({
                 id: entry.id,
                 categoryId: entry.category_id ?? null,
                 title: trimmedTitle,
@@ -639,42 +718,18 @@ export default function EntryEditor({
                 await db_delete_relation(existingRelation.id)
             }
 
-            const refreshed = await db_get_entry(updated.id)
-            const refreshedRelations = await db_list_relations_for_entry(updated.id)
-            setEntry(refreshed)
-            setDraft(buildDraft(refreshed))
-            setEntryRelations(refreshedRelations)
-            setRelationDrafts(refreshedRelations.map((relation) => buildRelationDraft(updated.id, relation)))
-            setEntryCache((current) => ({ ...current, [refreshed.id]: refreshed }))
-            setProjectEntries((current) => {
-                const next = current.map((item) => (
-                    item.id === refreshed.id
-                        ? {
-                            ...item,
-                            title: refreshed.title,
-                            summary: refreshed.summary ?? null,
-                            type: refreshed.type ?? null,
-                            updated_at: String(refreshed.updated_at ?? ''),
-                        }
-                        : item
-                ))
-                projectEntriesRef.current = next
-                return next
-            })
+            const refreshed = await reloadEntryFromDatabase('save')
             if (refreshed.title !== entry.title) {
                 await onTitleChange?.(refreshed)
             }
             await onSaved?.(refreshed)
-            const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(updated.id, relation))
-            historyInitializedRef.current = null
-            undoRedo.reset({draft: buildDraft(refreshed), relationDrafts: savedRelationDrafts})
             void showAlert('词条已保存', 'success', 'toast', 1000)
         } catch (e) {
             setError(String(e))
         } finally {
             setSaving(false)
         }
-    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, entryTags.localTagSchemas, projectId, entryRelations, relationDrafts, onTitleChange, onSaved, showAlert, undoRedo])
+    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, entryTags.localTagSchemas, projectId, entryRelations, relationDrafts, onTitleChange, onSaved, showAlert, reloadEntryFromDatabase])
 
     useEffect(() => {
         canSaveRef.current = canSave

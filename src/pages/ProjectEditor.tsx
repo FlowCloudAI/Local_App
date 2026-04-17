@@ -7,6 +7,7 @@ import {
     db_create_category,
     db_delete_category,
     db_get_project,
+    db_get_project_stats,
     db_list_all_entry_types,
     db_list_categories,
     db_list_tag_schemas,
@@ -17,6 +18,7 @@ import {
     type TagSchema,
 } from '../api'
 import EntryEditor from '../components/EntryEditor'
+import ProjectTimeline from '../components/ProjectTimeline'
 import EntryTypeCreator from '../components/EntryTypeCreator'
 import ProjectRelationGraph from '../components/ProjectRelationGraph'
 import TagCreator from '../components/TagCreator'
@@ -40,7 +42,7 @@ interface Props {
 }
 
 type Selection = { kind: 'project' } | { kind: 'category'; id: string }
-type ProjectPanel = 'overview' | 'relation-graph'
+type ProjectPanel = 'overview' | 'relation-graph' | 'timeline'
 
 function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [], onOpenEntry, onEntryTitleChange, onBackToProject, onEntryDirtyChange}: Props) {
     const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_PX)
@@ -54,6 +56,8 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
     const [categories, setCategories] = useState<Category[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [entryCount, setEntryCount] = useState(0)
+    const [imageCount, setImageCount] = useState<number | null>(null)
+    const [wordCount, setWordCount] = useState<number | null>(null)
     const [categoryEntryRefreshToken, setCategoryEntryRefreshToken] = useState(0)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
@@ -109,6 +113,16 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
         }
     }, [fetchAll])
 
+    const loadStats = useCallback(async () => {
+        try {
+            const stats = await db_get_project_stats(projectId)
+            setImageCount(stats.imageCount)
+            setWordCount(stats.wordCount)
+        } catch (e) {
+            console.error('ProjectEditor stats load failed', e)
+        }
+    }, [projectId])
+
     useEffect(() => {
         let cancelled = false
 
@@ -128,10 +142,21 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
             }
         })()
 
+        void (async () => {
+            try {
+                const stats = await db_get_project_stats(projectId)
+                if (cancelled) return
+                setImageCount(stats.imageCount)
+                setWordCount(stats.wordCount)
+            } catch (e) {
+                if (!cancelled) console.error('ProjectEditor stats load failed', e)
+            }
+        })()
+
         return () => {
             cancelled = true
         }
-    }, [fetchAll])
+    }, [fetchAll, projectId])
 
     useEffect(() => {
         if (!treeCollapsed) {
@@ -427,6 +452,8 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                                 tagSchemas={tagSchemas}
                                 entryCount={entryCount}
                                 tagCount={tagSchemas.length}
+                                imageCount={imageCount}
+                                wordCount={wordCount}
                                 onCreateTag={() => {
                                     setEditingTag(null)
                                     setTagCreatorOpen(true)
@@ -444,12 +471,22 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                                     setEntryTypeCreatorOpen(true)
                                 }}
                                 onOpenRelationGraph={() => setProjectPanel('relation-graph')}
+                                onOpenTimeline={() => setProjectPanel('timeline')}
                             />
-                        ) : (
+                        ) : projectPanel === 'relation-graph' ? (
                             <div className="pe-project-panel">
                                 <ProjectRelationGraph
                                     projectId={projectId}
                                     onBack={() => setProjectPanel('overview')}
+                                />
+                            </div>
+                        ) : (
+                            <div className="pe-project-panel">
+                                <ProjectTimeline
+                                    projectId={projectId}
+                                    tagSchemas={tagSchemas}
+                                    onBack={() => setProjectPanel('overview')}
+                                    onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 />
                             </div>
                         )

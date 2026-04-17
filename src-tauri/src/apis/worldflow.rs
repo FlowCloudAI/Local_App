@@ -1,4 +1,6 @@
 use crate::{AppState, PathsState};
+use serde::Serialize;
+use serde_json::Value;
 use std::collections::BTreeSet;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -8,9 +10,216 @@ use tauri_plugin_opener::OpenerExt;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 use worldflow_core::{
-    CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, SqliteDb,
-    TagSchemaOps, models::*,
+    CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps, IdeaNoteOps, ProjectOps,
+    SqliteDb, TagSchemaOps, models::*,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TimelineTagRole {
+    Start,
+    End,
+    Parent,
+    Show,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTimelineEvent {
+    pub id: String,
+    pub title: String,
+    pub start_time: i32,
+    pub end_time: Option<i32>,
+    pub description: Option<String>,
+    pub parent_id: Option<String>,
+    pub entry_type: Option<String>,
+    pub category_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTimelineData {
+    pub events: Vec<ProjectTimelineEvent>,
+    pub year_start: Option<i32>,
+    pub year_end: Option<i32>,
+    pub scanned_entry_count: usize,
+    pub matched_entry_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectStats {
+    pub image_count: usize,
+    pub word_count: usize,
+}
+
+struct DefaultTimelineTagDefinition {
+    name: &'static str,
+    description: &'static str,
+    value_type: &'static str,
+    default_value: Option<&'static str>,
+    range_min: Option<f64>,
+    range_max: Option<f64>,
+    sort_order: i64,
+}
+
+const DEFAULT_TIMELINE_TAG_TARGETS: &[&str] = &["event"];
+
+const DEFAULT_TIMELINE_TAG_DEFINITIONS: &[DefaultTimelineTagDefinition] = &[
+    DefaultTimelineTagDefinition {
+        name: "开始年份",
+        description: "事件在时间线上的起始年份。公元前年份请填写负数，例如 -221。",
+        value_type: "number",
+        default_value: None,
+        range_min: None,
+        range_max: None,
+        sort_order: 0,
+    },
+    DefaultTimelineTagDefinition {
+        name: "结束年份",
+        description: "事件结束年份；若留空则视为单点事件。",
+        value_type: "number",
+        default_value: None,
+        range_min: None,
+        range_max: None,
+        sort_order: 1,
+    },
+    DefaultTimelineTagDefinition {
+        name: "父事件ID",
+        description: "用于把事件挂到上层事件下，可填写父事件词条 ID 或标题。",
+        value_type: "string",
+        default_value: None,
+        range_min: None,
+        range_max: None,
+        sort_order: 2,
+    },
+    DefaultTimelineTagDefinition {
+        name: "时间线",
+        description: "是否在项目时间线中显示该事件。",
+        value_type: "boolean",
+        default_value: Some("true"),
+        range_min: None,
+        range_max: None,
+        sort_order: 3,
+    },
+];
+
+fn normalize_timeline_tag_name(name: &str) -> String {
+    name.trim()
+        .chars()
+        .filter(|ch| !matches!(ch, ' ' | '\t' | '\r' | '\n' | '_' | '-'))
+        .flat_map(|ch| ch.to_lowercase())
+        .collect()
+}
+
+fn timeline_tag_role_from_name(name: &str) -> Option<TimelineTagRole> {
+    match normalize_timeline_tag_name(name).as_str() {
+        "start" | "startyear" | "starttime" | "year" | "年份" | "开始" | "开始年"
+        | "开始年份" | "开始时间" | "起始" | "起始年" | "起始年份" | "起始时间" => {
+            Some(TimelineTagRole::Start)
+        }
+        "end" | "endyear" | "endtime" | "结束" | "结束年" | "结束年份" | "结束时间"
+        | "终止" | "终止年" | "终止年份" | "终止时间" => Some(TimelineTagRole::End),
+        "parent" | "parentid" | "父事件" | "父级事件" | "父事件id" | "父级事件id"
+        | "上级事件" | "上级事件id" => Some(TimelineTagRole::Parent),
+        "timeline" | "ontimeline" | "showtimeline" | "时间线" | "纳入时间线"
+        | "显示在时间线" | "显示时间线" => Some(TimelineTagRole::Show),
+        _ => None,
+    }
+}
+
+fn parse_timeline_year_from_str(raw: &str) -> Option<i32> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Ok(value) = trimmed.parse::<i32>() {
+        return Some(value);
+    }
+
+    let normalized = trimmed.replace(' ', "").to_lowercase();
+    let negative = normalized.contains("公元前")
+        || normalized.contains("前")
+        || normalized.contains("bc")
+        || normalized.contains("bce");
+
+    let digits = normalized
+        .chars()
+        .filter(|ch| ch.is_ascii_digit() || *ch == '-')
+        .collect::<String>();
+
+    if digits.is_empty() {
+        return None;
+    }
+
+    let parsed = digits.parse::<i32>().ok()?;
+    if negative && parsed > 0 {
+        Some(-parsed)
+    } else {
+        Some(parsed)
+    }
+}
+
+fn parse_timeline_year(value: &Value) -> Option<i32> {
+    match value {
+        Value::Number(number) => number.as_i64().and_then(|value| i32::try_from(value).ok()),
+        Value::String(text) => parse_timeline_year_from_str(text),
+        _ => None,
+    }
+}
+
+fn parse_timeline_bool(value: &Value) -> Option<bool> {
+    match value {
+        Value::Bool(flag) => Some(*flag),
+        Value::Number(number) => number.as_i64().map(|value| value != 0),
+        Value::String(text) => match text.trim().to_lowercase().as_str() {
+            "true" | "1" | "yes" | "y" | "on" | "是" | "显示" | "加入" => Some(true),
+            "false" | "0" | "no" | "n" | "off" | "否" | "隐藏" | "移除" => Some(false),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn parse_timeline_parent(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Value::Number(number) => Some(number.to_string()),
+        _ => None,
+    }
+}
+
+async fn initialize_default_timeline_tags(db: &SqliteDb, project_id: &Uuid) -> Result<(), String> {
+    let targets = DEFAULT_TIMELINE_TAG_TARGETS
+        .iter()
+        .map(|target| (*target).to_string())
+        .collect::<Vec<_>>();
+
+    for definition in DEFAULT_TIMELINE_TAG_DEFINITIONS {
+        db.create_tag_schema(CreateTagSchema {
+            project_id: *project_id,
+            name: definition.name.to_string(),
+            description: Some(definition.description.to_string()),
+            r#type: definition.value_type.to_string(),
+            target: targets.clone(),
+            default_val: definition.default_value.map(|value| value.to_string()),
+            range_min: definition.range_min,
+            range_max: definition.range_max,
+            sort_order: Some(definition.sort_order),
+        })
+            .await
+            .map_err(|error| format!("初始化默认时间线标签“{}”失败: {}", definition.name, error))?;
+    }
+
+    Ok(())
+}
 
 // ============ Logging & Window ============
 
@@ -192,13 +401,32 @@ pub async fn db_create_project(
 ) -> Result<Project, String> {
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    db.create_project(CreateProject {
+    let project = db.create_project(CreateProject {
         name,
         description,
         cover_image,
     })
     .await
-    .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    if let Err(error) = initialize_default_timeline_tags(&db, &project.id).await {
+        if let Err(cleanup_error) = db.delete_project(&project.id).await {
+            log::error!(
+                "[worldflow] 创建项目默认时间线标签失败，且回滚项目失败: project_id={} error={} cleanup_error={}",
+                project.id,
+                error,
+                cleanup_error
+            );
+            return Err(format!(
+                "{}；同时回滚项目失败，请手动检查该项目是否已创建。",
+                error
+            ));
+        }
+
+        return Err(error);
+    }
+
+    Ok(project)
 }
 
 /// 查询单个项目
@@ -473,6 +701,214 @@ pub async fn db_list_entries(
     }
 
     result.map_err(|e| e.to_string())
+}
+
+/// 聚合项目内带时间标签的词条，输出时间线事件数据
+#[tauri::command]
+pub async fn db_list_timeline_events(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+) -> Result<ProjectTimelineData, String> {
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+
+    let tag_schemas = db
+        .list_tag_schemas(&project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let schema_role_map = tag_schemas
+        .iter()
+        .filter_map(|schema| timeline_tag_role_from_name(&schema.name).map(|role| (schema.id, role)))
+        .collect::<std::collections::HashMap<_, _>>();
+
+    let mut entry_briefs = Vec::new();
+    let mut offset = 0usize;
+    const PAGE_SIZE: usize = 500;
+
+    loop {
+        let batch = db
+            .list_entries(
+                &project_id,
+                EntryFilter {
+                    category_id: None,
+                    entry_type: None,
+                },
+                PAGE_SIZE,
+                offset,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let batch_len = batch.len();
+        if batch_len == 0 {
+            break;
+        }
+
+        offset += batch_len;
+        entry_briefs.extend(batch);
+
+        if batch_len < PAGE_SIZE {
+            break;
+        }
+    }
+
+    let scanned_entry_count = entry_briefs.len();
+    let mut events = Vec::new();
+
+    for brief in entry_briefs {
+        let entry = db.get_entry(&brief.id).await.map_err(|e| e.to_string())?;
+        let mut start_time = None;
+        let mut end_time = None;
+        let mut parent_id = None;
+        let mut show_on_timeline = None;
+
+        for tag in &entry.tags.0 {
+            let Some(role) = schema_role_map.get(&tag.schema_id).copied() else {
+                continue;
+            };
+
+            match role {
+                TimelineTagRole::Start => {
+                    if start_time.is_none() {
+                        start_time = parse_timeline_year(&tag.value);
+                    }
+                }
+                TimelineTagRole::End => {
+                    if end_time.is_none() {
+                        end_time = parse_timeline_year(&tag.value);
+                    }
+                }
+                TimelineTagRole::Parent => {
+                    if parent_id.is_none() {
+                        parent_id = parse_timeline_parent(&tag.value);
+                    }
+                }
+                TimelineTagRole::Show => {
+                    if show_on_timeline.is_none() {
+                        show_on_timeline = parse_timeline_bool(&tag.value);
+                    }
+                }
+            }
+        }
+
+        let Some(start_time) = start_time else {
+            continue;
+        };
+
+        if matches!(show_on_timeline, Some(false)) {
+            continue;
+        }
+
+        let (start_time, end_time) = match end_time {
+            Some(end_time) if end_time < start_time => (end_time, Some(start_time)),
+            Some(end_time) => (start_time, Some(end_time)),
+            None => (start_time, None),
+        };
+
+        events.push(ProjectTimelineEvent {
+            id: entry.id.to_string(),
+            title: entry.title.clone(),
+            start_time,
+            end_time,
+            description: entry.summary.clone(),
+            parent_id,
+            entry_type: entry.r#type.clone(),
+            category_id: entry.category_id.map(|category_id| category_id.to_string()),
+        });
+    }
+
+    let title_to_id = events
+        .iter()
+        .map(|event| (normalize_timeline_tag_name(&event.title), event.id.clone()))
+        .collect::<std::collections::HashMap<_, _>>();
+    let valid_ids = events
+        .iter()
+        .map(|event| event.id.clone())
+        .collect::<std::collections::HashSet<_>>();
+
+    for event in &mut events {
+        let resolved_parent = event.parent_id.as_ref().and_then(|parent| {
+            if valid_ids.contains(parent) {
+                Some(parent.clone())
+            } else {
+                title_to_id.get(&normalize_timeline_tag_name(parent)).cloned()
+            }
+        });
+
+        event.parent_id = match resolved_parent {
+            Some(parent_id) if parent_id != event.id => Some(parent_id),
+            _ => None,
+        };
+    }
+
+    events.sort_by(|left, right| {
+        left.start_time
+            .cmp(&right.start_time)
+            .then_with(|| left.end_time.unwrap_or(left.start_time).cmp(&right.end_time.unwrap_or(right.start_time)))
+            .then_with(|| left.title.cmp(&right.title))
+    });
+
+    let year_start = events.iter().map(|event| event.start_time).min();
+    let year_end = events
+        .iter()
+        .map(|event| event.end_time.unwrap_or(event.start_time))
+        .max();
+
+    Ok(ProjectTimelineData {
+        matched_entry_count: events.len(),
+        scanned_entry_count,
+        year_start,
+        year_end,
+        events,
+    })
+}
+
+/// 统计项目图片总数和总字数
+#[tauri::command]
+pub async fn db_get_project_stats(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+) -> Result<ProjectStats, String> {
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+
+    let mut image_count = 0usize;
+    let mut word_count = 0usize;
+    let mut offset = 0usize;
+    const PAGE_SIZE: usize = 500;
+
+    loop {
+        let batch = db
+            .list_entries(
+                &project_id,
+                EntryFilter { category_id: None, entry_type: None },
+                PAGE_SIZE,
+                offset,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let batch_len = batch.len();
+        if batch_len == 0 {
+            break;
+        }
+
+        for brief in &batch {
+            let entry = db.get_entry(&brief.id).await.map_err(|e| e.to_string())?;
+            image_count += entry.images.0.len();
+            word_count += entry.content.chars().count();
+        }
+
+        offset += batch_len;
+        if batch_len < PAGE_SIZE {
+            break;
+        }
+    }
+
+    Ok(ProjectStats { image_count, word_count })
 }
 
 /// 全文搜索词条（FTS）；可按分类和词条类型过滤
@@ -1108,4 +1544,127 @@ pub async fn db_replace_outgoing_links(
         .map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &project_id).await?;
     Ok(links)
+}
+
+// ============ Idea Notes ============
+
+/// 创建灵感便签
+#[tauri::command]
+pub async fn db_create_idea_note(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: Option<String>,
+    content: String,
+    title: Option<String>,
+    pinned: Option<bool>,
+) -> Result<IdeaNote, String> {
+    let project_id = project_id
+        .map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
+        .transpose()?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.create_idea_note(CreateIdeaNote {
+        project_id,
+        content,
+        title,
+        pinned,
+    })
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 获取单条灵感便签
+#[tauri::command]
+pub async fn db_get_idea_note(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<IdeaNote, String> {
+    let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.get_idea_note(&id).await.map_err(|e| e.to_string())
+}
+
+/// 查询灵感便签列表
+#[tauri::command]
+pub async fn db_list_idea_notes(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: Option<String>,
+    only_global: Option<bool>,
+    status: Option<IdeaNoteStatus>,
+    pinned: Option<bool>,
+    limit: usize,
+    offset: usize,
+) -> Result<Vec<IdeaNote>, String> {
+    if project_id.is_some() && only_global.unwrap_or(false) {
+        return Err("project_id 与 only_global 不能同时设置".to_string());
+    }
+
+    let project_id = project_id
+        .map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
+        .transpose()?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+
+    db.list_idea_notes(
+        IdeaNoteFilter {
+            project_id: project_id.as_ref(),
+            only_global: only_global.unwrap_or(false),
+            status: status.as_ref(),
+            pinned,
+        },
+        limit,
+        offset,
+    )
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 更新灵感便签
+#[tauri::command]
+pub async fn db_update_idea_note(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+    title: Option<Option<String>>,
+    content: Option<String>,
+    status: Option<IdeaNoteStatus>,
+    pinned: Option<bool>,
+    last_reviewed_at: Option<Option<String>>,
+    converted_entry_id: Option<Option<String>>,
+) -> Result<IdeaNote, String> {
+    let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let converted_entry_id = converted_entry_id
+        .map(|value| {
+            value
+                .map(|entry_id| Uuid::parse_str(&entry_id).map_err(|e| e.to_string()))
+                .transpose()
+        })
+        .transpose()?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+
+    db.update_idea_note(
+        &id,
+        UpdateIdeaNote {
+            title,
+            content,
+            status,
+            pinned,
+            last_reviewed_at,
+            converted_entry_id,
+        },
+    )
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 删除灵感便签
+#[tauri::command]
+pub async fn db_delete_idea_note(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    id: String,
+) -> Result<(), String> {
+    let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    db.delete_idea_note(&id).await.map_err(|e| e.to_string())
 }

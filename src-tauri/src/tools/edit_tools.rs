@@ -2,7 +2,7 @@ use crate::tools;
 use crate::tools::format;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
-use flowcloudai_client::tool::{ToolRegistry, arg_str};
+use flowcloudai_client::tool::{arg_str, ToolRegistry};
 use tauri::Emitter;
 use tokio::sync::oneshot;
 
@@ -143,6 +143,18 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                 let entry = tools::update_entry_content(&*guard, entry_id, Some(after_content))
                     .await
                     .map_err(|e| anyhow::anyhow!("{}", e))?;
+                #[derive(serde::Serialize, Clone)]
+                struct EntryUpdatedPayload {
+                    entry_id: String,
+                }
+                app_handle
+                    .emit(
+                        "entry:updated",
+                        EntryUpdatedPayload {
+                            entry_id: entry.id.to_string(),
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("emit 失败: {}", e))?;
 
                 Ok(format::format_entry(&entry))
             })
