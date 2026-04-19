@@ -648,7 +648,7 @@ export default function Settings() {
                                 <h2 className="settings-section-title">编辑器行为</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
-                                        <label className="settings-label-wide">自动保存间隔(分)</label>
+                                        <label className="settings-label-wide">词条编辑器最长自动保存间隔(分)</label>
                                         <Input
                                             type="number"
                                             min="0"
@@ -656,6 +656,15 @@ export default function Settings() {
                                             onChange={handleAutoSaveChange}
                                             className="settings-input-small"
                                         />
+                                        <div
+                                            style={{
+                                                marginTop: '6px',
+                                                fontSize: '12px',
+                                                color: 'var(--fc-color-tertiary)'
+                                            }}
+                                        >
+                                            仅作用于词条编辑器的持续编辑场景；0 表示关闭，不影响灵感便签的即时自动保存。
+                                        </div>
                                     </div>
                                     <div className="settings-field">
                                         <label className="settings-label-wide">默认词条类型</label>

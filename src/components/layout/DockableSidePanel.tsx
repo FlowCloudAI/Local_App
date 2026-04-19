@@ -2,12 +2,15 @@ import {type MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useS
 import './DockableSidePanel.css'
 
 export type DockableSidePanelMode = 'fullscreen' | 'floating'
+const PANEL_COLLAPSE_THRESHOLD_RATIO = 1 / 3
 
 interface DockableSidePanelProps {
     mode: DockableSidePanelMode
     width: number
     minWidth: number
     maxWidthRatio?: number
+    collapsed?: boolean
+    onCollapsedChange?: (collapsed: boolean) => void
     onWidthChange: (width: number) => void
     className?: string
     handleTitle?: string
@@ -19,42 +22,74 @@ export default function DockableSidePanel({
                                               width,
                                               minWidth,
                                               maxWidthRatio = 0.5,
+                                              collapsed = false,
+                                              onCollapsedChange,
                                               onWidthChange,
                                               className = '',
                                               handleTitle = '拖拽调整宽度',
                                               children,
                                           }: DockableSidePanelProps) {
     const [isDragging, setIsDragging] = useState(false)
+    const [isCollapsePreview, setIsCollapsePreview] = useState(false)
     const isDraggingRef = useRef(false)
+    const isCollapsePreviewRef = useRef(false)
     const dragStartXRef = useRef(0)
     const dragStartWidthRef = useRef(0)
+    const lastExpandedWidthRef = useRef(width)
+
+    useEffect(() => {
+        if (mode === 'floating' && !collapsed) {
+            lastExpandedWidthRef.current = width
+        }
+    }, [collapsed, mode, width])
 
     const handleResizeStart = useCallback((event: ReactMouseEvent) => {
         if (mode !== 'floating') return
         event.preventDefault()
         isDraggingRef.current = true
         setIsDragging(true)
+        isCollapsePreviewRef.current = false
+        setIsCollapsePreview(false)
         dragStartXRef.current = event.clientX
-        dragStartWidthRef.current = width
+        dragStartWidthRef.current = collapsed ? (lastExpandedWidthRef.current || width || minWidth) : width
+        if (collapsed) {
+            onCollapsedChange?.(false)
+            onWidthChange(dragStartWidthRef.current)
+        }
         document.body.style.cursor = 'col-resize'
         document.body.style.userSelect = 'none'
-    }, [mode, width])
+    }, [collapsed, minWidth, mode, onCollapsedChange, onWidthChange, width])
 
     useEffect(() => {
         const handleMouseMove = (event: MouseEvent) => {
             if (!isDraggingRef.current) return
             const delta = dragStartXRef.current - event.clientX
-            const nextWidth = Math.max(
-                minWidth,
-                Math.min(window.innerWidth * maxWidthRatio, dragStartWidthRef.current + delta),
+            const rawWidth = dragStartWidthRef.current + delta
+            const collapseThreshold = dragStartWidthRef.current * PANEL_COLLAPSE_THRESHOLD_RATIO
+            const nextWidth = Math.min(
+                window.innerWidth * maxWidthRatio,
+                Math.max(minWidth, rawWidth),
             )
-            onWidthChange(nextWidth)
+            const shouldCollapse = rawWidth <= collapseThreshold
+            isCollapsePreviewRef.current = shouldCollapse
+            setIsCollapsePreview(shouldCollapse)
+            if (!shouldCollapse) {
+                onCollapsedChange?.(false)
+                onWidthChange(nextWidth)
+            }
         }
 
         const handleMouseUp = () => {
             if (!isDraggingRef.current) return
             isDraggingRef.current = false
             setIsDragging(false)
+            if (isCollapsePreviewRef.current) {
+                onCollapsedChange?.(true)
+            } else {
+                onCollapsedChange?.(false)
+            }
+            isCollapsePreviewRef.current = false
+            setIsCollapsePreview(false)
             document.body.style.cursor = ''
             document.body.style.userSelect = ''
         }
@@ -65,18 +100,20 @@ export default function DockableSidePanel({
             window.removeEventListener('mousemove', handleMouseMove)
             window.removeEventListener('mouseup', handleMouseUp)
         }
-    }, [maxWidthRatio, minWidth, onWidthChange])
+    }, [maxWidthRatio, minWidth, onCollapsedChange, onWidthChange])
 
     const rootClassName = [
         'dockable-side-panel',
         `dockable-side-panel--${mode}`,
+        mode === 'floating' && collapsed ? 'is-collapsed' : '',
+        mode === 'floating' && isCollapsePreview ? 'is-collapse-preview' : '',
         className,
     ].filter(Boolean).join(' ')
 
     return (
         <section
             className={rootClassName}
-            style={mode === 'floating' ? {width} : undefined}
+            style={mode === 'floating' ? {width: collapsed || isCollapsePreview ? undefined : width} : undefined}
         >
             {mode === 'floating' && (
                 <div

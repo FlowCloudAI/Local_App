@@ -1,4 +1,10 @@
 .dockable-side-panel {
+    --dockable-side-panel-handle-width: 8px;
+    --dockable-side-panel-handle-gutter: 8px;
+    --dockable-side-panel-collapsed-width: 8px;
+}
+
+.dockable-side-panel {
     min-width: 0;
     min-height: 0;
     display: flex;
@@ -19,6 +25,11 @@
     border-left: 1px solid var(--fc-color-border);
 }
 
+.dockable-side-panel--floating.is-collapsed,
+.dockable-side-panel--floating.is-collapse-preview {
+    width: var(--dockable-side-panel-collapsed-width);
+}
+
 .dockable-side-panel__body {
     flex: 1;
     min-width: 0;
@@ -27,14 +38,25 @@
     overflow: hidden;
 }
 
+.dockable-side-panel--floating .dockable-side-panel__body {
+    padding-left: var(--dockable-side-panel-handle-gutter);
+}
+
+.dockable-side-panel--floating.is-collapsed .dockable-side-panel__body,
+.dockable-side-panel--floating.is-collapse-preview .dockable-side-panel__body {
+    padding-left: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .dockable-side-panel__resize-handle {
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
-    width: 8px;
+    width: var(--dockable-side-panel-handle-width);
     cursor: col-resize;
-    z-index: 10;
+    z-index: 30;
     background: transparent;
     transition: background 0.1s ease;
     user-select: none;
@@ -58,7 +80,7 @@
 .dockable-side-panel__resize-grip {
     position: relative;
     z-index: 1;
-    width: 8px;
+    width: var(--dockable-side-panel-handle-width);
     height: 48px;
     border-radius: 999px;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);

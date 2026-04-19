@@ -16,14 +16,17 @@ import {
     db_update_entry,
     db_update_relation,
     type Entry,
+    ENTRY_DELETED,
     ENTRY_UPDATED,
     type EntryBrief,
+    type EntryDeletedEvent,
     type EntryLink,
     type EntryRelation,
     entryTypeKey,
     type EntryTypeView,
     type EntryUpdatedEvent,
     import_entry_images,
+    setting_get_settings,
     type TagSchema,
 } from '../api'
 import {openUrl} from '@tauri-apps/plugin-opener'
@@ -69,12 +72,14 @@ import {
 import type {EntryRelationDraft} from './project-editor/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
+type SaveTrigger = 'manual' | 'auto'
 type EntryEditorCache = {
     entry: Entry
     draft: EntryDraft
     editorMode: EditorMode
     relations: EntryRelation[]
     relationDrafts: EntryRelationDraft[]
+    lastSuccessfulSaveAt: number
 }
 
 interface EntryEditorProps {
@@ -106,6 +111,9 @@ interface EditorHistory {
     draft: EntryDraft
     relationDrafts: EntryRelationDraft[]
 }
+
+const AUTO_SAVE_CHECK_INTERVAL_MS = 1000
+const AUTO_SAVE_FAILURE_COOLDOWN_MS = 10000
 
 function buildDraft(entry: Entry): EntryDraft {
     return {
@@ -156,6 +164,8 @@ export default function EntryEditor({
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [autoSaveSeconds, setAutoSaveSeconds] = useState(0)
+    const [autoSaveStatus, setAutoSaveStatus] = useState('')
     const [editorMode, setEditorMode] = useState<EditorMode>('browse')
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -188,6 +198,8 @@ export default function EntryEditor({
     const hasChangesRef = useRef(false)
     const onSavedRef = useRef(onSaved)
     const onTitleChangeRef = useRef(onTitleChange)
+    const lastSuccessfulSaveAtRef = useRef(Date.now())
+    const lastAutoSaveAttemptAtRef = useRef(0)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     projectEntriesRef.current = projectEntries
@@ -196,6 +208,23 @@ export default function EntryEditor({
     onSavedRef.current = onSaved
     onTitleChangeRef.current = onTitleChange
     const { showAlert } = useAlert()
+
+    useEffect(() => {
+        let cancelled = false
+
+        void setting_get_settings()
+            .then((settings) => {
+                if (cancelled) return
+                setAutoSaveSeconds(settings.auto_save_secs)
+            })
+            .catch((loadError) => {
+                console.error('加载自动保存设置失败', loadError)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     const entryTags = useEntryTags({
         tagSchemas,
@@ -269,6 +298,9 @@ export default function EntryEditor({
 
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
+        setAutoSaveStatus('')
+        lastAutoSaveAttemptAtRef.current = 0
+        lastSuccessfulSaveAtRef.current = Date.now()
         // Reset history tracking when switching entries
         historyInitializedRef.current = null
         undoRedo.reset({
@@ -303,6 +335,7 @@ export default function EntryEditor({
             setEditorMode(cachedState.editorMode)
             setEntryRelations(cachedState.relations)
             setRelationDrafts(cachedState.relationDrafts)
+            lastSuccessfulSaveAtRef.current = cachedState.lastSuccessfulSaveAt
             setLoading(false)
             return () => {
                 cancelled = true
@@ -315,6 +348,7 @@ export default function EntryEditor({
                 setEntry(result)
                 setDraft(buildDraft(result))
                 setEditorMode('browse')
+                lastSuccessfulSaveAtRef.current = Date.now()
             })
             .catch((e) => {
                 if (cancelled) return
@@ -509,6 +543,28 @@ export default function EntryEditor({
 
     useEffect(() => {
         if (!entry) return
+        if (autoSaveSeconds <= 0) {
+            setAutoSaveStatus('')
+            return
+        }
+        if (!hasChanges) {
+            setAutoSaveStatus('')
+            return
+        }
+        if (!trimmedTitle) {
+            setAutoSaveStatus('标题为空，暂不自动保存')
+            return
+        }
+        if (hasInvalidRelationDrafts) {
+            setAutoSaveStatus('存在未完成关系，暂不自动保存')
+            return
+        }
+        if (saving) return
+        setAutoSaveStatus(`持续编辑中，最多每 ${autoSaveSeconds} 秒自动保存一次`)
+    }, [autoSaveSeconds, entry, hasChanges, hasInvalidRelationDrafts, saving, trimmedTitle])
+
+    useEffect(() => {
+        if (!entry) return
         if (hasChanges) {
             entryCacheRef.current[entryId] = {
                 entry,
@@ -516,6 +572,7 @@ export default function EntryEditor({
                 editorMode,
                 relations: entryRelations,
                 relationDrafts,
+                lastSuccessfulSaveAt: lastSuccessfulSaveAtRef.current,
             }
             return
         }
@@ -589,6 +646,9 @@ export default function EntryEditor({
         const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation))
         historyInitializedRef.current = null
         undoRedo.reset({draft: savedDraft, relationDrafts: savedRelationDrafts})
+        lastSuccessfulSaveAtRef.current = Date.now()
+        lastAutoSaveAttemptAtRef.current = 0
+        setAutoSaveStatus('')
 
         if (reason === 'external') {
             if (previousEntry && previousEntry.title !== refreshed.title) {
@@ -620,19 +680,36 @@ export default function EntryEditor({
         }
     }, [entryId, reloadEntryFromDatabase, showAlert])
 
+    useEffect(() => {
+        const unlisten = listen<EntryDeletedEvent>(ENTRY_DELETED, (event) => {
+            if (event.payload.entry_id !== entryId) return
+            void showAlert('词条已被 AI 删除', 'warning', 'toast', 2500)
+            void onBack?.()
+        })
+        return () => {
+            unlisten.then((fn) => fn())
+        }
+    }, [entryId, onBack, showAlert])
 
-    const handleSave = useCallback(async () => {
+    const handleSave = useCallback(async (trigger: SaveTrigger = 'manual') => {
         if (!entry || !canSave) return
 
         setSaving(true)
         setError(null)
+        if (trigger === 'auto') {
+            setAutoSaveStatus('正在自动保存…')
+        }
 
         try {
             const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, entry.category_id ?? null, trimmedTitle, entry.id)
             if (duplicatedEntry) {
                 const message = '当前分类下已存在同名词条，请更换标题。'
                 setError(message)
-                void showAlert(message, 'warning', 'toast', 1800)
+                if (trigger === 'manual') {
+                    void showAlert(message, 'warning', 'toast', 1800)
+                } else {
+                    setAutoSaveStatus('标题重复，暂不自动保存')
+                }
                 return
             }
 
@@ -673,6 +750,9 @@ export default function EntryEditor({
             for (const draftRelation of relationDrafts) {
                 if (hasInvalidRelationDraft(draftRelation, entry.id)) {
                     setError('存在未完成的词条关系，请先选择目标词条。')
+                    if (trigger === 'auto') {
+                        setAutoSaveStatus('存在未完成关系，暂不自动保存')
+                    }
                     setSaving(false)
                     return
                 }
@@ -723,9 +803,20 @@ export default function EntryEditor({
                 await onTitleChange?.(refreshed)
             }
             await onSaved?.(refreshed)
-            void showAlert('词条已保存', 'success', 'toast', 1000)
+            lastSuccessfulSaveAtRef.current = Date.now()
+            lastAutoSaveAttemptAtRef.current = 0
+            if (trigger === 'manual') {
+                setAutoSaveStatus('')
+                void showAlert('词条已保存', 'success', 'toast', 1000)
+            } else {
+                setAutoSaveStatus('已自动保存')
+            }
         } catch (e) {
             setError(String(e))
+            if (trigger === 'auto') {
+                lastAutoSaveAttemptAtRef.current = Date.now()
+                setAutoSaveStatus('自动保存失败，可手动重试')
+            }
         } finally {
             setSaving(false)
         }
@@ -737,6 +828,30 @@ export default function EntryEditor({
             void handleSave()
         }
     }, [canSave, handleSave])
+
+    useEffect(() => {
+        if (!entry || autoSaveSeconds <= 0) return
+
+        const timer = window.setInterval(() => {
+            if (!hasChangesRef.current) return
+            if (!canSaveRef.current) return
+
+            const now = Date.now()
+            if (lastAutoSaveAttemptAtRef.current > 0 && now - lastAutoSaveAttemptAtRef.current < AUTO_SAVE_FAILURE_COOLDOWN_MS) {
+                return
+            }
+            if (now - lastSuccessfulSaveAtRef.current < autoSaveSeconds * 1000) {
+                return
+            }
+
+            lastAutoSaveAttemptAtRef.current = now
+            void handleSave('auto')
+        }, AUTO_SAVE_CHECK_INTERVAL_MS)
+
+        return () => {
+            window.clearInterval(timer)
+        }
+    }, [autoSaveSeconds, entry, handleSave])
 
     const applyHistory = useCallback((history: EditorHistory) => {
         isApplyingHistoryRef.current = true
@@ -915,7 +1030,11 @@ export default function EntryEditor({
                         </div>
                         <span className="entry-editor-workspace__meta">
                             {editorMode === 'edit'
-                                ? (projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`)
+                                ? (
+                                    autoSaveStatus
+                                        ? `${projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`} · ${autoSaveStatus}`
+                                        : (projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`)
+                                )
                                 : '单击双链查看预览，双击或按钮可在新页签打开。'}
                         </span>
                     </div>

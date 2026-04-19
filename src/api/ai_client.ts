@@ -274,9 +274,41 @@ export interface EntryUpdatedEvent {
   entry_id: string
 }
 
+export interface EntryDeleteRequestEvent {
+    request_id: string
+    entry_id: string
+    entry_title: string
+    entry_summary: string | null
+}
+
+export interface EntryDeletedEvent {
+    entry_id: string
+}
+
+export interface CategoryDeleteRequestEvent {
+    request_id: string
+    category_id: string
+    category_name: string
+    mode: 'move_to_parent'
+}
+
+export interface CategoryCascadeDeleteRequestEvent {
+    request_id: string
+    category_id: string
+    category_name: string
+    entry_count: number
+    subcategory_count: number
+    step: 1 | 2
+}
+
 export const ENTRY_EDIT_REQUEST = 'entry:edit-request'
 export const ENTRY_UPDATED = 'entry:updated'
+export const ENTRY_DELETE_REQUEST = 'entry:delete-request'
+export const ENTRY_DELETED = 'entry:deleted'
+export const CATEGORY_DELETE_REQUEST = 'category:delete-request'
+export const CATEGORY_CASCADE_DELETE_REQUEST = 'category:cascade-delete-request'
 
+/** 统一确认回调，所有 AI 确认类型均复用此命令 */
 export const confirm_entry_edit = (requestId: string, confirmed: boolean) =>
     command<void>('confirm_entry_edit', {requestId, confirmed})
 
@@ -293,3 +325,15 @@ export const ai_is_enabled = (name: string) =>
 
 export const ai_list_tools = () =>
     command<ToolStatus[]>('ai_list_tools')
+
+// ── 编排上下文 ────────────────────────────────────────────────────────────────
+
+export interface TaskContextPayload {
+    projectId?: string | null
+    taskType?: string | null
+    attributes?: Record<string, string>
+    flags?: Record<string, boolean>
+}
+
+export const ai_set_task_context = (sessionId: string, ctx: TaskContextPayload) =>
+    command<void>('ai_set_task_context', {sessionId, ctx})

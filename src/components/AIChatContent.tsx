@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
-import {MessageBox, RollingBox, useAlert} from 'flowcloudai-ui'
+import {MessageBox, RollingBox} from 'flowcloudai-ui'
 import type {AiContextValue} from '../contexts/AiControllerTypes'
 
 const MAX_CHARS = 4000
@@ -11,6 +11,7 @@ interface AIChatContentProps {
 
 export default function AIChatContent({controller}: AIChatContentProps) {
     const ctx = controller
+    const isBlankChat = !ctx.activeConversationId
 
     const [renamingId, setRenamingId] = useState<string | null>(null)
     const [renameValue, setRenameValue] = useState('')
@@ -65,8 +66,6 @@ export default function AIChatContent({controller}: AIChatContentProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
     const lastScrollTopRef = useRef(0)
-    const {showAlert} = useAlert()
-
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
@@ -117,21 +116,13 @@ export default function AIChatContent({controller}: AIChatContentProps) {
         })
     }, [ctx.inputValue])
 
-    const handleKeyDown = useCallback(
-        (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
-                event.preventDefault()
-                if (!ctx.inputValue.trim() || ctx.isStreaming || !ctx.activeConversationId) {
-                    if (!ctx.activeConversationId) {
-                        void showAlert('请先创建新对话', 'warning', 'toast', 2000)
-                    }
-                    return
-                }
-                void ctx.sendMessage(ctx.inputValue)
-            }
-        },
-        [ctx.activeConversationId, ctx.inputValue, ctx.isStreaming, ctx.sendMessage, showAlert],
-    )
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+            event.preventDefault()
+            if (!ctx.inputValue.trim() || ctx.isStreaming) return
+            void ctx.sendMessage(ctx.inputValue)
+        }
+    }
 
     const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
         if (event.target.value.length <= MAX_CHARS) ctx.setInputValue(event.target.value)
@@ -141,14 +132,26 @@ export default function AIChatContent({controller}: AIChatContentProps) {
         <>
             <aside className="ai-sidebar">
                 <div className="ai-sidebar-top">
-                    <button className="ai-sidebar-new-btn" onClick={() => void ctx.createNewConversation()}
-                            title="新对话">
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
-                             strokeWidth="1.5">
-                            <path d="M7 2v10M2 7h10"/>
-                        </svg>
-                        <span>新对话</span>
-                    </button>
+                    <div className="ai-sidebar-top-actions">
+                        <button className="ai-sidebar-new-btn" onClick={() => void ctx.createNewConversation()}
+                                title="新对话">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                <path d="M7 2v10M2 7h10"/>
+                            </svg>
+                            <span>新对话</span>
+                        </button>
+                        <button
+                            className="ai-sidebar-close-btn"
+                            onClick={() => ctx.setSidebarCollapsed(true)}
+                            title="收起侧边栏"
+                        >
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                <path d="M9 2L4 7L9 12"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div className="ai-conversations-list">
                     {ctx.conversations.length === 0 && (
@@ -274,17 +277,9 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                     onScroll={handleMessagesScroll}
                     thumbSize={'thin'}
                 >
-                    {!ctx.activeConversationId && (
-                        <div className="ai-empty-state">
-                            <div className="ai-empty-icon">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     strokeWidth="1.5">
-                                    <path
-                                        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                                </svg>
-                            </div>
-                            <p className="ai-empty-text">开始新的对话</p>
-                            <p className="ai-empty-hint">点击右上角「+」按钮开始聊天</p>
+                    {isBlankChat && (
+                        <div className="ai-empty-state ai-empty-state--brand">
+                            <p className="ai-empty-brand">流云AI</p>
                         </div>
                     )}
                     {ctx.activeConversationId && ctx.messages.length > 0 && (
@@ -313,6 +308,7 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                     blocks={ctx.streamingBlocks}
                                     streaming
                                     markdown
+                                    rolePlaying
                                     toolCallDetail={'verbose'}
                                 />
                             )}
@@ -349,8 +345,8 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                             value={ctx.inputValue}
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
-                            placeholder={ctx.activeConversationId ? '请输入消息...' : '请先创建新对话'}
-                            disabled={ctx.isStreaming || !ctx.activeConversationId}
+                            placeholder={'请输入消息...'}
+                            disabled={ctx.isStreaming}
                         />
                         <div className="ai-floating-footer">
                             <div className="ai-floating-toolbar">
@@ -439,10 +435,10 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                         className="ai-floating-send-btn"
                                         onClick={(event) => {
                                             event.stopPropagation()
-                                            if (!ctx.inputValue.trim() || !ctx.activeConversationId) return
+                                            if (!ctx.inputValue.trim()) return
                                             void ctx.sendMessage(ctx.inputValue)
                                         }}
-                                        disabled={!ctx.inputValue.trim() || !ctx.activeConversationId}
+                                        disabled={!ctx.inputValue.trim()}
                                         title="发送"
                                     >
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"

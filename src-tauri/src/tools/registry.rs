@@ -5,8 +5,10 @@ use std::collections::HashMap;
 use tauri::AppHandle;
 use tokio::sync::oneshot;
 
+use super::category_tools;
 use super::edit_tools;
 use super::entry_tools;
+use super::project_tools;
 use super::state::WorldflowToolState;
 use super::web_tools;
 
@@ -43,6 +45,8 @@ pub fn register_worldflow_tools(
     // 注册各模块工具
     entry_tools::register_entry_tools(registry)?;
     edit_tools::register_edit_tools(registry)?;
+    category_tools::register_category_tools(registry)?;
+    project_tools::register_project_tools(registry)?;
     web_tools::register_web_tools(registry)?;
 
     Ok(())

@@ -4,8 +4,11 @@ use worldflow_core::{
     CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps, models::*,
 };
 
+pub mod category_tools;
+pub mod confirm;
 pub mod edit_tools;
 pub mod entry_tools;
+pub mod project_tools;
 pub mod registry;
 pub mod state;
 pub mod web_tools;
@@ -222,6 +225,52 @@ pub mod format {
         }
 
         render(None, 0, &children_map, &mut result);
+        result
+    }
+
+    /// 格式化词条类型列表（用于 list_entry_types 返回）
+    pub fn format_entry_types(types: &[EntryTypeView]) -> String {
+        if types.is_empty() {
+            return "该项目未定义任何词条类型".to_string();
+        }
+        let mut result = String::from("可用词条类型：\n\n");
+        for et in types {
+            match et {
+                EntryTypeView::Builtin { key, name, description, .. } => {
+                    result.push_str(&format!("- **{}** (key: `{}`, 内置)\n", name, key));
+                    if !description.is_empty() {
+                        result.push_str(&format!("  {}\n", description));
+                    }
+                }
+                EntryTypeView::Custom(c) => {
+                    result.push_str(&format!("- **{}** (id: `{}`, 自定义)\n", c.name, c.id));
+                    if let Some(d) = &c.description {
+                        result.push_str(&format!("  {}\n", d));
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// 格式化单个分类（用于 create_category 返回）
+    pub fn format_category(cat: &Category) -> String {
+        let parent = cat
+            .parent_id
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "（根节点）".to_string());
+        format!(
+            "分类已创建\n名称：{}\nID：{}\n上级分类：{}",
+            cat.name, cat.id, parent
+        )
+    }
+
+    /// 格式化单个项目（用于 create_project 返回）
+    pub fn format_project(project: &Project) -> String {
+        let mut result = format!("项目已创建\n名称：{}\nID：{}", project.name, project.id);
+        if let Some(desc) = &project.description {
+            result.push_str(&format!("\n描述：{}", desc));
+        }
         result
     }
 }
@@ -725,4 +774,279 @@ pub async fn update_entry_tags(
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+/// 删除词条
+pub async fn delete_entry(state: &AppState, entry_id: &str) -> Result<(), String> {
+    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.delete_entry(&entry_id).await.map_err(|e| e.to_string())
+}
+
+/// 创建分类
+pub async fn create_category(
+    state: &AppState,
+    project_id: &str,
+    name: String,
+    parent_id: Option<&str>,
+) -> Result<Category, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let parent_id = parent_id
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = state.sqlite_db.lock().await;
+    db.create_category(CreateCategory {
+        project_id,
+        parent_id,
+        name,
+        sort_order: None,
+    })
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 获取分类（含 project_id / parent_id 信息）
+pub async fn get_category(state: &AppState, category_id: &str) -> Result<Category, String> {
+    let category_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.get_category(&category_id).await.map_err(|e| e.to_string())
+}
+
+/// 收集以 root_id 为根的分类子树（包含根节点本身），广度优先。
+/// all_categories 为项目内全部分类列表（已从 DB 取出）。
+pub fn collect_subtree_ids(root_id: Uuid, all_categories: &[Category]) -> Vec<Uuid> {
+    let mut result = vec![root_id];
+    let mut queue = vec![root_id];
+    while let Some(current) = queue.pop() {
+        for cat in all_categories {
+            if cat.parent_id == Some(current) {
+                result.push(cat.id);
+                queue.push(cat.id);
+            }
+        }
+    }
+    result
+}
+
+/// 预览联级删除的影响范围，不执行任何写操作。
+/// 返回 (entry_count, subcategory_count)
+pub async fn preview_cascade_delete(
+    state: &AppState,
+    category_id: &str,
+) -> Result<(usize, usize), String> {
+    let root_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    let root_cat = db.get_category(&root_id).await.map_err(|e| e.to_string())?;
+    let all_cats = db
+        .list_categories(&root_cat.project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let cat_ids = collect_subtree_ids(root_id, &all_cats);
+    let subcategory_count = cat_ids.len().saturating_sub(1);
+
+    let mut entry_count = 0usize;
+    for cid in &cat_ids {
+        let mut offset = 0usize;
+        loop {
+            let batch = db
+                .list_entries(
+                    &root_cat.project_id,
+                    EntryFilter {
+                        category_id: Some(cid),
+                        entry_type: None,
+                    },
+                    200,
+                    offset,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            entry_count += batch.len();
+            if batch.len() < 200 {
+                break;
+            }
+            offset += 200;
+        }
+    }
+    Ok((entry_count, subcategory_count))
+}
+
+/// 执行联级删除：删除子树内所有词条，再从叶到根删除所有分类。
+/// 返回 (deleted_entries, deleted_categories)
+pub async fn cascade_delete_category(
+    state: &AppState,
+    category_id: &str,
+) -> Result<(usize, usize), String> {
+    let root_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    let root_cat = db.get_category(&root_id).await.map_err(|e| e.to_string())?;
+    let all_cats = db
+        .list_categories(&root_cat.project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let cat_ids = collect_subtree_ids(root_id, &all_cats);
+
+    let mut entries_deleted = 0usize;
+    for cid in &cat_ids {
+        let mut offset = 0usize;
+        loop {
+            let batch = db
+                .list_entries(
+                    &root_cat.project_id,
+                    EntryFilter {
+                        category_id: Some(cid),
+                        entry_type: None,
+                    },
+                    200,
+                    offset,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            if batch.is_empty() {
+                break;
+            }
+            for brief in &batch {
+                db.delete_entry(&brief.id)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                entries_deleted += 1;
+            }
+            if batch.len() < 200 {
+                break;
+            }
+            offset += 200;
+        }
+    }
+
+    // 从叶到根删除分类
+    for cid in cat_ids.iter().rev() {
+        db.delete_category(cid).await.map_err(|e| e.to_string())?;
+    }
+
+    Ok((entries_deleted, cat_ids.len()))
+}
+
+/// 删除分类并将直接子分类和词条上移到父分类（或根节点）。
+pub async fn delete_category_move_to_parent(
+    state: &AppState,
+    category_id: &str,
+) -> Result<(), String> {
+    let cat_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    let category = db.get_category(&cat_id).await.map_err(|e| e.to_string())?;
+    let new_parent = category.parent_id; // None = 根节点
+
+    // 将直接子分类的 parent_id 指向祖父
+    let all_cats = db
+        .list_categories(&category.project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    for child in all_cats.iter().filter(|c| c.parent_id == Some(cat_id)) {
+        db.update_category(
+            &child.id,
+            UpdateCategory {
+                parent_id: Some(new_parent),
+                name: None,
+                sort_order: None,
+            },
+        )
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    // 将该分类下词条移到父分类
+    let mut offset = 0usize;
+    loop {
+        let batch = db
+            .list_entries(
+                &category.project_id,
+                EntryFilter {
+                    category_id: Some(&cat_id),
+                    entry_type: None,
+                },
+                200,
+                offset,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        if batch.is_empty() {
+            break;
+        }
+        for brief in &batch {
+            db.update_entry(
+                &brief.id,
+                UpdateEntry {
+                    category_id: Some(new_parent),
+                    title: None,
+                    summary: None,
+                    content: None,
+                    r#type: None,
+                    tags: None,
+                    images: None,
+                },
+            )
+                .await
+                .map_err(|e| e.to_string())?;
+        }
+        if batch.len() < 200 {
+            break;
+        }
+        offset += 200;
+    }
+
+    db.delete_category(&cat_id).await.map_err(|e| e.to_string())
+}
+
+/// 列出项目所有词条类型（内置 + 自定义）
+pub async fn list_entry_types(
+    state: &AppState,
+    project_id: &str,
+) -> Result<Vec<EntryTypeView>, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.list_all_entry_types(&project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 移动词条到指定分类；category_id = None 表示移出所有分类（置为根节点词条）
+pub async fn move_entry(
+    state: &AppState,
+    entry_id: &str,
+    category_id: Option<&str>,
+) -> Result<Entry, String> {
+    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
+    let category_id = category_id
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = state.sqlite_db.lock().await;
+    db.update_entry(
+        &entry_id,
+        UpdateEntry {
+            category_id: Some(category_id),
+            title: None,
+            summary: None,
+            content: None,
+            r#type: None,
+            tags: None,
+            images: None,
+        },
+    )
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 创建项目（仅创建基础结构，不含默认标签初始化）
+pub async fn create_project(
+    state: &AppState,
+    name: String,
+    description: Option<String>,
+) -> Result<Project, String> {
+    let db = state.sqlite_db.lock().await;
+    db.create_project(CreateProject {
+        name,
+        description,
+        cover_image: None,
+    })
+        .await
+        .map_err(|e| e.to_string())
 }

@@ -21,8 +21,8 @@ const AUTOSAVE_DELAY = 700
 const PREVIEW_LENGTH = 28
 
 const IDEA_VIEW_OPTIONS: Array<{ key: IdeaViewMode; label: string; status?: IdeaNoteStatus }> = [
-    {key: 'inbox', label: '待整理', status: 'inbox'},
     {key: 'all', label: '全部'},
+    {key: 'inbox', label: '待整理', status: 'inbox'},
     {key: 'processed', label: '已处理', status: 'processed'},
     {key: 'archived', label: '已归档', status: 'archived'},
 ]
@@ -80,7 +80,7 @@ export default function Idea() {
     const [loading, setLoading] = useState(true)
     const [saveState, setSaveState] = useState<SaveState>('idle')
     const [statusMessage, setStatusMessage] = useState('输入内容后会自动保存')
-    const [viewMode, setViewMode] = useState<IdeaViewMode>('inbox')
+    const [viewMode, setViewMode] = useState<IdeaViewMode>('all')
     const [projectFilter, setProjectFilter] = useState<ProjectFilterMode>('all')
 
     const selectedIdea = useMemo(

@@ -675,6 +675,57 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         },
     );
 
+    // ⑯ list_entry_types — 列出所有词条类型
+    registry.register_async::<WorldflowToolState, _>(
+        "list_entry_types",
+        "列出项目中所有可用的词条类型（内置类型 + 自定义类型），包含 key/id 和名称",
+        vec![
+            ToolFunctionArg::new("project_id", "string")
+                .required(true)
+                .desc("项目ID"),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            Box::pin(async move {
+                let project_id = arg_str(args, "project_id")?;
+
+                let guard = app_state.lock().await;
+                let types = tools::list_entry_types(&*guard, project_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                Ok(format::format_entry_types(&types))
+            })
+        },
+    );
+
+    // ⑰ move_entry — 移动词条到指定分类
+    registry.register_async::<WorldflowToolState, _>(
+        "move_entry",
+        "将词条移动到指定分类；不填 category_id 则将词条移出所有分类（置为无分类状态）",
+        vec![
+            ToolFunctionArg::new("entry_id", "string")
+                .required(true)
+                .desc("词条ID"),
+            ToolFunctionArg::new("category_id", "string")
+                .desc("目标分类ID；不填则移出分类"),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            Box::pin(async move {
+                let entry_id = arg_str(args, "entry_id")?;
+                let category_id = args.get("category_id").and_then(|v| v.as_str());
+
+                let guard = app_state.lock().await;
+                let entry = tools::move_entry(&*guard, entry_id, category_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                Ok(format::format_entry(&entry))
+            })
+        },
+    );
+
     Ok(())
 }
 

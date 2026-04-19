@@ -2,11 +2,12 @@ use crate::AiState;
 use crate::ApiKeyStore;
 use crate::PendingEditsState;
 use flowcloudai_client::{
-    AudioDecoder, AudioSource, ConversationMeta, ImageSession, PluginKind, SessionEvent,
-    StoredConversation, TurnStatus,
+    AudioDecoder, AudioSource, ConversationMeta, DefaultOrchestrator, ImageSession, PluginKind,
+    SessionEvent, StoredConversation, TaskContext, TurnStatus,
 };
 use futures::StreamExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -152,6 +153,7 @@ pub async fn ai_create_llm_session(
         .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
 
     let client = ai_state.client.lock().await;
+    let registry = client.tool_registry().clone();
     let mut session = match conversation_id {
         Some(ref conv_id) => client
             .resume_llm_session(&plugin_id, &api_key, conv_id)
@@ -161,6 +163,8 @@ pub async fn ai_create_llm_session(
             .map_err(|e| e.to_string())?,
     };
     drop(client);
+
+    session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
 
     if let Some(m) = model {
         session.set_model(&m).await;
@@ -178,7 +182,7 @@ pub async fn ai_create_llm_session(
         .unwrap_or_else(|| session_id.clone());
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.run(input_rx, None);
+    let (event_stream, handle) = session.run(input_rx);
     let run_id = Uuid::new_v4().to_string();
     log::info!(
         "[ai_create_llm_session] conversation_id={} session_id={} run_id={}",
@@ -996,4 +1000,46 @@ pub async fn confirm_entry_edit(
         }
         None => Err(format!("编辑请求 '{}' 不存在或已超时", request_id)),
     }
+}
+
+// ============ 编排上下文 ============
+
+/// 前端传入的任务上下文 DTO。
+///
+/// 所有字段可选——只传有意义的字段，未传的字段在后端以 Default 填充。
+#[derive(Deserialize)]
+pub struct TaskContextDto {
+    pub project_id: Option<String>,
+    pub task_type: Option<String>,
+    pub attributes: Option<HashMap<String, String>>,
+    pub flags: Option<HashMap<String, bool>>,
+}
+
+/// 更新指定会话的编排上下文（下一轮对话开始前生效）。
+///
+/// Session 每轮调用 `Orchestrate::assemble` 前会通过 `try_recv` 拉取最新值，
+/// 多次调用只保留最后一次——前端可以放心高频推送（如 tab 切换时）。
+#[tauri::command]
+pub async fn ai_set_task_context(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+    ctx: TaskContextDto,
+) -> Result<(), String> {
+    let handle = {
+        let sessions = ai_state.sessions.lock().await;
+        sessions
+            .get(&session_id)
+            .map(|entry| entry.handle.clone())
+            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+    };
+
+    handle
+        .set_task_context(TaskContext {
+            project_id: ctx.project_id,
+            task_type: ctx.task_type.unwrap_or_default(),
+            attributes: ctx.attributes.unwrap_or_default(),
+            flags: ctx.flags.unwrap_or_default(),
+            ..Default::default()
+        })
+        .await
 }

@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+    "ego-tree",
  "flowcloudai_client",
  "futures",
  "keyring",
@@ -991,7 +992,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
- "windows 0.61.3",
+    "windows 0.62.2",
 ]
 
 [[package]]
@@ -1430,7 +1431,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+    "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1664,7 +1665,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+    "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1776,7 +1777,7 @@ dependencies = [
 [[package]]
 name = "flowcloudai_client"
 version = "0.1.1"
-source = "git+ssh://git@github.com/FlowCloudAI/AI_Client_Core?branch=main#8d8c930e72145bcbdcc5519a80556a3400c1a59f"
+source = "git+ssh://git@github.com/FlowCloudAI/AI_Client_Core?branch=main#a479aaacd0aaec2bd3a8bc8ef16399ab19afa836"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2622,7 +2623,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+    "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -3498,7 +3499,7 @@ version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
 dependencies = [
- "proc-macro-crate 2.0.2",
+    "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -4840,7 +4841,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+    "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4907,7 +4908,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+    "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6427,7 +6428,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+    "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7805,7 +7806,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+    "windows-sys 0.48.0",
 ]
 
 [[package]]

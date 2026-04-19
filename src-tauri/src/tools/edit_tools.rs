@@ -1,14 +1,14 @@
 use crate::tools;
+use crate::tools::confirm::request_confirmation;
 use crate::tools::format;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{arg_str, ToolRegistry};
 use tauri::Emitter;
-use tokio::sync::oneshot;
 
-/// 注册编辑确认工具（需要用户预览和确认）
+/// 注册所有需要用户确认的编辑工具
 pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
-    // ⑬ edit_entry_content_lines - 按行编辑词条正文（需用户确认）
+    // ① edit_entry_content_lines — 按行局部编辑正文（需用户确认）
     registry.register_async::<WorldflowToolState, _>(
         "edit_entry_content_lines",
         "对词条正文按行进行替换、删除或插入；修改会发送给用户预览，用户确认后才写入。\
@@ -50,7 +50,6 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                 if start_line == 0 {
                     anyhow::bail!("start_line 必须从 1 开始");
                 }
-                // end_line == start_line - 1 是合法的"纯插入"语义，比该值更小才是错误
                 if end_line + 1 < start_line {
                     anyhow::bail!(
                         "end_line ({}) 无效：最小可为 start_line - 1 ({})（纯插入模式）",
@@ -59,7 +58,6 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                     );
                 }
 
-                // 1. 读取词条当前内容，然后立即释放锁
                 let (entry_title, before_content) = {
                     let guard = app_state.lock().await;
                     let entry = tools::get_entry(&*guard, entry_id)
@@ -68,7 +66,6 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                     (entry.title.clone(), entry.content.clone())
                 };
 
-                // 2. 按行切割，验证范围，拼出 after_content
                 let lines: Vec<&str> = before_content.lines().collect();
                 let total = lines.len();
                 if start_line > total + 1 {
@@ -77,27 +74,18 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                 let end_clamped = end_line.min(total);
 
                 let mut new_lines: Vec<&str> = Vec::new();
-                // 保留 start_line 之前的行（0-indexed: 0..start_line-1）
                 new_lines.extend_from_slice(&lines[..start_line - 1]);
-                // 插入新内容（按行拆分）
                 let replacement_lines: Vec<&str> = if new_content.is_empty() {
                     vec![]
                 } else {
                     new_content.lines().collect()
                 };
                 new_lines.extend_from_slice(&replacement_lines);
-                // 保留 end_line 之后的行
                 if end_clamped < total {
                     new_lines.extend_from_slice(&lines[end_clamped..]);
                 }
                 let after_content = new_lines.join("\n");
 
-                // 3. 生成唯一 request_id，注册 oneshot channel
-                let request_id = uuid::Uuid::new_v4().to_string();
-                let (tx, rx) = oneshot::channel::<bool>();
-                pending_edits.lock().await.insert(request_id.clone(), tx);
-
-                // 4. 向前端发送预览事件
                 #[derive(serde::Serialize, Clone)]
                 struct EntryEditRequestPayload {
                     request_id: String,
@@ -106,43 +94,33 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
                     before_content: String,
                     after_content: String,
                 }
-                app_handle
-                    .emit(
-                        "entry:edit-request",
-                        EntryEditRequestPayload {
-                            request_id: request_id.clone(),
-                            entry_id: entry_id.to_string(),
-                            entry_title: entry_title.clone(),
-                            before_content: before_content.clone(),
-                            after_content: after_content.clone(),
-                        },
-                    )
-                    .map_err(|e| anyhow::anyhow!("emit 失败: {}", e))?;
 
-                // 5. 等待用户确认（最长 180 秒）
-                let confirmed =
-                    match tokio::time::timeout(std::time::Duration::from_secs(180), rx).await {
-                        Ok(Ok(v)) => v,
-                        Ok(Err(_)) => {
-                            // sender 已被 drop（不应发生）
-                            anyhow::bail!("编辑确认通道异常关闭");
-                        }
-                        Err(_) => {
-                            // 超时：清理 map 中的残留 sender
-                            pending_edits.lock().await.remove(&request_id);
-                            anyhow::bail!("用户未在规定时间内响应，编辑已自动取消");
-                        }
-                    };
+                let entry_id_str = entry_id.to_string();
+                let confirmed = request_confirmation(
+                    &app_handle,
+                    &pending_edits,
+                    "entry:edit-request",
+                    |request_id| EntryEditRequestPayload {
+                        request_id,
+                        entry_id: entry_id_str.clone(),
+                        entry_title: entry_title.clone(),
+                        before_content: before_content.clone(),
+                        after_content: after_content.clone(),
+                    },
+                    180,
+                )
+                    .await?;
 
                 if !confirmed {
                     return Ok("用户取消了此次编辑，内容未修改".to_string());
                 }
 
-                // 6. 写入数据库
                 let guard = app_state.lock().await;
-                let entry = tools::update_entry_content(&*guard, entry_id, Some(after_content))
-                    .await
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                let entry =
+                    tools::update_entry_content(&*guard, entry_id, Some(after_content))
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+
                 #[derive(serde::Serialize, Clone)]
                 struct EntryUpdatedPayload {
                     entry_id: String,
@@ -161,8 +139,164 @@ pub fn register_edit_tools(registry: &mut ToolRegistry) -> Result<()> {
         },
     );
 
+    // ② replace_entry_content — 全量替换正文（需用户确认）
+    registry.register_async::<WorldflowToolState, _>(
+        "replace_entry_content",
+        "将词条正文全量替换为新内容；修改会发送给用户预览，用户确认后才写入。\
+         适合 AI 生成初稿或大范围重写场景，对比 edit_entry_content_lines 粒度更粗",
+        vec![
+            ToolFunctionArg::new("entry_id", "string")
+                .required(true)
+                .desc("词条ID"),
+            ToolFunctionArg::new("new_content", "string")
+                .required(true)
+                .desc("新的完整正文内容，支持 Markdown"),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone().unwrap();
+            let pending_edits = _state.pending_edits.clone();
+            Box::pin(async move {
+                let entry_id = arg_str(args, "entry_id")?;
+                let new_content = arg_str(args, "new_content")?;
+
+                let (entry_title, before_content) = {
+                    let guard = app_state.lock().await;
+                    let entry = tools::get_entry(&*guard, entry_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    (entry.title.clone(), entry.content.clone())
+                };
+
+                #[derive(serde::Serialize, Clone)]
+                struct EntryEditRequestPayload {
+                    request_id: String,
+                    entry_id: String,
+                    entry_title: String,
+                    before_content: String,
+                    after_content: String,
+                }
+
+                let entry_id_str = entry_id.to_string();
+                let after = new_content.to_string();
+                let confirmed = request_confirmation(
+                    &app_handle,
+                    &pending_edits,
+                    "entry:edit-request",
+                    |request_id| EntryEditRequestPayload {
+                        request_id,
+                        entry_id: entry_id_str.clone(),
+                        entry_title: entry_title.clone(),
+                        before_content: before_content.clone(),
+                        after_content: after.clone(),
+                    },
+                    180,
+                )
+                    .await?;
+
+                if !confirmed {
+                    return Ok("用户取消了此次编辑，内容未修改".to_string());
+                }
+
+                let guard = app_state.lock().await;
+                let entry =
+                    tools::update_entry_content(&*guard, entry_id, Some(new_content.to_string()))
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                #[derive(serde::Serialize, Clone)]
+                struct EntryUpdatedPayload {
+                    entry_id: String,
+                }
+                app_handle
+                    .emit(
+                        "entry:updated",
+                        EntryUpdatedPayload {
+                            entry_id: entry.id.to_string(),
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("emit 失败: {}", e))?;
+
+                Ok(format::format_entry(&entry))
+            })
+        },
+    );
+
+    // ③ delete_entry — 删除词条（需用户确认）
+    registry.register_async::<WorldflowToolState, _>(
+        "delete_entry",
+        "删除指定词条；操作不可逆，会发送给用户确认后才执行",
+        vec![
+            ToolFunctionArg::new("entry_id", "string")
+                .required(true)
+                .desc("词条ID"),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone().unwrap();
+            let pending_edits = _state.pending_edits.clone();
+            Box::pin(async move {
+                let entry_id = arg_str(args, "entry_id")?;
+
+                let (entry_title, entry_summary) = {
+                    let guard = app_state.lock().await;
+                    let entry = tools::get_entry(&*guard, entry_id)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    (entry.title.clone(), entry.summary.clone())
+                };
+
+                #[derive(serde::Serialize, Clone)]
+                struct EntryDeleteRequestPayload {
+                    request_id: String,
+                    entry_id: String,
+                    entry_title: String,
+                    entry_summary: Option<String>,
+                }
+
+                let entry_id_str = entry_id.to_string();
+                let confirmed = request_confirmation(
+                    &app_handle,
+                    &pending_edits,
+                    "entry:delete-request",
+                    |request_id| EntryDeleteRequestPayload {
+                        request_id,
+                        entry_id: entry_id_str.clone(),
+                        entry_title: entry_title.clone(),
+                        entry_summary: entry_summary.clone(),
+                    },
+                    180,
+                )
+                    .await?;
+
+                if !confirmed {
+                    return Ok("用户取消了删除操作".to_string());
+                }
+
+                let guard = app_state.lock().await;
+                tools::delete_entry(&*guard, entry_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                #[derive(serde::Serialize, Clone)]
+                struct EntryDeletedPayload {
+                    entry_id: String,
+                }
+                app_handle
+                    .emit(
+                        "entry:deleted",
+                        EntryDeletedPayload {
+                            entry_id: entry_id.to_string(),
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("emit 失败: {}", e))?;
+
+                Ok(format!("词条「{}」已删除", entry_title))
+            })
+        },
+    );
+
     Ok(())
 }
 
-// 需要引用 state 模块中的 WorldflowToolState
 use super::state::WorldflowToolState;

@@ -1,7 +1,8 @@
 use anyhow::Result;
+use ego_tree::NodeRef;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{ToolRegistry, arg_str};
-use scraper::{Html, Selector};
+use scraper::{Html, Node, Selector};
 
 /// 注册网络工具（搜索和URL获取）
 pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
@@ -49,10 +50,11 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
         },
     );
 
-    // ⑮ open_url - 获取网页内容
+    // ⑮ open_url - 获取网页内容（HTML 转纯文本，剔除 script/style）
     registry.register_async::<WorldflowToolState, _>(
         "open_url",
-        "获取指定URL的网页原始内容",
+        "获取指定URL的网页内容并提取纯文本（自动剔除脚本和样式）；\
+         返回 HTTP 状态码和可读正文，适合直接喂给后续分析",
         vec![
             ToolFunctionArg::new("url", "string")
                 .required(true)
@@ -70,14 +72,17 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .map_err(|e| anyhow::anyhow!("请求失败: {}", e))?;
 
                 let status = response.status();
-                let text = response
+                let html = response
                     .text()
                     .await
                     .map_err(|e| anyhow::anyhow!("读取响应失败: {}", e))?;
 
-                const MAX_LEN: usize = 20000;
-                let body = if text.len() > MAX_LEN {
-                    format!("{}...(内容过长已截断)", &text[..MAX_LEN])
+                let text = html_to_text(&html);
+
+                const MAX_CHARS: usize = 8000;
+                let body = if text.chars().count() > MAX_CHARS {
+                    let truncated: String = text.chars().take(MAX_CHARS).collect();
+                    format!("{}\n…（内容过长已截断）", truncated)
                 } else {
                     text
                 };
@@ -319,6 +324,53 @@ fn extract_uddg_url(href: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// 将 HTML 转换为纯文本，跳过 script / style / head 节点
+fn html_to_text(html: &str) -> String {
+    let document = Html::parse_document(html);
+    let mut buf = String::new();
+    collect_text(document.tree.root(), &mut buf);
+    buf.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const SKIP_TAGS: &[&str] = &[
+    "script", "style", "noscript", "head", "meta", "link", "svg", "canvas",
+];
+
+fn collect_text(node: NodeRef<'_, Node>, buf: &mut String) {
+    match node.value() {
+        Node::Text(t) => {
+            buf.push_str(&t.text);
+        }
+        Node::Element(el) => {
+            let tag = el.name();
+            if SKIP_TAGS.contains(&tag) {
+                return;
+            }
+            for child in node.children() {
+                collect_text(child, buf);
+            }
+            // 块级元素后加换行，使文本结构更清晰
+            if matches!(
+                tag,
+                "p" | "div" | "br" | "li" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+                    | "tr" | "article" | "section" | "blockquote" | "pre" | "header"
+                    | "footer" | "nav"
+            ) {
+                buf.push('\n');
+            }
+        }
+        _ => {
+            for child in node.children() {
+                collect_text(child, buf);
+            }
+        }
+    }
 }
 
 // 需要引用 state 模块中的 WorldflowToolState

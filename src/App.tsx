@@ -2,6 +2,7 @@ import './App.css'
 import "./api"
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
 import {useAiController} from './hooks/useAiController'
+import type {AiFocus} from './hooks/useAiController'
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {type CSSProperties, useCallback, useEffect, useMemo, useState} from "react";
 import ProjectList from "./pages/ProjectList.tsx";
@@ -10,22 +11,27 @@ import Settings from "./pages/Settings";
 import Idea from "./pages/Idea";
 import type {Project} from "./api";
 import AIChat from "./components/AI";
+import DockableSidePanel from "./components/layout/DockableSidePanel";
 import RelationDemo from "./components/RelationDemo";
 import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
 import TimelineDemo from "./components/TimelineDemo";
 import AIImageGenerator from "./components/AIImageGenerator";
 import AITtsDemo from "./components/AITtsDemo";
 import EntryEditModal from "./components/EntryEditModal";
+import AiConfirmModal from "./components/AiConfirmModal";
 
 type EntryTabMeta = {
     projectId: string
     entryId: string
 }
 
+type MainContentKey = 'home' | 'relation' | 'timeline' | 'map-editor' | 'ai-image' | 'ai-tts' | 'settings'
+type SidePanelContentKey = 'idea' | 'ai-chat'
+
 function App() {
+    const AI_MIN_PANEL_WIDTH = 460
     const win = getCurrentWindow();
     const {showAlert} = useAlert()
-    const aiController = useAiController()
 
     const [isMaximized, setIsMaximized] = useState(false);
     useEffect(() => {
@@ -42,14 +48,25 @@ function App() {
     // projectTabMap: tabKey → projectId（仅项目标签页）
     const [projectTabMap, setProjectTabMap] = useState<Record<string, string>>({});
     const [entryTabMap, setEntryTabMap] = useState<Record<string, EntryTabMeta>>({});
+
+    const aiFocus = useMemo<AiFocus>(() => ({
+        projectId: projectTabMap[activeKey] ?? entryTabMap[activeKey]?.projectId ?? null,
+        entryId: entryTabMap[activeKey]?.entryId ?? null,
+    }), [activeKey, projectTabMap, entryTabMap])
+
+    const aiController = useAiController(aiFocus)
     const [entryDirtyMap, setEntryDirtyMap] = useState<Record<string, boolean>>({});
     const [recentPageKeys, setRecentPageKeys] = useState<string[]>([])
 
-    const [selectedKey, setSelectedKey] = useState('home')
+    const [selectedKey, setSelectedKey] = useState<string>('home')
+    const [mainContentKey, setMainContentKey] = useState<MainContentKey>('home')
+    const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [collapsed, setCollapsed] = useState(false)
-    const aiDisplayMode = selectedKey === 'ai-chat' ? 'fullscreen' : 'floating'
+    const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
+    const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false)
 
     const showHomeWorkspace = useCallback(() => {
+        setMainContentKey('home')
         setSelectedKey('home')
         setCollapsed(true)
     }, [])
@@ -197,11 +214,21 @@ function App() {
                     showHomeWorkspace()
                 }
             } else {
+                setMainContentKey('home')
                 setSelectedKey('home')
             }
             setActiveKey(nextTab?.key ?? '');
         }
     }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, showHomeWorkspace, tabs, touchRecentPage]);
+
+    const handleSideBarSelect = useCallback((key: string) => {
+        setSelectedKey(key)
+        if (key === 'idea' || key === 'ai-chat') {
+            setSidePanelContentKey(key)
+            return
+        }
+        setMainContentKey(key as MainContentKey)
+    }, [])
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
@@ -443,8 +470,8 @@ function App() {
                     </div>
                 </div>
                 <div className="main-content">
-                    <div className={`page-container ${selectedKey === 'ai-chat' ? 'is-hidden-for-ai-chat' : ''}`}>
-                        <div className={`page-wrapper ${selectedKey === 'home' ? 'active' : ''}`}>
+                    <div className="page-container">
+                        <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
                             <div className="home-page-stack">
                                 <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
                                     <ProjectList onOpenProject={handleOpenProject}/>
@@ -472,29 +499,40 @@ function App() {
                                 })}
                             </div>
                         </div>
-                        <div className={`page-wrapper ${selectedKey === 'idea' ? 'active' : ''}`}>
-                            <Idea/>
-                        </div>
-                        <div className={`page-wrapper ${selectedKey === 'relation' ? 'active' : ''}`}>
+                        <div className={`page-wrapper ${mainContentKey === 'relation' ? 'active' : ''}`}>
                             <RelationDemo/>
                         </div>
-                        <div className={`page-wrapper ${selectedKey === 'timeline' ? 'active' : ''}`}>
+                        <div className={`page-wrapper ${mainContentKey === 'timeline' ? 'active' : ''}`}>
                             <TimelineDemo/>
                         </div>
-                        <div className={`page-wrapper ${selectedKey === 'map-editor' ? 'active' : ''}`}>
+                        <div className={`page-wrapper ${mainContentKey === 'map-editor' ? 'active' : ''}`}>
                             <MapShapeEditorDemo/>
                         </div>
-                        <div className={`page-wrapper ${selectedKey === 'ai-image' ? 'active' : ''}`}>
+                        <div className={`page-wrapper ${mainContentKey === 'ai-image' ? 'active' : ''}`}>
                             <AIImageGenerator/>
                         </div>
-                        <div className={`page-wrapper ${selectedKey === 'ai-tts' ? 'active' : ''}`}>
+                        <div className={`page-wrapper ${mainContentKey === 'ai-tts' ? 'active' : ''}`}>
                             <AITtsDemo/>
                         </div>
-                        <div className={`page-wrapper ${selectedKey === 'settings' ? 'active' : ''}`}>
+                        <div className={`page-wrapper ${mainContentKey === 'settings' ? 'active' : ''}`}>
                             <Settings/>
                         </div>
                     </div>
-                    <AIChat mode={aiDisplayMode} controller={aiController}/>
+                    <DockableSidePanel
+                        mode="floating"
+                        width={aiPanelWidth}
+                        minWidth={AI_MIN_PANEL_WIDTH}
+                        maxWidthRatio={0.5}
+                        collapsed={aiPanelCollapsed}
+                        onCollapsedChange={setAiPanelCollapsed}
+                        onWidthChange={setAiPanelWidth}
+                        className="ai-shell"
+                        handleTitle="拖拽调整宽度"
+                    >
+                        {sidePanelContentKey === 'idea'
+                            ? <Idea/>
+                            : <AIChat controller={aiController}/>}
+                    </DockableSidePanel>
                     <SideBar
                         className={"side-bar"}
                         items={menuItems}
@@ -503,12 +541,13 @@ function App() {
                         collapsed={collapsed}
                         width={150}
                         collapsedWidth={50}
-                        onSelect={setSelectedKey}
+                        onSelect={handleSideBarSelect}
                         onCollapse={setCollapsed}
                         placement={"right"}
                     />
                 </div>
                 <EntryEditModal/>
+            <AiConfirmModal/>
             </div>
     )
 }

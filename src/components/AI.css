@@ -12,7 +12,7 @@
 .ai-chat-layout {
     container-type: inline-size;
     container-name: ai-chat;
-    display: flex;
+    display: block;
     width: 100%;
     height: 100%;
     background: var(--fc-color-bg);
@@ -22,16 +22,22 @@
 
 /* ========== 左侧边栏（历史对话） ========== */
 .ai-sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 120;
     width: 220px;
     min-width: 220px;
     border-right: 1px solid var(--fc-color-border);
     background: var(--fc-color-bg-secondary);
     display: flex;
     flex-direction: column;
-    transition: width 0.25s ease, min-width 0.25s ease;
+    transition: transform 0.1s ease-out, opacity 0.1s ease-out;
     overflow: hidden;
     height: 100%;
     padding-top: 6px;
+    box-shadow: 12px 0 28px rgba(0, 0, 0, 0.18);
 }
 
 /* 宽屏时侧边栏更宽 */
@@ -44,8 +50,9 @@
 
 /* 折叠时隐藏（宽屏）*/
 .ai-chat-layout.sidebar-collapsed .ai-sidebar {
-    width: 0;
-    min-width: 0;
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* 侧边栏顶部新建按钮 */
@@ -54,11 +61,17 @@
     flex-shrink: 0;
 }
 
+.ai-sidebar-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .ai-sidebar-new-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 100%;
+    flex: 1;
     padding: 5px 8px;
     font-size: 0.82rem;
     border: none;
@@ -70,6 +83,26 @@
 }
 
 .ai-sidebar-new-btn:hover {
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+}
+
+.ai-sidebar-close-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.ai-sidebar-close-btn:hover {
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text);
 }
@@ -187,9 +220,10 @@
 
 /* ========== 右侧主区域 ========== */
 .ai-main {
-    flex: 1;
+    --ai-chat-content-max-width: 840px;
     display: flex;
     flex-direction: column;
+    width: 100%;
     min-width: 0;
     overflow: hidden;
     background: var(--fc-color-bg);
@@ -335,6 +369,7 @@
 .ai-messages-container {
     flex: 1;
     overflow: hidden;
+    position: relative;
 }
 
 .ai-messages-container .fc-roll {
@@ -351,6 +386,20 @@
     height: 100%;
     gap: 0.75rem;
     opacity: 0.6;
+}
+
+.ai-empty-state--brand {
+    opacity: 1;
+}
+
+.ai-empty-brand {
+    font-size: clamp(2.8rem, 7vw, 5.5rem);
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--fc-color-text) 12%, transparent);
+    user-select: none;
+    pointer-events: none;
 }
 
 .ai-empty-icon {
@@ -375,8 +424,8 @@
     flex-direction: column;
     gap: 16px;
     width: 100%;
-    max-width: 700px;
-    margin: 0 auto 220px;
+    max-width: var(--ai-chat-content-max-width);
+    margin: 1rem auto 220px;
     padding-inline: 1.5rem;
 }
 
@@ -464,7 +513,7 @@
     bottom: 24px;
     left: 50%;
     transform: translateX(-50%);
-    width: min(700px, calc(100% - 40px));
+    width: min(var(--ai-chat-content-max-width), calc(100% - 40px));
     z-index: 100;
 }
 

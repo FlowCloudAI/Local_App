@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {listen} from '@tauri-apps/api/event'
 import {
     ai_close_session,
     ai_delete_conversation,
@@ -9,9 +10,15 @@ import {
     ai_list_conversations,
     ai_list_plugins,
     ai_list_tools,
+    ai_set_task_context,
     ai_update_session,
+    db_get_entry,
+    db_get_project,
+    ENTRY_UPDATED,
+    type EntryUpdatedEvent,
     type PluginInfo,
     type StoredMessage,
+    type TaskContextPayload,
     type ToolStatus,
 } from '../api'
 import {type SessionMessage, useAiSession} from './useAiSession'
@@ -138,14 +145,19 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
     return result
 }
 
-export function useAiController(): AiContextValue {
+export interface AiFocus {
+    projectId: string | null
+    entryId: string | null
+}
+
+export function useAiController(focus: AiFocus): AiContextValue {
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
 
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
     const [autoScroll, setAutoScroll] = useState(true)
 
     const [inputValue, setInputValue] = useState('')
@@ -154,6 +166,15 @@ export function useAiController(): AiContextValue {
     const [tools, setTools] = useState<ToolStatus[]>([])
     const [webSearchEnabled, setWebSearchEnabled] = useState(true)
     const [editModeEnabled, setEditModeEnabled] = useState(true)
+
+    const focusRef = useRef(focus)
+    useEffect(() => {
+        focusRef.current = focus
+    }, [focus])
+
+    const projectNameCacheRef = useRef<Map<string, string>>(new Map())
+    // Map value: snippet string（含空字符串），undefined 表示未缓存
+    const entrySnippetCacheRef = useRef<Map<string, string>>(new Map())
 
     const activeConversation = useMemo(
         () => conversations.find((conversation) => conversation.id === activeConversationId),
@@ -205,6 +226,92 @@ export function useAiController(): AiContextValue {
 
     const session = useAiSession({onMessage, onError})
 
+    // 词条内容更新时清除对应缓存，避免下次推送旧摘要
+    useEffect(() => {
+        const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (e) => {
+            entrySnippetCacheRef.current.delete(e.payload.entry_id)
+        })
+        return () => {
+            unlisten.then(fn => fn())
+        }
+    }, [])
+
+    const resolveContextPayload = useCallback(async (
+        projectId: string | null,
+        entryId: string | null,
+    ): Promise<TaskContextPayload> => {
+        const attributes: Record<string, string> = {}
+        const [projResult, entryResult] = await Promise.allSettled([
+            projectId ? (async () => {
+                const cached = projectNameCacheRef.current.get(projectId)
+                if (cached !== undefined) return cached
+                const proj = await db_get_project(projectId)
+                projectNameCacheRef.current.set(projectId, proj.name)
+                return proj.name
+            })() : Promise.resolve(null),
+            entryId ? (async () => {
+                if (entrySnippetCacheRef.current.has(entryId)) {
+                    return entrySnippetCacheRef.current.get(entryId)!
+                }
+                const entry = await db_get_entry(entryId)
+                const snippet = entry.content?.slice(0, 500) ?? ''
+                entrySnippetCacheRef.current.set(entryId, snippet)
+                return snippet
+            })() : Promise.resolve(null),
+        ])
+
+        if (projectId) {
+            attributes.project_id = projectId
+            if (projResult.status === 'fulfilled' && projResult.value) {
+                attributes.project_name = projResult.value
+            }
+        }
+        if (entryId) {
+            attributes.entry_id = entryId
+            if (entryResult.status === 'fulfilled' && entryResult.value) {
+                attributes.entry_snippet = entryResult.value
+            }
+        }
+
+        const hints: string[] = []
+        if (!webSearchEnabled) {
+            hints.push(
+                '用户已禁用 "web_search" 和 "open_url" 工具。' +
+                '若问题涉及联网获取信息，请勿主观臆断，而是告知用户开启"联网搜索"功能后再试。'
+            )
+        }
+        if (!editModeEnabled) {
+            hints.push(
+                '用户当前处于阅读模式，所有词条编辑工具已被禁用。' +
+                '若用户要求修改内容，请告知其切换到"编辑模式"后再操作。'
+            )
+        }
+        if (hints.length > 0) {
+            attributes.ai_instructions = hints.join('\n')
+        }
+
+        return {
+            attributes,
+            flags: {read_only: !editModeEnabled},
+        }
+    }, [editModeEnabled, webSearchEnabled])
+
+    // tab 切换或 session 建立时推送最新焦点上下文
+    useEffect(() => {
+        const sid = session.sessionId
+        if (!sid) return
+        let cancelled = false
+        resolveContextPayload(focus.projectId, focus.entryId).then((ctx) => {
+            if (cancelled) return
+            ai_set_task_context(sid, ctx).catch(() => {
+            })
+        }).catch(() => {
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
+
     useEffect(() => {
         ai_list_plugins('llm').then(setPlugins).catch(console.error)
         ai_list_tools().then((fetched) => {
@@ -215,6 +322,11 @@ export function useAiController(): AiContextValue {
             setEditModeEnabled(true)
         }).catch(console.error)
     }, [])
+
+    useEffect(() => {
+        if (selectedPlugin || plugins.length === 0) return
+        setSelectedPlugin(plugins[0].id)
+    }, [plugins, selectedPlugin])
 
     useEffect(() => {
         let mounted = true
@@ -236,30 +348,11 @@ export function useAiController(): AiContextValue {
                     timestamp: new Date(meta.updated_at).getTime(),
                 }))
 
-                const stored = await ai_get_conversation(convs[0].id).catch(() => null)
-                if (!mounted) return
-
-                if (stored) {
-                    convs[0] = {...convs[0], messages: storedToMessages(stored.messages)}
-                }
-
                 setConversations(convs)
-                setActiveConversationId(convs[0].id)
-                setSelectedPlugin(convs[0].pluginId)
-                setSelectedModel(convs[0].model)
+                setActiveConversationId(null)
             } else {
-                const newId = `conv_${Date.now()}`
-                setConversations([{
-                    id: newId,
-                    title: '新对话',
-                    messages: [],
-                    pluginId: '',
-                    model: '',
-                    sessionId: null,
-                    runId: null,
-                    timestamp: Date.now(),
-                }])
-                setActiveConversationId(newId)
+                setConversations([])
+                setActiveConversationId(null)
             }
         }
 
@@ -292,26 +385,11 @@ export function useAiController(): AiContextValue {
             abortControllerRef.current?.abort()
         }
         await session.closeSession()
-
-        const newId = `conv_${Date.now()}`
-        const newConversation: Conversation = {
-            id: newId,
-            title: '新对话',
-            messages: [],
-            pluginId: selectedPlugin,
-            model: selectedModel,
-            sessionId: null,
-            runId: null,
-            timestamp: Date.now(),
-        }
-
-        setConversations((prev) => [newConversation, ...prev])
-        setActiveConversationId(newId)
+        setActiveConversationId(null)
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
-        if (sidebarCollapsed) setSidebarCollapsed(false)
-    }, [selectedModel, selectedPlugin, session, sidebarCollapsed])
+    }, [session])
 
     const switchConversation = useCallback(async (convId: string) => {
         if (convId === activeConversationIdRef.current) return
@@ -358,6 +436,8 @@ export function useAiController(): AiContextValue {
         if (activeConversationIdRef.current === convId) {
             await session.closeSession()
             setActiveConversationId(null)
+            setInputValue('')
+            setEditingMessageId(null)
             setAutoScroll(true)
         }
     }, [conversations, session])
@@ -375,8 +455,27 @@ export function useAiController(): AiContextValue {
         const trimmed = content.trim()
         if (!trimmed || session.isStreaming) return
 
-        const currentConvId = activeConversationRef.current?.id
-        if (!currentConvId) return
+        let currentConvId = activeConversationRef.current?.id ?? null
+        let effectiveConvId = currentConvId
+
+        if (!currentConvId) {
+            const draftConversationId = `conv_${Date.now()}`
+            const draftConversation: Conversation = {
+                id: draftConversationId,
+                title: '新对话',
+                messages: [],
+                pluginId: selectedPlugin,
+                model: selectedModel,
+                sessionId: null,
+                runId: null,
+                timestamp: Date.now(),
+            }
+            currentConvId = draftConversationId
+            effectiveConvId = draftConversationId
+            setConversations((prev) => [draftConversation, ...prev])
+            setActiveConversationId(draftConversationId)
+            setAutoScroll(true)
+        }
 
         abortControllerRef.current = new AbortController()
 
@@ -411,7 +510,6 @@ export function useAiController(): AiContextValue {
         }
 
         let currentSid = sessionBelongsHere ? session.sessionId : null
-        let effectiveConvId = currentConvId
 
         if (!currentSid) {
             await new Promise<void>((resolve) => {
@@ -429,6 +527,14 @@ export function useAiController(): AiContextValue {
             if (!created) return
 
             currentSid = created.sessionId
+
+            // 兜底推送：session 刚建立时 effect 可能尚未触发，确保首轮 assemble 有上下文
+            resolveContextPayload(focusRef.current.projectId, focusRef.current.entryId)
+                .then((ctx) => ai_set_task_context(currentSid!, ctx).catch(() => {
+                }))
+                .catch(() => {
+                })
+
             if (isPending) {
                 effectiveConvId = created.conversationId
                 runtimeConversationRef.current[
@@ -471,7 +577,7 @@ export function useAiController(): AiContextValue {
 
         setInputValue('')
         await session.sendMessage(trimmed, currentSid!)
-    }, [editingMessageId, selectedModel, selectedPlugin, session])
+    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload])
 
     const stopStreaming = useCallback(() => {
         abortControllerRef.current?.abort()
@@ -527,13 +633,9 @@ export function useAiController(): AiContextValue {
         const webNames = ['web_search', 'open_url']
         setTools((prev) => prev.map((tool) => (!webNames.includes(tool.name)) ? {...tool, enabled: next} : tool))
         setEditModeEnabled(next)
-        if (!session.sessionId) {
-            const ops = tools
-                .filter((tool) => !webNames.includes(tool.name))
-                .map((tool) => next ? ai_enable_tool(tool.name) : ai_disable_tool(tool.name))
-            await Promise.all(ops).catch(console.error)
-        }
-    }, [editModeEnabled, session.sessionId, tools])
+        // registry 侧同步由 sendMessage 的工具初始化流程负责；
+        // read_only flag 通过 resolveContextPayload → ai_set_task_context 在下一轮 assemble 生效
+    }, [editModeEnabled])
 
     return useMemo(() => ({
         plugins,

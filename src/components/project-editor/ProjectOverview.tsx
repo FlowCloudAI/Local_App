@@ -277,8 +277,6 @@ function ProjectOverview({
                     <FeatureEntry
                         title="词条关系图谱"
                         description="查看人物、组织、地点与关键物件之间的连接结构，直接观察整体关系网。"
-                        badge="推荐"
-                        emphasized
                         onClick={onOpenRelationGraph}
                     >
                         <RelationGraphIcon/>
@@ -286,7 +284,6 @@ function ProjectOverview({
                     <FeatureEntry
                         title="时间线"
                         description="按事件顺序梳理世界进程、角色行动和关键转折节点。"
-                        badge="已接数据"
                         onClick={onOpenTimeline}
                     >
                         <TimelineIcon/>
