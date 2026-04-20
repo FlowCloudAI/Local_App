@@ -26,6 +26,7 @@ serde = { version = "1.0", features = ["derive"] }
 keyring = { version = "3", features = ["windows-native"] }
 anyhow = "1"
 worldflow_core = { git = "ssh://git@github.com/FlowCloudAI/Worldflow_Core", branch = "main" }
+git2 = "0.20"
 flowcloudai_client = { git = "ssh://git@github.com/FlowCloudAI/AI_Client_Core", branch = "main" }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

@@ -17,6 +17,7 @@ import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
 import TimelineDemo from "./components/TimelineDemo";
 import AIImageGenerator from "./components/AIImageGenerator";
 import AITtsDemo from "./components/AITtsDemo";
+import SnapshotPanel from "./components/SnapshotPanel";
 import EntryEditModal from "./components/EntryEditModal";
 import AiConfirmModal from "./components/AiConfirmModal";
 
@@ -26,7 +27,7 @@ type EntryTabMeta = {
 }
 
 type MainContentKey = 'home' | 'relation' | 'timeline' | 'map-editor' | 'ai-image' | 'ai-tts' | 'settings'
-type SidePanelContentKey = 'idea' | 'ai-chat'
+type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot'
 
 function App() {
     const AI_MIN_PANEL_WIDTH = 460
@@ -61,6 +62,8 @@ function App() {
     const [selectedKey, setSelectedKey] = useState<string>('home')
     const [mainContentKey, setMainContentKey] = useState<MainContentKey>('home')
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
+    const [snapshotPanelWidth, setSnapshotPanelWidth] = useState(360)
+    const [snapshotPanelCollapsed, setSnapshotPanelCollapsed] = useState(false)
     const [collapsed, setCollapsed] = useState(false)
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false)
@@ -223,8 +226,8 @@ function App() {
 
     const handleSideBarSelect = useCallback((key: string) => {
         setSelectedKey(key)
-        if (key === 'idea' || key === 'ai-chat') {
-            setSidePanelContentKey(key)
+        if (key === 'idea' || key === 'ai-chat' || key === 'snapshot') {
+            setSidePanelContentKey(key as SidePanelContentKey)
             return
         }
         setMainContentKey(key as MainContentKey)
@@ -289,6 +292,23 @@ function App() {
             />
             <path
                 d="M9 8.75h6M9 11.25h4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+            />
+        </svg>)
+
+    const SnapshotIcon = (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <path
+                d="M12 3C7.5 3 4 6 4 10c0 2.5 1.5 4.5 3.5 5.5L6 21l5-2.5c.5.1 1 .15 1.5.15 4.5 0 8-3 8-7.65C21 6 17.5 3 12 3Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M9 10h6M12 7v6"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
@@ -370,6 +390,7 @@ function App() {
         {key: 'timeline', label: '时间线', icon: TimelineIcon},
         {key: 'map-editor', label: '地图编辑', icon: MapIcon},
         {key: 'ai-chat', label: 'AI 对话', icon: AiChatIcon},
+        {key: 'snapshot', label: '版本管理', icon: SnapshotIcon},
         {key: 'ai-image', label: 'AI 绘图', icon: AiImageIcon},
         {key: 'ai-tts', label: 'AI 语音', icon: TtsIcon},
     ]
@@ -520,18 +541,20 @@ function App() {
                     </div>
                     <DockableSidePanel
                         mode="floating"
-                        width={aiPanelWidth}
-                        minWidth={AI_MIN_PANEL_WIDTH}
+                        width={sidePanelContentKey === 'snapshot' ? snapshotPanelWidth : aiPanelWidth}
+                        minWidth={sidePanelContentKey === 'snapshot' ? 280 : AI_MIN_PANEL_WIDTH}
                         maxWidthRatio={0.5}
-                        collapsed={aiPanelCollapsed}
-                        onCollapsedChange={setAiPanelCollapsed}
-                        onWidthChange={setAiPanelWidth}
+                        collapsed={sidePanelContentKey === 'snapshot' ? snapshotPanelCollapsed : aiPanelCollapsed}
+                        onCollapsedChange={sidePanelContentKey === 'snapshot' ? setSnapshotPanelCollapsed : setAiPanelCollapsed}
+                        onWidthChange={sidePanelContentKey === 'snapshot' ? setSnapshotPanelWidth : setAiPanelWidth}
                         className="ai-shell"
                         handleTitle="拖拽调整宽度"
                     >
                         {sidePanelContentKey === 'idea'
                             ? <Idea contextProjectId={aiFocus.projectId}/>
-                            : <AIChat controller={aiController}/>}
+                            : sidePanelContentKey === 'snapshot'
+                                ? <SnapshotPanel/>
+                                : <AIChat controller={aiController}/>}
                     </DockableSidePanel>
                     <SideBar
                         className={"side-bar"}

@@ -389,8 +389,9 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         }
     }, [selectedIdea])
 
-    const handleProjectChange = useCallback(async (value: string | number) => {
-        const nextProjectId = value === 'global' ? null : String(value)
+    const handleProjectChange = useCallback((value: string | number | (string | number)[]) => {
+        const singleValue = Array.isArray(value) ? value[0] : value
+        const nextProjectId = singleValue === 'global' ? null : String(singleValue)
 
         if (!selectedIdea) {
             setDraftProjectId(nextProjectId)
@@ -398,23 +399,25 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
             return
         }
 
-        try {
-            const updated = await db_update_idea_note({
-                id: selectedIdea.id,
-                projectId: nextProjectId,
-            })
-            setStatusMessage(nextProjectId ? '已更新便签所属项目' : '已将便签设为未归属')
+        void (async () => {
+            try {
+                const updated = await db_update_idea_note({
+                    id: selectedIdea.id,
+                    projectId: nextProjectId,
+                })
+                setStatusMessage(nextProjectId ? '已更新便签所属项目' : '已将便签设为未归属')
 
-            if (matchesCurrentFilters(updated)) {
-                setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === updated.id ? updated : item)))
-            } else {
-                await loadIdeaNotes(updated.id)
+                if (matchesCurrentFilters(updated)) {
+                    setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === updated.id ? updated : item)))
+                } else {
+                    await loadIdeaNotes(updated.id)
+                }
+            } catch (error) {
+                console.error('更新便签所属项目失败', error)
+                setSaveState('error')
+                setStatusMessage(error instanceof Error ? error.message : '更新所属项目失败')
             }
-        } catch (error) {
-            console.error('更新便签所属项目失败', error)
-            setSaveState('error')
-            setStatusMessage(error instanceof Error ? error.message : '更新所属项目失败')
-        }
+        })()
     }, [loadIdeaNotes, matchesCurrentFilters, selectedIdea])
 
     const handleConvertToEntry = useCallback(async () => {
@@ -641,3 +644,4 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         </div>
     )
 }
+ 
