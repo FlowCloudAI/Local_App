@@ -1,21 +1,17 @@
-mod ai_services;
 mod apis;
 mod layout;
 mod map;
 mod prompt;
 mod reports;
-mod settings;
 mod senses;
+mod settings;
 mod state;
 mod tools;
 
 pub use settings::*;
 pub use state::*;
 
-use apis::ai_character::*;
 use apis::ai_client::*;
-use apis::ai_contradiction::*;
-use apis::ai_summary::*;
 use apis::app_settings::*;
 use apis::layout::*;
 use apis::map::*;
@@ -28,13 +24,13 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use tauri::{
-    http::{header::CONTENT_TYPE, Response, StatusCode}, AppHandle, Emitter, Manager, Runtime, UriSchemeContext,
-    WindowBuilder,
+    AppHandle, Emitter, Manager, Runtime, UriSchemeContext, WindowBuilder,
+    http::{Response, StatusCode, header::CONTENT_TYPE},
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log;
 use tokio::sync::Mutex;
-use worldflow_core::SqliteDb;
+use worldflow_core::{SqliteDb, SnapshotConfig};
 
 /// 运行时设置状态：持有设置值 + 配置文件路径（供保存时使用）
 pub struct SettingsState {
@@ -108,9 +104,10 @@ pub fn run() {
             // 异步初始化数据库
             let db_path = prepare_db_path(&app_handle, &resolved_db_path)
                 .unwrap_or_else(|e| fatal(&app_handle, &e.to_string()));
+            let snapshot_dir = db_path.parent().map(|p| p.join("snapshots"));
 
             tauri::async_runtime::spawn(async move {
-                match init_db(&db_path).await {
+                match init_db(&db_path, snapshot_dir.as_deref()).await {
                     Ok(db) => {
                         let app_state = Arc::new(Mutex::new(AppState {
                             sqlite_db: Mutex::new(db),
@@ -229,18 +226,9 @@ pub fn run() {
             db_list_idea_notes,
             db_update_idea_note,
             db_delete_idea_note,
-            // Snapshots
-            db_snapshot,
-            db_list_snapshots,
-            db_rollback_to,
-            db_append_from,
             // AI Client
             ai_list_plugins,
             ai_create_llm_session,
-            ai_create_character_session,
-            ai_generate_entry_summary,
-            ai_start_contradiction_session,
-            ai_get_contradiction_report,
             ai_send_message,
             ai_cancel_session,
             ai_close_session,
@@ -286,6 +274,11 @@ pub fn run() {
             plugin_market_delete,
             map_save_scene,
             compute_layout,
+            // Snapshots
+            db_snapshot,
+            db_list_snapshots,
+            db_rollback_to,
+            db_append_from,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -293,7 +286,7 @@ pub fn run() {
 
 // ── 初始化辅助 ────────────────────────────────────────────────────────────────
 
-async fn init_db(db_path: &Path) -> Result<SqliteDb> {
+async fn init_db(db_path: &Path, snapshot_dir: Option<&Path>) -> Result<SqliteDb> {
     if !db_path.exists() {
         std::fs::File::create(db_path).map_err(|e| anyhow::anyhow!("无法创建数据库文件: {}", e))?;
     }
@@ -302,7 +295,18 @@ async fn init_db(db_path: &Path) -> Result<SqliteDb> {
         .ok_or_else(|| anyhow::anyhow!("数据库路径包含非法 UTF-8 字符: {:?}", db_path))?
         .replace('\\', "/");
     log::info!("Connecting to database: {}", path_str);
-    SqliteDb::new(&path_str).await.map_err(Into::into)
+
+    if let Some(dir) = snapshot_dir {
+        std::fs::create_dir_all(dir)?;
+        let config = SnapshotConfig {
+            dir: dir.to_path_buf(),
+            author_name: "FlowCloudAI".to_string(),
+            author_email: "app@flowcloud.ai".to_string(),
+        };
+        SqliteDb::new_with_snapshot(&path_str, config).await.map_err(Into::into)
+    } else {
+        SqliteDb::new(&path_str).await.map_err(Into::into)
+    }
 }
 
 fn prepare_db_path(_app: &AppHandle, db_dir: &Path) -> Result<PathBuf> {

@@ -1,4 +1,3 @@
-use crate::senses::app_sense::AppSense;
 use crate::AiSessionKind;
 use crate::AiState;
 use crate::ApiKeyStore;
@@ -478,7 +477,6 @@ pub async fn ai_create_llm_session(
 
     let client = ai_state.client.lock().await;
     let registry = client.tool_registry().clone();
-    let app_sense = AppSense::new();
     let mut session = match conversation_id {
         Some(ref conv_id) => client
             .resume_llm_session(&plugin_id, &api_key, conv_id)
@@ -488,11 +486,6 @@ pub async fn ai_create_llm_session(
             .map_err(|e| e.to_string())?,
     };
     drop(client);
-
-    session
-        .load_sense(app_sense)
-        .await
-        .map_err(|e| e.to_string())?;
     session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
 
     if let Some(m) = model {
