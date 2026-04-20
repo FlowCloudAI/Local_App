@@ -1,17 +1,27 @@
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
-import {MessageBox, RollingBox} from 'flowcloudai-ui'
+import {MessageBox, RollingBox, useAlert} from 'flowcloudai-ui'
+import {ai_list_plugins, ai_play_tts, type PluginInfo, setting_get_settings, setting_has_api_key} from '../api'
 import type {AiContextValue} from '../contexts/AiControllerTypes'
+import type {DockableSidePanelMode} from './layout/DockableSidePanel'
+import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from './utils/ttsVoice'
+import './AIChatContent.css'
 
 const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
+const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 
 interface AIChatContentProps {
     controller: AiContextValue
+    panelMode?: DockableSidePanelMode
+    onTogglePanelMode?: () => void
 }
 
-export default function AIChatContent({controller}: AIChatContentProps) {
+export default function AIChatContent({controller, panelMode, onTogglePanelMode}: AIChatContentProps) {
     const ctx = controller
     const isBlankChat = !ctx.activeConversationId
+    const activeConversation = ctx.activeConversation
+    const isCharacterConversation = activeConversation?.mode === 'character'
+    const {showAlert} = useAlert()
 
     const [renamingId, setRenamingId] = useState<string | null>(null)
     const [renameValue, setRenameValue] = useState('')
@@ -66,6 +76,7 @@ export default function AIChatContent({controller}: AIChatContentProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
     const lastScrollTopRef = useRef(0)
+    const roleplayAutoPlayRef = useRef<string | null>(null)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
@@ -128,6 +139,115 @@ export default function AIChatContent({controller}: AIChatContentProps) {
         if (event.target.value.length <= MAX_CHARS) ctx.setInputValue(event.target.value)
     }
 
+    const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
+        const text = content.trim()
+        if (!text) {
+            await showAlert('当前消息没有可播放的文本内容。', 'warning', 'toast', 1800)
+            return
+        }
+
+        let settings
+        let plugins: PluginInfo[]
+        try {
+            ;[settings, plugins] = await Promise.all([
+                setting_get_settings(),
+                ai_list_plugins('tts'),
+            ])
+        } catch (error) {
+            await showAlert(`读取语音设置失败：${String(error)}`, 'error', 'toast', 2600)
+            return
+        }
+
+        if (plugins.length === 0) {
+            await showAlert('当前没有可用的语音插件，请先安装 TTS 插件。', 'warning', 'toast', 2600)
+            return
+        }
+
+        const selectedPlugin = resolvePreferredTtsPlugin(plugins, settings.tts.plugin_id)
+
+        if (!selectedPlugin) {
+            await showAlert('默认语音插件不可用，请在设置中重新选择。', 'warning', 'toast', 2600)
+            return
+        }
+
+        let hasApiKey = false
+        try {
+            hasApiKey = await setting_has_api_key(selectedPlugin.id)
+        } catch (error) {
+            await showAlert(`读取语音插件密钥状态失败：${String(error)}`, 'error', 'toast', 2600)
+            return
+        }
+
+        if (!hasApiKey) {
+            await showAlert(`语音插件「${selectedPlugin.name}」尚未配置 API Key。`, 'warning', 'toast', 2600)
+            return
+        }
+
+        const model = settings.tts.default_model
+        && selectedPlugin.models.includes(settings.tts.default_model)
+            ? settings.tts.default_model
+            : (selectedPlugin.default_model ?? selectedPlugin.models[0] ?? '')
+
+        if (!model) {
+            await showAlert(`语音插件「${selectedPlugin.name}」没有可用模型。`, 'warning', 'toast', 2600)
+            return
+        }
+
+        const voiceId = resolveVoiceIdWithPlugin(
+            selectedPlugin,
+            [overrideVoiceId, settings.tts.voice_id],
+            DEFAULT_ROLEPLAY_VOICE_ID,
+        )
+
+        try {
+            await ai_play_tts({
+                pluginId: selectedPlugin.id,
+                model,
+                text,
+                voiceId,
+            })
+        } catch (error) {
+            await showAlert(`语音播放失败：${String(error)}`, 'error', 'toast', 2800)
+        }
+    }, [showAlert])
+
+    useEffect(() => {
+        if (!isCharacterConversation || !activeConversation) {
+            roleplayAutoPlayRef.current = null
+            return
+        }
+        const latestMessage = ctx.messages[ctx.messages.length - 1]
+        if (!latestMessage || latestMessage.role !== 'assistant') return
+        const currentKey = `${activeConversation.id}:${latestMessage.id}`
+        if (roleplayAutoPlayRef.current === currentKey) return
+        let cancelled = false
+
+        const run = async () => {
+            let shouldAutoPlay = activeConversation.characterAutoPlay
+            if (shouldAutoPlay == null) {
+                try {
+                    const settings = await setting_get_settings()
+                    shouldAutoPlay = settings.tts.auto_play
+                } catch {
+                    shouldAutoPlay = false
+                }
+            }
+            if (!shouldAutoPlay || cancelled) return
+            roleplayAutoPlayRef.current = currentKey
+            await handlePlayRoleMessage(latestMessage.content, activeConversation.characterVoiceId)
+        }
+
+        void run()
+        return () => {
+            cancelled = true
+        }
+    }, [
+        activeConversation,
+        ctx.messages,
+        handlePlayRoleMessage,
+        isCharacterConversation,
+    ])
+
     return (
         <>
             <aside className="ai-sidebar">
@@ -160,9 +280,18 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                     {ctx.conversations.map((conv) => (
                         <div
                             key={conv.id}
-                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}`}
+                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}`}
                             onClick={() => renamingId !== conv.id && void ctx.switchConversation(conv.id)}
                         >
+                            {conv.mode === 'character' && (
+                                <div className="ai-conversation-avatar" aria-hidden="true">
+                                    {conv.backgroundImageUrl ? (
+                                        <img src={conv.backgroundImageUrl} alt={conv.characterName ?? conv.title}/>
+                                    ) : (
+                                        <span>{(conv.characterName ?? conv.title).slice(0, 1) || '角'}</span>
+                                    )}
+                                </div>
+                            )}
                             <div className="ai-conversation-info">
                                 {renamingId === conv.id ? (
                                     <input
@@ -175,7 +304,12 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                         onClick={(event) => event.stopPropagation()}
                                     />
                                 ) : (
-                                    <div className="ai-conversation-title" title={conv.title}>{conv.title}</div>
+                                    <>
+                                        <div className="ai-conversation-title" title={conv.title}>{conv.title}</div>
+                                        {conv.mode === 'character' && (
+                                            <div className="ai-conversation-subtitle">角色对话</div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                             <div className="ai-conversation-actions">
@@ -207,7 +341,13 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                 </div>
             </aside>
 
-            <main className="ai-main">
+            <main className={`ai-main${isCharacterConversation ? ' is-character' : ''}`}>
+                {activeConversation?.backgroundImageUrl && (
+                    <div className="ai-main-background" aria-hidden="true">
+                        <img src={activeConversation.backgroundImageUrl}
+                             alt={activeConversation.characterName ?? '角色背景'}/>
+                    </div>
+                )}
                 <div className="ai-topbar">
                     <div className="ai-topbar-left">
                         <button
@@ -268,6 +408,24 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                 <path d="M8 3v10M3 8h10"/>
                             </svg>
                         </button>
+                        <button
+                            className="ai-topbar-toggle"
+                            onClick={() => onTogglePanelMode?.()}
+                            title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                {panelMode === 'fullscreen' ? (
+                                    <>
+                                        <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
+                                    </>
+                                ) : (
+                                    <>
+                                        <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
+                                    </>
+                                )}
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -293,7 +451,11 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                     toolCallDetail={'verbose'}
                                     markdown={message.role === 'assistant'}
                                     reasoning={message.reasoning || undefined}
+                                    rolePlaying={isCharacterConversation && message.role === 'assistant'}
                                     onCopy={() => navigator.clipboard.writeText(message.content)}
+                                    onPlay={isCharacterConversation && message.role === 'assistant'
+                                        ? () => void handlePlayRoleMessage(message.content, activeConversation?.characterVoiceId)
+                                        : undefined}
                                     onEdit={message.role === 'user'
                                         ? () => ctx.editMessage(message.id)
                                         : undefined}
@@ -308,7 +470,17 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                     blocks={ctx.streamingBlocks}
                                     streaming
                                     markdown
+                                    rolePlaying={isCharacterConversation}
                                     toolCallDetail={'verbose'}
+                                    onPlay={isCharacterConversation
+                                        ? () => void handlePlayRoleMessage(
+                                            ctx.streamingBlocks
+                                                .filter((block) => block.type === 'content')
+                                                .map((block) => block.content)
+                                                .join(''),
+                                            activeConversation?.characterVoiceId,
+                                        )
+                                        : undefined}
                                 />
                             )}
                         </div>
@@ -359,26 +531,30 @@ export default function AIChatContent({controller}: AIChatContentProps) {
                                 >
                                     深度思考
                                 </button>
-                                <button
-                                    className={`ai-toolbar-btn ${ctx.webSearchEnabled ? 'active' : ''}`}
-                                    onClick={(event) => {
-                                        event.stopPropagation()
-                                        void ctx.toggleWebSearch()
-                                    }}
-                                    title="联网搜索"
-                                >
-                                    联网搜索
-                                </button>
-                                <button
-                                    className={`ai-toolbar-btn ${ctx.editModeEnabled ? 'active' : ''}`}
-                                    onClick={(event) => {
-                                        event.stopPropagation()
-                                        void ctx.toggleEditMode()
-                                    }}
-                                    title={ctx.editModeEnabled ? '编辑模式' : '阅读模式'}
-                                >
-                                    {ctx.editModeEnabled ? '编辑模式' : '阅读模式'}
-                                </button>
+                                {!isCharacterConversation && (
+                                    <>
+                                        <button
+                                            className={`ai-toolbar-btn ${ctx.webSearchEnabled ? 'active' : ''}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                void ctx.toggleWebSearch()
+                                            }}
+                                            title="联网搜索"
+                                        >
+                                            联网搜索
+                                        </button>
+                                        <button
+                                            className={`ai-toolbar-btn ${ctx.editModeEnabled ? 'active' : ''}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                void ctx.toggleEditMode()
+                                            }}
+                                            title={ctx.editModeEnabled ? '编辑模式' : '阅读模式'}
+                                        >
+                                            {ctx.editModeEnabled ? '编辑模式' : '阅读模式'}
+                                        </button>
+                                    </>
+                                )}
                                 <div className="ai-model-switcher" ref={modelSwitcherRef}>
                                     {isModelMenuOpen && selectedPluginInfo && (
                                         <div className="ai-model-menu">

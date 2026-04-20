@@ -29,6 +29,12 @@ export interface Conversation {
     sessionId: string | null
     runId: string | null
     timestamp: number
+    mode?: 'default' | 'character'
+    characterEntryId?: string | null
+    characterName?: string | null
+    backgroundImageUrl?: string | null
+    characterVoiceId?: string | null
+    characterAutoPlay?: boolean | null
 }
 
 export interface SessionParams {
@@ -74,6 +80,10 @@ export interface AiContextValue {
     setAutoScroll: (v: boolean) => void
 
     createNewConversation: () => Promise<void>
+    startCharacterConversation: (params: {
+        projectId: string
+        entryId: string
+    }) => Promise<void>
     switchConversation: (convId: string) => Promise<void>
     deleteConversation: (convId: string, e?: React.MouseEvent) => Promise<void>
     renameConversation: (convId: string, title: string) => Promise<void>

@@ -74,6 +74,7 @@ pub(crate) struct SessionEntry {
     pub(crate) run_id: String,
     pub(crate) input_tx: mpsc::Sender<String>,
     pub(crate) handle: SessionHandle,
+    #[allow(dead_code)]
     pub(crate) kind: AiSessionKind,
 }
 

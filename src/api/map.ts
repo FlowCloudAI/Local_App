@@ -1,5 +1,7 @@
-import type {MapShapeSaveRequest, MapShapeSaveResponse} from 'flowcloudai-ui'
+import type {MapPreviewBackgroundImage, MapShapeSaveRequest, MapShapeSaveResponse} from 'flowcloudai-ui'
 import {command} from './base'
+
+export type MapBackgroundImagePayload = MapPreviewBackgroundImage
 
 type MapShapeKind = 'coastline'
 type MapProtocolVersion = 'map_shape_mvp_v1'

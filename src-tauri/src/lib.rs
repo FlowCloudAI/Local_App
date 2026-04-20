@@ -222,6 +222,7 @@ pub fn run() {
             db_list_incoming_links,
             db_delete_links_from_entry,
             db_replace_outgoing_links,
+            import_remote_images,
             // Idea Notes
             db_create_idea_note,
             db_get_idea_note,

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useMemo, useState} from 'react'
 import {Button, Input, Select, Slider, type Theme, useAlert, useTheme} from 'flowcloudai-ui'
 import {open} from '@tauri-apps/plugin-dialog'
 import {listen} from '@tauri-apps/api/event'
@@ -23,6 +23,7 @@ import {
     setting_update_settings
 } from '../api'
 import {LocalPluginCard, MarketPluginCard} from '../components/PluginCard'
+import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../components/utils/ttsVoice'
 import UploadPlugin from '../components/UploadPlugin'
 import './Settings.css'
 
@@ -206,7 +207,15 @@ export default function Settings() {
 
             const nextLlm = normalizeAiConfig('llm')
             const nextImage = normalizeAiConfig('image')
-            const nextTts = normalizeAiConfig('tts')
+            const normalizedTts = normalizeAiConfig('tts')
+            const ttsPlugin = getPluginById('tts', normalizedTts.plugin_id)
+            const nextTtsVoiceId = normalizeVoiceIdWithPlugin(ttsPlugin, normalizedTts.voice_id)
+            const nextTts = nextTtsVoiceId === normalizedTts.voice_id
+                ? normalizedTts
+                : {
+                    ...normalizedTts,
+                    voice_id: nextTtsVoiceId,
+                }
             const changed = nextLlm !== prev.llm || nextImage !== prev.image || nextTts !== prev.tts
 
             return changed ? {
@@ -454,6 +463,16 @@ export default function Settings() {
             setUninstallingId(null)
         }
     }
+
+    const selectedTtsPlugin = useMemo(
+        () => getPluginById('tts', settings?.tts.plugin_id ?? null),
+        [getPluginById, settings?.tts.plugin_id],
+    )
+
+    const ttsVoiceOptions = useMemo(
+        () => buildTtsVoiceOptions(selectedTtsPlugin, '未选择'),
+        [selectedTtsPlugin],
+    )
 
     if (loading || !settings) {
         return (
@@ -875,6 +894,40 @@ export default function Settings() {
                                             disabled={!settings.tts.plugin_id}
                                             style={{flex: 1}}
                                         />
+                                    </div>
+                                    <div className="settings-field">
+                                        <label className="settings-label">默认音色 ID</label>
+                                        <Select
+                                            options={ttsVoiceOptions}
+                                            value={settings.tts.voice_id || ''}
+                                            onChange={(value) => setSettings(prev => prev ? {
+                                                ...prev,
+                                                tts: {
+                                                    ...prev.tts,
+                                                    voice_id: value ? String(value) : null,
+                                                }
+                                            } : null)}
+                                            disabled={!selectedTtsPlugin || selectedTtsPlugin.supported_voices.length === 0}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="settings-row">
+                                    <div className="settings-field">
+                                        <label className="settings-label">角色回复自动播放</label>
+                                        <label className="settings-checkbox-row">
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.tts.auto_play}
+                                                onChange={(event) => setSettings(prev => prev ? {
+                                                    ...prev,
+                                                    tts: {
+                                                        ...prev.tts,
+                                                        auto_play: event.target.checked,
+                                                    }
+                                                } : null)}
+                                            />
+                                            <span>启用后，角色对话的新回复会自动尝试播放语音</span>
+                                        </label>
                                     </div>
                                 </div>
                             </section>

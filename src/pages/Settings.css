@@ -329,3 +329,15 @@
     padding: 0.5rem 0.5rem;
   }
 }
+
+.settings-checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--fc-color-text-secondary);
+    font-size: 0.84rem;
+}
+
+.settings-checkbox-row input {
+    margin: 0;
+}

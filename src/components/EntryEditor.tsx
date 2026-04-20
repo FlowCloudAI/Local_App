@@ -3,6 +3,8 @@ import {listen} from '@tauri-apps/api/event'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
+    ai_generate_entry_summary,
+    ai_list_plugins,
     type Category,
     db_create_entry,
     db_create_relation,
@@ -26,6 +28,7 @@ import {
     type EntryTypeView,
     type EntryUpdatedEvent,
     import_entry_images,
+    type PluginInfo,
     setting_get_settings,
     type TagSchema,
 } from '../api'
@@ -34,6 +37,7 @@ import EntryEditorSidebar from './EntryEditorSidebar'
 import EntryImageLightbox from './EntryImageLightbox'
 import TagCreator from './TagCreator'
 import EntryEditorMetaPanel from './EntryEditorMetaPanel'
+import EntryImageAddModal from './EntryImageAddModal'
 import EntryEditorWikiLink from './EntryEditorWikiLink'
 import EntryEditorLinkPreview from './EntryEditorLinkPreview'
 import useWikiLink from './hooks/useWikiLink'
@@ -69,6 +73,7 @@ import {
     normalizeEntryLookupTitle,
     parseDateValue,
 } from './utils/entryCommon'
+import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from './utils/ttsVoice'
 import type {EntryRelationDraft} from './project-editor/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
@@ -86,6 +91,8 @@ interface EntryEditorProps {
     entryId: string
     projectId: string
     projectName: string
+    aiPluginId?: string | null
+    aiModel?: string | null
     categories: Category[]
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
@@ -96,6 +103,7 @@ interface EntryEditorProps {
     onTagSchemasChange?: (schemas: TagSchema[]) => void | Promise<void>
     onBack?: () => void | Promise<void>
     onDirtyChange?: (dirty: boolean) => void
+    onStartCharacterChat?: (entry: Entry) => void | Promise<void>
 }
 
 interface EntryDraft {
@@ -141,6 +149,8 @@ export default function EntryEditor({
     entryId,
     projectId,
     projectName,
+                                        aiPluginId = null,
+                                        aiModel = null,
     categories,
     entryTypes,
     tagSchemas,
@@ -151,6 +161,7 @@ export default function EntryEditor({
     onTagSchemasChange,
     onBack,
     onDirtyChange,
+                                        onStartCharacterChat,
 }: EntryEditorProps) {
     const [entry, setEntry] = useState<Entry | null>(null)
     const [draft, setDraft] = useState<EntryDraft>({
@@ -166,6 +177,7 @@ export default function EntryEditor({
     const [error, setError] = useState<string | null>(null)
     const [autoSaveSeconds, setAutoSaveSeconds] = useState(0)
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
+    const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EditorMode>('browse')
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
@@ -173,12 +185,19 @@ export default function EntryEditor({
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
 
     const [projectDataLoading, setProjectDataLoading] = useState(false)
+    const [ttsVoiceOptions, setTtsVoiceOptions] = useState<{ value: string; label: string }[]>([
+        {value: '', label: '请先在设置中选择默认 TTS 插件'},
+    ])
+    const [ttsVoiceSelectable, setTtsVoiceSelectable] = useState(false)
+    const [ttsVoicePluginName, setTtsVoicePluginName] = useState<string | null>(null)
+    const [ttsVoiceHint, setTtsVoiceHint] = useState('请先在设置中选择默认 TTS 插件')
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
     const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
     const [, setLinksLoading] = useState(false)
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
+    const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
     const entryCacheRef = useRef<Record<string, EntryEditorCache>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -219,6 +238,53 @@ export default function EntryEditor({
             })
             .catch((loadError) => {
                 console.error('加载自动保存设置失败', loadError)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
+
+    useEffect(() => {
+        let cancelled = false
+
+        void Promise.all([
+            setting_get_settings(),
+            ai_list_plugins('tts'),
+        ])
+            .then(([settings, plugins]) => {
+                if (cancelled) return
+
+                const selectedPlugin = resolvePreferredTtsPlugin(plugins as PluginInfo[], settings.tts.plugin_id)
+                setTtsVoicePluginName(selectedPlugin?.name ?? null)
+                setTtsVoiceOptions(buildTtsVoiceOptions(selectedPlugin, '跟随全局默认'))
+
+                if (!selectedPlugin) {
+                    setTtsVoiceSelectable(false)
+                    setTtsVoiceHint('当前没有可用的 TTS 插件')
+                    return
+                }
+
+                if (selectedPlugin.supported_voices.length === 0) {
+                    setTtsVoiceSelectable(false)
+                    setTtsVoiceHint(`插件「${selectedPlugin.name}」未声明可选音色`)
+                    return
+                }
+
+                setTtsVoiceSelectable(true)
+                if (settings.tts.plugin_id) {
+                    setTtsVoiceHint(`使用「${selectedPlugin.name}」提供的音色列表`)
+                    return
+                }
+                setTtsVoiceHint(`当前未设置默认 TTS 插件，暂按「${selectedPlugin.name}」的音色列表展示`)
+            })
+            .catch((loadError) => {
+                if (cancelled) return
+                console.error('加载 TTS 音色列表失败', loadError)
+                setTtsVoiceSelectable(false)
+                setTtsVoicePluginName(null)
+                setTtsVoiceOptions([{value: '', label: '音色列表加载失败'}])
+                setTtsVoiceHint('音色列表加载失败')
             })
 
         return () => {
@@ -535,6 +601,72 @@ export default function EntryEditor({
         ),
     )
     const canSave = Boolean(entry && trimmedTitle && hasChanges && !hasInvalidRelationDrafts && !loading && !saving)
+
+    const handleGenerateSummary = useCallback(async () => {
+        if (generatingSummary || loading || saving) return
+        if (!aiPluginId) {
+            await showAlert('当前还没有可用的 AI 插件，请先在右侧 AI 面板选择或配置模型。', 'warning', 'toast', 2200)
+            return
+        }
+
+        const fallbackTitle = normalizeComparableText(draft.title) || entry?.title || '未命名词条'
+        const draftContent = normalizeComparableContent(draft.content)
+        if (!draftContent) {
+            await showAlert('正文为空，无法生成摘要。', 'warning', 'toast', 1800)
+            return
+        }
+
+        setGeneratingSummary(true)
+        try {
+            const result = await ai_generate_entry_summary({
+                pluginId: aiPluginId,
+                projectId,
+                entryIds: [entryId],
+                outputMode: 'entry_field',
+                focus: `请概括词条《${fallbackTitle}》的核心设定，输出适合放在摘要字段中的中文。`,
+                draftEntry: {
+                    entryId,
+                    title: fallbackTitle,
+                    summary: normalizeComparableText(draft.summary) || null,
+                    content: draft.content,
+                    entryType: draft.type,
+                },
+                model: aiModel || null,
+            })
+
+            const nextSummary = normalizeComparableText(result.summaryMarkdown)
+            if (!nextSummary) {
+                throw new Error('AI 未返回可用摘要')
+            }
+
+            setDraft((current) => (
+                normalizeComparableText(current.summary) === nextSummary
+                    ? current
+                    : {...current, summary: nextSummary}
+            ))
+            await showAlert('已生成摘要', 'success', 'toast', 1500)
+        } catch (summaryError) {
+            console.error('generate summary failed', summaryError)
+            const message = summaryError instanceof Error ? summaryError.message : '生成摘要失败'
+            await showAlert(message, 'error', 'toast', 2200)
+        } finally {
+            setGeneratingSummary(false)
+        }
+    }, [
+        aiModel,
+        aiPluginId,
+        draft.content,
+        draft.summary,
+        draft.title,
+        draft.type,
+        entry?.title,
+        entryId,
+        generatingSummary,
+        loading,
+        projectId,
+        saving,
+        showAlert,
+    ])
     hasChangesRef.current = hasChanges
 
     useEffect(() => {
@@ -1047,6 +1179,7 @@ export default function EntryEditor({
                             editorMode={editorMode}
                             loading={loading}
                             saving={saving}
+                            generatingSummary={generatingSummary}
                             projectName={projectName}
                             categories={categories}
                             entryTypes={entryTypes}
@@ -1056,10 +1189,22 @@ export default function EntryEditor({
                             implantedTagSchemaIdSet={entryTags.implantedTagSchemaIdSet}
                             availableTagSchemaOptions={entryTags.availableTagSchemaOptions}
                             tagSchemaPickerValue={entryTags.tagSchemaPickerValue}
+                            ttsVoiceOptions={ttsVoiceOptions}
+                            ttsVoiceSelectable={ttsVoiceSelectable}
+                            ttsVoicePluginName={ttsVoicePluginName}
+                            ttsVoiceHint={ttsVoiceHint}
                             onDraftChange={setDraft}
-                            onUploadImages={handleUploadImages}
+                            onOpenImageAddModal={() => setImageAddModalOpen(true)}
+                            onViewImageSet={() => {
+                                setLightboxIndex(0)
+                                setLightboxOpen(true)
+                            }}
+                            onGenerateSummary={handleGenerateSummary}
                             onAddVisibleTagSchema={entryTags.handleAddVisibleTagSchema}
                             onOpenTagCreator={() => setTagCreatorOpen(true)}
+                            onStartCharacterChat={entry ? () => {
+                                void onStartCharacterChat?.(entry)
+                            } : undefined}
                         />
                         {editorMode === 'edit' ? (
                             <div className="entry-editor-markdown">
@@ -1217,7 +1362,10 @@ export default function EntryEditor({
                 onIndexChange={setLightboxIndex}
                 onSetCover={handleSetCover}
                 onRemove={handleRemoveImage}
-                onAddImage={() => void handleUploadImages()}
+                onAddImage={() => {
+                    setLightboxOpen(false)
+                    setImageAddModalOpen(true)
+                }}
             />
 
             <TagCreator
@@ -1228,6 +1376,28 @@ export default function EntryEditor({
                 existingCount={entryTags.localTagSchemas.length}
                 onClose={() => setTagCreatorOpen(false)}
                 onSaved={(schema) => void handleTagSchemaSaved(schema)}
+            />
+
+            <EntryImageAddModal
+                open={imageAddModalOpen}
+                projectId={projectId}
+                onClose={() => setImageAddModalOpen(false)}
+                onUploadLocal={handleUploadImages}
+                onAddAiImages={(aiImages) => {
+                    setDraft((current) => {
+                        const nextImages = [...current.images]
+                        aiImages.forEach((image, index) => {
+                            nextImages.push({
+                                ...image,
+                                is_cover: nextImages.length === 0 && index === 0,
+                            })
+                        })
+                        return {
+                            ...current,
+                            images: nextImages,
+                        }
+                    })
+                }}
             />
         </div>
     )

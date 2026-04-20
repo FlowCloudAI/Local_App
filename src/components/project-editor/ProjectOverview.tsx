@@ -1,9 +1,10 @@
-import {memo, type CSSProperties, type ReactNode} from 'react'
-import { Button, RollingBox } from 'flowcloudai-ui'
+import {convertFileSrc} from '@tauri-apps/api/core'
+import {type CSSProperties, memo, type ReactNode} from 'react'
+import {Button, RollingBox} from 'flowcloudai-ui'
 import {
-    entryTypeKey,
     type Category,
     type CustomEntryType,
+    entryTypeKey,
     type EntryTypeView,
     type Project,
     type TagSchema,
@@ -54,6 +55,15 @@ interface ProjectOverviewProps {
     onEditEntryType?: (entryType: CustomEntryType) => void
     onOpenRelationGraph?: () => void
     onOpenTimeline?: () => void
+    onEditCover?: () => void
+    onClearCover?: () => void
+    coverUpdating?: boolean
+}
+
+function toProjectImageSrc(coverPath?: string | null): string | undefined {
+    if (!coverPath) return undefined
+    if (/^(https?:|data:|blob:|asset:)/i.test(coverPath)) return coverPath
+    return convertFileSrc(coverPath)
 }
 
 function getTagTypeLabel(type: string): string {
@@ -241,20 +251,61 @@ function ProjectOverview({
     onEditEntryType,
     onOpenRelationGraph,
                              onOpenTimeline,
+                             onEditCover,
+                             onClearCover,
+                             coverUpdating = false,
 }: ProjectOverviewProps) {
     const entryTypeNameMap = getEntryTypeNameMap(entryTypes)
+    const coverSrc = toProjectImageSrc(project.cover_path)
+    const titleMark = project.name?.trim()?.[0] ?? '项'
 
     return (
         <RollingBox className="pe-overview" thumbSize="thin">
-            <h1 className="pe-overview-title">{project.name}</h1>
-            {project.description && (
-                <p className="pe-overview-desc">{project.description}</p>
-            )}
-            <div className="pe-overview-meta">
-                <span>创建于 {formatDate(project.created_at)}</span>
-                <span className="pe-meta-sep">·</span>
-                <span>更新于 {formatDate(project.updated_at)}</span>
-            </div>
+            <section className="pe-overview-hero">
+                <div className="pe-project-cover-card">
+                    <button
+                        type="button"
+                        className={`pe-project-cover${coverSrc ? ' has-image' : ''}`}
+                        onClick={onEditCover}
+                        disabled={coverUpdating}
+                    >
+                        {coverSrc ? (
+                            <img
+                                src={coverSrc}
+                                alt={`${project.name} 项目封面`}
+                                className="pe-project-cover__image"
+                            />
+                        ) : (
+                            <div className="pe-project-cover__placeholder">
+                                <span className="pe-project-cover__mark">{titleMark}</span>
+                                <span className="pe-project-cover__hint">点击设置项目封面</span>
+                            </div>
+                        )}
+                    </button>
+                    <div className="pe-project-cover__actions">
+                        <Button variant="outline" size="sm" onClick={onEditCover} disabled={coverUpdating}>
+                            {coverUpdating ? '保存中…' : coverSrc ? '更换封面' : '设置封面'}
+                        </Button>
+                        {coverSrc && (
+                            <Button variant="ghost" size="sm" onClick={onClearCover} disabled={coverUpdating}>
+                                清除封面
+                            </Button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="pe-overview-hero__content">
+                    <h1 className="pe-overview-title">{project.name}</h1>
+                    {project.description && (
+                        <p className="pe-overview-desc">{project.description}</p>
+                    )}
+                    <div className="pe-overview-meta">
+                        <span>创建于 {formatDate(project.created_at)}</span>
+                        <span className="pe-meta-sep">·</span>
+                        <span>更新于 {formatDate(project.updated_at)}</span>
+                    </div>
+                </div>
+            </section>
 
             <div className="pe-stats-grid">
                 <StatCard label="词条数" value={entryCount}/>

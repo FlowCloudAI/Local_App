@@ -3,69 +3,73 @@ use crate::AiSessionKind;
 use crate::AiState;
 use crate::ApiKeyStore;
 use crate::PendingEditsState;
-use flowcloudai_client::sense::Sense;
 use flowcloudai_client::{
-    AudioDecoder, AudioSource, ConversationMeta, DefaultOrchestrator, ImageSession, PluginKind,
-    SessionEvent, StoredConversation, TaskContext, TurnStatus,
+    image::ImageRequest, AudioDecoder, AudioSource, ConversationMeta, DefaultOrchestrator,
+    ImageSession,
+    PluginKind, SessionEvent, StoredConversation, TaskContext, TurnStatus,
 };
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use zip::ZipArchive;
 
 // ============ 前端事件 Payload ============
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventReady {
-    session_id: String,
-    run_id: String,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventDelta {
-    session_id: String,
-    run_id: String,
-    text: String,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) text: String,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventToolCall {
-    session_id: String,
-    run_id: String,
-    index: usize,
-    name: String,
-    arguments: String,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) index: usize,
+    pub(crate) name: String,
+    pub(crate) arguments: String,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventTurnEnd {
-    session_id: String,
-    run_id: String,
-    status: String, // "ok" | "cancelled" | "interrupted" | "error:<msg>"
-    node_id: u64,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) status: String, // "ok" | "cancelled" | "interrupted" | "error:<msg>"
+    pub(crate) node_id: u64,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventTurnBegin {
-    session_id: String,
-    run_id: String,
-    turn_id: u64,
-    node_id: u64,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) turn_id: u64,
+    pub(crate) node_id: u64,
 }
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventToolResult {
-    session_id: String,
-    run_id: String,
-    index: usize,
-    output: String,
-    result: String,
-    is_error: bool,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) index: usize,
+    pub(crate) output: String,
+    pub(crate) result: String,
+    pub(crate) is_error: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct CreateLlmSessionResult {
     pub session_id: String,
     pub conversation_id: String,
@@ -74,9 +78,9 @@ pub struct CreateLlmSessionResult {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct EventError {
-    session_id: String,
-    run_id: String,
-    error: String,
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) error: String,
 }
 
 pub(crate) fn turn_status_str(s: &TurnStatus) -> String {
@@ -267,6 +271,138 @@ pub struct PluginInfo {
     pub kind: String,
     pub models: Vec<String>,
     pub default_model: Option<String>,
+    pub supported_sizes: Vec<String>,
+    pub supported_voices: Vec<String>,
+}
+
+fn load_string_array_from_fcplug(
+    fcplug_path: &Path,
+    keys: &[&str],
+) -> Vec<String> {
+    let file = match File::open(fcplug_path) {
+        Ok(file) => file,
+        Err(_) => return Vec::new(),
+    };
+    let mut archive = match ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(_) => return Vec::new(),
+    };
+    let mut manifest = match archive.by_name("manifest.json") {
+        Ok(file) => file,
+        Err(_) => return Vec::new(),
+    };
+    let mut content = String::new();
+    if manifest.read_to_string(&mut content).is_err() {
+        return Vec::new();
+    }
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(json) => json,
+        Err(_) => return Vec::new(),
+    };
+
+    for key in keys {
+        let candidates = [
+            json.get(*key),
+            json.get("ext").and_then(|ext| ext.get(*key)),
+        ];
+        for candidate in candidates.into_iter().flatten() {
+            let Some(values) = candidate.as_array() else {
+                continue;
+            };
+            let items = values
+                .iter()
+                .filter_map(|value| value.as_str().map(str::trim))
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            if !items.is_empty() {
+                return items;
+            }
+        }
+    }
+
+    Vec::new()
+}
+
+fn load_voice_array_from_fcplug(
+    fcplug_path: &Path,
+    keys: &[&str],
+) -> Vec<String> {
+    let file = match File::open(fcplug_path) {
+        Ok(file) => file,
+        Err(_) => return Vec::new(),
+    };
+    let mut archive = match ZipArchive::new(file) {
+        Ok(archive) => archive,
+        Err(_) => return Vec::new(),
+    };
+    let mut manifest = match archive.by_name("manifest.json") {
+        Ok(file) => file,
+        Err(_) => return Vec::new(),
+    };
+    let mut content = String::new();
+    if manifest.read_to_string(&mut content).is_err() {
+        return Vec::new();
+    }
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(json) => json,
+        Err(_) => return Vec::new(),
+    };
+
+    for key in keys {
+        let candidates = [
+            json.get(*key),
+            json.get("ext").and_then(|ext| ext.get(*key)),
+        ];
+        for candidate in candidates.into_iter().flatten() {
+            let Some(values) = candidate.as_array() else {
+                continue;
+            };
+            let items = values
+                .iter()
+                .filter_map(|value| {
+                    if let Some(text) = value.as_str() {
+                        let trimmed = text.trim();
+                        return (!trimmed.is_empty()).then(|| trimmed.to_string());
+                    }
+                    let object = value.as_object()?;
+                    let id = object
+                        .get("id")
+                        .and_then(|raw| raw.as_str())
+                        .map(str::trim)
+                        .filter(|raw| !raw.is_empty());
+                    if let Some(id) = id {
+                        return Some(id.to_string());
+                    }
+                    object
+                        .get("name")
+                        .and_then(|raw| raw.as_str())
+                        .map(str::trim)
+                        .filter(|raw| !raw.is_empty())
+                        .map(str::to_string)
+                })
+                .collect::<Vec<_>>();
+            if !items.is_empty() {
+                return items;
+            }
+        }
+    }
+
+    Vec::new()
+}
+
+fn load_supported_sizes_from_fcplug(fcplug_path: &Path) -> Vec<String> {
+    load_string_array_from_fcplug(
+        fcplug_path,
+        &["supported-sizes", "supported_sizes"],
+    )
+}
+
+fn load_supported_voices_from_fcplug(fcplug_path: &Path) -> Vec<String> {
+    load_voice_array_from_fcplug(
+        fcplug_path,
+        &["voices", "supported-voices", "supported_voices", "voice_ids", "voice-ids"],
+    )
 }
 
 /// 列出指定类型的可用插件；kind 为 "llm" / "image" / "tts"
@@ -286,12 +422,27 @@ pub async fn ai_list_plugins(
     let list = client
         .list_by_kind(plugin_kind)
         .into_iter()
-        .map(|(id, meta)| PluginInfo {
-            id: id.clone(),
-            name: meta.name.clone(),
-            kind: kind.clone(),
-            models: meta.models().to_vec(),
-            default_model: meta.default_model().map(str::to_string),
+        .map(|(id, meta)| {
+            let supported_sizes = meta
+                .as_image()
+                .map(|info| info.supported_sizes.clone())
+                .filter(|sizes| !sizes.is_empty())
+                .unwrap_or_else(|| load_supported_sizes_from_fcplug(&meta.fcplug_path));
+            let supported_voices = if kind == "tts" {
+                load_supported_voices_from_fcplug(&meta.fcplug_path)
+            } else {
+                Vec::new()
+            };
+
+            PluginInfo {
+                id: id.clone(),
+                name: meta.name.clone(),
+                kind: kind.clone(),
+                models: meta.models().to_vec(),
+                default_model: meta.default_model().map(str::to_string),
+                supported_sizes,
+                supported_voices,
+            }
         })
         .collect();
 
@@ -804,9 +955,14 @@ pub async fn ai_text_to_image(
     plugin_id: String,
     model: String,
     prompt: String,
+    size: Option<String>,
 ) -> Result<Vec<ImageData>, String> {
     let session = make_image_session(&ai_state, &plugin_id).await?;
-    let result = session.text_to_image(&model, &prompt).await.map_err(|e| {
+    let mut request = ImageRequest::text_to_image(&model, &prompt);
+    if let Some(size) = size.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+        request = request.size(size);
+    }
+    let result = session.generate(&request).await.map_err(|e| {
         format!(
             "text_to_image 调用失败 [plugin={} model={}]: {}",
             plugin_id, model, e

@@ -110,11 +110,12 @@
 .ai-image-generator__field-row {
     display: flex;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .ai-image-generator__field-row .ai-image-generator__field {
     flex: 1 1 0;
-    min-width: 0;
+    min-width: 10rem;
 }
 
 .ai-image-generator__field {

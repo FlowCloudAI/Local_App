@@ -140,12 +140,14 @@ export interface EntryRelation {
 export interface CreateProjectInput {
     name: string
     description?: string | null
+    coverPath?: string | null
 }
 
 export interface UpdateProjectInput {
     id: string
     name?: string | null
     description?: string | null
+    coverPath?: string | null
 }
 
 export interface CreateCategoryInput {
@@ -249,15 +251,15 @@ export const show_main_window = () => command<string>('show_main_window')
 
 export const showWindow = () => show_main_window().then(() => undefined)
 
-export const db_create_project = ({name, description}: CreateProjectInput) =>
-    command<Project>('db_create_project', {name, description})
+export const db_create_project = ({name, description, coverPath}: CreateProjectInput) =>
+    command<Project>('db_create_project', {name, description, coverImage: coverPath})
 
 export const db_get_project = (id: string) => command<Project>('db_get_project', {id})
 
 export const db_list_projects = () => command<Project[]>('db_list_projects')
 
-export const db_update_project = ({id, name, description}: UpdateProjectInput) =>
-    command<Project>('db_update_project', {id, name, description})
+export const db_update_project = ({id, name, description, coverPath}: UpdateProjectInput) =>
+    command<Project>('db_update_project', {id, name, description, coverImage: coverPath})
 
 export const db_delete_project = (id: string) =>
     command<void>('db_delete_project', {id})
@@ -378,6 +380,9 @@ export const db_optimize_fts = () => command<void>('db_optimize_fts')
 
 export const import_entry_images = (projectId: string, filePaths: string[]) =>
     command<FCImage[]>('import_entry_images', {projectId, filePaths})
+
+export const import_remote_images = (projectId: string, urls: string[]) =>
+    command<FCImage[]>('import_remote_images', {projectId, urls})
 
 export const open_entry_image_path = (path: string) =>
     command<void>('open_entry_image_path', {path})

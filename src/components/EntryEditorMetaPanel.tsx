@@ -13,6 +13,11 @@ import {
 import {getComparableTagValue, normalizeComparableTagValue} from './utils/entryTag'
 import type {EntryImage} from './utils/entryImage'
 import {getCoverImage, toEntryImageSrc} from './utils/entryImage'
+import {
+    CHARACTER_VOICE_AUTO_PLAY_TAG,
+    CHARACTER_VOICE_ID_TAG,
+    readCharacterVoiceConfigFromDraftTags,
+} from './utils/characterVoice'
 
 interface EntryEditorMetaPanelProps {
     entryId: string
@@ -28,6 +33,7 @@ interface EntryEditorMetaPanelProps {
     editorMode: 'edit' | 'browse'
     loading: boolean
     saving: boolean
+    generatingSummary: boolean
     projectName: string
     categories: Category[]
     entryTypes: EntryTypeView[]
@@ -37,10 +43,17 @@ interface EntryEditorMetaPanelProps {
     implantedTagSchemaIdSet: Set<string>
     availableTagSchemaOptions: { value: string; label: string }[]
     tagSchemaPickerValue: string | undefined
+    ttsVoiceOptions: { value: string; label: string }[]
+    ttsVoiceSelectable: boolean
+    ttsVoicePluginName: string | null
+    ttsVoiceHint: string
     onDraftChange: (updater: (prev: EntryEditorMetaPanelProps['draft']) => EntryEditorMetaPanelProps['draft']) => void
-    onUploadImages: () => void
+    onOpenImageAddModal: () => void
+    onViewImageSet: () => void
+    onGenerateSummary: () => void
     onAddVisibleTagSchema: (schemaId: string) => void
     onOpenTagCreator: () => void
+    onStartCharacterChat?: () => void
 }
 
 export default function EntryEditorMetaPanel({
@@ -50,6 +63,7 @@ export default function EntryEditorMetaPanel({
                                                  editorMode,
                                                  loading,
                                                  saving,
+                                                 generatingSummary,
                                                  projectName,
                                                  categories,
                                                  entryTypes,
@@ -59,10 +73,17 @@ export default function EntryEditorMetaPanel({
                                                  implantedTagSchemaIdSet,
                                                  availableTagSchemaOptions,
                                                  tagSchemaPickerValue,
+                                                 ttsVoiceOptions,
+                                                 ttsVoiceSelectable,
+                                                 ttsVoicePluginName,
+                                                 ttsVoiceHint,
                                                  onDraftChange,
-                                                 onUploadImages,
+                                                 onOpenImageAddModal,
+                                                 onViewImageSet,
+                                                 onGenerateSummary,
                                                  onAddVisibleTagSchema,
                                                  onOpenTagCreator,
+                                                 onStartCharacterChat,
                                              }: EntryEditorMetaPanelProps) {
     const isBrowseMode = editorMode === 'browse'
     const trimmedTitle = normalizeComparableText(draft.title)
@@ -70,10 +91,12 @@ export default function EntryEditorMetaPanel({
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
     const coverImage = getCoverImage(draft.images)
     const coverSrc = toEntryImageSrc(coverImage)
-    const coverHintText = isBrowseMode ? '暂无主图' : '点击上传主图'
+    const coverHintText = isBrowseMode ? '暂无主图' : '点击添加图片'
     const entryPathLabel = buildEntryPath(projectName, categories, entry?.category_id ?? null, infoTitle)
     const entryCreatedAtText = formatDate(entry?.['created_at'] as string | null | undefined)
     const entryUpdatedAtText = formatDate(entry?.updated_at as string | null | undefined)
+    const isCharacterEntry = normalizeComparableType(draft.type) === 'character'
+    const characterVoiceConfig = readCharacterVoiceConfigFromDraftTags(draft.tags)
 
     const typeOptions = entryTypes.map((entryType) => {
         const kind = entryType.kind
@@ -97,7 +120,7 @@ export default function EntryEditorMetaPanel({
                         if (draft.images.length) {
                             // lightbox open handled by parent
                         } else if (!isBrowseMode) {
-                            onUploadImages()
+                            onOpenImageAddModal()
                         }
                     }}
                 >
@@ -113,12 +136,12 @@ export default function EntryEditorMetaPanel({
 
                 <div className="entry-editor-cover__toolbar">
                     {!isBrowseMode && (
-                        <Button variant="outline" size="sm" onClick={() => onUploadImages()}>
+                        <Button variant="outline" size="sm" onClick={() => onOpenImageAddModal()}>
                             添加图片
                         </Button>
                     )}
                     {coverImage && (
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={onViewImageSet}>
                             查看设定集
                         </Button>
                     )}
@@ -146,7 +169,20 @@ export default function EntryEditorMetaPanel({
                 </div>
 
                 <div className="entry-editor-meta-panel__section">
-                    <label className="entry-editor-field-label">摘要</label>
+                    <div className="entry-editor-field-label-row">
+                        <label className="entry-editor-field-label">摘要</label>
+                        {!isBrowseMode && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                disabled={saving || loading || generatingSummary}
+                                onClick={onGenerateSummary}
+                            >
+                                {generatingSummary ? '总结中…' : 'AI总结'}
+                            </Button>
+                        )}
+                    </div>
                     {isBrowseMode ? (
                         <div className={`entry-editor-readonly-summary${trimmedSummary ? '' : ' is-empty'}`}>
                             {trimmedSummary || '暂无摘要'}
@@ -166,6 +202,107 @@ export default function EntryEditorMetaPanel({
                         />
                     )}
                 </div>
+
+                {isBrowseMode && isCharacterEntry && onStartCharacterChat && (
+                    <div className="entry-editor-meta-panel__section">
+                        <div className="entry-editor-field-label-row">
+                            <label className="entry-editor-field-label">角色对话</label>
+                            <span className="entry-editor-field-note">以该角色身份在 AI 对话中继续交流</span>
+                        </div>
+                        <Button variant="outline" size="sm" type="button" onClick={onStartCharacterChat}>
+                            和 TA 聊天
+                        </Button>
+                    </div>
+                )}
+
+                {isCharacterEntry && (
+                    <div className="entry-editor-meta-panel__section">
+                        <div className="entry-editor-field-label-row">
+                            <label className="entry-editor-field-label">角色语音</label>
+                            <span
+                                className="entry-editor-field-note">留空时跟随全局 TTS 默认音色{ttsVoicePluginName ? ` · 当前来源：${ttsVoicePluginName}` : ''}</span>
+                        </div>
+                        {isBrowseMode ? (
+                            <div className="entry-editor-readonly-summary">
+                                <div>音色 ID：{characterVoiceConfig.voiceId || '跟随全局默认'}</div>
+                                <div style={{marginTop: '0.35rem'}}>
+                                    自动播放：{characterVoiceConfig.autoPlay == null ? '跟随全局设置' : (characterVoiceConfig.autoPlay ? '开启' : '关闭')}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="entry-editor-character-voice">
+                                <Select
+                                    options={ttsVoiceOptions}
+                                    value={characterVoiceConfig.voiceId ?? ''}
+                                    onChange={(value) => onDraftChange((current) => {
+                                        const nextVoiceId = value ? normalizeComparableText(String(value)) : ''
+                                        const nextTags = {...current.tags}
+                                        if (nextVoiceId) {
+                                            nextTags[CHARACTER_VOICE_ID_TAG] = nextVoiceId
+                                        } else {
+                                            delete nextTags[CHARACTER_VOICE_ID_TAG]
+                                        }
+                                        return {
+                                            ...current,
+                                            tags: nextTags,
+                                        }
+                                    })}
+                                    disabled={saving || loading || !ttsVoiceSelectable}
+                                />
+                                <div className="entry-editor-field-note">{ttsVoiceHint}</div>
+                                <label className="entry-editor-character-voice__toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={characterVoiceConfig.autoPlay ?? false}
+                                        onChange={(event) => onDraftChange((current) => ({
+                                            ...current,
+                                            tags: {
+                                                ...current.tags,
+                                                [CHARACTER_VOICE_AUTO_PLAY_TAG]: event.target.checked,
+                                            },
+                                        }))}
+                                        disabled={saving || loading}
+                                    />
+                                    <span>自动播放角色回复</span>
+                                </label>
+                                {characterVoiceConfig.autoPlay == null && (
+                                    <button
+                                        type="button"
+                                        className="entry-editor-character-voice__reset"
+                                        onClick={() => onDraftChange((current) => {
+                                            const nextTags = {...current.tags}
+                                            delete nextTags[CHARACTER_VOICE_AUTO_PLAY_TAG]
+                                            return {
+                                                ...current,
+                                                tags: nextTags,
+                                            }
+                                        })}
+                                        disabled={saving || loading}
+                                    >
+                                        当前：跟随全局设置
+                                    </button>
+                                )}
+                                {characterVoiceConfig.autoPlay != null && (
+                                    <button
+                                        type="button"
+                                        className="entry-editor-character-voice__reset"
+                                        onClick={() => onDraftChange((current) => {
+                                            const nextTags = {...current.tags}
+                                            delete nextTags[CHARACTER_VOICE_AUTO_PLAY_TAG]
+                                            return {
+                                                ...current,
+                                                tags: nextTags,
+                                            }
+                                        })}
+                                        disabled={saving || loading}
+                                    >
+                                        改为跟随全局自动播放设置
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="entry-editor-meta-panel__section">
                     <div className="entry-editor-field-label-row">

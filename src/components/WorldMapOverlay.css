@@ -1,0 +1,32 @@
+.world-map-overlay {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+}
+
+.world-map-overlay__deck,
+.world-map-overlay__svg,
+.world-map-overlay__markers {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* deck layer captures mouse for pan/zoom */
+.world-map-overlay__deck {
+    z-index: 0;
+}
+
+/* svg editor layer: readOnly allows pan/zoom but blocks shape edits */
+.world-map-overlay__svg {
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* marker layer is purely visual */
+.world-map-overlay__markers {
+    z-index: 2;
+    pointer-events: none;
+}

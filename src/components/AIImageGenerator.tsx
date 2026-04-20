@@ -9,6 +9,7 @@ export default function AIImageGenerator() {
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
+    const [selectedSize, setSelectedSize] = useState('')
     const [prompt, setPrompt] = useState('')
     const [generateState, setGenerateState] = useState<GenerateState>('idle')
     const [results, setResults] = useState<ImageData[]>([])
@@ -45,14 +46,21 @@ export default function AIImageGenerator() {
         const plugin = plugins.find((p) => p.id === selectedPlugin)
         if (plugin) {
             const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
-            console.log('[AIImageGenerator] 插件变化，自动选择模型:', {pluginId: plugin.id, defaultModel})
+            const defaultSize = plugin.supported_sizes[0] ?? ''
+            console.log('[AIImageGenerator] 插件变化，自动选择模型与尺寸:', {
+                pluginId: plugin.id,
+                defaultModel,
+                defaultSize
+            })
             queueMicrotask(() => {
                 setSelectedModel(defaultModel)
+                setSelectedSize(defaultSize)
             })
         } else {
-            console.log('[AIImageGenerator] 清空模型选择（插件未选中或不存在）')
+            console.log('[AIImageGenerator] 清空模型与尺寸选择（插件未选中或不存在）')
             queueMicrotask(() => {
                 setSelectedModel('')
+                setSelectedSize('')
             })
         }
     }, [selectedPlugin, plugins])
@@ -87,6 +95,7 @@ export default function AIImageGenerator() {
             pluginId: selectedPlugin,
             model: selectedModel,
             prompt: prompt.trim(),
+            size: selectedSize || null,
         }
         console.log('[AIImageGenerator] ========== 开始图像生成 ==========')
         console.log('[AIImageGenerator] 请求参数:', requestPayload)
@@ -189,7 +198,24 @@ export default function AIImageGenerator() {
                                     options={selectedPluginInfo?.models.map((m) => ({value: m, label: m})) ?? []}
                                 />
                             </div>
+                            <div className="ai-image-generator__field">
+                                <label className="ai-image-generator__label">尺寸</label>
+                                <Select
+                                    className="ai-image-generator__select"
+                                    value={selectedSize}
+                                    onChange={(v) => setSelectedSize(String(v))}
+                                    placeholder="选择尺寸"
+                                    options={selectedPluginInfo?.supported_sizes.map((size) => ({
+                                        value: size,
+                                        label: size
+                                    })) ?? []}
+                                    disabled={!selectedPluginInfo || selectedPluginInfo.supported_sizes.length === 0}
+                                />
+                            </div>
                         </div>
+                        {selectedPluginInfo && selectedPluginInfo.supported_sizes.length === 0 && (
+                            <span className="ai-image-generator__hint">当前插件未声明可选尺寸，将使用模型默认尺寸。</span>
+                        )}
 
                         <div className="ai-image-generator__field">
                             <label className="ai-image-generator__label">提示词（Prompt）</label>

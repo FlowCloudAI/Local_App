@@ -1,4 +1,12 @@
-import {type MouseEvent as ReactMouseEvent, useCallback, useEffect, useRef, useState} from 'react'
+import {
+    type CSSProperties,
+    type MouseEvent as ReactMouseEvent,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState
+} from 'react'
 import './DockableSidePanel.css'
 
 export type DockableSidePanelMode = 'fullscreen' | 'floating'
@@ -29,8 +37,15 @@ export default function DockableSidePanel({
                                               handleTitle = '拖拽调整宽度',
                                               children,
                                           }: DockableSidePanelProps) {
+    const rootRef = useRef<HTMLElement | null>(null)
     const [isDragging, setIsDragging] = useState(false)
     const [isCollapsePreview, setIsCollapsePreview] = useState(false)
+    const [fullscreenRect, setFullscreenRect] = useState<{
+        top: number
+        left: number
+        width: number
+        height: number
+    } | null>(null)
     const isDraggingRef = useRef(false)
     const isCollapsePreviewRef = useRef(false)
     const dragStartXRef = useRef(0)
@@ -42,6 +57,44 @@ export default function DockableSidePanel({
             lastExpandedWidthRef.current = width
         }
     }, [collapsed, mode, width])
+
+    useLayoutEffect(() => {
+        if (mode !== 'fullscreen') return
+
+        const updateFullscreenRect = () => {
+            const parent = rootRef.current?.parentElement
+            if (!parent) return
+            const rect = parent.getBoundingClientRect()
+            setFullscreenRect({
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+            })
+        }
+
+        updateFullscreenRect()
+
+        const parent = rootRef.current?.parentElement
+        if (!parent || typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateFullscreenRect)
+            return () => {
+                window.removeEventListener('resize', updateFullscreenRect)
+            }
+        }
+
+        const observer = new ResizeObserver(() => {
+            updateFullscreenRect()
+        })
+
+        observer.observe(parent)
+        window.addEventListener('resize', updateFullscreenRect)
+
+        return () => {
+            observer.disconnect()
+            window.removeEventListener('resize', updateFullscreenRect)
+        }
+    }, [mode])
 
     const handleResizeStart = useCallback((event: ReactMouseEvent) => {
         if (mode !== 'floating') return
@@ -110,10 +163,29 @@ export default function DockableSidePanel({
         className,
     ].filter(Boolean).join(' ')
 
+    const rootStyle: CSSProperties | undefined = (() => {
+        if (mode === 'fullscreen') {
+            if (!fullscreenRect) return undefined
+            return {
+                position: 'fixed',
+                top: fullscreenRect.top,
+                left: fullscreenRect.left,
+                width: fullscreenRect.width,
+                height: fullscreenRect.height,
+                zIndex: 1000,
+            }
+        }
+
+        return {
+            width: collapsed || isCollapsePreview ? undefined : width,
+        }
+    })()
+
     return (
         <section
+            ref={rootRef}
             className={rootClassName}
-            style={mode === 'floating' ? {width: collapsed || isCollapsePreview ? undefined : width} : undefined}
+            style={rootStyle}
         >
             {mode === 'floating' && (
                 <div

@@ -19,30 +19,54 @@ pub fn build_task_context(
 }
 
 pub fn build_entry_markdown(entry: &Entry, max_content_chars: usize) -> String {
+    let tags = entry
+        .tags
+        .0
+        .iter()
+        .map(|tag| (tag.schema_id.to_string(), tag.value.to_string()))
+        .collect::<Vec<_>>();
+    build_entry_snapshot_markdown(
+        &entry.id.to_string(),
+        &entry.title,
+        entry.r#type.as_deref(),
+        entry.summary.as_deref(),
+        &tags,
+        &entry.content,
+        max_content_chars,
+    )
+}
+
+pub fn build_entry_snapshot_markdown(
+    entry_id: &str,
+    title: &str,
+    entry_type: Option<&str>,
+    summary: Option<&str>,
+    tags: &[(String, String)],
+    content: &str,
+    max_content_chars: usize,
+) -> String {
     let mut output = String::new();
-    output.push_str(&format!("### {} ({})\n", entry.title, entry.id));
-    if let Some(entry_type) = &entry.r#type {
+    output.push_str(&format!("### {} ({})\n", title, entry_id));
+    if let Some(entry_type) = entry_type {
         output.push_str(&format!("- 类型：{}\n", entry_type));
     }
-    if let Some(summary) = &entry.summary {
+    if let Some(summary) = summary {
         output.push_str(&format!("- 摘要：{}\n", summary));
     }
-    if !entry.tags.0.is_empty() {
-        let tag_text = entry
-            .tags
-            .0
+    if !tags.is_empty() {
+        let tag_text = tags
             .iter()
-            .map(|tag| format!("{}={}", tag.schema_id, tag.value))
+            .map(|(schema_id, value)| format!("{}={}", schema_id, value))
             .collect::<Vec<_>>()
             .join("；");
         output.push_str(&format!("- 标签：{}\n", tag_text));
     }
 
-    let content: String = if entry.content.chars().count() > max_content_chars {
-        let clipped = entry.content.chars().take(max_content_chars).collect::<String>();
+    let content: String = if content.chars().count() > max_content_chars {
+        let clipped = content.chars().take(max_content_chars).collect::<String>();
         format!("{}\n……（正文过长，已截断）", clipped)
     } else {
-        entry.content.clone()
+        content.to_string()
     };
     output.push_str("\n正文：\n");
     output.push_str(&content);
@@ -54,18 +78,33 @@ pub fn build_summary_prompt(
     project_name: &str,
     focus: Option<&str>,
     entry_blocks: &[String],
+    output_mode: Option<&str>,
 ) -> String {
-    let mut prompt = format!(
-        "请基于以下项目资料生成一份中文总结。项目名：{}。\n",
-        project_name
-    );
+    let is_entry_field_mode = matches!(output_mode, Some("entry_field"));
+    let mut prompt = if is_entry_field_mode {
+        format!(
+            "请基于以下项目资料，为当前词条生成可直接写入“摘要”字段的中文概括。项目名：{}。\n",
+            project_name
+        )
+    } else {
+        format!(
+            "请基于以下项目资料生成一份中文总结。项目名：{}。\n",
+            project_name
+        )
+    };
     if let Some(focus) = focus {
         prompt.push_str(&format!("总结重点：{}。\n", focus));
     }
     prompt.push_str("输出要求：\n");
-    prompt.push_str("1. 使用 Markdown。\n");
-    prompt.push_str("2. 先给一个总览，再给 3-6 条关键信息。\n");
-    prompt.push_str("3. 不要编造资料中不存在的设定。\n\n");
+    if is_entry_field_mode {
+        prompt.push_str("1. 只输出一个 JSON 对象，不要有任何其他文字：{\"summary\": \"摘要内容\"}\n");
+        prompt.push_str("2. summary 字段：30-120 字中文，优先概括身份、核心设定或主要作用。\n");
+        prompt.push_str("3. 不要写”该词条””这个角色”等空泛指代，不要编造资料中不存在的设定。\n\n");
+    } else {
+        prompt.push_str("1. 使用 Markdown。\n");
+        prompt.push_str("2. 先给一个总览，再给 3-6 条关键信息。\n");
+        prompt.push_str("3. 不要编造资料中不存在的设定。\n\n");
+    }
     prompt.push_str("资料如下：\n\n");
     prompt.push_str(&entry_blocks.join("\n\n"));
     prompt

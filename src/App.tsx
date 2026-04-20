@@ -10,7 +10,7 @@ import ProjectEditor from "./pages/ProjectEditor";
 import Settings from "./pages/Settings";
 import Idea from "./pages/Idea";
 import type {Project} from "./api";
-import AIChat from "./components/AI";
+import AIChatContent from "./components/AIChatContent";
 import DockableSidePanel from "./components/layout/DockableSidePanel";
 import RelationDemo from "./components/RelationDemo";
 import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
@@ -63,7 +63,8 @@ function App() {
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [collapsed, setCollapsed] = useState(false)
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
-    const [aiPanelCollapsed, setAiPanelCollapsed] = useState(false)
+    const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
+    const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
 
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
@@ -229,6 +230,26 @@ function App() {
         }
         setMainContentKey(key as MainContentKey)
     }, [])
+
+    const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {
+        setSelectedKey('ai-chat')
+        setSidePanelContentKey('ai-chat')
+        setAiPanelCollapsed(false)
+        const entryTabKey = `entry-${projectId}-${entry.id}`
+        if (activeKey !== entryTabKey) {
+            setActiveKey(entryTabKey)
+        }
+        touchRecentPage(entryTabKey)
+        showHomeWorkspace()
+        try {
+            await aiController.startCharacterConversation({
+                projectId,
+                entryId: entry.id,
+            })
+        } catch (error) {
+            console.error('启动角色对话失败', error)
+        }
+    }, [activeKey, aiController, showHomeWorkspace, touchRecentPage])
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
@@ -470,69 +491,87 @@ function App() {
                     </div>
                 </div>
                 <div className="main-content">
-                    <div className="page-container">
-                        <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
-                            <div className="home-page-stack">
-                                <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
-                                    <ProjectList onOpenProject={handleOpenProject}/>
-                                </div>
-                                {projectTabs.map(tab => {
-                                    const projectId = projectTabMap[tab.key]
-                                    if (!projectId) return null
+                    <div className="workspace-content">
+                        <div className="page-container">
+                            <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
+                                <div className="home-page-stack">
+                                    <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
+                                        <ProjectList onOpenProject={handleOpenProject}/>
+                                    </div>
+                                    {projectTabs.map(tab => {
+                                        const projectId = projectTabMap[tab.key]
+                                        if (!projectId) return null
 
-                                    return (
-                                        <div
-                                            key={tab.key}
-                                            className={`home-page-layer ${activeHomeProjectId === projectId ? 'active' : ''}`}
-                                        >
-                                            <ProjectEditor
-                                                projectId={projectId}
-                                                activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
-                                                openEntryIds={openEntryIdsByProject[projectId] ?? []}
-                                                onOpenEntry={handleOpenEntry}
-                                                onEntryTitleChange={handleEntryTitleChange}
-                                                onBackToProject={handleBackToProject}
-                                                onEntryDirtyChange={handleEntryDirtyChange}
-                                            />
-                                        </div>
-                                    )
-                                })}
+                                        return (
+                                            <div
+                                                key={tab.key}
+                                                className={`home-page-layer ${activeHomeProjectId === projectId ? 'active' : ''}`}
+                                            >
+                                                <ProjectEditor
+                                                    projectId={projectId}
+                                                    aiPluginId={aiController.selectedPlugin || null}
+                                                    aiModel={aiController.selectedModel || null}
+                                                    activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
+                                                    openEntryIds={openEntryIdsByProject[projectId] ?? []}
+                                                    onOpenEntry={handleOpenEntry}
+                                                    onEntryTitleChange={handleEntryTitleChange}
+                                                    onBackToProject={handleBackToProject}
+                                                    onEntryDirtyChange={handleEntryDirtyChange}
+                                                    onStartCharacterChat={handleStartCharacterChat}
+                                                />
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            <div className={`page-wrapper ${mainContentKey === 'relation' ? 'active' : ''}`}>
+                                <RelationDemo/>
+                            </div>
+                            <div className={`page-wrapper ${mainContentKey === 'timeline' ? 'active' : ''}`}>
+                                <TimelineDemo/>
+                            </div>
+                            <div className={`page-wrapper ${mainContentKey === 'map-editor' ? 'active' : ''}`}>
+                                <MapShapeEditorDemo/>
+                            </div>
+                            <div className={`page-wrapper ${mainContentKey === 'ai-image' ? 'active' : ''}`}>
+                                <AIImageGenerator/>
+                            </div>
+                            <div className={`page-wrapper ${mainContentKey === 'ai-tts' ? 'active' : ''}`}>
+                                <AITtsDemo/>
+                            </div>
+                            <div className={`page-wrapper ${mainContentKey === 'settings' ? 'active' : ''}`}>
+                                <Settings/>
                             </div>
                         </div>
-                        <div className={`page-wrapper ${mainContentKey === 'relation' ? 'active' : ''}`}>
-                            <RelationDemo/>
-                        </div>
-                        <div className={`page-wrapper ${mainContentKey === 'timeline' ? 'active' : ''}`}>
-                            <TimelineDemo/>
-                        </div>
-                        <div className={`page-wrapper ${mainContentKey === 'map-editor' ? 'active' : ''}`}>
-                            <MapShapeEditorDemo/>
-                        </div>
-                        <div className={`page-wrapper ${mainContentKey === 'ai-image' ? 'active' : ''}`}>
-                            <AIImageGenerator/>
-                        </div>
-                        <div className={`page-wrapper ${mainContentKey === 'ai-tts' ? 'active' : ''}`}>
-                            <AITtsDemo/>
-                        </div>
-                        <div className={`page-wrapper ${mainContentKey === 'settings' ? 'active' : ''}`}>
-                            <Settings/>
-                        </div>
+                        <DockableSidePanel
+                            mode={aiPanelMode}
+                            width={aiPanelWidth}
+                            minWidth={AI_MIN_PANEL_WIDTH}
+                            maxWidthRatio={0.5}
+                            collapsed={aiPanelCollapsed}
+                            onCollapsedChange={setAiPanelCollapsed}
+                            onWidthChange={setAiPanelWidth}
+                            className="ai-shell"
+                            handleTitle="拖拽调整宽度"
+                        >
+                            {sidePanelContentKey === 'idea'
+                                ? <Idea
+                                    contextProjectId={aiFocus.projectId}
+                                    onOpenEntry={handleOpenEntry}
+                                    panelMode={aiPanelMode}
+                                    onTogglePanelMode={() =>
+                                        setAiPanelMode(
+                                            (prev) => prev === 'floating' ? 'fullscreen' : 'floating')
+                                    }/>
+                                : (
+                                    <div
+                                        className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+                                        <AIChatContent controller={aiController} panelMode={aiPanelMode}
+                                                       onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}/>
+                                    </div>
+                                )}
+                        </DockableSidePanel>
                     </div>
-                    <DockableSidePanel
-                        mode="floating"
-                        width={aiPanelWidth}
-                        minWidth={AI_MIN_PANEL_WIDTH}
-                        maxWidthRatio={0.5}
-                        collapsed={aiPanelCollapsed}
-                        onCollapsedChange={setAiPanelCollapsed}
-                        onWidthChange={setAiPanelWidth}
-                        className="ai-shell"
-                        handleTitle="拖拽调整宽度"
-                    >
-                        {sidePanelContentKey === 'idea'
-                            ? <Idea contextProjectId={aiFocus.projectId}/>
-                            : <AIChat controller={aiController}/>}
-                    </DockableSidePanel>
                     <SideBar
                         className={"side-bar"}
                         items={menuItems}

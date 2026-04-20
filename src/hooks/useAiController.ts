@@ -3,26 +3,43 @@ import {listen} from '@tauri-apps/api/event'
 import {
     ai_close_session,
     ai_delete_conversation,
-    ai_rename_conversation,
     ai_disable_tool,
     ai_enable_tool,
     ai_get_conversation,
     ai_list_conversations,
     ai_list_plugins,
     ai_list_tools,
+    ai_rename_conversation,
     ai_set_task_context,
     ai_update_session,
+    type Category,
+    type CharacterChatCategorySnapshot,
+    type CharacterChatEntrySnapshot,
+    type CharacterChatProjectSnapshot,
+    type CharacterChatRelationSnapshot,
+    type CharacterChatTagSchemaSnapshot,
     db_get_entry,
     db_get_project,
+    db_list_categories,
+    db_list_entries,
+    db_list_relations_for_project,
+    db_list_tag_schemas,
+    type Entry,
     ENTRY_UPDATED,
+    type EntryRelation,
+    type EntryTag,
     type EntryUpdatedEvent,
     type PluginInfo,
     type StoredMessage,
+    type TagSchema,
     type TaskContextPayload,
     type ToolStatus,
 } from '../api'
 import {type SessionMessage, useAiSession} from './useAiSession'
 import type {AiContextValue, Conversation, Message, SessionParams} from '../contexts/AiControllerTypes'
+import {getCoverImage, normalizeEntryImages, toEntryImageSrc} from '../components/utils/entryImage'
+import {normalizeComparableType, normalizeEntryContent} from '../components/utils/entryCommon'
+import {readCharacterVoiceConfigFromTags} from '../components/utils/characterVoice'
 
 const generateTitleFromMessage = (content: string): string => {
     const cleaned = content.trim().replace(/\s+/g, ' ')
@@ -31,6 +48,158 @@ const generateTitleFromMessage = (content: string): string => {
 }
 
 const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
+const PROJECT_SCAN_LIMIT = 1000
+const CHARACTER_CONTENT_LIMIT = 8000
+const ENTRY_CONTENT_LIMIT = 2400
+const ENTRY_SUMMARY_LIMIT = 600
+const RELATION_CONTENT_LIMIT = 400
+const TAG_VALUE_LIMIT = 160
+
+function truncateText(value: string | null | undefined, limit: number): string {
+    if (typeof value !== 'string') return ''
+    const normalized = value.trim()
+    if (!normalized) return ''
+    return normalized.length > limit ? `${normalized.slice(0, limit)}…` : normalized
+}
+
+function buildCategoryPathMap(categories: Category[]): Map<string, string[]> {
+    const categoryMap = new Map(categories.map((category) => [category.id, category]))
+    const pathMap = new Map<string, string[]>()
+
+    const resolvePath = (categoryId: string | null | undefined): string[] => {
+        if (!categoryId) return []
+        const cached = pathMap.get(categoryId)
+        if (cached) return cached
+
+        const path: string[] = []
+        const visited = new Set<string>()
+        let currentId: string | null = categoryId
+        while (currentId) {
+            if (visited.has(currentId)) break
+            visited.add(currentId)
+            const current = categoryMap.get(currentId)
+            if (!current) break
+            path.unshift(current.name)
+            currentId = current.parent_id ?? null
+        }
+        pathMap.set(categoryId, path)
+        return path
+    }
+
+    categories.forEach((category) => resolvePath(category.id))
+    return pathMap
+}
+
+function stringifyTagValue(value: EntryTag['value']): string {
+    if (value == null) return ''
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        return truncateText(String(value), TAG_VALUE_LIMIT)
+    }
+    return ''
+}
+
+function mapTagSchemas(schemas: TagSchema[]): CharacterChatTagSchemaSnapshot[] {
+    return schemas.map((schema) => ({
+        id: schema.id,
+        name: schema.name,
+        description: schema.description ?? null,
+        type: schema.type,
+        target: schema.target,
+    }))
+}
+
+function mapRelations(relations: EntryRelation[]): CharacterChatRelationSnapshot[] {
+    return relations.map((relation) => ({
+        id: relation.id,
+        fromEntryId: relation.a_id,
+        toEntryId: relation.b_id,
+        relation: relation.relation,
+        content: truncateText(relation.content, RELATION_CONTENT_LIMIT),
+    }))
+}
+
+function mapEntrySnapshot(entry: Entry, categoryPathMap: Map<string, string[]>, contentLimit: number): CharacterChatEntrySnapshot {
+    return {
+        id: entry.id,
+        title: entry.title,
+        summary: truncateText(entry.summary ?? '', ENTRY_SUMMARY_LIMIT) || null,
+        content: truncateText(normalizeEntryContent(entry), contentLimit) || null,
+        entryType: normalizeComparableType(entry.type),
+        categoryId: entry.category_id ?? null,
+        categoryPath: categoryPathMap.get(entry.category_id ?? '') ?? [],
+        tags: (entry.tags ?? [])
+            .map((tag) => {
+                const value = stringifyTagValue(tag.value)
+                return {
+                    schemaId: tag.schema_id ?? null,
+                    name: tag.name ?? tag.schema_id ?? '未命名标签',
+                    value,
+                }
+            })
+            .filter((tag) => tag.value),
+    }
+}
+
+async function buildCharacterProjectSnapshot(projectId: string, entryId: string): Promise<{
+    snapshot: CharacterChatProjectSnapshot
+    characterEntry: Entry
+    backgroundImageUrl: string | null
+    characterVoiceId: string | null
+    characterAutoPlay: boolean | null
+}> {
+    const [project, categories, tagSchemas, entryBriefs, relations, characterEntry] = await Promise.all([
+        db_get_project(projectId),
+        db_list_categories(projectId),
+        db_list_tag_schemas(projectId),
+        db_list_entries({projectId, limit: PROJECT_SCAN_LIMIT, offset: 0}),
+        db_list_relations_for_project(projectId),
+        db_get_entry(entryId),
+    ])
+
+    const detailResults = await Promise.all(
+        entryBriefs.map(async (brief) => {
+            try {
+                return await db_get_entry(brief.id)
+            } catch {
+                return null
+            }
+        }),
+    )
+    const allEntries = detailResults.filter((item): item is Entry => Boolean(item))
+    const categoryPathMap = buildCategoryPathMap(categories)
+    const targetSnapshot = mapEntrySnapshot(characterEntry, categoryPathMap, CHARACTER_CONTENT_LIMIT)
+    const entrySnapshots = allEntries.map((entry) => (
+        entry.id === characterEntry.id
+            ? targetSnapshot
+            : mapEntrySnapshot(entry, categoryPathMap, ENTRY_CONTENT_LIMIT)
+    ))
+    const backgroundImageUrl = toEntryImageSrc(getCoverImage(normalizeEntryImages(characterEntry.images))) ?? null
+    const characterVoiceConfig = readCharacterVoiceConfigFromTags(characterEntry.tags)
+
+    return {
+        snapshot: {
+            project: {
+                id: project.id,
+                name: project.name,
+                description: truncateText(project.description ?? '', ENTRY_SUMMARY_LIMIT) || null,
+            },
+            targetCharacter: targetSnapshot,
+            categories: categories.map((category): CharacterChatCategorySnapshot => ({
+                id: category.id,
+                name: category.name,
+                parentId: category.parent_id ?? null,
+                path: categoryPathMap.get(category.id) ?? [category.name],
+            })),
+            tagSchemas: mapTagSchemas(tagSchemas),
+            entries: entrySnapshots,
+            relations: mapRelations(relations),
+        },
+        characterEntry,
+        backgroundImageUrl,
+        characterVoiceId: characterVoiceConfig.voiceId,
+        characterAutoPlay: characterVoiceConfig.autoPlay,
+    }
+}
 
 const storedToMessages = (messages: StoredMessage[]): Message[] => {
     const result: Message[] = []
@@ -346,6 +515,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     sessionId: null,
                     runId: null,
                     timestamp: new Date(meta.updated_at).getTime(),
+                    mode: 'default',
+                    characterEntryId: null,
+                    characterName: null,
+                    backgroundImageUrl: null,
+                    characterVoiceId: null,
+                    characterAutoPlay: null,
                 }))
 
                 setConversations(convs)
@@ -390,6 +565,63 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setEditingMessageId(null)
         setAutoScroll(true)
     }, [session])
+
+    const startCharacterConversation = useCallback(async ({projectId, entryId}: {
+        projectId: string
+        entryId: string
+    }) => {
+        if (!selectedPlugin || !selectedModel) {
+            throw new Error('当前 AI 插件或模型尚未准备好，请稍后重试。')
+        }
+        if (session.isStreaming) {
+            abortControllerRef.current?.abort()
+            await session.cancelSession()
+        }
+
+        const currentConv = activeConversationRef.current
+        if (currentConv?.sessionId) {
+            await session.closeSession(currentConv.sessionId)
+        } else {
+            await session.closeSession()
+        }
+
+        const built = await buildCharacterProjectSnapshot(projectId, entryId)
+        const characterType = normalizeComparableType(built.characterEntry.type)
+        if (characterType !== 'character') {
+            throw new Error('当前词条不是角色类型，无法开启角色对话。')
+        }
+
+        const created = await session.createCharacterSession(selectedPlugin, selectedModel, {
+            characterName: built.characterEntry.title,
+            projectSnapshot: built.snapshot,
+        })
+        if (!created) return
+
+        const conversation: Conversation = {
+            id: created.conversationId,
+            title: `和「${built.characterEntry.title}」聊天`,
+            messages: [],
+            pluginId: selectedPlugin,
+            model: selectedModel,
+            sessionId: created.sessionId,
+            runId: created.runId,
+            timestamp: Date.now(),
+            mode: 'character',
+            characterEntryId: entryId,
+            characterName: built.characterEntry.title,
+            backgroundImageUrl: built.backgroundImageUrl,
+            characterVoiceId: built.characterVoiceId,
+            characterAutoPlay: built.characterAutoPlay,
+        }
+        runtimeConversationRef.current[
+            runtimeConversationKey(created.sessionId, created.runId)
+            ] = created.conversationId
+        setConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)])
+        setActiveConversationId(conversation.id)
+        setInputValue('')
+        setEditingMessageId(null)
+        setAutoScroll(true)
+    }, [selectedModel, selectedPlugin, session])
 
     const switchConversation = useCallback(async (convId: string) => {
         if (convId === activeConversationIdRef.current) return
@@ -469,6 +701,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 sessionId: null,
                 runId: null,
                 timestamp: Date.now(),
+                mode: 'default',
+                characterEntryId: null,
+                characterName: null,
+                backgroundImageUrl: null,
+                characterVoiceId: null,
+                characterAutoPlay: null,
             }
             currentConvId = draftConversationId
             effectiveConvId = draftConversationId
@@ -478,6 +716,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         abortControllerRef.current = new AbortController()
+
+        let sessionForcedClosed = false
 
         if (editingMessageId) {
             const conv = activeConversationRef.current
@@ -494,13 +734,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
                         await session.checkoutForEdit(precedingMsg.nodeId)
                     } else if (session.sessionId) {
                         await session.closeSession()
+                        sessionForcedClosed = true
                     }
                 }
             }
             setEditingMessageId(null)
         }
 
-        const sessionBelongsHere = session.sessionId != null
+        const sessionBelongsHere = !sessionForcedClosed && session.sessionId != null
             && session.sessionId === activeConversationRef.current?.sessionId
             && session.runId != null
             && session.runId === activeConversationRef.current?.runId
@@ -570,7 +811,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
             const isFirstMessage = conversation.messages.length === 0
             return {
                 ...conversation,
-                title: isFirstMessage ? generateTitleFromMessage(trimmed) : conversation.title,
+                title: isFirstMessage && conversation.mode !== 'character'
+                    ? generateTitleFromMessage(trimmed)
+                    : conversation.title,
                 messages: [...conversation.messages, userMessage],
             }
         }))
@@ -669,6 +912,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         autoScroll,
         setAutoScroll,
         createNewConversation,
+        startCharacterConversation,
         switchConversation,
         deleteConversation,
         renameConversation,
@@ -679,6 +923,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
         sessionParams, session.isStreaming, session.blocks, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
-        renameConversation,
+        renameConversation, startCharacterConversation,
     ])
 }

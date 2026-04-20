@@ -1,4 +1,4 @@
-use crate::{AppState, PathsState};
+use crate::{AppState, NetworkState, PathsState};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -1763,4 +1763,61 @@ pub async fn db_append_from(
         .await
         .map(AppendResultDto::from)
         .map_err(|e| e.to_string())
+}
+
+/// 下载远程图片到本地 images 目录
+#[tauri::command]
+pub async fn import_remote_images(
+    paths: State<'_, PathsState>,
+    network: State<'_, NetworkState>,
+    project_id: String,
+    urls: Vec<String>,
+) -> Result<Vec<FCImage>, String> {
+    let _project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+
+    let images_root = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| "invalid db path".to_string())?
+        .join("images");
+    std::fs::create_dir_all(&images_root).map_err(|e| e.to_string())?;
+
+    let mut images = Vec::new();
+    for (i, url) in urls.into_iter().enumerate() {
+        // 清洗 URL：移除查询参数，提取纯净扩展名
+        let clean_url = url.split('?').next().unwrap_or(&url);
+        let ext = clean_url
+            .split('.')
+            .last()
+            .unwrap_or("png");
+
+        // 清洗文件名：移除 Windows 非法字符
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let filename = format!("remote_{}_{}.{}",
+                               timestamp,
+                               i, ext);
+        let local_path = images_root.join(&filename);
+
+        let bytes = network
+            .client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .bytes()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        std::fs::write(&local_path, &bytes).map_err(|e| e.to_string())?;
+
+        images.push(FCImage {
+            path: local_path,
+            is_cover: false,
+            caption: None,
+        });
+    }
+    Ok(images)
 }

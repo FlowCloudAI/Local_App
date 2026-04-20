@@ -8,6 +8,8 @@ export interface PluginInfo {
   kind: string
   models: string[]
   default_model: string | null
+    supported_sizes: string[]
+    supported_voices: string[]
 }
 
 export interface AiCreateLlmSessionParams {
@@ -26,6 +28,71 @@ export interface AiCreateLlmSessionResult {
   run_id: string
 }
 
+export interface CharacterChatProjectMeta {
+    id: string
+    name: string
+    description?: string | null
+}
+
+export interface CharacterChatCategorySnapshot {
+    id: string
+    name: string
+    parentId?: string | null
+    path: string[]
+}
+
+export interface CharacterChatTagSchemaSnapshot {
+    id: string
+    name: string
+    description?: string | null
+    type: string
+    target: string[]
+}
+
+export interface CharacterChatTagSnapshot {
+    schemaId?: string | null
+    name: string
+    value: string
+}
+
+export interface CharacterChatEntrySnapshot {
+    id: string
+    title: string
+    summary?: string | null
+    content?: string | null
+    entryType?: string | null
+    categoryId?: string | null
+    categoryPath: string[]
+    tags: CharacterChatTagSnapshot[]
+}
+
+export interface CharacterChatRelationSnapshot {
+    id: string
+    fromEntryId: string
+    toEntryId: string
+    relation: string
+    content: string
+}
+
+export interface CharacterChatProjectSnapshot {
+    project: CharacterChatProjectMeta
+    targetCharacter: CharacterChatEntrySnapshot
+    categories: CharacterChatCategorySnapshot[]
+    tagSchemas: CharacterChatTagSchemaSnapshot[]
+    entries: CharacterChatEntrySnapshot[]
+    relations: CharacterChatRelationSnapshot[]
+}
+
+export interface AiCreateCharacterSessionParams {
+    sessionId: string
+    pluginId: string
+    characterName: string
+    projectSnapshot: CharacterChatProjectSnapshot
+    model?: string | null
+    temperature?: number | null
+    maxTokens?: number | null
+}
+
 export interface ImageData {
   url: string | null
   size: string | null
@@ -35,6 +102,7 @@ export interface AiImageParams {
   pluginId: string
   model: string
   prompt: string
+    size?: string | null
 }
 
 export interface AiEditImageParams extends AiImageParams {
@@ -147,6 +215,27 @@ export const ai_create_llm_session = ({
       conversationId,
   })
 
+export const ai_create_character_session = ({
+                                                sessionId,
+                                                pluginId,
+                                                characterName,
+                                                projectSnapshot,
+                                                model,
+                                                temperature,
+                                                maxTokens,
+                                            }: AiCreateCharacterSessionParams) =>
+    command<AiCreateLlmSessionResult>('ai_create_character_session', {
+        input: {
+            sessionId,
+            pluginId,
+            characterName,
+            projectSnapshot,
+            model,
+            temperature,
+            maxTokens,
+        },
+    })
+
 export const ai_send_message = (sessionId: string, message: string) =>
   command<void>('ai_send_message', { sessionId, message })
 
@@ -185,8 +274,8 @@ export interface UpdateSessionParams {
 export const ai_update_session = (sessionId: string, params: UpdateSessionParams) =>
     command<void>('ai_update_session', {sessionId, params})
 
-export const ai_text_to_image = ({pluginId, model, prompt}: AiImageParams) =>
-    command<ImageData[]>('ai_text_to_image', {pluginId, model, prompt})
+export const ai_text_to_image = ({pluginId, model, prompt, size}: AiImageParams) =>
+    command<ImageData[]>('ai_text_to_image', {pluginId, model, prompt, size})
 
 export const ai_edit_image = ({
   pluginId,
@@ -247,6 +336,55 @@ export interface StoredConversation extends ConversationMeta {
   schema_version?: number
   messages: StoredMessage[]
 }
+
+export interface SummaryResult {
+    summaryMarkdown: string
+    highlights: string[]
+    sourceEntryIds: string[]
+    warnings: string[]
+}
+
+export interface SummaryDraftEntry {
+    entryId: string
+    title?: string | null
+    summary?: string | null
+    content?: string | null
+    entryType?: string | null
+}
+
+export interface GenerateEntrySummaryParams {
+    pluginId: string
+    projectId: string
+    entryIds: string[]
+    focus?: string | null
+    outputMode?: string | null
+    draftEntry?: SummaryDraftEntry | null
+    model?: string | null
+    maxTokens?: number | null
+}
+
+export const ai_generate_entry_summary = ({
+                                              pluginId,
+                                              projectId,
+                                              entryIds,
+                                              focus,
+                                              outputMode,
+                                              draftEntry,
+                                              model,
+                                              maxTokens,
+                                          }: GenerateEntrySummaryParams) =>
+    command<SummaryResult>('ai_generate_entry_summary', {
+        request: {
+            pluginId,
+            projectId,
+            entryIds,
+            focus,
+            outputMode,
+            draftEntry,
+            model,
+            maxTokens,
+        },
+    })
 
 export const ai_list_conversations = () =>
     command<ConversationMeta[]>('ai_list_conversations')

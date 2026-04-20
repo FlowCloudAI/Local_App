@@ -91,8 +91,19 @@ body {
     background: var(--fc-color-bg);
 }
 
+.workspace-content {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+}
+
 .page-container {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     position: relative;
     overflow: hidden;
     background: var(--fc-color-bg);

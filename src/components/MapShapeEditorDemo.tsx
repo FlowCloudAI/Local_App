@@ -10,6 +10,7 @@ import {
     type MapDeckPreviewRenderOptions,
     type MapEditorCanvas,
     type MapKeyLocationDraft,
+    type MapPreviewBackgroundImage,
     type MapPreviewScene,
     type MapShapeDraft,
     type MapShapeEditorApi,
@@ -38,12 +39,13 @@ const DEFAULT_CANVAS: MapEditorCanvas = {
     height: 650,
 }
 
-function buildPreview(draft: MapShapeEditorDraft, canvas: MapEditorCanvas): MapPreviewScene {
-    return buildPreviewSceneFromDraft({
-        canvas,
-        shapes: draft.shapes,
-        keyLocations: draft.keyLocations,
-    })
+function buildPreview(
+    draft: MapShapeEditorDraft,
+    canvas: MapEditorCanvas,
+    backgroundImage?: MapPreviewBackgroundImage,
+): MapPreviewScene {
+    const scene = buildPreviewSceneFromDraft({canvas, shapes: draft.shapes, keyLocations: draft.keyLocations})
+    return backgroundImage ? {...scene, backgroundImage} : scene
 }
 
 const DRAFT_PRESETS: DraftPreset[] = [
@@ -189,10 +191,19 @@ export default function MapShapeEditorDemo() {
     const [drawingShape, setDrawingShape] = useState<MapShapeDraft | null>(null)
     const [canvas, setCanvas] = useState<MapEditorCanvas>(DEFAULT_CANVAS)
     const [viewBox, setViewBox] = useState<MapShapeEditorViewBox>(() => createInitialMapShapeEditorViewBox(DEFAULT_CANVAS))
-    const [preview, setPreview] = useState<MapPreviewScene | null>(() => buildPreview(initialDraft, DEFAULT_CANVAS))
+    const [preview, setPreview] = useState<MapPreviewScene | null>(() => buildPreview(initialDraft, DEFAULT_CANVAS, undefined))
     const [previewSource, setPreviewSource] = useState<PreviewSource>('draft')
     const [submitState, setSubmitState] = useState<SubmitState>('idle')
     const [submitMessage, setSubmitMessage] = useState('当前预览来自初始草稿。')
+
+    const [bgImageUrl, setBgImageUrl] = useState<string>('')
+    const [bgImageEnabled, setBgImageEnabled] = useState(false)
+    const [bgImageOpacity, setBgImageOpacity] = useState(0.8)
+
+    const backgroundImage = useMemo<MapPreviewBackgroundImage | undefined>(() => {
+        if (!bgImageEnabled || !bgImageUrl.trim()) return undefined
+        return {url: bgImageUrl.trim(), opacity: bgImageOpacity, fit: 'cover'}
+    }, [bgImageEnabled, bgImageUrl, bgImageOpacity])
 
     const [coastlineParams, setCoastlineParams] = useState<CoastlineParamsPayload>({
         minSegments: 5,
@@ -413,7 +424,7 @@ export default function MapShapeEditorDemo() {
     }
 
     const handleBuildPreview = () => {
-        setPreview(buildPreview(draft, canvas))
+        setPreview(buildPreview(draft, canvas, backgroundImage))
         setPreviewSource('draft')
         setSubmitState('draft')
         setSubmitMessage('已使用当前草稿重新构建 MapDeckPreview 场景。')
@@ -436,7 +447,7 @@ export default function MapShapeEditorDemo() {
                 keyLocations: draft.keyLocations,
             })
 
-            setPreview(response.scene)
+            setPreview(backgroundImage ? {...response.scene, backgroundImage} : response.scene)
             setPreviewSource('backend')
             setSubmitState('success')
             setSubmitMessage(response.message ?? `提交成功，保存时间：${response.savedAt}`)
@@ -596,6 +607,40 @@ export default function MapShapeEditorDemo() {
                                         onChange={(event) => handleCanvasChange('height', event.target.value)}
                                     />
                                 </div>
+                            </div>
+                            <div className="map-shape-editor-demo__field">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={bgImageEnabled}
+                                        onChange={(e) => setBgImageEnabled(e.target.checked)}
+                                        style={{marginRight: 6}}
+                                    />
+                                    底图
+                                </label>
+                                {bgImageEnabled && (
+                                    <>
+                                        <input
+                                            placeholder="fcimg://... 或 https://..."
+                                            value={bgImageUrl}
+                                            onChange={(e) => setBgImageUrl(e.target.value)}
+                                            style={{width: '100%', marginTop: 4}}
+                                        />
+                                        <div style={{display: 'flex', alignItems: 'center', gap: 8, marginTop: 4}}>
+                                            <label style={{whiteSpace: 'nowrap'}}>透明度</label>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={1}
+                                                step={0.05}
+                                                value={bgImageOpacity}
+                                                onChange={(e) => setBgImageOpacity(Number(e.target.value))}
+                                                style={{flex: 1}}
+                                            />
+                                            <span style={{minWidth: 32}}>{Math.round(bgImageOpacity * 100)}%</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div className="map-shape-editor-demo__button-row">
                                 <Button size="sm" onClick={handleBuildPreview}>仅用草稿生成预览</Button>

@@ -1,11 +1,10 @@
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {ai_list_plugins, ai_play_tts, ai_speak, type PluginInfo, type TtsResult} from '../api'
+import {buildTtsVoiceOptions, resolveVoiceIdWithPlugin} from './utils/ttsVoice'
 import './AITtsDemo.css'
 
 type GenerateState = 'idle' | 'generating' | 'playing' | 'success' | 'error'
-
-const VOICE_PRESETS = ['Ethan', 'Cherry', 'Chelsie', 'Serena']
 
 function createAudioObjectUrl(result: TtsResult): string {
     const binary = atob(result.audio_base64)
@@ -55,13 +54,15 @@ export default function AITtsDemo() {
             const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
             queueMicrotask(() => {
                 setSelectedModel(defaultModel)
+                setVoiceId(resolveVoiceIdWithPlugin(plugin, [voiceId], ''))
             })
             return
         }
         queueMicrotask(() => {
             setSelectedModel('')
+            setVoiceId('')
         })
-    }, [selectedPlugin, plugins])
+    }, [selectedPlugin, plugins, voiceId])
 
     useEffect(() => () => {
         if (audioUrlRef.current) {
@@ -72,6 +73,11 @@ export default function AITtsDemo() {
     const selectedPluginInfo = useMemo(
         () => plugins.find((p) => p.id === selectedPlugin),
         [plugins, selectedPlugin]
+    )
+
+    const voiceOptions = useMemo(
+        () => buildTtsVoiceOptions(selectedPluginInfo ?? null, '请选择音色'),
+        [selectedPluginInfo],
     )
 
     const canGenerate = useMemo(() => {
@@ -147,10 +153,6 @@ export default function AITtsDemo() {
         setText(event.target.value)
     }
 
-    const handleVoiceChange = (event: ChangeEvent<HTMLInputElement>) => {
-        setVoiceId(event.target.value)
-    }
-
     const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
             event.preventDefault()
@@ -205,25 +207,19 @@ export default function AITtsDemo() {
 
                         <div className="ai-tts-demo__field">
                             <label className="ai-tts-demo__label">音色 ID</label>
-                            <input
-                                className="ai-tts-demo__input"
+                            <Select
+                                className="ai-tts-demo__select"
                                 value={voiceId}
-                                onChange={handleVoiceChange}
-                                placeholder="例如 Ethan"
-                                disabled={generateState === 'generating' || generateState === 'playing'}
+                                onChange={(value) => setVoiceId(String(value))}
+                                placeholder="选择音色"
+                                options={voiceOptions}
+                                disabled={
+                                    generateState === 'generating'
+                                    || generateState === 'playing'
+                                    || !selectedPluginInfo
+                                    || selectedPluginInfo.supported_voices.length === 0
+                                }
                             />
-                            <div className="ai-tts-demo__chips">
-                                {VOICE_PRESETS.map((preset) => (
-                                    <button
-                                        key={preset}
-                                        type="button"
-                                        className={`ai-tts-demo__chip ${voiceId === preset ? 'active' : ''}`}
-                                        onClick={() => setVoiceId(preset)}
-                                    >
-                                        {preset}
-                                    </button>
-                                ))}
-                            </div>
                         </div>
 
                         <div className="ai-tts-demo__field">

@@ -1,4 +1,5 @@
 import {type EntryTag, type TagSchema} from '../api'
+import {CHARACTER_VOICE_AUTO_PLAY_TAG, CHARACTER_VOICE_ID_TAG} from './utils/characterVoice'
 
 export type EntryTagRuntimeValue = string | number | boolean | null
 
@@ -177,7 +178,12 @@ export function buildEntryTagsPayload(
     originalTags?: EntryTag[] | null,
 ): EntryTag[] | null {
     const schemaIds = new Set(tagSchemas.map(schema => schema.id))
-    const preservedExtras = (originalTags ?? []).filter(tag => !tag.schema_id || !schemaIds.has(tag.schema_id))
+    const reservedExtraNames = new Set([CHARACTER_VOICE_ID_TAG, CHARACTER_VOICE_AUTO_PLAY_TAG])
+    const preservedExtraByName = new Map(
+        (originalTags ?? [])
+            .filter(tag => (!tag.schema_id || !schemaIds.has(tag.schema_id)) && tag.name)
+            .map(tag => [tag.name as string, tag]),
+    )
     const schemaTags = tagSchemas.flatMap(schema => {
         const hasKey = hasSchemaTagKey(draftTags, schema)
         const value = normalizeEntryTagValue(draftTags[schema.id] ?? draftTags[schema.name] ?? null)
@@ -187,11 +193,21 @@ export function buildEntryTagsPayload(
             value,
         }]
     })
-    const merged = [...preservedExtras, ...schemaTags]
+    const nextReservedExtras = [...reservedExtraNames].flatMap((name) => {
+        const value = normalizeEntryTagValue(draftTags[name] ?? null)
+        if (value === null) return []
+        return [{
+            ...preservedExtraByName.get(name),
+            name,
+            value,
+        }]
+    })
+    const preservedExtras = [...preservedExtraByName.values()].filter(tag => !reservedExtraNames.has(tag.name ?? ''))
+    const merged = [...preservedExtras, ...nextReservedExtras, ...schemaTags]
     console.log('[entryTagUtils] 生成词条标签 payload', {
         draftTags,
         schemaTagCount: schemaTags.length,
-        preservedExtraCount: preservedExtras.length,
+        preservedExtraCount: preservedExtras.length + nextReservedExtras.length,
         merged,
     })
     return merged.length ? merged : null

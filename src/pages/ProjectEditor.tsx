@@ -1,5 +1,5 @@
 import React, {memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {type DropPosition, flatToTree, Tree} from 'flowcloudai-ui'
+import {type DropPosition, flatToTree, Tree, useAlert} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -23,6 +23,7 @@ import EntryTypeCreator from '../components/EntryTypeCreator'
 import ProjectRelationGraph from '../components/ProjectRelationGraph'
 import TagCreator from '../components/TagCreator'
 import {CategoryView, ProjectOverview} from '../components/project-editor'
+import ProjectCoverPickerModal from '../components/project-editor/ProjectCoverPickerModal'
 import './ProjectEditor.css'
 
 const TREE_MIN_WIDTH = '15rem'
@@ -33,18 +34,32 @@ const ROOT_ID = '__project_root__'
 
 interface Props {
     projectId: string
+    aiPluginId?: string | null
+    aiModel?: string | null
     activeEntryId?: string | null
     openEntryIds?: string[]
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onEntryTitleChange?: (projectId: string, entry: { id: string; title: string }) => void
     onBackToProject?: (projectId: string) => void
     onEntryDirtyChange?: (projectId: string, entryId: string, dirty: boolean) => void
+    onStartCharacterChat?: (projectId: string, entry: { id: string; title: string }) => void
 }
 
 type Selection = { kind: 'project' } | { kind: 'category'; id: string }
 type ProjectPanel = 'overview' | 'relation-graph' | 'timeline'
 
-function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [], onOpenEntry, onEntryTitleChange, onBackToProject, onEntryDirtyChange}: Props) {
+function ProjectEditorInner({
+                                projectId,
+                                aiPluginId = null,
+                                aiModel = null,
+                                activeEntryId = null,
+                                openEntryIds = [],
+                                onOpenEntry,
+                                onEntryTitleChange,
+                                onBackToProject,
+                                onEntryDirtyChange,
+                                onStartCharacterChat,
+                            }: Props) {
     const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_PX)
     const [treeCollapsed, setTreeCollapsed] = useState(false)
     const [dividerDragging, setDividerDragging] = useState(false)
@@ -64,10 +79,13 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
     const [entryTypeCreatorOpen, setEntryTypeCreatorOpen] = useState(false)
     const [editingTag, setEditingTag] = useState<TagSchema | null>(null)
     const [editingEntryType, setEditingEntryType] = useState<CustomEntryType | null>(null)
+    const [coverPickerOpen, setCoverPickerOpen] = useState(false)
+    const [coverUpdating, setCoverUpdating] = useState(false)
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
     const [projectPanel, setProjectPanel] = useState<ProjectPanel>('overview')
+    const {showAlert} = useAlert()
 
     const touchProjectUpdatedAt = useCallback(() => {
         setProject(current => current ? {...current, updated_at: new Date().toISOString()} : current)
@@ -239,6 +257,29 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
             touchProjectUpdatedAt()
         }
     }
+
+    const handleUpdateProjectCover = useCallback(async (coverPath: string | null) => {
+        setCoverUpdating(true)
+        try {
+            const updated = await db_update_project({id: projectId, coverPath})
+            setProject((current) => {
+                if (!current) return current
+                return {
+                    ...current,
+                    ...updated,
+                    cover_path: coverPath,
+                    updated_at: new Date().toISOString(),
+                }
+            })
+            touchProjectUpdatedAt()
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            await showAlert(message, 'error', 'toast', 3000)
+            throw error
+        } finally {
+            setCoverUpdating(false)
+        }
+    }, [projectId, showAlert, touchProjectUpdatedAt])
 
     const handleCreate = async (parentKey: string | null): Promise<string> => {
         const actualParentId = (!parentKey || parentKey === ROOT_ID) ? null : parentKey
@@ -462,6 +503,11 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                                 }}
                                 onOpenRelationGraph={() => setProjectPanel('relation-graph')}
                                 onOpenTimeline={() => setProjectPanel('timeline')}
+                                onEditCover={() => setCoverPickerOpen(true)}
+                                onClearCover={() => {
+                                    void handleUpdateProjectCover(null).catch(() => undefined)
+                                }}
+                                coverUpdating={coverUpdating}
                             />
                         ) : projectPanel === 'relation-graph' ? (
                             <div className="pe-project-panel">
@@ -508,6 +554,8 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                                 entryId={entryId}
                                 projectId={projectId}
                                 projectName={project.name}
+                                aiPluginId={aiPluginId}
+                                aiModel={aiModel}
                                 categories={categories}
                                 entryTypes={entryTypes}
                                 tagSchemas={tagSchemas}
@@ -532,6 +580,10 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                                 onDirtyChange={(dirty) => {
                                     onEntryDirtyChange?.(projectId, entryId, dirty)
                                 }}
+                                onStartCharacterChat={(entry) => onStartCharacterChat?.(projectId, {
+                                    id: entry.id,
+                                    title: entry.title,
+                                })}
                             />
                         </div>
                     ))}
@@ -595,6 +647,14 @@ function ProjectEditorInner({projectId, activeEntryId = null, openEntryIds = [],
                     await refreshProject()
                     touchProjectUpdatedAt()
                 }}
+            />
+
+            <ProjectCoverPickerModal
+                open={coverPickerOpen}
+                projectId={projectId}
+                currentCoverPath={project?.cover_path ?? null}
+                onClose={() => setCoverPickerOpen(false)}
+                onSelectCover={handleUpdateProjectCover}
             />
         </div>
     )

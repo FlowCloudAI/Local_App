@@ -5,6 +5,7 @@ import {
     ai_cancel_session,
     ai_checkout,
     ai_close_session,
+    ai_create_character_session,
     ai_create_llm_session,
     ai_send_message,
     ai_switch_plugin,
@@ -17,6 +18,7 @@ import {
     type AiEventToolResult,
     type AiEventTurnBegin,
     type AiEventTurnEnd,
+    type CharacterChatProjectSnapshot,
 } from '../api'
 
 // ── 导出类型 ──────────────────────────────────────────────────
@@ -360,6 +362,39 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         }
     }, [])
 
+    const createCharacterSession = useCallback(async (
+        pluginId: string,
+        model: string,
+        params: {
+            characterName: string
+            projectSnapshot: CharacterChatProjectSnapshot
+        },
+    ): Promise<SessionIdentity | null> => {
+        const newId = `session_${Date.now()}`
+        try {
+            const created = await ai_create_character_session({
+                sessionId: newId,
+                pluginId,
+                characterName: params.characterName,
+                projectSnapshot: params.projectSnapshot,
+                model,
+            })
+            sessionIdRef.current = created.session_id
+            runIdRef.current = created.run_id
+            setSessionId(created.session_id)
+            setRunId(created.run_id)
+            lastUserNodeIdRef.current = null
+            return {
+                sessionId: created.session_id,
+                conversationId: created.conversation_id,
+                runId: created.run_id,
+            }
+        } catch (e) {
+            onErrorRef.current(`创建角色会话失败: ${e}`)
+            return null
+        }
+    }, [])
+
     /** 关闭会话并重置流式状态。传入 sid 可关闭非当前会话（用于删除对话）。 */
     const closeSession = useCallback(async (overrideSid?: string | null) => {
         const target = overrideSid !== undefined ? overrideSid : sessionId
@@ -447,6 +482,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         lastUserNodeId,
         lastUserNodeIdRef,
         createSession,
+        createCharacterSession,
         closeSession,
         cancelSession,
         sendMessage,

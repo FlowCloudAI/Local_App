@@ -1,14 +1,22 @@
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
+    type Category,
+    db_create_entry,
     db_create_idea_note,
     db_delete_idea_note,
+    db_get_entry,
+    db_list_all_entry_types,
+    db_list_categories,
     db_list_idea_notes,
     db_list_projects,
     db_update_idea_note,
+    entryTypeKey,
+    type EntryTypeView,
     type IdeaNote,
     type IdeaNoteStatus,
     type Project,
+    setting_get_settings,
 } from '../api'
 import './Idea.css'
 
@@ -18,6 +26,9 @@ type ProjectFilterMode = 'all' | 'global' | string
 
 interface IdeaProps {
     contextProjectId?: string | null
+    onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
+    panelMode?: 'floating' | 'fullscreen'
+    onTogglePanelMode?: () => void
 }
 
 const IDEA_LIST_LIMIT = 100
@@ -70,7 +81,19 @@ function formatIdeaTime(value?: string | null) {
     }).format(date)
 }
 
-export default function Idea({contextProjectId = null}: IdeaProps) {
+function buildEntryTitleFromIdea(title: string, content: string) {
+    const trimmedTitle = title.trim()
+    if (trimmedTitle) return trimmedTitle.slice(0, 160)
+
+    const firstLine = content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find(Boolean)
+
+    return firstLine ? firstLine.slice(0, 160) : ''
+}
+
+export default function Idea({contextProjectId = null, onOpenEntry, panelMode, onTogglePanelMode}: IdeaProps) {
     const {showAlert} = useAlert()
     const textareaRef = useRef<HTMLTextAreaElement | null>(null)
     const createRequestIdRef = useRef(0)
@@ -79,10 +102,17 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
 
     const [ideaNotes, setIdeaNotes] = useState<IdeaNote[]>([])
     const [projects, setProjects] = useState<Project[]>([])
+    const [categories, setCategories] = useState<Category[]>([])
+    const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
     const [draftTitle, setDraftTitle] = useState('')
     const [draftContent, setDraftContent] = useState('')
     const [draftProjectId, setDraftProjectId] = useState<string | null>(contextProjectId)
+    const [defaultEntryType, setDefaultEntryType] = useState<string | null>(null)
+    const [convertCategoryId, setConvertCategoryId] = useState<string | null>(null)
+    const [convertEntryType, setConvertEntryType] = useState<string | null>(null)
+    const [openAfterConvert, setOpenAfterConvert] = useState(true)
+    const [converting, setConverting] = useState(false)
     const [initialized, setInitialized] = useState(false)
     const [loading, setLoading] = useState(true)
     const [saveState, setSaveState] = useState<SaveState>('idle')
@@ -96,6 +126,7 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         () => ideaNotes.find((item) => item.id === selectedIdeaId) ?? null,
         [ideaNotes, selectedIdeaId],
     )
+    const selectedIdeaProjectId = selectedIdea?.project_id ?? null
 
     useEffect(() => {
         selectedIdeaIdRef.current = selectedIdeaId
@@ -111,6 +142,19 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         {value: 'global', label: '未归属'},
         ...projects.map((project) => ({value: project.id, label: project.name})),
     ]), [projects])
+
+    const categoryOptions = useMemo(() => ([
+        {value: 'root', label: '项目根目录'},
+        ...categories.map((category) => ({value: category.id, label: category.name})),
+    ]), [categories])
+
+    const entryTypeOptions = useMemo(() => ([
+        {value: '', label: '不设置'},
+        ...entryTypes.map((entryType) => ({
+            value: entryTypeKey(entryType),
+            label: entryType.name,
+        })),
+    ]), [entryTypes])
 
     const syncDraftFromIdea = useCallback((idea: IdeaNote | null) => {
         setDraftTitle(idea?.title ?? '')
@@ -204,6 +248,15 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         }
     }, [])
 
+    const loadIdeaConversionSettings = useCallback(async () => {
+        try {
+            const settings = await setting_get_settings()
+            setDefaultEntryType(settings.default_entry_type ?? null)
+        } catch (error) {
+            console.error('加载默认词条类型失败', error)
+        }
+    }, [])
+
     useEffect(() => {
         void loadIdeaNotes()
     }, [loadIdeaNotes])
@@ -211,6 +264,10 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
     useEffect(() => {
         void loadProjects()
     }, [loadProjects])
+
+    useEffect(() => {
+        void loadIdeaConversionSettings()
+    }, [loadIdeaConversionSettings])
 
     useEffect(() => {
         syncDraftFromIdea(selectedIdea)
@@ -230,6 +287,51 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
 
         return () => window.clearTimeout(timer)
     }, [initialized, selectedIdeaId])
+
+    useEffect(() => {
+        setOpenAfterConvert(true)
+
+        if (!selectedIdeaId || !selectedIdeaProjectId) {
+            setCategories([])
+            setEntryTypes([])
+            setConvertCategoryId(null)
+            setConvertEntryType(null)
+            return
+        }
+
+        let cancelled = false
+
+        void (async () => {
+            try {
+                const [nextCategories, nextEntryTypes] = await Promise.all([
+                    db_list_categories(selectedIdeaProjectId),
+                    db_list_all_entry_types(selectedIdeaProjectId),
+                ])
+
+                if (cancelled) return
+
+                setCategories(nextCategories)
+                setEntryTypes(nextEntryTypes)
+                setConvertCategoryId(null)
+
+                const preferredEntryType = defaultEntryType && nextEntryTypes.some((item) => entryTypeKey(item) === defaultEntryType)
+                    ? defaultEntryType
+                    : null
+                setConvertEntryType(preferredEntryType)
+            } catch (error) {
+                if (cancelled) return
+                console.error('加载转词条配置失败', error)
+                setCategories([])
+                setEntryTypes([])
+                setConvertCategoryId(null)
+                setConvertEntryType(null)
+            }
+        })()
+
+        return () => {
+            cancelled = true
+        }
+    }, [defaultEntryType, selectedIdeaId, selectedIdeaProjectId])
 
     useEffect(() => {
         const element = layoutRef.current
@@ -389,8 +491,10 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         }
     }, [selectedIdea])
 
-    const handleProjectChange = useCallback(async (value: string | number) => {
-        const nextProjectId = value === 'global' ? null : String(value)
+    const handleProjectChange = useCallback(async (value: string | number | Array<string | number>) => {
+        const normalizedValue = Array.isArray(value) ? value[0] : value
+        if (normalizedValue === undefined) return
+        const nextProjectId = normalizedValue === 'global' ? null : String(normalizedValue)
 
         if (!selectedIdea) {
             setDraftProjectId(nextProjectId)
@@ -417,9 +521,125 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
         }
     }, [loadIdeaNotes, matchesCurrentFilters, selectedIdea])
 
+    const handleOpenConvertedEntry = useCallback(async () => {
+        if (!selectedIdea?.converted_entry_id || !selectedIdea.project_id) return
+
+        try {
+            const entry = await db_get_entry(selectedIdea.converted_entry_id)
+            onOpenEntry?.(selectedIdea.project_id, {
+                id: entry.id,
+                title: entry.title,
+            })
+            setSaveState('saved')
+            setStatusMessage('已打开关联词条')
+        } catch (error) {
+            console.error('打开关联词条失败', error)
+            setSaveState('error')
+            setStatusMessage(error instanceof Error ? error.message : '打开关联词条失败')
+        }
+    }, [onOpenEntry, selectedIdea])
+
     const handleConvertToEntry = useCallback(async () => {
-        await showAlert('转词条流程尚未实现，后续会支持把灵感整理为正式词条。', 'info')
-    }, [showAlert])
+        if (!selectedIdea) return
+
+        if (selectedIdea.converted_entry_id) {
+            await handleOpenConvertedEntry()
+            return
+        }
+
+        if (!selectedIdea.project_id) {
+            await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'toast', 1800)
+            return
+        }
+
+        const targetTitle = buildEntryTitleFromIdea(draftTitle, draftContent)
+        if (!targetTitle) {
+            await showAlert('便签标题和正文都为空，暂时无法转为词条。', 'warning', 'toast', 1800)
+            return
+        }
+
+        setConverting(true)
+        setSaveState('saving')
+        setStatusMessage('正在转为词条…')
+
+        try {
+            let latestIdea = selectedIdea
+            const currentProjectId = selectedIdea.project_id ?? null
+            if (
+                selectedIdea.title !== draftTitle
+                || selectedIdea.content !== draftContent
+                || currentProjectId !== draftProjectId
+            ) {
+                latestIdea = await db_update_idea_note({
+                    id: selectedIdea.id,
+                    projectId: currentProjectId === draftProjectId ? undefined : draftProjectId,
+                    title: draftTitle.trim() ? draftTitle : null,
+                    content: draftContent,
+                })
+                setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === latestIdea.id ? latestIdea : item)))
+            }
+
+            if (!latestIdea.project_id) {
+                await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'toast', 1800)
+                setSaveState('idle')
+                setStatusMessage('请先为便签设置所属项目')
+                return
+            }
+
+            const createdEntry = await db_create_entry({
+                projectId: latestIdea.project_id,
+                categoryId: convertCategoryId,
+                title: targetTitle,
+                summary: null,
+                content: draftContent.trim() ? draftContent : null,
+                type: convertEntryType,
+                tags: null,
+                images: null,
+            })
+
+            const convertedIdea = await db_update_idea_note({
+                id: latestIdea.id,
+                status: 'processed',
+                lastReviewedAt: new Date().toISOString(),
+                convertedEntryId: createdEntry.id,
+            })
+
+            setSaveState('saved')
+            setStatusMessage(`已转为词条「${createdEntry.title}」`)
+
+            if (matchesCurrentFilters(convertedIdea)) {
+                setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === convertedIdea.id ? convertedIdea : item)))
+            } else {
+                await loadIdeaNotes(convertedIdea.id)
+            }
+
+            if (openAfterConvert) {
+                onOpenEntry?.(latestIdea.project_id, {
+                    id: createdEntry.id,
+                    title: createdEntry.title,
+                })
+            }
+        } catch (error) {
+            console.error('转为词条失败', error)
+            setSaveState('error')
+            setStatusMessage(error instanceof Error ? error.message : '转为词条失败')
+        } finally {
+            setConverting(false)
+        }
+    }, [
+        convertCategoryId,
+        convertEntryType,
+        draftContent,
+        draftProjectId,
+        draftTitle,
+        handleOpenConvertedEntry,
+        loadIdeaNotes,
+        matchesCurrentFilters,
+        onOpenEntry,
+        openAfterConvert,
+        selectedIdea,
+        showAlert,
+    ])
 
     const handleDeleteCurrentIdea = useCallback(async () => {
         if (!selectedIdea) return
@@ -560,15 +780,47 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
                             </button>
                             <div className="idea-page__main-title">灵感便签</div>
                         </div>
+                        <div className="idea-page__main-topbar-right">
+                            <button
+                                type="button"
+                                className="idea-page__sidebar-toggle idea-page__fullscreen-toggle"
+                                onClick={() => onTogglePanelMode?.()}
+                                title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                     strokeWidth="1.5">
+                                    {panelMode === 'fullscreen' ? (
+                                        <>
+                                            <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
+                                        </>
+                                    )}
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     <section className="idea-page__editor">
                         <div className="idea-page__editor-header">
-                            <div>
-                                <h3 className="idea-page__editor-title">
-                                    {selectedIdea ? '编辑便签' : '快速记录'}
-                                </h3>
-                                <p className={`idea-page__status idea-page__status--${saveState}`}>{statusMessage}</p>
+                            <div className="idea-page__editor-header-top">
+                                <div>
+                                    <h3 className="idea-page__editor-title">
+                                        {selectedIdea ? '编辑便签' : '快速记录'}
+                                    </h3>
+                                    <p className={`idea-page__status idea-page__status--${saveState}`}>{statusMessage}</p>
+                                </div>
+                                <div className="idea-page__actions">
+                                    <Button variant="ghost" onClick={handleCreateBlankIdea}>空白便签</Button>
+                                    <Button variant="ghost" disabled={!selectedIdea}
+                                            onClick={() => void handleDeleteCurrentIdea()}>
+                                        删除
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="idea-page__editor-header-bottom">
                                 <div className="idea-page__editor-meta">
                                     <div className="idea-page__meta-field">
                                         <span className="idea-page__meta-label">所属项目</span>
@@ -581,17 +833,59 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
                                     </div>
                                     {selectedIdea ? (
                                         <span className="idea-page__meta-badge">
-                                        当前状态：{getIdeaStatusLabel(selectedIdea.status)}
-                                    </span>
+                                            当前状态：{getIdeaStatusLabel(selectedIdea.status)}
+                                        </span>
+                                    ) : null}
+                                    {selectedIdea?.converted_entry_id ? (
+                                        <span className="idea-page__meta-badge">
+                                            已关联词条
+                                        </span>
+                                    ) : null}
+                                    {selectedIdea?.project_id ? (
+                                        <>
+                                            <div className="idea-page__meta-field">
+                                                <span className="idea-page__meta-label">目标分类</span>
+                                                <Select
+                                                    className="idea-page__meta-select"
+                                                    value={convertCategoryId ?? 'root'}
+                                                    options={categoryOptions}
+                                                    onChange={(value) => setConvertCategoryId(value === 'root' ? null : String(value))}
+                                                    disabled={converting || Boolean(selectedIdea.converted_entry_id)}
+                                                />
+                                            </div>
+                                            <div className="idea-page__meta-field">
+                                                <span className="idea-page__meta-label">词条类型</span>
+                                                <Select
+                                                    className="idea-page__meta-select"
+                                                    value={convertEntryType ?? ''}
+                                                    options={entryTypeOptions}
+                                                    onChange={(value) => setConvertEntryType(value ? String(value) : null)}
+                                                    disabled={converting || Boolean(selectedIdea.converted_entry_id)}
+                                                />
+                                            </div>
+                                        </>
+                                    ) : selectedIdea ? (
+                                        <span className="idea-page__meta-badge">
+                                            先设置所属项目后才能转为词条
+                                        </span>
                                     ) : null}
                                 </div>
-                            </div>
-                            <div className="idea-page__actions">
-                                <Button variant="ghost" onClick={handleCreateBlankIdea}>空白便签</Button>
-                                <Button variant="ghost" disabled={!selectedIdea}
-                                        onClick={() => void handleDeleteCurrentIdea()}>
-                                    删除
-                                </Button>
+                                <div className="idea-page__actions idea-page__actions--secondary">
+                                    <Button
+                                        variant="ghost"
+                                        disabled={!selectedIdea || converting || Boolean(selectedIdea?.converted_entry_id)}
+                                        onClick={() => setOpenAfterConvert((prev) => !prev)}
+                                    >
+                                        转后打开：{openAfterConvert ? '开' : '关'}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        disabled={!selectedIdea || converting}
+                                        onClick={() => void handleConvertToEntry()}
+                                    >
+                                        {converting ? '转词条中…' : selectedIdea?.converted_entry_id ? '打开词条' : '转为词条'}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
 
@@ -614,10 +908,6 @@ export default function Idea({contextProjectId = null}: IdeaProps) {
                                     <Button variant="ghost" disabled={!selectedIdea}
                                             onClick={() => void handleTogglePinned()}>
                                         {selectedIdea?.pinned ? '取消置顶' : '置顶'}
-                                    </Button>
-                                    <Button variant="ghost" disabled={!selectedIdea}
-                                            onClick={() => void handleConvertToEntry()}>
-                                        转为词条
                                     </Button>
                                 </div>
                             </div>
