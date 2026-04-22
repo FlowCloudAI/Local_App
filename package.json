@@ -11,7 +11,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deck.gl/core": "9.2.11",
+    "@deck.gl/layers": "9.2.11",
     "@deck.gl/widgets": "^9.2.11",
+    "@luma.gl/shadertools": "9.2.6",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-log": "^2.8.0",

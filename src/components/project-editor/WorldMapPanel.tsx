@@ -6,7 +6,6 @@ import {
     createMapShapeEditorLocalId,
     type MapDeckPreviewPickDetail,
     type MapDeckPreviewTooltip,
-    type MapDeckShaderInject,
     type MapKeyLocationDraft,
     type MapPreviewScene,
     type MapShapeDraft,
@@ -32,6 +31,11 @@ import {
     type MapEntry,
 } from '../../api'
 import './WorldMapPanel.css'
+import {
+    buildDeckStyleConfig,
+    createParchmentTexture,
+    createRicePaperTexture,
+} from './mapStyleUtils'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -67,44 +71,6 @@ const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
     waveAWeight: 0.50,
     waveBWeight: 0.29,
     waveCWeight: 0.30,
-}
-
-// ── GLSL Shader Presets ───────────────────────────────────────────────────────
-
-const STYLE_INJECT: Record<MapStyle, MapDeckShaderInject> = {
-    flat: {},
-    tolkien: {
-        'fs:DECKGL_FILTER_COLOR': `
-            float lum = color.r * 0.299 + color.g * 0.587 + color.b * 0.114;
-            color.r = min(lum * 1.40 + 0.13, 1.0);
-            color.g = min(lum * 1.12 + 0.07, 1.0);
-            color.b = min(lum * 0.68, 1.0);
-            color.a *= 0.88;
-        `,
-    },
-    ink: {
-        'fs:DECKGL_FILTER_COLOR': `
-            float lum = color.r * 0.299 + color.g * 0.587 + color.b * 0.114;
-            float darkness = 1.0 - lum;
-            color.r = lum;
-            color.g = lum;
-            color.b = lum * 0.94;
-            color.a *= 0.45 + darkness * 0.5;
-        `,
-    },
-}
-
-const STYLE_POLYGON_OVERRIDES: Record<MapStyle, Record<string, unknown>> = {
-    flat: {
-        lineWidthMinPixels: 2,
-        getFillColor: () => [255, 255, 255, 255] as [number, number, number, number],
-    },
-    tolkien: {lineWidthMinPixels: 2},
-    ink: {
-        lineWidthMinPixels: 3,
-        getFillColor: (s: { fillColor: [number, number, number, number] }) =>
-            [s.fillColor[0], s.fillColor[1], s.fillColor[2], 70] as [number, number, number, number],
-    },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -784,11 +750,23 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         setSelectedLocationId(loc.id)
     }, [draft, selectedShapeId, updateDraft])
 
+    // ── Style textures (cached once) ────────────────────────────────────────────
+
+    const styleTextures = useMemo(() => ({
+        parchment: createParchmentTexture(CANVAS.width, CANVAS.height),
+        ricePaper: createRicePaperTexture(CANVAS.width, CANVAS.height),
+    }), [])
+
     // ── Deck & SVG props ──────────────────────────────────────────────────────
 
     const displayScene = useMemo(() => {
         const oceanUrl = makeOceanSvgUrl(OCEAN_COLORS[style])
-        const bgUrl = backgroundImageUrl ?? oceanUrl
+        const styleTextureUrl = style === 'tolkien'
+            ? styleTextures.parchment
+            : style === 'ink'
+                ? styleTextures.ricePaper
+                : null
+        const bgUrl = backgroundImageUrl ?? styleTextureUrl ?? oceanUrl
         const previewScene = buildPreviewSceneFromDraft({
             canvas: CANVAS,
             shapes: draft.shapes,
@@ -803,54 +781,17 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             ...base,
             backgroundImage: {url: bgUrl, fit: backgroundImageUrl ? 'cover' as const : 'fill' as const},
         }, style)
-    }, [scene, sceneDirty, draft, style, backgroundImageUrl, viewportMode])
+    }, [scene, sceneDirty, draft, style, backgroundImageUrl, viewportMode, styleTextures])
 
-    const deckProps = useMemo(() => ({
-        polygonShaderInject: STYLE_INJECT[style],
-        polygonLayerProps: STYLE_POLYGON_OVERRIDES[style],
-        showLabels: true,
-        keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
-        scatterplotLayerProps: style === 'flat'
-            ? {
-                getRadius: 8,
-                radiusMaxPixels: 18,
-                stroked: true,
-                getLineColor: () => [255, 255, 255, 255] as [number, number, number, number],
-                lineWidthMinPixels: 2,
-            }
-            : style === 'tolkien'
-                ? {
-                    getRadius: 7,
-                    radiusMaxPixels: 16,
-                    stroked: true,
-                    getLineColor: () => [245, 232, 199, 255] as [number, number, number, number],
-                    lineWidthMinPixels: 2,
-                }
-                : {
-                    getRadius: 6,
-                    radiusMaxPixels: 14,
-                    stroked: true,
-                    getLineColor: () => [255, 255, 255, 235] as [number, number, number, number],
-                    lineWidthMinPixels: 1.5,
-                },
-        iconLayerProps: style === 'flat'
-            ? undefined
-            : {
-                getSize: style === 'tolkien' ? 30 : 28,
-            },
-        textLayerProps: {
-            getSize: style === 'flat' ? 13 : style === 'tolkien' ? 15 : 14,
-            getColor: () => (
-                style === 'flat'
-                    ? [38, 43, 56, 255]
-                    : style === 'tolkien'
-                        ? [92, 59, 34, 255]
-                        : [17, 17, 17, 255]
-            ) as [number, number, number, number],
-            fontFamily: STYLE_FONT_FAMILY[style],
-        },
-        getTooltip: (detail: MapDeckPreviewPickDetail) => buildStyleTooltip(style, detail),
-    }), [style])
+    const deckProps = useMemo(() => {
+        const base = buildDeckStyleConfig(style)
+        return {
+            ...base,
+            showLabels: true,
+            keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
+            getTooltip: (detail: MapDeckPreviewPickDetail) => buildStyleTooltip(style, detail),
+        }
+    }, [style])
 
     const svgProps = useMemo(() => ({
         draft,
