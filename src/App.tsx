@@ -605,16 +605,21 @@ function App() {
                                 onTogglePanelMode={() =>
                                     setAiPanelMode(
                                         (prev) => prev === 'floating' ? 'fullscreen' : 'floating')
-                                }/>
+                                }
+                                onToggleCollapsed={() => setAiPanelCollapsed(true)}/>
                             : sidePanelContentKey === 'snapshot'
                                 ? <SnapshotPanel
                                     className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+                                    panelMode={aiPanelMode}
+                                    onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
+                                    onToggleCollapsed={() => setAiPanelCollapsed(true)}
                                 />
                                 : (
                                     <div
                                         className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
                                         <AIChatContent controller={aiController} panelMode={aiPanelMode}
-                                                       onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}/>
+                                                       onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
+                                                       onToggleCollapsed={() => setAiPanelCollapsed(true)}/>
                                     </div>
                                 )}
                     </DockableSidePanel>

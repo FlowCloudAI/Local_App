@@ -14,9 +14,15 @@ interface AIChatContentProps {
     controller: AiContextValue
     panelMode?: DockableSidePanelMode
     onTogglePanelMode?: () => void
+    onToggleCollapsed?: () => void
 }
 
-export default function AIChatContent({controller, panelMode, onTogglePanelMode}: AIChatContentProps) {
+export default function AIChatContent({
+                                          controller,
+                                          panelMode,
+                                          onTogglePanelMode,
+                                          onToggleCollapsed
+                                      }: AIChatContentProps) {
     const ctx = controller
     const isBlankChat = !ctx.activeConversationId
     const activeConversation = ctx.activeConversation
@@ -487,6 +493,16 @@ export default function AIChatContent({controller, panelMode, onTogglePanelMode}
                                         <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
                                     </>
                                 )}
+                            </svg>
+                        </button>
+                        <button
+                            className="ai-topbar-toggle"
+                            onClick={() => onToggleCollapsed?.()}
+                            title="最小化"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                <path d="M6 4l4 4-4 4"/>
                             </svg>
                         </button>
                     </div>

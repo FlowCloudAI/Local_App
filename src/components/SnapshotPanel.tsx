@@ -18,6 +18,9 @@ import './SnapshotPanel.css'
 
 interface SnapshotPanelProps {
     className?: string
+    panelMode?: 'floating' | 'fullscreen'
+    onTogglePanelMode?: () => void
+    onToggleCollapsed?: () => void
 }
 
 interface SnapshotGraphRow {
@@ -130,7 +133,12 @@ function laneX(lane: number): number {
     return GRAPH_PAD + lane * LANE_GAP
 }
 
-export default function SnapshotPanel({className}: SnapshotPanelProps) {
+export default function SnapshotPanel({
+                                          className,
+                                          panelMode,
+                                          onTogglePanelMode,
+                                          onToggleCollapsed
+                                      }: SnapshotPanelProps) {
     const {showAlert} = useAlert()
     const [branches, setBranches] = useState<SnapshotBranchInfo[]>([])
     const [graph, setGraph] = useState<SnapshotGraph>({activeBranch: '', branches: [], nodes: []})
@@ -284,10 +292,48 @@ export default function SnapshotPanel({className}: SnapshotPanelProps) {
 
     const graphRows = useMemo(() => buildGraphRows(graph.nodes), [graph.nodes])
 
+    const maxRailWidth = useMemo(() => {
+        return graphRows.reduce((max, row) => {
+            const w = Math.max(LANE_GAP + GRAPH_PAD * 2, GRAPH_PAD * 2 + row.laneCount * LANE_GAP)
+            return Math.max(max, w)
+        }, 0)
+    }, [graphRows])
+
+    const RAIL_PX = 32
+    const midY = RAIL_PX / 2
+
     return (
         <div className={`snapshot-panel${className ? ` ${className}` : ''}`}>
             <div className="snapshot-panel__header">
                 <h3 className="snapshot-panel__title">版本管理</h3>
+                <button
+                    type="button"
+                    className="snapshot-panel__fullscreen-toggle"
+                    onClick={() => onTogglePanelMode?.()}
+                    title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
+                >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        {panelMode === 'fullscreen' ? (
+                            <>
+                                <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
+                            </>
+                        ) : (
+                            <>
+                                <path d="M4 4h3M4 4v3M12 4h-3M12 4v3M4 12h3M4 12v-3M12 12h-3M12 12v-3"/>
+                            </>
+                        )}
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    className="snapshot-panel__fullscreen-toggle"
+                    onClick={() => onToggleCollapsed?.()}
+                    title="最小化"
+                >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M6 4l4 4-4 4"/>
+                    </svg>
+                </button>
             </div>
 
             <div className="snapshot-panel__section">
@@ -341,9 +387,9 @@ export default function SnapshotPanel({className}: SnapshotPanelProps) {
                     {activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}
                 </div>
             ) : (
-                <div className="snapshot-panel__graph">
+                <div className="snapshot-panel__graph"
+                     style={{'--rail-width': `${maxRailWidth}px`} as React.CSSProperties}>
                     {graphRows.map((row) => {
-                        const svgWidth = Math.max(LANE_GAP + GRAPH_PAD * 2, GRAPH_PAD * 2 + row.laneCount * LANE_GAP)
                         const circleColor = row.node.isActiveTip
                             ? 'var(--fc-color-primary)'
                             : GRAPH_COLORS[row.lane % GRAPH_COLORS.length]
@@ -353,12 +399,11 @@ export default function SnapshotPanel({className}: SnapshotPanelProps) {
                                 key={row.node.id}
                                 className={`snapshot-panel__graph-row${row.node.isActiveTip ? ' is-active' : ''}`}
                             >
-                                <div className="snapshot-panel__graph-rail" style={{width: `${svgWidth}px`}}>
+                                <div className="snapshot-panel__graph-rail" style={{width: `${maxRailWidth}px`}}>
                                     <svg
-                                        width={svgWidth}
-                                        height="100%"
-                                        viewBox={`0 0 ${svgWidth} 100`}
-                                        preserveAspectRatio="none"
+                                        width={maxRailWidth}
+                                        height={RAIL_PX}
+                                        viewBox={`0 0 ${maxRailWidth} ${RAIL_PX}`}
                                         style={{overflow: 'visible'}}
                                     >
                                         {Array.from({length: row.laneCount}, (_, lane) => {
@@ -368,9 +413,9 @@ export default function SnapshotPanel({className}: SnapshotPanelProps) {
                                             const hasBot = lane < row.lanePresenceBelow.length && row.lanePresenceBelow[lane]
                                             return (
                                                 <g key={`${row.node.id}-lane-${lane}`}>
-                                                    {hasTop && <line x1={x} y1="0" x2={x} y2="50" stroke={color}
+                                                    {hasTop && <line x1={x} y1="0" x2={x} y2={midY} stroke={color}
                                                                      strokeWidth="1.5"/>}
-                                                    {hasBot && <line x1={x} y1="50" x2={x} y2="100" stroke={color}
+                                                    {hasBot && <line x1={x} y1={midY} x2={x} y2={RAIL_PX} stroke={color}
                                                                      strokeWidth="1.5"/>}
                                                 </g>
                                             )
@@ -384,7 +429,7 @@ export default function SnapshotPanel({className}: SnapshotPanelProps) {
                                                 return (
                                                     <path
                                                         key={`${row.node.id}-${parentLane}`}
-                                                        d={`M ${fromX} 50 C ${fromX} 78, ${toX} 78, ${toX} 100`}
+                                                        d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX}`}
                                                         fill="none"
                                                         stroke={color}
                                                         strokeWidth="1.5"
@@ -403,9 +448,6 @@ export default function SnapshotPanel({className}: SnapshotPanelProps) {
                                     />
                                 </div>
                                 <div className="snapshot-panel__item">
-                                    <span className="snapshot-panel__item-type">
-                                        {row.node.message.startsWith('auto') ? '自动' : '手动'}
-                                    </span>
                                     <span className="snapshot-panel__item-message">
                                         {formatSnapshotMessage(row.node.message)}
                                     </span>

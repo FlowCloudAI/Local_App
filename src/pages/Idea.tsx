@@ -29,6 +29,7 @@ interface IdeaProps {
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     panelMode?: 'floating' | 'fullscreen'
     onTogglePanelMode?: () => void
+    onToggleCollapsed?: () => void
 }
 
 const IDEA_LIST_LIMIT = 100
@@ -93,7 +94,13 @@ function buildEntryTitleFromIdea(title: string, content: string) {
     return firstLine ? firstLine.slice(0, 160) : ''
 }
 
-export default function Idea({contextProjectId = null, onOpenEntry, panelMode, onTogglePanelMode}: IdeaProps) {
+export default function Idea({
+                                 contextProjectId = null,
+                                 onOpenEntry,
+                                 panelMode,
+                                 onTogglePanelMode,
+                                 onToggleCollapsed
+                             }: IdeaProps) {
     const {showAlert} = useAlert()
     const textareaRef = useRef<HTMLTextAreaElement | null>(null)
     const createRequestIdRef = useRef(0)
@@ -806,6 +813,17 @@ export default function Idea({contextProjectId = null, onOpenEntry, panelMode, o
                                             <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
                                         </>
                                     )}
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                className="idea-page__sidebar-toggle idea-page__collapse-toggle"
+                                onClick={() => onToggleCollapsed?.()}
+                                title="最小化"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                     strokeWidth="1.5">
+                                    <path d="M6 4l4 4-4 4"/>
                                 </svg>
                             </button>
                         </div>
