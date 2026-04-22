@@ -13,7 +13,7 @@
   "dependencies": {
     "@deck.gl/core": "9.2.11",
     "@deck.gl/layers": "9.2.11",
-    "@deck.gl/widgets": "^9.2.11",
+    "@deck.gl/widgets": "9.2.11",
     "@luma.gl/shadertools": "9.2.6",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
@@ -48,5 +48,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^6.3.5"
+  },
+  "overrides": {
+    "@luma.gl/*": "9.2.6"
   }
 }
