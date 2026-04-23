@@ -6,9 +6,11 @@ import {
     createMapShapeEditorLocalId,
     type MapKeyLocationDraft,
     type MapPreviewScene,
+    type MapRgbaColor,
     type MapShapeDraft,
     type MapShapeEditorDraft,
     MapShapeViewport,
+    type MapShapeViewportRenderer,
     RollingBox,
     useAlert,
     useContextMenu,
@@ -33,6 +35,7 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type ViewportMode = 'edit' | 'preview'
 
 const CANVAS = {width: 1000, height: 1000}
+const FLAT_PIXI_REGION_FILL: MapRgbaColor = [255, 255, 255, 255]
 
 const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
     minSegments: 5,
@@ -66,6 +69,19 @@ function newMapEntry(name: string): MapEntry {
         backgroundImageUrl: null,
         createdAt: now,
         updatedAt: now,
+    }
+}
+
+function normalizeSceneForPixiRenderer(scene: MapPreviewScene, style: MapStyle): MapPreviewScene {
+    if (style !== 'flat') return scene
+
+    return {
+        ...scene,
+        // Deck 的 flat 风格会通过 layer props 强制白色不透明填充；Pixi 直接读取 scene，需要在宿主侧补齐一致性。
+        shapes: scene.shapes.map(shape => ({
+            ...shape,
+            fillColor: [...FLAT_PIXI_REGION_FILL],
+        })),
     }
 }
 
@@ -154,6 +170,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
     const [viewBox, setViewBox] = useState(() => createInitialMapShapeEditorViewBox(CANVAS))
     const [viewportMode, setViewportMode] = useState<ViewportMode>('preview')
+    const [previewRenderer, setPreviewRenderer] = useState<MapShapeViewportRenderer>('pixi')
 
     // ── Op state ─────────────────────────────────────────────────────────────
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -637,6 +654,12 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         return def.transformScene?.(withBg) ?? withBg
     }, [scene, sceneDirty, draft, style, backgroundImageUrl, viewportMode, styleTextureUrl])
 
+    const renderedScene = useMemo(() => (
+        previewRenderer === 'pixi'
+            ? normalizeSceneForPixiRenderer(displayScene, style)
+            : displayScene
+    ), [displayScene, previewRenderer, style])
+
     const deckProps = useMemo(() => {
         const def = getStyleDefinition(style)
         const decorations = def.buildDecorations?.({canvas: CANVAS, scene: displayScene}) ?? {}
@@ -649,6 +672,18 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             extraLayers,
         }
     }, [style, displayScene])
+
+    const pixiProps = useMemo(() => {
+        const def = getStyleDefinition(style)
+        return {
+            style: {backgroundColor: def.oceanColor},
+            showLabels: true,
+            keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
+            emptyHint: '提交后将在这里显示 Pixi 预览结果。',
+        }
+    }, [style])
+
+    const viewportRenderKey = `${previewRenderer}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
     const svgProps = useMemo(() => ({
         draft,
@@ -751,6 +786,17 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                             })
                         }}>
                     {viewportMode === 'edit' ? '切换预览' : '切换编辑'}
+                </button>
+                <div className="wm-toolbar-sep"/>
+                <button type="button"
+                        className={`wm-chip${previewRenderer === 'pixi' ? ' is-active' : ''}`}
+                        onClick={() => setPreviewRenderer('pixi')}>
+                    Pixi 引擎
+                </button>
+                <button type="button"
+                        className={`wm-chip${previewRenderer === 'deck' ? ' is-active' : ''}`}
+                        onClick={() => setPreviewRenderer('deck')}>
+                    Deck 回退
                 </button>
                 {viewportMode === 'edit' && (
                     <>
@@ -1163,13 +1209,16 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                 <div className="wm-viewport-container">
                     {activeMapId ? (
                         <MapShapeViewport
+                            key={viewportRenderKey}
                             mode={viewportMode}
+                            renderer={previewRenderer}
                             canvas={CANVAS}
-                            scene={displayScene}
+                            scene={renderedScene}
                             viewBox={viewBox}
                             onViewBoxChange={setViewBox}
                             svgProps={svgProps}
                             deckProps={deckProps}
+                            pixiProps={pixiProps}
                         />
                     ) : (
                         <div className="wm-viewport-empty">
