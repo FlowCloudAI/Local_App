@@ -1,17 +1,15 @@
-import type {MapVisualStyle} from '../types'
+import type {PixiMapStyle} from '../types'
 
-export const flatMapVisualStyle: MapVisualStyle = {
+export const flatPixiMapStyle: PixiMapStyle = {
     version: 1,
-    id: 'semantic-flat',
-    name: '语义扁平',
-    description: 'MapStyles 新语义层的基础预设，用于验证 Pixi 与 Deck 的最小编译链路。',
-    rendererIntent: 'balanced',
+    id: 'flat',
+    name: 'Pixi 扁平',
+    description: 'Pixi 风格系统的基础预设，强调清晰不透明区域与稳定地点标记。',
     palette: {
         ocean: '#b8d7ee',
+        paper: '#ffffff',
         land: '#ffffff',
         coastline: '#185fa5',
-        regionFill: '#ffffff',
-        regionStroke: '#185fa5',
         location: '#d4306a',
         label: '#262b38',
         accent: '#2563eb',
@@ -55,12 +53,5 @@ export const flatMapVisualStyle: MapVisualStyle = {
         fontFamily: '"Microsoft YaHei UI", "PingFang SC", sans-serif',
         fontSize: 13,
         fontWeight: '600',
-    },
-    deck: {
-        mode: 'readable',
-        showLabels: true,
-        regionFillOpacity: 1,
-        regionStrokeWidth: 2,
-        locationRadius: 8,
     },
 }

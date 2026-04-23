@@ -74,7 +74,7 @@ export interface MapStyleDefinition {
     oceanColor: string
     deckConfig: MapStyleDeckConfig
 
-    createBackgroundTexture?: (canvas: {width: number; height: number}) => string | null
+    createBackgroundTexture?: (canvas: { width: number; height: number }) => string | null
     buildLocationIcon?: (type: string, colorHex: string) => MapPreviewKeyLocationIcon | null
     buildShapeTooltip?: (shape: MapPreviewShape) => MapDeckPreviewTooltip
     buildLocationTooltip?: (location: MapPreviewKeyLocation) => MapDeckPreviewTooltip

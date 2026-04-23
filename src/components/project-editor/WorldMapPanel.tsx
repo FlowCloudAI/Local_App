@@ -6,7 +6,6 @@ import {
     createMapShapeEditorLocalId,
     type MapKeyLocationDraft,
     type MapPreviewScene,
-    type MapRgbaColor,
     type MapShapeDraft,
     type MapShapeEditorDraft,
     MapShapeViewport,
@@ -27,7 +26,8 @@ import {
     type MapEntry,
 } from '../../api'
 import './WorldMapPanel.css'
-import {getStyleDefinition, makeOceanSvgUrl, type MapStyle,} from './map-styles'
+import {getStyleDefinition, makeOceanSvgUrl, type MapStyle,} from './MapStyles/deck/presets'
+import {compilePixiMapStyle, getPixiMapStyle} from './MapStyles/pixi'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,6 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type ViewportMode = 'edit' | 'preview'
 
 const CANVAS = {width: 1000, height: 1000}
-const FLAT_PIXI_REGION_FILL: MapRgbaColor = [255, 255, 255, 255]
 
 const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
     minSegments: 5,
@@ -69,19 +68,6 @@ function newMapEntry(name: string): MapEntry {
         backgroundImageUrl: null,
         createdAt: now,
         updatedAt: now,
-    }
-}
-
-function normalizeSceneForPixiRenderer(scene: MapPreviewScene, style: MapStyle): MapPreviewScene {
-    if (style !== 'flat') return scene
-
-    return {
-        ...scene,
-        // Deck 的 flat 风格会通过 layer props 强制白色不透明填充；Pixi 直接读取 scene，需要在宿主侧补齐一致性。
-        shapes: scene.shapes.map(shape => ({
-            ...shape,
-            fillColor: [...FLAT_PIXI_REGION_FILL],
-        })),
     }
 }
 
@@ -623,7 +609,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         setSelectedLocationId(loc.id)
     }, [draft, selectedShapeId, updateDraft])
 
-    // ── Deck & SVG props ──────────────────────────────────────────────────────
+    // ── Scene & renderer props ────────────────────────────────────────────────
 
     const styleTextureUrl = useMemo(() => {
         if (backgroundImageUrl) return null
@@ -631,10 +617,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         return def.createBackgroundTexture?.(CANVAS) ?? null
     }, [style, backgroundImageUrl])
 
-    const displayScene = useMemo(() => {
-        const def = getStyleDefinition(style)
-        const oceanUrl = makeOceanSvgUrl(def.oceanColor)
-        const bgUrl = backgroundImageUrl ?? styleTextureUrl ?? oceanUrl
+    const baseScene = useMemo(() => {
         const previewScene = buildPreviewSceneFromDraft({
             canvas: CANVAS,
             shapes: draft.shapes,
@@ -645,25 +628,53 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             : !sceneDirty && scene
                 ? scene
                 : previewScene
-        const withBg: MapPreviewScene = {
+
+        return {
             ...base,
             // 关键地点属于编辑草稿数据，预览时始终以 draft 为准，避免旧 scene 覆盖最新地点。
             keyLocations: previewScene.keyLocations,
+        }
+    }, [scene, sceneDirty, draft, viewportMode])
+
+    const deckScene = useMemo(() => {
+        const def = getStyleDefinition(style)
+        const oceanUrl = makeOceanSvgUrl(def.oceanColor)
+        const bgUrl = backgroundImageUrl ?? styleTextureUrl ?? oceanUrl
+        const withBg: MapPreviewScene = {
+            ...baseScene,
             backgroundImage: {url: bgUrl, fit: backgroundImageUrl ? 'cover' as const : 'fill' as const},
         }
         return def.transformScene?.(withBg) ?? withBg
-    }, [scene, sceneDirty, draft, style, backgroundImageUrl, viewportMode, styleTextureUrl])
+    }, [baseScene, style, backgroundImageUrl, styleTextureUrl])
 
-    const renderedScene = useMemo(() => (
-        previewRenderer === 'pixi'
-            ? normalizeSceneForPixiRenderer(displayScene, style)
-            : displayScene
-    ), [displayScene, previewRenderer, style])
+    const pixiStyle = useMemo(() => {
+        const def = getPixiMapStyle(style)
+        if (!backgroundImageUrl) return def
+
+        return {
+            ...def,
+            background: {
+                kind: 'image' as const,
+                url: backgroundImageUrl,
+                color: def.palette.ocean,
+                opacity: 1,
+                fit: 'cover' as const,
+            },
+        }
+    }, [style, backgroundImageUrl])
+
+    const compiledPixiStyle = useMemo(() => (
+        compilePixiMapStyle({style: pixiStyle, canvas: CANVAS, scene: baseScene})
+    ), [pixiStyle, baseScene])
+
+    const renderedScene = previewRenderer === 'pixi'
+        ? compiledPixiStyle.scene
+        : deckScene
 
     const deckProps = useMemo(() => {
         const def = getStyleDefinition(style)
-        const decorations = def.buildDecorations?.({canvas: CANVAS, scene: displayScene}) ?? {}
-        const extraLayers = def.createExtraLayers?.({canvas: CANVAS, scene: displayScene, decorations}) ?? []
+        const decorations = def.buildDecorations?.({canvas: CANVAS, scene: deckScene}) ?? {}
+        const extraLayers = def.createExtraLayers?.({canvas: CANVAS, scene: deckScene, decorations}) ?? []
         return {
             ...def.deckConfig,
             style: {backgroundColor: def.oceanColor},
@@ -671,17 +682,12 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
             extraLayers,
         }
-    }, [style, displayScene])
+    }, [style, deckScene])
 
-    const pixiProps = useMemo(() => {
-        const def = getStyleDefinition(style)
-        return {
-            style: {backgroundColor: def.oceanColor},
-            showLabels: true,
-            keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
-            emptyHint: '提交后将在这里显示 Pixi 预览结果。',
-        }
-    }, [style])
+    const pixiProps = compiledPixiStyle.pixiProps
+    const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined
+    const viewportKeyLocationStyle = previewRenderer === 'pixi' ? compiledPixiStyle.keyLocationStyle : undefined
+    const viewportLabelStyle = previewRenderer === 'pixi' ? compiledPixiStyle.labelStyle : undefined
 
     const viewportRenderKey = `${previewRenderer}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
@@ -1216,6 +1222,9 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                             scene={renderedScene}
                             viewBox={viewBox}
                             onViewBoxChange={setViewBox}
+                            shapeStyle={viewportShapeStyle}
+                            keyLocationStyle={viewportKeyLocationStyle}
+                            labelStyle={viewportLabelStyle}
                             svgProps={svgProps}
                             deckProps={deckProps}
                             pixiProps={pixiProps}

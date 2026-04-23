@@ -1,4 +1,10 @@
-import type {MapDeckPreviewTooltip, MapPreviewKeyLocation, MapPreviewKeyLocationIcon, MapPreviewScene, MapPreviewShape} from 'flowcloudai-ui'
+import type {
+    MapDeckPreviewTooltip,
+    MapPreviewKeyLocation,
+    MapPreviewKeyLocationIcon,
+    MapPreviewScene,
+    MapPreviewShape
+} from 'flowcloudai-ui'
 import type {MapStyleDefinition} from './types'
 
 function buildLocationIcon(): MapPreviewKeyLocationIcon | null {

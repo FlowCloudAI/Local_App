@@ -57,24 +57,24 @@ const registry: Record<MapStyle, MapStyleDefinition> = {
 type MapStyle = 'flat' | 'tolkien' | 'ink' | 'cyberpunk'
 ```
 
-> 注：未来可将 `MapStyle` 类型改为从 `map-styles` 导出，实现完全零侵入。
+> 注：Deck 预设统一从 `MapStyles/deck/presets` 导出，便于与 Pixi 风格系统分离演进。
 
 ---
 
 ## 接口速查
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| `id` | ✅ | 风格唯一标识符 |
-| `label` | ✅ | UI 显示名称 |
-| `fontFamily` | ✅ | 标签字体 |
-| `oceanColor` | ✅ | 无背景图时的海洋/底色 |
-| `deckConfig` | ✅ | deck.gl 层配置（GLSL、props、effects） |
-| `createBackgroundTexture` | ❌ | 生成自定义纸张/纹理底图 |
-| `buildLocationIcon` | ❌ | 地点 SVG 图标工厂 |
-| `buildShapeTooltip` | ❌ | 图形悬浮提示 |
-| `buildLocationTooltip` | ❌ | 地点悬浮提示 |
-| `transformScene` | ❌ | scene 后处理（图标注入等） |
+| 字段                        | 必填 | 说明                              |
+|---------------------------|----|---------------------------------|
+| `id`                      | ✅  | 风格唯一标识符                         |
+| `label`                   | ✅  | UI 显示名称                         |
+| `fontFamily`              | ✅  | 标签字体                            |
+| `oceanColor`              | ✅  | 无背景图时的海洋/底色                     |
+| `deckConfig`              | ✅  | deck.gl 层配置（GLSL、props、effects） |
+| `createBackgroundTexture` | ❌  | 生成自定义纸张/纹理底图                    |
+| `buildLocationIcon`       | ❌  | 地点 SVG 图标工厂                     |
+| `buildShapeTooltip`       | ❌  | 图形悬浮提示                          |
+| `buildLocationTooltip`    | ❌  | 地点悬浮提示                          |
+| `transformScene`          | ❌  | scene 后处理（图标注入等）                |
 
 ---
 

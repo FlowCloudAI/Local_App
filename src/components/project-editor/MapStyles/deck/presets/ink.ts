@@ -58,7 +58,7 @@ export const inkStyle: MapStyleDefinition = {
         polygonLayerProps: {
             lineWidthMinPixels: 3,
             getLineColor: () => [18, 18, 18, 210] as [number, number, number, number],
-            getFillColor: (s: {fillColor: [number, number, number, number]}) =>
+            getFillColor: (s: { fillColor: [number, number, number, number] }) =>
                 [s.fillColor[0], s.fillColor[1], s.fillColor[2], 8] as [number, number, number, number],
         },
         scatterplotLayerProps: {

@@ -1,5 +1,5 @@
 import type {MapPreviewBackgroundImage, MapRgbaColor} from 'flowcloudai-ui'
-import type {MapStyleBackground, MapStylePaintToken, MapStylePalette, MapStyleStrokeToken} from './types'
+import type {MapStyleBackgroundImageToken, MapStylePaintToken, MapStyleStrokeToken} from './types'
 
 function clampAlpha(opacity: number | undefined, fallback = 255): number {
     if (typeof opacity !== 'number' || !Number.isFinite(opacity)) return fallback
@@ -33,9 +33,16 @@ export function makeSolidBackgroundDataUrl(color: string): string {
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
+/**
+ * 将 SVG 字符串编码为 Data URL，供图标和轻量纹理复用。
+ */
+export function svgToDataUrl(svg: string): string {
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
 export function resolveBackgroundImage(
-    background: MapStyleBackground,
-    palette: MapStylePalette,
+    background: MapStyleBackgroundImageToken,
+    fallbackColor: string,
 ): MapPreviewBackgroundImage {
     if (background.kind === 'image' && background.url) {
         return {
@@ -45,10 +52,9 @@ export function resolveBackgroundImage(
         }
     }
 
-    // 纹理生成器后续由 Pixi 插件层接管；当前先回退到可存储的纯色背景。
-    const color = background.color ?? palette.ocean
+    // 纹理生成器由各渲染器风格层自行解释；共享工具只提供安全纯色回退。
     return {
-        url: makeSolidBackgroundDataUrl(color),
+        url: makeSolidBackgroundDataUrl(background.color ?? fallbackColor),
         opacity: background.opacity ?? 1,
         fit: 'fill',
     }
