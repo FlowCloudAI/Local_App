@@ -672,6 +672,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         : deckScene
 
     const deckProps = useMemo(() => {
+        if (previewRenderer !== 'deck') {
+            return undefined
+        }
+
         const def = getStyleDefinition(style)
         const decorations = def.buildDecorations?.({canvas: CANVAS, scene: deckScene}) ?? {}
         const extraLayers = def.createExtraLayers?.({canvas: CANVAS, scene: deckScene, decorations}) ?? []
@@ -682,14 +686,14 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
             extraLayers,
         }
-    }, [style, deckScene])
+    }, [previewRenderer, style, deckScene])
 
     const pixiProps = compiledPixiStyle.pixiProps
     const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined
     const viewportKeyLocationStyle = previewRenderer === 'pixi' ? compiledPixiStyle.keyLocationStyle : undefined
     const viewportLabelStyle = previewRenderer === 'pixi' ? compiledPixiStyle.labelStyle : undefined
 
-    const viewportRenderKey = `${previewRenderer}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
+    const viewportRenderKey = `${previewRenderer}-${viewportMode}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
     const svgProps = useMemo(() => ({
         draft,

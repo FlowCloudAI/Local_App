@@ -39,11 +39,13 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
                 color: '#64411f',
                 opacity: 0.22,
                 width: 9,
+                jitter: 1.8,
             },
             {
                 color: '#825828',
                 opacity: 0.48,
                 width: 3.5,
+                jitter: 0.9,
             },
         ],
     },
@@ -59,17 +61,67 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
             },
             iconSize: 32,
         },
+        iconRules: [
+            {
+                typePattern: '城|都|王都|京|要塞|港',
+                iconSet: 'tolkien',
+                asset: 'tolkien-castle',
+                color: '#5a3a1c',
+                iconSize: 36,
+            },
+            {
+                typePattern: '村|镇|营地',
+                iconSet: 'tolkien',
+                asset: 'tolkien-settlement',
+                color: '#6a4325',
+                iconSize: 30,
+            },
+            {
+                typePattern: '遗迹|神殿',
+                iconSet: 'tolkien',
+                asset: 'tolkien-ruin',
+                color: '#6a4325',
+                iconSize: 30,
+            },
+        ],
         iconSet: 'tolkien',
     },
     labels: {
         show: true,
+        renderer: 'overlay',
         color: '#5c3b22',
         fontFamily: '"Georgia", "Times New Roman", "STSong", serif',
         fontSize: 15,
         fontWeight: '600',
+        offsetY: 34,
+        haloColor: 'rgba(247, 231, 188, 0.82)',
+        haloWidth: 4,
+        rules: [
+            {
+                typePattern: '城|都|王都|京|要塞|港',
+                fontSize: 17,
+                fontWeight: '700',
+                offsetY: 42,
+                color: '#4f321b',
+            },
+        ],
     },
     decorations: [
-        {id: 'coastline-outline'},
-        {id: 'compass'},
+        {
+            id: 'coastline-outline',
+            params: {
+                brush: 'tolkien-coastline',
+                roughness: 1.2,
+            },
+        },
+        {
+            id: 'compass',
+            params: {
+                asset: 'tolkien-compass',
+                size: 58,
+                margin: 72,
+                color: '#5a3a1c',
+            },
+        },
     ],
 }

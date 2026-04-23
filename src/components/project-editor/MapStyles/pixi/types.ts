@@ -18,7 +18,14 @@ export interface PixiMapStylePalette {
 }
 
 export type PixiGeneratedBackgroundTexture = 'parchment' | 'rice-paper'
-export type PixiLocationIconSet = 'tolkien'
+export type PixiLocationIconSet = 'tolkien' | 'ink-stamp'
+export type PixiLocationIconAsset =
+    | 'tolkien-castle'
+    | 'tolkien-tower'
+    | 'tolkien-settlement'
+    | 'tolkien-ruin'
+    | 'ink-dot'
+    | 'ink-seal'
 export type PixiDecorationPluginId = 'coastline-outline' | 'compass'
 export type PixiEffectPluginId = 'ink-bleed'
 
@@ -51,6 +58,15 @@ export interface PixiLocationColorRule {
     opacity?: number
 }
 
+export interface PixiLocationIconRule {
+    typePattern?: string
+    typeIncludes?: string[]
+    iconSet: PixiLocationIconSet
+    asset?: PixiLocationIconAsset
+    color?: string
+    iconSize?: number
+}
+
 export interface PixiLocationStyle {
     renderMode: MapKeyLocationRenderMode
     marker: {
@@ -60,15 +76,36 @@ export interface PixiLocationStyle {
         iconSize?: number
     }
     colorRules?: PixiLocationColorRule[]
+    iconRules?: PixiLocationIconRule[]
     iconSet?: PixiLocationIconSet
+}
+
+export interface PixiLabelRule {
+    typePattern?: string
+    typeIncludes?: string[]
+    namePattern?: string
+    nameIncludes?: string[]
+    color?: string
+    opacity?: number
+    fontFamily?: string
+    fontSize?: number
+    fontWeight?: string
+    offsetY?: number
+    haloColor?: string
+    haloWidth?: number
 }
 
 export interface PixiLabelStyle {
     show: boolean
+    renderer?: 'builtin' | 'overlay'
     color: string
     fontFamily: string
     fontSize: number
     fontWeight?: string
+    offsetY?: number
+    haloColor?: string
+    haloWidth?: number
+    rules?: PixiLabelRule[]
 }
 
 export interface PixiStylePluginConfig {

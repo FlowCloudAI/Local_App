@@ -37,10 +37,11 @@ export const inkPixiMapStyle: PixiMapStyle = {
         layers: [],
     },
     locations: {
-        renderMode: 'circle',
+        renderMode: 'auto',
         marker: {
             radius: 4,
             color: '#101010',
+            iconSize: 18,
         },
         colorRules: [
             {
@@ -49,12 +50,34 @@ export const inkPixiMapStyle: PixiMapStyle = {
                 opacity: 0.72,
             },
         ],
+        iconRules: [
+            {
+                typePattern: '都|京',
+                iconSet: 'ink-stamp',
+                asset: 'ink-seal',
+                color: '#9b2323',
+                iconSize: 24,
+            },
+        ],
+        iconSet: 'ink-stamp',
     },
     labels: {
         show: true,
+        renderer: 'overlay',
         color: '#0c0c0c',
         fontFamily: '"STKaiti", "KaiTi", "FangSong", serif',
         fontSize: 14,
         fontWeight: '500',
+        offsetY: 16,
+        rules: [
+            {
+                typePattern: '都|京',
+                color: '#9b2323',
+                opacity: 0.82,
+                fontSize: 15,
+                fontWeight: '600',
+                offsetY: 18,
+            },
+        ],
     },
 }

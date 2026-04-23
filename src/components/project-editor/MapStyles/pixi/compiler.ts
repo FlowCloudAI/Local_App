@@ -1,20 +1,14 @@
 import type {MapStyleCompileContext} from '../common'
-import {
-    createParchmentTexture,
-    createRicePaperTexture,
-    makeSolidBackgroundDataUrl,
-    paintToRgbaColor,
-    strokeToRgbaColor,
-} from '../common'
-import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiMapStyle} from './types'
-import {buildTolkienPixiLocationIcon} from './icons'
+import {makeSolidBackgroundDataUrl, paintToRgbaColor, strokeToRgbaColor,} from '../common'
+import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
+import {buildPixiLocationIconAsset, createPixiPaperTextureAsset} from './assets'
 import {createPixiOverlayRenderer} from './overlays'
 
 function colorToHexString(color: [number, number, number, number]): string {
     return `#${color.slice(0, 3).map(value => value.toString(16).padStart(2, '0')).join('')}`
 }
 
-function matchLocationColorRule(type: string, rule: PixiLocationColorRule): boolean {
+function matchLocationTypeRule(type: string, rule: Pick<PixiLocationColorRule | PixiLocationIconRule, 'typePattern' | 'typeIncludes'>): boolean {
     if (rule.typeIncludes?.some(token => type.includes(token))) return true
     if (!rule.typePattern) return false
 
@@ -26,11 +20,15 @@ function matchLocationColorRule(type: string, rule: PixiLocationColorRule): bool
 }
 
 function resolveLocationColor(type: string, style: PixiMapStyle): [number, number, number, number] {
-    const rule = style.locations.colorRules?.find(item => matchLocationColorRule(type, item))
+    const rule = style.locations.colorRules?.find(item => matchLocationTypeRule(type, item))
     return paintToRgbaColor({
         color: rule?.color ?? style.locations.marker.color,
         opacity: rule?.opacity ?? 1,
     })
+}
+
+function resolveLocationIconRule(type: string, style: PixiMapStyle): PixiLocationIconRule | undefined {
+    return style.locations.iconRules?.find(rule => matchLocationTypeRule(type, rule))
 }
 
 function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<PixiMapStyle>) {
@@ -45,11 +43,7 @@ function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<Pixi
     }
 
     if (background.kind === 'generated-texture') {
-        const textureUrl = background.texture === 'parchment'
-            ? createParchmentTexture(canvas.width, canvas.height)
-            : background.texture === 'rice-paper'
-                ? createRicePaperTexture(canvas.width, canvas.height)
-                : ''
+        const textureUrl = createPixiPaperTextureAsset(background.texture, canvas.width, canvas.height)
 
         if (textureUrl) {
             return {
@@ -80,15 +74,23 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
         })),
         keyLocations: scene.keyLocations.map(location => {
             const color = resolveLocationColor(location.type, style)
-            const icon = style.locations.iconSet === 'tolkien'
-                ? buildTolkienPixiLocationIcon(location.type, colorToHexString(color))
+            const iconRule = resolveLocationIconRule(location.type, style)
+            const iconSet = iconRule?.iconSet ?? style.locations.iconSet
+            const iconColor = iconRule?.color ?? colorToHexString(color)
+            const icon = iconSet
+                ? buildPixiLocationIconAsset({
+                    iconSet,
+                    asset: iconRule?.asset,
+                    type: location.type,
+                    color: iconColor,
+                })
                 : undefined
 
             return {
                 ...location,
                 color,
                 icon,
-                iconSize: icon ? style.locations.marker.iconSize : undefined,
+                iconSize: icon ? iconRule?.iconSize ?? style.locations.marker.iconSize : undefined,
             }
         }),
     }
@@ -123,7 +125,7 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
             style: {
                 backgroundColor: style.background.color ?? style.palette.ocean,
             },
-            showLabels: style.labels.show,
+            showLabels: style.labels.show && style.labels.renderer !== 'overlay',
             keyLocationRenderMode: style.locations.renderMode,
             emptyHint: '当前 Pixi 风格暂无可渲染的场景。',
             renderOverlay: createPixiOverlayRenderer(style),
