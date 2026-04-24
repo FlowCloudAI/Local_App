@@ -61,6 +61,10 @@
       }
     ],
     "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
       "wix": {
         "language": "SimpChinese"
       },

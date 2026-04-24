@@ -2,7 +2,7 @@ import {type CSSProperties, memo, useEffect, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_count_entries, db_list_projects, type Project} from '../api'
-import ProjectCreator from '../components/ProjectCreator'
+import ProjectCreator from '../features/projects/components/ProjectCreator'
 import './ProjectList.css'
 
 interface ProjectListProps {

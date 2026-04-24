@@ -21,6 +21,7 @@ use apis::map::*;
 use apis::map_persistence::*;
 use apis::plugins::*;
 use apis::worldflow::*;
+use apis::webview_control::*;
 use layout::cache::LayoutCacheState;
 
 use anyhow::Result;
@@ -63,7 +64,7 @@ pub fn run() {
             // 禁用 release 模式下的 WebView 右键菜单
             #[cfg(not(debug_assertions))]
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.disable_context_menu();
+                let _ = window.eval("document.addEventListener('contextmenu', e => e.preventDefault(), true);");
             }
 
             let app_handle = app.handle().clone();
@@ -95,7 +96,7 @@ pub fn run() {
                 .unwrap_or_else(|| data_root.join("plugins"));
 
             // 搜索引擎状态（供 AI 工具实时读取，随设置更新）
-            let search_engine_arc = std::sync::Arc::new(Mutex::new(settings.search_engine.clone()));
+            let search_engine_arc = Arc::new(Mutex::new(settings.search_engine.clone()));
             app.manage(SearchEngineState {
                 engine: search_engine_arc.clone(),
             });
@@ -129,7 +130,7 @@ pub fn run() {
                             });
 
                             // 创建待确认编辑请求状态（AI 工具和 confirm command 共享同一个 Arc）
-                            let pending_edits = std::sync::Arc::new(tokio::sync::Mutex::new(
+                            let pending_edits = Arc::new(Mutex::new(
                                 std::collections::HashMap::<
                                     String,
                                     tokio::sync::oneshot::Sender<bool>,
@@ -302,6 +303,8 @@ pub fn run() {
             db_snapshot_to_branch,
             db_rollback_to,
             db_append_from,
+            suspend_webview,
+            resume_webview,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

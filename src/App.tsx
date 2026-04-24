@@ -1,8 +1,8 @@
 import './App.css'
 import "./api"
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
-import type {AiFocus} from './hooks/useAiController'
-import {useAiController} from './hooks/useAiController'
+import type {AiFocus} from './features/ai-chat/hooks/useAiController'
+import {useAiController} from './features/ai-chat/hooks/useAiController'
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {type CSSProperties, useCallback, useEffect, useMemo, useState} from "react";
 import ProjectList from "./pages/ProjectList.tsx";
@@ -10,14 +10,14 @@ import ProjectEditor from "./pages/ProjectEditor";
 import Settings from "./pages/Settings";
 import Idea from "./pages/Idea";
 import type {Project} from "./api";
-import AIChatContent from "./components/AIChatContent";
-import DockableSidePanel from "./components/layout/DockableSidePanel";
-import RelationDemo from "./components/RelationDemo";
-import MapShapeEditorDemo from "./components/MapShapeEditorDemo";
-import SnapshotPanel from "./components/SnapshotPanel";
-import EntryEditModal from "./components/EntryEditModal";
-import AiConfirmModal from "./components/AiConfirmModal";
-import type {ReportConversationContext} from "./contexts/AiControllerTypes";
+import AIChatContent from "./features/ai-chat/components/AIChatContent";
+import DockableSidePanel from "./shared/ui/layout/DockableSidePanel";
+import RelationDemo from "./features/relation-graph/dev/RelationDemo";
+import MapShapeEditorDemo from "./features/maps/dev/MapShapeEditorDemo";
+import SnapshotPanel from "./features/snapshots/components/SnapshotPanel";
+import EntryEditModal from "./features/entries/components/EntryEditModal";
+import AiConfirmModal from "./features/ai-chat/components/AiConfirmModal";
+import type {ReportConversationContext} from "./features/ai-chat/model/AiControllerTypes";
 
 type EntryTabMeta = {
     projectId: string

@@ -1,7 +1,0 @@
-export { default as CategoryView } from './CategoryView'
-export {default as EntryRelationCreator} from './EntryRelationCreator'
-export {default as EntryRelationViewer} from './EntryRelationViewer'
-export { default as EntryTypeIcon } from './EntryTypeIcon'
-export {default as ProjectContradictionPanel} from './ProjectContradictionPanel'
-export { default as ProjectOverview } from './ProjectOverview'
-export {default as WorldMapPanel} from './WorldMapPanel'

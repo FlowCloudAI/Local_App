@@ -10,8 +10,8 @@ import {
     plugin_uninstall,
     type RemotePluginInfo,
 } from '../api'
-import {LocalPluginCard, MarketPluginCard} from '../components/PluginCard'
-import UploadPlugin from '../components/UploadPlugin'
+import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
+import UploadPlugin from '../features/plugins/UploadPlugin'
 import './Plugins.css'
 
 function normalizePluginKey(value: string): string {

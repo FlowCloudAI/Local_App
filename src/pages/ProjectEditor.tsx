@@ -17,14 +17,15 @@ import {
     type Project,
     type TagSchema,
 } from '../api'
-import EntryEditor from '../components/EntryEditor'
-import ProjectTimeline from '../components/ProjectTimeline'
-import EntryTypeCreator from '../components/EntryTypeCreator'
-import ProjectRelationGraph from '../components/ProjectRelationGraph'
-import TagCreator from '../components/TagCreator'
-import {CategoryView, ProjectContradictionPanel, ProjectOverview, WorldMapPanel} from '../components/project-editor'
-import ProjectCoverPickerModal from '../components/project-editor/ProjectCoverPickerModal'
-import type {ReportConversationContext} from '../contexts/AiControllerTypes'
+import EntryEditor from '../features/entries/components/EntryEditor'
+import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
+import EntryTypeCreator from '../features/entries/components/EntryTypeCreator'
+import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
+import TagCreator from '../features/entries/components/TagCreator'
+import {CategoryView, ProjectContradictionPanel, ProjectOverview} from '../features/project-editor'
+import WorldMapPanel from '../features/maps/components/WorldMapPanel'
+import ProjectCoverPickerModal from '../features/project-editor/components/ProjectCoverPickerModal'
+import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
 import './ProjectEditor.css'
 
 const TREE_MIN_WIDTH = '15rem'

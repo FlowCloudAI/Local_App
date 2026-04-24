@@ -22,9 +22,9 @@ import {
     setting_set_api_key,
     setting_update_settings
 } from '../api'
-import {LocalPluginCard, MarketPluginCard} from '../components/PluginCard'
-import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../components/utils/ttsVoice'
-import UploadPlugin from '../components/UploadPlugin'
+import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
+import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
+import UploadPlugin from '../features/plugins/UploadPlugin'
 import './Settings.css'
 
 // 内置词条类型（来自 worldflow_core::models::entry_type::BUILTIN_ENTRY_TYPES）
