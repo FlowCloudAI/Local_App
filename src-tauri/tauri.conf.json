@@ -42,7 +42,9 @@
   "bundle": {
     "active": true,
     "targets": [
-      "nsis"
+      "nsis",
+      "deb",
+      "appimage"
     ],
     "icon": [
       "icons/32x32.png",
@@ -70,14 +72,26 @@
       },
       "nsis": {
         "installMode": "both",
-        "template": null,
         "languages": [
           "SimpChinese",
           "English"
         ],
         "displayLanguageSelector": true,
         "installerIcon": "icons/icon.ico",
-        "compression": "lzma"
+        "compression": "lzma",
+        "startMenuFolder": "流云AI",
+        "minimumWebview2Version": "110.0.1531.0"
+      }
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libssl3"
+        ]
       }
     }
   }

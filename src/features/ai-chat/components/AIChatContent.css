@@ -329,20 +329,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 8px;
-    height: 40px;
+    padding: 0 var(--fc-space-sm);
+    min-height: 3rem;
     border-bottom: 1px solid var(--fc-color-border);
     flex-shrink: 0;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     position: relative;
     z-index: 5;
     overflow: visible;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    backdrop-filter: blur(10px);
 }
 
 .ai-topbar-left {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--fc-space-2xs, 0.125rem);
     min-width: 0;
     flex: 1;
 }
@@ -350,16 +352,16 @@
 .ai-topbar-right {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--fc-space-2xs, 0.125rem);
     flex-shrink: 0;
 }
 
 .ai-topbar-toggle,
 .ai-topbar-new-chat {
-    width: 28px;
-    height: 28px;
+    width: 2rem;
+    height: 2rem;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--fc-radius-md);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -368,12 +370,12 @@
     justify-content: center;
     flex-shrink: 0;
     padding: 0;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
 
 .ai-topbar-toggle:hover,
 .ai-topbar-new-chat:hover {
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
     color: var(--fc-color-text);
 }
 
@@ -381,20 +383,21 @@
 .ai-topbar-btn {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 4px 8px;
-    font-size: 0.82rem;
+    gap: var(--fc-space-xs);
+    padding: 0.38rem 0.65rem;
+    font-size: var(--fc-font-size-sm);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--fc-radius-md);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.16s ease, color 0.16s ease;
     white-space: nowrap;
+    font-weight: var(--fc-font-weight-medium);
 }
 
 .ai-topbar-btn:hover {
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
     color: var(--fc-color-text);
 }
 
@@ -413,14 +416,14 @@
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
-    background: var(--fc-color-bg-secondary);
+    background: var(--fc-color-bg-elevated);
     border: 1px solid var(--fc-color-border);
-    border-radius: 10px;
-    padding: 4px;
+    border-radius: var(--fc-radius-lg);
+    padding: var(--fc-space-2xs, 0.125rem);
     min-width: 160px;
     max-height: 280px;
     overflow-y: auto;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--fc-shadow-md);
     z-index: 200;
     display: flex;
     flex-direction: column;
@@ -439,10 +442,10 @@
 .ai-plugin-menu-item {
     width: 100%;
     text-align: left;
-    padding: 6px 10px;
-    font-size: 0.82rem;
+    padding: 0.42rem 0.65rem;
+    font-size: var(--fc-font-size-sm);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--fc-radius-md);
     background: transparent;
     color: var(--fc-color-text);
     cursor: pointer;
@@ -453,7 +456,7 @@
 }
 
 .ai-plugin-menu-item:hover {
-    background: var(--fc-color-bg-elevated);
+    background: var(--fc-color-bg-secondary);
 }
 
 .ai-plugin-menu-item.active {
@@ -481,9 +484,13 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100%;
-    gap: 0.75rem;
-    opacity: 0.6;
+    width: min(100%, 36rem);
+    min-height: calc(100vh - 20rem);
+    gap: var(--fc-space-xs);
+    opacity: 1;
+    margin: auto auto 5.5rem;
+    padding: var(--fc-space-lg) var(--fc-space-lg) var(--fc-space-sm);
+    text-align: center;
 }
 
 .ai-empty-state--brand {
@@ -491,11 +498,13 @@
 }
 
 .ai-empty-brand {
-    font-size: clamp(2.8rem, 7vw, 5.5rem);
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: color-mix(in srgb, var(--fc-color-text) 12%, transparent);
+    margin: 0;
+    font-size: clamp(2.1rem, 4.6vw, 3rem);
+    font-weight: var(--fc-font-weight-medium);
+    letter-spacing: 0;
+    text-transform: none;
+    color: color-mix(in srgb, var(--fc-color-text) 92%, transparent);
+    line-height: 1.12;
     user-select: none;
     pointer-events: none;
 }
@@ -512,8 +521,11 @@
 }
 
 .ai-empty-hint {
-    font-size: 0.85rem;
-    color: var(--fc-color-text-secondary);
+    max-width: 24rem;
+    margin: 0;
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.6;
+    color: color-mix(in srgb, var(--fc-color-text-secondary) 76%, transparent);
 }
 
 /* 消息列表 */
@@ -534,27 +546,27 @@
 .ai-report-context-bar {
     display: flex;
     align-items: flex-start;
-    gap: 0.65rem;
+    gap: var(--fc-space-sm);
     width: calc(100% - 3rem);
     max-width: var(--ai-chat-content-max-width);
     margin: 1rem auto 0;
-    padding: 0.7rem 0.8rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-warning, #d9822b) 36%, var(--fc-color-border));
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--fc-color-warning-bg, rgba(217, 130, 43, 0.16)) 62%, var(--fc-color-bg));
-    color: var(--fc-color-text);
+    padding: var(--fc-space-md) var(--fc-space-lg);
+    border-color: var(--fc-color-warning-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-warning-bg);
+    color: var(--fc-color-warning);
 }
 
 .ai-report-context-icon {
     width: 2rem;
     height: 2rem;
-    border-radius: 0.65rem;
+    border-radius: var(--fc-radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    color: var(--fc-color-warning, #d9822b);
-    background: color-mix(in srgb, var(--fc-color-warning-bg, rgba(217, 130, 43, 0.16)) 70%, transparent);
+    color: var(--fc-color-warning);
+    background: color-mix(in srgb, var(--fc-color-warning) 12%, transparent);
 }
 
 .ai-report-context-main {
@@ -566,7 +578,7 @@
     align-items: center;
     gap: 0.45rem;
     min-width: 0;
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     color: var(--fc-color-text-secondary);
 }
 
@@ -676,14 +688,14 @@
 }
 
 .ai-floating-input-inner {
-    background: var(--fc-color-bg-secondary);
-    border-radius: 16px;
-    padding: 12px 16px;
+    background: var(--fc-color-bg-elevated);
+    border-radius: var(--fc-radius-xl);
+    padding: var(--fc-space-md) var(--fc-space-lg);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--fc-color-border);
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: var(--fc-shadow-md);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
     width: 100%;
     box-sizing: border-box;
 }
@@ -695,8 +707,8 @@
 }
 
 .ai-floating-input-inner:focus-within {
-    border-color: transparent;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+    border-color: color-mix(in srgb, var(--fc-color-primary) 42%, var(--fc-color-border));
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
 }
 
 .ai-floating-textarea {
@@ -741,26 +753,27 @@
 .ai-floating-toolbar {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--fc-space-xs);
 }
 
 .ai-toolbar-btn {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px 10px;
-    font-size: 0.82rem;
+    gap: var(--fc-space-xs);
+    padding: 0.36rem 0.72rem;
+    font-size: var(--fc-font-size-sm);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--fc-radius-md);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.16s ease, color 0.16s ease;
     white-space: nowrap;
+    font-weight: var(--fc-font-weight-medium);
 }
 
 .ai-toolbar-btn:hover {
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
     color: var(--fc-color-text);
 }
 

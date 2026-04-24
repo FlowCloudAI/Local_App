@@ -1,40 +1,25 @@
 .project-list-page {
-  max-width: 84rem;
-  margin: 0 auto;
-  padding: 1rem 1.1rem 1.5rem;
   user-select: none;
 }
 
 .project-list-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+    margin-bottom: var(--fc-space-xl);
 }
 
 .project-list-title-block {
-  display: grid;
-  gap: 0.45rem;
+    gap: var(--fc-space-xs);
 }
 
 .project-list-title {
-  margin: 0;
-  font-size: 2rem;
   line-height: 1.1;
 }
 
 .project-list-subtitle {
-  margin: 0;
-  color: var(--fc-color-text-secondary, #888);
-  font-size: 0.95rem;
+    max-width: 40rem;
 }
 
 .project-list-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
+    gap: var(--fc-space-sm);
 }
 
 .project-list-refresh {
@@ -44,8 +29,8 @@
 .project-list-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.85rem;
-  margin-bottom: 1.25rem;
+    gap: var(--fc-space-md);
+    margin-bottom: var(--fc-space-lg);
 }
 
 .project-list-search {
@@ -62,12 +47,12 @@
 .project-list-sort-tab {
   padding: 0.42rem 0.85rem;
   border: 1px solid var(--fc-color-border);
-  border-radius: 0.5rem;
+    border-radius: var(--fc-radius-md);
   background: transparent;
   color: var(--fc-color-text);
-  font-size: 0.85rem;
+    font-size: var(--fc-font-size-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+    transition: background var(--fc-transition), border-color var(--fc-transition), color var(--fc-transition);
 }
 
 .project-list-sort-tab:hover {
@@ -78,23 +63,15 @@
 .project-list-sort-tab.active {
   background: var(--fc-color-primary);
   border-color: var(--fc-color-primary);
-  color: #fff;
+    color: var(--fc-color-text-on-primary);
 }
 
 .project-list-feedback {
-  margin-bottom: 1rem;
-  padding: 0.8rem 1rem;
-  border-radius: var(--fc-radius-md);
-  border: 1px solid var(--fc-color-border);
-  background: var(--fc-color-bg-secondary);
-  color: var(--fc-color-text-secondary, #888);
-  font-size: 0.92rem;
+    margin-bottom: var(--fc-space-lg);
 }
 
 .project-list-feedback.error {
-  border-color: color-mix(in srgb, var(--fc-color-danger, #dc2626) 35%, transparent);
-  background: var(--fc-color-danger-bg, rgba(220, 38, 38, 0.08));
-  color: var(--fc-color-danger, #dc2626);
+    margin-bottom: var(--fc-space-lg);
 }
 
 .project-list-grid {
@@ -111,59 +88,18 @@
 }
 
 .project-list-empty-panel {
-  width: min(100%, 42rem);
   min-height: 28rem;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 1rem;
-  padding: 2.4rem;
-  text-align: center;
-  border-radius: 2rem;
-  border: 1px solid var(--fc-color-info-border);
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--fc-color-primary) 16%, transparent), transparent 32%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--fc-color-info-bg) 76%, var(--fc-color-bg-elevated) 24%),
-      var(--fc-color-bg-elevated)
-    );
-  box-shadow: var(--fc-shadow-lg);
-}
-
-[data-theme="dark"] .project-list-empty-panel {
-  border-color: color-mix(in srgb, var(--fc-color-primary) 20%, var(--fc-color-border));
-  background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--fc-color-primary) 14%, transparent), transparent 34%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--fc-color-info-bg) 52%, var(--fc-color-bg-elevated) 48%),
-      var(--fc-color-bg)
-    );
 }
 
 .project-list-empty-mark {
-  padding: 0.48rem 0.85rem;
-  border-radius: 999px;
-  border: 1px solid var(--fc-color-info-border);
-  background: color-mix(in srgb, var(--fc-color-info-bg) 72%, transparent);
-  color: var(--fc-color-primary);
-  font-size: 0.8rem;
   letter-spacing: 0.18em;
 }
 
 .project-list-empty-title {
-  margin: 0;
-  color: var(--fc-color-text);
-  font-size: clamp(1.9rem, 3vw, 2.8rem);
   line-height: 1.08;
 }
 
 .project-list-empty-copy {
-  max-width: 34rem;
-  margin: 0;
-  color: var(--fc-color-text-secondary);
-  font-size: 1rem;
   line-height: 1.75;
 }
 
@@ -326,7 +262,7 @@
 
 @media (max-width: 640px) {
   .project-list-page {
-    padding-inline: 0.75rem;
+      padding-inline: var(--fc-space-md);
   }
 
   .project-list-header {

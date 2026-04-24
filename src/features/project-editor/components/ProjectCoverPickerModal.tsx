@@ -15,6 +15,7 @@ import {
 } from '../../../api'
 import type {EntryImage} from '../../entries/lib/entryImage'
 import {normalizeEntryImages, toEntryImageSrc} from '../../entries/lib/entryImage'
+import '../../../shared/ui/layout/WorkspaceScaffold.css'
 
 type Tab = 'existing' | 'local' | 'ai'
 type GenerateState = 'idle' | 'generating' | 'success' | 'error'
@@ -295,8 +296,8 @@ export default function ProjectCoverPickerModal({
                 aria-label="设置项目封面"
             >
                 <div className="pe-cover-picker__header">
-                    <div>
-                        <h3 className="pe-cover-picker__title">设置项目封面</h3>
+                    <div className="fc-page-title-block">
+                        <h3 className="pe-cover-picker__title fc-section-title">设置项目封面</h3>
                         <p className="pe-cover-picker__desc">可以从已有词条图片中选择，也可以上传或 AI 生成。</p>
                     </div>
                     <button

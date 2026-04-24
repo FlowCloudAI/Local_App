@@ -12,6 +12,7 @@ import {
     type StoredContradictionReport,
 } from '../../../api'
 import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
+import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectContradictionPanel.css'
 
 interface ProjectContradictionPanelProps {
@@ -246,12 +247,12 @@ function ProjectContradictionPanel({
             <div className="pe-contradiction-toolbar">
                 <div className="pe-contradiction-toolbar__left">
                     <Button variant="ghost" size="sm" onClick={onBack}>返回概览</Button>
-                    <div>
-                        <h2 className="pe-contradiction-title">设定矛盾检测</h2>
-                        <p className="pe-contradiction-desc">生成结构化报告，保留历史记录，并可在右侧聊天区继续讨论这份报告。</p>
+                    <div className="fc-page-title-block">
+                        <h2 className="pe-contradiction-title fc-page-title">设定矛盾检测</h2>
+                        <p className="pe-contradiction-desc fc-page-subtitle">生成结构化报告，保留历史记录，并可在右侧聊天区继续讨论这份报告。</p>
                     </div>
                 </div>
-                <div className="pe-contradiction-toolbar__actions">
+                <div className="pe-contradiction-toolbar__actions fc-page-header-actions">
                     <Button variant="outline" size="sm" onClick={() => void loadHistory()}
                             disabled={historyLoading || generating}>
                         刷新历史
@@ -265,7 +266,7 @@ function ProjectContradictionPanel({
             <div className="pe-contradiction-layout">
                 <section className="pe-contradiction-history">
                     <div className="pe-contradiction-section__header">
-                        <h3 className="pe-contradiction-section__title">历史报告</h3>
+                        <h3 className="pe-contradiction-section__title fc-section-title">历史报告</h3>
                         <span className="pe-contradiction-section__meta">{historyItems.length} 份</span>
                     </div>
                     <RollingBox className="pe-contradiction-history__scroll" thumbSize="thin">
@@ -382,7 +383,7 @@ function ProjectContradictionPanel({
 
                                     <section className="pe-contradiction-report__section">
                                         <div className="pe-contradiction-section__header">
-                                            <h4 className="pe-contradiction-section__title">冲突清单</h4>
+                                            <h4 className="pe-contradiction-section__title fc-section-title">冲突清单</h4>
                                             <span
                                                 className="pe-contradiction-section__meta">{activeRecord.report.issues.length} 项</span>
                                         </div>
@@ -451,7 +452,7 @@ function ProjectContradictionPanel({
                                     <div className="pe-contradiction-report__grid">
                                         <section className="pe-contradiction-report__section">
                                             <div className="pe-contradiction-section__header">
-                                                <h4 className="pe-contradiction-section__title">待确认问题</h4>
+                                                <h4 className="pe-contradiction-section__title fc-section-title">待确认问题</h4>
                                                 <span
                                                     className="pe-contradiction-section__meta">{activeRecord.report.unresolvedQuestions.length} 项</span>
                                             </div>
@@ -471,7 +472,7 @@ function ProjectContradictionPanel({
 
                                         <section className="pe-contradiction-report__section">
                                             <div className="pe-contradiction-section__header">
-                                                <h4 className="pe-contradiction-section__title">修订建议</h4>
+                                                <h4 className="pe-contradiction-section__title fc-section-title">修订建议</h4>
                                                 <span
                                                     className="pe-contradiction-section__meta">{activeRecord.report.suggestions.length} 条</span>
                                             </div>

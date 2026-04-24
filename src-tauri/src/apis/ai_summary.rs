@@ -95,7 +95,7 @@ pub async fn ai_generate_entry_summary(
     let (mut session, temp_conv_id) = {
         let client = ai_state.client.lock().await;
         let session = client
-            .create_llm_session(&request.plugin_id, &api_key)
+            .create_llm_session(&request.plugin_id, &api_key, None)
             .map_err(|e| e.to_string())?;
         let temp_conv_id = session.conversation_id().map(str::to_string);
         (session, temp_conv_id)

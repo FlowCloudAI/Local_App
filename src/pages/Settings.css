@@ -6,7 +6,8 @@
 
 .settings-page-layout {
   display: flex;
-  max-width: 75rem;
+    width: 100%;
+    max-width: 88rem;
   margin: 0 auto;
   min-height: 100%;
 }
@@ -14,7 +15,7 @@
 .settings-sidebar {
   width: 180px;
   flex-shrink: 0;
-  padding: 1rem 0.6rem;
+    padding: var(--fc-space-lg) var(--fc-space-sm);
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -39,16 +40,16 @@
 .settings-back-button {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    margin-bottom: 8px;
+    gap: var(--fc-space-sm);
+    padding: 0.375rem 0.625rem;
+    margin-bottom: var(--fc-space-sm);
     border: none;
     border-radius: var(--fc-radius-md);
     background: transparent;
     color: var(--fc-color-text-secondary);
-    font-size: 13px;
+    font-size: var(--fc-font-size-sm);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background var(--fc-transition), color var(--fc-transition);
 }
 
 .settings-back-button:hover {
@@ -67,7 +68,7 @@
 
 .settings-content {
   flex: 1;
-  padding: 1rem;
+    padding: var(--fc-space-md);
 }
 
 .settings-container {
@@ -75,20 +76,15 @@
 }
 
 .settings-title {
-  margin-bottom: 2rem;
+    margin-bottom: 0;
 }
 
 .settings-section {
-  margin-bottom: 2rem;
-  padding: 1.6rem;
-  border: 1px solid var(--fc-color-border);
-  border-radius: var(--fc-radius-md);
+    margin-bottom: 0;
 }
 
 .settings-section-title {
-  color: var(--fc-color-primary);
-  font-size: 18px;
-  margin-bottom: 2rem;
+    margin-bottom: var(--fc-space-xl);
 }
 
 .settings-row {
@@ -105,7 +101,7 @@
 
 .settings-field-actions {
   display: flex;
-  gap: 0.5rem;
+    gap: var(--fc-space-sm);
   justify-content: flex-end;
   width: 7.5rem;
   flex-shrink: 0;
@@ -166,7 +162,7 @@
 .settings-api-key-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+    gap: var(--fc-space-sm);
   align-items: center;
   justify-content: flex-end;
 }
@@ -208,22 +204,38 @@
 
 .settings-api-key-form-label {
   min-width: 4.5rem;
-  font-size: 13px;
-  font-weight: 500;
+    font-size: var(--fc-font-size-sm);
+    font-weight: var(--fc-font-weight-medium);
 }
 
 .settings-api-key-form-actions {
   display: flex;
-  gap: 8px;
+    gap: var(--fc-space-sm);
   margin-left: auto;
 }
 
 .settings-footer {
   display: flex;
-  gap: 12px;
+    gap: var(--fc-space-md);
   justify-content: flex-end;
-  padding-top: 16px;
+    padding-top: var(--fc-space-lg);
   border-top: 1px solid var(--fc-color-border);
+}
+
+.settings-field-hint {
+    margin-top: 0.375rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: var(--fc-line-height-normal);
+}
+
+.settings-empty-state {
+    padding: var(--fc-space-xl);
+    border: 1px dashed color-mix(in srgb, var(--fc-color-border) 88%, transparent);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text-secondary);
+    text-align: center;
 }
 
 /* 插件管理样式（从 Plugins.css 合并） */
@@ -236,8 +248,6 @@
 }
 
 .plugins-section-title {
-  color: var(--fc-color-primary);
-  font-size: 18px;
   margin: 0;
 }
 
@@ -255,9 +265,9 @@
 
 .plugins-empty {
   text-align: center;
-  padding: 2rem 0;
-  color: var(--fc-color-text-secondary, #888);
-  font-size: 0.9rem;
+    padding: var(--fc-space-2xl) 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
 }
 
 .plugins-filter-bar {
@@ -300,11 +310,6 @@
 }
 
 .plugins-error {
-  padding: 0.75rem 1rem;
-  border-radius: var(--fc-radius-md);
-  background: var(--fc-color-danger-bg, rgba(220, 38, 38, 0.08));
-  color: var(--fc-color-danger, #dc2626);
-  font-size: 0.875rem;
   margin-bottom: 1rem;
 }
 

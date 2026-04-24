@@ -4,6 +4,7 @@ import {ai_list_plugins, ai_play_tts, type PluginInfo, setting_get_settings, set
 import type {AiContextValue} from '../model/AiControllerTypes'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
+import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './AIChatContent.css'
 
 const MAX_CHARS = 4000
@@ -530,7 +531,7 @@ export default function AIChatContent({
                     thumbSize={'thin'}
                 >
                     {isReportConversation && activeConversation?.reportContext && (
-                        <div className="ai-report-context-bar">
+                        <div className="ai-report-context-bar fc-status-banner">
                             <div className="ai-report-context-icon" aria-hidden="true">
                                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor"
                                      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -551,7 +552,10 @@ export default function AIChatContent({
                     )}
                     {isBlankChat && (
                         <div className="ai-empty-state ai-empty-state--brand">
-                            <p className="ai-empty-brand">流云AI</p>
+                            <p className="ai-empty-brand">准备好了，随时开始</p>
+                            <p className="ai-empty-hint">
+                                输入问题，或从左侧打开一段历史对话。
+                            </p>
                         </div>
                     )}
                     {ctx.activeConversationId && ctx.messages.length > 0 && (

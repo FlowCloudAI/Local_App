@@ -13,15 +13,34 @@ pub use settings::*;
 pub use state::*;
 
 use apis::ai_character::*;
-use apis::ai_client::*;
+use apis::ai_client::confirmations::*;
+use apis::ai_client::conversations::*;
+use apis::ai_client::media::*;
+use apis::ai_client::plugins::*;
+use apis::ai_client::sessions::*;
+use apis::ai_client::task_context::*;
+use apis::ai_client::tools::*;
 use apis::ai_contradiction::*;
+use apis::ai_summary::*;
 use apis::app_settings::*;
 use apis::layout::*;
 use apis::map::*;
 use apis::map_persistence::*;
-use apis::plugins::*;
-use apis::worldflow::*;
+use apis::plugins::local::*;
+use apis::plugins::market::*;
+use apis::plugins::remote::*;
 use apis::webview_control::*;
+use apis::worldflow::categories::*;
+use apis::worldflow::entries::*;
+use apis::worldflow::entry_types::*;
+use apis::worldflow::ideas::*;
+use apis::worldflow::images::*;
+use apis::worldflow::links::*;
+use apis::worldflow::projects::*;
+use apis::worldflow::relations::*;
+use apis::worldflow::snapshots::*;
+use apis::worldflow::system::*;
+use apis::worldflow::tags::*;
 use layout::cache::LayoutCacheState;
 
 use anyhow::Result;
@@ -240,6 +259,7 @@ pub fn run() {
             ai_list_contradiction_reports,
             ai_get_contradiction_report_entry,
             ai_delete_contradiction_report,
+            ai_generate_entry_summary,
             ai_send_message,
             ai_cancel_session,
             ai_close_session,

@@ -4,7 +4,7 @@ import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 
 import type {AiFocus} from './features/ai-chat/hooks/useAiController'
 import {useAiController} from './features/ai-chat/hooks/useAiController'
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {type CSSProperties, useCallback, useEffect, useMemo, useState} from "react";
+import {useCallback, useEffect, useMemo, useState} from "react";
 import ProjectList from "./pages/ProjectList.tsx";
 import ProjectEditor from "./pages/ProjectEditor";
 import Settings from "./pages/Settings";
@@ -478,24 +478,21 @@ function App() {
                         activeKey={activeKey}
                         onReorder={setTabs}
                         onChange={(key) => {
-                            console.log('切换到:', key);
                             void handleTabChange(key);
                         }}
                         onClose={(key) => {
-                            console.log('关闭:', key);
                             handleClose(key).then();
                         }}
                         onAdd={() => {
-                            console.log('新增标签页');
                             handleAdd();
                         }}
                     />
                 </div>
                 <div className="top-bar-actions" data-tauri-drag-region>
                     <Button
+                        className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.minimize()}
-                        style={{'--btn-bg-hover': 'var(--fc-color-bg-elevated)'} as CSSProperties}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -504,9 +501,9 @@ function App() {
                         </svg>
                     </Button>
                     <Button
+                        className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.toggleMaximize()}
-                        style={{'--btn-bg-hover': 'var(--fc-color-bg-elevated)'} as CSSProperties}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -522,9 +519,9 @@ function App() {
                         </svg>
                     </Button>
                     <Button
+                        className="window-control-btn window-control-btn--danger"
                         variant="ghost"
                         onClick={() => win.close()}
-                        style={{'--btn-bg-hover': '#f00'} as CSSProperties}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"

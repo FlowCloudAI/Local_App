@@ -25,6 +25,7 @@ import {
     map_save_scene,
     type MapEntry,
 } from '../../../api'
+import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
 import {getStyleDefinition, makeOceanSvgUrl, type MapStyle,} from '../styles/deck/presets'
 import {compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
@@ -760,7 +761,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             {/* ── Header ── */}
             <div className="wm-header">
                 <button type="button" className="wm-back-btn" onClick={onBack}><BackArrow/>返回</button>
-                <h2 className="wm-title">世界地图 · {projectName}</h2>
+                <div className="wm-header__title-block fc-page-title-block">
+                    <h2 className="wm-title">世界地图</h2>
+                    <p className="wm-subtitle">当前项目：{projectName}。编辑区域、地点与海岸线风格。</p>
+                </div>
                 <div className="wm-style-switcher">
                     {(['flat', 'tolkien', 'ink'] as MapStyle[]).map(s => (
                         <button key={s} type="button"
@@ -845,7 +849,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
             {/* ── Error Banner ── */}
             {errorMsg && (
-                <div className="wm-error-banner">
+                <div className="wm-error-banner fc-status-banner fc-status-banner--error">
                     {errorMsg}
                     <button type="button" className="wm-error-banner__close" onClick={() => setErrorMsg(null)}>×
                     </button>

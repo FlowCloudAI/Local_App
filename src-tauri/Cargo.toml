@@ -1,10 +1,10 @@
 [package]
 name = "FlowCloudAI"
 version = "0.1.0"
-description = "A Tauri App"
+description = "A Tauri-based desktop app for creative writing and knowledge management with AI assistance."
 authors = ["flowcloudai"]
 license = "MIT"
-repository = ""
+repository = "https://github.com/FlowCloudAI/Local_App/"
 edition = "2024"
 
 [lib]
@@ -15,35 +15,52 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.3", features = [] }
 
 [dependencies]
-log = "0.4"
+# ── 核心框架 ──
 tauri = { version = "2", features = ["unstable", "protocol-asset"] }
 tokio = { version = "1.50", features = ["full"] }
-serde_json = "1.0"
 futures = "0.3"
+
+# ── Tauri 插件 ──
 tauri-plugin-single-instance = "2"
 tauri-plugin-log = "2"
-serde = { version = "1.0", features = ["derive"] }
-keyring = { version = "3", features = ["windows-native"] }
-anyhow = "1"
-worldflow_core = { git = "ssh://git@github.com/FlowCloudAI/Worldflow_Core", branch = "main" }
-flowcloudai_client = { git = "ssh://git@github.com/FlowCloudAI/AI_Client_Core", branch = "main" }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-base64 = "0.22.1"
-quick-xml = "0.39"
+
+# ── 序列化 ──
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# ── 日志与错误 ──
+log = "0.4"
+anyhow = "1"
+
+# ── 私有 Git 依赖 ──
+worldflow_core = { git = "ssh://git@github.com/FlowCloudAI/Worldflow_Core", branch = "main" }
+flowcloudai_client = { git = "ssh://git@github.com/FlowCloudAI/AI_Client_Core", branch = "main" }
+
+# ── 网络与 HTTP ──
 reqwest = { version = "0.13.2", features = ["json", "multipart"] }
-zip = { version = "8", default-features = false, features = ["deflate"] }
-uuid = { version = "1", features = ["v4"] }
-git2 = "0.20.4"
-mime_guess = "2"
-urlencoding = "2"
+
+# ── 数据解析 ──
+quick-xml = "0.39"
 scraper = "0.26.0"
 ego-tree = "0.11.0"
-moka = { version = "0.12", features = ["future"] }
-htmd = "0.1"
-semver = "1"
+htmd = "0.5"
+
+# ── 编码与压缩 ──
+base64 = "0.22.1"
+urlencoding = "2"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+mime_guess = "2"
+
+# ── 工具库 ──
+uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+semver = "1"
+git2 = "0.20.4"
+keyring = { version = "3", features = ["windows-native", "linux-native"] }
+moka = { version = "0.12", features = ["future"] }
 
 [target.'cfg(windows)'.dependencies]
-webview2-com = "0.38"
-windows = "0.61"
+webview2-com = "0.39"
+windows = "0.62"

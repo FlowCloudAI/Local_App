@@ -25,6 +25,7 @@ import {
 import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
 import UploadPlugin from '../features/plugins/UploadPlugin'
+import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
 // 内置词条类型（来自 worldflow_core::models::entry_type::BUILTIN_ENTRY_TYPES）
@@ -579,12 +580,17 @@ export default function Settings({onBack}: SettingsProps) {
                 </aside>
                 <div className="settings-content">
                     {activeTab === 'system' ? (
-                        <div className="settings-container">
-                            <h1 className="settings-title">系统配置</h1>
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">系统配置</h1>
+                                    <p className="fc-page-subtitle">管理存储路径、外观主题和编辑器默认行为。</p>
+                                </div>
+                            </div>
 
                             {/* 存储 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">存储</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">存储</h2>
                                 <div className="settings-field">
                                     <label className="settings-label-wide">媒体目录</label>
                                     <Input
@@ -634,8 +640,8 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* 外观 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">外观</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">外观</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label">主题</label>
@@ -680,8 +686,8 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* 编辑器行为 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">编辑器行为</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">编辑器行为</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label-wide">词条编辑器最长自动保存间隔(分)</label>
@@ -692,13 +698,7 @@ export default function Settings({onBack}: SettingsProps) {
                                             onChange={handleAutoSaveChange}
                                             className="settings-input-small"
                                         />
-                                        <div
-                                            style={{
-                                                marginTop: '6px',
-                                                fontSize: '12px',
-                                                color: 'var(--fc-color-tertiary)'
-                                            }}
-                                        >
+                                        <div className="settings-field-hint">
                                             仅作用于词条编辑器的持续编辑场景；0 表示关闭，不影响灵感便签的即时自动保存。
                                         </div>
                                     </div>
@@ -723,8 +723,14 @@ export default function Settings({onBack}: SettingsProps) {
                             </div>
                         </div>
                     ) : (
-                        <div className="settings-container">
-                            <h1 className="settings-title">AI配置</h1>
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">AI配置</h1>
+                                    <p className="fc-page-subtitle">管理插件市场、默认模型、搜索引擎和各插件的 API
+                                        Key。</p>
+                                </div>
+                            </div>
 
                             <UploadPlugin
                                 open={uploadDialogOpen}
@@ -735,9 +741,9 @@ export default function Settings({onBack}: SettingsProps) {
                             />
 
                             {/* 已安装插件 */}
-                            <section className="settings-section">
+                            <section className="settings-section fc-section-card">
                                 <div className="plugins-section-header">
-                                    <h2 className="plugins-section-title">已安装</h2>
+                                    <h2 className="plugins-section-title fc-section-title">已安装</h2>
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -748,7 +754,8 @@ export default function Settings({onBack}: SettingsProps) {
                                     </Button>
                                 </div>
 
-                                {localError && <div className="plugins-error">{localError}</div>}
+                                {localError && <div
+                                    className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>}
 
                                 <div className="plugins-list">
                                     {localPlugins.length === 0 && !loadingLocal ? (
@@ -767,9 +774,9 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* 插件市场 */}
-                            <section className="settings-section">
+                            <section className="settings-section fc-section-card">
                                 <div className="plugins-section-header">
-                                    <h2 className="plugins-section-title">插件库</h2>
+                                    <h2 className="plugins-section-title fc-section-title">插件库</h2>
                                     <div className="plugins-section-actions">
                                         <Button
                                             size="sm"
@@ -816,7 +823,8 @@ export default function Settings({onBack}: SettingsProps) {
                                     </div>
                                 </div>
 
-                                {marketError && <div className="plugins-error">{marketError}</div>}
+                                {marketError && <div
+                                    className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>}
 
                                 <div className="plugins-list">
                                     {filteredMarket.length === 0 && !loadingMarket ? (
@@ -838,8 +846,8 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* LLM 默认配置 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">LLM 默认配置</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">LLM 默认配置</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label">插件</label>
@@ -864,8 +872,8 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* 图片生成默认配置 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">图片生成默认配置</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">图片生成默认配置</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label">插件</label>
@@ -890,8 +898,8 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* TTS 默认配置 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">TTS 默认配置</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">TTS 默认配置</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label">插件</label>
@@ -931,8 +939,8 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* AI 工具配置 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">AI 工具配置</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">AI 工具配置</h2>
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label">搜索引擎</label>
@@ -954,15 +962,11 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
 
                             {/* API Key 管理 */}
-                            <section className="settings-section">
-                                <h2 className="settings-section-title">API Key 管理</h2>
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">API Key 管理</h2>
                                 <div className="settings-row">
                                     {allPlugins.length === 0 ? (
-                                        <div style={{
-                                            padding: '20px',
-                                            textAlign: 'center',
-                                            color: 'var(--fc-color-tertiary)'
-                                        }}>
+                                        <div className="settings-empty-state">
                                             没有安装插件
                                         </div>
                                     ) : (
