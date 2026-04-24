@@ -32,7 +32,7 @@ pub async fn suspend_webview(app: tauri::AppHandle) -> Result<bool, String> {
                 let tx_err = tx.clone();
 
                 let handler = TrySuspendCompletedHandler::create(Box::new(
-                    move |error_result: ::windows::core::Result<()>, is_suspended: bool| {
+                    move |error_result: windows::core::Result<()>, is_suspended: bool| {
                         let result = match error_result {
                             Ok(()) => Ok(is_suspended),
                             Err(e) => Err(format!("挂起失败: {}", e)),
@@ -45,10 +45,10 @@ pub async fn suspend_webview(app: tauri::AppHandle) -> Result<bool, String> {
                 let result = (|| -> Result<(), String> {
                     let controller = webview.controller();
                     let core: ICoreWebView2 =
-                        unsafe { controller.CoreWebView2() }.map_err(|e: ::windows::core::Error| e.to_string())?;
+                        unsafe { controller.CoreWebView2() }.map_err(|e: windows::core::Error| e.to_string())?;
                     let core3: ICoreWebView2_3 =
-                        core.cast().map_err(|e: ::windows::core::Error| e.to_string())?;
-                    unsafe { core3.TrySuspend(&handler) }.map_err(|e: ::windows::core::Error| e.to_string())?;
+                        core.cast().map_err(|e: windows::core::Error| e.to_string())?;
+                    unsafe { core3.TrySuspend(&handler) }.map_err(|e: windows::core::Error| e.to_string())?;
                     Ok(())
                 })();
 
@@ -83,10 +83,10 @@ pub async fn resume_webview(app: tauri::AppHandle) -> Result<(), String> {
                 let result = (|| -> Result<(), String> {
                     let controller = webview.controller();
                     let core: ICoreWebView2 =
-                        unsafe { controller.CoreWebView2() }.map_err(|e: ::windows::core::Error| e.to_string())?;
+                        unsafe { controller.CoreWebView2() }.map_err(|e: windows::core::Error| e.to_string())?;
                     let core3: ICoreWebView2_3 =
-                        core.cast().map_err(|e: ::windows::core::Error| e.to_string())?;
-                    unsafe { core3.Resume() }.map_err(|e: ::windows::core::Error| e.to_string())?;
+                        core.cast().map_err(|e: windows::core::Error| e.to_string())?;
+                    unsafe { core3.Resume() }.map_err(|e: windows::core::Error| e.to_string())?;
                     Ok(())
                 })();
                 let _ = tx.send(result);

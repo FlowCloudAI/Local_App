@@ -3,6 +3,7 @@ import {convertFileSrc} from '@tauri-apps/api/core'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_count_entries, db_list_projects, type Project} from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
+import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
 interface ProjectListProps {
@@ -123,15 +124,15 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                 existingNames={projects.map(p => p.name)}
             />
             <RollingBox style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
-                <div className="project-list-page">
-                    <div className="project-list-header">
-                        <div className="project-list-title-block">
-                            <h1 className="project-list-title">项目</h1>
-                            <p className="project-list-subtitle">
+                <div className="project-list-page fc-page-shell">
+                    <div className="project-list-header fc-page-header">
+                        <div className="project-list-title-block fc-page-title-block">
+                            <h1 className="project-list-title fc-page-title">项目</h1>
+                            <p className="project-list-subtitle fc-page-subtitle">
                                 浏览你的世界观项目。
                             </p>
                         </div>
-                        <div className="project-list-header-actions">
+                        <div className="project-list-header-actions fc-page-header-actions">
                             <Button
                                 size="sm"
                                 onClick={() => setCreatorOpen(true)}
@@ -177,23 +178,23 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                     </div>
 
                     {error && (
-                        <div className="project-list-feedback error">
+                        <div className="project-list-feedback fc-status-banner fc-status-banner--error error">
                             项目列表加载失败：{error}
                         </div>
                     )}
 
                 {!error && (
-                    <div className="project-list-feedback">
+                    <div className="project-list-feedback fc-status-banner">
                         共 {projectCountLabel} 个项目，当前显示 {filteredProjectCountLabel} 个。
                     </div>
                 )}
 
                     {hasLoadedProjects && projects.length === 0 && !loading ? (
                         <section className="project-list-empty-state">
-                            <div className="project-list-empty-panel">
-                                <div className="project-list-empty-mark">WORLD</div>
-                                <h2 className="project-list-empty-title">让您的世界开始发光</h2>
-                                <p className="project-list-empty-copy">
+                            <div className="project-list-empty-panel fc-empty-state-card">
+                                <div className="project-list-empty-mark fc-empty-state-mark">WORLD</div>
+                                <h2 className="project-list-empty-title fc-empty-state-title">让您的世界开始发光</h2>
+                                <p className="project-list-empty-copy fc-empty-state-copy">
                                     从一个名字、一张封面、一个角色开始，把脑海里的大陆、城市、神话和命运写成真正可返回的世界
                                 </p>
                                 <Button size="lg" onClick={() => setCreatorOpen(true)}>创建您的第一个世界</Button>
@@ -202,7 +203,7 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                     ) : hasLoadedProjects || loading || error ? (
                         <div className="project-list-grid">
                             {filteredProjects.length === 0 && !loading ? (
-                                <div className="project-list-feedback">
+                                <div className="project-list-feedback fc-status-banner">
                                     没有匹配的项目。
                                 </div>
                             ) : (

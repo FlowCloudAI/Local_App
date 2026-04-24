@@ -14,6 +14,7 @@ import {
     type SnapshotGraph,
     type SnapshotGraphNode,
 } from '../../../api'
+import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './SnapshotPanel.css'
 
 interface SnapshotPanelProps {
@@ -305,7 +306,10 @@ export default function SnapshotPanel({
     return (
         <div className={`snapshot-panel${className ? ` ${className}` : ''}`}>
             <div className="snapshot-panel__header">
-                <h3 className="snapshot-panel__title">版本管理</h3>
+                <div className="fc-page-title-block">
+                    <h3 className="snapshot-panel__title fc-section-title">版本管理</h3>
+                    <p className="snapshot-panel__subtitle">管理分支、手动快照与历史回退。</p>
+                </div>
                 <div className="snapshot-panel__header-actions">
                     <button
                         type="button"
@@ -340,8 +344,8 @@ export default function SnapshotPanel({
                 </div>
             </div>
 
-            <div className="snapshot-panel__section">
-                <div className="snapshot-panel__section-title">当前分支</div>
+            <div className="snapshot-panel__section fc-section-card">
+                <div className="snapshot-panel__section-title fc-section-title">当前分支</div>
                 <div className="snapshot-panel__branch-row">
                     <Select
                         options={branchOptions}
@@ -369,8 +373,8 @@ export default function SnapshotPanel({
                 </div>
             </div>
 
-            <div className="snapshot-panel__section">
-                <div className="snapshot-panel__section-title">手动保存</div>
+            <div className="snapshot-panel__section fc-section-card">
+                <div className="snapshot-panel__section-title fc-section-title">手动保存</div>
                 <div className="snapshot-panel__save-row">
                     <Input
                         placeholder="可选：输入本次版本说明"
@@ -385,10 +389,16 @@ export default function SnapshotPanel({
             </div>
 
             {loading && graphRows.length === 0 ? (
-                <div className="snapshot-panel__empty">正在加载…</div>
+                <div className="snapshot-panel__empty fc-empty-state-card">
+                    <span className="fc-empty-state-mark">Snapshot</span>
+                    <p className="fc-empty-state-title">正在加载版本历史</p>
+                    <p className="fc-empty-state-copy">正在读取快照图与分支信息。</p>
+                </div>
             ) : graphRows.length === 0 ? (
-                <div className="snapshot-panel__empty">
-                    {activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}
+                <div className="snapshot-panel__empty fc-empty-state-card">
+                    <span className="fc-empty-state-mark">Snapshot</span>
+                    <p className="fc-empty-state-title">{activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}</p>
+                    <p className="fc-empty-state-copy">创建一次手动保存，或先切换到已有分支查看历史记录。</p>
                 </div>
             ) : (
                 <div className="snapshot-panel__graph"

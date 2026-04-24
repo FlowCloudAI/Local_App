@@ -61,8 +61,14 @@ npm run dev
 # 仅构建前端（输出到 dist/）
 npm run build
 
-# 构建完整的桌面应用安装包（Windows NSIS）
+# 构建完整的桌面应用安装包（Windows NSIS / Linux deb & AppImage）
 npm run tauri build
+
+# 以 Release 模式启动 Tauri 开发服务器
+npm run tauri:release
+
+# 预览生产构建
+npm run preview
 ```
 
 ### 代码检查
@@ -86,16 +92,26 @@ cargo test
 flowcloudai_app/
 ├── src/                      # 前端源码
 │   ├── api/                  # Tauri invoke 封装（与后端 apis 模块一一对应）
-│   ├── components/           # React 组件
-│   ├── contexts/             # 前端上下文
-│   ├── hooks/                # 全局自定义 Hooks
+│   ├── features/             # 按功能域组织的 React 组件
+│   │   ├── ai-chat/          # AI 对话助手
+│   │   ├── entries/          # 词条系统（编辑、标签、关系、图片）
+│   │   ├── maps/             # 地图与形状编辑器
+│   │   ├── plugins/          # 插件管理
+│   │   ├── project-editor/   # 项目编辑器（概览、时间线、矛盾检测）
+│   │   ├── projects/         # 项目列表与创建
+│   │   ├── relation-graph/   # 词条关系图
+│   │   └── snapshots/        # 快照面板
 │   ├── i18n/                 # 国际化配置与语言包
 │   ├── pages/                # 页面级组件
+│   ├── shared/               # 共享组件与 Hooks
 │   ├── App.tsx               # 根组件（含标签页、侧边栏、窗口控制）
 │   └── main.tsx              # 应用入口
 ├── src-tauri/                # Tauri / Rust 后端
 │   ├── src/
 │   │   ├── apis/             # Tauri Commands（暴露给前端的 API）
+│   │   │   ├── ai_client/    # AI 会话、媒体、工具调用
+│   │   │   ├── plugins/      # 本地/远程插件与市场
+│   │   │   └── worldflow/    # 项目、词条、标签、关系等数据操作
 │   │   ├── ai_services/      # AI 服务：Artifact 解析、上下文构建、矛盾检测
 │   │   ├── layout/           # 确定性图布局引擎
 │   │   ├── map/              # 地图生成服务
@@ -114,6 +130,7 @@ flowcloudai_app/
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.app.json
+├── tsconfig.node.json
 └── eslint.config.js
 ```
 
@@ -136,6 +153,8 @@ flowcloudai_app/
 - [`docs/tauri_deterministic_layout_engine.md`](docs/tauri_deterministic_layout_engine.md) —— 关系图布局引擎算法与协议
 - [`docs/semantic_map_generation_design.md`](docs/semantic_map_generation_design.md) —— 语义地图生成设计
 - [`docs/map_shape_editor_backend_mvp.md`](docs/map_shape_editor_backend_mvp.md) —— 地图形状编辑器后端 MVP
+- [`docs/prompt_README.md`](docs/prompt_README.md) —— Prompt 模板与 AI Tools 模块说明
+- [`docs/ui_style_unification_plan.md`](docs/ui_style_unification_plan.md) —— UI 视觉统一化方案
 
 ---
 

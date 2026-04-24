@@ -13,40 +13,37 @@
 
 .pe-contradiction-toolbar {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
+    gap: var(--fc-space-lg);
+    padding: var(--fc-space-lg) var(--fc-space-xl);
     border-bottom: 1px solid var(--fc-color-border);
     flex-shrink: 0;
     flex-wrap: wrap;
+    background: var(--fc-color-bg);
 }
 
 .pe-contradiction-toolbar__left {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    align-items: flex-start;
+    gap: var(--fc-space-md);
+    min-width: 0;
+    flex: 1;
 }
 
 .pe-contradiction-toolbar__actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     flex-wrap: wrap;
 }
 
 .pe-contradiction-title {
     margin: 0;
-    font-size: var(--fc-font-size-lg);
-    font-weight: var(--fc-font-weight-bold);
-    color: var(--fc-color-text);
 }
 
 .pe-contradiction-desc {
-    margin: 0.2rem 0 0;
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.55;
-    color: var(--fc-color-text-secondary);
+    margin: 0;
 }
 
 /* ── Layout ────────────────────────────────────────────────────────────────── */
@@ -56,8 +53,8 @@
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
-    gap: 0.9rem;
-    padding: 0.9rem 1rem;
+    gap: var(--fc-space-lg);
+    padding: 0 var(--fc-space-xl) var(--fc-space-xl);
 }
 
 /* ── History & Report sections ─────────────────────────────────────────────── */
@@ -88,9 +85,6 @@
 
 .pe-contradiction-section__title {
     margin: 0;
-    font-size: var(--fc-font-size-base);
-    font-weight: var(--fc-font-weight-bold);
-    color: var(--fc-color-text);
 }
 
 .pe-contradiction-section__meta {
@@ -177,8 +171,8 @@
 
 .pe-contradiction-history__warning,
 .pe-contradiction-report__warning {
-    background: color-mix(in srgb, var(--fc-color-warning, #d97706) 14%, transparent);
-    color: var(--fc-color-warning, #d97706);
+    background: color-mix(in srgb, var(--fc-color-warning) 14%, transparent);
+    color: var(--fc-color-warning);
 }
 
 .pe-contradiction-history__summary {
@@ -284,13 +278,13 @@
 }
 
 .pe-contradiction-severity-pill.is-critical {
-    background: color-mix(in srgb, var(--fc-color-danger, #d9485f) 14%, transparent);
-    color: var(--fc-color-danger, #d9485f);
+    background: color-mix(in srgb, var(--fc-color-danger) 14%, transparent);
+    color: var(--fc-color-danger);
 }
 
 .pe-contradiction-severity-pill.is-high {
-    background: color-mix(in srgb, var(--fc-color-warning, #d97706) 14%, transparent);
-    color: var(--fc-color-warning, #d97706);
+    background: color-mix(in srgb, var(--fc-color-warning) 14%, transparent);
+    color: var(--fc-color-warning);
 }
 
 .pe-contradiction-severity-pill.is-medium {
@@ -359,11 +353,11 @@
 }
 
 .pe-contradiction-issue-card.is-severity-critical {
-    border-left-color: var(--fc-color-danger, #d9485f);
+    border-left-color: var(--fc-color-danger);
 }
 
 .pe-contradiction-issue-card.is-severity-high {
-    border-left-color: var(--fc-color-warning, #d97706);
+    border-left-color: var(--fc-color-warning);
 }
 
 .pe-contradiction-issue-card.is-severity-medium {
@@ -417,13 +411,13 @@
 }
 
 .pe-contradiction-issue-card__severity.is-critical {
-    background: color-mix(in srgb, var(--fc-color-danger, #d9485f) 14%, transparent);
-    color: var(--fc-color-danger, #d9485f);
+    background: color-mix(in srgb, var(--fc-color-danger) 14%, transparent);
+    color: var(--fc-color-danger);
 }
 
 .pe-contradiction-issue-card__severity.is-high {
-    background: color-mix(in srgb, var(--fc-color-warning, #d97706) 14%, transparent);
-    color: var(--fc-color-warning, #d97706);
+    background: color-mix(in srgb, var(--fc-color-warning) 14%, transparent);
+    color: var(--fc-color-warning);
 }
 
 .pe-contradiction-issue-card__severity.is-medium {
