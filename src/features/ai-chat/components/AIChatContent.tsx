@@ -323,15 +323,8 @@ export default function AIChatContent({
         <>
             <aside className="ai-sidebar">
                 <div className="ai-sidebar-top">
-                    <div className="ai-sidebar-top-actions">
-                        <button className="ai-sidebar-new-btn" onClick={() => void ctx.createNewConversation()}
-                                title="新对话">
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
-                                 strokeWidth="1.5">
-                                <path d="M7 2v10M2 7h10"/>
-                            </svg>
-                            <span>新对话</span>
-                        </button>
+                    <div className="ai-sidebar-topbar">
+                        <div className="ai-sidebar-topbar-title">对话列表</div>
                         <button
                             className="ai-sidebar-close-btn"
                             onClick={() => ctx.setSidebarCollapsed(true)}
@@ -341,6 +334,16 @@ export default function AIChatContent({
                                  strokeWidth="1.5">
                                 <path d="M9 2L4 7L9 12"/>
                             </svg>
+                        </button>
+                    </div>
+                    <div className="ai-sidebar-top-actions">
+                        <button className="ai-sidebar-new-btn" onClick={() => void ctx.createNewConversation()}
+                                title="新对话">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                                 strokeWidth="1.5">
+                                <path d="M7 2v10M2 7h10"/>
+                            </svg>
+                            <span>新对话</span>
                         </button>
                     </div>
                 </div>

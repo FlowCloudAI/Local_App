@@ -57,8 +57,25 @@
 
 /* 侧边栏顶部新建按钮 */
 .ai-sidebar-top {
-    padding: 6px 8px;
+    padding: 6px 8px 8px;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ai-sidebar-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.ai-sidebar-topbar-title {
+    min-width: 0;
+    font-size: 0.85rem;
+    font-weight: var(--fc-font-weight-medium);
+    color: var(--fc-color-text-secondary);
 }
 
 .ai-sidebar-top-actions {
@@ -71,7 +88,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    flex: 1;
+    width: 100%;
+    justify-content: center;
     padding: 5px 8px;
     font-size: 0.82rem;
     border: none;

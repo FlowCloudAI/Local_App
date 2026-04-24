@@ -306,10 +306,7 @@ export default function SnapshotPanel({
     return (
         <div className={`snapshot-panel${className ? ` ${className}` : ''}`}>
             <div className="snapshot-panel__header">
-                <div className="fc-page-title-block">
-                    <h3 className="snapshot-panel__title fc-section-title">版本管理</h3>
-                    <p className="snapshot-panel__subtitle">管理分支、手动快照与历史回退。</p>
-                </div>
+                <h3 className="snapshot-panel__title fc-section-title">版本管理</h3>
                 <div className="snapshot-panel__header-actions">
                     <button
                         type="button"
@@ -344,164 +341,177 @@ export default function SnapshotPanel({
                 </div>
             </div>
 
-            <div className="snapshot-panel__section fc-section-card">
-                <div className="snapshot-panel__section-title fc-section-title">当前分支</div>
-                <div className="snapshot-panel__branch-row">
-                    <Select
-                        options={branchOptions}
-                        value={activeBranch}
-                        onChange={(value) => void handleSwitchBranch(String(value))}
-                        style={{flex: 1}}
-                        disabled={loading || branchSwitching || branches.length === 0}
-                    />
-                    <span className="snapshot-panel__branch-badge">{activeBranch || '未初始化'}</span>
-                </div>
-                <div className="snapshot-panel__branch-create">
-                    <Input
-                        placeholder="新分支名称，例如 feature/世界观重写"
-                        value={newBranchName}
-                        onChange={setNewBranchName}
-                    />
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleCreateBranch()}
-                        disabled={loading || branchSwitching}
-                    >
-                        新建分支
-                    </Button>
-                </div>
-            </div>
-
-            <div className="snapshot-panel__section fc-section-card">
-                <div className="snapshot-panel__section-title fc-section-title">手动保存</div>
-                <div className="snapshot-panel__save-row">
-                    <Input
-                        placeholder="可选：输入本次版本说明"
-                        value={message}
-                        onChange={setMessage}
-                    />
-                    <Button variant="primary" size="sm" onClick={() => void handleSnapshot()}
-                            disabled={loading || saving}>
-                        保存
-                    </Button>
-                </div>
-            </div>
-
-            {loading && graphRows.length === 0 ? (
-                <div className="snapshot-panel__empty fc-empty-state-card">
-                    <span className="fc-empty-state-mark">Snapshot</span>
-                    <p className="fc-empty-state-title">正在加载版本历史</p>
-                    <p className="fc-empty-state-copy">正在读取快照图与分支信息。</p>
-                </div>
-            ) : graphRows.length === 0 ? (
-                <div className="snapshot-panel__empty fc-empty-state-card">
-                    <span className="fc-empty-state-mark">Snapshot</span>
-                    <p className="fc-empty-state-title">{activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}</p>
-                    <p className="fc-empty-state-copy">创建一次手动保存，或先切换到已有分支查看历史记录。</p>
-                </div>
-            ) : (
-                <div className="snapshot-panel__graph"
-                     style={{'--rail-width': `${maxRailWidth}px`} as React.CSSProperties}>
-                    {graphRows.map((row) => {
-                        const circleColor = row.node.isActiveTip
-                            ? 'var(--fc-color-primary)'
-                            : GRAPH_COLORS[row.lane % GRAPH_COLORS.length]
-                        const circleR = row.node.isActiveTip || row.node.isCurrentHead ? 6 : 5
-                        return (
-                            <div
-                                key={row.node.id}
-                                className={`snapshot-panel__graph-row${row.node.isActiveTip ? ' is-active' : ''}`}
-                            >
-                                <div className="snapshot-panel__graph-rail" style={{width: `${maxRailWidth}px`}}>
-                                    <svg
-                                        width={maxRailWidth}
-                                        height={RAIL_PX}
-                                        viewBox={`0 0 ${maxRailWidth} ${RAIL_PX}`}
-                                        style={{overflow: 'visible'}}
-                                    >
-                                        {Array.from({length: row.laneCount}, (_, lane) => {
-                                            const color = GRAPH_COLORS[lane % GRAPH_COLORS.length]
-                                            const x = laneX(lane)
-                                            const hasTop = lane < row.lanePresenceAbove.length && row.lanePresenceAbove[lane]
-                                            const hasBot = lane < row.lanePresenceBelow.length && row.lanePresenceBelow[lane]
-                                            return (
-                                                <g key={`${row.node.id}-lane-${lane}`}>
-                                                    {hasTop && <line x1={x} y1="0" x2={x} y2={midY} stroke={color}
-                                                                     strokeWidth="1.5"/>}
-                                                    {hasBot && <line x1={x} y1={midY} x2={x} y2={RAIL_PX} stroke={color}
-                                                                     strokeWidth="1.5"/>}
-                                                </g>
-                                            )
-                                        })}
-                                        {row.connections
-                                            .filter(parentLane => parentLane !== row.lane)
-                                            .map(parentLane => {
-                                                const fromX = laneX(row.lane)
-                                                const toX = laneX(parentLane)
-                                                const color = GRAPH_COLORS[parentLane % GRAPH_COLORS.length]
-                                                return (
-                                                    <path
-                                                        key={`${row.node.id}-${parentLane}`}
-                                                        d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX}`}
-                                                        fill="none"
-                                                        stroke={color}
-                                                        strokeWidth="1.5"
-                                                    />
-                                                )
-                                            })}
-                                    </svg>
+            <div className="snapshot-panel__workspace">
+                <div className="snapshot-panel__viewport">
+                    {loading && graphRows.length === 0 ? (
+                        <div className="snapshot-panel__empty fc-empty-state-card">
+                            <span className="fc-empty-state-mark">Snapshot</span>
+                            <p className="fc-empty-state-title">正在加载版本历史</p>
+                            <p className="fc-empty-state-copy">正在读取快照图与分支信息。</p>
+                        </div>
+                    ) : graphRows.length === 0 ? (
+                        <div className="snapshot-panel__empty fc-empty-state-card">
+                            <span className="fc-empty-state-mark">Snapshot</span>
+                            <p className="fc-empty-state-title">{activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}</p>
+                            <p className="fc-empty-state-copy">创建一次手动保存，或先切换到已有分支查看历史记录。</p>
+                        </div>
+                    ) : (
+                        <div className="snapshot-panel__graph"
+                             style={{'--rail-width': `${maxRailWidth}px`} as React.CSSProperties}>
+                            {graphRows.map((row) => {
+                                const circleColor = row.node.isActiveTip
+                                    ? 'var(--fc-color-primary)'
+                                    : GRAPH_COLORS[row.lane % GRAPH_COLORS.length]
+                                const circleR = row.node.isActiveTip || row.node.isCurrentHead ? 6 : 5
+                                return (
                                     <div
-                                        className="snapshot-panel__graph-node"
-                                        style={{
-                                            width: circleR * 2,
-                                            height: circleR * 2,
-                                            left: laneX(row.lane) - circleR,
-                                            background: circleColor,
-                                        }}
-                                    />
-                                </div>
-                                <div className="snapshot-panel__item">
-                                    <span className="snapshot-panel__item-message">
-                                        {formatSnapshotMessage(row.node.message)}
-                                    </span>
-                                    <span className="snapshot-panel__item-branches">
-                                        {row.node.branchNames.map(branchName => (
-                                            <span
-                                                key={`${row.node.id}-${branchName}`}
-                                                className="snapshot-panel__branch-tag"
+                                        key={row.node.id}
+                                        className={`snapshot-panel__graph-row${row.node.isActiveTip ? ' is-active' : ''}`}
+                                    >
+                                        <div className="snapshot-panel__graph-rail"
+                                             style={{width: `${maxRailWidth}px`}}>
+                                            <svg
+                                                width={maxRailWidth}
+                                                height={RAIL_PX}
+                                                viewBox={`0 0 ${maxRailWidth} ${RAIL_PX}`}
+                                                style={{overflow: 'visible'}}
                                             >
-                                                {branchName}
+                                                {Array.from({length: row.laneCount}, (_, lane) => {
+                                                    const color = GRAPH_COLORS[lane % GRAPH_COLORS.length]
+                                                    const x = laneX(lane)
+                                                    const hasTop = lane < row.lanePresenceAbove.length && row.lanePresenceAbove[lane]
+                                                    const hasBot = lane < row.lanePresenceBelow.length && row.lanePresenceBelow[lane]
+                                                    return (
+                                                        <g key={`${row.node.id}-lane-${lane}`}>
+                                                            {hasTop &&
+                                                                <line x1={x} y1="0" x2={x} y2={midY} stroke={color}
+                                                                      strokeWidth="1.5"/>}
+                                                            {hasBot && <line x1={x} y1={midY} x2={x} y2={RAIL_PX}
+                                                                             stroke={color}
+                                                                             strokeWidth="1.5"/>}
+                                                        </g>
+                                                    )
+                                                })}
+                                                {row.connections
+                                                    .filter(parentLane => parentLane !== row.lane)
+                                                    .map(parentLane => {
+                                                        const fromX = laneX(row.lane)
+                                                        const toX = laneX(parentLane)
+                                                        const color = GRAPH_COLORS[parentLane % GRAPH_COLORS.length]
+                                                        return (
+                                                            <path
+                                                                key={`${row.node.id}-${parentLane}`}
+                                                                d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX}`}
+                                                                fill="none"
+                                                                stroke={color}
+                                                                strokeWidth="1.5"
+                                                            />
+                                                        )
+                                                    })}
+                                            </svg>
+                                            <div
+                                                className="snapshot-panel__graph-node"
+                                                style={{
+                                                    width: circleR * 2,
+                                                    height: circleR * 2,
+                                                    left: laneX(row.lane) - circleR,
+                                                    background: circleColor,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="snapshot-panel__item">
+                                            <span className="snapshot-panel__item-message">
+                                                {formatSnapshotMessage(row.node.message)}
                                             </span>
-                                        ))}
-                                    </span>
-                                    <span className="snapshot-panel__item-actions">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={actionId === row.node.id}
-                                            onClick={() => void handleRollback(row.node)}
-                                        >
-                                            回退
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={actionId === row.node.id}
-                                            onClick={() => void handleAppend(row.node)}
-                                        >
-                                            恢复
-                                        </Button>
-                                    </span>
-                                    <span className="snapshot-panel__item-time">
-                                        {formatSnapshotTime(row.node.timestamp)}
-                                    </span>
-                                </div>
-                            </div>
-                        )
-                    })}
+                                            <span className="snapshot-panel__item-branches">
+                                                {row.node.branchNames.map(branchName => (
+                                                    <span
+                                                        key={`${row.node.id}-${branchName}`}
+                                                        className="snapshot-panel__branch-tag"
+                                                    >
+                                                        {branchName}
+                                                    </span>
+                                                ))}
+                                            </span>
+                                            <span className="snapshot-panel__item-actions">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={actionId === row.node.id}
+                                                    onClick={() => void handleRollback(row.node)}
+                                                >
+                                                    回退
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    disabled={actionId === row.node.id}
+                                                    onClick={() => void handleAppend(row.node)}
+                                                >
+                                                    恢复
+                                                </Button>
+                                            </span>
+                                            <span className="snapshot-panel__item-time">
+                                                {formatSnapshotTime(row.node.timestamp)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
-            )}
+
+                <aside className="snapshot-panel__sidebar">
+                    <div className="snapshot-panel__section fc-section-card">
+                        <div className="snapshot-panel__section-title fc-section-title">当前分支</div>
+                        <div className="snapshot-panel__branch-row">
+                            <Select
+                                options={branchOptions}
+                                value={activeBranch}
+                                onChange={(value) => void handleSwitchBranch(String(value))}
+                                style={{flex: 1}}
+                                disabled={loading || branchSwitching || branches.length === 0}
+                            />
+                            <span className="snapshot-panel__branch-badge">{activeBranch || '未初始化'}</span>
+                        </div>
+                        <div className="snapshot-panel__branch-create">
+                            <Input
+                                placeholder="新分支名称，例如 feature/世界观重写"
+                                value={newBranchName}
+                                onChange={setNewBranchName}
+                            />
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleCreateBranch()}
+                                disabled={loading || branchSwitching}
+                            >
+                                新建分支
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="snapshot-panel__section fc-section-card">
+                        <div className="snapshot-panel__section-title fc-section-title">手动保存</div>
+                        <div className="snapshot-panel__save-row">
+                            <textarea
+                                className="snapshot-panel__save-textarea"
+                                placeholder="可选：输入本次版本说明"
+                                value={message}
+                                onChange={(event) => setMessage(event.target.value)}
+                                rows={4}
+                            />
+                            <div className="snapshot-panel__save-actions">
+                                <Button variant="primary" size="sm" onClick={() => void handleSnapshot()}
+                                        disabled={loading || saving}>
+                                    保存
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
         </div>
     )
 }

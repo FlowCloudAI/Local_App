@@ -734,9 +734,9 @@ export default function Idea({
                         </div>
 
                         <div className="idea-page__sidebar-header">
-                            <div>
-                                <h2 className="idea-page__title">灵感便签</h2>
-                                <p className="idea-page__subtitle">默认先看待整理，重要内容可以置顶。</p>
+                            <div className="idea-page__sidebar-list-meta">
+                                <span className="idea-page__sidebar-list-title">便签列表</span>
+                                <span className="idea-page__sidebar-count">{ideaNotes.length}</span>
                             </div>
                             <Button variant="ghost" onClick={handleCreateBlankIdea}>新建便签</Button>
                         </div>
@@ -848,7 +848,7 @@ export default function Idea({
                             </div>
                             <div className="idea-page__editor-header-bottom">
                                 <div className="idea-page__editor-meta">
-                                    <div className="idea-page__meta-field">
+                                    <div className="idea-page__meta-field idea-page__meta-field--plain">
                                         <span className="idea-page__meta-label">所属项目</span>
                                         <Select
                                             className="idea-page__meta-select"
