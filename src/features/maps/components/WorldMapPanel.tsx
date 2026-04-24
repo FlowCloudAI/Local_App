@@ -707,6 +707,25 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const viewportKeyLocationStyle = previewRenderer === 'pixi' ? compiledPixiStyle.keyLocationStyle : undefined
     const viewportLabelStyle = previewRenderer === 'pixi' ? compiledPixiStyle.labelStyle : undefined
 
+    // DEBUG: wrap renderOverlay to trace whether MapShapeViewport actually calls it
+    const wrappedPixiProps = useMemo(() => {
+        if (!pixiProps.renderOverlay) {
+            mapLog('wrapRenderOverlay: no renderOverlay to wrap')
+            return pixiProps
+        }
+        const original = pixiProps.renderOverlay
+        mapLog('wrapRenderOverlay: wrapping renderOverlay')
+        return {
+            ...pixiProps,
+            renderOverlay: (ctx: Parameters<typeof original>[0]) => {
+                mapLog('wrapRenderOverlay: CALLED')
+                const result = original(ctx)
+                mapLog(`wrapRenderOverlay: RETURNED type=${typeof result} isNull=${result === null}`)
+                return result
+            }
+        }
+    }, [pixiProps])
+
     const viewportRenderKey = `${previewRenderer}-${viewportMode}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
     useEffect(() => {
@@ -1266,7 +1285,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                             labelStyle={viewportLabelStyle}
                             svgProps={svgProps}
                             deckProps={deckProps}
-                            pixiProps={pixiProps}
+                            pixiProps={wrappedPixiProps}
                         />
                     ) : (
                         <div className="wm-viewport-empty">
