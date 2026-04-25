@@ -655,7 +655,7 @@ export default function EntryEditor({
                     ? current
                     : {...current, summary: nextSummary}
             ))
-            await showAlert('已生成摘要', 'success', 'toast', 1500)
+            await showAlert('已生成摘要', 'success', 'nonInvasive', 1500)
         } catch (summaryError) {
             console.error('generate summary failed', summaryError)
             const message = summaryError instanceof Error ? summaryError.message : '生成摘要失败'
@@ -948,7 +948,7 @@ export default function EntryEditor({
             lastAutoSaveAttemptAtRef.current = 0
             if (trigger === 'manual') {
                 setAutoSaveStatus('')
-                void showAlert('词条已保存', 'success', 'toast', 1000)
+                void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
             } else {
                 setAutoSaveStatus('已自动保存')
             }

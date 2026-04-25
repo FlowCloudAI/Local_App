@@ -29,11 +29,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: fcimg: http://asset.localhost http://fcimg.localhost https://www.flowcloudai.cn",
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["$TEMP/**"]
-      },
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: fcimg: http://fcimg.localhost https://www.flowcloudai.cn",
       "capabilities": [
         "default"
       ]
@@ -55,7 +51,9 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["fcplug"],
+        "ext": [
+          "fcplug"
+        ],
         "mimeType": "application/x-fcplugin",
         "description": "流云AI插件文件",
         "role": "Editor",

@@ -48,7 +48,6 @@ use std::process::exit;
 use std::sync::Arc;
 use tauri::{
     http::{header::CONTENT_TYPE, Response, StatusCode}, AppHandle, Emitter, Manager, Runtime, UriSchemeContext,
-    WindowBuilder,
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log;
@@ -393,12 +392,8 @@ fn prepare_db_path(_app: &AppHandle, db_dir: &Path) -> Result<PathBuf> {
 }
 
 fn fatal<R: Runtime, M: Manager<R>>(manager: &M, msg: &str) -> ! {
-    if let Some(w) = manager.get_window("main") {
+    if let Some(w) = manager.get_webview_window("main") {
         let _ = w.dialog().message(msg).blocking_show();
-    } else {
-        let _ = WindowBuilder::new(manager, "error_dialog")
-            .build()
-            .map(|w| w.dialog().message(msg).blocking_show());
     }
     exit(1);
 }

@@ -396,7 +396,7 @@ export default function Settings({onBack}: SettingsProps) {
             setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
             setExpandedApiKeyPluginId(null)
             setApiKeyDraft('')
-            void showAlert('API Key 已保存', 'success')
+            void showAlert('API Key 已保存', 'success', 'nonInvasive')
         } catch (error) {
             void showAlert('保存失败: ' + error, 'error')
         } finally {
@@ -412,7 +412,7 @@ export default function Settings({onBack}: SettingsProps) {
                 setExpandedApiKeyPluginId(null)
                 setApiKeyDraft('')
             }
-            void showAlert('API Key 已删除', 'success')
+            void showAlert('API Key 已删除', 'success', 'nonInvasive')
         } catch (error) {
             void showAlert('删除失败: ' + error, 'error')
         }
@@ -430,7 +430,7 @@ export default function Settings({onBack}: SettingsProps) {
                     ? prev.map(p => (p.id === info.id ? info : p))
                     : [...prev, info]
             })
-            void showAlert(`${info.name} 安装成功`, 'success')
+            void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive')
         } catch (e) {
             void showAlert('安装失败: ' + e, 'error')
         } finally {
