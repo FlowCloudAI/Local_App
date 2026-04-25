@@ -238,6 +238,14 @@ export default function Settings({onBack}: SettingsProps) {
         })
     }, [getPluginById, loading, resolveDefaultModel, settings])
 
+    // 字体大小变化时实时通知其他组件
+    useEffect(() => {
+        if (!settings || loading) return
+        window.dispatchEvent(new CustomEvent('fc:editor-font-size-change', {
+            detail: {fontSize: settings.editor_font_size}
+        }))
+    }, [settings?.editor_font_size, loading]) // eslint-disable-line react-hooks/exhaustive-deps
+
     // 自动保存设置
     useEffect(() => {
         if (!settings || loading) return
@@ -561,7 +569,7 @@ export default function Settings({onBack}: SettingsProps) {
     })
 
     return (
-        <RollingBox className="settings-outer">
+        <RollingBox className="settings-outer" thumbSize={'thin'}>
             <div className="settings-page-layout">
                 <aside className="settings-sidebar">
                     {onBack && (
@@ -708,6 +716,11 @@ export default function Settings({onBack}: SettingsProps) {
                                             style={{flex: 1}}
                                         />
                                         <span className="settings-span">{settings.editor_font_size}px</span>
+                                        {settings.editor_font_size !== 14 && (
+                                            <Button size="sm" variant="outline" style={{marginLeft: 8}} onClick={() =>
+                                                setSettings(prev => prev ? {...prev, editor_font_size: 14} : null)
+                                            }>恢复默认</Button>
+                                        )}
                                     </div>
                                 </div>
                             </section>
@@ -716,15 +729,17 @@ export default function Settings({onBack}: SettingsProps) {
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">编辑器行为</h2>
                                 <div className="settings-row">
-                                    <div className="settings-field">
-                                        <label className="settings-label-wide">词条编辑器最长自动保存间隔(分)</label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            value={Math.round(settings.auto_save_secs / 60).toString()}
-                                            onChange={handleAutoSaveChange}
-                                            className="settings-input-small"
-                                        />
+                                    <div className="settings-field-stack">
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">自动保存间隔（分钟）</label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                value={Math.round(settings.auto_save_secs / 60).toString()}
+                                                onChange={handleAutoSaveChange}
+                                                style={{width: '4rem', flexShrink: 0}}
+                                            />
+                                        </div>
                                         <div className="settings-field-hint">
                                             仅作用于词条编辑器的持续编辑场景；0 表示关闭，不影响灵感便签的即时自动保存。
                                         </div>

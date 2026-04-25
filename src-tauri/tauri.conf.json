@@ -63,10 +63,6 @@
       }
     ],
     "windows": {
-      "webviewInstallMode": {
-        "type": "offlineInstaller",
-        "silent": true
-      },
       "wix": {
         "language": "SimpChinese"
       },
@@ -81,7 +77,8 @@
         "compression": "lzma",
         "startMenuFolder": "流云AI",
         "minimumWebview2Version": "110.0.1531.0",
-        "installerHooks": "nsis/installer-hooks.nsh"
+        "installerHooks": "nsis/installer-hooks.nsh",
+        "sidebarImage": "icons/sidebarImage.bmp"
       }
     },
     "linux": {

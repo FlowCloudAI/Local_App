@@ -301,12 +301,13 @@ export default function SnapshotPanel({
     }, [graphRows])
 
     const RAIL_PX = 32
+    const RAIL_OVERLAP = 2
     const midY = RAIL_PX / 2
 
     return (
         <div className={`snapshot-panel${className ? ` ${className}` : ''}`}>
             <div className="snapshot-panel__header">
-                <h3 className="snapshot-panel__title fc-section-title">版本管理</h3>
+                <div className="snapshot-panel__title">版本管理</div>
                 <div className="snapshot-panel__header-actions">
                     <button
                         type="button"
@@ -372,8 +373,8 @@ export default function SnapshotPanel({
                                              style={{width: `${maxRailWidth}px`}}>
                                             <svg
                                                 width={maxRailWidth}
-                                                height={RAIL_PX}
-                                                viewBox={`0 0 ${maxRailWidth} ${RAIL_PX}`}
+                                                height={RAIL_PX + RAIL_OVERLAP * 2}
+                                                viewBox={`0 ${-RAIL_OVERLAP} ${maxRailWidth} ${RAIL_PX + RAIL_OVERLAP * 2}`}
                                                 style={{overflow: 'visible'}}
                                             >
                                                 {Array.from({length: row.laneCount}, (_, lane) => {
@@ -384,11 +385,22 @@ export default function SnapshotPanel({
                                                     return (
                                                         <g key={`${row.node.id}-lane-${lane}`}>
                                                             {hasTop &&
-                                                                <line x1={x} y1="0" x2={x} y2={midY} stroke={color}
-                                                                      strokeWidth="1.5"/>}
-                                                            {hasBot && <line x1={x} y1={midY} x2={x} y2={RAIL_PX}
-                                                                             stroke={color}
-                                                                             strokeWidth="1.5"/>}
+                                                                <line
+                                                                    x1={x}
+                                                                    y1={-RAIL_OVERLAP}
+                                                                    x2={x}
+                                                                    y2={midY + 1}
+                                                                    stroke={color}
+                                                                    strokeWidth="1.5"
+                                                                />}
+                                                            {hasBot && <line
+                                                                x1={x}
+                                                                y1={midY - 1}
+                                                                x2={x}
+                                                                y2={RAIL_PX + RAIL_OVERLAP}
+                                                                stroke={color}
+                                                                strokeWidth="1.5"
+                                                            />}
                                                         </g>
                                                     )
                                                 })}
@@ -401,7 +413,7 @@ export default function SnapshotPanel({
                                                         return (
                                                             <path
                                                                 key={`${row.node.id}-${parentLane}`}
-                                                                d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX}`}
+                                                                d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX + RAIL_OVERLAP}`}
                                                                 fill="none"
                                                                 stroke={color}
                                                                 strokeWidth="1.5"
@@ -463,8 +475,8 @@ export default function SnapshotPanel({
                 </div>
 
                 <aside className="snapshot-panel__sidebar">
-                    <div className="snapshot-panel__section fc-section-card">
-                        <div className="snapshot-panel__section-title fc-section-title">当前分支</div>
+                    <div className="snapshot-panel__section">
+                        <div className="snapshot-panel__section-title">当前分支</div>
                         <div className="snapshot-panel__branch-row">
                             <Select
                                 options={branchOptions}
@@ -492,8 +504,8 @@ export default function SnapshotPanel({
                         </div>
                     </div>
 
-                    <div className="snapshot-panel__section fc-section-card">
-                        <div className="snapshot-panel__section-title fc-section-title">手动保存</div>
+                    <div className="snapshot-panel__section">
+                        <div className="snapshot-panel__section-title">手动保存</div>
                         <div className="snapshot-panel__save-row">
                             <textarea
                                 className="snapshot-panel__save-textarea"

@@ -25,7 +25,6 @@ export default function AIChatContent({
                                           onToggleCollapsed
                                       }: AIChatContentProps) {
     const ctx = controller
-    const isBlankChat = !ctx.activeConversationId
     const activeConversation = ctx.activeConversation
     const isCharacterConversation = activeConversation?.mode === 'character'
     const isReportConversation = activeConversation?.mode === 'report'
@@ -551,14 +550,6 @@ export default function AIChatContent({
                                 <div
                                     className="ai-report-context-scope">{activeConversation.reportContext.scopeSummary}</div>
                             </div>
-                        </div>
-                    )}
-                    {isBlankChat && (
-                        <div className="ai-empty-state ai-empty-state--brand">
-                            <p className="ai-empty-brand">准备好了，随时开始</p>
-                            <p className="ai-empty-hint">
-                                输入问题，或从左侧打开一段历史对话。
-                            </p>
                         </div>
                     )}
                     {ctx.activeConversationId && ctx.messages.length > 0 && (

@@ -2,7 +2,6 @@ mod apis;
 mod ai_services;
 mod layout;
 mod map;
-mod prompt;
 mod reports;
 mod senses;
 mod settings;

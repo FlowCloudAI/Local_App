@@ -176,6 +176,7 @@ export default function EntryEditor({
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [autoSaveSeconds, setAutoSaveSeconds] = useState(0)
+    const [editorFontSize, setEditorFontSize] = useState(14)
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
     const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EditorMode>('browse')
@@ -242,13 +243,22 @@ export default function EntryEditor({
             .then((settings) => {
                 if (cancelled) return
                 setAutoSaveSeconds(settings.auto_save_secs)
+                setEditorFontSize(settings.editor_font_size ?? 14)
             })
             .catch((loadError) => {
                 console.error('加载自动保存设置失败', loadError)
             })
 
+        function handleFontSizeChange(event: Event) {
+            const fontSize = (event as CustomEvent<{ fontSize: number }>).detail.fontSize
+            setEditorFontSize(fontSize ?? 14)
+        }
+
+        window.addEventListener('fc:editor-font-size-change', handleFontSizeChange)
+
         return () => {
             cancelled = true
+            window.removeEventListener('fc:editor-font-size-change', handleFontSizeChange)
         }
     }, [])
 
@@ -1216,6 +1226,7 @@ export default function EntryEditor({
                                                     ? current
                                                     : {...current, content: value}
                                             ))}
+                                            fontSizeScale={editorFontSize / 14}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
                                             onKeyDown={(event) => {
@@ -1311,6 +1322,7 @@ export default function EntryEditor({
                                         onChange={() => {
                                         }}
                                         background={"transparent"}
+                                        fontSizeScale={editorFontSize / 14}
                                         autoHeight
                                     />
 

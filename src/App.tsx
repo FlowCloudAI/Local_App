@@ -493,6 +493,7 @@ function App() {
                         className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.minimize()}
+                        hoverBackground={"var(--fc-color-bg-tertiary)"}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -504,6 +505,7 @@ function App() {
                         className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.toggleMaximize()}
+                        hoverBackground={"var(--fc-color-bg-tertiary)"}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
@@ -522,6 +524,7 @@ function App() {
                         className="window-control-btn window-control-btn--danger"
                         variant="ghost"
                         onClick={() => win.close()}
+                        hoverBackground={"#aa1111"}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"

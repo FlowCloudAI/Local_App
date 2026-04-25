@@ -5,6 +5,15 @@ import react from '@vitejs/plugin-react'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
+function normalizeModuleId(id: string): string {
+    return id.replace(/\\/g, '/')
+}
+
+function matchesNodeModulePrefix(id: string, prefixes: string[]): boolean {
+    const normalized = normalizeModuleId(id)
+    return prefixes.some(prefix => normalized.includes(`/node_modules/${prefix}`))
+}
+
 // https://vite.dev/config/
 export default defineConfig({
     plugins: [react()],
@@ -53,5 +62,86 @@ export default defineConfig({
         minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
         // 在 debug 构建中生成 sourcemap
         sourcemap: !!process.env.TAURI_ENV_DEBUG,
+        rollupOptions: {
+            output: {
+                manualChunks(id) {
+                    const normalized = normalizeModuleId(id)
+
+                    if (!normalized.includes('/node_modules/')) return
+                    if (normalized.endsWith('.css')) return
+
+                    // React 基础运行时，几乎所有页面都会用到。
+                    if (matchesNodeModulePrefix(normalized, [
+                        'react/',
+                        'react-dom/',
+                        'scheduler/',
+                    ])) {
+                        return 'react-vendor'
+                    }
+
+                    // Tauri 桥接层单独拆出，避免混进主包。
+                    if (matchesNodeModulePrefix(normalized, [
+                        '@tauri-apps/api/',
+                        '@tauri-apps/plugin-dialog/',
+                        '@tauri-apps/plugin-log/',
+                        '@tauri-apps/plugin-opener/',
+                        '@tauri-apps/plugin-sql/',
+                    ])) {
+                        return 'tauri-vendor'
+                    }
+
+                    // 国际化在设置页、入口页和编辑页都会共用，但不该和 React/地图混在一起。
+                    if (matchesNodeModulePrefix(normalized, [
+                        'i18next/',
+                        'react-i18next/',
+                        'i18next-browser-languagedetector/',
+                    ])) {
+                        return 'i18n-vendor'
+                    }
+
+                    // 地图预览链最重，连同 deck.gl / loaders.gl / pixi 一起拆出。
+                    if (matchesNodeModulePrefix(normalized, [
+                        '@deck.gl/',
+                        '@loaders.gl/',
+                        '@luma.gl/',
+                        '@math.gl/',
+                        '@probe.gl/',
+                        '@pixi/react/',
+                        'pixi.js/',
+                    ])) {
+                        return 'map-vendor'
+                    }
+
+                    // Markdown 编辑器及其语法树链通常体积较大，适合和主工作台隔离。
+                    if (matchesNodeModulePrefix(normalized, [
+                        '@uiw/react-md-editor/',
+                        '@uiw/react-markdown-preview/',
+                        '@codemirror/',
+                        'codemirror/',
+                        'unified/',
+                        'remark-',
+                        'rehype-',
+                        'micromark',
+                        'mdast-',
+                        'hast-',
+                        'property-information/',
+                        'space-separated-tokens/',
+                        'comma-separated-tokens/',
+                    ])) {
+                        return 'markdown-vendor'
+                    }
+
+                    // 内部 UI 库和常用前端辅助库拆成共享 UI 包，减轻主入口体积。
+                    if (matchesNodeModulePrefix(normalized, [
+                        'flowcloudai-ui/',
+                        'classnames/',
+                        'react-dropzone/',
+                        'react-window/',
+                    ])) {
+                        return 'ui-vendor'
+                    }
+                },
+            },
+        },
     },
 })
