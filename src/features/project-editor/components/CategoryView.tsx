@@ -7,9 +7,7 @@ import {
     type EntryBrief,
     entryTypeKey,
     type EntryTypeView,
-    type TagSchema,
 } from '../../../api'
-import EntryCreator from '../../entries/components/EntryCreator'
 import EntryTypeIcon from './EntryTypeIcon'
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
@@ -71,9 +69,8 @@ interface CategoryViewProps {
     categoryName?: string
     projectId: string
     entryTypes: EntryTypeView[]
-    tagSchemas: TagSchema[]
     refreshToken?: number
-    onEntryCreated?: () => void | Promise<void>
+    onRequestCreateEntry?: (categoryId: string) => void | Promise<void>
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
@@ -82,9 +79,8 @@ function CategoryView({
                           categoryName = '',
                           projectId,
                           entryTypes,
-                          tagSchemas,
                           refreshToken = 0,
-                          onEntryCreated,
+                          onRequestCreateEntry,
                           onOpenEntry
                       }: CategoryViewProps) {
     const [entries, setEntries] = useState<EntryBrief[]>([])
@@ -92,7 +88,6 @@ function CategoryView({
     const [searchText, setSearchText] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
-    const [creatorOpen, setCreatorOpen] = useState(false)
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const loadEntries = useCallback(async (query: string, type: string | null) => {
@@ -195,7 +190,7 @@ function CategoryView({
                         onChange={handleSearchChange}
                     />
                     <div className="pe-category-toolbar-actions">
-                        <Button size="sm" onClick={() => setCreatorOpen(true)}>
+                        <Button size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
                             + 新建词条
                         </Button>
                     </div>
@@ -313,7 +308,7 @@ function CategoryView({
                         <button
                             type="button"
                             className="pe-entry-create-card"
-                            onClick={() => setCreatorOpen(true)}
+                            onClick={() => void onRequestCreateEntry?.(categoryId)}
                         >
                             <span className="pe-entry-create-card__plus">+</span>
                             <span className="pe-entry-create-card__label">新建词条</span>
@@ -321,20 +316,6 @@ function CategoryView({
                     </div>
                 </RollingBox>
             )}
-
-            <EntryCreator
-                open={creatorOpen}
-                projectId={projectId}
-                categoryId={categoryId}
-                entryTypes={entryTypes}
-                tagSchemas={tagSchemas}
-                onClose={() => setCreatorOpen(false)}
-                onCreated={async (createdEntry) => {
-                    await loadEntries(searchText, typeFilter)
-                    await onEntryCreated?.()
-                    onOpenEntry?.({id: createdEntry.id, title: createdEntry.title})
-                }}
-            />
         </div>
     )
 }

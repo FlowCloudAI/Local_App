@@ -4,6 +4,7 @@ use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{arg_str, ToolRegistry};
 use std::sync::Arc;
+use tauri::Emitter;
 use tokio::sync::Mutex;
 
 // ── 词条操作分派枚举 ─────────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ enum EntryOp {
     GetProjectSummary { project_id: String },
     ListProjects,
     ListEntryTypes { project_id: String },
-    CreateEntry { project_id: String, title: String, entry_type: Option<String>, summary: Option<String>, content: Option<String> },
+    CreateEntry { project_id: String, category_id: String, title: String, entry_type: Option<String>, summary: Option<String>, content: Option<String> },
     UpdateEntry { entry_id: String, title: Option<String>, summary: Option<Option<String>>, entry_type: Option<Option<String>> },
     UpdateEntryTags { entry_id: String, tags: serde_json::Value },
     AddEntryTag { entry_id: String, schema_id: String, value: String },
@@ -33,6 +34,7 @@ enum EntryOp {
 
 async fn dispatch_entry_op(
     state: Arc<Mutex<crate::AppState>>,
+    app_handle: Option<tauri::AppHandle>,
     op: EntryOp,
 ) -> anyhow::Result<String> {
     use EntryOp::*;
@@ -116,10 +118,15 @@ async fn dispatch_entry_op(
             let types = tools::list_entry_types(&*guard, &project_id).await.map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_entry_types(&types))
         }
-        CreateEntry { project_id, title, entry_type, summary, content } => {
+        CreateEntry { project_id, category_id, title, entry_type, summary, content } => {
             let guard = state.lock().await;
-            let entry = tools::create_entry(&*guard, &project_id, title, entry_type, summary, content)
+            let entry = tools::create_entry(&*guard, &project_id, &category_id, title, entry_type, summary, content)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String, project_id: String }
+                let _ = h.emit("entry:created", Evt { entry_id: entry.id.to_string(), project_id: entry.project_id.to_string() });
+            }
             Ok(format::format_entry(&entry))
         }
         UpdateEntry { entry_id, title, summary, entry_type } => {
@@ -129,6 +136,11 @@ async fn dispatch_entry_op(
             let guard = state.lock().await;
             let entry = tools::update_entry_fields(&*guard, &entry_id, title, summary, entry_type)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: entry.id.to_string() });
+            }
             Ok(format::format_entry(&entry))
         }
         UpdateEntryTags { entry_id, tags } => {
@@ -137,44 +149,94 @@ async fn dispatch_entry_op(
             let guard = state.lock().await;
             let entry = tools::update_entry_tags(&*guard, &entry_id, tags)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: entry.id.to_string() });
+            }
             Ok(format::format_entry(&entry))
         }
         AddEntryTag { entry_id, schema_id, value } => {
             let guard = state.lock().await;
             let entry = tools::add_entry_tag(&*guard, &entry_id, &schema_id, value)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: entry.id.to_string() });
+            }
             Ok(format::format_entry(&entry))
         }
         RemoveEntryTag { entry_id, schema_id } => {
             let guard = state.lock().await;
             let entry = tools::remove_entry_tag(&*guard, &entry_id, &schema_id)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: entry.id.to_string() });
+            }
             Ok(format::format_entry(&entry))
         }
         CreateRelation { a_id, b_id, relation, content } => {
             let guard = state.lock().await;
             let rel = tools::create_relation(&*guard, &a_id, &b_id, relation, content)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: a_id.clone() });
+                let _ = h.emit("entry:updated", Evt { entry_id: b_id.clone() });
+            }
             Ok(format!("关系已创建 (ID: {})", rel.id))
         }
         UpdateRelation { relation_id, relation, content } => {
             if relation.is_none() && content.is_none() {
                 anyhow::bail!("relation 和 content 至少需要提供一个");
             }
+            let (a_id, b_id) = {
+                let guard = state.lock().await;
+                let rel = tools::get_relation(&*guard, &relation_id)
+                    .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+                (rel.a_id, rel.b_id)
+            };
             let guard = state.lock().await;
             let rel = tools::update_relation(&*guard, &relation_id, relation, content)
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: a_id.to_string() });
+                let _ = h.emit("entry:updated", Evt { entry_id: b_id.to_string() });
+            }
             Ok(format!("关系已更新 (ID: {})", rel.id))
         }
         DeleteRelation { relation_id } => {
+            let (a_id, b_id) = {
+                let guard = state.lock().await;
+                let rel = tools::get_relation(&*guard, &relation_id)
+                    .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+                (rel.a_id, rel.b_id)
+            };
             let guard = state.lock().await;
             tools::delete_relation(&*guard, &relation_id).await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: a_id.to_string() });
+                let _ = h.emit("entry:updated", Evt { entry_id: b_id.to_string() });
+            }
             Ok("关系已删除".to_string())
         }
         MoveEntry { entry_id, category_id } => {
             let guard = state.lock().await;
             let entry = tools::move_entry(&*guard, &entry_id, category_id.as_deref())
                 .await.map_err(|e| anyhow::anyhow!("{}", e))?;
+            if let Some(ref h) = app_handle {
+                #[derive(serde::Serialize, Clone)]
+                struct Evt { entry_id: String }
+                let _ = h.emit("entry:updated", Evt { entry_id: entry.id.to_string() });
+            }
             Ok(format::format_entry(&entry))
         }
     }
@@ -196,6 +258,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 let query = arg_str(args, "query")?.to_string();
@@ -208,7 +271,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -218,6 +281,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("entry_id", "string").required(true).desc("词条ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 Ok(EntryOp::GetEntry { entry_id })
@@ -226,7 +290,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -240,6 +304,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 let start_line = args.get("start_line").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
@@ -250,7 +315,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -265,6 +330,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 let category_id = args.get("category_id").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -276,7 +342,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -286,6 +352,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("project_id", "string").required(true).desc("项目ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 Ok(EntryOp::ListCategories { project_id })
@@ -294,7 +361,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -310,6 +377,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 let entry_type = arg_str(args, "entry_type")?.to_string();
@@ -322,7 +390,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -332,6 +400,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("project_id", "string").required(true).desc("项目ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 Ok(EntryOp::ListTagSchemas { project_id })
@@ -340,7 +409,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -350,6 +419,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("entry_id", "string").required(true).desc("词条ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 Ok(EntryOp::GetEntryRelations { entry_id })
@@ -358,7 +428,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -368,6 +438,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("project_id", "string").required(true).desc("项目ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 Ok(EntryOp::GetProjectSummary { project_id })
@@ -376,7 +447,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -386,15 +457,17 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![],
         |_state, _args| {
             let app_state = _state.app_state.clone().unwrap();
-            Box::pin(dispatch_entry_op(app_state, EntryOp::ListProjects))
+            let app_handle = _state.app_handle.clone();
+            Box::pin(dispatch_entry_op(app_state, app_handle, EntryOp::ListProjects))
         },
     );
 
     registry.register_async::<WorldflowToolState, _>(
         "create_entry",
-        "在指定项目中新建一个词条，返回新词条的完整信息",
+        "在指定项目的指定分类下新建一个词条，返回新词条的完整信息",
         vec![
             ToolFunctionArg::new("project_id", "string").required(true).desc("项目ID"),
+            ToolFunctionArg::new("category_id", "string").required(true).desc("分类ID（必填，从 list_categories 或 query_categories 获取）"),
             ToolFunctionArg::new("title", "string").required(true).desc("词条标题"),
             ToolFunctionArg::new("entry_type", "string").desc("词条类型（如 character, item, location, event, faction）"),
             ToolFunctionArg::new("summary", "string").desc("词条摘要"),
@@ -402,19 +475,21 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
+                let category_id = arg_str(args, "category_id")?.to_string();
                 let title = arg_str(args, "title")?.to_string();
                 let entry_type = args.get("entry_type").and_then(|v| v.as_str()).map(|s| s.to_string());
                 let summary = args.get("summary").and_then(|v| v.as_str()).map(|s| s.to_string());
                 let content = args.get("content").and_then(|v| v.as_str()).map(|s| s.to_string());
-                Ok(EntryOp::CreateEntry { project_id, title, entry_type, summary, content })
+                Ok(EntryOp::CreateEntry { project_id, category_id, title, entry_type, summary, content })
             })();
             let op = match result {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -429,6 +504,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 let title: Option<String> = args.get("title").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -444,7 +520,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -457,6 +533,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 let tags = args.get("tags").cloned().ok_or_else(|| anyhow::anyhow!("缺少 tags 参数"))?;
@@ -466,7 +543,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -480,6 +557,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 let schema_id = arg_str(args, "schema_id")?.to_string();
@@ -490,7 +568,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -503,6 +581,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 let schema_id = arg_str(args, "schema_id")?.to_string();
@@ -512,7 +591,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -527,6 +606,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let a_id = arg_str(args, "a_id")?.to_string();
                 let b_id = arg_str(args, "b_id")?.to_string();
@@ -538,7 +618,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -552,6 +632,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let relation_id = arg_str(args, "relation_id")?.to_string();
                 let relation = args.get("relation").and_then(|v| v.as_str())
@@ -563,7 +644,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -573,6 +654,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("relation_id", "string").required(true).desc("关系ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let relation_id = arg_str(args, "relation_id")?.to_string();
                 Ok(EntryOp::DeleteRelation { relation_id })
@@ -581,7 +663,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -591,6 +673,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![ToolFunctionArg::new("project_id", "string").required(true).desc("项目ID")],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let project_id = arg_str(args, "project_id")?.to_string();
                 Ok(EntryOp::ListEntryTypes { project_id })
@@ -599,7 +682,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 
@@ -612,6 +695,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             let result = (|| -> anyhow::Result<EntryOp> {
                 let entry_id = arg_str(args, "entry_id")?.to_string();
                 let category_id = args.get("category_id").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -621,7 +705,7 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 Ok(op) => op,
                 Err(e) => return Box::pin(async move { Err(e) })
             };
-            Box::pin(dispatch_entry_op(app_state, op))
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
         },
     );
 

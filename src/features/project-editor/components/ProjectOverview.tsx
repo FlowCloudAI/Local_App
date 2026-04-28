@@ -1,6 +1,6 @@
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {type CSSProperties, memo, type ReactNode} from 'react'
-import {Button, RollingBox} from 'flowcloudai-ui'
+import {type CSSProperties, memo, type ReactNode, useState} from 'react'
+import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -61,6 +61,8 @@ interface ProjectOverviewProps {
     onEditCover?: () => void
     onClearCover?: () => void
     coverUpdating?: boolean
+    onDelete?: () => void | Promise<void>
+    onDescriptionChange?: (description: string) => void | Promise<void>
 }
 
 function toProjectImageSrc(coverPath?: string | null): string | undefined {
@@ -259,10 +261,50 @@ function ProjectOverview({
                              onEditCover,
                              onClearCover,
                              coverUpdating = false,
+                             onDelete,
+                             onDescriptionChange,
                          }: ProjectOverviewProps) {
+    const {showAlert} = useAlert()
+    const [descEditing, setDescEditing] = useState(false)
+    const [descDraft, setDescDraft] = useState('')
+    const [descSaving, setDescSaving] = useState(false)
+
     const entryTypeNameMap = getEntryTypeNameMap(entryTypes)
     const coverSrc = toProjectImageSrc(project.cover_path)
     const titleMark = project.name?.trim()?.[0] ?? '项'
+
+    async function handleDelete() {
+        if (!onDelete) return
+        const confirmed = await showAlert(
+            `确定要删除项目「${project.name}」吗？项目内的所有词条和数据将被永久删除，此操作不可撤销。`,
+            'warning',
+            'confirm',
+        )
+        if (!confirmed) return
+        try {
+            await onDelete()
+        } catch (e) {
+            void showAlert(`删除失败：${String(e)}`, 'error', 'toast', 2200)
+        }
+    }
+
+    function handleDescEditStart() {
+        setDescDraft(project.description ?? '')
+        setDescEditing(true)
+    }
+
+    async function handleDescSave() {
+        if (!onDescriptionChange) return
+        setDescSaving(true)
+        try {
+            await onDescriptionChange(descDraft.trim())
+            setDescEditing(false)
+        } catch (e) {
+            void showAlert(`保存失败：${String(e)}`, 'error', 'toast', 2200)
+        } finally {
+            setDescSaving(false)
+        }
+    }
 
     return (
         <RollingBox className="pe-overview fc-page-shell" thumbSize="thin">
@@ -301,8 +343,42 @@ function ProjectOverview({
 
                 <div className="pe-overview-hero__content">
                     <h1 className="pe-overview-title fc-page-title">{project.name}</h1>
-                    {project.description && (
-                        <p className="pe-overview-desc fc-page-subtitle">{project.description}</p>
+                    {descEditing ? (
+                        <div className="pe-overview-desc-editor">
+                            <textarea
+                                className="pe-overview-desc-textarea"
+                                value={descDraft}
+                                onChange={(e) => setDescDraft(e.target.value)}
+                                rows={3}
+                                // eslint-disable-next-line jsx-a11y/no-autofocus
+                                autoFocus
+                                placeholder="添加项目描述…"
+                            />
+                            <div className="pe-overview-desc-actions">
+                                <Button size="sm" disabled={descSaving} onClick={() => void handleDescSave()}>
+                                    {descSaving ? '保存中…' : '保存'}
+                                </Button>
+                                <Button variant="ghost" size="sm" disabled={descSaving}
+                                        onClick={() => setDescEditing(false)}>
+                                    取消
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="pe-overview-desc-row">
+                            {project.description ? (
+                                <p className="pe-overview-desc fc-page-subtitle">{project.description}</p>
+                            ) : (
+                                onDescriptionChange && (
+                                    <p className="pe-overview-desc fc-page-subtitle is-placeholder">暂无描述</p>
+                                )
+                            )}
+                            {onDescriptionChange && (
+                                <Button variant="ghost" size="sm" onClick={handleDescEditStart}>
+                                    {project.description ? '编辑描述' : '添加描述'}
+                                </Button>
+                            )}
+                        </div>
                     )}
                     <div className="pe-overview-meta">
                         <span>创建于 {formatDate(project.created_at)}</span>
@@ -317,6 +393,13 @@ function ProjectOverview({
                         <StatCard label="图片数" value={imageCount ?? '--'}/>
                         <StatCard label="总字数" value={wordCount ?? '--'}/>
                     </div>
+                    {onDelete && (
+                        <div className="pe-overview-danger-row">
+                            <Button variant="ghost" size="sm" onClick={() => void handleDelete()}>
+                                删除项目
+                            </Button>
+                        </div>
+                    )}
                 </div>
             </section>
 

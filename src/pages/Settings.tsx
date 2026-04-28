@@ -1,9 +1,11 @@
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import {Button, Input, RollingBox, Select, Slider, type Theme, useAlert, useTheme} from 'flowcloudai-ui'
 import {open} from '@tauri-apps/plugin-dialog'
-import {openPath} from '@tauri-apps/plugin-opener'
+import {openUrl} from '@tauri-apps/plugin-opener'
 import {appConfigDir} from '@tauri-apps/api/path'
+import {getVersion} from '@tauri-apps/api/app'
 import {listen} from '@tauri-apps/api/event'
+import LicenseModal from '../features/about/LicenseModal'
 import {
     ai_close_all_sessions,
     ai_list_plugins,
@@ -17,6 +19,7 @@ import {
     type PluginInfo,
     type RemotePluginInfo,
     setting_delete_api_key,
+    open_in_file_manager,
     setting_get_default_paths,
     setting_get_media_dir,
     setting_get_settings,
@@ -29,9 +32,6 @@ import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plug
 import UploadPlugin from '../features/plugins/UploadPlugin'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
-
-// 内置词条类型（来自 worldflow_core::models::entry_type::BUILTIN_ENTRY_TYPES）
-const BUILTIN_ENTRY_TYPES = ['note', 'task', 'event', 'contact']
 
 type SettingsTab = 'system' | 'ai'
 
@@ -49,6 +49,8 @@ export default function Settings({onBack}: SettingsProps) {
     const [mediaDir, setMediaDir] = useState<string>('')
     const [defaultPaths, setDefaultPaths] = useState<{ db_path: string; plugins_path: string } | null>(null)
     const [configDir, setConfigDir] = useState<string>('')
+    const [appVersion, setAppVersion] = useState<string>('')
+    const [licenseModalOpen, setLicenseModalOpen] = useState(false)
 
     // ── AI 配置状态 ──
     const [llmPlugins, setLlmPlugins] = useState<PluginInfo[]>([])
@@ -68,7 +70,7 @@ export default function Settings({onBack}: SettingsProps) {
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
     const [localError, setLocalError] = useState<string | null>(null)
     const [marketError, setMarketError] = useState<string | null>(null)
-    const [installingId, setInstallingId] = useState<string | null>(null)
+    const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
     const [uninstallingId, setUninstallingId] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [kindFilter, setKindFilter] = useState<'all' | 'llm' | 'image' | 'tts'>('all')
@@ -175,6 +177,7 @@ export default function Settings({onBack}: SettingsProps) {
         loadData().catch(console.error)
         loadLocal().catch(console.error)
         loadMarket().catch(console.error)
+        getVersion().then(setAppVersion).catch(console.error)
     }, [loadData, loadLocal, loadMarket])
 
     useEffect(() => {
@@ -298,10 +301,13 @@ export default function Settings({onBack}: SettingsProps) {
         void showAlert('已重置为默认设置', 'info')
     }
 
-    // 在资源管理器中打开目录
+    // 在系统文件管理器中打开目录
     const handleOpenDir = (path: string) => {
         if (!path) return
-        openPath(path).catch(console.error)
+        open_in_file_manager(path).catch((err) => {
+            console.error('打开目录失败', err)
+            void showAlert(`打开目录失败：${String(err)}`, 'error', 'toast', 2200)
+        })
     }
 
     // 选择媒体目录
@@ -349,17 +355,6 @@ export default function Settings({onBack}: SettingsProps) {
         }
     }
 
-    // 自动保存间隔处理（分钟 ↔ 秒）
-    const handleAutoSaveChange = (value: string) => {
-        const minutes = Number(value)
-        if (!isNaN(minutes) && minutes >= 0) {
-            setSettings(prev => prev ? {
-                ...prev,
-                auto_save_secs: Math.round(minutes * 60)
-            } : null)
-        }
-    }
-
     // AI 配置处理
     const handleAiConfigChange = (
         type: 'llm' | 'image' | 'tts',
@@ -396,7 +391,7 @@ export default function Settings({onBack}: SettingsProps) {
             setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
             setExpandedApiKeyPluginId(null)
             setApiKeyDraft('')
-            void showAlert('API Key 已保存', 'success', 'nonInvasive')
+            void showAlert('API Key 已保存', 'success', 'nonInvasive', 2000)
         } catch (error) {
             void showAlert('保存失败: ' + error, 'error')
         } finally {
@@ -412,7 +407,7 @@ export default function Settings({onBack}: SettingsProps) {
                 setExpandedApiKeyPluginId(null)
                 setApiKeyDraft('')
             }
-            void showAlert('API Key 已删除', 'success', 'nonInvasive')
+            void showAlert('API Key 已删除', 'success', 'nonInvasive', 2000)
         } catch (error) {
             void showAlert('删除失败: ' + error, 'error')
         }
@@ -420,7 +415,7 @@ export default function Settings({onBack}: SettingsProps) {
 
     // 插件管理操作
     const handleInstall = async (pluginId: string) => {
-        setInstallingId(pluginId)
+        setInstallingIds(prev => new Set([...prev, pluginId]))
         try {
             await closeIdleAiSessions()
             const info = await plugin_market_install(pluginId)
@@ -430,11 +425,16 @@ export default function Settings({onBack}: SettingsProps) {
                     ? prev.map(p => (p.id === info.id ? info : p))
                     : [...prev, info]
             })
-            void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive')
+            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
+            void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
         } catch (e) {
             void showAlert('安装失败: ' + e, 'error')
         } finally {
-            setInstallingId(null)
+            setInstallingIds(prev => {
+                const next = new Set(prev)
+                next.delete(pluginId)
+                return next
+            })
         }
     }
 
@@ -462,6 +462,7 @@ export default function Settings({onBack}: SettingsProps) {
                     ? prev.map(p => (p.id === info.id ? info : p))
                     : [...prev, info]
             })
+            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
             void showAlert(`${info.name} 安装成功`, 'success')
         } catch (e) {
             void showAlert('本地插件安装失败: ' + e, 'error')
@@ -482,6 +483,7 @@ export default function Settings({onBack}: SettingsProps) {
             await closeIdleAiSessions()
             await plugin_uninstall(pluginId)
             setLocalPlugins(prev => prev.filter(p => p.id !== pluginId))
+            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
         } catch (e) {
             void showAlert('卸载失败: ' + e, 'error')
         } finally {
@@ -535,11 +537,6 @@ export default function Settings({onBack}: SettingsProps) {
         {value: 'en-US', label: 'English'}
     ]
 
-    const entryTypeOptions = [
-        {value: '', label: '无默认'},
-        ...BUILTIN_ENTRY_TYPES.map(type => ({value: type, label: type}))
-    ]
-
     const getPluginOptions = (type: 'llm' | 'image' | 'tts') => {
         const plugins = getPluginsForType(type)
         return [
@@ -569,7 +566,7 @@ export default function Settings({onBack}: SettingsProps) {
     })
 
     return (
-        <RollingBox className="settings-outer" thumbSize={'thin'}>
+        <div className="settings-outer">
             <div className="settings-page-layout">
                 <aside className="settings-sidebar">
                     {onBack && (
@@ -598,7 +595,8 @@ export default function Settings({onBack}: SettingsProps) {
                         AI配置
                     </button>
                 </aside>
-                <div className="settings-content">
+                <RollingBox className="settings-scroll-area" thumbSize={'thin'}>
+                    <div className="settings-content">
                     {activeTab === 'system' ? (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
@@ -677,85 +675,94 @@ export default function Settings({onBack}: SettingsProps) {
                             {/* 外观 */}
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">外观</h2>
-                                <div className="settings-row">
-                                    <div className="settings-field">
-                                        <label className="settings-label">主题</label>
-                                        <Select
-                                            options={themeOptions}
-                                            value={settings.theme}
-                                            onChange={(value) => {
-                                                setSettings(prev => prev ? {...prev, theme: String(value)} : null);
-                                                setTheme(value as Theme)
-                                            }}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label">语言</label>
-                                        <Select
-                                            options={languageOptions}
-                                            value={settings.language}
-                                            onChange={(value) => setSettings(prev => prev ? {
-                                                ...prev,
-                                                language: String(value)
-                                            } : null)}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label">字体大小</label>
-                                        <Slider
-                                            min={10}
-                                            max={24}
-                                            step={1}
-                                            value={settings.editor_font_size}
-                                            onChange={(value) => setSettings(prev => prev ? {
-                                                ...prev,
-                                                editor_font_size: value as number
-                                            } : null)}
-                                            style={{flex: 1}}
-                                        />
-                                        <span className="settings-span">{settings.editor_font_size}px</span>
-                                        {settings.editor_font_size !== 14 && (
-                                            <Button size="sm" variant="outline" style={{marginLeft: 8}} onClick={() =>
-                                                setSettings(prev => prev ? {...prev, editor_font_size: 14} : null)
-                                            }>恢复默认</Button>
-                                        )}
-                                    </div>
+                                <div className="settings-field">
+                                    <label className="settings-label">主题</label>
+                                    <Select
+                                        options={themeOptions}
+                                        value={settings.theme}
+                                        onChange={(value) => {
+                                            setSettings(prev => prev ? {...prev, theme: String(value)} : null);
+                                            setTheme(value as Theme)
+                                        }}
+                                        style={{flex: 1}}
+                                    />
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label">语言</label>
+                                    <Select
+                                        options={languageOptions}
+                                        value={settings.language}
+                                        onChange={(value) => setSettings(prev => prev ? {
+                                            ...prev,
+                                            language: String(value)
+                                        } : null)}
+                                        style={{flex: 1}}
+                                    />
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label">字体大小</label>
+                                    <Slider
+                                        min={10}
+                                        max={24}
+                                        step={1}
+                                        value={settings.editor_font_size}
+                                        onChange={(value) => setSettings(prev => prev ? {
+                                            ...prev,
+                                            editor_font_size: value as number
+                                        } : null)}
+                                        style={{flex: 1}}
+                                    />
+                                    <span className="settings-span">{settings.editor_font_size}px</span>
+                                    {settings.editor_font_size !== 14 && (
+                                        <Button size="sm" variant="outline" style={{marginLeft: 8}} onClick={() =>
+                                            setSettings(prev => prev ? {...prev, editor_font_size: 14} : null)
+                                        }>恢复默认</Button>
+                                    )}
                                 </div>
                             </section>
 
-                            {/* 编辑器行为 */}
+                            {/* 关于 */}
                             <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">编辑器行为</h2>
-                                <div className="settings-row">
-                                    <div className="settings-field-stack">
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">自动保存间隔（分钟）</label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                value={Math.round(settings.auto_save_secs / 60).toString()}
-                                                onChange={handleAutoSaveChange}
-                                                style={{width: '4rem', flexShrink: 0}}
-                                            />
-                                        </div>
-                                        <div className="settings-field-hint">
-                                            仅作用于词条编辑器的持续编辑场景；0 表示关闭，不影响灵感便签的即时自动保存。
-                                        </div>
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label-wide">默认词条类型</label>
-                                        <Select
-                                            options={entryTypeOptions}
-                                            value={settings.default_entry_type || ''}
-                                            onChange={(value) => setSettings(prev => prev ? {
-                                                ...prev,
-                                                default_entry_type: value ? String(value) : null
-                                            } : null)}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
+                                <h2 className="settings-section-title fc-section-title">关于</h2>
+                                <div className="settings-field">
+                                    <label className="settings-label-wide">当前版本</label>
+                                    <span className="settings-about-value">{appVersion || '加载中…'}</span>
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label-wide">开源协议</label>
+                                    <span className="settings-about-value">MIT License</span>
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label-wide">官网</label>
+                                    <button
+                                        type="button"
+                                        className="settings-about-link"
+                                        onClick={() => {
+                                            void openUrl('https://www.flowcloudai.cn').catch(console.error)
+                                        }}
+                                    >
+                                        https://www.flowcloudai.cn
+                                    </button>
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label-wide">用户知情同意书</label>
+                                    <Button variant="outline" size="sm" onClick={() => setLicenseModalOpen(true)}>
+                                        查看
+                                    </Button>
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label-wide">日志目录</label>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={!configDir}
+                                        onClick={() => handleOpenDir(configDir)}
+                                    >
+                                        打开
+                                    </Button>
+                                    <span className="settings-field-hint" style={{marginLeft: '0.5rem'}}>
+                                        日志文件 app.log 位于配置目录内（仅 release 构建写入）
+                                    </span>
                                 </div>
                             </section>
 
@@ -880,7 +887,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                 plugin={plugin}
                                                 installedIds={installedIds}
                                                 onInstall={handleInstall}
-                                                installing={installingId === plugin.id}
+                                                installing={installingIds.has(plugin.id)}
                                             />
                                         ))
                                     )}
@@ -1109,8 +1116,10 @@ export default function Settings({onBack}: SettingsProps) {
                             </section>
                         </div>
                     )}
-                </div>
+                    </div>
+                </RollingBox>
             </div>
-        </RollingBox>
+            <LicenseModal open={licenseModalOpen} onClose={() => setLicenseModalOpen(false)}/>
+        </div>
     )
 }

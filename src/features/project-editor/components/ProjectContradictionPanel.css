@@ -437,6 +437,18 @@
     border: 1px solid var(--fc-color-border);
 }
 
+button.pe-contradiction-chip--entry {
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+button.pe-contradiction-chip--entry:hover {
+    background: color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+    color: var(--fc-color-primary);
+    border-color: var(--fc-color-primary);
+}
+
 .pe-contradiction-evidence-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
@@ -473,4 +485,119 @@
     .pe-contradiction-report__hero {
         flex-direction: column;
     }
+}
+
+/* ── Model selectors ─────────────────────────────────────────── */
+
+.pe-contradiction-model-selectors {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pe-contradiction-model-selectors .ai-toolbar-btn {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 6px;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s;
+}
+
+.pe-contradiction-model-selectors .ai-toolbar-btn:hover {
+    background: var(--fc-color-bg-secondary);
+}
+
+.pe-contradiction-model-selectors .ai-toolbar-btn.active {
+    border-color: var(--fc-color-primary);
+    color: var(--fc-color-primary);
+}
+
+.pe-contradiction-model-selectors .ai-model-menu {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    background: var(--fc-color-bg-secondary);
+    border: 1px solid var(--fc-color-border);
+    border-radius: 10px;
+    padding: 4px;
+    min-width: 180px;
+    max-height: 280px;
+    overflow-y: auto;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pe-contradiction-model-selectors .ai-model-menu-item {
+    width: 100%;
+    text-align: left;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fc-color-text);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pe-contradiction-model-selectors .ai-model-menu-item:hover {
+    background: var(--fc-color-bg-elevated);
+}
+
+.pe-contradiction-model-selectors .ai-model-menu-item.active {
+    background: var(--fc-color-primary-subtle);
+    color: var(--fc-color-primary);
+    font-weight: 500;
+}
+
+.pe-contradiction-model-selectors .ai-model-menu-item.disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* ── History item text color fix ────────────────────────────── */
+
+.pe-contradiction-history__item .fc-op-item__title {
+    color: var(--fc-color-text);
+}
+
+.pe-contradiction-history__item .fc-op-item__meta {
+    color: var(--fc-color-text-secondary);
+}
+
+/* ── Select width fix ───────────────────────────────────────── */
+
+.pe-contradiction-model-selectors > :first-child {
+    min-width: 150px;
+}
+
+.pe-contradiction-model-selectors > :nth-child(2) {
+    min-width: 200px;
+}
+
+/* ── History item button reset ──────────────────────────────── */
+
+button.fc-op-item__content {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    width: 100%;
 }

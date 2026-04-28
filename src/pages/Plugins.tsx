@@ -68,7 +68,7 @@ export default function Plugins() {
     const [marketError, setMarketError] = useState<string | null>(null)
 
     // 正在安装/卸载的插件 id
-    const [installingId, setInstallingId] = useState<string | null>(null)
+    const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
     const [uninstallingId, setUninstallingId] = useState<string | null>(null)
 
     // 市场过滤
@@ -105,7 +105,7 @@ export default function Plugins() {
     }, [loadLocal, loadMarket])
 
     const handleInstall = async (pluginId: string) => {
-        setInstallingId(pluginId)
+        setInstallingIds(prev => new Set([...prev, pluginId]))
         try {
             const info = await plugin_market_install(pluginId)
             setLocalPlugins(prev => {
@@ -118,7 +118,11 @@ export default function Plugins() {
         } catch (e) {
             void showAlert('安装失败: ' + e, 'error')
         } finally {
-            setInstallingId(null)
+            setInstallingIds(prev => {
+                const next = new Set(prev)
+                next.delete(pluginId)
+                return next
+            })
         }
     }
 
@@ -310,7 +314,7 @@ export default function Plugins() {
                                     installedVersion={localVersionMap.get(normalizePluginKey(plugin.id))}
                                     hasUpdate={updateVersionMap.has(normalizePluginKey(plugin.id))}
                                     onInstall={handleInstall}
-                                    installing={installingId === plugin.id}
+                                    installing={installingIds.has(plugin.id)}
                                 />
                             ))
                         )}

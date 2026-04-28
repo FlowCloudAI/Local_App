@@ -226,7 +226,7 @@ pub async fn ai_start_contradiction_session(
 
     let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<ContradictionReport, String>>();
     spawn_contradiction_event_loop(
-        app,
+        app.clone(),
         request.session_id.clone(),
         run_id.clone(),
         event_stream,
@@ -251,11 +251,22 @@ pub async fn ai_start_contradiction_session(
     let report = match first_turn_rx.await {
         Ok(Ok(report)) => report,
         Ok(Err(error)) => {
+            // Cancel 前先发射详细错误事件，避免 Tauri IPC 吞掉原始错误信息
+            app.emit("ai:error", crate::apis::ai_client::EventError {
+                session_id: request.session_id.clone(),
+                run_id: run_id.clone(),
+                error: error.clone(),
+            }).ok();
             ai_state.sessions.lock().await.remove(&request.session_id);
             handle_for_error.cancel();
             return Err(error);
         }
         Err(_) => {
+            app.emit("ai:error", crate::apis::ai_client::EventError {
+                session_id: request.session_id.clone(),
+                run_id: run_id.clone(),
+                error: "矛盾检测首轮未返回结果".to_string(),
+            }).ok();
             ai_state.sessions.lock().await.remove(&request.session_id);
             handle_for_error.cancel();
             return Err("矛盾检测首轮未返回结果".to_string());
@@ -486,6 +497,23 @@ fn spawn_contradiction_event_loop<S>(
                                 run_id: rid.clone(),
                                 status: turn_status_str(&status),
                                 node_id,
+                            },
+                        )
+                        .ok();
+
+                    // 在解析前打完整 log 并发送到前端
+                    log::info!(
+                        "[contradiction] 原始响应 ({} chars): {}",
+                        first_turn_buffer.len(),
+                        first_turn_buffer
+                    );
+                    app_clone
+                        .emit(
+                            "ai:debug_raw_response",
+                            crate::apis::ai_client::EventDelta {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                text: first_turn_buffer.clone(),
                             },
                         )
                         .ok();

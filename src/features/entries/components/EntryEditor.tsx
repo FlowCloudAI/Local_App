@@ -8,6 +8,7 @@ import {
     type Category,
     db_create_entry,
     db_create_relation,
+    db_delete_entry,
     db_delete_relation,
     db_get_entry,
     db_list_entries,
@@ -97,11 +98,13 @@ interface EntryEditorProps {
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
     openEntryIds?: string[]
+    initialEditorMode?: EditorMode
     onOpenEntry?: (entry: { id: string; title: string }) => void
     onTitleChange?: (entry: Entry) => void | Promise<void>
     onSaved?: (entry: Entry) => void | Promise<void>
     onTagSchemasChange?: (schemas: TagSchema[]) => void | Promise<void>
     onBack?: () => void | Promise<void>
+    onDelete?: () => void | Promise<void>
     onDirtyChange?: (dirty: boolean) => void
     onStartCharacterChat?: (entry: Entry) => void | Promise<void>
 }
@@ -122,6 +125,7 @@ interface EditorHistory {
 
 const AUTO_SAVE_CHECK_INTERVAL_MS = 1000
 const AUTO_SAVE_FAILURE_COOLDOWN_MS = 10000
+const AUTO_SAVE_SECONDS = 30
 
 function buildDraft(entry: Entry): EntryDraft {
     return {
@@ -155,11 +159,13 @@ export default function EntryEditor({
                                         entryTypes,
                                         tagSchemas,
                                         openEntryIds = [],
+                                        initialEditorMode = 'browse',
                                         onOpenEntry,
                                         onTitleChange,
                                         onSaved,
                                         onTagSchemasChange,
                                         onBack,
+                                        onDelete,
                                         onDirtyChange,
                                         onStartCharacterChat,
                                     }: EntryEditorProps) {
@@ -175,11 +181,11 @@ export default function EntryEditor({
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [autoSaveSeconds, setAutoSaveSeconds] = useState(0)
+    const autoSaveSeconds = AUTO_SAVE_SECONDS
     const [editorFontSize, setEditorFontSize] = useState(14)
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
     const [generatingSummary, setGeneratingSummary] = useState(false)
-    const [editorMode, setEditorMode] = useState<EditorMode>('browse')
+    const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode)
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
@@ -242,11 +248,10 @@ export default function EntryEditor({
         void setting_get_settings()
             .then((settings) => {
                 if (cancelled) return
-                setAutoSaveSeconds(settings.auto_save_secs)
                 setEditorFontSize(settings.editor_font_size ?? 14)
             })
             .catch((loadError) => {
-                console.error('加载自动保存设置失败', loadError)
+                console.error('加载编辑器字体设置失败', loadError)
             })
 
         function handleFontSizeChange(event: Event) {
@@ -427,7 +432,7 @@ export default function EntryEditor({
                 if (cancelled) return
                 setEntry(result)
                 setDraft(buildDraft(result))
-                setEditorMode('browse')
+                setEditorMode(initialEditorMode)
                 lastSuccessfulSaveAtRef.current = Date.now()
             })
             .catch((e) => {
@@ -832,6 +837,22 @@ export default function EntryEditor({
         }
     }, [entryId, onBack, showAlert])
 
+    const handleDelete = useCallback(async () => {
+        if (!entry) return
+        const confirmed = await showAlert(
+            `确定要删除词条「${entry.title}」吗？此操作不可撤销。`,
+            'warning',
+            'confirm',
+        )
+        if (!confirmed) return
+        try {
+            await db_delete_entry(entry.id)
+            await onDelete?.()
+        } catch (e) {
+            void showAlert(`删除失败：${String(e)}`, 'error', 'toast', 2200)
+        }
+    }, [entry, onDelete, showAlert])
+
     const handleSave = useCallback(async (trigger: SaveTrigger = 'manual') => {
         if (!entry || !canSave) return
 
@@ -1167,6 +1188,17 @@ export default function EntryEditor({
                                 <Button size="sm" disabled={!canSave} onClick={() => void handleSave()}>
                                     {saving ? '保存中…' : '保存修改'}
                                 </Button>
+                                {onDelete && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="entry-editor-delete-button"
+                                        disabled={loading || saving}
+                                        onClick={() => void handleDelete()}
+                                    >
+                                        删除词条
+                                    </Button>
+                                )}
                             </div>
                             <span className="entry-editor-workspace__meta">
                             {editorMode === 'edit'

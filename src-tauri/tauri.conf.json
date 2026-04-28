@@ -49,6 +49,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "licenseFile": "nsis/license.rtf",
     "fileAssociations": [
       {
         "ext": [
@@ -64,6 +65,9 @@
       "wix": {
         "language": "SimpChinese"
       },
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
       "nsis": {
         "installMode": "both",
         "languages": [

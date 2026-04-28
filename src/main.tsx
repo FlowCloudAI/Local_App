@@ -2,33 +2,28 @@ import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
 import App from './App.tsx'
-import {log_message, setting_get_settings, showWindow} from './api'
+import {setting_get_settings, showWindow} from './api'
 import {AlertProvider, ContextMenuProvider, ThemeProvider} from 'flowcloudai-ui'
 // @ts-expect-error - CSS import, no types needed
 import 'flowcloudai-ui/style';
 import './i18n' // 初始化 i18n
 
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
-
-function safeLog(level: 'debug' | 'info' | 'warn' | 'error', msg: string) {
-    void log_message(level, msg)
-}
-
 // JS 运行时错误 & 未捕获 Promise rejection
 window.addEventListener('error', (e) => {
     const src = e.filename ? ` @ ${e.filename}:${e.lineno}` : ''
-    safeLog('error', `[GlobalError] ${e.message}${src}`)
+    console.error(`[GlobalError] ${e.message}${src}`)
 })
 window.addEventListener('unhandledrejection', (e) => {
     const reason = e.reason instanceof Error
         ? `${e.reason.message}\n${e.reason.stack ?? ''}`
         : String(e.reason)
-    safeLog('error', `[UnhandledRejection] ${reason.slice(0, 400)}`)
+    console.error(`[UnhandledRejection] ${reason.slice(0, 400)}`)
 })
 
 // CSP 违规（能精确定位被拦截的资源/指令）
 document.addEventListener('securitypolicyviolation', (e) => {
-    safeLog('error', `[CSPViolation] directive="${e.violatedDirective}" blocked="${e.blockedURI}" src="${e.sourceFile}:${e.lineNumber}"`)
+    console.error(`[CSPViolation] directive="${e.violatedDirective}" blocked="${e.blockedURI}" src="${e.sourceFile}:${e.lineNumber}"`)
 })
 
 function isTauriRuntime(): boolean {

@@ -53,6 +53,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                 description: description.trim() || null,
             })
             void showAlert('世界观已创建', 'success', 'toast', 1000)
+            window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
             onCreated?.(project)
             onClose()
         } catch (e) {

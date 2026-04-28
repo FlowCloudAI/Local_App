@@ -25,7 +25,7 @@ type TimelineTagRole = 'start' | 'end' | 'parent' | 'show'
 const TIMELINE_TAG_HINTS: TimelineTagHintGroup[] = [
     {label: '开始时间', examples: ['开始年份', '开始时间', 'year', 'start_year']},
     {label: '结束时间', examples: ['结束年份', '结束时间', 'end_year']},
-    {label: '父事件', examples: ['父事件ID', '父级事件', 'parent_id']},
+    {label: '上级事件', examples: ['上级事件', '父级事件', 'parent_id']},
     {label: '是否显示', examples: ['时间线', '纳入时间线', 'show_timeline']},
 ]
 
@@ -273,7 +273,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                             标签：{[
                                 matchedSchemaNames.start.length > 0 ? `开始 ${matchedSchemaNames.start.join('、')}` : '',
                                 matchedSchemaNames.end.length > 0 ? `结束 ${matchedSchemaNames.end.join('、')}` : '',
-                                matchedSchemaNames.parent.length > 0 ? `父事件 ${matchedSchemaNames.parent.join('、')}` : '',
+                                matchedSchemaNames.parent.length > 0 ? `上级事件 ${matchedSchemaNames.parent.join('、')}` : '',
                                 matchedSchemaNames.show.length > 0 ? `显示 ${matchedSchemaNames.show.join('、')}` : '',
                             ].filter(Boolean).join('；')}
                         </span>

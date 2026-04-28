@@ -1,3 +1,4 @@
+use crate::apis::worldflow::common::initialize_default_timeline_tags;
 use crate::AppState;
 use uuid::Uuid;
 use worldflow_core::{
@@ -253,6 +254,72 @@ pub mod format {
         result
     }
 
+    /// 格式化分类子树（用于 query_categories 返回）
+    ///
+    /// * `parent_id`  — 起始父节点；`None` 表示从根开始
+    /// * `max_depth`  — 最大层级数；`None` 表示不限制（1 = 只返回直接子分类）
+    pub fn format_categories_subtree(
+        categories: &[Category],
+        parent_id: Option<Uuid>,
+        max_depth: Option<usize>,
+    ) -> String {
+        // 建立 parent_id → children 的映射
+        let mut children_map: std::collections::HashMap<Option<Uuid>, Vec<&Category>> =
+            std::collections::HashMap::new();
+        for cat in categories {
+            children_map.entry(cat.parent_id).or_default().push(cat);
+        }
+
+        // 检查起始节点下是否有子分类
+        if !children_map.contains_key(&parent_id) {
+            return match parent_id {
+                None => "该项目暂无分类".to_string(),
+                Some(pid) => {
+                    let name = categories.iter()
+                        .find(|c| c.id == pid)
+                        .map(|c| c.name.as_str())
+                        .unwrap_or("未知分类");
+                    format!("分类「{}」下暂无子分类", name)
+                }
+            };
+        }
+
+        let header = match parent_id {
+            None => String::from("根目录下的分类：\n\n"),
+            Some(pid) => {
+                let name = categories.iter()
+                    .find(|c| c.id == pid)
+                    .map(|c| c.name.as_str())
+                    .unwrap_or("未知分类");
+                format!("分类「{}」（ID: {}）的子分类：\n\n", name, pid)
+            }
+        };
+        let mut result = header;
+
+        fn render(
+            parent: Option<Uuid>,
+            depth: usize,
+            max_depth: Option<usize>,
+            map: &std::collections::HashMap<Option<Uuid>, Vec<&Category>>,
+            out: &mut String,
+        ) {
+            if let Some(max) = max_depth {
+                if depth >= max {
+                    return;
+                }
+            }
+            let Some(children) = map.get(&parent) else { return };
+            for cat in children {
+                let indent = "  ".repeat(depth);
+                out.push_str(&format!("{}- **{}** (ID: {})\n", indent, cat.name, cat.id));
+                render(Some(cat.id), depth + 1, max_depth, map, out);
+            }
+        }
+
+        render(parent_id, 0, max_depth, &children_map, &mut result);
+        result
+    }
+
     /// 格式化单个分类（用于 create_category 返回）
     pub fn format_category(cat: &Category) -> String {
         let parent = cat
@@ -281,16 +348,18 @@ pub mod format {
 pub async fn create_entry(
     state: &AppState,
     project_id: &str,
+    category_id: &str,
     title: String,
     entry_type: Option<String>,
     summary: Option<String>,
     content: Option<String>,
 ) -> Result<Entry, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let category_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
     db.create_entry(CreateEntry {
         project_id,
-        category_id: None,
+        category_id: Some(category_id),
         title,
         summary,
         content,
@@ -444,6 +513,13 @@ pub async fn get_entry_relations(
     Ok((relations, names))
 }
 
+/// 获取单条关系
+pub async fn get_relation(state: &AppState, relation_id: &str) -> Result<EntryRelation, String> {
+    let id = Uuid::parse_str(relation_id).map_err(|e| e.to_string())?;
+    let db = state.sqlite_db.lock().await;
+    db.get_relation(&id).await.map_err(|e| e.to_string())
+}
+
 /// 创建词条关系
 pub async fn create_relation(
     state: &AppState,
@@ -565,58 +641,10 @@ pub async fn update_entry_fields(
             category_id: None,
             title,
             // UpdateEntry.summary 是 Option<String>，None = 不更新，Some(s) = 更新
-            // 清空摘要（Some(None)）在 DB 层无法区分"不更新"，此处降级为不更新
-            summary: summary.flatten(),
+            // Some(None)（AI 传空字符串）→ Some("") → DB 层清空摘要
+            summary: summary.map(|s| s.unwrap_or_default()),
             content: None,
             r#type: entry_type,
-            tags: None,
-            images: None,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
-}
-
-/// 更新词条标题
-pub async fn update_entry_title(
-    state: &AppState,
-    entry_id: &str,
-    title: String,
-) -> Result<Entry, String> {
-    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
-    db.update_entry(
-        &entry_id,
-        UpdateEntry {
-            category_id: None,
-            title: Some(title),
-            summary: None,
-            content: None,
-            r#type: None,
-            tags: None,
-            images: None,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
-}
-
-/// 更新词条摘要
-pub async fn update_entry_summary(
-    state: &AppState,
-    entry_id: &str,
-    summary: Option<String>,
-) -> Result<Entry, String> {
-    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
-    db.update_entry(
-        &entry_id,
-        UpdateEntry {
-            category_id: None,
-            title: None,
-            summary,
-            content: None,
-            r#type: None,
             tags: None,
             images: None,
         },
@@ -641,30 +669,6 @@ pub async fn update_entry_content(
             summary: None,
             content,
             r#type: None,
-            tags: None,
-            images: None,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
-}
-
-/// 更新词条类型
-pub async fn update_entry_type(
-    state: &AppState,
-    entry_id: &str,
-    entry_type: Option<String>,
-) -> Result<Entry, String> {
-    let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
-    db.update_entry(
-        &entry_id,
-        UpdateEntry {
-            category_id: None,
-            title: None,
-            summary: None,
-            content: None,
-            r#type: Some(entry_type),
             tags: None,
             images: None,
         },
@@ -1035,18 +1039,25 @@ pub async fn move_entry(
         .map_err(|e| e.to_string())
 }
 
-/// 创建项目（仅创建基础结构，不含默认标签初始化）
+/// 创建项目（含默认时间线标签初始化）
 pub async fn create_project(
     state: &AppState,
     name: String,
     description: Option<String>,
 ) -> Result<Project, String> {
     let db = state.sqlite_db.lock().await;
-    db.create_project(CreateProject {
+    let project = db.create_project(CreateProject {
         name,
         description,
         cover_image: None,
     })
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    if let Err(error) = initialize_default_timeline_tags(&db, &project.id).await {
+        log::error!("[tools] AI 创建项目后初始化时间线标签失败: project_id={} error={}", project.id, error);
+        // 不回滚项目，避免 AI 工具链因标签初始化失败而中断
+    }
+
+    Ok(project)
 }

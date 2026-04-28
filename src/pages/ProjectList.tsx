@@ -1,4 +1,4 @@
-import {type CSSProperties, memo, useEffect, useState} from 'react'
+import {type CSSProperties, memo, useCallback, useEffect, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_count_entries, db_list_projects, type Project} from '../api'
@@ -54,7 +54,7 @@ function ProjectList({onOpenProject}: ProjectListProps) {
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
 
-    async function loadProjects() {
+    const loadProjects = useCallback(async () => {
         setLoading(true)
         setError(null)
         try {
@@ -75,11 +75,17 @@ function ProjectList({onOpenProject}: ProjectListProps) {
             setLoading(false)
             setHasLoadedProjects(true)
         }
-    }
+    }, [])
 
     useEffect(() => {
         void loadProjects()
-    }, [])
+    }, [loadProjects])
+
+    useEffect(() => {
+        const handler = () => void loadProjects()
+        window.addEventListener('fc:project-list-changed', handler)
+        return () => window.removeEventListener('fc:project-list-changed', handler)
+    }, [loadProjects])
 
     const query = searchText.trim().toLowerCase()
     const filteredProjects = projects
@@ -186,12 +192,11 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                     {hasLoadedProjects && projects.length === 0 && !loading ? (
                         <section className="project-list-empty-state">
                             <div className="project-list-empty-panel fc-empty-state-card">
-                                <div className="project-list-empty-mark fc-empty-state-mark">WORLD</div>
-                                <h2 className="project-list-empty-title fc-empty-state-title">让您的世界开始发光</h2>
+                                <h2 className="project-list-empty-title fc-empty-state-title">给灵感一个安放之处</h2>
                                 <p className="project-list-empty-copy fc-empty-state-copy">
-                                    从一个名字、一张封面、一个角色开始，把脑海里的大陆、城市、神话和命运写成真正可返回的世界
+                                    从一名角色、一个物品、一处地点开始，构建属于你的世界
                                 </p>
-                                <Button size="lg" onClick={() => setCreatorOpen(true)}>创建您的第一个世界</Button>
+                                <Button size="lg" onClick={() => setCreatorOpen(true)}>创建你的第一个世界</Button>
                             </div>
                         </section>
                     ) : hasLoadedProjects || loading || error ? (

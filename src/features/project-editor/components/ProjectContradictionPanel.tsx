@@ -1,16 +1,20 @@
-import {memo, useCallback, useEffect, useMemo, useState} from 'react'
-import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
+import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {Button, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {
     ai_delete_contradiction_report,
     ai_get_contradiction_report_entry,
     ai_list_contradiction_reports,
+    ai_list_plugins,
     ai_start_contradiction_session,
+    db_get_entry,
     type ContradictionCategory,
     type ContradictionIssue,
     type ContradictionReport,
     type ContradictionReportHistoryItem,
+    type PluginInfo,
     type StoredContradictionReport,
 } from '../../../api'
+import {listen} from '@tauri-apps/api/event'
 import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectContradictionPanel.css'
@@ -27,6 +31,7 @@ interface ProjectContradictionPanelProps {
         model: string
         reportContext: ReportConversationContext
     }) => void
+    onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
 function BackArrow() {
@@ -120,14 +125,71 @@ function ProjectContradictionPanel({
                                        aiModel = null,
                                        onBack,
                                        onStartDiscussion,
+                                       onOpenEntry,
                                    }: ProjectContradictionPanelProps) {
     const {showAlert} = useAlert()
+
+    // ── 插件 & 模型选择 ──
+    const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const [localPluginId, setLocalPluginId] = useState<string | null>(null)
+    const [localModel, setLocalModel] = useState<string | null>(null)
+
+    const effectivePluginId = localPluginId ?? aiPluginId
+    const effectiveModel = localModel ?? aiModel
+    const selectedPluginInfo = plugins.find((p) => p.id === effectivePluginId)
+
+    useEffect(() => {
+        ai_list_plugins('llm')
+            .then((list) => setPlugins(list))
+            .catch((err) => console.warn('[ContradictionPanel] 获取插件列表失败', err))
+    }, [])
+
     const [historyItems, setHistoryItems] = useState<ContradictionReportHistoryItem[]>([])
     const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
     const [activeRecord, setActiveRecord] = useState<StoredContradictionReport | null>(null)
     const [historyLoading, setHistoryLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
     const [generating, setGenerating] = useState(false)
+    const [progressMessage, setProgressMessage] = useState<string | null>(null)
+    const debugRawRef = useRef<string | null>(null)
+
+    // 监听进度报告事件
+    useEffect(() => {
+        let unlistenFn: (() => void) | null = null
+        listen('ai:contradiction_progress', (event) => {
+            const payload = event.payload as Record<string, unknown>
+            const msg = String(payload?.message ?? '')
+            if (msg) {
+                setProgressMessage(msg)
+                console.log('[ContradictionPanel] 进度:', msg)
+            }
+        }).then((fn) => {
+            unlistenFn = fn
+        })
+        return () => {
+            unlistenFn?.()
+        }
+    }, [])
+
+    // 监听 Rust 端发出的原始 AI 响应，用于调试
+    useEffect(() => {
+        let unlistenFn: (() => void) | null = null
+        listen('ai:debug_raw_response', (event) => {
+            const payload = event.payload as Record<string, unknown>
+            const text = String(payload?.text ?? '')
+            debugRawRef.current = text
+            console.log('[ContradictionPanel] 原始 AI 响应（完整）:', text)
+            const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) ?? text.match(/{[\s\S]*"overview"[\s\S]*}/)
+            if (jsonMatch) {
+                console.log('[ContradictionPanel] 提取的 JSON 候选:', jsonMatch[1] ?? jsonMatch[0])
+            }
+        }).then((fn) => {
+            unlistenFn = fn
+        })
+        return () => {
+            unlistenFn?.()
+        }
+    }, [])
 
     const loadHistory = useCallback(async () => {
         setHistoryLoading(true)
@@ -176,20 +238,29 @@ function ProjectContradictionPanel({
     }, [selectedReportId, showAlert])
 
     const handleGenerate = useCallback(async () => {
-        if (!aiPluginId || !aiModel) {
-            await showAlert('当前 AI 插件或模型尚未准备好，请稍后重试。', 'warning', 'toast', 2200)
+        if (!effectivePluginId || !effectiveModel) {
+            await showAlert('请先选择 AI 插件和模型。', 'warning', 'toast', 2200)
             return
         }
 
         setGenerating(true)
+        setProgressMessage(null)
         try {
-            const result = await ai_start_contradiction_session({
+            const startInput = {
                 sessionId: `contradiction_${Date.now()}`,
-                pluginId: aiPluginId,
-                model: aiModel,
+                pluginId: effectivePluginId,
+                model: effectiveModel,
                 projectId,
-            })
+            }
+            console.log('[ProjectContradictionPanel] start contradiction session', startInput)
+            const result = await ai_start_contradiction_session(startInput)
+            console.log('[ProjectContradictionPanel] 矛盾检测原始返回（完整）:', JSON.stringify(result, null, 2))
+            console.log('[ProjectContradictionPanel] report 字段:', JSON.stringify(result.report, null, 2))
             const record = await ai_get_contradiction_report_entry(result.reportId)
+            console.log('[ProjectContradictionPanel] 持久化报告记录（完整）:', JSON.stringify(record, null, 2))
+            if (debugRawRef.current) {
+                console.log('[ProjectContradictionPanel] 本次检测的原始 AI 输出:', debugRawRef.current)
+            }
             if (!record) {
                 throw new Error('新生成的矛盾报告未能写入历史记录')
             }
@@ -200,18 +271,29 @@ function ProjectContradictionPanel({
                 onStartDiscussion({
                     title: `设定矛盾检测：${projectName}`,
                     pluginId: result.pluginId,
-                    model: result.model ?? aiModel,
+                    model: result.model ?? effectiveModel,
                     reportContext: buildReportConversationContext(record),
                 })
             }
             await showAlert('矛盾检测完成，右侧已为这份报告新建讨论对话。', 'success', 'toast', 2200)
         } catch (error) {
-            console.error('生成矛盾检测报告失败', error)
-            await showAlert(`生成矛盾检测报告失败：${String(error)}`, 'error', 'toast', 3000)
+            console.error('[ProjectContradictionPanel] 生成矛盾检测报告失败', {
+                error,
+                message: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                effectivePluginId,
+                effectiveModel,
+                projectId,
+            })
+            const errorMsg = error instanceof Error ? error.message : String(error)
+            const userFriendly = errorMsg === 'error decoding response body'
+                ? 'AI 返回的内容格式异常，无法生成矛盾报告。请检查 AI 模型返回是否符合预期格式，或换一个模型重试。'
+                : `生成矛盾检测报告失败：${errorMsg}`
+            await showAlert(userFriendly, 'error', 'toast', 3000)
         } finally {
             setGenerating(false)
         }
-    }, [aiModel, aiPluginId, loadHistory, onStartDiscussion, projectId, projectName, showAlert])
+    }, [effectiveModel, effectivePluginId, loadHistory, onStartDiscussion, projectId, projectName, showAlert])
 
     const handleDelete = useCallback(async (reportId: string) => {
         const confirmed = await showAlert('删除后将无法在历史中恢复这份报告。是否继续？', 'warning', 'confirm')
@@ -235,7 +317,7 @@ function ProjectContradictionPanel({
 
     const handleStartDiscussion = useCallback(async () => {
         if (!activeRecord || !onStartDiscussion) return
-        const model = activeRecord.model ?? aiModel
+        const model = activeRecord.model ?? effectiveModel
         if (!model) {
             await showAlert('当前缺少可用模型，无法创建报告讨论对话。', 'warning', 'toast', 2200)
             return
@@ -246,7 +328,30 @@ function ProjectContradictionPanel({
             model,
             reportContext: buildReportConversationContext(activeRecord),
         })
-    }, [activeRecord, aiModel, onStartDiscussion, showAlert])
+    }, [activeRecord, effectiveModel, onStartDiscussion, showAlert])
+
+    const [entryTitleMap, setEntryTitleMap] = useState<Record<string, string>>({})
+
+    useEffect(() => {
+        if (!activeRecord) {
+            setEntryTitleMap({})
+            return
+        }
+        const ids = new Set<string>()
+        for (const issue of activeRecord.report.issues) {
+            for (const id of issue.relatedEntryIds) ids.add(id)
+        }
+        if (ids.size === 0) return
+        const idList = [...ids]
+        Promise.allSettled(idList.map((id) => db_get_entry(id))).then((results) => {
+            const map: Record<string, string> = {}
+            idList.forEach((id, i) => {
+                const r = results[i]
+                map[id] = r.status === 'fulfilled' ? r.value.title : id
+            })
+            setEntryTitleMap(map)
+        }).catch(() => {})
+    }, [activeRecord])
 
     const summary = useMemo(() => {
         if (!activeRecord) return null
@@ -277,12 +382,43 @@ function ProjectContradictionPanel({
                     </div>
                 </div>
                 <div className="pe-contradiction-toolbar__actions fc-op-header__actions">
+                    <div className="pe-contradiction-model-selectors">
+                        <Select
+                            options={plugins.map((p) => ({value: p.id, label: p.name}))}
+                            value={effectivePluginId ?? ''}
+                            onChange={(v) => {
+                                setLocalPluginId(String(v))
+                                setLocalModel(null)
+                            }}
+                            placeholder="选择插件"
+                            radius="md"
+                            triggerBackground="var(--fc-color-bg)"
+                            triggerBorderColor="var(--fc-color-border)"
+                            selectedColor="var(--fc-color-primary)"
+                            selectedBackground="var(--fc-color-primary-subtle)"
+                        />
+                        {selectedPluginInfo && (
+                            <Select
+                                options={(selectedPluginInfo.models ?? []).map((m) => ({value: m, label: m}))}
+                                value={effectiveModel ?? ''}
+                                onChange={(v) => setLocalModel(String(v))}
+                                placeholder="选择模型"
+                                radius="md"
+                                triggerBackground="var(--fc-color-bg)"
+                                triggerBorderColor="var(--fc-color-border)"
+                                selectedColor="var(--fc-color-primary)"
+                                selectedBackground="var(--fc-color-primary-subtle)"
+                            />
+                        )}
+                    </div>
                     <Button variant="outline" size="sm" onClick={() => void loadHistory()}
                             disabled={historyLoading || generating}>
                         刷新历史
                     </Button>
                     <Button variant="primary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
-                        {generating ? '检测中…' : '生成新报告'}
+                        {generating ? (
+                            <span>{progressMessage ?? '检测中…'}</span>
+                        ) : '生成新报告'}
                     </Button>
                 </div>
             </div>
@@ -439,13 +575,19 @@ function ProjectContradictionPanel({
                                                     <p className="pe-contradiction-issue-card__desc">{issue.description}</p>
                                                     {issue.relatedEntryIds.length > 0 && (
                                                         <div className="pe-contradiction-chip-list">
-                                                        <span
-                                                            className="pe-contradiction-chip-list__label">相关词条</span>
+                                                            <span className="pe-contradiction-chip-list__label">相关词条</span>
                                                             {issue.relatedEntryIds.map((entryId) => (
-                                                                <span key={`${issue.issueId}-${entryId}`}
-                                                                      className="pe-contradiction-chip">
-                                                                {entryId}
-                                                            </span>
+                                                                <button
+                                                                    key={`${issue.issueId}-${entryId}`}
+                                                                    type="button"
+                                                                    className="pe-contradiction-chip pe-contradiction-chip--entry"
+                                                                    onClick={() => onOpenEntry?.({
+                                                                        id: entryId,
+                                                                        title: entryTitleMap[entryId] ?? entryId,
+                                                                    })}
+                                                                >
+                                                                    {entryTitleMap[entryId] ?? entryId}
+                                                                </button>
                                                             ))}
                                                         </div>
                                                     )}

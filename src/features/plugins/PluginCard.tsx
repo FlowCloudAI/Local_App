@@ -42,7 +42,7 @@ interface IconDisplayProps {
 
 function IconDisplay({kind, iconUrl, isLocalPath = false}: IconDisplayProps) {
     const src = iconUrl
-        ? (isLocalPath ? convertFileSrc(iconUrl) : iconUrl)
+        ? (isLocalPath ? convertFileSrc(iconUrl, 'fcimg') : iconUrl)
         : null
 
     return (

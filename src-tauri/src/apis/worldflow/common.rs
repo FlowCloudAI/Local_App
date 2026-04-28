@@ -194,14 +194,17 @@ pub(super) fn parse_timeline_parent(value: &Value) -> Option<String> {
     }
 }
 
-pub(super) async fn initialize_default_timeline_tags(db: &SqliteDb, project_id: &Uuid) -> Result<(), String> {
+pub(crate) async fn initialize_default_timeline_tags(db: &SqliteDb, project_id: &Uuid) -> Result<(), String> {
+    log::info!("[worldflow] 开始初始化项目默认时间线标签: project_id={}", project_id);
+
     let targets = DEFAULT_TIMELINE_TAG_TARGETS
         .iter()
         .map(|target| (*target).to_string())
         .collect::<Vec<_>>();
 
     for definition in DEFAULT_TIMELINE_TAG_DEFINITIONS {
-        db.create_tag_schema(CreateTagSchema {
+        log::info!("[worldflow] 创建时间线标签: name={} type={}", definition.name, definition.value_type);
+        match db.create_tag_schema(CreateTagSchema {
             project_id: *project_id,
             name: definition.name.to_string(),
             description: Some(definition.description.to_string()),
@@ -211,11 +214,16 @@ pub(super) async fn initialize_default_timeline_tags(db: &SqliteDb, project_id: 
             range_min: definition.range_min,
             range_max: definition.range_max,
             sort_order: Some(definition.sort_order),
-        })
-            .await
-            .map_err(|error| format!("初始化默认时间线标签“{}”失败: {}", definition.name, error))?;
+        }).await {
+            Ok(schema) => log::info!("[worldflow] 标签创建成功: id={} name={}", schema.id, schema.name),
+            Err(error) => {
+                log::error!("[worldflow] 标签创建失败: name={} error={}", definition.name, error);
+                return Err(format!("初始化默认时间线标签 '{}' 失败: {}", definition.name, error));
+            }
+        }
     }
 
+    log::info!("[worldflow] 项目默认时间线标签初始化完成: project_id={}", project_id);
     Ok(())
 }
 

@@ -199,6 +199,64 @@ function App() {
         activateProjectTab(projectId);
     }, [activateProjectTab]);
 
+    const closeTabsForKeys = useCallback((keysToRemove: Set<string>) => {
+        const newTabs = tabs.filter((tab) => !keysToRemove.has(tab.key))
+        setTabs(newTabs)
+        setProjectTabMap((prev) => {
+            const next = {...prev}
+            for (const k of keysToRemove) delete next[k]
+            return next
+        })
+        setEntryTabMap((prev) => {
+            const next = {...prev}
+            for (const k of keysToRemove) delete next[k]
+            return next
+        })
+        setToolTabMap((prev) => {
+            const next = {...prev}
+            for (const k of keysToRemove) delete next[k]
+            return next
+        })
+        setEntryDirtyMap((prev) => {
+            const next = {...prev}
+            for (const k of keysToRemove) delete next[k]
+            return next
+        })
+        setRecentPageKeys((prev) => prev.filter((k) => !keysToRemove.has(k)))
+        if (keysToRemove.has(activeKey)) {
+            const closedIndex = tabs.findIndex((tab) => keysToRemove.has(tab.key))
+            const nextTab = newTabs[closedIndex] ?? newTabs[closedIndex - 1]
+            if (nextTab?.key) {
+                if (projectTabMap[nextTab.key] || toolTabMap[nextTab.key] || entryTabMap[nextTab.key]) {
+                    touchRecentPage(nextTab.key)
+                    showHomeWorkspace()
+                }
+            } else {
+                setMainContentKey('home')
+                setSelectedKey('home')
+            }
+            setActiveKey(nextTab?.key ?? '')
+        }
+    }, [activeKey, entryTabMap, projectTabMap, tabs, toolTabMap, touchRecentPage, showHomeWorkspace])
+
+    const handleDeleteProject = useCallback((projectId: string) => {
+        const projKey = `proj-${projectId}`
+        const relatedToolKeys = Object.entries(toolTabMap)
+            .filter(([, meta]) => meta.projectId === projectId)
+            .map(([k]) => k)
+        const relatedEntryKeys = Object.entries(entryTabMap)
+            .filter(([, meta]) => meta.projectId === projectId)
+            .map(([k]) => k)
+        closeTabsForKeys(new Set([projKey, ...relatedToolKeys, ...relatedEntryKeys]))
+        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+    }, [closeTabsForKeys, entryTabMap, toolTabMap])
+
+    const handleDeleteEntry = useCallback((projectId: string, entryId: string) => {
+        const entryKey = `entry-${projectId}-${entryId}`
+        closeTabsForKeys(new Set([entryKey]))
+        activateProjectTab(projectId)
+    }, [activateProjectTab, closeTabsForKeys])
+
     const handleTabChange = useCallback((key: string) => {
         const shouldShowHomeWorkspace = Boolean(projectTabMap[key] || toolTabMap[key] || entryTabMap[key])
         if (key === activeKey) {
@@ -562,6 +620,8 @@ function App() {
                                                 onEntryDirtyChange={handleEntryDirtyChange}
                                                 onStartCharacterChat={handleStartCharacterChat}
                                             onStartReportDiscussion={handleStartReportDiscussion}
+                                            onDeleteProject={handleDeleteProject}
+                                            onDeleteEntry={handleDeleteEntry}
                                         />
                                     </div>
                                 ))}

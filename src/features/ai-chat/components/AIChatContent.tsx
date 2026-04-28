@@ -562,6 +562,7 @@ export default function AIChatContent({
                                     content={message.content}
                                     toolCallDetail={'verbose'}
                                     markdown={message.role === 'assistant'}
+                                    lineHeight={1.5}
                                     reasoning={message.reasoning || undefined}
                                     rolePlaying={isCharacterConversation && message.role === 'assistant'}
                                     onCopy={() => navigator.clipboard.writeText(message.content)}
@@ -580,6 +581,7 @@ export default function AIChatContent({
                                 <MessageBox
                                     role="assistant"
                                     blocks={ctx.streamingBlocks}
+                                    lineHeight={1.5}
                                     streaming
                                     markdown
                                     rolePlaying={isCharacterConversation}

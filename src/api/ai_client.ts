@@ -446,6 +446,20 @@ export interface EntryDeletedEvent {
     entry_id: string
 }
 
+export interface EntryCreatedEvent {
+    entry_id: string
+    project_id: string
+}
+
+export interface CategoryCreatedEvent {
+    category_id: string
+    project_id: string
+}
+
+export interface CategoryDeletedEvent {
+    category_id: string
+}
+
 export interface CategoryDeleteRequestEvent {
     request_id: string
     category_id: string
@@ -466,8 +480,11 @@ export const ENTRY_EDIT_REQUEST = 'entry:edit-request'
 export const ENTRY_UPDATED = 'entry:updated'
 export const ENTRY_DELETE_REQUEST = 'entry:delete-request'
 export const ENTRY_DELETED = 'entry:deleted'
+export const ENTRY_CREATED = 'entry:created'
 export const CATEGORY_DELETE_REQUEST = 'category:delete-request'
 export const CATEGORY_CASCADE_DELETE_REQUEST = 'category:cascade-delete-request'
+export const CATEGORY_CREATED = 'category:created'
+export const CATEGORY_DELETED = 'category:deleted'
 
 /** 统一确认回调，所有 AI 确认类型均复用此命令 */
 export const confirm_entry_edit = (requestId: string, confirmed: boolean) =>

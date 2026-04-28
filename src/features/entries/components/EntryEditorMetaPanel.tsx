@@ -150,21 +150,34 @@ export default function EntryEditorMetaPanel({
 
             <div className="entry-editor-meta-panel">
                 <div className="entry-editor-meta-panel__section">
-                    <label className="entry-editor-field-label">标题</label>
+                    <label className="entry-editor-field-label">
+                        标题
+                        {!isBrowseMode && (
+                            <span className="entry-editor-required" aria-hidden="true"> *</span>
+                        )}
+                    </label>
                     {isBrowseMode ? (
                         <div className="entry-editor-readonly-title">{infoTitle}</div>
                     ) : (
-                        <input
-                            className="entry-editor-title-input"
-                            value={draft.title}
-                            onChange={(event) => onDraftChange((current) => (
-                                normalizeComparableText(current.title) === normalizeComparableText(event.target.value)
-                                    ? current
-                                    : {...current, title: event.target.value}
-                            ))}
-                            placeholder="输入词条标题"
-                            disabled={saving || loading}
-                        />
+                        <>
+                            <input
+                                className={`entry-editor-title-input${trimmedTitle ? '' : ' is-missing'}`}
+                                value={draft.title}
+                                onChange={(event) => onDraftChange((current) => (
+                                    normalizeComparableText(current.title) === normalizeComparableText(event.target.value)
+                                        ? current
+                                        : {...current, title: event.target.value}
+                                ))}
+                                placeholder="输入词条标题"
+                                disabled={saving || loading}
+                                autoFocus={!trimmedTitle}
+                            />
+                            {!trimmedTitle && (
+                                <div className="entry-editor-field-hint entry-editor-field-hint--required">
+                                    请填写标题，标题不能为空。
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 

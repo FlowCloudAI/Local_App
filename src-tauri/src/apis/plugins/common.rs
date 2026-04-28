@@ -61,11 +61,15 @@ pub struct PluginUpdateInfo {
 
 // ============ 辅助函数 ============
 
-/// 从 .fcplug（ZIP）中提取 icon.png 到系统临时目录缓存，返回本地文件路径。
-/// 已缓存时直接返回，无 icon.png 时返回 None。
-pub(super) fn extract_icon_to_cache(plugin_id: &str, fcplug_path: &Path) -> Option<String> {
-    let cache_dir = std::env::temp_dir().join("flowcloudai_icons");
-    let icon_path = cache_dir.join(format!("{}.png", plugin_id));
+/// 从 .fcplug（ZIP）中提取 icon.png，复制到 images/plugins/ 目录下，返回本地文件路径。
+/// 已存在时直接返回，无 icon.png 时返回 None。
+pub(super) fn extract_icon_to_images_dir(
+    plugin_id: &str,
+    fcplug_path: &Path,
+    images_dir: &Path,
+) -> Option<String> {
+    let plugins_icons_dir = images_dir.join("plugins");
+    let icon_path = plugins_icons_dir.join(format!("{}.png", plugin_id));
 
     if icon_path.exists() {
         return Some(icon_path.to_string_lossy().into_owned());
@@ -78,19 +82,23 @@ pub(super) fn extract_icon_to_cache(plugin_id: &str, fcplug_path: &Path) -> Opti
     let mut bytes = Vec::new();
     entry.read_to_end(&mut bytes).ok()?;
 
-    std::fs::create_dir_all(&cache_dir).ok()?;
+    std::fs::create_dir_all(&plugins_icons_dir).ok()?;
     std::fs::write(&icon_path, &bytes).ok()?;
 
     Some(icon_path.to_string_lossy().into_owned())
 }
 
-pub(super) fn plugin_meta_to_local_info(meta: &PluginMeta, ref_count: usize) -> LocalPluginInfo {
+pub(super) fn plugin_meta_to_local_info(
+    meta: &PluginMeta,
+    ref_count: usize,
+    images_dir: &Path,
+) -> LocalPluginInfo {
     let kind_str = match meta.kind {
         flowcloudai_client::PluginKind::LLM => "llm",
         flowcloudai_client::PluginKind::Image => "image",
         flowcloudai_client::PluginKind::TTS => "tts",
     };
-    let icon_url = extract_icon_to_cache(&meta.id, &meta.fcplug_path);
+    let icon_url = extract_icon_to_images_dir(&meta.id, &meta.fcplug_path, images_dir);
     LocalPluginInfo {
         id: meta.id.clone(),
         name: meta.name.clone(),

@@ -14,6 +14,7 @@ import {
     ai_save_character_conversation_meta,
     ai_set_task_context,
     ai_update_session,
+    setting_get_settings,
     type Category,
     type CharacterChatCategorySnapshot,
     type CharacterChatEntrySnapshot,
@@ -221,13 +222,27 @@ function stringifyTagValue(value: EntryTag['value']): string {
     return ''
 }
 
+function parseStringArray(value: unknown): string[] {
+    if (Array.isArray(value)) return value as string[]
+    if (typeof value === 'string' && value.trim().startsWith('[')) {
+        try {
+            const parsed = JSON.parse(value)
+            return Array.isArray(parsed) ? parsed : []
+        } catch {
+            return []
+        }
+    }
+    return []
+}
+
 function mapTagSchemas(schemas: TagSchema[]): CharacterChatTagSchemaSnapshot[] {
     return schemas.map((schema) => ({
         id: schema.id,
         name: schema.name,
         description: schema.description ?? null,
         type: schema.type,
-        target: schema.target,
+        // SQLite 将数组列存为 JSON 文本，运行时实际可能是字符串，需要解析
+        target: parseStringArray(schema.target),
     }))
 }
 
@@ -606,23 +621,48 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
 
     useEffect(() => {
-        ai_list_plugins('llm').then(setPlugins).catch(console.error)
-        ai_list_tools().then((fetched) => {
+        let mounted = true
+        Promise.all([
+            ai_list_plugins('llm'),
+            setting_get_settings().catch(() => null),
+            ai_list_tools(),
+        ]).then(([pluginList, settings, fetched]) => {
+            if (!mounted) return
+            setPlugins(pluginList)
+
+            const defaultPluginId = settings?.llm?.plugin_id
+            const validPlugin = defaultPluginId
+                ? pluginList.find((p) => p.id === defaultPluginId)
+                : null
+            const initialPlugin = validPlugin ?? pluginList[0] ?? null
+
+            if (initialPlugin) {
+                setSelectedPlugin(initialPlugin.id)
+                const defaultModel = settings?.llm?.default_model
+                const validModel = defaultModel && initialPlugin.models.includes(defaultModel)
+                    ? defaultModel
+                    : (initialPlugin.default_model ?? initialPlugin.models[0] ?? '')
+                if (validModel) setSelectedModel(validModel)
+            }
+
             const enableOps = fetched.map((tool) => ai_enable_tool(tool.name))
             void Promise.all(enableOps)
             setTools(fetched.map((tool) => ({...tool, enabled: true})))
             setWebSearchEnabled(true)
             setEditModeEnabled(true)
         }).catch(console.error)
+        return () => {
+            mounted = false
+        }
     }, [])
 
     useEffect(() => {
-        if (selectedPlugin || plugins.length === 0) return
-        const timer = setTimeout(() => {
-            setSelectedPlugin(plugins[0].id)
-        }, 0)
-        return () => clearTimeout(timer)
-    }, [plugins, selectedPlugin])
+        const handler = () => {
+            ai_list_plugins('llm').then(setPlugins).catch(console.error)
+        }
+        window.addEventListener('fc:plugins-changed', handler)
+        return () => window.removeEventListener('fc:plugins-changed', handler)
+    }, [])
 
     useEffect(() => {
         let mounted = true
@@ -666,17 +706,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [conversationMetaLoaded, conversations])
 
     useEffect(() => {
-        if (selectedPlugin && plugins.length > 0 && !selectedModel) {
-            const plugin = plugins.find((item) => item.id === selectedPlugin)
-            if (plugin) {
-                const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
-                if (defaultModel) {
-                    const timer = setTimeout(() => setSelectedModel(defaultModel), 0)
-                    return () => clearTimeout(timer)
-                }
-            }
+        if (!selectedPlugin || plugins.length === 0) return
+        const plugin = plugins.find((item) => item.id === selectedPlugin)
+        if (!plugin) return
+        if (!selectedModel || !plugin.models.includes(selectedModel)) {
+            const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
+            if (defaultModel) setSelectedModel(defaultModel)
         }
-    }, [selectedPlugin, plugins, selectedModel])
+    }, [selectedPlugin, plugins]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!session.sessionId) return

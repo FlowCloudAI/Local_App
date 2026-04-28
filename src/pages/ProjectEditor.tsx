@@ -1,11 +1,20 @@
 import React, {memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {type DropPosition, flatToTree, Tree, useAlert} from 'flowcloudai-ui'
+import {type CategoryTreeNode, type DropPosition, DeleteDialog, flatToTree, Tree, useAlert} from 'flowcloudai-ui'
+import {listen} from '@tauri-apps/api/event'
 import {
     type Category,
+    type CategoryCreatedEvent,
+    type CategoryDeletedEvent,
     type CustomEntryType,
+    CATEGORY_CREATED,
+    CATEGORY_DELETED,
     db_count_entries,
     db_create_category,
+    db_create_entry,
     db_delete_category,
+    db_delete_entry,
+    db_delete_project,
+    db_get_entry,
     db_get_project,
     db_get_project_stats,
     db_list_all_entry_types,
@@ -13,7 +22,13 @@ import {
     db_list_tag_schemas,
     db_update_category,
     db_update_project,
+    type EntryCreatedEvent,
+    type EntryDeletedEvent,
     type EntryTypeView,
+    type EntryUpdatedEvent,
+    ENTRY_CREATED,
+    ENTRY_DELETED,
+    ENTRY_UPDATED,
     type Project,
     type TagSchema,
 } from '../api'
@@ -53,6 +68,8 @@ interface Props {
     }) => void
     activeToolPanel?: ProjectPanel | null
     onOpenProjectPanel?: (panel: Exclude<ProjectPanel, 'overview'>, project: { id: string; name: string }) => void
+    onDeleteProject?: (projectId: string) => void
+    onDeleteEntry?: (projectId: string, entryId: string) => void
 }
 
 type Selection = { kind: 'project' } | { kind: 'category'; id: string }
@@ -72,6 +89,8 @@ function ProjectEditorInner({
                                 onStartReportDiscussion,
                                 activeToolPanel = null,
                                 onOpenProjectPanel,
+                                onDeleteProject,
+                                onDeleteEntry,
                             }: Props) {
     const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_PX)
     const [treeCollapsed, setTreeCollapsed] = useState(false)
@@ -97,6 +116,9 @@ function ProjectEditorInner({
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
+    const [deleteTarget, setDeleteTarget] = useState<CategoryTreeNode | null>(null)
+    const [placeholderEntryIds, setPlaceholderEntryIds] = useState<Set<string>>(() => new Set())
+    const placeholderSeenInOpenRef = useRef<Set<string>>(new Set())
     const {showAlert} = useAlert()
 
     const touchProjectUpdatedAt = useCallback(() => {
@@ -177,6 +199,43 @@ function ProjectEditorInner({
             cancelled = true
         }
     }, [fetchAll, projectId])
+
+    // 监听 AI 工具调用产生的事件，刷新编辑页
+    useEffect(() => {
+        let cancelled = false
+        const unlistens: (() => void)[] = []
+
+        void Promise.all([
+            listen<EntryUpdatedEvent>(ENTRY_UPDATED, () => {
+                setCategoryEntryRefreshToken(t => t + 1)
+            }),
+            listen<EntryCreatedEvent>(ENTRY_CREATED, (e) => {
+                if (e.payload.project_id === projectId) {
+                    setCategoryEntryRefreshToken(t => t + 1)
+                    setEntryCount(c => c + 1)
+                }
+            }),
+            listen<EntryDeletedEvent>(ENTRY_DELETED, () => {
+                setCategoryEntryRefreshToken(t => t + 1)
+                setEntryCount(c => Math.max(0, c - 1))
+            }),
+            listen<CategoryCreatedEvent>(CATEGORY_CREATED, (e) => {
+                if (e.payload.project_id === projectId) {
+                    void loadAll()
+                }
+            }),
+            listen<CategoryDeletedEvent>(CATEGORY_DELETED, () => {
+                void loadAll()
+            }),
+        ]).then(fns => {
+            if (!cancelled) unlistens.push(...fns)
+        })
+
+        return () => {
+            cancelled = true
+            unlistens.forEach(fn => fn())
+        }
+    }, [projectId, loadAll])
 
     useEffect(() => {
         if (!treeCollapsed) {
@@ -360,6 +419,77 @@ function ProjectEditorInner({
         }
     }
 
+    const handleRequestCreateEntry = useCallback(async (categoryId: string) => {
+        try {
+            const created = await db_create_entry({
+                projectId,
+                categoryId,
+                title: '未命名词条',
+                summary: null,
+                content: null,
+                type: null,
+                tags: null,
+                images: null,
+            })
+            setPlaceholderEntryIds(prev => {
+                const next = new Set(prev)
+                next.add(created.id)
+                return next
+            })
+            setEntryCount(count => count + 1)
+            touchProjectUpdatedAt()
+            onOpenEntry?.(projectId, {id: created.id, title: created.title})
+        } catch (e) {
+            await showAlert(`新建词条失败：${String(e)}`, 'error', 'toast', 2200)
+        }
+    }, [projectId, onOpenEntry, showAlert, touchProjectUpdatedAt])
+
+    useEffect(() => {
+        if (placeholderEntryIds.size === 0) return
+        const stillOpen = new Set(openEntryIds)
+        // Track placeholders that have actually appeared in openEntryIds — only those
+        // count as "removed" when later absent. Guards the brief window between creation
+        // and the parent propagating the new openEntryIds.
+        for (const id of openEntryIds) {
+            if (placeholderEntryIds.has(id)) placeholderSeenInOpenRef.current.add(id)
+        }
+        const removed: string[] = []
+        for (const id of placeholderEntryIds) {
+            if (!stillOpen.has(id) && placeholderSeenInOpenRef.current.has(id)) {
+                removed.push(id)
+            }
+        }
+        if (removed.length === 0) return
+        removed.forEach(id => placeholderSeenInOpenRef.current.delete(id))
+
+        setPlaceholderEntryIds(prev => {
+            const next = new Set(prev)
+            removed.forEach(id => next.delete(id))
+            return next
+        })
+
+        // Untouched placeholders → silently delete from DB.
+        // "Untouched" means: title still default AND no content/summary/images.
+        for (const id of removed) {
+            void (async () => {
+                try {
+                    const entry = await db_get_entry(id)
+                    const titleUntouched = (entry.title ?? '').trim() === '未命名词条'
+                    const contentEmpty = !(entry.content ?? '').trim()
+                    const summaryEmpty = !(entry.summary ?? '').trim()
+                    const imagesEmpty = !entry.images || (Array.isArray(entry.images) && entry.images.length === 0)
+                    if (titleUntouched && contentEmpty && summaryEmpty && imagesEmpty) {
+                        await db_delete_entry(id)
+                        setEntryCount(count => Math.max(0, count - 1))
+                        setCategoryEntryRefreshToken(current => current + 1)
+                    }
+                } catch {
+                    // Entry may already be deleted — ignore.
+                }
+            })()
+        }
+    }, [openEntryIds, placeholderEntryIds])
+
     const handleMove = async (key: string, targetKey: string, position: DropPosition) => {
         if (key === ROOT_ID) return
         const target = categories.find(c => c.id === targetKey)
@@ -470,7 +600,7 @@ function ProjectEditorInner({
                         onSelect={handleSelect}
                         onRename={handleRename}
                         onCreate={handleCreate}
-                        onDelete={handleDelete}
+                        onDeleteRequest={(node) => setDeleteTarget(node)}
                         onMove={handleMove}
                         searchable
                         collapseDuration={0.13}
@@ -524,9 +654,25 @@ function ProjectEditorInner({
                             onOpenContradiction={() => handleOpenProjectPanel('contradiction')}
                             onEditCover={() => setCoverPickerOpen(true)}
                             onClearCover={() => {
-                                void handleUpdateProjectCover(null).catch(() => undefined)
+                                void (async () => {
+                                    const confirmed = await showAlert(
+                                        '确定要清除项目封面吗？此操作不会删除已上传的图片文件。',
+                                        'warning',
+                                        'confirm',
+                                    )
+                                    if (confirmed !== 'yes') return
+                                    await handleUpdateProjectCover(null).catch(() => undefined)
+                                })()
                             }}
                             coverUpdating={coverUpdating}
+                            onDescriptionChange={async (description) => {
+                                const updated = await db_update_project({id: projectId, description})
+                                setProject((current) => current ? {...current, description: updated.description} : current)
+                            }}
+                            onDelete={onDeleteProject ? async () => {
+                                await db_delete_project(projectId)
+                                onDeleteProject(projectId)
+                            } : undefined}
                         />
                     ) : (
                         <CategoryView
@@ -535,12 +681,8 @@ function ProjectEditorInner({
                             categoryName={categories.find(c => c.id === selection.id)?.name ?? ''}
                             projectId={projectId}
                             entryTypes={entryTypes}
-                            tagSchemas={tagSchemas}
                             refreshToken={categoryEntryRefreshToken}
-                            onEntryCreated={async () => {
-                                setEntryCount(count => count + 1)
-                                touchProjectUpdatedAt()
-                            }}
+                            onRequestCreateEntry={handleRequestCreateEntry}
                             onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                         />
                     )}
@@ -569,6 +711,7 @@ function ProjectEditorInner({
                             aiModel={aiModel}
                             onBack={() => onBackToProject?.(projectId)}
                             onStartDiscussion={onStartReportDiscussion}
+                            onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                         />
                     )}
                     {activeToolPanel === 'world-map' && (
@@ -597,6 +740,7 @@ function ProjectEditorInner({
                                 entryTypes={entryTypes}
                                 tagSchemas={tagSchemas}
                                 openEntryIds={visibleEntryIds}
+                                initialEditorMode={placeholderEntryIds.has(entryId) ? 'edit' : 'browse'}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 onTitleChange={async (updatedEntry) => {
                                     onEntryTitleChange?.(projectId, {
@@ -614,6 +758,11 @@ function ProjectEditorInner({
                                     touchProjectUpdatedAt()
                                 }}
                                 onBack={() => onBackToProject?.(projectId)}
+                                onDelete={() => {
+                                    setEntryCount((c) => Math.max(0, c - 1))
+                                    setCategoryEntryRefreshToken((t) => t + 1)
+                                    onDeleteEntry?.(projectId, entryId)
+                                }}
                                 onDirtyChange={(dirty) => {
                                     onEntryDirtyChange?.(projectId, entryId, dirty)
                                 }}
@@ -692,6 +841,12 @@ function ProjectEditorInner({
                 currentCoverPath={project?.cover_path ?? null}
                 onClose={() => setCoverPickerOpen(false)}
                 onSelectCover={handleUpdateProjectCover}
+            />
+
+            <DeleteDialog
+                node={deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                onDelete={(key, mode) => handleDelete(key, mode)}
             />
         </div>
     )

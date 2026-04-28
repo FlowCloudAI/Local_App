@@ -55,25 +55,34 @@ pub(super) fn copy_entry_images(
     images: Option<Vec<FCImage>>,
 ) -> Result<Option<Vec<FCImage>>, String> {
     let Some(images) = images else {
+        log::info!("[copy_entry_images] images=None, 跳过复制");
         return Ok(None);
     };
+
+    log::info!("[copy_entry_images] 开始复制 {} 张图片, project_id={}", images.len(), project_id);
 
     let target_dir = build_entry_images_dir(paths, project_id)?;
     std::fs::create_dir_all(&target_dir)
         .map_err(|e| format!("创建图片目录失败 {:?}: {}", target_dir, e))?;
 
+    let total = images.len();
     let copied_images = images
         .into_iter()
-        .map(|mut image| {
+        .enumerate()
+        .map(|(i, mut image)| {
+            log::info!("[copy_entry_images] 图片 [{}/{}] path={:?} is_cover={}", i + 1, total, image.path, image.is_cover);
             if image.path.as_os_str().is_empty() {
+                log::info!("[copy_entry_images] 图片 [{}] path为空，跳过", i);
                 return Ok(image);
             }
 
             let source_path = image.path.clone();
             if should_keep_existing_image(&source_path, &target_dir) {
+                log::info!("[copy_entry_images] 图片 [{}] 已在目标目录，跳过复制", i);
                 return Ok(image);
             }
             if !source_path.exists() {
+                log::error!("[copy_entry_images] 图片 [{}] 文件不存在: {:?}", i, source_path);
                 return Err(format!("图片文件不存在: {:?}", source_path));
             }
 
@@ -85,9 +94,11 @@ pub(super) fn copy_entry_images(
                 Some(ext) => format!("{}.{}", Uuid::new_v4(), ext),
                 None => Uuid::new_v4().to_string(),
             };
-            let target_path = target_dir.join(file_name);
+            let target_path = target_dir.join(&file_name);
 
+            log::info!("[copy_entry_images] 复制 {:?} -> {:?}", source_path, target_path);
             std::fs::copy(&source_path, &target_path).map_err(|e| {
+                log::error!("[copy_entry_images] 复制失败: {:?} -> {:?}, {}", source_path, target_path, e);
                 format!(
                     "复制图片失败: {:?} -> {:?}, {}",
                     source_path, target_path, e
@@ -95,10 +106,12 @@ pub(super) fn copy_entry_images(
             })?;
 
             image.path = target_path;
+            log::info!("[copy_entry_images] 图片 [{}] 复制完成, 新path={:?}", i, image.path);
             Ok(image)
         })
         .collect::<Result<Vec<_>, String>>()?;
 
+    log::info!("[copy_entry_images] 全部复制完成, 共 {} 张", copied_images.len());
     Ok(Some(copied_images))
 }
 

@@ -156,5 +156,7 @@ pub fn build_contradiction_prompt(corpus: &ContradictionCorpus) -> String {
     prompt.push_str("9. 如果分析范围内的词条内容不足以判断是否存在冲突，issues 和 unresolvedQuestions 均留空即可。\n\n");
     prompt.push_str("资料如下：\n\n");
     prompt.push_str(&corpus.entry_blocks.join("\n\n"));
+    // JSON priming：引导模型直接续写 JSON，避免输出解释性文本
+    prompt.push_str("\n\n请严格按照以上 JSON 格式输出：\n{\n  \"overview\": \"");
     prompt
 }

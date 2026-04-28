@@ -158,7 +158,9 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             const runKey = event.payload.run_id
             const prev = blocksByRunRef.current[runKey] ?? []
             const existingIndex = prev.findIndex(
-                block => block.type === 'tool' && block.tool.index === event.payload.index,
+                block => block.type === 'tool'
+                    && block.tool.index === event.payload.index
+                    && block.tool.result == null,
             )
             let next: MessageBoxBlock[]
             if (existingIndex !== -1) {
@@ -197,7 +199,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             const runKey = event.payload.run_id
             const prev = blocksByRunRef.current[runKey] ?? []
             const next = prev.map(b => {
-                if (b.type !== 'tool' || b.tool.index !== event.payload.index) return b
+                if (b.type !== 'tool' || b.tool.index !== event.payload.index || b.tool.result != null) return b
                 return {
                     ...b,
                     tool: {
@@ -295,7 +297,40 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                 })
             } else if (status === 'cancelled' || status === 'interrupted') {
                 processingNodeIdByRunRef.current[rid] = null
+                const prev = blocksByRunRef.current[rid] ?? []
+                if (prev.length > 0) {
+                    // 保留已生成的部分内容，标记为非流式并提交给上层
+                    const finalBlocks = prev.map(b => {
+                        if (b.type === 'reasoning' || b.type === 'content') {
+                            return {...b, streaming: false}
+                        }
+                        return b
+                    })
+                    blocksByRunRef.current[rid] = finalBlocks
+                    const contentText = finalBlocks
+                        .filter(b => b.type === 'content')
+                        .map(b => (b as { content: string }).content)
+                        .join('')
+                    const reasoningText = finalBlocks
+                        .filter(b => b.type === 'reasoning')
+                        .map(b => (b as { content: string }).content)
+                        .join('')
+                    messageQueueRef.current.push({
+                        id: `a_${Date.now()}`,
+                        role: 'assistant',
+                        content: contentText,
+                        timestamp: Date.now(),
+                        reasoning: reasoningText || undefined,
+                        blocks: finalBlocks,
+                        sessionId: sid,
+                        runId: rid,
+                        // 取消的轮次没有有效的 checkpoint 节点，不设 nodeId
+                    })
+                }
                 queueMicrotask(() => {
+                    const queued = [...messageQueueRef.current]
+                    messageQueueRef.current = []
+                    queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
                     if (runIdRef.current === rid) {
                         setBlocks([])
@@ -306,6 +341,11 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenError = listen<AiEventError>('ai:error', event => {
+            console.error('[useAiSession] ai:error event', {
+                payload: event.payload,
+                currentSessionId: sessionIdRef.current,
+                currentRunId: runIdRef.current,
+            })
             onErrorRef.current(`AI 错误: ${event.payload.error}`)
             queueMicrotask(() => {
                 delete blocksByRunRef.current[event.payload.run_id]

@@ -248,6 +248,9 @@ export interface UpdateRelationInput {
 export const log_message = (level: LogLevel, message: string) =>
     command<void>('log_message', {level, message})
 
+export const open_in_file_manager = (path: string) =>
+    command<void>('open_in_file_manager', {path})
+
 export const show_main_window = () => command<string>('show_main_window')
 
 export const showWindow = () => show_main_window().then(() => undefined)

@@ -12,12 +12,16 @@ pub async fn plugin_market_list(net: State<'_, NetworkState>) -> Result<serde_js
 /// 从官方市场下载并安装插件
 #[tauri::command]
 pub async fn plugin_market_install(
-    _paths: State<'_, PathsState>,
+    paths: State<'_, PathsState>,
     ai_state: State<'_, AiState>,
     net: State<'_, NetworkState>,
     plugin_id: String,
 ) -> Result<LocalPluginInfo, String> {
     require_no_active_sessions(&ai_state).await?;
+
+    let images_dir = paths.db_path.parent()
+        .map(|p| p.join("images"))
+        .unwrap_or_else(|| std::env::temp_dir().join("flowcloudai_images"));
 
     // 先下载到系统临时目录，再由 install_plugin_from_path 复制到 plugins_dir。
     // 直接下载到 plugins_dir 会导致 Windows 上 src==dst 时 std::fs::copy 报 os error 32。
@@ -35,7 +39,7 @@ pub async fn plugin_market_install(
     let _ = std::fs::remove_file(&tmp);
 
     let rc = client.get_plugin_ref_count(&meta.id);
-    Ok(plugin_meta_to_local_info(&meta, rc))
+    Ok(plugin_meta_to_local_info(&meta, rc, &images_dir))
 }
 
 /// 向官方市场发布新插件（开发者用）

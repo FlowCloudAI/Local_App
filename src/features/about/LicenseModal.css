@@ -1,0 +1,95 @@
+.license-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.license-modal-dialog {
+    width: min(100%, 44rem);
+    max-height: min(90vh, 48rem);
+    display: flex;
+    flex-direction: column;
+    border-radius: 1.25rem;
+    border: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
+}
+
+.license-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.4rem 0.6rem;
+}
+
+.license-modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fc-color-text);
+    letter-spacing: 0.01em;
+}
+
+.license-modal-close {
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    border: none;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.license-modal-close:hover {
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+}
+
+.license-modal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 0.6rem 1.4rem 1rem;
+}
+
+.license-modal-intro {
+    margin: 0 0 1rem;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--fc-color-text);
+}
+
+.license-modal-section + .license-modal-section {
+    margin-top: 1rem;
+}
+
+.license-modal-section-title {
+    margin: 0 0 0.4rem;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--fc-color-text);
+}
+
+.license-modal-section-body {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.75;
+    color: var(--fc-color-text-secondary);
+    text-align: justify;
+}
+
+.license-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.8rem 1.4rem 1.2rem;
+    border-top: 1px solid var(--fc-color-border);
+}

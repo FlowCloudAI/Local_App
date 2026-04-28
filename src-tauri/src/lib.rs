@@ -85,10 +85,20 @@ pub fn run() {
                     .unwrap_or_else(|_| std::env::current_dir().unwrap());
 
                 let log_builder = tauri_plugin_log::Builder::new()
-                    .level(log::LevelFilter::Debug)
+                    .level(log::LevelFilter::Info)
                     .target(tauri_plugin_log::Target::new(
                         tauri_plugin_log::TargetKind::Stdout,
-                    ));
+                    )
+                        .filter(|meta| {
+                            // 过滤 sqlx 和 hyper 的 debug 日志，避免刷屏
+                            let target = meta.target();
+                            !target.starts_with("sqlx::")
+                                && !target.starts_with("hyper")
+                                && !target.starts_with("hyper_util")
+                                && !target.starts_with("h2::")
+                                && !target.starts_with("reqwest::")
+                        }),
+                    );
 
                 #[cfg(not(debug_assertions))]
                 let log_builder = log_builder.target(
@@ -211,6 +221,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             log_message,
+            open_in_file_manager,
             show_main_window,
             // Projects
             db_create_project,

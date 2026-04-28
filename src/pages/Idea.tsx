@@ -16,7 +16,6 @@ import {
     type IdeaNote,
     type IdeaNoteStatus,
     type Project,
-    setting_get_settings,
 } from '../api'
 import './Idea.css'
 
@@ -115,7 +114,6 @@ export default function Idea({
     const [draftTitle, setDraftTitle] = useState('')
     const [draftContent, setDraftContent] = useState('')
     const [draftProjectId, setDraftProjectId] = useState<string | null>(contextProjectId)
-    const [defaultEntryType, setDefaultEntryType] = useState<string | null>(null)
     const [convertCategoryId, setConvertCategoryId] = useState<string | null>(null)
     const [convertEntryType, setConvertEntryType] = useState<string | null>(null)
     const [openAfterConvert, setOpenAfterConvert] = useState(true)
@@ -255,15 +253,6 @@ export default function Idea({
         }
     }, [])
 
-    const loadIdeaConversionSettings = useCallback(async () => {
-        try {
-            const settings = await setting_get_settings()
-            setDefaultEntryType(settings.default_entry_type ?? null)
-        } catch (error) {
-            console.error('加载默认词条类型失败', error)
-        }
-    }, [])
-
     useEffect(() => {
         void loadIdeaNotes()
     }, [loadIdeaNotes])
@@ -271,10 +260,6 @@ export default function Idea({
     useEffect(() => {
         void loadProjects()
     }, [loadProjects])
-
-    useEffect(() => {
-        void loadIdeaConversionSettings()
-    }, [loadIdeaConversionSettings])
 
     useEffect(() => {
         syncDraftFromIdea(selectedIdea)
@@ -320,11 +305,7 @@ export default function Idea({
                 setCategories(nextCategories)
                 setEntryTypes(nextEntryTypes)
                 setConvertCategoryId(null)
-
-                const preferredEntryType = defaultEntryType && nextEntryTypes.some((item) => entryTypeKey(item) === defaultEntryType)
-                    ? defaultEntryType
-                    : null
-                setConvertEntryType(preferredEntryType)
+                setConvertEntryType(null)
             } catch (error) {
                 if (cancelled) return
                 console.error('加载转词条配置失败', error)
@@ -338,7 +319,7 @@ export default function Idea({
         return () => {
             cancelled = true
         }
-    }, [defaultEntryType, selectedIdeaId, selectedIdeaProjectId])
+    }, [selectedIdeaId, selectedIdeaProjectId])
 
     useEffect(() => {
         const element = layoutRef.current

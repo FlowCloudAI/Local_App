@@ -1,4 +1,4 @@
-mod common;
+pub(crate) mod common;
 pub(crate) mod system;
 pub(crate) mod images;
 pub(crate) mod projects;

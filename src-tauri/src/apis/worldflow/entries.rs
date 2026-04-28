@@ -415,6 +415,7 @@ pub async fn db_update_entry(
     tags: Option<Vec<EntryTag>>,
     images: Option<Vec<FCImage>>,
 ) -> Result<Entry, String> {
+    log::info!("[db_update_entry] 开始保存 entry_id={}, images_count={:?}", id, images.as_ref().map(|v| v.len()));
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
@@ -440,6 +441,7 @@ pub async fn db_update_entry(
         .map_err(|e| e.to_string())?;
 
     touch_project_updated_at(&db, &entry.project_id).await?;
+    log::info!("[db_update_entry] 保存完成 entry_id={}, images_count={}", entry.id, entry.images.0.len());
     Ok(entry)
 }
 

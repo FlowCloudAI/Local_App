@@ -4,6 +4,8 @@ use crate::tools::format;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{arg_str, ToolRegistry};
+use tauri::Emitter;
+use uuid::Uuid;
 
 /// 注册分类管理工具
 pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
@@ -25,6 +27,7 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
             Box::pin(async move {
                 let project_id = arg_str(args, "project_id")?;
                 let name = arg_str(args, "name")?;
@@ -39,6 +42,12 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                     tools::create_category(&*guard, project_id, name.to_string(), parent_id)
                         .await
                         .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                if let Some(ref h) = app_handle {
+                    #[derive(serde::Serialize, Clone)]
+                    struct Evt { category_id: String, project_id: String }
+                    let _ = h.emit("category:created", Evt { category_id: category.id.to_string(), project_id: project_id.to_string() });
+                }
 
                 Ok(format::format_category(&category))
             })
@@ -109,6 +118,10 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                         tools::delete_category_move_to_parent(&*guard, category_id)
                             .await
                             .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                        #[derive(serde::Serialize, Clone)]
+                        struct Evt { category_id: String }
+                        let _ = app_handle.emit("category:deleted", Evt { category_id: cat_id_str.clone() });
 
                         Ok(format!("分类「{}」已删除，其子内容已上移到父分类", cat.name))
                     }
@@ -185,6 +198,10 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                                 .await
                                 .map_err(|e| anyhow::anyhow!("{}", e))?;
 
+                        #[derive(serde::Serialize, Clone)]
+                        struct Evt { category_id: String }
+                        let _ = app_handle.emit("category:deleted", Evt { category_id: cat_id_str.clone() });
+
                         Ok(format!(
                             "联级删除完成：已删除分类「{}」及其 {} 个子分类，共 {} 个词条",
                             cat_name, deleted_cats.saturating_sub(1), deleted_entries
@@ -196,6 +213,54 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                         other
                     ),
                 }
+            })
+        },
+    );
+
+    // ③ query_categories — 查询分类树（支持指定起始父节点和最大深度）
+    registry.register_async::<WorldflowToolState, _>(
+        "query_categories",
+        "查询项目的分类结构。\
+         可通过 parent_id 指定查询某个分类的子分类，不填则查询根目录下的分类。\
+         可通过 limit 限制返回的最大层级深度（1 = 只返回直接子分类），不填则返回全部层级。\
+         适用于了解项目层级结构、为新建分类选取父节点，或为词条列表指定过滤范围。",
+        vec![
+            ToolFunctionArg::new("project_id", "string")
+                .required(true)
+                .desc("项目ID"),
+            ToolFunctionArg::new("parent_id", "string")
+                .desc("可选：父分类ID；不填时查询根目录下的分类"),
+            ToolFunctionArg::new("limit", "integer")
+                .desc("可选：最大层级深度；1 只返回直接子分类，2 返回子分类和孙分类，以此类推；不填返回全部层级")
+                .min(1),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            Box::pin(async move {
+                let project_id = arg_str(args, "project_id")?;
+
+                let parent_id_str = args
+                    .get("parent_id")
+                    .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty());
+
+                let max_depth = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as usize);
+
+                let parent_uuid = parent_id_str
+                    .map(|s| Uuid::parse_str(s))
+                    .transpose()
+                    .map_err(|e| anyhow::anyhow!("parent_id 格式无效：{}", e))?;
+
+                let guard = app_state.lock().await;
+                let categories = tools::list_categories(&*guard, project_id)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                Ok(format::format_categories_subtree(&categories, parent_uuid, max_depth))
             })
         },
     );
