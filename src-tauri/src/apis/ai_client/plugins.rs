@@ -158,7 +158,7 @@ pub async fn ai_list_plugins(
     let list = client
         .list_by_kind(plugin_kind)
         .into_iter()
-        .map(|(id, meta)| {
+        .map(|meta| {
             let supported_sizes = meta
                 .as_image()
                 .map(|info| info.supported_sizes.clone())
@@ -171,7 +171,7 @@ pub async fn ai_list_plugins(
             };
 
             PluginInfo {
-                id: id.clone(),
+                id: meta.id.clone(),
                 name: meta.name.clone(),
                 kind: kind.clone(),
                 models: meta.models().to_vec(),
