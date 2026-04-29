@@ -147,11 +147,18 @@ async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Usage) {
         let ai_state = app.state::<AiState>();
         let sessions = ai_state.sessions.lock().await;
         let Some(entry) = sessions.get(session_id) else {
+            log::warn!("[usage] session '{}' not found, skipping save", session_id);
             return;
         };
         model = entry.model.clone();
         plugin_id = entry.plugin_id.clone();
     }
+
+    log::info!(
+        "[usage] saving: session={} model={} plugin={} prompt={} completion={} total={}",
+        session_id, model, plugin_id,
+        usage.prompt_tokens, usage.completion_tokens, usage.total_tokens
+    );
 
     let app_state = app.state::<crate::AppState>();
     let db = app_state.sqlite_db.lock().await;
@@ -165,7 +172,11 @@ async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Usage) {
         completion_tokens: usage.completion_tokens,
         total_tokens: usage.total_tokens,
     };
-    let _ = worldflow_core::insert_api_usage(&db.pool, &input).await;
+    if let Err(e) = worldflow_core::insert_api_usage(&db.pool, &input).await {
+        log::error!("[usage] insert failed: {}", e);
+    } else {
+        log::info!("[usage] saved successfully for session {}", session_id);
+    }
 }
 
 pub(crate) fn spawn_session_event_loop<S>(
@@ -278,11 +289,12 @@ pub(crate) fn spawn_session_event_loop<S>(
                 }
                 SessionEvent::TurnEnd { status, node_id, usage } => {
                     log::info!(
-                        "[ai:turn_end] session_id={} run_id={} status={} node_id={}",
+                        "[ai:turn_end] session_id={} run_id={} status={} node_id={} has_usage={}",
                         sid,
                         rid,
                         turn_status_str(&status),
-                        node_id
+                        node_id,
+                        usage.is_some()
                     );
                     if let Some(ref u) = usage {
                         save_api_usage(&app_clone, &sid, u).await;
