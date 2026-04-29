@@ -71,9 +71,3 @@ moka = { version = "0.12", features = ["future"] }
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
 windows = "0.62"
-
-[patch."ssh://git@github.com/FlowCloudAI/Worldflow_Core"]
-worldflow_core = { path = "../../worldflow_core" }
-
-[patch."ssh://git@github.com/FlowCloudAI/AI_Client_Core"]
-flowcloudai_client = { path = "../../client_core" }
