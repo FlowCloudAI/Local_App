@@ -643,7 +643,7 @@ export default function Settings({onBack}: SettingsProps) {
                 </aside>
                 <RollingBox className="settings-scroll-area" thumbSize={'thin'}>
                     <div className="settings-content">
-                    {activeTab === 'system' ? (
+                    {activeTab === 'system' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
@@ -817,7 +817,8 @@ export default function Settings({onBack}: SettingsProps) {
                                 <Button variant="outline" onClick={handleReset}>重置为默认</Button>
                             </div>
                         </div>
-                    ) : (
+                    )}
+                    {activeTab === 'ai' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
@@ -1161,7 +1162,8 @@ export default function Settings({onBack}: SettingsProps) {
                                 </div>
                             </section>
                         </div>
-                    ) : activeTab === 'usage' ? (
+                    )}
+                    {activeTab === 'usage' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
