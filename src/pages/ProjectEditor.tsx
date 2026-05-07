@@ -7,7 +7,7 @@ import React, {
     useRef,
     useState
 } from 'react'
-import {type CategoryTreeNode, DeleteDialog, type DropPosition, flatToTree, Tree, useAlert} from 'flowcloudai-ui'
+import {type CategoryTreeNode, DeleteDialog, type DropPosition, flatToTree, Tree, type TreeViewportRowsPayload, useAlert} from 'flowcloudai-ui'
 import {listen} from '@tauri-apps/api/event'
 import {
     type Category,
@@ -25,6 +25,7 @@ import {
     db_get_entry,
     db_get_project,
     db_get_project_stats,
+    db_list_entries,
     db_list_all_entry_types,
     db_list_categories,
     db_list_tag_schemas,
@@ -35,6 +36,7 @@ import {
     ENTRY_UPDATED,
     type EntryCreatedEvent,
     type EntryDeletedEvent,
+    type EntryBrief,
     type EntryTypeView,
     type EntryUpdatedEvent,
     type Project,
@@ -58,6 +60,8 @@ const TREE_MAX_WIDTH = '22rem'
 const TREE_DEFAULT_PX = 256
 const TREE_COLLAPSE_THRESHOLD_RATIO = 1 / 5
 const ROOT_ID = '__project_root__'
+const ALL_ENTRIES_CACHE_KEY = '__all_entries__'
+const CATEGORY_PREFETCH_LIMIT = 6
 
 interface Props {
     projectId: string
@@ -85,6 +89,10 @@ interface Props {
 
 type Selection = { kind: 'project' } | { kind: 'category'; id: string }
 type ProjectPanel = 'overview' | 'relation-graph' | 'timeline' | 'contradiction' | 'world-map'
+
+function getCategoryCacheKey(categoryId: string | null): string {
+    return categoryId ?? ALL_ENTRIES_CACHE_KEY
+}
 
 function ProjectEditorInner({
                                 projectId,
@@ -128,9 +136,12 @@ function ProjectEditorInner({
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
+    const [expandedKeys, setExpandedKeys] = useState<string[]>([ROOT_ID])
     const [deleteTarget, setDeleteTarget] = useState<CategoryTreeNode | null>(null)
     const [placeholderEntryIds, setPlaceholderEntryIds] = useState<Set<string>>(() => new Set())
+    const [prefetchedCategoryEntries, setPrefetchedCategoryEntries] = useState<Record<string, EntryBrief[]>>({})
     const placeholderSeenInOpenRef = useRef<Set<string>>(new Set())
+    const prefetchingCategoryKeysRef = useRef<Set<string>>(new Set())
     const {showAlert} = useAlert()
 
     const touchProjectUpdatedAt = useCallback(() => {
@@ -254,6 +265,17 @@ function ProjectEditorInner({
             lastExpandedWidthRef.current = treeWidth
         }
     }, [treeCollapsed, treeWidth])
+
+    useEffect(() => {
+        setExpandedKeys([ROOT_ID])
+        setPrefetchedCategoryEntries({})
+        prefetchingCategoryKeysRef.current.clear()
+    }, [projectId])
+
+    useEffect(() => {
+        setPrefetchedCategoryEntries({})
+        prefetchingCategoryKeysRef.current.clear()
+    }, [categoryEntryRefreshToken])
 
     const expandTree = useCallback(() => {
         const nextWidth = lastExpandedWidthRef.current || TREE_DEFAULT_PX
@@ -577,6 +599,54 @@ function ProjectEditorInner({
         return flatToTree(flatRows)
     }, [project?.name, categories])
 
+    const storePrefetchedEntries = useCallback((categoryId: string | null, entries: EntryBrief[]) => {
+        const cacheKey = getCategoryCacheKey(categoryId)
+        setPrefetchedCategoryEntries((current) => {
+            const previous = current[cacheKey]
+            if (previous === entries) return current
+            return {
+                ...current,
+                [cacheKey]: entries,
+            }
+        })
+    }, [])
+
+    const prefetchCategoryEntries = useCallback(async (categoryId: string | null) => {
+        const cacheKey = getCategoryCacheKey(categoryId)
+        if (prefetchedCategoryEntries[cacheKey] !== undefined) return
+        if (prefetchingCategoryKeysRef.current.has(cacheKey)) return
+
+        prefetchingCategoryKeysRef.current.add(cacheKey)
+        try {
+            const entries = await db_list_entries({
+                projectId,
+                categoryId,
+                entryType: null,
+                limit: 200,
+                offset: 0,
+            })
+            storePrefetchedEntries(categoryId, entries)
+        } catch (error) {
+            console.error('prefetch category entries failed', {
+                projectId,
+                categoryId,
+                error,
+            })
+        } finally {
+            prefetchingCategoryKeysRef.current.delete(cacheKey)
+        }
+    }, [prefetchedCategoryEntries, projectId, storePrefetchedEntries])
+
+    const handleViewportRowsChange = useCallback((payload: TreeViewportRowsPayload) => {
+        const categoryIds = payload.rows
+            .map((row) => row.key === ROOT_ID ? null : row.key)
+            .slice(0, CATEGORY_PREFETCH_LIMIT)
+
+        categoryIds.forEach((categoryId) => {
+            void prefetchCategoryEntries(categoryId)
+        })
+    }, [prefetchCategoryEntries])
+
     const visibleEntryIds = useMemo(() => openEntryIds.slice(-10), [openEntryIds])
     const hasActiveEntry = Boolean(activeEntryId)
     const hasActiveTool = Boolean(activeToolPanel)
@@ -613,7 +683,9 @@ function ProjectEditorInner({
                     <Tree
                         treeData={roots}
                         selectedKey={selectedKey}
-                        defaultExpandedKeys={[ROOT_ID]}
+                        expandedKeys={expandedKeys}
+                        onExpandedKeysChange={setExpandedKeys}
+                        onViewportRowsChange={handleViewportRowsChange}
                         scrollHeight="100%"
                         onSelect={handleSelect}
                         onRename={handleRename}
@@ -698,8 +770,10 @@ function ProjectEditorInner({
                                 categoryName="全部词条"
                                 projectId={projectId}
                                 entryTypes={entryTypes}
+                                prefetchedEntries={prefetchedCategoryEntries[getCategoryCacheKey(null)]}
                                 refreshToken={categoryEntryRefreshToken}
                                 noScroll
+                                onDefaultEntriesLoaded={storePrefetchedEntries}
                                 onRequestCreateEntry={handleRequestCreateEntry}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                             />
@@ -711,7 +785,9 @@ function ProjectEditorInner({
                             categoryName={categories.find(c => c.id === selection.id)?.name ?? ''}
                             projectId={projectId}
                             entryTypes={entryTypes}
+                            prefetchedEntries={prefetchedCategoryEntries[getCategoryCacheKey(selection.id)]}
                             refreshToken={categoryEntryRefreshToken}
+                            onDefaultEntriesLoaded={storePrefetchedEntries}
                             onRequestCreateEntry={handleRequestCreateEntry}
                             onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                         />

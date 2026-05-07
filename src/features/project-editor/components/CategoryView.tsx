@@ -63,8 +63,10 @@ interface CategoryViewProps {
     categoryName?: string
     projectId: string
     entryTypes: EntryTypeView[]
+    prefetchedEntries?: EntryBrief[]
     refreshToken?: number
     noScroll?: boolean
+    onDefaultEntriesLoaded?: (categoryId: string | null, entries: EntryBrief[]) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
@@ -74,8 +76,10 @@ function CategoryView({
                           categoryName = '',
                           projectId,
                           entryTypes,
+                          prefetchedEntries,
                           refreshToken = 0,
                           noScroll = false,
+                          onDefaultEntriesLoaded,
                           onRequestCreateEntry,
                           onOpenEntry
                       }: CategoryViewProps) {
@@ -86,9 +90,14 @@ function CategoryView({
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    const loadEntries = useCallback(async (query: string, type: string | null) => {
+    const loadEntries = useCallback(async (
+        query: string,
+        type: string | null,
+        options?: { silent?: boolean }
+    ) => {
         const trimmedQuery = query.trim()
         const requestLabel = trimmedQuery ? 'search' : 'list'
+        const silent = options?.silent ?? false
         console.info('[CategoryView] 开始加载词条', {
             requestLabel,
             projectId,
@@ -96,8 +105,9 @@ function CategoryView({
             typeFilter: type,
             rawQuery: query,
             trimmedQuery,
+            silent,
         })
-        setLoading(true)
+        if (!silent) setLoading(true)
         try {
             let result: EntryBrief[]
             if (trimmedQuery) {
@@ -128,6 +138,9 @@ function CategoryView({
                 })),
             })
             setEntries(result)
+            if (!trimmedQuery && type === null) {
+                onDefaultEntriesLoaded?.(categoryId, result)
+            }
         } catch (e) {
             console.error('[CategoryView] 词条加载失败', {
                 requestLabel,
@@ -138,15 +151,21 @@ function CategoryView({
                 error: e,
             })
         } finally {
-            setLoading(false)
+            if (!silent) setLoading(false)
         }
-    }, [projectId, categoryId])
+    }, [projectId, categoryId, onDefaultEntriesLoaded])
 
     useEffect(() => {
+        if (typeFilter === null && prefetchedEntries !== undefined) {
+            setEntries(prefetchedEntries)
+            setLoading(false)
+            void loadEntries(searchText, typeFilter, {silent: true})
+            return
+        }
         void loadEntries(searchText, typeFilter)
         // searchText 变更由 handleSearchChange 的防抖处理
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [categoryId, typeFilter, refreshToken, loadEntries])
+    }, [categoryId, typeFilter, refreshToken, loadEntries, prefetchedEntries])
 
     useEffect(() => () => {
         if (searchTimer.current) clearTimeout(searchTimer.current)
@@ -183,7 +202,7 @@ function CategoryView({
                         className="pe-search-input"
                         placeholder="搜索词条…"
                         value={searchText}
-                        onChange={handleSearchChange}
+                        onValueChange={handleSearchChange}
                     />
                     <div className="pe-category-toolbar-actions">
                         <Button size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
