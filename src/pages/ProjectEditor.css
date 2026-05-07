@@ -87,7 +87,9 @@
 }
 
 .pe-tree-panel__body > .fc-tree .fc-tree__viewport {
+    height: auto !important;
     flex: 1;
+    min-height: 0;
 }
 
 .pe-tree-toggle {
