@@ -1,0 +1,10 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+  <!-- Base application theme (light mode) -->
+  <style name="Theme.flow_cloud_ai" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <!--
+        windowBackground 与 index.html body{background} 保持一致。
+        这样从 Activity 启动到 WebView 首帧渲染之间不会有白屏闪烁。
+    -->
+    <item name="android:windowBackground">@color/splash_background</item>
+  </style>
+</resources>

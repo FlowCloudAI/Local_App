@@ -1,0 +1,16 @@
+# {{ title }}
+
+{% if summary %}**摘要**：{{ summary }}
+
+{% endif %}{% if entry_type %}**类型**：{{ entry_type }}
+
+{% endif %}{% if content %}## 内容
+
+{{ content }}
+
+{% endif %}{% if tags | length > 0 %}## 标签
+
+{% for tag in tags %}
+- {{ tag }}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,8 @@
+项目列表：
+
+{% for item in items %}
+{{ item }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}

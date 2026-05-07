@@ -1,0 +1,65 @@
+请检测以下项目资料中的设定矛盾，并按约定 JSON 对象格式输出。
+项目：{{ project_name }}。
+检测范围：{{ scope_summary }}。
+{% if truncated %}注意：本轮资料经过裁剪；若证据不足，请放入 unresolvedQuestions，不要硬判定。
+{% endif %}【数据格式说明】
+每条词条包含以下字段，其中“类型”和“标签”是系统管理字段，不属于世界观设定内容：
+- 类型：系统分类标签（如 character、location 等），仅作识别用途，不同词条类型不一致不是矛盾。
+- 标签：结构化属性键值对（如 age=18），是作者填写的设定数据。
+- 摘要：词条简介。
+- 正文：词条的详细设定描述，是最主要的分析对象。
+
+【判断标准】
+1. 只分析世界观设定内容本身（正文、摘要、标签数值），不评判数据结构是否完整。
+2. 以下情况【不得】放入 issues 或 unresolvedQuestions：
+   - 某词条没有填写“类型”字段
+   - 不同词条的“类型”字段值不同（这是正常的分类差异）
+   - 词条缺少某个标签或摘要（信息缺失不是矛盾）
+   - 词条正文内容简短或是占位文字（内容稀少不是矛盾）
+3. 只有当两条或多条词条的设定内容存在明确逻辑冲突时，才放入 issues。
+4. unresolvedQuestions 只用于：有两条以上证据暗示可能存在冲突，但现有信息不足以确认。
+   不得用于：提问作者为何没有填写某字段，或建议作者补充信息。
+5. evidence.quote 必须直接引用词条原文片段，不得改写或概括。
+
+【检测维度】请沿以下六个维度逐一审查，并在 issues 的 category 字段中注明所属维度：
+- timeline：时间线矛盾——事件年份、发生顺序、角色年龄与历史时间线不自洽。
+- relationship：人物关系矛盾——两个词条对同一关系的描述存在对立（如一方说友好，另一方说敌对）。
+- geography：地理空间矛盾——同一地点的位置、归属、距离在不同词条中相互冲突。
+- ability：能力/规则矛盾——角色能力或事件违反了世界观规则词条中明确规定的限制。
+- faction：阵营/立场矛盾——某角色或势力在不同词条中被归入对立阵营，或立场描述明显冲突。
+- other：其他——不属于以上维度的内容事实冲突。
+
+【严重程度标准】
+- low：局部措辞不一致，不影响主线理解。
+- medium：同一事实存在冲突，但可通过小幅改写修复。
+- high：影响角色身份、关系、时间线或世界规则的核心理解。
+- critical：导致主线事件、核心世界规则或主要人物设定无法成立。
+
+【输出要求】
+1. 只输出一个 JSON 对象，不要输出 Markdown、解释文字或代码块。
+2. 顶层字段必须且只能包含：overview、issues、unresolvedQuestions、suggestions。
+3. overview 必须是一段纯文字摘要字符串（不得是对象或数组），一两句话概括整体情况。
+   示例："overview": "共发现 2 处设定冲突，主要集中在角色年龄与时间线之间。"
+4. issues 中每一项必须包含：issueId、severity、category、title、description、relatedEntryIds、evidence；可选 recommendation。
+5. severity 只能是 low、medium、high、critical 之一。
+6. category 只能是 timeline、relationship、geography、ability、faction、other 之一。
+7. evidence 中每一项必须包含：entryId、entryTitle、quote；可选 note。
+8. unresolvedQuestions 和 suggestions 均为字符串数组。
+9. 如果分析范围内的词条内容不足以判断是否存在冲突，issues 和 unresolvedQuestions 均留空即可。
+
+资料如下：
+
+{% for block in entry_blocks %}
+{{ block }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+
+请严格按照以下 JSON 结构输出：
+{
+  "overview": "",
+  "issues": [],
+  "unresolvedQuestions": [],
+  "suggestions": []
+}

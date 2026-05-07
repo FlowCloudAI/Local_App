@@ -1,0 +1,14 @@
+<entry id="{{ entry_id }}" title="{{ title }}">
+{% if entry_type %}
+<类型>{{ entry_type }}</类型>
+{% endif %}
+{% if summary %}
+<摘要>{{ summary }}</摘要>
+{% endif %}
+{% if tag_text %}
+<标签>{{ tag_text }}</标签>
+{% endif %}
+<正文>
+{{ content }}
+</正文>
+</entry>

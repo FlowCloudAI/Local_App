@@ -1,0 +1,8 @@
+「{{ current_name }}」的关系网络：
+
+{% for item in items %}
+{{ item }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}

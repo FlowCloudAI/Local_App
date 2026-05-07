@@ -1,0 +1,6 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+  <!-- Dark mode override -->
+  <style name="Theme.flow_cloud_ai" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <item name="android:windowBackground">@color/splash_background</item>
+  </style>
+</resources>
