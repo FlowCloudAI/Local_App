@@ -138,7 +138,9 @@ function ProjectEditorInner({
     const [dividerDragging, setDividerDragging] = useState(false)
     const isDragging = useRef(false)
     const layoutRef = useRef<HTMLDivElement>(null)
+    const treePanelBodyRef = useRef<HTMLDivElement>(null)
     const lastExpandedWidthRef = useRef(TREE_DEFAULT_PX)
+    const [treeViewportHeight, setTreeViewportHeight] = useState(0)
 
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
@@ -286,6 +288,23 @@ function ProjectEditorInner({
             lastExpandedWidthRef.current = treeWidth
         }
     }, [treeCollapsed, treeWidth])
+
+    useEffect(() => {
+        const element = treePanelBodyRef.current
+        if (!element) return
+
+        const updateHeight = (height: number) => {
+            setTreeViewportHeight(current => Math.round(current) === Math.round(height) ? current : height)
+        }
+
+        updateHeight(element.clientHeight)
+        const observer = new ResizeObserver((entries) => {
+            const nextHeight = entries[0]?.contentRect.height
+            if (nextHeight !== undefined) updateHeight(nextHeight)
+        })
+        observer.observe(element)
+        return () => observer.disconnect()
+    }, [])
 
     useEffect(() => {
         setExpandedKeys([ROOT_ID])
@@ -700,14 +719,14 @@ function ProjectEditorInner({
                     </button>
                 </div>
 
-                <div className="pe-tree-panel__body">
+                <div className="pe-tree-panel__body" ref={treePanelBodyRef}>
                     <Tree
                         treeData={roots}
                         selectedKey={selectedKey}
                         expandedKeys={expandedKeys}
                         onExpandedKeysChange={setExpandedKeys}
                         onViewportRowsChange={handleViewportRowsChange}
-                        scrollHeight="100%"
+                        scrollHeight={treeViewportHeight > 0 ? `${treeViewportHeight}px` : '400px'}
                         onSelect={handleSelect}
                         onRename={handleRename}
                         onCreate={handleCreate}
