@@ -67,6 +67,7 @@ pub async fn db_update_project(
     id: String,
     name: Option<String>,
     description: Option<String>,
+    description_set: Option<bool>,
     cover_image: Option<Option<String>>,
 ) -> Result<Project, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
@@ -76,7 +77,11 @@ pub async fn db_update_project(
         &id,
         UpdateProject {
             name,
-            description,
+            description: if description_set.unwrap_or(false) {
+                Some(description)
+            } else {
+                None
+            },
             cover_image,
         },
     )

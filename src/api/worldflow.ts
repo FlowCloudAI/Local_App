@@ -245,6 +245,8 @@ export const show_main_window = () => command<string>('show_main_window')
 
 export const showWindow = () => show_main_window().then(() => undefined)
 
+export const exit_app = () => command<void>('exit_app')
+
 const normalizeProject = (project: Project): Project => ({
     ...project,
     cover_path: project.cover_path ?? project.cover_image ?? null,
@@ -258,8 +260,16 @@ export const db_get_project = (id: string) => command<Project>('db_get_project',
 export const db_list_projects = () => command<Project[]>('db_list_projects')
     .then(projects => projects.map(normalizeProject))
 
-export const db_update_project = ({id, name, description, coverPath}: UpdateProjectInput) =>
-    command<Project>('db_update_project', {id, name, description, coverImage: coverPath}).then(normalizeProject)
+export const db_update_project = (input: UpdateProjectInput) => {
+    const {id, name, description, coverPath} = input
+    return command<Project>('db_update_project', {
+        id,
+        name,
+        description: description ?? null,
+        descriptionSet: description !== undefined,
+        coverImage: coverPath,
+    }).then(normalizeProject)
+}
 
 export const db_delete_project = (id: string) =>
     command<void>('db_delete_project', {id})
@@ -350,17 +360,8 @@ export const db_search_entries = ({
 export const db_count_entries = ({projectId, categoryId, entryType}: CountEntriesParams) =>
     command<number>('db_count_entries', {projectId, categoryId, entryType})
 
-export const db_update_entry = ({
-                                    id,
-                                    categoryId,
-                                    title,
-                                    summary,
-                                    content,
-                                    type,
-                                    tags,
-                                    images,
-                                }: UpdateEntryInput) =>
-    command<Entry>('db_update_entry', {
+export const db_update_entry = (input: UpdateEntryInput) => {
+    const {
         id,
         categoryId,
         title,
@@ -369,7 +370,19 @@ export const db_update_entry = ({
         type,
         tags,
         images,
+    } = input
+    return command<Entry>('db_update_entry', {
+        id,
+        categoryId,
+        title,
+        summary: summary ?? null,
+        summarySet: summary !== undefined,
+        content,
+        type,
+        tags,
+        images,
     })
+}
 
 export const db_delete_entry = (id: string) => command<void>('db_delete_entry', {id})
 

@@ -424,6 +424,7 @@ pub async fn db_update_entry(
     category_id: Option<String>,
     title: Option<String>,
     summary: Option<String>,
+    summary_set: Option<bool>,
     content: Option<String>,
     r#type: Option<String>,
     tags: Option<Vec<EntryTag>>,
@@ -448,7 +449,11 @@ pub async fn db_update_entry(
             UpdateEntry {
                 category_id: Some(category_id),
                 title,
-                summary,
+                summary: if summary_set.unwrap_or(false) {
+                    Some(summary)
+                } else {
+                    None
+                },
                 content,
                 r#type: Some(r#type),
                 tags,

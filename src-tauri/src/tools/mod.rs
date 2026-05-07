@@ -1,8 +1,8 @@
-use crate::apis::worldflow::common::initialize_default_timeline_tags;
 use crate::AppState;
+use crate::apis::worldflow::common::initialize_default_timeline_tags;
 use uuid::Uuid;
 use worldflow_core::{
-    models::*, CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps,
+    CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps, models::*,
 };
 
 pub mod category_tools;
@@ -786,13 +786,8 @@ pub async fn list_projects(state: &AppState) -> Result<Vec<Project>, String> {
 }
 
 /// 更新词条基本字段（标题、摘要、类型，均可选）
-/// - title:      Some(s)       更新标题
-/// - summary:    Some(s)       更新摘要；Some("") 或 None 沿用原值
-///   （与 update_entry_summary 语义一致：空字符串 = 清空）
-/// 更新词条基本字段（标题、摘要、类型，均可选）
 /// - title:      None = 不更新；Some(s) = 更新
 /// - summary:    None = 不更新；Some(None) = 清空；Some(Some(s)) = 更新
-///   注意：清空摘要依赖 UpdateEntry.summary 的 DB 层语义（None = 不更新 or 清空）
 /// - entry_type: None = 不更新；Some(None) = 清空；Some(Some(s)) = 更新
 pub async fn update_entry_fields(
     state: &AppState,
@@ -808,9 +803,7 @@ pub async fn update_entry_fields(
         UpdateEntry {
             category_id: None,
             title,
-            // UpdateEntry.summary 是 Option<String>，None = 不更新，Some(s) = 更新
-            // Some(None)（AI 传空字符串）→ Some("") → DB 层清空摘要
-            summary: summary.map(|s| s.unwrap_or_default()),
+            summary,
             content: None,
             r#type: entry_type,
             tags: None,
