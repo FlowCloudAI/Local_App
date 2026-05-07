@@ -94,14 +94,6 @@ function getCategoryCacheKey(categoryId: string | null): string {
     return categoryId ?? ALL_ENTRIES_CACHE_KEY
 }
 
-function measureOuterHeight(element: Element | null): number {
-    if (!(element instanceof HTMLElement)) return 0
-    const style = window.getComputedStyle(element)
-    const marginTop = Number.parseFloat(style.marginTop || '0') || 0
-    const marginBottom = Number.parseFloat(style.marginBottom || '0') || 0
-    return element.offsetHeight + marginTop + marginBottom
-}
-
 function areEntryBriefListsEqual(prev: EntryBrief[] | undefined, next: EntryBrief[]): boolean {
     if (prev === next) return true
     if (!prev || prev.length !== next.length) return false
@@ -146,9 +138,7 @@ function ProjectEditorInner({
     const [dividerDragging, setDividerDragging] = useState(false)
     const isDragging = useRef(false)
     const layoutRef = useRef<HTMLDivElement>(null)
-    const treePanelBodyRef = useRef<HTMLDivElement>(null)
     const lastExpandedWidthRef = useRef(TREE_DEFAULT_PX)
-    const [treeViewportHeight, setTreeViewportHeight] = useState(0)
 
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
@@ -296,29 +286,6 @@ function ProjectEditorInner({
             lastExpandedWidthRef.current = treeWidth
         }
     }, [treeCollapsed, treeWidth])
-
-    useEffect(() => {
-        const element = treePanelBodyRef.current
-        if (!element) return
-
-        const updateHeight = () => {
-            const searchHeight = measureOuterHeight(element.querySelector('.fc-tree__search'))
-            const addRootHeight = measureOuterHeight(element.querySelector('.fc-tree__add-root'))
-            const nextHeight = Math.max(120, element.clientHeight - searchHeight - addRootHeight)
-            setTreeViewportHeight(current => Math.round(current) === Math.round(nextHeight) ? current : nextHeight)
-        }
-
-        updateHeight()
-        const observer = new ResizeObserver(() => {
-            updateHeight()
-        })
-        observer.observe(element)
-        const searchElement = element.querySelector('.fc-tree__search')
-        const addRootElement = element.querySelector('.fc-tree__add-root')
-        if (searchElement instanceof HTMLElement) observer.observe(searchElement)
-        if (addRootElement instanceof HTMLElement) observer.observe(addRootElement)
-        return () => observer.disconnect()
-    }, [])
 
     useEffect(() => {
         setExpandedKeys([ROOT_ID])
@@ -733,14 +700,13 @@ function ProjectEditorInner({
                     </button>
                 </div>
 
-                <div className="pe-tree-panel__body" ref={treePanelBodyRef}>
+                <div className="pe-tree-panel__body">
                     <Tree
                         treeData={roots}
                         selectedKey={selectedKey}
                         expandedKeys={expandedKeys}
                         onExpandedKeysChange={setExpandedKeys}
                         onViewportRowsChange={handleViewportRowsChange}
-                        scrollHeight={treeViewportHeight > 0 ? `${treeViewportHeight}px` : '400px'}
                         onSelect={handleSelect}
                         onRename={handleRename}
                         onCreate={handleCreate}
