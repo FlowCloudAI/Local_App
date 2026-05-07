@@ -15,10 +15,6 @@ function matchesNodeModulePrefix(id: string, prefixes: string[]): boolean {
     return prefixes.some(prefix => normalized.includes(`/node_modules/${prefix}`))
 }
 
-function isDeferredVendorAsset(dep: string): boolean {
-    return /(?:^|\/)(?:deck|pixi|markdown)-vendor-[^/]+\.(?:js|css)$/.test(normalizeModuleId(dep))
-}
-
 // https://vite.dev/config/
 export default defineConfig({
     plugins: [react()],
@@ -58,9 +54,6 @@ export default defineConfig({
     // 添加有关当前构建目标的额外前缀，使这些 CLI 设置的 Tauri 环境变量可以在客户端代码中访问
     envPrefix: ['VITE_', 'TAURI_ENV_*'],
     build: {
-        modulePreload: {
-            resolveDependencies: (_filename, deps) => deps.filter(dep => !isDeferredVendorAsset(dep)),
-        },
         // Tauri 在 Windows 上使用 Chromium，在 macOS 和 Linux 上使用 WebKit
         target:
             process.env.TAURI_ENV_PLATFORM == 'windows'

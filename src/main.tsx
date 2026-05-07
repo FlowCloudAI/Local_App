@@ -1,10 +1,9 @@
-import {lazy, StrictMode, Suspense} from 'react'
+import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
+import AppShell from './app/index/AppShell'
 import {get_platform_info, type PlatformInfo, setting_get_settings, showWindow} from './api'
 import './i18n' // 初始化 i18n
-
-const AppShell = lazy(() => import('./app/index/AppShell'))
 
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
 // JS 运行时错误 & 未捕获 Promise rejection
@@ -79,12 +78,10 @@ const initApp = async () => {
 
     createRoot(document.getElementById('root')!).render(
         <StrictMode>
-            <Suspense fallback={<div className="app-loading">加载中…</div>}>
-                <AppShell
-                    initialTheme={initialTheme as 'system' | 'light' | 'dark'}
-                    platformInfo={platformInfo}
-                />
-            </Suspense>
+            <AppShell
+                initialTheme={initialTheme as 'system' | 'light' | 'dark'}
+                platformInfo={platformInfo}
+            />
         </StrictMode>,
     )
 }

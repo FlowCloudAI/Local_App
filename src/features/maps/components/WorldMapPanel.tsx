@@ -17,6 +17,7 @@ import {
     type MapShapeViewportRenderer,
     validateMapEditorDraft,
 } from './MapShapeEditor'
+import * as deckStyleApi from '../styles/deck/presets'
 import {
     type CoastlineParamsPayload,
     db_list_entries,
@@ -41,7 +42,6 @@ function mapLog(msg: string) {
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type ViewportMode = 'edit' | 'preview'
 type MapStyle = 'flat' | 'tolkien' | 'ink'
-type DeckStyleApi = typeof import('../styles/deck/presets')
 
 const CANVAS = {width: 1000, height: 1000}
 const MAP_STYLE_LABELS: Record<MapStyle, string> = {
@@ -166,27 +166,11 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const [viewBox, setViewBox] = useState(() => createInitialMapShapeEditorViewBox(CANVAS))
     const [viewportMode, setViewportMode] = useState<ViewportMode>('preview')
     const [previewRenderer, setPreviewRenderer] = useState<MapShapeViewportRenderer>('pixi')
-    const [deckStyleApi, setDeckStyleApi] = useState<DeckStyleApi | null>(null)
 
     // ── 操作状态 ─────────────────────────────────────────────────────────────
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
     const [isGenerating, setIsGenerating] = useState(false)
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
-
-    useEffect(() => {
-        if (previewRenderer !== 'deck' || deckStyleApi) return
-        let cancelled = false
-        import('../styles/deck/presets')
-            .then((module) => {
-                if (!cancelled) setDeckStyleApi(() => module)
-            })
-            .catch((error) => {
-                if (!cancelled) setErrorMsg(`加载 Deck 渲染器失败：${error instanceof Error ? error.message : String(error)}`)
-            })
-        return () => {
-            cancelled = true
-        }
-    }, [deckStyleApi, previewRenderer])
 
     const updateDraft = useCallback((updater: MapShapeEditorDraft | ((draft: MapShapeEditorDraft) => MapShapeEditorDraft)) => {
         setDraft(current => typeof updater === 'function'
@@ -638,11 +622,11 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     // ── 场景与渲染器属性 ────────────────────────────────────────────────
 
     const styleTextureUrl = useMemo(() => {
-        if (previewRenderer !== 'deck' || !deckStyleApi) return null
+        if (previewRenderer !== 'deck') return null
         if (backgroundImageUrl) return null
         const def = deckStyleApi.getStyleDefinition(style)
         return def.createBackgroundTexture?.(CANVAS) ?? null
-    }, [deckStyleApi, previewRenderer, style, backgroundImageUrl])
+    }, [previewRenderer, style, backgroundImageUrl])
 
     const baseScene = useMemo(() => {
         const previewScene = buildPreviewSceneFromDraft({
@@ -666,7 +650,6 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     }, [scene, sceneDirty, draft, viewportMode])
 
     const deckScene = useMemo(() => {
-        if (!deckStyleApi) return baseScene
         const def = deckStyleApi.getStyleDefinition(style)
         const oceanUrl = deckStyleApi.makeOceanSvgUrl(def.oceanColor)
         const bgUrl = backgroundImageUrl ?? styleTextureUrl ?? oceanUrl
@@ -675,7 +658,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             backgroundImage: {url: bgUrl, fit: backgroundImageUrl ? 'cover' as const : 'fill' as const},
         }
         return def.transformScene?.(withBg) ?? withBg
-    }, [baseScene, deckStyleApi, style, backgroundImageUrl, styleTextureUrl])
+    }, [baseScene, style, backgroundImageUrl, styleTextureUrl])
 
     const pixiStyle = useMemo(() => {
         const def = getPixiMapStyle(style)
@@ -708,7 +691,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         : deckScene
 
     const deckProps = useMemo(() => {
-        if (previewRenderer !== 'deck' || !deckStyleApi) {
+        if (previewRenderer !== 'deck') {
             return undefined
         }
 
@@ -722,7 +705,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
             extraLayers,
         }
-    }, [deckStyleApi, previewRenderer, style, deckScene])
+    }, [previewRenderer, style, deckScene])
 
     const pixiProps = compiledPixiStyle.pixiProps
     const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined

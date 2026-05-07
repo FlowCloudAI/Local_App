@@ -1,8 +1,6 @@
 import React, {
-    lazy,
     memo,
     type MouseEvent as ReactMouseEvent,
-    Suspense,
     useCallback,
     useEffect,
     useMemo,
@@ -42,19 +40,18 @@ import {
     type Project,
     type TagSchema,
 } from '../api'
+import EntryEditor from '../features/entries/components/EntryEditor'
 import EntryTypeCreator from '../features/entries/components/EntryTypeCreator'
+import WorldMapPanel from '../features/maps/components/WorldMapPanel'
+import ProjectContradictionPanel from '../features/project-editor/components/ProjectContradictionPanel'
 import TagCreator from '../features/entries/components/TagCreator'
 import CategoryView from '../features/project-editor/components/CategoryView'
 import ProjectOverview from '../features/project-editor/components/ProjectOverview'
 import ProjectCoverPickerModal from '../features/project-editor/components/ProjectCoverPickerModal'
+import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
+import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
 import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
 import './ProjectEditor.css'
-
-const EntryEditor = lazy(() => import('../features/entries/components/EntryEditor'))
-const ProjectTimeline = lazy(() => import('../features/project-editor/components/ProjectTimeline'))
-const ProjectRelationGraph = lazy(() => import('../features/relation-graph/components/ProjectRelationGraph'))
-const ProjectContradictionPanel = lazy(() => import('../features/project-editor/components/ProjectContradictionPanel'))
-const WorldMapPanel = lazy(() => import('../features/maps/components/WorldMapPanel'))
 
 const TREE_MIN_WIDTH = '15rem'
 const TREE_MAX_WIDTH = '22rem'
@@ -722,41 +719,39 @@ function ProjectEditorInner({
                 </div>
 
                 <div className={`pe-tool-stack${hasActiveTool ? ' active' : ''}`}>
-                    <Suspense fallback={<div className="pe-loading">加载项目工具…</div>}>
-                        {activeToolPanel === 'relation-graph' && (
-                            <ProjectRelationGraph
-                                projectId={projectId}
-                                onBack={() => onBackToProject?.(projectId)}
-                            />
-                        )}
-                        {activeToolPanel === 'timeline' && (
-                            <ProjectTimeline
-                                projectId={projectId}
-                                tagSchemas={tagSchemas}
-                                onBack={() => onBackToProject?.(projectId)}
-                                onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                            />
-                        )}
-                        {activeToolPanel === 'contradiction' && (
-                            <ProjectContradictionPanel
-                                projectId={projectId}
-                                projectName={project.name}
-                                aiPluginId={aiPluginId}
-                                aiModel={aiModel}
-                                onBack={() => onBackToProject?.(projectId)}
-                                onStartDiscussion={onStartReportDiscussion}
-                                onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                            />
-                        )}
-                        {activeToolPanel === 'world-map' && (
-                            <WorldMapPanel
-                                projectId={projectId}
-                                projectName={project.name}
-                                onBack={() => onBackToProject?.(projectId)}
-                                onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                            />
-                        )}
-                    </Suspense>
+                    {activeToolPanel === 'relation-graph' && (
+                        <ProjectRelationGraph
+                            projectId={projectId}
+                            onBack={() => onBackToProject?.(projectId)}
+                        />
+                    )}
+                    {activeToolPanel === 'timeline' && (
+                        <ProjectTimeline
+                            projectId={projectId}
+                            tagSchemas={tagSchemas}
+                            onBack={() => onBackToProject?.(projectId)}
+                            onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
+                        />
+                    )}
+                    {activeToolPanel === 'contradiction' && (
+                        <ProjectContradictionPanel
+                            projectId={projectId}
+                            projectName={project.name}
+                            aiPluginId={aiPluginId}
+                            aiModel={aiModel}
+                            onBack={() => onBackToProject?.(projectId)}
+                            onStartDiscussion={onStartReportDiscussion}
+                            onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
+                        />
+                    )}
+                    {activeToolPanel === 'world-map' && (
+                        <WorldMapPanel
+                            projectId={projectId}
+                            projectName={project.name}
+                            onBack={() => onBackToProject?.(projectId)}
+                            onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
+                        />
+                    )}
                 </div>
 
                 <div className={`pe-entry-stack${hasActiveEntry ? ' active' : ''}`}>
@@ -765,49 +760,47 @@ function ProjectEditorInner({
                             key={entryId}
                             className={`pe-entry-layer${entryId === activeEntryId ? ' active' : ''}`}
                         >
-                            <Suspense fallback={<div className="pe-loading">加载词条编辑器…</div>}>
-                                <EntryEditor
-                                    entryId={entryId}
-                                    projectId={projectId}
-                                    projectName={project.name}
-                                    aiPluginId={aiPluginId}
-                                    aiModel={aiModel}
-                                    categories={categories}
-                                    entryTypes={entryTypes}
-                                    tagSchemas={tagSchemas}
-                                    openEntryIds={visibleEntryIds}
-                                    initialEditorMode={placeholderEntryIds.has(entryId) ? 'edit' : 'browse'}
-                                    onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                                    onTitleChange={async (updatedEntry) => {
-                                        onEntryTitleChange?.(projectId, {
-                                            id: updatedEntry.id,
-                                            title: updatedEntry.title,
-                                        })
-                                    }}
-                                    onSaved={async () => {
-                                        setCategoryEntryRefreshToken(current => current + 1)
-                                        touchProjectUpdatedAt()
-                                    }}
-                                    onTagSchemasChange={async (schemas) => {
-                                        setTagSchemas(schemas)
-                                        await refreshProject()
-                                        touchProjectUpdatedAt()
-                                    }}
-                                    onBack={() => onBackToProject?.(projectId)}
-                                    onDelete={() => {
-                                        setEntryCount((c) => Math.max(0, c - 1))
-                                        setCategoryEntryRefreshToken((t) => t + 1)
-                                        onDeleteEntry?.(projectId, entryId)
-                                    }}
-                                    onDirtyChange={(dirty) => {
-                                        onEntryDirtyChange?.(projectId, entryId, dirty)
-                                    }}
-                                    onStartCharacterChat={(entry) => onStartCharacterChat?.(projectId, {
-                                        id: entry.id,
-                                        title: entry.title,
-                                    })}
-                                />
-                            </Suspense>
+                            <EntryEditor
+                                entryId={entryId}
+                                projectId={projectId}
+                                projectName={project.name}
+                                aiPluginId={aiPluginId}
+                                aiModel={aiModel}
+                                categories={categories}
+                                entryTypes={entryTypes}
+                                tagSchemas={tagSchemas}
+                                openEntryIds={visibleEntryIds}
+                                initialEditorMode={placeholderEntryIds.has(entryId) ? 'edit' : 'browse'}
+                                onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
+                                onTitleChange={async (updatedEntry) => {
+                                    onEntryTitleChange?.(projectId, {
+                                        id: updatedEntry.id,
+                                        title: updatedEntry.title,
+                                    })
+                                }}
+                                onSaved={async () => {
+                                    setCategoryEntryRefreshToken(current => current + 1)
+                                    touchProjectUpdatedAt()
+                                }}
+                                onTagSchemasChange={async (schemas) => {
+                                    setTagSchemas(schemas)
+                                    await refreshProject()
+                                    touchProjectUpdatedAt()
+                                }}
+                                onBack={() => onBackToProject?.(projectId)}
+                                onDelete={() => {
+                                    setEntryCount((c) => Math.max(0, c - 1))
+                                    setCategoryEntryRefreshToken((t) => t + 1)
+                                    onDeleteEntry?.(projectId, entryId)
+                                }}
+                                onDirtyChange={(dirty) => {
+                                    onEntryDirtyChange?.(projectId, entryId, dirty)
+                                }}
+                                onStartCharacterChat={(entry) => onStartCharacterChat?.(projectId, {
+                                    id: entry.id,
+                                    title: entry.title,
+                                })}
+                            />
                         </div>
                     ))}
                 </div>
