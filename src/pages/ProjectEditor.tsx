@@ -94,6 +94,14 @@ function getCategoryCacheKey(categoryId: string | null): string {
     return categoryId ?? ALL_ENTRIES_CACHE_KEY
 }
 
+function measureOuterHeight(element: Element | null): number {
+    if (!(element instanceof HTMLElement)) return 0
+    const style = window.getComputedStyle(element)
+    const marginTop = Number.parseFloat(style.marginTop || '0') || 0
+    const marginBottom = Number.parseFloat(style.marginBottom || '0') || 0
+    return element.offsetHeight + marginTop + marginBottom
+}
+
 function areEntryBriefListsEqual(prev: EntryBrief[] | undefined, next: EntryBrief[]): boolean {
     if (prev === next) return true
     if (!prev || prev.length !== next.length) return false
@@ -293,16 +301,22 @@ function ProjectEditorInner({
         const element = treePanelBodyRef.current
         if (!element) return
 
-        const updateHeight = (height: number) => {
-            setTreeViewportHeight(current => Math.round(current) === Math.round(height) ? current : height)
+        const updateHeight = () => {
+            const searchHeight = measureOuterHeight(element.querySelector('.fc-tree__search'))
+            const addRootHeight = measureOuterHeight(element.querySelector('.fc-tree__add-root'))
+            const nextHeight = Math.max(120, element.clientHeight - searchHeight - addRootHeight)
+            setTreeViewportHeight(current => Math.round(current) === Math.round(nextHeight) ? current : nextHeight)
         }
 
-        updateHeight(element.clientHeight)
-        const observer = new ResizeObserver((entries) => {
-            const nextHeight = entries[0]?.contentRect.height
-            if (nextHeight !== undefined) updateHeight(nextHeight)
+        updateHeight()
+        const observer = new ResizeObserver(() => {
+            updateHeight()
         })
         observer.observe(element)
+        const searchElement = element.querySelector('.fc-tree__search')
+        const addRootElement = element.querySelector('.fc-tree__add-root')
+        if (searchElement instanceof HTMLElement) observer.observe(searchElement)
+        if (addRootElement instanceof HTMLElement) observer.observe(addRootElement)
         return () => observer.disconnect()
     }, [])
 
