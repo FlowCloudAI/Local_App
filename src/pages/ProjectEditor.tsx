@@ -714,7 +714,7 @@ function ProjectEditorInner({
                         onMove={handleMove}
                         searchable
                         collapseDuration={0.13}
-                        indentSize={7}
+                        indentSize={12}
                     />
                 </div>
             </div>
