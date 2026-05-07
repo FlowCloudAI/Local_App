@@ -156,7 +156,7 @@ function CategoryView({
     }, [projectId, categoryId, onDefaultEntriesLoaded])
 
     useEffect(() => {
-        if (typeFilter === null && prefetchedEntries !== undefined) {
+        if (!searchText.trim() && typeFilter === null && prefetchedEntries !== undefined) {
             setEntries(prefetchedEntries)
             setLoading(false)
             void loadEntries(searchText, typeFilter, {silent: true})

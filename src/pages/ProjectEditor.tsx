@@ -94,6 +94,27 @@ function getCategoryCacheKey(categoryId: string | null): string {
     return categoryId ?? ALL_ENTRIES_CACHE_KEY
 }
 
+function areEntryBriefListsEqual(prev: EntryBrief[] | undefined, next: EntryBrief[]): boolean {
+    if (prev === next) return true
+    if (!prev || prev.length !== next.length) return false
+
+    for (let i = 0; i < next.length; i += 1) {
+        const prevItem = prev[i]
+        const nextItem = next[i]
+        if (
+            prevItem.id !== nextItem.id
+            || prevItem.updated_at !== nextItem.updated_at
+            || prevItem.title !== nextItem.title
+            || prevItem.type !== nextItem.type
+            || prevItem.category_id !== nextItem.category_id
+        ) {
+            return false
+        }
+    }
+
+    return true
+}
+
 function ProjectEditorInner({
                                 projectId,
                                 aiPluginId = null,
@@ -603,7 +624,7 @@ function ProjectEditorInner({
         const cacheKey = getCategoryCacheKey(categoryId)
         setPrefetchedCategoryEntries((current) => {
             const previous = current[cacheKey]
-            if (previous === entries) return current
+            if (areEntryBriefListsEqual(previous, entries)) return current
             return {
                 ...current,
                 [cacheKey]: entries,
