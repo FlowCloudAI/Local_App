@@ -56,11 +56,13 @@ const CANVAS_CONTEXT_PATCH_FLAG = '__fcMapDeckPreviewCanvasContextPatched__';
 export type MapDeckShaderInject = Record<string, string>;
 
 /**
- * 将 `MapDeckShaderInject` 映射表包装在匿名 `LayerExtension` 中，以便
+ * 将 `MapDeckShaderInject` 映射表包装在 `LayerExtension` 中，以便
  * 传递给任意图层的 `extensions` prop。
  */
 export function makeInjectExtension(inject: MapDeckShaderInject): LayerExtension {
-    return new class extends LayerExtension {
+    return new class FcMapDeckInjectExtension extends LayerExtension {
+        static override componentName = 'FcMapDeckInjectExtension';
+
         override getShaders() {
             return {inject};
         }

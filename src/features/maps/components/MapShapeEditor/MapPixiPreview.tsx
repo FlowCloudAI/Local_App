@@ -1063,6 +1063,10 @@ function MapPixiApplicationGuard({
     const {app} = useApplication();
 
     useEffect(() => {
+        if (!app) {
+            return undefined;
+        }
+
         const canvas = app.canvas as HTMLCanvasElement | null;
         if (!canvas || typeof canvas.addEventListener !== 'function') {
             return undefined;
