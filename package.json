@@ -7,11 +7,12 @@
     "dev": "vite",
     "tauri": "tauri",
     "build": "tsc -b && vite build",
-    "tauri:release": "tauri dev --release",
     "lint": "eslint .",
-    "preview": "vite preview",
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
-    "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu"
+    "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
+    "android:dev": "adb wait-for-device && adb reverse --remove-all && adb reverse tcp:5175 tcp:5175 && adb reverse tcp:1421 tcp:1421 && set CARGO_PROFILE_DEV_DEBUG=0&& set CARGO_PROFILE_DEV_STRIP=debuginfo&& tauri android dev --host 127.0.0.1",
+    "android:build:apk": "tauri android build --apk",
+    "android:build:debug:x86_64": "set CARGO_PROFILE_DEV_DEBUG=0&& set CARGO_PROFILE_DEV_STRIP=debuginfo&& tauri android build --debug --apk --target x86_64"
   },
   "dependencies": {
     "@deck.gl/core": "9.2.11",
@@ -26,7 +27,7 @@
     "@tauri-apps/plugin-sql": "^2.3.1",
     "@uiw/react-md-editor": "^4.0.11",
     "classnames": "^2.5.1",
-    "flowcloudai-ui": "^0.1.45",
+    "flowcloudai-ui": "^0.1.46",
     "i18next": "^26.0.3",
     "i18next-browser-languagedetector": "^8.2.1",
     "react": "^19.2.0",
@@ -57,6 +58,7 @@
   },
   "overrides": {
     "@deck.gl/*": "9.2.11",
-    "@luma.gl/*": "9.2.6"
+    "@luma.gl/*": "9.2.6",
+    "dompurify": "^3.3.4"
   }
 }

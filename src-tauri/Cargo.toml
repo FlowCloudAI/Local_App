@@ -29,7 +29,6 @@ tokio = { version = "1.50", features = ["rt-multi-thread", "sync", "time", "fs"]
 futures = "0.3"
 
 # ── Tauri 插件 ──
-tauri-plugin-single-instance = "2"
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
@@ -43,7 +42,6 @@ log = "0.4"
 anyhow = "1"
 
 # ── 私有 Git 依赖 ──
-worldflow_core = { git = "ssh://git@github.com/FlowCloudAI/Worldflow_Core", branch = "main" }
 flowcloudai_client = { git = "ssh://git@github.com/FlowCloudAI/AI_Client_Core", branch = "main" }
 
 # ── 网络与 HTTP ──
@@ -64,10 +62,17 @@ mime_guess = "2"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 semver = "1"
-git2 = "0.20.4"
 keyring = { version = "3", features = ["windows-native", "linux-native"] }
 moka = { version = "0.12", features = ["future"] }
 tera = "1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+worldflow_core = { path = "vendor/worldflow_core" }
+git2 = { version = "0.20.4", default-features = false, features = ["vendored-libgit2"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+worldflow_core = { path = "vendor/worldflow_core", default-features = false, features = ["sqlite"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"

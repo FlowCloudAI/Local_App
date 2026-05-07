@@ -1,13 +1,13 @@
 use crate::template::render_global_template;
 use flowcloudai_client::llm::types::ChatRequest;
-use flowcloudai_client::{ToolRegistry, sense::Sense};
+use flowcloudai_client::{sense::Sense, ToolRegistry};
 use serde::{Deserialize, Serialize};
 
 const MAX_TAG_LINES: usize = 16;
 const MAX_WORLD_ENTRIES: usize = 120;
 const MAX_RELATIONS: usize = 160;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterProjectMeta {
     pub id: String,
@@ -15,7 +15,7 @@ pub struct CharacterProjectMeta {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterCategorySnapshot {
     pub id: String,
@@ -24,7 +24,7 @@ pub struct CharacterCategorySnapshot {
     pub path: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterTagSchemaSnapshot {
     pub id: String,
@@ -34,7 +34,7 @@ pub struct CharacterTagSchemaSnapshot {
     pub target: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterTagSnapshot {
     pub schema_id: Option<String>,
@@ -42,7 +42,7 @@ pub struct CharacterTagSnapshot {
     pub value: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterEntrySnapshot {
     pub id: String,
@@ -55,7 +55,7 @@ pub struct CharacterEntrySnapshot {
     pub tags: Vec<CharacterTagSnapshot>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterRelationSnapshot {
     pub id: String,
@@ -65,7 +65,7 @@ pub struct CharacterRelationSnapshot {
     pub content: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterProjectSnapshot {
     pub project: CharacterProjectMeta,

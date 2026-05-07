@@ -10,7 +10,7 @@ src-tauri/src/
 ├── senses/                   # AI "感知"模块（矛盾检测、角色一致性等）
 └── tools/
     ├── mod.rs                # 数据库查询工具 + 格式化输出
-    ├── format                # 格式化辅助（词条简报、完整词条、标签、关系等）
+    ├── format                # 格式化辅助（词条简报、完整词条、标签、关系等，内联模块于 mod.rs）
     ├── entry_tools.rs        # 词条 CRUD Tauri 命令
     ├── category_tools.rs     # 分类 CRUD Tauri 命令
     ├── project_tools.rs      # 项目相关 Tauri 命令

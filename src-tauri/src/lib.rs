@@ -30,6 +30,7 @@ use apis::map_persistence::*;
 use apis::plugins::local::*;
 use apis::plugins::market::*;
 use apis::plugins::remote::*;
+use apis::templates::*;
 use apis::webview_control::*;
 use apis::worldflow::categories::*;
 use apis::worldflow::entries::*;
@@ -43,7 +44,7 @@ use apis::worldflow::snapshots::*;
 use apis::worldflow::system::*;
 use apis::worldflow::tags::*;
 use layout::cache::LayoutCacheState;
-use template::{install_global_template_engine, TemplateEngine};
+use template::install_global_template_runtime;
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
@@ -56,7 +57,9 @@ use tauri::{
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log;
 use tokio::sync::Mutex;
-use worldflow_core::{SnapshotConfig, SqliteDb};
+#[cfg(not(target_os = "android"))]
+use worldflow_core::SnapshotConfig;
+use worldflow_core::SqliteDb;
 
 /// 运行时设置状态：持有设置值 + 配置文件路径（供保存时使用）
 pub struct SettingsState {
@@ -87,14 +90,18 @@ fn resolve_template_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .register_uri_scheme_protocol("fcimg", |ctx, request| handle_fcimg_request(ctx, request))
-        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
-            log::info!("Single instance detected, quitting.");
-            exit(0);
-        }))
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
+        log::info!("Single instance detected, quitting.");
+        exit(0);
+    }));
+
+    builder
         .setup(|app| {
             // ── 日志初始化 ────────────────────────────────────────────────────────
             // release 模式：写入 settings.json 同目录（app_config_dir）；
@@ -184,13 +191,17 @@ pub fn run() {
                 path: settings_path,
             });
 
-            match resolve_template_dir(&app_handle).and_then(|dir| TemplateEngine::new(&dir)) {
-                Ok(engine) => {
-                    if let Err(error) = install_global_template_engine(Arc::new(engine)) {
-                        log::warn!("模板引擎注册失败，将继续使用硬编码回退：{}", error);
-                    } else {
-                        log::info!("模板引擎初始化完成");
-                    }
+            let override_template_dir = app_handle
+                .path()
+                .app_config_dir()
+                .unwrap_or_else(|_| std::env::current_dir().unwrap())
+                .join("templates");
+
+            match resolve_template_dir(&app_handle)
+                .and_then(|dir| install_global_template_runtime(dir, override_template_dir.clone()))
+            {
+                Ok(()) => {
+                    log::info!("模板引擎初始化完成");
                 }
                 Err(error) => {
                     log::warn!("模板引擎初始化失败，将继续使用硬编码回退：{}", error);
@@ -265,6 +276,8 @@ pub fn run() {
             log_message,
             open_in_file_manager,
             show_main_window,
+            exit_app,
+            get_platform_info,
             // 项目
             db_create_project,
             db_get_project,
@@ -286,6 +299,7 @@ pub fn run() {
             db_search_entries,
             db_count_entries,
             db_update_entry,
+            db_save_entry_bundle,
             db_delete_entry,
             db_create_entries_bulk,
             db_optimize_fts,
@@ -302,6 +316,7 @@ pub fn run() {
             db_get_relation,
             db_list_relations_for_entry,
             db_list_relations_for_project,
+            db_get_relation_graph_data,
             db_update_relation,
             db_delete_relation,
             db_delete_relations_between,
@@ -328,6 +343,7 @@ pub fn run() {
             // AI Client
             ai_list_plugins,
             ai_create_llm_session,
+            ai_build_character_project_snapshot,
             ai_create_character_session,
             ai_start_contradiction_session,
             ai_get_contradiction_report,
@@ -363,6 +379,7 @@ pub fn run() {
             ai_get_usage_by_model,
             // 应用设置
             setting_get_settings,
+            setting_get_settings_bootstrap,
             setting_update_settings,
             setting_get_media_dir,
             setting_get_default_paths,
@@ -370,6 +387,12 @@ pub fn run() {
             setting_set_api_key,
             setting_has_api_key,
             setting_delete_api_key,
+            template_list,
+            template_get,
+            template_get_default,
+            template_get_local_root_dir,
+            template_get_effective_path,
+            template_save,
             // Plugin Management — 本地
             plugin_list_local,
             plugin_install_from_file,
@@ -420,6 +443,13 @@ async fn init_db(db_path: &Path, snapshot_dir: Option<&Path>) -> Result<SqliteDb
         .replace('\\', "/");
     log::info!("Connecting to database: {}", path_str);
 
+    #[cfg(target_os = "android")]
+    {
+        let _ = snapshot_dir;
+        SqliteDb::new(&path_str).await.map_err(Into::into)
+    }
+
+    #[cfg(not(target_os = "android"))]
     if let Some(dir) = snapshot_dir {
         std::fs::create_dir_all(dir)?;
         let config = SnapshotConfig {

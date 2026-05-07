@@ -4,6 +4,7 @@ import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
+const devHost = process.env.TAURI_DEV_HOST || process.env.HOST || '127.0.0.1'
 
 function normalizeModuleId(id: string): string {
     return id.replace(/\\/g, '/')
@@ -12,6 +13,10 @@ function normalizeModuleId(id: string): string {
 function matchesNodeModulePrefix(id: string, prefixes: string[]): boolean {
     const normalized = normalizeModuleId(id)
     return prefixes.some(prefix => normalized.includes(`/node_modules/${prefix}`))
+}
+
+function isDeferredVendorAsset(dep: string): boolean {
+    return /(?:^|\/)(?:deck|pixi|markdown)-vendor-[^/]+\.(?:js|css)$/.test(normalizeModuleId(dep))
 }
 
 // https://vite.dev/config/
@@ -35,11 +40,11 @@ export default defineConfig({
         port: 5175,
         // Tauri 工作于固定端口，如果端口不可用则报错
         strictPort: true,
-        // 如果设置了 host，Tauri 则会使用
-        host: process.env.HOST || '127.0.0.1',
+        // Android/iOS 开发模式下，Tauri 会注入 TAURI_DEV_HOST，前端必须监听该地址。
+        host: devHost,
         hmr: {
             protocol: 'ws',
-            host: process.env.HOST || '127.0.0.1',
+            host: devHost,
             port: 1421,
         },
         watch: {
@@ -53,6 +58,9 @@ export default defineConfig({
     // 添加有关当前构建目标的额外前缀，使这些 CLI 设置的 Tauri 环境变量可以在客户端代码中访问
     envPrefix: ['VITE_', 'TAURI_ENV_*'],
     build: {
+        modulePreload: {
+            resolveDependencies: (_filename, deps) => deps.filter(dep => !isDeferredVendorAsset(dep)),
+        },
         // Tauri 在 Windows 上使用 Chromium，在 macOS 和 Linux 上使用 WebKit
         target:
             process.env.TAURI_ENV_PLATFORM == 'windows'
@@ -66,6 +74,10 @@ export default defineConfig({
             output: {
                 manualChunks(id) {
                     const normalized = normalizeModuleId(id)
+
+                    if (normalized.includes('vite/preload-helper')) {
+                        return 'vite-preload'
+                    }
 
                     if (!normalized.includes('/node_modules/')) return
                     if (normalized.endsWith('.css')) return
@@ -99,17 +111,23 @@ export default defineConfig({
                         return 'i18n-vendor'
                     }
 
-                    // 地图预览链最重，连同 deck.gl / loaders.gl / pixi 一起拆出。
+                    // Deck 回退链较重，仅在用户切换到 Deck 渲染器时加载。
                     if (matchesNodeModulePrefix(normalized, [
                         '@deck.gl/',
                         '@loaders.gl/',
                         '@luma.gl/',
                         '@math.gl/',
                         '@probe.gl/',
+                    ])) {
+                        return 'deck-vendor'
+                    }
+
+                    // Pixi 是地图默认预览引擎，和 Deck 分离，避免打开地图时拉取 Deck 回退链。
+                    if (matchesNodeModulePrefix(normalized, [
                         '@pixi/react/',
                         'pixi.js/',
                     ])) {
-                        return 'map-vendor'
+                        return 'pixi-vendor'
                     }
 
                     // Markdown 编辑器及其语法树链通常体积较大，适合和主工作台隔离。

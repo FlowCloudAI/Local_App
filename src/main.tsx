@@ -1,12 +1,10 @@
-import {StrictMode} from 'react'
+import {lazy, StrictMode, Suspense} from 'react'
 import {createRoot} from 'react-dom/client'
 
-import App from './App.tsx'
-import {setting_get_settings, showWindow} from './api'
-import {AlertProvider, ContextMenuProvider, ThemeProvider} from 'flowcloudai-ui'
-// @ts-expect-error - CSS 导入，无需类型声明
-import 'flowcloudai-ui/style';
+import {get_platform_info, type PlatformInfo, setting_get_settings, showWindow} from './api'
 import './i18n' // 初始化 i18n
+
+const AppShell = lazy(() => import('./app/index/AppShell'))
 
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
 // JS 运行时错误 & 未捕获 Promise rejection
@@ -32,16 +30,33 @@ function isTauriRuntime(): boolean {
             || Object.prototype.hasOwnProperty.call(window, '__TAURI__'))
 }
 
+function getFallbackPlatformInfo(): PlatformInfo {
+    return {
+        os: 'unknown',
+        formFactor: 'desktop',
+        windowControls: isTauriRuntime(),
+    }
+}
+
 // 异步初始化主题
 const initApp = async () => {
     let initialTheme = 'system'
-    try {
-        const settings = await setting_get_settings()
-        if (settings.theme) {
-            initialTheme = settings.theme
-        }
-    } catch (error) {
-        console.warn('Failed to load settings, using default theme:', error)
+    let platformInfo = getFallbackPlatformInfo()
+
+    // 并行发起两个 IPC，节省一个往返延迟
+    const [settingsResult, platformResult] = await Promise.allSettled([
+        setting_get_settings(),
+        get_platform_info(),
+    ])
+    if (settingsResult.status === 'fulfilled' && settingsResult.value.theme) {
+        initialTheme = settingsResult.value.theme
+    } else if (settingsResult.status === 'rejected') {
+        console.warn('Failed to load settings, using default theme:', settingsResult.reason)
+    }
+    if (platformResult.status === 'fulfilled') {
+        platformInfo = platformResult.value
+    } else {
+        console.warn('Failed to load platform info, using fallback:', platformResult.reason)
     }
 
     if (isTauriRuntime()) {
@@ -56,19 +71,20 @@ const initApp = async () => {
     document.documentElement.setAttribute('data-theme', resolvedTheme)
 
     // data-theme 已同步写入，下一帧再显示窗口，确保浏览器绘制的第一帧已带有正确主题
-    requestAnimationFrame(() => {
-        showWindow().catch(console.error)
-    })
+    if (platformInfo.windowControls) {
+        requestAnimationFrame(() => {
+            showWindow().catch(console.error)
+        })
+    }
 
     createRoot(document.getElementById('root')!).render(
         <StrictMode>
-            <ThemeProvider defaultTheme={initialTheme as 'system' | 'light' | 'dark'}>
-                <ContextMenuProvider>
-                    <AlertProvider>
-                        <App/>
-                    </AlertProvider>
-                </ContextMenuProvider>
-            </ThemeProvider>
+            <Suspense fallback={<div className="app-loading">加载中…</div>}>
+                <AppShell
+                    initialTheme={initialTheme as 'system' | 'light' | 'dark'}
+                    platformInfo={platformInfo}
+                />
+            </Suspense>
         </StrictMode>,
     )
 }

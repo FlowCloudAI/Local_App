@@ -2,6 +2,13 @@
 
 ## 目标与边界
 
+> ⚠️ 以下三个特性处于设计阶段，当前 MVP 尚未实现：
+> - 语义化参数映射引擎（前端语义值 → 后端底层常量）
+> - 单一 Seed 派生机制（用户主 Seed 派生各子系统 salt）
+> - 配置快照体系（可分享的 `{ version, styleFamily, qualityTier, seed, controls }` JSON 对象）
+>
+> 当前 `coastline.rs` 使用 `shape.id + shape.name` 哈希与 `constants.rs` 固定 salt，参数为硬编码常量。
+
 当前 `MapShapeEditor` 的 Rust 后端实现，目标不是完整 GIS / CAD / 地图学系统，而是先把下面这条链路稳定打通：
 
 - 前端维护可编辑草稿 `shapes + keyLocations`

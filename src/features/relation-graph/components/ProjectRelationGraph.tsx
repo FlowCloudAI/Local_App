@@ -1,4 +1,5 @@
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useState} from 'react'
+import {convertFileSrc} from '@tauri-apps/api/core'
 import {
     Button,
     type LayoutFunction,
@@ -8,15 +9,7 @@ import {
     type RelationLayoutState,
     type RelationNodeInput,
 } from 'flowcloudai-ui'
-import {
-    compute_layout,
-    db_list_entries,
-    db_list_relations_for_project,
-    type EntryBrief,
-    type EntryRelation,
-} from '../../../api'
-import {type RelationDemoNode, toRelationEdges, toRelationNodes,} from '../fixtures/relationGraphFixture'
-import '../dev/RelationDemo.css'
+import {compute_layout, db_get_relation_graph_data, type RelationGraphEdge, type RelationGraphNode,} from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectRelationGraph.css'
 
@@ -53,34 +46,52 @@ const INITIAL_LAYOUT_STATE: RelationLayoutState = {
     layoutError: null,
 }
 
+type ProjectRelationNode = RelationNodeInput & RelationGraphNode
+
 function normalizeError(error: unknown): Error {
     return error instanceof Error ? error : new Error(typeof error === 'string' ? error : '未知错误')
 }
 
+function fallbackCover(seed: string, title: string): string {
+    const mark = title.trim().slice(0, 2) || '词条'
+    const hue = Array.from(seed).reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 360
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+        <rect width="96" height="96" rx="18" fill="hsl(${hue} 62% 44%)" />
+        <circle cx="70" cy="26" r="16" fill="rgba(255,255,255,0.16)" />
+        <text x="48" y="58" fill="white" font-size="22" font-family="Microsoft YaHei, sans-serif" font-weight="700" text-anchor="middle">${mark}</text>
+      </svg>
+    `.trim()
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+function coverSrc(node: RelationGraphNode): string {
+    const cover = node.coverImage
+    if (!cover) return fallbackCover(node.id, node.title)
+    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(cover)) return cover
+    return convertFileSrc(String(cover), 'fcimg')
+}
+
+function toProjectRelationNode(node: RelationGraphNode): ProjectRelationNode {
+    return {...node}
+}
+
 export default function ProjectRelationGraph({projectId, onBack}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
-    const [entries, setEntries] = useState<EntryBrief[]>([])
-    const [relations, setRelations] = useState<EntryRelation[]>([])
+    const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
+    const [edges, setEdges] = useState<RelationGraphEdge[]>([])
     const [dataLoading, setDataLoading] = useState(false)
     const [dataError, setDataError] = useState<Error | null>(null)
     const [layoutState, setLayoutState] = useState<RelationLayoutState>(INITIAL_LAYOUT_STATE)
-
-    const nodes = useMemo(() => toRelationNodes(entries), [entries])
-    const nodeIds = useMemo(() => new Set(entries.map((entry) => entry.id)), [entries])
-    const edges = useMemo(() => toRelationEdges(relations, nodeIds), [nodeIds, relations])
 
     const loadGraphData = useCallback(async () => {
         setDataLoading(true)
         setDataError(null)
 
         try {
-            const [nextEntries, nextRelations] = await Promise.all([
-                db_list_entries({projectId, limit: 1000, offset: 0}),
-                db_list_relations_for_project(projectId),
-            ])
-
-            setEntries(nextEntries)
-            setRelations(nextRelations)
+            const data = await db_get_relation_graph_data(projectId)
+            setNodes(data.nodes.map(toProjectRelationNode))
+            setEdges(data.edges)
             setLayoutState(INITIAL_LAYOUT_STATE)
             setGraphKey((prev) => prev + 1)
         } catch (error) {
@@ -113,8 +124,8 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
     }, [loadGraphData])
 
     const statsChips = [
-        {label: '词条', value: entries.length},
-        {label: '关系', value: relations.length},
+        {label: '词条', value: nodes.length},
+        {label: '关系', value: edges.length},
     ]
 
     const statusItems = [
@@ -125,14 +136,14 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
     ].filter(Boolean)
 
     const renderNode = useCallback((data: RelationNodeInput, selected: boolean) => {
-        const node = data as RelationDemoNode
+        const node = data as unknown as ProjectRelationNode
 
         return (
             <div className={selected ? 'relation-demo-node relation-demo-node--selected' : 'relation-demo-node'}>
                 <div className="relation-demo-node__cover-wrap">
                     <img
                         className="relation-demo-node__cover"
-                        src={node.cover_image}
+                        src={coverSrc(node)}
                         alt={node.title}
                     />
                 </div>
@@ -171,7 +182,7 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
             </div>
 
             {/* ── 工具栏（统计 + 状态） ── */}
-            {(entries.length > 0 || statusItems.length > 0) && (
+            {(nodes.length > 0 || statusItems.length > 0) && (
                 <div className="fc-op-toolbar">
                     {statsChips.map((chip) => (
                         <span key={chip.label} className="fc-op-chip">
@@ -209,11 +220,11 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
 
             {/* ── 视口 ── */}
             <div className="fc-op-viewport">
-                {dataLoading && entries.length === 0 ? (
+                {dataLoading && nodes.length === 0 ? (
                     <div className="fc-op-viewport-empty">正在加载项目关系数据…</div>
                 ) : dataError ? (
                     <div className="fc-op-viewport-empty">无法展示关系图，请先处理数据加载错误。</div>
-                ) : entries.length === 0 ? (
+                ) : nodes.length === 0 ? (
                     <div className="fc-op-viewport-empty">当前项目还没有词条，暂时无法生成关系图。</div>
                 ) : (
                     <RelationGraph

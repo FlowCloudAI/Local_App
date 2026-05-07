@@ -1,4 +1,5 @@
 import {command} from './base'
+import type {Entry, FCImage} from './worldflow'
 
 export type AiPluginKind = 'llm' | 'image' | 'tts'
 
@@ -93,6 +94,14 @@ export interface AiCreateCharacterSessionParams {
     temperature?: number | null
     maxTokens?: number | null
     maxToolRounds?: number | null
+}
+
+export interface AiBuildCharacterProjectSnapshotResult {
+    snapshot: CharacterChatProjectSnapshot
+    characterEntry: Entry
+    backgroundImage?: FCImage | null
+    characterVoiceId?: string | null
+    characterAutoPlay?: boolean | null
 }
 
 export interface ImageData {
@@ -247,6 +256,9 @@ export const ai_create_character_session = ({
             maxToolRounds,
         },
     })
+
+export const ai_build_character_project_snapshot = (projectId: string, entryId: string) =>
+    command<AiBuildCharacterProjectSnapshotResult>('ai_build_character_project_snapshot', {projectId, entryId})
 
 export const ai_send_message = (sessionId: string, message: string) =>
   command<void>('ai_send_message', { sessionId, message })

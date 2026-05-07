@@ -6,7 +6,7 @@
 
 ### 1.1 核心层 (flowcloudai_client_core)
 - **职责**：WASM 插件的扫描、编译、实例化及生命周期管理。
-- **位置**：`client_core/`（工作区根目录）
+- **位置**：`flowcloudai_client` crate（外部 Git 依赖）
 - **关键组件**：
   - `PluginScanner`: 扫描 `.fcplug` 文件并解析 `manifest.json`。
   - `PluginRegistry`: 维护插件元数据与 WASM 实例池。
@@ -90,9 +90,9 @@ interface LocalPluginInfo {
 interface RemotePluginInfo {
   id: string;
   name: string;
-  latest_version: string;
+  version: string;
   description: string;
-  download_url: string;
+  url: string;
 }
 
 interface PluginUpdateInfo {
@@ -144,9 +144,9 @@ try {
   {
     "id": "test-plugin",
     "name": "Test Plugin",
-    "latest_version": "2.0.0",
+    "version": "2.0.0",
     "description": "A test plugin",
-    "download_url": "http://localhost:8080/test.fcplug"
+    "url": "http://localhost:8080/test.fcplug"
   }
 ]
 ```
@@ -156,7 +156,8 @@ try {
 
 ## 6. 已知限制与后续计划
 
-- **动态热插拔**：`install` 和 `uninstall` 接口已完整实现（参见 `src-tauri/src/apis/plugins/local.rs`），支持运行时的插件安装与卸载。
+- **动态热插拔**：`install` 和 `uninstall` 接口已实现基本功能（参见 `src-tauri/src/apis/plugins/local.rs`），但因 Rust
+  所有权限制尚未完全实现运行时热插拔，修改插件后可能需要重启应用生效。
   **前置条件**：安装/卸载操作需要当前无活跃 AI 会话（`require_no_active_sessions` 检查）。若存在活跃会话，将返回错误提示。
   **引用计数保护**：卸载时还会检查插件引用计数。若有 AI 会话正在使用该插件（`ref_count > 0`），卸载将被拒绝。
 - **依赖管理**：当前暂不支持插件间的依赖声明，后续将在 `manifest.json` 中增加 `dependencies` 字段。

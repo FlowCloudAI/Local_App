@@ -1,6 +1,6 @@
 use super::common::*;
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct PluginInfo {
     pub id: String,
     pub name: String,
@@ -138,11 +138,9 @@ fn load_supported_voices_from_fcplug(fcplug_path: &Path) -> Vec<String> {
     )
 }
 
-/// 列出指定类型的可用插件；kind 为 "llm" / "image" / "tts"
-#[tauri::command]
-pub async fn ai_list_plugins(
-    ai_state: State<'_, AiState>,
-    kind: String,
+pub(crate) async fn list_plugins_for_kind(
+    ai_state: &AiState,
+    kind: &str,
 ) -> Result<Vec<PluginInfo>, String> {
     let plugin_kind = match kind.to_lowercase().as_str() {
         "llm" => PluginKind::LLM,
@@ -159,7 +157,7 @@ pub async fn ai_list_plugins(
             let supported_sizes = meta
                 .as_image()
                 .map(|info| info.supported_sizes.clone())
-                .filter(|sizes:&Vec<String> | !sizes.is_empty())
+                .filter(|sizes: &Vec<String>| !sizes.is_empty())
                 .unwrap_or_else(|| load_supported_sizes_from_fcplug(&meta.fcplug_path));
             let supported_voices = if kind == "tts" {
                 load_supported_voices_from_fcplug(&meta.fcplug_path)
@@ -170,7 +168,7 @@ pub async fn ai_list_plugins(
             PluginInfo {
                 id: meta.id.clone(),
                 name: meta.name.clone(),
-                kind: kind.clone(),
+                kind: kind.to_string(),
                 models: meta.models().to_vec(),
                 default_model: meta.default_model().map(str::to_string),
                 supported_sizes,
@@ -180,4 +178,13 @@ pub async fn ai_list_plugins(
         .collect();
 
     Ok(list)
+}
+
+/// 列出指定类型的可用插件；kind 为 "llm" / "image" / "tts"
+#[tauri::command]
+pub async fn ai_list_plugins(
+    ai_state: State<'_, AiState>,
+    kind: String,
+) -> Result<Vec<PluginInfo>, String> {
+    list_plugins_for_kind(ai_state.inner(), &kind).await
 }

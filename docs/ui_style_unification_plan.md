@@ -119,8 +119,8 @@ FlowCloudAI 应统一为“桌面创作工具”视觉，而不是“营销页 +
 
 典型问题：
 
-- `src/App.css` 中仍保留 `--bg-base`、`--text-primary`、`--accent` 等旧变量
-- 个别弹窗仍使用 `--bg-primary`、`--border-color`、`--text-secondary` 等历史变量
+- `src/App.css` 已完成改造，旧变量已基本清理
+- 个别弹窗和历史页面仍使用 `--bg-primary`、`--border-color`、`--text-secondary` 等历史变量
 
 这会造成主题切换与统一改色成本持续上升。
 
@@ -299,7 +299,7 @@ FlowCloudAI 应统一为“桌面创作工具”视觉，而不是“营销页 +
 
 范围：
 
-- `App.tsx`
+- `app/index/AppRoot`
 - `App.css`
 - 顶栏
 - 标签栏容器
@@ -325,7 +325,7 @@ FlowCloudAI 应统一为“桌面创作工具”视觉，而不是“营销页 +
 - 常规工具栏、筛选、反馈条、卡片边框、卡片 hover 必须回归语义 token
 - 不能让首页成为独立视觉体系
 
-### ProjectEditor
+### ProjectEditor / Idea / Settings / AIChatContent
 
 定位：主工作台样式基准页。
 

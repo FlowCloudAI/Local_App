@@ -1,4 +1,5 @@
 import {command} from './base'
+import type {PluginInfo} from './ai_client'
 
 export interface LlmDefaults {
   plugin_id: string | null
@@ -41,7 +42,20 @@ export interface DefaultPaths {
   plugins_path: string
 }
 
+export interface SettingsBootstrap {
+    settings: AppSettings
+    llmPlugins: PluginInfo[]
+    imagePlugins: PluginInfo[]
+    ttsPlugins: PluginInfo[]
+    apiKeyStatus: Record<string, boolean>
+    mediaDir: string
+    defaultPaths: DefaultPaths
+}
+
 export const setting_get_settings = () => command<AppSettings>('setting_get_settings')
+
+export const setting_get_settings_bootstrap = () =>
+    command<SettingsBootstrap>('setting_get_settings_bootstrap')
 
 export const setting_update_settings = (newSettings: AppSettings) =>
   command<string>('setting_update_settings', { newSettings })

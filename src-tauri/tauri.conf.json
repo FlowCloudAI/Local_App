@@ -37,6 +37,9 @@
   },
   "bundle": {
     "active": true,
+    "android": {
+      "minSdkVersion": 26
+    },
     "targets": [
       "nsis",
       "deb",

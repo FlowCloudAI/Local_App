@@ -28,7 +28,6 @@ import {
 } from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
-import {getStyleDefinition, makeOceanSvgUrl, type MapStyle,} from '../styles/deck/presets'
 import {compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
 
 function mapLog(msg: string) {
@@ -39,8 +38,15 @@ function mapLog(msg: string) {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type ViewportMode = 'edit' | 'preview'
+type MapStyle = 'flat' | 'tolkien' | 'ink'
+type DeckStyleApi = typeof import('../styles/deck/presets')
 
 const CANVAS = {width: 1000, height: 1000}
+const MAP_STYLE_LABELS: Record<MapStyle, string> = {
+    flat: '扁平',
+    tolkien: '托尔金',
+    ink: '墨线',
+}
 
 const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
     minSegments: 5,
@@ -126,11 +132,6 @@ interface WorldMapPanelProps {
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
-function isLikelyLocationEntryType(type?: string | null): boolean {
-    if (!type) return false
-    return type.trim().toLowerCase() === 'location'
-}
-
 function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
     const value = location?.ext?.linkedEntryId
     return typeof value === 'string' ? value : ''
@@ -163,11 +164,27 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const [viewBox, setViewBox] = useState(() => createInitialMapShapeEditorViewBox(CANVAS))
     const [viewportMode, setViewportMode] = useState<ViewportMode>('preview')
     const [previewRenderer, setPreviewRenderer] = useState<MapShapeViewportRenderer>('pixi')
+    const [deckStyleApi, setDeckStyleApi] = useState<DeckStyleApi | null>(null)
 
     // ── 操作状态 ─────────────────────────────────────────────────────────────
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
     const [isGenerating, setIsGenerating] = useState(false)
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (previewRenderer !== 'deck' || deckStyleApi) return
+        let cancelled = false
+        import('../styles/deck/presets')
+            .then((module) => {
+                if (!cancelled) setDeckStyleApi(() => module)
+            })
+            .catch((error) => {
+                if (!cancelled) setErrorMsg(`加载 Deck 渲染器失败：${error instanceof Error ? error.message : String(error)}`)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [deckStyleApi, previewRenderer])
 
     const updateDraft = useCallback((updater: MapShapeEditorDraft | ((draft: MapShapeEditorDraft) => MapShapeEditorDraft)) => {
         setDraft(current => typeof updater === 'function'
@@ -210,11 +227,12 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
         void db_list_entries({
             projectId,
+            entryType: 'location',
             limit: 1000,
             offset: 0,
         }).then((entries) => {
             if (cancelled) return
-            setEntryOptions(entries.filter(entry => isLikelyLocationEntryType(entry.type)))
+            setEntryOptions(entries)
         }).catch(() => {
             if (!cancelled) setEntryOptions([])
         })
@@ -618,10 +636,11 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     // ── 场景与渲染器属性 ────────────────────────────────────────────────
 
     const styleTextureUrl = useMemo(() => {
+        if (previewRenderer !== 'deck' || !deckStyleApi) return null
         if (backgroundImageUrl) return null
-        const def = getStyleDefinition(style)
+        const def = deckStyleApi.getStyleDefinition(style)
         return def.createBackgroundTexture?.(CANVAS) ?? null
-    }, [style, backgroundImageUrl])
+    }, [deckStyleApi, previewRenderer, style, backgroundImageUrl])
 
     const baseScene = useMemo(() => {
         const previewScene = buildPreviewSceneFromDraft({
@@ -645,15 +664,16 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     }, [scene, sceneDirty, draft, viewportMode])
 
     const deckScene = useMemo(() => {
-        const def = getStyleDefinition(style)
-        const oceanUrl = makeOceanSvgUrl(def.oceanColor)
+        if (!deckStyleApi) return baseScene
+        const def = deckStyleApi.getStyleDefinition(style)
+        const oceanUrl = deckStyleApi.makeOceanSvgUrl(def.oceanColor)
         const bgUrl = backgroundImageUrl ?? styleTextureUrl ?? oceanUrl
         const withBg: MapPreviewScene = {
             ...baseScene,
             backgroundImage: {url: bgUrl, fit: backgroundImageUrl ? 'cover' as const : 'fill' as const},
         }
         return def.transformScene?.(withBg) ?? withBg
-    }, [baseScene, style, backgroundImageUrl, styleTextureUrl])
+    }, [baseScene, deckStyleApi, style, backgroundImageUrl, styleTextureUrl])
 
     const pixiStyle = useMemo(() => {
         const def = getPixiMapStyle(style)
@@ -686,11 +706,11 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         : deckScene
 
     const deckProps = useMemo(() => {
-        if (previewRenderer !== 'deck') {
+        if (previewRenderer !== 'deck' || !deckStyleApi) {
             return undefined
         }
 
-        const def = getStyleDefinition(style)
+        const def = deckStyleApi.getStyleDefinition(style)
         const decorations = def.buildDecorations?.({canvas: CANVAS, scene: deckScene}) ?? {}
         const extraLayers = def.createExtraLayers?.({canvas: CANVAS, scene: deckScene, decorations}) ?? []
         return {
@@ -700,7 +720,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
             extraLayers,
         }
-    }, [previewRenderer, style, deckScene])
+    }, [deckStyleApi, previewRenderer, style, deckScene])
 
     const pixiProps = compiledPixiStyle.pixiProps
     const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined
@@ -819,7 +839,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                     {(['flat', 'tolkien', 'ink'] as MapStyle[]).map(s => (
                         <button key={s} type="button"
                                 className={`wm-style-btn${style === s ? ' is-active' : ''}`}
-                                onClick={() => setStyle(s)}>{getStyleDefinition(s).label}</button>
+                                onClick={() => setStyle(s)}>{MAP_STYLE_LABELS[s]}</button>
                     ))}
                 </div>
                 <div className="wm-header-actions">
@@ -930,7 +950,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                 >
                                     <span className="wm-map-item__name">{m.name}</span>
                                     <span
-                                        className="wm-map-item__meta">{getStyleDefinition((m.style as MapStyle) ?? 'flat').label}</span>
+                                        className="wm-map-item__meta">{MAP_STYLE_LABELS[(m.style as MapStyle) ?? 'flat'] ?? MAP_STYLE_LABELS.flat}</span>
                                     <button
                                         type="button"
                                         className="wm-map-item__delete"

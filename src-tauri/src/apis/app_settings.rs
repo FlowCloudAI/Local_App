@@ -1,5 +1,8 @@
+use crate::apis::ai_client::plugins::{list_plugins_for_kind, PluginInfo};
 use crate::state::{BackendReadyState, SearchEngineState};
-use crate::{ApiKeyStore, AppSettings, SettingsState};
+use crate::{AiState, ApiKeyStore, AppSettings, SettingsState};
+use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
@@ -195,6 +198,59 @@ pub fn setting_get_default_paths(app: AppHandle) -> Result<DefaultPaths, String>
     Ok(DefaultPaths {
         db_path: data_root.join("db").to_string_lossy().to_string(),
         plugins_path: data_root.join("plugins").to_string_lossy().to_string(),
+    })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsBootstrap {
+    pub settings: AppSettings,
+    pub llm_plugins: Vec<PluginInfo>,
+    pub image_plugins: Vec<PluginInfo>,
+    pub tts_plugins: Vec<PluginInfo>,
+    pub api_key_status: HashMap<String, bool>,
+    pub media_dir: String,
+    pub default_paths: DefaultPaths,
+}
+
+/// 设置页首屏聚合数据，减少多轮 IPC 和串行 API Key 检查。
+#[tauri::command]
+pub async fn setting_get_settings_bootstrap(
+    app: AppHandle,
+    settings_state: State<'_, SettingsState>,
+    ai_state: State<'_, AiState>,
+) -> Result<SettingsBootstrap, String> {
+    let settings = setting_get_settings(app.clone(), settings_state.clone()).await?;
+    let default_paths = setting_get_default_paths(app.clone())?;
+    let media_dir = if let Some(dir) = &settings.media_dir {
+        dir.clone()
+    } else {
+        app.path()
+            .document_dir()
+            .map_err(|e| e.to_string())?
+            .join("FlowCloudAI")
+            .to_string_lossy()
+            .to_string()
+    };
+
+    let llm_plugins = list_plugins_for_kind(ai_state.inner(), "llm").await?;
+    let image_plugins = list_plugins_for_kind(ai_state.inner(), "image").await?;
+    let tts_plugins = list_plugins_for_kind(ai_state.inner(), "tts").await?;
+    let api_key_status = llm_plugins
+        .iter()
+        .chain(image_plugins.iter())
+        .chain(tts_plugins.iter())
+        .map(|plugin| (plugin.id.clone(), ApiKeyStore::get(&plugin.id).is_some()))
+        .collect::<HashMap<_, _>>();
+
+    Ok(SettingsBootstrap {
+        settings,
+        llm_plugins,
+        image_plugins,
+        tts_plugins,
+        api_key_status,
+        media_dir,
+        default_paths,
     })
 }
 

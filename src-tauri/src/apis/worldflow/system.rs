@@ -1,5 +1,13 @@
 use super::common::*;
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    pub os: &'static str,
+    pub form_factor: &'static str,
+    pub window_controls: bool,
+}
+
 #[tauri::command]
 pub fn log_message(level: &str, message: &str) {
     match level {
@@ -35,4 +43,41 @@ pub fn show_main_window(window: Window) -> Result<&'static str, &'static str> {
         env::set_var("TAURI_DEBUG", "1");
     }
     Ok("open the window")
+}
+
+/// 退出应用。
+/// 移动端不暴露前端 Window API，因此统一走后端 AppHandle 退出。
+#[tauri::command]
+pub fn exit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+/// 返回当前运行平台与首轮壳层分流所需的基础能力信息。
+#[tauri::command]
+pub fn get_platform_info() -> PlatformInfo {
+    let os = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "ios") {
+        "ios"
+    } else {
+        "unknown"
+    };
+
+    let form_factor = if cfg!(target_os = "android") || cfg!(target_os = "ios") {
+        "mobile"
+    } else {
+        "desktop"
+    };
+
+    PlatformInfo {
+        os,
+        form_factor,
+        window_controls: form_factor == "desktop",
+    }
 }

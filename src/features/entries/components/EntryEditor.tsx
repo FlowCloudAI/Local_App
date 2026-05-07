@@ -7,17 +7,13 @@ import {
     ai_list_plugins,
     type Category,
     db_create_entry,
-    db_create_relation,
     db_delete_entry,
-    db_delete_relation,
     db_get_entry,
     db_list_entries,
     db_list_incoming_links,
     db_list_outgoing_links,
     db_list_relations_for_entry,
-    db_replace_outgoing_links,
-    db_update_entry,
-    db_update_relation,
+    db_save_entry_bundle,
     type Entry,
     ENTRY_DELETED,
     ENTRY_UPDATED,
@@ -52,17 +48,11 @@ import {
     type InternalEntryLink,
     isSafeExternalHref,
     parseInternalEntryHref,
-    parseInternalEntryLinks,
     resolveMarkdownAnchor,
 } from '../lib/entryMarkdown'
 import {type EntryImage, normalizeEntryImages, toEntryImageSrc,} from '../lib/entryImage'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
-import {
-    areRelationDraftsEqual,
-    buildRelationDraft,
-    hasInvalidRelationDraft,
-    resolveRelationPayload,
-} from '../lib/entryRelation'
+import {areRelationDraftsEqual, buildRelationDraft, hasInvalidRelationDraft,} from '../lib/entryRelation'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
 import {
     buildTagValueMap,
@@ -71,7 +61,6 @@ import {
     normalizeComparableText,
     normalizeComparableType,
     normalizeEntryContent,
-    normalizeEntryLookupTitle,
     parseDateValue,
 } from '../lib/entryCommon'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
@@ -868,52 +857,6 @@ export default function EntryEditor({
         }
 
         try {
-            const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, draft.categoryId, trimmedTitle, entry.id)
-            if (duplicatedEntry) {
-                const message = '当前分类下已存在同名词条，请更换标题。'
-                setError(message)
-                if (trigger === 'manual') {
-                    void showAlert(message, 'warning', 'toast', 1800)
-                } else {
-                    setAutoSaveStatus('标题重复，暂不自动保存')
-                }
-                return
-            }
-
-            await db_update_entry({
-                id: entry.id,
-                categoryId: draft.categoryId,
-                title: trimmedTitle,
-                summary: trimmedSummary || null,
-                content: normalizedContent === '' ? null : normalizedContent,
-                type: draft.type,
-                tags: buildEntryTagsPayload(draft.tags, entryTags.localTagSchemas, entry.tags),
-                images: draft.images,
-            })
-
-            // 同步出链：将正文中的内部链接替换到 entry_links 表
-            const internalLinks = parseInternalEntryLinks(normalizedContent)
-            const targetIds: string[] = []
-            for (const link of internalLinks) {
-                if (link.entryId) {
-                    targetIds.push(link.entryId)
-                } else {
-                    const normalizedTitle = normalizeEntryLookupTitle(link.title)
-                    const matched = projectEntriesRef.current.find(
-                        (item) => normalizeEntryLookupTitle(item.title) === normalizedTitle,
-                    )
-                    if (matched) {
-                        targetIds.push(matched.id)
-                    }
-                }
-            }
-            const uniqueTargetIds = [...new Set(targetIds)]
-            const newLinks = await db_replace_outgoing_links(projectId, entry.id, uniqueTargetIds)
-            setOutgoingLinks(newLinks)
-
-            const currentRelationMap = new Map(entryRelations.map((relation) => [relation.id, relation]))
-            const nextRelationIds = new Set(relationDrafts.map((item) => item.id).filter(Boolean) as string[])
-
             for (const draftRelation of relationDrafts) {
                 if (hasInvalidRelationDraft(draftRelation, entry.id)) {
                     setError('存在未完成的词条关系，请先选择目标词条。')
@@ -923,47 +866,23 @@ export default function EntryEditor({
                     setSaving(false)
                     return
                 }
-
-                const payload = resolveRelationPayload(entry.id, draftRelation)
-                const existing = draftRelation.id ? currentRelationMap.get(draftRelation.id) : undefined
-
-                if (!existing) {
-                    await db_create_relation({
-                        projectId,
-                        aId: payload.aId,
-                        bId: payload.bId,
-                        relation: payload.relation,
-                        content: payload.content,
-                    })
-                    continue
-                }
-
-                const endpointChanged = existing.a_id !== payload.aId || existing.b_id !== payload.bId
-                if (endpointChanged) {
-                    await db_delete_relation(existing.id)
-                    await db_create_relation({
-                        projectId,
-                        aId: payload.aId,
-                        bId: payload.bId,
-                        relation: payload.relation,
-                        content: payload.content,
-                    })
-                    continue
-                }
-
-                if (existing.relation !== payload.relation || normalizeComparableText(existing.content ?? '') !== payload.content) {
-                    await db_update_relation({
-                        id: existing.id,
-                        relation: payload.relation,
-                        content: payload.content,
-                    })
-                }
             }
 
-            for (const existingRelation of entryRelations) {
-                if (nextRelationIds.has(existingRelation.id)) continue
-                await db_delete_relation(existingRelation.id)
-            }
+            const savedBundle = await db_save_entry_bundle({
+                id: entry.id,
+                projectId,
+                categoryId: draft.categoryId,
+                title: trimmedTitle,
+                summary: trimmedSummary || null,
+                content: normalizedContent === '' ? null : normalizedContent,
+                type: draft.type,
+                tags: buildEntryTagsPayload(draft.tags, entryTags.localTagSchemas, entry.tags),
+                images: draft.images,
+                relationDrafts,
+            })
+            setOutgoingLinks(savedBundle.outgoingLinks)
+            setIncomingLinks(savedBundle.incomingLinks)
+            setEntryRelations(savedBundle.relations)
 
             const refreshed = await reloadEntryFromDatabase('save')
             if (refreshed.title !== entry.title) {
@@ -979,15 +898,18 @@ export default function EntryEditor({
                 setAutoSaveStatus('已自动保存')
             }
         } catch (e) {
-            setError(String(e))
+            const message = String(e)
+            setError(message)
             if (trigger === 'auto') {
                 lastAutoSaveAttemptAtRef.current = Date.now()
-                setAutoSaveStatus('自动保存失败，可手动重试')
+                setAutoSaveStatus(message.includes('同名词条') ? '标题重复，暂不自动保存' : '自动保存失败，可手动重试')
+            } else if (message.includes('同名词条')) {
+                void showAlert(message, 'warning', 'toast', 1800)
             }
         } finally {
             setSaving(false)
         }
-    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, entryRelations, relationDrafts, onTitleChange, onSaved, showAlert, reloadEntryFromDatabase])
+    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, relationDrafts, onTitleChange, onSaved, showAlert, reloadEntryFromDatabase])
 
     useEffect(() => {
         canSaveRef.current = canSave

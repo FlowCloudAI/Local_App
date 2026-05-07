@@ -199,6 +199,25 @@ export interface UpdateEntryInput {
     images?: FCImage[] | null
 }
 
+export interface SaveEntryRelationDraftInput {
+    id?: string | null
+    otherEntryId?: string | null
+    direction: 'incoming' | 'outgoing' | 'two_way'
+    content?: string | null
+}
+
+export interface SaveEntryBundleInput extends UpdateEntryInput {
+    projectId: string
+    relationDrafts: SaveEntryRelationDraftInput[]
+}
+
+export interface SaveEntryBundleResponse {
+    entry: Entry
+    outgoingLinks: EntryLink[]
+    incomingLinks: EntryLink[]
+    relations: EntryRelation[]
+}
+
 export interface CreateTagSchemaInput {
     projectId: string
     name: string
@@ -233,6 +252,27 @@ export interface UpdateRelationInput {
     id: string
     relation?: RelationDirection | null
     content?: string | null
+}
+
+export interface RelationGraphNode {
+    id: string
+    label: string
+    title: string
+    summary: string
+    coverImage?: string | null
+}
+
+export interface RelationGraphEdge {
+    id: string
+    source: string
+    target: string
+    label: string
+    kind: RelationDirection
+}
+
+export interface RelationGraphData {
+    nodes: RelationGraphNode[]
+    edges: RelationGraphEdge[]
 }
 
 export const log_message = (level: LogLevel, message: string) =>
@@ -384,6 +424,35 @@ export const db_update_entry = (input: UpdateEntryInput) => {
     })
 }
 
+export const db_save_entry_bundle = (input: SaveEntryBundleInput) => {
+    const {
+        id,
+        projectId,
+        categoryId,
+        title,
+        summary,
+        content,
+        type,
+        tags,
+        images,
+        relationDrafts,
+    } = input
+    return command<SaveEntryBundleResponse>('db_save_entry_bundle', {
+        input: {
+            id,
+            projectId,
+            categoryId,
+            title,
+            summary: summary ?? null,
+            content,
+            type,
+            tags,
+            images,
+            relationDrafts,
+        },
+    })
+}
+
 export const db_delete_entry = (id: string) => command<void>('db_delete_entry', {id})
 
 export const db_create_entries_bulk = (entries: CreateEntryInput[]) =>
@@ -474,6 +543,9 @@ export const db_list_relations_for_entry = (entryId: string) =>
 
 export const db_list_relations_for_project = (projectId: string) =>
     command<EntryRelation[]>('db_list_relations_for_project', {projectId})
+
+export const db_get_relation_graph_data = (projectId: string) =>
+    command<RelationGraphData>('db_get_relation_graph_data', {projectId})
 
 export const db_update_relation = ({id, relation, content}: UpdateRelationInput) =>
     command<EntryRelation>('db_update_relation', {id, relation, content})

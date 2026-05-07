@@ -1,5 +1,4 @@
 pub(super) use crate::{AppState, NetworkState, PathsState};
-pub(super) use git2::{BranchType, Oid, Repository, Sort};
 pub(super) use serde::Serialize;
 pub(super) use serde_json::Value;
 pub(super) use std::collections::BTreeSet;
@@ -10,10 +9,11 @@ pub(super) use tauri::{AppHandle, State, Window};
 pub(super) use tauri_plugin_opener::OpenerExt;
 pub(super) use tokio::sync::Mutex;
 pub(super) use uuid::Uuid;
+#[cfg(not(target_os = "android"))]
+pub(super) use worldflow_core::WorldflowError;
 pub(super) use worldflow_core::{
-    models::*, AppendResult, CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps,
-    IdeaNoteOps, ProjectOps, SnapshotBranchInfo, SnapshotInfo, SqliteDb, TagSchemaOps,
-    WorldflowError,
+    models::*, CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps, IdeaNoteOps,
+    ProjectOps, SqliteDb, TagSchemaOps,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

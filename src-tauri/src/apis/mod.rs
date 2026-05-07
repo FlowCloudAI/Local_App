@@ -7,5 +7,6 @@ pub mod layout;
 pub mod map;
 pub mod map_persistence;
 pub mod plugins;
+pub mod templates;
 pub mod webview_control;
 pub mod worldflow;

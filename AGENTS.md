@@ -21,25 +21,27 @@
 
 ## 技术栈
 
-| 层级     | 技术                                                           |
-|--------|--------------------------------------------------------------|
-| 前端框架   | React 19 + TypeScript 5.9                                    |
-| 构建工具   | Vite 6                                                       |
-| UI 组件库 | `flowcloudai-ui`（内部私有包）                                      |
-| 国际化    | `i18next` + `react-i18next`，支持 `zh-CN` / `en-US`             |
-| 后端框架   | Tauri 2 + Rust (Edition 2024)                                |
-| 异步运行时  | `tokio` (full features)                                      |
-| 数据库    | `SQLite`，通过 `worldflow_core`  crate 封装访问                     |
-| AI 客户端 | `flowcloudai_client` crate，支持 WASM 插件                        |
-| 状态管理   | React Hooks（无 Redux / Zustand）                               |
-| 代码检查   | ESLint 9 + `typescript-eslint` + `eslint-plugin-react-hooks` |
+| 层级     | 技术                                                                                           |
+|--------|----------------------------------------------------------------------------------------------|
+| 前端框架   | React 19 + TypeScript 5.9                                                                    |
+| 构建工具   | Vite 6                                                                                       |
+| UI 组件库 | `flowcloudai-ui`（内部私有包）                                                                      |
+| 国际化    | `i18next` + `react-i18next`，支持 `zh-CN` / `en-US`                                             |
+| 后端框架   | Tauri 2 + Rust (Edition 2024)                                                                |
+| 异步运行时  | `tokio` (rt-multi-thread, sync, time, fs)                                                    |
+| 数据库    | `SQLite`，通过 `worldflow_core`  crate 封装访问                                                     |
+| AI 客户端 | `flowcloudai_client` crate，支持 WASM 插件                                                        |
+| 状态管理   | React Hooks（无 Redux / Zustand）                                                               |
+| 代码检查   | ESLint 9 + `typescript-eslint` + `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh` |
 
 ### 关键外部依赖
 
-- **前端**：`@tauri-apps/api`、`@tauri-apps/plugin-*`、`@uiw/react-md-editor`、`@deck.gl/widgets`、`react-window`
-- **后端**：`tauri`、`tokio`、`serde`、`anyhow`、`reqwest`、`keyring`、`uuid`、`zip`、`scraper`、`quick-xml`
-- **私有 Git 依赖**：
-    - `worldflow_core`：`ssh://git@github.com/FlowCloudAI/Worldflow_Core`
+- **前端**：`@tauri-apps/api`、`@tauri-apps/plugin-*`、`@uiw/react-md-editor`、`@deck.gl/core`/`layers`/`react`/`widgets`、
+  `@luma.gl/shadertools`、`react-window`、`classnames`、`react-dropzone`、`i18next-browser-languagedetector`
+- **后端**：`tauri`、`tokio`、`serde`、`serde_json`、`anyhow`、`reqwest`、`keyring`、`uuid`、`zip`、`scraper`、`futures`、`log`、
+  `chrono`、`semver`、`moka`、`tera`、`git2`、`ego-tree`、`htmd`、`base64`、`urlencoding`、`mime_guess`
+- **私有依赖**：
+    - `worldflow_core`：本地路径 `vendor/worldflow_core`
     - `flowcloudai_client`：`ssh://git@github.com/FlowCloudAI/AI_Client_Core`
 
 ---
@@ -50,18 +52,42 @@
 flowcloudai_app/
 ├── src/                      # 前端源码
 │   ├── api/                  # Tauri invoke 封装（与后端 apis 模块一一对应）
-│   ├── components/           # React 组件
-│   │   ├── project-editor/   # 项目编辑器子组件
-│   │   └── hooks/            # 组件级自定义 Hooks
+│   ├── app/                  # 应用根组件（含标签页、侧边栏、窗口控制）
+│   │   ├── desktop/          # 桌面端布局组件
+│   │   ├── index/            # 应用入口与根组件（AppRoot）
+│   │   └── mobile/           # 移动端布局组件
 │   ├── contexts/             # 前端上下文（如 AiControllerTypes）
+│   ├── features/             # 按功能域组织的 React 组件
+│   │   ├── about/            # 关于页面
+│   │   ├── ai-chat/          # AI 对话助手
+│   │   ├── entries/          # 词条系统
+│   │   ├── maps/             # 地图与形状编辑器
+│   │   ├── plugins/          # 插件管理
+│   │   ├── project-editor/   # 项目编辑器
+│   │   ├── projects/         # 项目列表与创建
+│   │   ├── relation-graph/   # 词条关系图
+│   │   └── snapshots/        # 快照面板
 │   ├── hooks/                # 全局自定义 Hooks
 │   ├── i18n/                 # 国际化配置与语言包
 │   ├── pages/                # 页面级组件
-│   ├── App.tsx               # 根组件（含标签页、侧边栏、窗口控制）
+│   ├── shared/               # 共享组件与工具
+│   ├── App.css               # 根组件样式
 │   └── main.tsx              # 应用入口（主题预加载后挂载 React）
 ├── src-tauri/                # Tauri / Rust 后端
 │   ├── src/
 │   │   ├── apis/             # Tauri Commands（暴露给前端的 API）
+│   │   │   ├── ai_client/    # AI 会话、媒体、工具调用
+│   │   │   ├── plugins/      # 本地/远程插件与市场
+│   │   │   ├── worldflow/    # 项目、词条、标签、关系等数据操作
+│   │   │   ├── ai_character.rs
+│   │   │   ├── ai_contradiction.rs
+│   │   │   ├── ai_summary.rs
+│   │   │   ├── app_settings.rs
+│   │   │   ├── layout.rs
+│   │   │   ├── map.rs
+│   │   │   ├── map_persistence.rs
+│   │   │   ├── templates.rs
+│   │   │   └── webview_control.rs
 │   │   ├── ai_services/      # AI 服务：Artifact 解析、上下文构建、矛盾检测加载
 │   │   ├── layout/           # 确定性图布局引擎
 │   │   ├── map/              # 地图生成服务
@@ -70,7 +96,7 @@ flowcloudai_app/
 │   │   ├── reports/          # 报告生成（矛盾报告、摘要结果）
 │   │   ├── lib.rs            # Tauri Builder 配置与状态初始化
 │   │   ├── main.rs           # 程序入口
-│   │   ├── prompt.rs         # Prompt 模板
+│   │   ├── template.rs       # Tera 模板引擎与 Prompt 模板
 │   │   ├── settings.rs       # 应用设置与密钥存取
 │   │   └── state.rs          # 全局状态定义（AiState、AppState 等）
 │   ├── capabilities/         # Tauri 权限配置
@@ -113,8 +139,9 @@ npm run lint
 
 ### Tauri 构建说明
 
-- `tauri.conf.json` 中配置的包目标为 `nsis`（Windows 安装程序）。
-- 应用窗口为无边框（`decorations: false`）、透明背景（`transparent: true`），最小化 / 最大化 / 关闭按钮由前端 `App.tsx` 自行实现。
+- `tauri.conf.json` 中配置的包目标包含 `nsis`（Windows 安装程序）、`deb` 和 `appimage`（Linux）。
+- 应用窗口为无边框（`decorations: false`）、透明背景（`transparent: true`），最小化 / 最大化 / 关闭按钮由前端
+  `app/index/AppRoot` 自行实现。
 - 发布模式（release）下会自动禁用 WebView 右键菜单。
 - 程序强制单实例运行，重复启动会退出。
 
@@ -124,7 +151,24 @@ npm run lint
 
 ### 前端调用后端
 
-所有前端 API 封装位于 `src/api/`，统一通过 `src/api/base.ts` 中的 `command` 函数调用 Tauri Invoke：
+所有前端 API 封装位于 `src/api/`，统一通过 `src/api/base.ts` 中的 `command` 函数调用 Tauri Invoke。`src/api/` 下各文件与后端
+`apis/` 模块一一对应：
+
+| 文件                 | 对应后端模块                     |
+|--------------------|----------------------------|
+| `ai_client.ts`     | `apis/ai_client/`          |
+| `plugins.ts`       | `apis/plugins/`            |
+| `worldflow.ts`     | `apis/worldflow/`          |
+| `app_settings.ts`  | `apis/app_settings.rs`     |
+| `layout.ts`        | `apis/layout.rs`           |
+| `map.ts`           | `apis/map.rs`              |
+| `templates.ts`     | `apis/templates.rs`        |
+| `webview.ts`       | `apis/webview_control.rs`  |
+| `contradiction.ts` | `apis/ai_contradiction.rs` |
+| `snapshot.ts`      | —                          |
+| `api_usage.ts`     | —                          |
+| `idea_note.ts`     | —                          |
+| `platform.ts`      | —                          |
 
 ```ts
 import {invoke} from '@tauri-apps/api/core'

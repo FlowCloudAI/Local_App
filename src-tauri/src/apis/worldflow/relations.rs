@@ -1,4 +1,32 @@
 use super::common::*;
+use std::collections::HashSet;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationGraphNode {
+    pub id: String,
+    pub label: String,
+    pub title: String,
+    pub summary: String,
+    pub cover_image: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationGraphEdge {
+    pub id: String,
+    pub source: String,
+    pub target: String,
+    pub label: String,
+    pub kind: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationGraphData {
+    pub nodes: Vec<RelationGraphNode>,
+    pub edges: Vec<RelationGraphEdge>,
+}
 
 #[tauri::command]
 pub async fn db_create_relation(
@@ -67,6 +95,50 @@ pub async fn db_list_relations_for_project(
     db.list_relations_for_project(&project_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// 聚合关系图渲染所需的节点和边，避免前端重复拉取与转换。
+#[tauri::command]
+pub async fn db_get_relation_graph_data(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    project_id: String,
+) -> Result<RelationGraphData, String> {
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    let entries = db
+        .list_entries(&project_id, EntryFilter::default(), 1000, 0)
+        .await
+        .map_err(|e| e.to_string())?;
+    let relations = db
+        .list_relations_for_project(&project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let node_ids = entries.iter().map(|entry| entry.id).collect::<HashSet<_>>();
+
+    Ok(RelationGraphData {
+        nodes: entries
+            .into_iter()
+            .map(|entry| RelationGraphNode {
+                id: entry.id.to_string(),
+                label: entry.title.clone(),
+                title: entry.title,
+                summary: entry.summary.unwrap_or_else(|| "暂无摘要".to_string()),
+                cover_image: entry.cover,
+            })
+            .collect(),
+        edges: relations
+            .into_iter()
+            .filter(|relation| node_ids.contains(&relation.a_id) && node_ids.contains(&relation.b_id))
+            .map(|relation| RelationGraphEdge {
+                id: relation.id.to_string(),
+                source: relation.a_id.to_string(),
+                target: relation.b_id.to_string(),
+                label: relation.content,
+                kind: relation.relation.as_str().to_string(),
+            })
+            .collect(),
+    })
 }
 
 /// 更新词条关系的方向或描述内容

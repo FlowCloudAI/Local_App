@@ -1,6 +1,7 @@
 import {type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
 import {
+    ai_build_character_project_snapshot,
     ai_close_session,
     ai_delete_conversation,
     ai_disable_tool,
@@ -15,28 +16,14 @@ import {
     ai_set_task_context,
     ai_update_session,
     type AppSettings,
-    type Category,
-    type CharacterChatCategorySnapshot,
-    type CharacterChatEntrySnapshot,
-    type CharacterChatProjectSnapshot,
-    type CharacterChatRelationSnapshot,
-    type CharacterChatTagSchemaSnapshot,
     type CharacterConversationMeta,
     db_get_entry,
     db_get_project,
-    db_list_categories,
-    db_list_entries,
-    db_list_relations_for_project,
-    db_list_tag_schemas,
-    type Entry,
     ENTRY_UPDATED,
-    type EntryRelation,
-    type EntryTag,
     type EntryUpdatedEvent,
     type PluginInfo,
     setting_get_settings,
     type StoredMessage,
-    type TagSchema,
     type TaskContextPayload,
     type ToolStatus,
 } from '../../../api'
@@ -48,9 +35,7 @@ import type {
     ReportConversationContext,
     SessionParams,
 } from '../model/AiControllerTypes'
-import {getCoverImage, normalizeEntryImages, toEntryImageSrc} from '../../entries/lib/entryImage'
-import {normalizeComparableType, normalizeEntryContent} from '../../entries/lib/entryCommon'
-import {readCharacterVoiceConfigFromTags} from '../../entries/lib/characterVoice'
+import {toEntryImageSrc} from '../../entries/lib/entryImage'
 
 const generateTitleFromMessage = (content: string): string => {
     const cleaned = content.trim().replace(/\s+/g, ' ')
@@ -59,12 +44,6 @@ const generateTitleFromMessage = (content: string): string => {
 }
 
 const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
-const PROJECT_SCAN_LIMIT = 1000
-const CHARACTER_CONTENT_LIMIT = 8000
-const ENTRY_CONTENT_LIMIT = 2400
-const ENTRY_SUMMARY_LIMIT = 600
-const RELATION_CONTENT_LIMIT = 400
-const TAG_VALUE_LIMIT = 160
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
 
 interface StoredCharacterConversationMeta {
@@ -178,166 +157,6 @@ function buildCharacterConversationMetaMap(conversations: Conversation[]): Recor
         }
     })
     return metadata
-}
-
-function truncateText(value: string | null | undefined, limit: number): string {
-    if (typeof value !== 'string') return ''
-    const normalized = value.trim()
-    if (!normalized) return ''
-    return normalized.length > limit ? `${normalized.slice(0, limit)}…` : normalized
-}
-
-function buildCategoryPathMap(categories: Category[]): Map<string, string[]> {
-    const categoryMap = new Map(categories.map((category) => [category.id, category]))
-    const pathMap = new Map<string, string[]>()
-
-    const resolvePath = (categoryId: string | null | undefined): string[] => {
-        if (!categoryId) return []
-        const cached = pathMap.get(categoryId)
-        if (cached) return cached
-
-        const path: string[] = []
-        const visited = new Set<string>()
-        let currentId: string | null = categoryId
-        while (currentId) {
-            if (visited.has(currentId)) break
-            visited.add(currentId)
-            const current = categoryMap.get(currentId)
-            if (!current) break
-            path.unshift(current.name)
-            currentId = current.parent_id ?? null
-        }
-        pathMap.set(categoryId, path)
-        return path
-    }
-
-    categories.forEach((category) => resolvePath(category.id))
-    return pathMap
-}
-
-function stringifyTagValue(value: EntryTag['value']): string {
-    if (value == null) return ''
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        return truncateText(String(value), TAG_VALUE_LIMIT)
-    }
-    return ''
-}
-
-function parseStringArray(value: unknown): string[] {
-    if (Array.isArray(value)) return value as string[]
-    if (typeof value === 'string' && value.trim().startsWith('[')) {
-        try {
-            const parsed = JSON.parse(value)
-            return Array.isArray(parsed) ? parsed : []
-        } catch {
-            return []
-        }
-    }
-    return []
-}
-
-function mapTagSchemas(schemas: TagSchema[]): CharacterChatTagSchemaSnapshot[] {
-    return schemas.map((schema) => ({
-        id: schema.id,
-        name: schema.name,
-        description: schema.description ?? null,
-        type: schema.type,
-        // SQLite 将数组列存为 JSON 文本，运行时实际可能是字符串，需要解析
-        target: parseStringArray(schema.target),
-    }))
-}
-
-function mapRelations(relations: EntryRelation[]): CharacterChatRelationSnapshot[] {
-    return relations.map((relation) => ({
-        id: relation.id,
-        fromEntryId: relation.a_id,
-        toEntryId: relation.b_id,
-        relation: relation.relation,
-        content: truncateText(relation.content, RELATION_CONTENT_LIMIT),
-    }))
-}
-
-function mapEntrySnapshot(entry: Entry, categoryPathMap: Map<string, string[]>, contentLimit: number): CharacterChatEntrySnapshot {
-    return {
-        id: entry.id,
-        title: entry.title,
-        summary: truncateText(entry.summary ?? '', ENTRY_SUMMARY_LIMIT) || null,
-        content: truncateText(normalizeEntryContent(entry), contentLimit) || null,
-        entryType: normalizeComparableType(entry.type),
-        categoryId: entry.category_id ?? null,
-        categoryPath: categoryPathMap.get(entry.category_id ?? '') ?? [],
-        tags: (entry.tags ?? [])
-            .map((tag) => {
-                const value = stringifyTagValue(tag.value)
-                return {
-                    schemaId: tag.schema_id ?? null,
-                    name: tag.name ?? tag.schema_id ?? '未命名标签',
-                    value,
-                }
-            })
-            .filter((tag) => tag.value),
-    }
-}
-
-async function buildCharacterProjectSnapshot(projectId: string, entryId: string): Promise<{
-    snapshot: CharacterChatProjectSnapshot
-    characterEntry: Entry
-    backgroundImageUrl: string | null
-    characterVoiceId: string | null
-    characterAutoPlay: boolean | null
-}> {
-    const [project, categories, tagSchemas, entryBriefs, relations, characterEntry] = await Promise.all([
-        db_get_project(projectId),
-        db_list_categories(projectId),
-        db_list_tag_schemas(projectId),
-        db_list_entries({projectId, limit: PROJECT_SCAN_LIMIT, offset: 0}),
-        db_list_relations_for_project(projectId),
-        db_get_entry(entryId),
-    ])
-
-    const detailResults = await Promise.all(
-        entryBriefs.map(async (brief) => {
-            try {
-                return await db_get_entry(brief.id)
-            } catch {
-                return null
-            }
-        }),
-    )
-    const allEntries = detailResults.filter((item): item is Entry => Boolean(item))
-    const categoryPathMap = buildCategoryPathMap(categories)
-    const targetSnapshot = mapEntrySnapshot(characterEntry, categoryPathMap, CHARACTER_CONTENT_LIMIT)
-    const entrySnapshots = allEntries.map((entry) => (
-        entry.id === characterEntry.id
-            ? targetSnapshot
-            : mapEntrySnapshot(entry, categoryPathMap, ENTRY_CONTENT_LIMIT)
-    ))
-    const backgroundImageUrl = toEntryImageSrc(getCoverImage(normalizeEntryImages(characterEntry.images))) ?? null
-    const characterVoiceConfig = readCharacterVoiceConfigFromTags(characterEntry.tags)
-
-    return {
-        snapshot: {
-            project: {
-                id: project.id,
-                name: project.name,
-                description: truncateText(project.description ?? '', ENTRY_SUMMARY_LIMIT) || null,
-            },
-            targetCharacter: targetSnapshot,
-            categories: categories.map((category): CharacterChatCategorySnapshot => ({
-                id: category.id,
-                name: category.name,
-                parentId: category.parent_id ?? null,
-                path: categoryPathMap.get(category.id) ?? [category.name],
-            })),
-            tagSchemas: mapTagSchemas(tagSchemas),
-            entries: entrySnapshots,
-            relations: mapRelations(relations),
-        },
-        characterEntry,
-        backgroundImageUrl,
-        characterVoiceId: characterVoiceConfig.voiceId,
-        characterAutoPlay: characterVoiceConfig.autoPlay,
-    }
 }
 
 const storedToMessages = (messages: StoredMessage[]): Message[] => {
@@ -911,9 +730,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             await session.closeSession()
         }
 
-        const built = await buildCharacterProjectSnapshot(projectId, entryId)
-        const characterType = normalizeComparableType(built.characterEntry.type)
-        if (characterType !== 'character') {
+        const built = await ai_build_character_project_snapshot(projectId, entryId)
+        if ((built.characterEntry.type ?? '').trim().toLowerCase() !== 'character') {
             throw new Error('当前词条不是角色类型，无法开启角色对话。')
         }
 
@@ -936,7 +754,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             mode: 'character',
             characterEntryId: entryId,
             characterName: built.characterEntry.title,
-            backgroundImageUrl: built.backgroundImageUrl,
+            backgroundImageUrl: toEntryImageSrc(built.backgroundImage) ?? null,
             characterVoiceId: built.characterVoiceId,
             characterAutoPlay: built.characterAutoPlay,
             reportContext: null,
