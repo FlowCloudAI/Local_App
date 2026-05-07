@@ -1,4 +1,4 @@
-import type {MapDeckPreviewTooltip, MapPreviewKeyLocation, MapPreviewScene, MapPreviewShape,} from 'flowcloudai-ui'
+import type {MapDeckPreviewTooltip, MapPreviewKeyLocation, MapPreviewScene, MapPreviewShape,} from '../../../components/MapShapeEditor'
 import type {MapStyleDefinition} from './types'
 import {createRicePaperTexture} from './textures'
 import {createInkBleedEffect} from './effects'

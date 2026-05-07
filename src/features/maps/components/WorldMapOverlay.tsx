@@ -7,7 +7,7 @@ import {
     type MapShapeEditorDraft,
     type MapShapeEditorViewBox,
     MapShapeSvgEditor,
-} from 'flowcloudai-ui'
+} from './MapShapeEditor'
 import './WorldMapOverlay.css'
 
 export interface WorldMapOverlayMarker {

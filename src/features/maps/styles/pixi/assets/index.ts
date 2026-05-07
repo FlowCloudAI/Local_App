@@ -1,4 +1,4 @@
-import type {MapPreviewKeyLocationIcon, MapRgbaColor} from 'flowcloudai-ui'
+import type {MapPreviewKeyLocationIcon, MapRgbaColor} from '../../../components/MapShapeEditor'
 import {createParchmentTexture, createRicePaperTexture, svgToDataUrl} from '../../common'
 import type {
     PixiEffectPluginId,

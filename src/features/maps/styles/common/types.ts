@@ -6,7 +6,7 @@ import type {
     MapPreviewScene,
     MapPreviewShapeStyle,
     MapRgbaColor,
-} from 'flowcloudai-ui'
+} from '../../components/MapShapeEditor'
 
 export type MapStyleParameterValue = string | number | boolean | null
 export type MapStyleParameterRecord = Record<string, MapStyleParameterValue | MapStyleParameterValue[]>

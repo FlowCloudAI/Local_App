@@ -10,7 +10,7 @@ import {useEffect, useMemo, useState} from 'react'
 import type {TextStyleOptions} from 'pixi.js'
 import {Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
-import type {MapPixiPreviewOverlayContext, MapPreviewKeyLocation, MapRgbaColor} from 'flowcloudai-ui'
+import type {MapPixiPreviewOverlayContext, MapPreviewKeyLocation, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {
     PixiCoastlineLayerStyle,
     PixiDecorationPluginId,

@@ -1,4 +1,4 @@
-import type {MapPreviewScene} from 'flowcloudai-ui'
+import type {MapPreviewScene} from '../../../../components/MapShapeEditor'
 import type {DecoSymbol} from '../types'
 
 /** 确定性伪随机，基于 seed，保证相同 scene 生成相同符号位置 */

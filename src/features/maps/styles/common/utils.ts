@@ -1,4 +1,4 @@
-import type {MapPreviewBackgroundImage, MapRgbaColor} from 'flowcloudai-ui'
+import type {MapPreviewBackgroundImage, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {MapStyleBackgroundImageToken, MapStylePaintToken, MapStyleStrokeToken} from './types'
 
 function clampAlpha(opacity: number | undefined, fallback = 255): number {

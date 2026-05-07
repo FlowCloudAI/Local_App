@@ -6,7 +6,7 @@ import type {
     MapPreviewKeyLocationIcon,
     MapPreviewScene,
     MapPreviewShape,
-} from 'flowcloudai-ui'
+} from '../../../components/MapShapeEditor'
 
 /** 支持的地图风格 */
 export type MapStyle = 'flat' | 'tolkien' | 'ink'

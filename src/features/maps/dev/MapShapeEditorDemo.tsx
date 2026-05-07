@@ -1,7 +1,7 @@
 import {useMemo, useState} from 'react'
+import {Button, RollingBox} from 'flowcloudai-ui'
 import {
     buildPreviewSceneFromDraft,
-    Button,
     createEmptyShapeDraft,
     createInitialMapShapeEditorViewBox,
     createMapShapeEditorLocalId,
@@ -16,10 +16,9 @@ import {
     type MapShapeEditorDraft,
     type MapShapeEditorViewBox,
     MapShapeSvgEditor,
-    RollingBox,
     submitMapShapeScene,
     validateMapEditorDraft,
-} from 'flowcloudai-ui'
+} from '../components/MapShapeEditor'
 import {type CoastlineParamsPayload, map_save_scene} from '../../../api'
 import './MapShapeEditorDemo.css'
 

@@ -1,4 +1,4 @@
-import type {MapKeyLocationRenderMode, MapPixiPreviewProps} from 'flowcloudai-ui'
+import type {MapKeyLocationRenderMode, MapPixiPreviewProps} from '../../components/MapShapeEditor'
 import type {
     MapStyleBackgroundImageToken,
     MapStyleCompiledBase,

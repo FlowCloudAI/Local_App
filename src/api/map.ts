@@ -1,4 +1,8 @@
-import type {MapPreviewBackgroundImage, MapShapeSaveRequest, MapShapeSaveResponse} from 'flowcloudai-ui'
+import type {
+    MapPreviewBackgroundImage,
+    MapShapeSaveRequest,
+    MapShapeSaveResponse,
+} from '../features/maps/components/MapShapeEditor'
 import {command} from './base'
 
 export type MapBackgroundImagePayload = MapPreviewBackgroundImage

@@ -1,6 +1,6 @@
 import {PathLayer, PolygonLayer} from '@deck.gl/layers'
 import type {Layer} from '@deck.gl/core'
-import type {MapDeckPreviewTooltip, MapPreviewKeyLocation, MapPreviewScene, MapPreviewShape,} from 'flowcloudai-ui'
+import type {MapDeckPreviewTooltip, MapPreviewKeyLocation, MapPreviewScene, MapPreviewShape,} from '../../../components/MapShapeEditor'
 import type {
     MapStyleDecorationContext,
     MapStyleDecorations,

@@ -1,4 +1,4 @@
-import type {MapPreviewScene} from 'flowcloudai-ui'
+import type {MapPreviewScene} from '../../../../components/MapShapeEditor'
 import type {DecoPath} from '../types'
 
 /**

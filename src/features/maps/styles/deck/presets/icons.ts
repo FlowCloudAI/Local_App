@@ -1,4 +1,4 @@
-import type {MapPreviewKeyLocationIcon} from 'flowcloudai-ui'
+import type {MapPreviewKeyLocationIcon} from '../../../components/MapShapeEditor'
 import {svgToDataUrl} from './utils'
 
 /**

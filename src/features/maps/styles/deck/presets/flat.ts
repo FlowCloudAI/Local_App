@@ -4,7 +4,7 @@ import type {
     MapPreviewKeyLocationIcon,
     MapPreviewScene,
     MapPreviewShape
-} from 'flowcloudai-ui'
+} from '../../../components/MapShapeEditor'
 import type {MapStyleDefinition} from './types'
 
 function buildLocationIcon(): MapPreviewKeyLocationIcon | null {

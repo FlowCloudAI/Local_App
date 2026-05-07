@@ -1,5 +1,10 @@
 import {type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
+    RollingBox,
+    useAlert,
+    useContextMenu,
+} from 'flowcloudai-ui'
+import {
     buildPreviewSceneFromDraft,
     createEmptyShapeDraft,
     createInitialMapShapeEditorViewBox,
@@ -10,11 +15,8 @@ import {
     type MapShapeEditorDraft,
     MapShapeViewport,
     type MapShapeViewportRenderer,
-    RollingBox,
-    useAlert,
-    useContextMenu,
     validateMapEditorDraft,
-} from 'flowcloudai-ui'
+} from './MapShapeEditor'
 import {
     type CoastlineParamsPayload,
     db_list_entries,
