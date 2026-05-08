@@ -2,12 +2,12 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import {
     db_create_entry,
+    db_list_all_entry_types,
     db_list_entries,
     db_search_entries,
-    db_list_all_entry_types,
     type EntryBrief,
-    type EntryTypeView,
     entryTypeKey,
+    type EntryTypeView,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobilePage} from '../usePageStack'
@@ -100,7 +100,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                 <Input
                     placeholder="搜索词条…"
                     value={searchText}
-                    onChange={handleSearch}
+                    onValueChange={handleSearch}
                     style={{flex: 1}}
                 />
                 <Button size="sm" onClick={handleCreateEntry}>新建</Button>

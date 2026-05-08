@@ -491,7 +491,7 @@ export default function SnapshotPanel({
                             <Input
                                 placeholder="新分支名称，例如 feature/世界观重写"
                                 value={newBranchName}
-                                onChange={setNewBranchName}
+                                onValueChange={setNewBranchName}
                             />
                             <Button
                                 variant="outline"

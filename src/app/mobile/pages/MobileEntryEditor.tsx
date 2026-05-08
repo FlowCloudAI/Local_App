@@ -1,13 +1,13 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {
-    db_get_entry,
-    db_list_categories,
-    db_list_all_entry_types,
-    db_update_entry,
     type Category,
-    type EntryTypeView,
+    db_get_entry,
+    db_list_all_entry_types,
+    db_list_categories,
+    db_update_entry,
     entryTypeKey,
+    type EntryTypeView,
 } from '../../../api'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -106,7 +106,7 @@ export default function MobileEntryEditor({pop, replace, setAiFocus, params}: Pr
             <Input
                 placeholder="词条标题"
                 value={title}
-                onChange={v => {
+                onValueChange={v => {
                     setTitle(v)
                 }}
                 style={{marginBottom: 12, fontWeight: 600, fontSize: 'var(--fc-font-size-lg)'}}
@@ -138,7 +138,7 @@ export default function MobileEntryEditor({pop, replace, setAiFocus, params}: Pr
             <Input
                 placeholder="摘要（可选）"
                 value={summary}
-                onChange={v => {
+                onValueChange={v => {
                     setSummary(v)
                 }}
                 style={{marginBottom: 12}}

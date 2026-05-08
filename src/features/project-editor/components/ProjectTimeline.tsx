@@ -369,8 +369,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                         <RollingBox
                             ref={eventStripRef}
                             className="project-timeline__event-strip"
-                            horizontal
-                            vertical={false}
+                            axis="x"
                             thumbSize="thin"
                             showThumb="auto"
                             interceptWheel={handleEventStripWheelIntercept}

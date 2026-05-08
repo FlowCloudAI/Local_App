@@ -156,7 +156,7 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                             className="project-list-search"
                             placeholder="搜索项目名称或描述…"
                             value={searchText}
-                            onChange={setSearchText}
+                            onValueChange={setSearchText}
                         />
                         <div className="project-list-sort-tabs">
                             {SORT_OPTIONS.map(option => (

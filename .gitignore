@@ -28,7 +28,6 @@ package-lock.json
 *.sln
 *.sw?
 .claude/
-package-lock.json
 src-tauri/gen/.idea/
 src-tauri/gen/android/.idea/
 src-tauri/gen/android/.gradle/

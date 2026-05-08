@@ -833,7 +833,7 @@ export default function DesktopApp() {
                     bottomItems={bottomItems}
                     selectedKey={selectedKey}
                     collapsed={collapsed}
-                    width={150}
+                    width={130}
                     collapsedWidth={50}
                     onSelect={handleSideBarSelect}
                     onCollapse={setCollapsed}

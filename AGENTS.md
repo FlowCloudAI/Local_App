@@ -41,7 +41,7 @@
 - **后端**：`tauri`、`tokio`、`serde`、`serde_json`、`anyhow`、`reqwest`、`keyring`、`uuid`、`zip`、`scraper`、`futures`、`log`、
   `chrono`、`semver`、`moka`、`tera`、`git2`、`ego-tree`、`htmd`、`base64`、`urlencoding`、`mime_guess`
 - **私有依赖**：
-    - `worldflow_core`：本地路径 `vendor/worldflow_core`
+    - `worldflow_core`：Git 依赖 `ssh://git@github.com/FlowCloudAI/Worldflow_Core`
     - `flowcloudai_client`：`ssh://git@github.com/FlowCloudAI/AI_Client_Core`
 
 ---

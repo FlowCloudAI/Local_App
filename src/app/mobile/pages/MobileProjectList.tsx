@@ -107,7 +107,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 <Input
                     placeholder="搜索项目…"
                     value={searchText}
-                    onChange={setSearchText}
+                    onValueChange={setSearchText}
                     style={{flex: 1}}
                 />
                 <Button size="sm" onClick={() => setCreatorOpen(true)}>新建</Button>

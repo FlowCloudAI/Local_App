@@ -128,7 +128,7 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
                         <Input
                             type="password"
                             value={password}
-                            onChange={value => setPassword(String(value))}
+                            onValueChange={value => setPassword(String(value))}
                             placeholder="请输入上传密码"
                             disabled={submitting}
                         />

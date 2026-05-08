@@ -212,8 +212,7 @@ export default function EntryImageLightbox({
         return (
             <RollingBox
                 className="entry-editor-lightbox__gallery"
-                horizontal
-                vertical={false}
+                axis="x"
                 thumbSize="thin"
             >
                 {renderThumbItems()}

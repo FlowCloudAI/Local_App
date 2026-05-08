@@ -1170,7 +1170,7 @@ export default function Settings({onBack}: SettingsProps) {
                                     <Input
                                         placeholder="搜索名称或作者…"
                                         value={searchText}
-                                        onChange={setSearchText}
+                                        onValueChange={setSearchText}
                                         className="plugins-search"
                                     />
                                     <div className="plugins-kind-tabs">
@@ -1395,7 +1395,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                                 <Input
                                                                     type="password"
                                                                     value={isExpanded ? apiKeyDraft : ''}
-                                                                    onChange={(value) => setApiKeyDraft(String(value))}
+                                                                    onValueChange={(value) => setApiKeyDraft(String(value))}
                                                                     placeholder={`请输入 ${plugin.name} 的 API Key`}
                                                                     style={{flex: 1}}
                                                                 />
