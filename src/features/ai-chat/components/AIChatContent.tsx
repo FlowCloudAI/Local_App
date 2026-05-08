@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
+import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {MessageBox, RollingBox, useAlert} from 'flowcloudai-ui'
 import {ai_list_plugins, ai_play_tts, type PluginInfo, setting_get_settings, setting_has_api_key} from '../../../api'
 import type {AiContextValue} from '../model/AiControllerTypes'
@@ -83,11 +83,67 @@ export default function AIChatContent({
     const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const focusContextRef = useRef<HTMLDivElement>(null)
+    const focusChipTextRefs = useRef<Record<string, HTMLSpanElement | null>>({})
     const lastScrollTopRef = useRef(0)
     const roleplayAutoPlayRef = useRef<string | null>(null)
+    const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
+    const showFocusContext = !isCharacterConversation && !isReportConversation
+    const focusContextItems = useMemo(() => {
+        const focusContext = ctx.focusContext
+        return [
+            focusContext.projectId
+                ? {key: 'project', label: `项目：${focusContext.projectName ?? '加载中'}`}
+                : {key: 'project', label: '项目：未引用'},
+            focusContext.entryId
+                ? {key: 'entry', label: `词条：${focusContext.entryTitle ?? '加载中'}`}
+                : null,
+        ].filter((item): item is { key: string; label: string } => Boolean(item))
+    }, [ctx.focusContext])
+    const sendDisabledReason = ctx.isStreaming
+        ? '正在生成中'
+        : !ctx.inputValue.trim()
+            ? '请输入消息'
+            : ''
+
+    useLayoutEffect(() => {
+        if (!showFocusContext) {
+            setOverflowingFocusChips({})
+            return
+        }
+
+        const measureOverflow = () => {
+            const nextState: Record<string, boolean> = {}
+            focusContextItems.forEach((item) => {
+                const element = focusChipTextRefs.current[item.key]
+                nextState[item.key] = Boolean(element && element.scrollWidth > element.clientWidth + 1)
+            })
+            setOverflowingFocusChips((current) => {
+                const currentKeys = Object.keys(current)
+                const nextKeys = Object.keys(nextState)
+                if (currentKeys.length !== nextKeys.length) return nextState
+                for (const key of nextKeys) {
+                    if (current[key] !== nextState[key]) return nextState
+                }
+                return current
+            })
+        }
+
+        measureOverflow()
+        const observer = new ResizeObserver(() => {
+            measureOverflow()
+        })
+        if (focusContextRef.current) observer.observe(focusContextRef.current)
+        focusContextItems.forEach((item) => {
+            const element = focusChipTextRefs.current[item.key]
+            if (element) observer.observe(element)
+        })
+
+        return () => observer.disconnect()
+    }, [focusContextItems, showFocusContext])
 
     useEffect(() => {
         if (!autoScroll) return
@@ -486,6 +542,27 @@ export default function AIChatContent({
                                 </svg>
                             </button>
                         </div>
+                        {showFocusContext && (
+                            <div className="ai-focus-context" aria-label="当前 AI 上下文" ref={focusContextRef}>
+                                {focusContextItems.map((item) => (
+                                    <span
+                                        key={item.key}
+                                        className="ai-focus-chip"
+                                        title={item.label}
+                                        data-overflow={overflowingFocusChips[item.key] ? 'true' : 'false'}
+                                    >
+                                        <span
+                                            className="ai-focus-chip__text"
+                                            ref={(element) => {
+                                                focusChipTextRefs.current[item.key] = element
+                                            }}
+                                        >
+                                            {item.label}
+                                        </span>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="ai-topbar-right">
                         <button
@@ -750,7 +827,7 @@ export default function AIChatContent({
                                             void ctx.sendMessage(ctx.inputValue)
                                         }}
                                         disabled={!ctx.inputValue.trim()}
-                                        title="发送"
+                                        title={sendDisabledReason || '发送'}
                                     >
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
                                              stroke="currentColor" strokeWidth="2">

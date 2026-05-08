@@ -492,6 +492,43 @@
     font-weight: var(--fc-font-weight-medium);
 }
 
+.ai-focus-context {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: hidden;
+    flex: 1;
+}
+
+.ai-focus-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 12rem;
+    min-width: 0;
+    flex-shrink: 1;
+    padding: 0.22rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 82%, transparent);
+    color: var(--fc-color-text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.25;
+    overflow: hidden;
+}
+
+.ai-focus-chip__text {
+    display: block;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.ai-focus-chip[data-overflow='true'] .ai-focus-chip__text {
+    -webkit-mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 1.2rem), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 1.2rem), transparent 100%);
+}
+
 /* ========== 消息容器 ========== */
 .ai-messages-container {
     flex: 1;
