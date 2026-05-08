@@ -1,6 +1,7 @@
 /* ── 布局 ───────────────────────────────────────────────────────────────── */
 
 .pe-layout {
+    --pe-content-min-width: 64rem;
     display: flex;
     height: 100%;
     overflow: hidden;
@@ -186,12 +187,13 @@
 
 .pe-content {
     flex: 1;
-    min-width: 0;
+    min-width: var(--pe-content-min-width);
     height: 100%;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     position: relative;
+    --pe-breadcrumb-height: 2.25rem;
     --pe-font-delta-title: 5px;
     --pe-font-delta-body: 3px;
     --pe-font-size-overview-title: calc(1.75rem + var(--pe-font-delta-title));
