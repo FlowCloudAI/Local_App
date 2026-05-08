@@ -205,6 +205,17 @@ export default function DesktopApp() {
         setTabs(prev => prev.map(tab => tab.key === tabKey ? {...tab, label: entry.title} : tab))
     }, [])
 
+    const handleProjectViewLabelChange = useCallback((projectId: string, label: string) => {
+        const tabKey = `proj-${projectId}`
+        setTabs((prev) => prev.map((tab) => {
+            if (tab.key !== tabKey || tab.label === label) return tab
+            return {
+                ...tab,
+                label,
+            }
+        }))
+    }, [])
+
     const handleEntryDirtyChange = useCallback((projectId: string, entryId: string, dirty: boolean) => {
         const tabKey = `entry-${projectId}-${entryId}`
         setEntryDirtyMap(prev => {
@@ -484,6 +495,9 @@ export default function DesktopApp() {
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
+    const activeEntryTitle = activeEntryMeta
+        ? String(tabs.find(tab => tab.key === activeKey)?.label ?? '')
+        : null
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
         recentPageKeys
@@ -738,9 +752,11 @@ export default function DesktopApp() {
                                             projectId={projectId}
                                             activeToolPanel={toolTabMap[activeKey]?.projectId === projectId ? toolTabMap[activeKey].panel : null}
                                             onOpenProjectPanel={handleOpenProjectTool}
+                                            onProjectViewLabelChange={handleProjectViewLabelChange}
                                             aiPluginId={aiController.selectedPlugin || null}
                                             aiModel={aiController.selectedModel || null}
                                             activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
+                                            activeEntryTitle={activeEntryMeta?.projectId === projectId ? activeEntryTitle : null}
                                             openEntryIds={openEntryIdsByProject[projectId] ?? []}
                                             onOpenEntry={handleOpenEntry}
                                             onEntryTitleChange={handleEntryTitleChange}

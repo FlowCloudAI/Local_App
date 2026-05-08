@@ -68,6 +68,7 @@ interface Props {
     aiPluginId?: string | null
     aiModel?: string | null
     activeEntryId?: string | null
+    activeEntryTitle?: string | null
     openEntryIds?: string[]
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onEntryTitleChange?: (projectId: string, entry: { id: string; title: string }) => void
@@ -83,12 +84,21 @@ interface Props {
     }) => void
     activeToolPanel?: ProjectPanel | null
     onOpenProjectPanel?: (panel: Exclude<ProjectPanel, 'overview'>, project: { id: string; name: string }) => void
+    onProjectViewLabelChange?: (projectId: string, label: string) => void
     onDeleteProject?: (projectId: string) => void
     onDeleteEntry?: (projectId: string, entryId: string) => void
 }
 
 type Selection = { kind: 'project' } | { kind: 'category'; id: string }
 type ProjectPanel = 'overview' | 'relation-graph' | 'timeline' | 'contradiction' | 'world-map'
+
+const PROJECT_PANEL_LABELS: Record<ProjectPanel, string> = {
+    overview: '项目概览',
+    'relation-graph': '关系图',
+    timeline: '时间线',
+    contradiction: '矛盾检测',
+    'world-map': '世界地图',
+}
 
 function getCategoryCacheKey(categoryId: string | null): string {
     return categoryId ?? ALL_ENTRIES_CACHE_KEY
@@ -120,19 +130,21 @@ function ProjectEditorInner({
                                 aiPluginId = null,
                                 aiModel = null,
                                 activeEntryId = null,
+                                activeEntryTitle = null,
                                 openEntryIds = [],
                                 onOpenEntry,
                                 onEntryTitleChange,
                                 onBackHome,
                                 onBackToProject,
                                 onEntryDirtyChange,
-                                onStartCharacterChat,
-                                onStartReportDiscussion,
-                                activeToolPanel = null,
-                                onOpenProjectPanel,
-                                onDeleteProject,
-                                onDeleteEntry,
-                            }: Props) {
+                                 onStartCharacterChat,
+                                 onStartReportDiscussion,
+                                 activeToolPanel = null,
+                                 onOpenProjectPanel,
+                                 onProjectViewLabelChange,
+                                 onDeleteProject,
+                                 onDeleteEntry,
+                             }: Props) {
     const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_PX)
     const [treeCollapsed, setTreeCollapsed] = useState(false)
     const [dividerDragging, setDividerDragging] = useState(false)
@@ -671,6 +683,50 @@ function ProjectEditorInner({
     const visibleEntryIds = useMemo(() => openEntryIds.slice(-10), [openEntryIds])
     const hasActiveEntry = Boolean(activeEntryId)
     const hasActiveTool = Boolean(activeToolPanel)
+    const selectedCategoryPathNames = useMemo(() => {
+        if (selection.kind !== 'category') return [] as string[]
+
+        const categoryMap = new Map(categories.map((category) => [category.id, category]))
+        const names: string[] = []
+        const visited = new Set<string>()
+        let current = categoryMap.get(selection.id) ?? null
+
+        while (current && !visited.has(current.id)) {
+            visited.add(current.id)
+            names.push(current.name)
+            current = current.parent_id ? (categoryMap.get(current.parent_id) ?? null) : null
+        }
+
+        names.reverse()
+        return names
+    }, [categories, selection])
+
+    const breadcrumbItems = useMemo(() => {
+        const items = ['项目', project?.name ?? '加载中']
+        if (selection.kind === 'category') {
+            items.push(...selectedCategoryPathNames)
+        }
+        if (activeEntryId) {
+            items.push(activeEntryTitle || '词条')
+            return items
+        }
+        if (activeToolPanel) {
+            items.push(PROJECT_PANEL_LABELS[activeToolPanel])
+            return items
+        }
+        return items
+    }, [activeEntryId, activeEntryTitle, activeToolPanel, project?.name, selectedCategoryPathNames, selection.kind])
+
+    const projectViewLabel = useMemo(() => {
+        const projectName = project?.name ?? '加载中'
+        if (selection.kind !== 'category') return projectName
+        if (selectedCategoryPathNames.length === 0) return `${projectName} · 分类`
+        return `${projectName} · ${selectedCategoryPathNames.join(' / ')}`
+    }, [project?.name, selectedCategoryPathNames, selection.kind])
+
+    useEffect(() => {
+        onProjectViewLabelChange?.(projectId, projectViewLabel)
+    }, [onProjectViewLabelChange, projectId, projectViewLabel])
 
     if (!project) {
         return <div className="pe-loading">加载中…</div>
@@ -731,6 +787,14 @@ function ProjectEditorInner({
             </div>
 
             <div className="pe-content">
+                <nav className="pe-breadcrumb" aria-label="当前位置">
+                    {breadcrumbItems.map((item, index) => (
+                        <React.Fragment key={`${item}-${index}`}>
+                            {index > 0 && <span className="pe-breadcrumb__sep">/</span>}
+                            <span className="pe-breadcrumb__item" title={item}>{item}</span>
+                        </React.Fragment>
+                    ))}
+                </nav>
                 <div className={`pe-project-view${hasActiveEntry || hasActiveTool ? '' : ' active'}`}>
                     {selection.kind === 'project' ? (
                         <ProjectOverview
