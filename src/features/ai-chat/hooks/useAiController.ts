@@ -65,8 +65,9 @@ function buildReportBootstrapPrompt(reportContext: ReportConversationContext, us
         reportContext.truncated
             ? '注意：这份报告的检测范围经过裁剪，若结论依赖额外资料，请明确说明证据可能不足。'
             : '这份报告覆盖的是当前选定范围内的资料。',
+        '除非用户明确要求，不要在自然语言回答中直接展示内部 ID；需要引用具体词条时，优先使用标准 Markdown 链接格式：[词条标题](entry://词条ID)。',
         `报告范围：${reportContext.scopeSummary}`,
-        `来源词条 ID：${reportContext.sourceEntryIds.join('、') || '无'}`,
+        `来源词条 ID（仅供定位）：${reportContext.sourceEntryIds.join('、') || '无'}`,
         '报告 JSON 如下：',
         reportContext.reportJson,
         '',
