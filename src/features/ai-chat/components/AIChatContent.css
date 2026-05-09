@@ -832,6 +832,7 @@
 }
 
 .ai-floating-input-inner {
+    position: relative;
     background: var(--fc-color-bg-elevated);
     border-radius: var(--fc-radius-xl);
     padding: var(--fc-space-md) var(--fc-space-lg);
@@ -883,6 +884,74 @@
 .ai-floating-textarea:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-popover {
+    position: absolute;
+    z-index: 180;
+    max-width: min(24rem, calc(100% - 1.5rem));
+    width: min(24rem, calc(100% - 2rem));
+    overflow: hidden;
+    user-select: text;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 3%);
+    box-shadow: 0 18px 48px color-mix(in srgb, var(--fc-color-bg) 30%, transparent);
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-popover__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    font-size: 0.74rem;
+    color: var(--fc-color-text-secondary);
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-popover__query {
+    color: var(--fc-color-text);
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-popover__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 18rem;
+    overflow-y: auto;
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.85rem 0.9rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-option:hover,
+.ai-floating-input-inner .entry-editor-wikilink-option.is-active {
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-option__title {
+    font-size: 0.86rem;
+    color: var(--fc-color-text);
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-option__meta,
+.ai-floating-input-inner .entry-editor-wikilink-empty {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--fc-color-text-secondary);
+}
+
+.ai-floating-input-inner .entry-editor-wikilink-empty {
+    padding: 0.9rem;
 }
 
 .ai-floating-footer {

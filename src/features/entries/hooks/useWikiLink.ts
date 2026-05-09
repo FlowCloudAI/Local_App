@@ -29,6 +29,7 @@ interface UseWikiLinkOptions {
     onContentChange: (nextContent: string) => void
     onCreateEntry: (title: string) => Promise<{ id: string; title: string } | null>
     onShowAlert: (message: string, type: 'success' | 'warning' | 'error') => void
+    canCreateEntry?: boolean
 }
 
 export default function useWikiLink({
@@ -41,6 +42,7 @@ export default function useWikiLink({
                                         onContentChange,
                                         onCreateEntry,
                                         onShowAlert,
+                                        canCreateEntry = true,
                                     }: UseWikiLinkOptions) {
     const [wikiDraft, setWikiDraft] = useState<WikiDraft | null>(null)
     const [wikiPopoverPosition, setWikiPopoverPosition] = useState<{ top: number; left: number }>({top: 16, left: 16})
@@ -106,14 +108,14 @@ export default function useWikiLink({
             title: item.title,
             categoryId: item.category_id ?? null,
         }))
-        if (!hasExactCategorySuggestion && wikiDraft?.query.trim()) {
+        if (canCreateEntry && !hasExactCategorySuggestion && wikiDraft?.query.trim()) {
             options.push({
                 kind: 'create',
                 title: wikiDraft.query.trim(),
             })
         }
         return options
-    }, [filteredLinkSuggestions, hasExactCategorySuggestion, wikiDraft])
+    }, [canCreateEntry, filteredLinkSuggestions, hasExactCategorySuggestion, wikiDraft])
 
     useEffect(() => {
         if (!wikiDraft) return

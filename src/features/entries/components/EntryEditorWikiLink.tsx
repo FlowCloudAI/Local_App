@@ -93,9 +93,11 @@ export default function EntryEditorWikiLink({
                     )
                 ))}
 
-                {!wikiLinkOptions.length && (hasExactCategorySuggestion || !wikiDraft.query.trim()) && (
+                {!wikiLinkOptions.length && (
                     <div className="entry-editor-wikilink-empty">
-                        {wikiDraft.query.trim() ? '没有更多匹配项' : '继续输入词条名以搜索'}
+                        {wikiDraft.query.trim()
+                            ? (hasExactCategorySuggestion ? '没有更多匹配项' : '没有匹配项')
+                            : '继续输入词条名以搜索'}
                     </div>
                 )}
             </div>

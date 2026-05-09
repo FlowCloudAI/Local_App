@@ -15,12 +15,16 @@ import type {AiContextValue} from '../model/AiControllerTypes'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
 import useLinkPreview from '../../entries/hooks/useLinkPreview'
+import useWikiLink from '../../entries/hooks/useWikiLink'
 import EntryEditorLinkPreview from '../../entries/components/EntryEditorLinkPreview'
+import EntryEditorWikiLink from '../../entries/components/EntryEditorWikiLink'
 import {
+    buildInternalEntryMarkdown,
     type InternalEntryLink,
     parseInternalEntryHref,
     resolveMarkdownAnchor,
 } from '../../entries/lib/entryMarkdown'
+import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './AIChatContent.css'
 
@@ -147,10 +151,13 @@ export default function AIChatContent({
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
     const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
+    const inputWikiContainerRef = useRef<HTMLDivElement | null>(null)
+    const inputWikiPopoverRef = useRef<HTMLDivElement | null>(null)
     const focusContextRef = useRef<HTMLDivElement>(null)
     const focusChipTextRefs = useRef<Record<string, HTMLSpanElement | null>>({})
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
+    const projectEntriesRef = useRef<EntryBrief[]>([])
     const lastScrollTopRef = useRef(0)
     const roleplayAutoPlayRef = useRef<string | null>(null)
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
@@ -200,6 +207,7 @@ export default function AIChatContent({
         projectEntriesLoadPromiseRef.current = (async () => {
             try {
                 const briefs = await db_list_entries({projectId: linkPreviewProjectId, limit: 1000, offset: 0})
+                projectEntriesRef.current = briefs
                 setProjectEntries(briefs)
                 projectEntriesStatusRef.current = 'loaded'
                 void ensureProjectEntryDetailsLoaded(briefs)
@@ -226,10 +234,26 @@ export default function AIChatContent({
     useEffect(() => {
         projectEntriesStatusRef.current = 'idle'
         projectEntriesLoadPromiseRef.current = null
+        projectEntriesRef.current = []
         setProjectEntries([])
         setEntryCache({})
         linkPreview.closeLinkPreview()
     }, [linkPreview.closeLinkPreview, linkPreviewProjectId])
+
+    const inputWikiLink = useWikiLink({
+        entryId: ctx.focusContext.entryId ?? '',
+        entryCategoryId: null,
+        projectEntries,
+        content: ctx.inputValue,
+        containerRef: inputWikiContainerRef,
+        popoverRef: inputWikiPopoverRef,
+        onContentChange: ctx.setInputValue,
+        onCreateEntry: async () => null,
+        onShowAlert: (message, type) => {
+            void showAlert(message, type, 'toast', 1600)
+        },
+        canCreateEntry: false,
+    })
     const sendDisabledReason = ctx.isStreaming
         ? '正在生成中'
         : !ctx.inputValue.trim()
@@ -402,7 +426,33 @@ export default function AIChatContent({
         }
     }, [resizeTextarea])
 
+    const standardizeInputWikiLinks = useCallback(async (content: string) => {
+        if (!content.includes('[[')) return content
+        if (!linkPreviewProjectId) return content
+        await ensureProjectEntriesLoaded()
+        const entries = projectEntriesRef.current
+        if (!entries.length) return content
+
+        return content.replace(/\[\[([^[\]\n]+?)]]/g, (match, rawTitle) => {
+            const title = String(rawTitle).trim()
+            if (!title) return match
+            const normalizedTitle = normalizeEntryLookupTitle(title)
+            const target = entries.find((entry) => normalizeEntryLookupTitle(entry.title) === normalizedTitle)
+            return target ? buildInternalEntryMarkdown(target.title, target.id) : match
+        })
+    }, [ensureProjectEntriesLoaded, linkPreviewProjectId])
+
+    const handleSendCurrentInput = useCallback(async () => {
+        const rawInput = ctx.inputValue
+        if (!rawInput.trim() || ctx.isStreaming) return
+        const nextInput = await standardizeInputWikiLinks(rawInput)
+        await ctx.sendMessage(nextInput)
+    }, [ctx, standardizeInputWikiLinks])
+
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        inputWikiLink.handleWikiKeyDown(event)
+        if (event.defaultPrevented) return
+
         if (
             event.key === 'ArrowLeft'
             || event.key === 'ArrowRight'
@@ -416,12 +466,23 @@ export default function AIChatContent({
         if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
             event.preventDefault()
             if (!ctx.inputValue.trim() || ctx.isStreaming) return
-            void ctx.sendMessage(ctx.inputValue)
+            void handleSendCurrentInput()
         }
     }
 
     const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-        if (event.target.value.length <= MAX_CHARS) ctx.setInputValue(event.target.value)
+        const nextValue = event.target.value
+        if (nextValue.length <= MAX_CHARS) {
+            ctx.setInputValue(nextValue)
+            if (nextValue.includes('[[')) {
+                void ensureProjectEntriesLoaded()
+            }
+            inputWikiLink.handleMarkdownCursorSync(event.currentTarget)
+            return
+        }
+
+        ctx.setInputValue(nextValue.slice(0, MAX_CHARS))
+        inputWikiLink.handleMarkdownCursorSync(event.currentTarget)
     }
 
     const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
@@ -902,7 +963,7 @@ export default function AIChatContent({
                 )}
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
-                    <div className="ai-floating-input-inner">
+                    <div className="ai-floating-input-inner" ref={inputWikiContainerRef}>
                         {ctx.editingMessageId && (
                             <div className="ai-edit-indicator">
                                 <span>正在编辑上一条消息</span>
@@ -919,8 +980,26 @@ export default function AIChatContent({
                             value={ctx.inputValue}
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
+                            onKeyUp={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
+                            onClick={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
+                            onSelect={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
+                            onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
+                            onBlur={() => inputWikiLink.handleTextareaBlur()}
                             placeholder={'请输入消息...'}
                             disabled={ctx.isStreaming}
+                        />
+                        <EntryEditorWikiLink
+                            wikiDraft={inputWikiLink.wikiDraft}
+                            wikiPopoverPosition={inputWikiLink.wikiPopoverPosition}
+                            wikiLinkOptions={inputWikiLink.wikiLinkOptions}
+                            activeWikiOptionIndex={inputWikiLink.activeWikiOptionIndex}
+                            creatingLinkedEntry={inputWikiLink.creatingLinkedEntry}
+                            hasExactCategorySuggestion={inputWikiLink.hasExactCategorySuggestion}
+                            categories={[]}
+                            popoverRef={inputWikiPopoverRef}
+                            optionRefs={inputWikiLink.wikiOptionRefs}
+                            onOptionCommit={inputWikiLink.handleWikiOptionCommit}
+                            onActiveIndexChange={inputWikiLink.setActiveWikiOptionIndex}
                         />
                         <div className="ai-floating-footer">
                             <div className="ai-floating-toolbar">
@@ -1027,7 +1106,7 @@ export default function AIChatContent({
                                         onClick={(event) => {
                                             event.stopPropagation()
                                             if (!ctx.inputValue.trim()) return
-                                            void ctx.sendMessage(ctx.inputValue)
+                                            void handleSendCurrentInput()
                                         }}
                                         disabled={!ctx.inputValue.trim()}
                                         title={sendDisabledReason || '发送'}
