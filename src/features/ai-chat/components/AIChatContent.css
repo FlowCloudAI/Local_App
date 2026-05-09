@@ -607,6 +607,86 @@
     padding-inline: 1.5rem;
 }
 
+.ai-messages-list .entry-editor-link-preview {
+    position: fixed;
+    z-index: 180;
+    width: min(20rem, calc(100vw - 1.5rem));
+    max-height: min(22rem, calc(100vh - 1.5rem));
+    overflow: hidden;
+    user-select: text;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 3%);
+    box-shadow: 0 18px 48px color-mix(in srgb, var(--fc-color-bg) 30%, transparent);
+}
+
+.ai-messages-list .entry-editor-link-preview__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    font-size: 0.74rem;
+    color: var(--fc-color-text-secondary);
+}
+
+.ai-messages-list .entry-editor-link-preview__body {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.8rem;
+}
+
+.ai-messages-list .entry-editor-link-preview__media {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
+}
+
+.ai-messages-list .entry-editor-link-preview__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ai-messages-list .entry-editor-link-preview__placeholder {
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: var(--fc-color-primary);
+    font-size: 1.7rem;
+}
+
+.ai-messages-list .entry-editor-link-preview__content h3 {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--fc-color-text);
+}
+
+.ai-messages-list .entry-editor-link-preview__summary,
+.ai-messages-list .entry-editor-link-preview__empty {
+    margin: 0.3rem 0 0;
+    font-size: 0.74rem;
+    line-height: 1.55;
+    color: var(--fc-color-text-secondary);
+}
+
+.ai-messages-list .entry-editor-link-preview__empty {
+    padding: 0.95rem 1rem 1.05rem;
+    font-size: 0.92rem;
+    line-height: 1.7;
+    color: var(--fc-color-text);
+}
+
+.ai-messages-list .entry-editor-link-preview__hint {
+    margin: 0.45rem 0 0;
+    font-size: 0.7rem;
+    color: var(--fc-color-text-secondary);
+}
+
 .ai-report-context-bar {
     display: flex;
     align-items: flex-start;

@@ -1,29 +1,92 @@
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
-import {MessageBox, RollingBox, useAlert} from 'flowcloudai-ui'
-import {ai_list_plugins, ai_play_tts, type PluginInfo, setting_get_settings, setting_has_api_key} from '../../../api'
+import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
+import {
+    ai_list_plugins,
+    ai_play_tts,
+    db_get_entry,
+    db_list_entries,
+    type Entry,
+    type EntryBrief,
+    type PluginInfo,
+    setting_get_settings,
+    setting_has_api_key,
+} from '../../../api'
 import type {AiContextValue} from '../model/AiControllerTypes'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
+import useLinkPreview from '../../entries/hooks/useLinkPreview'
+import EntryEditorLinkPreview from '../../entries/components/EntryEditorLinkPreview'
+import {
+    type InternalEntryLink,
+    parseInternalEntryHref,
+    resolveMarkdownAnchor,
+} from '../../entries/lib/entryMarkdown'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './AIChatContent.css'
 
 const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
+const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
+
+function buildAiChatEntryHref(link: InternalEntryLink): string {
+    const params = new URLSearchParams()
+    if (link.entryId) params.set('entryId', link.entryId)
+    params.set('title', link.title)
+    return `${AI_CHAT_ENTRY_LINK_PREFIX}${params.toString()}`
+}
+
+function parseAiChatEntryHref(href: string, fallbackTitle = ''): InternalEntryLink | null {
+    if (href.startsWith(AI_CHAT_ENTRY_LINK_PREFIX)) {
+        const params = new URLSearchParams(href.slice(AI_CHAT_ENTRY_LINK_PREFIX.length))
+        const title = (params.get('title') ?? fallbackTitle).trim()
+        const entryId = params.get('entryId')?.trim() || null
+        if (!title && !entryId) return null
+        return {title, entryId}
+    }
+
+    return parseInternalEntryHref(href, fallbackTitle)
+}
+
+function buildRenderableAiChatMarkdown(content: string): string {
+    return content
+        .replace(/\[([^\]\n]+?)]\((entry:\/\/[^)\s]+|entry-title:\/\/[^)]+)\)/g, (_match, rawTitle, rawHref) => {
+            const title = String(rawTitle).trim()
+            const link = parseInternalEntryHref(String(rawHref), title)
+            if (!link) return _match
+            return `[${title}](${buildAiChatEntryHref(link)})`
+        })
+        .replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
+            const title = String(rawTitle).trim()
+            if (!title) return _match
+            return `[${title}](${buildAiChatEntryHref({title, entryId: null})})`
+        })
+}
+
+function buildRenderableAiChatBlocks(blocks?: MessageBoxBlock[]): MessageBoxBlock[] | undefined {
+    if (!blocks) return undefined
+    return blocks.map((block) => (
+        block.type === 'content'
+            ? {...block, content: buildRenderableAiChatMarkdown(block.content)}
+            : block
+    ))
+}
 
 interface AIChatContentProps {
     controller: AiContextValue
     panelMode?: DockableSidePanelMode
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
+    onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
 }
 
 export default function AIChatContent({
-                                          controller,
-                                          panelMode,
-                                          onTogglePanelMode,
-                                          onToggleCollapsed
-                                      }: AIChatContentProps) {
+                                           controller,
+                                           panelMode,
+                                           onTogglePanelMode,
+                                           onToggleCollapsed,
+                                           onOpenEntry,
+                                       }: AIChatContentProps) {
     const ctx = controller
     const activeConversation = ctx.activeConversation
     const isCharacterConversation = activeConversation?.mode === 'character'
@@ -83,15 +146,21 @@ export default function AIChatContent({
     const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
+    const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
     const focusContextRef = useRef<HTMLDivElement>(null)
     const focusChipTextRefs = useRef<Record<string, HTMLSpanElement | null>>({})
+    const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
+    const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     const lastScrollTopRef = useRef(0)
     const roleplayAutoPlayRef = useRef<string | null>(null)
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
+    const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
+    const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const showFocusContext = !isCharacterConversation && !isReportConversation
+    const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
     const focusContextItems = useMemo(() => {
         const focusContext = ctx.focusContext
         return [
@@ -103,6 +172,64 @@ export default function AIChatContent({
                 : null,
         ].filter((item): item is { key: string; label: string } => Boolean(item))
     }, [ctx.focusContext])
+
+    const ensureProjectEntryDetailsLoaded = useCallback(async (briefs: EntryBrief[]) => {
+        if (!briefs.length) return
+        const results = await Promise.all(
+            briefs.map(async (brief) => {
+                try {
+                    const detail = await db_get_entry(brief.id)
+                    return [brief.id, detail] as const
+                } catch {
+                    return null
+                }
+            }),
+        )
+        setEntryCache((current) => ({
+            ...current,
+            ...Object.fromEntries(results.filter(Boolean) as Array<readonly [string, Entry]>),
+        }))
+    }, [])
+
+    const ensureProjectEntriesLoaded = useCallback(async () => {
+        if (!linkPreviewProjectId) return
+        if (projectEntriesStatusRef.current === 'loaded') return
+        if (projectEntriesLoadPromiseRef.current) return projectEntriesLoadPromiseRef.current
+
+        projectEntriesStatusRef.current = 'loading'
+        projectEntriesLoadPromiseRef.current = (async () => {
+            try {
+                const briefs = await db_list_entries({projectId: linkPreviewProjectId, limit: 1000, offset: 0})
+                setProjectEntries(briefs)
+                projectEntriesStatusRef.current = 'loaded'
+                void ensureProjectEntryDetailsLoaded(briefs)
+            } catch {
+                projectEntriesStatusRef.current = 'idle'
+            } finally {
+                projectEntriesLoadPromiseRef.current = null
+            }
+        })()
+
+        return projectEntriesLoadPromiseRef.current
+    }, [ensureProjectEntryDetailsLoaded, linkPreviewProjectId])
+
+    const linkPreview = useLinkPreview({
+        entryCache,
+        projectEntries,
+        ensureProjectEntriesLoaded,
+        onOpenEntry: (entry) => {
+            if (!linkPreviewProjectId) return
+            onOpenEntry?.(linkPreviewProjectId, entry)
+        },
+    })
+
+    useEffect(() => {
+        projectEntriesStatusRef.current = 'idle'
+        projectEntriesLoadPromiseRef.current = null
+        setProjectEntries([])
+        setEntryCache({})
+        linkPreview.closeLinkPreview()
+    }, [linkPreview.closeLinkPreview, linkPreviewProjectId])
     const sendDisabledReason = ctx.isStreaming
         ? '正在生成中'
         : !ctx.inputValue.trim()
@@ -170,6 +297,61 @@ export default function AIChatContent({
         }
         lastScrollTopRef.current = scrollTop
     }, [])
+
+    const resolveEntryAnchor = useCallback((target: EventTarget | null): HTMLAnchorElement | null => {
+        const anchor = resolveMarkdownAnchor(target)
+        if (!anchor) return null
+        const href = anchor.getAttribute('href') ?? ''
+        return parseAiChatEntryHref(href, anchor.textContent ?? '') ? anchor : null
+    }, [])
+
+    const getEntryLinkFromAnchor = useCallback((anchor: HTMLAnchorElement): InternalEntryLink | null => {
+        const href = anchor.getAttribute('href') ?? ''
+        return parseAiChatEntryHref(href, anchor.textContent ?? '')
+    }, [])
+
+    const handleEntryLinkClick = useCallback((event: React.MouseEvent) => {
+        const anchor = resolveEntryAnchor(event.target)
+        if (!anchor) return
+        event.preventDefault()
+
+        const internalLink = getEntryLinkFromAnchor(anchor)
+        if (!internalLink) return
+        if (!linkPreviewProjectId) {
+            void showAlert('当前对话没有项目上下文，无法打开词条链接。', 'warning', 'toast', 1800)
+            return
+        }
+        void ensureProjectEntriesLoaded().then(() => {
+            linkPreview.handleOpenLinkedEntry(internalLink)
+        })
+    }, [ensureProjectEntriesLoaded, getEntryLinkFromAnchor, linkPreview, linkPreviewProjectId, resolveEntryAnchor, showAlert])
+
+    const handleEntryLinkMouseOver = useCallback((event: React.MouseEvent) => {
+        if (!linkPreviewProjectId) return
+        const anchor = resolveEntryAnchor(event.target)
+        if (!anchor) return
+        const internalLink = getEntryLinkFromAnchor(anchor)
+        if (!internalLink) return
+        if (linkPreview.linkPreviewAnchorRef.current === anchor) {
+            linkPreview.clearLinkPreviewCloseTimer()
+            linkPreview.updateLinkPreviewPosition(anchor)
+            return
+        }
+        linkPreview.openLinkPreview(anchor, internalLink)
+    }, [getEntryLinkFromAnchor, linkPreview, linkPreviewProjectId, resolveEntryAnchor])
+
+    const handleEntryLinkMouseOut = useCallback((event: React.MouseEvent) => {
+        const anchor = resolveEntryAnchor(event.target)
+        if (!anchor) return
+        const relatedTarget = event.relatedTarget
+        if (
+            relatedTarget instanceof Node
+            && (anchor.contains(relatedTarget) || linkPreviewPanelRef.current?.contains(relatedTarget))
+        ) {
+            return
+        }
+        linkPreview.scheduleLinkPreviewClose()
+    }, [linkPreview, resolveEntryAnchor])
 
     const scrollToBottom = useCallback(() => {
         setAutoScroll(true)
@@ -609,7 +791,10 @@ export default function AIChatContent({
                 <RollingBox
                     className="ai-messages-container"
                     ref={messagesContainerRef}
-                    onScroll={handleMessagesScroll}
+                    onScroll={() => {
+                        handleMessagesScroll()
+                        linkPreview.closeLinkPreview()
+                    }}
                     thumbSize={'thin'}
                 >
                     {isReportConversation && activeConversation?.reportContext && (
@@ -633,13 +818,22 @@ export default function AIChatContent({
                         </div>
                     )}
                     {ctx.activeConversationId && ctx.messages.length > 0 && (
-                        <div className="ai-messages-list">
+                        <div
+                            className="ai-messages-list"
+                            onClick={handleEntryLinkClick}
+                            onMouseOver={handleEntryLinkMouseOver}
+                            onMouseOut={handleEntryLinkMouseOut}
+                        >
                             {ctx.messages.map((message) => (
                                 <MessageBox
                                     key={message.id}
                                     role={message.role}
-                                    blocks={message.blocks}
-                                    content={message.content}
+                                    blocks={message.role === 'assistant'
+                                        ? buildRenderableAiChatBlocks(message.blocks)
+                                        : message.blocks}
+                                    content={message.role === 'assistant'
+                                        ? buildRenderableAiChatMarkdown(message.content)
+                                        : message.content}
                                     toolCallDetail={'verbose'}
                                     markdown={message.role === 'assistant'}
                                     lineHeight={1.5}
@@ -666,7 +860,7 @@ export default function AIChatContent({
                             {ctx.streamingBlocks.length > 0 && ctx.isStreaming && (
                                 <MessageBox
                                     role="assistant"
-                                    blocks={ctx.streamingBlocks}
+                                    blocks={buildRenderableAiChatBlocks(ctx.streamingBlocks)}
                                     lineHeight={1.5}
                                     streaming
                                     markdown
@@ -683,6 +877,15 @@ export default function AIChatContent({
                                         : undefined}
                                 />
                             )}
+                            <EntryEditorLinkPreview
+                                linkPreview={linkPreview.linkPreview}
+                                linkPreviewPosition={linkPreview.linkPreviewPosition}
+                                linkPreviewEntry={linkPreview.linkPreviewEntry}
+                                panelRef={linkPreviewPanelRef}
+                                anchorRef={linkPreview.linkPreviewAnchorRef}
+                                onClearCloseTimer={linkPreview.clearLinkPreviewCloseTimer}
+                                onScheduleClose={linkPreview.scheduleLinkPreviewClose}
+                            />
                         </div>
                     )}
                 </RollingBox>

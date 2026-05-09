@@ -836,6 +836,7 @@ export default function DesktopApp() {
                                             panelMode={aiPanelMode}
                                             onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
                                             onToggleCollapsed={() => setAiPanelCollapsed(true)}
+                                            onOpenEntry={handleOpenEntry}
                                         />
                                     </div>
                                 </div>
