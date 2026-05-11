@@ -67,7 +67,6 @@ import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/tts
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
-type SaveTrigger = 'manual' | 'auto'
 type EntryEditorCache = {
     entry: Entry
     draft: EntryDraft
@@ -112,10 +111,6 @@ interface EditorHistory {
     draft: EntryDraft
     relationDrafts: EntryRelationDraft[]
 }
-
-const AUTO_SAVE_CHECK_INTERVAL_MS = 1000
-const AUTO_SAVE_FAILURE_COOLDOWN_MS = 10000
-const AUTO_SAVE_SECONDS = 30
 
 function buildDraft(entry: Entry): EntryDraft {
     return {
@@ -173,7 +168,6 @@ export default function EntryEditor({
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const autoSaveSeconds = AUTO_SAVE_SECONDS
     const [editorFontSize, setEditorFontSize] = useState(14)
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
     const [generatingSummary, setGeneratingSummary] = useState(false)
@@ -217,7 +211,6 @@ export default function EntryEditor({
     const onSavedRef = useRef(onSaved)
     const onTitleChangeRef = useRef(onTitleChange)
     const lastSuccessfulSaveAtRef = useRef(0)
-    const lastAutoSaveAttemptAtRef = useRef(0)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
@@ -376,7 +369,6 @@ export default function EntryEditor({
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
         setAutoSaveStatus('')
-        lastAutoSaveAttemptAtRef.current = 0
         lastSuccessfulSaveAtRef.current = Date.now()
         // 切换词条时重置历史追踪
         historyInitializedRef.current = null
@@ -684,25 +676,21 @@ export default function EntryEditor({
 
     useEffect(() => {
         if (!entry) return
-        if (autoSaveSeconds <= 0) {
-            setAutoSaveStatus('')
-            return
-        }
         if (!hasChanges) {
             setAutoSaveStatus('')
             return
         }
         if (!trimmedTitle) {
-            setAutoSaveStatus('标题为空，暂不自动保存')
+            setAutoSaveStatus('标题为空，无法保存')
             return
         }
         if (hasInvalidRelationDrafts) {
-            setAutoSaveStatus('存在未完成关系，暂不自动保存')
+            setAutoSaveStatus('存在未完成关系，请处理后手动保存')
             return
         }
         if (saving) return
-        setAutoSaveStatus(`持续编辑中，最多每 ${autoSaveSeconds} 秒自动保存一次`)
-    }, [autoSaveSeconds, entry, hasChanges, hasInvalidRelationDrafts, saving, trimmedTitle])
+        setAutoSaveStatus('存在未保存修改')
+    }, [entry, hasChanges, hasInvalidRelationDrafts, saving, trimmedTitle])
 
     useEffect(() => {
         if (!entry) return
@@ -787,7 +775,6 @@ export default function EntryEditor({
         historyInitializedRef.current = null
         undoRedo.reset({draft: savedDraft, relationDrafts: savedRelationDrafts})
         lastSuccessfulSaveAtRef.current = Date.now()
-        lastAutoSaveAttemptAtRef.current = 0
         setAutoSaveStatus('')
 
         if (reason === 'external') {
@@ -847,22 +834,16 @@ export default function EntryEditor({
         }
     }, [entry, onDelete, showAlert])
 
-    const handleSave = useCallback(async (trigger: SaveTrigger = 'manual') => {
+    const handleSave = useCallback(async () => {
         if (!entry || !canSave) return
 
         setSaving(true)
         setError(null)
-        if (trigger === 'auto') {
-            setAutoSaveStatus('正在自动保存…')
-        }
 
         try {
             for (const draftRelation of relationDrafts) {
                 if (hasInvalidRelationDraft(draftRelation, entry.id)) {
                     setError('存在未完成的词条关系，请先选择目标词条。')
-                    if (trigger === 'auto') {
-                        setAutoSaveStatus('存在未完成关系，暂不自动保存')
-                    }
                     setSaving(false)
                     return
                 }
@@ -890,20 +871,12 @@ export default function EntryEditor({
             }
             await onSaved?.(refreshed)
             lastSuccessfulSaveAtRef.current = Date.now()
-            lastAutoSaveAttemptAtRef.current = 0
-            if (trigger === 'manual') {
-                setAutoSaveStatus('')
-                void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
-            } else {
-                setAutoSaveStatus('已自动保存')
-            }
+            setAutoSaveStatus('')
+            void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
         } catch (e) {
             const message = String(e)
             setError(message)
-            if (trigger === 'auto') {
-                lastAutoSaveAttemptAtRef.current = Date.now()
-                setAutoSaveStatus(message.includes('同名词条') ? '标题重复，暂不自动保存' : '自动保存失败，可手动重试')
-            } else if (message.includes('同名词条')) {
+            if (message.includes('同名词条')) {
                 void showAlert(message, 'warning', 'toast', 1800)
             }
         } finally {
@@ -917,30 +890,6 @@ export default function EntryEditor({
             void handleSave()
         }
     }, [canSave, handleSave])
-
-    useEffect(() => {
-        if (!entry || autoSaveSeconds <= 0) return
-
-        const timer = window.setInterval(() => {
-            if (!hasChangesRef.current) return
-            if (!canSaveRef.current) return
-
-            const now = Date.now()
-            if (lastAutoSaveAttemptAtRef.current > 0 && now - lastAutoSaveAttemptAtRef.current < AUTO_SAVE_FAILURE_COOLDOWN_MS) {
-                return
-            }
-            if (now - lastSuccessfulSaveAtRef.current < autoSaveSeconds * 1000) {
-                return
-            }
-
-            lastAutoSaveAttemptAtRef.current = now
-            void handleSave('auto')
-        }, AUTO_SAVE_CHECK_INTERVAL_MS)
-
-        return () => {
-            window.clearInterval(timer)
-        }
-    }, [autoSaveSeconds, entry, handleSave])
 
     const applyHistory = useCallback((history: EditorHistory) => {
         isApplyingHistoryRef.current = true

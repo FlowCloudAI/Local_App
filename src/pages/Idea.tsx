@@ -149,7 +149,7 @@ export default function Idea({
     ]), [projects])
 
     const categoryOptions = useMemo(() => ([
-        {value: 'root', label: '项目根目录'},
+        {value: '', label: '请选择分类'},
         ...categories.map((category) => ({value: category.id, label: category.name})),
     ]), [categories])
 
@@ -548,6 +548,11 @@ export default function Idea({
             return
         }
 
+        if (!convertCategoryId) {
+            await showAlert('请先选择目标分类，避免生成悬空词条。', 'warning', 'toast', 1800)
+            return
+        }
+
         const targetTitle = buildEntryTitleFromIdea(draftTitle, draftContent)
         if (!targetTitle) {
             await showAlert('便签标题和正文都为空，暂时无法转为词条。', 'warning', 'toast', 1800)
@@ -854,9 +859,9 @@ export default function Idea({
                                                 <span className="idea-page__meta-label">目标分类</span>
                                                 <Select
                                                     className="idea-page__meta-select"
-                                                    value={convertCategoryId ?? 'root'}
+                                                    value={convertCategoryId ?? ''}
                                                     options={categoryOptions}
-                                                    onChange={(value) => setConvertCategoryId(value === 'root' ? null : String(value))}
+                                                    onChange={(value) => setConvertCategoryId(value ? String(value) : null)}
                                                     disabled={converting || Boolean(selectedIdea.converted_entry_id)}
                                                 />
                                             </div>

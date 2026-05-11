@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     Button,
     type CategoryTreeNode,
@@ -27,6 +27,7 @@ import {
     type ApiUsageByModel,
     type ApiUsageSummary,
     type AppSettings,
+    type DefaultPaths,
     type LocalPluginInfo,
     open_in_file_manager,
     plugin_install_from_file,
@@ -39,6 +40,7 @@ import {
     setting_delete_api_key,
     setting_get_media_dir,
     setting_get_settings_bootstrap,
+    setting_open_backup_dir,
     setting_set_api_key,
     setting_update_settings,
     template_get,
@@ -62,6 +64,11 @@ type SettingsTab = 'system' | 'ai' | 'templates' | 'usage'
 
 type TemplateView = 'list' | 'detail'
 
+interface ParsedPluginVersion {
+    core: [number, number, number]
+    prerelease: string[]
+}
+
 interface TemplateTreeRow {
     id: string
     parent_id: string | null
@@ -82,6 +89,71 @@ const TEMPLATE_GROUP_LABELS: Record<string, string> = {
 
 const TEMPLATE_GROUP_ORDER = ['sense', 'contradiction', 'context', 'formats']
 
+function normalizePluginKey(value: string): string {
+    return value.trim().toLowerCase()
+}
+
+function parsePluginVersion(version: string): ParsedPluginVersion | null {
+    const trimmed = version.trim().replace(/^[vV]/, '')
+    if (!trimmed) return null
+
+    const [withoutBuild] = trimmed.split('+', 1)
+    const [corePart, prereleasePart = ''] = withoutBuild.split('-', 2)
+    const parts = corePart.split('.')
+    if (parts.length === 0 || parts.length > 3) return null
+    if (parts.some(part => !/^\d+$/.test(part))) return null
+
+    while (parts.length < 3) {
+        parts.push('0')
+    }
+
+    return {
+        core: [Number(parts[0]), Number(parts[1]), Number(parts[2])],
+        prerelease: prereleasePart ? prereleasePart.split('.') : [],
+    }
+}
+
+function comparePrerelease(a: string[], b: string[]): number {
+    if (a.length === 0 && b.length === 0) return 0
+    if (a.length === 0) return 1
+    if (b.length === 0) return -1
+
+    const len = Math.max(a.length, b.length)
+    for (let i = 0; i < len; i += 1) {
+        const left = a[i]
+        const right = b[i]
+        if (left == null) return -1
+        if (right == null) return 1
+
+        const leftIsNumber = /^\d+$/.test(left)
+        const rightIsNumber = /^\d+$/.test(right)
+        if (leftIsNumber && rightIsNumber) {
+            const diff = Number(left) - Number(right)
+            if (diff !== 0) return diff
+            continue
+        }
+        if (leftIsNumber !== rightIsNumber) {
+            return leftIsNumber ? -1 : 1
+        }
+        const diff = left.localeCompare(right)
+        if (diff !== 0) return diff
+    }
+    return 0
+}
+
+function isRemoteVersionNewer(current: string, latest: string): boolean {
+    const currentVersion = parsePluginVersion(current)
+    const latestVersion = parsePluginVersion(latest)
+    if (!currentVersion || !latestVersion) return false
+
+    for (let i = 0; i < 3; i += 1) {
+        const diff = latestVersion.core[i] - currentVersion.core[i]
+        if (diff !== 0) return diff > 0
+    }
+
+    return comparePrerelease(latestVersion.prerelease, currentVersion.prerelease) > 0
+}
+
 interface SettingsProps {
     onBack?: () => void
 }
@@ -94,10 +166,11 @@ export default function Settings({onBack}: SettingsProps) {
     const [loading, setLoading] = useState(true)
     const [settings, setSettings] = useState<AppSettings | null>(null)
     const [mediaDir, setMediaDir] = useState<string>('')
-    const [defaultPaths, setDefaultPaths] = useState<{ db_path: string; plugins_path: string } | null>(null)
+    const [defaultPaths, setDefaultPaths] = useState<DefaultPaths | null>(null)
     const [configDir, setConfigDir] = useState<string>('')
     const [appVersion, setAppVersion] = useState<string>('')
     const [licenseModalOpen, setLicenseModalOpen] = useState(false)
+    const settingsSaveSuccessNoticeEnabledRef = useRef(false)
 
     // ── 模板配置状态 ──
     const [templateMetas, setTemplateMetas] = useState<TemplateMeta[]>([])
@@ -185,7 +258,8 @@ export default function Settings({onBack}: SettingsProps) {
 
     const getPluginById = useCallback((type: 'llm' | 'image' | 'tts', pluginId: string | null) => {
         if (!pluginId) return null
-        return getPluginsForType(type).find(plugin => plugin.id === pluginId) ?? null
+        const targetKey = normalizePluginKey(pluginId)
+        return getPluginsForType(type).find(plugin => normalizePluginKey(plugin.id) === targetKey) ?? null
     }, [getPluginsForType])
 
     const resolveDefaultModel = useCallback((type: 'llm' | 'image' | 'tts', pluginId: string | null) => {
@@ -198,6 +272,7 @@ export default function Settings({onBack}: SettingsProps) {
     const loadData = useCallback(async () => {
         try {
             setLoading(true)
+            settingsSaveSuccessNoticeEnabledRef.current = false
             const [
                 bootstrap,
                 configDirData,
@@ -248,6 +323,14 @@ export default function Settings({onBack}: SettingsProps) {
         }
     }, [])
 
+    const refreshPluginConfigState = useCallback(async () => {
+        const bootstrap = await setting_get_settings_bootstrap()
+        setLlmPlugins(bootstrap.llmPlugins)
+        setImagePlugins(bootstrap.imagePlugins)
+        setTtsPlugins(bootstrap.ttsPlugins)
+        setApiKeyStatus(bootstrap.apiKeyStatus)
+    }, [])
+
     useEffect(() => {
         loadData().catch(console.error)
         getVersion().then(setAppVersion).catch(console.error)
@@ -282,7 +365,11 @@ export default function Settings({onBack}: SettingsProps) {
 
             const normalizeAiConfig = <T extends 'llm' | 'image' | 'tts'>(type: T) => {
                 const plugin = getPluginById(type, prev[type].plugin_id)
-                if (!plugin) return prev[type]
+                if (!plugin) {
+                    return prev[type].plugin_id || prev[type].default_model
+                        ? {...prev[type], plugin_id: null, default_model: null}
+                        : prev[type]
+                }
 
                 const currentModel = prev[type].default_model
                 const hasCurrentModel = currentModel ? plugin.models.includes(currentModel) : false
@@ -327,26 +414,36 @@ export default function Settings({onBack}: SettingsProps) {
         }))
     }, [settings?.editor_font_size, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
+    const persistSettings = useCallback(async (nextSettings: AppSettings) => {
+        try {
+            // 新 API 返回迁移摘要字符串（路径变更时自动复制文件），非空则弹窗提示
+            const migrationMsg = await setting_update_settings(nextSettings)
+            const newMediaDir = await setting_get_media_dir()
+            setMediaDir(newMediaDir)
+            const shouldShowSuccessNotice = settingsSaveSuccessNoticeEnabledRef.current
+            settingsSaveSuccessNoticeEnabledRef.current = true
+            if (migrationMsg) {
+                await showAlert(migrationMsg, 'info', 'toast', 3500)
+            } else if (shouldShowSuccessNotice) {
+                void showAlert('设置已保存', 'success', 'nonInvasive', 1200)
+            }
+        } catch (error) {
+            const message = String(error)
+            console.error('设置保存失败:', error)
+            void showAlert(`设置保存失败：${message}`, 'error')
+        }
+    }, [showAlert])
+
     // 自动保存设置
     useEffect(() => {
         if (!settings || loading) return
 
-        const timer = setTimeout(async () => {
-            try {
-                // 新 API 返回迁移摘要字符串（路径变更时自动复制文件），非空则弹窗提示
-                const migrationMsg = await setting_update_settings(settings)
-                const newMediaDir = await setting_get_media_dir()
-                setMediaDir(newMediaDir)
-                if (migrationMsg) {
-                    await showAlert(migrationMsg, 'info', 'toast', 3500)
-                }
-            } catch (error) {
-                console.error('自动保存失败:', error)
-            }
+        const timer = setTimeout(() => {
+            void persistSettings(settings)
         }, 500) // 防抖 500ms
 
         return () => clearTimeout(timer)
-    }, [settings, loading, showAlert])
+    }, [settings, loading, persistSettings])
 
     // 重置为默认值
     const handleReset = () => {
@@ -357,7 +454,10 @@ export default function Settings({onBack}: SettingsProps) {
             theme: 'system',
             language: 'zh-CN',
             editor_font_size: 14,
-            auto_save_secs: 30,
+            auto_save_secs: 0,
+            auto_backup_secs: 300,
+            backup_dir: null,
+            max_backup_count: 20,
             default_entry_type: null,
             llm: {
                 plugin_id: null,
@@ -437,6 +537,43 @@ export default function Settings({onBack}: SettingsProps) {
         }
     }
 
+    // 选择 CSV 自动备份目录
+    const handleSelectBackupDir = async () => {
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            title: '选择 CSV 自动备份目录'
+        })
+        if (selected) {
+            setSettings(prev => prev ? {
+                ...prev,
+                backup_dir: Array.isArray(selected) ? selected[0] : selected
+            } : null)
+        }
+    }
+
+    const handleOpenBackupDir = useCallback((path: string) => {
+        if (!path) return
+        setting_open_backup_dir(path).catch((err) => {
+            console.error('打开备份目录失败', err)
+            void showAlert(`打开备份目录失败：${String(err)}`, 'error', 'toast', 2200)
+        })
+    }, [showAlert])
+
+    const handleNumberSettingChange = (
+        field: 'auto_backup_secs' | 'max_backup_count',
+        value: string,
+        fallback: number,
+        min: number,
+        max: number,
+    ) => {
+        const parsed = Number(value)
+        const nextValue = Number.isFinite(parsed)
+            ? Math.min(max, Math.max(min, Math.trunc(parsed)))
+            : fallback
+        setSettings(prev => prev ? {...prev, [field]: nextValue} : null)
+    }
+
     // AI 配置处理
     const handleAiConfigChange = (
         type: 'llm' | 'image' | 'tts',
@@ -502,11 +639,13 @@ export default function Settings({onBack}: SettingsProps) {
             await closeIdleAiSessions()
             const info = await plugin_market_install(pluginId)
             setLocalPlugins(prev => {
-                const exists = prev.some(p => p.id === info.id)
+                const nextKey = normalizePluginKey(info.id)
+                const exists = prev.some(p => normalizePluginKey(p.id) === nextKey)
                 return exists
-                    ? prev.map(p => (p.id === info.id ? info : p))
+                    ? prev.map(p => (normalizePluginKey(p.id) === nextKey ? info : p))
                     : [...prev, info]
             })
+            await refreshPluginConfigState()
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
             void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
         } catch (e) {
@@ -539,11 +678,13 @@ export default function Settings({onBack}: SettingsProps) {
             await closeIdleAiSessions()
             const info = await plugin_install_from_file(selected)
             setLocalPlugins(prev => {
-                const exists = prev.some(p => p.id === info.id)
+                const nextKey = normalizePluginKey(info.id)
+                const exists = prev.some(p => normalizePluginKey(p.id) === nextKey)
                 return exists
-                    ? prev.map(p => (p.id === info.id ? info : p))
+                    ? prev.map(p => (normalizePluginKey(p.id) === nextKey ? info : p))
                     : [...prev, info]
             })
+            await refreshPluginConfigState()
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
             void showAlert(`${info.name} 安装成功`, 'success')
         } catch (e) {
@@ -564,7 +705,9 @@ export default function Settings({onBack}: SettingsProps) {
         try {
             await closeIdleAiSessions()
             await plugin_uninstall(pluginId)
-            setLocalPlugins(prev => prev.filter(p => p.id !== pluginId))
+            const removedKey = normalizePluginKey(pluginId)
+            setLocalPlugins(prev => prev.filter(p => normalizePluginKey(p.id) !== removedKey))
+            await refreshPluginConfigState()
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
         } catch (e) {
             void showAlert('卸载失败: ' + e, 'error')
@@ -857,7 +1000,14 @@ export default function Settings({onBack}: SettingsProps) {
     }
 
     const allPlugins = [...llmPlugins, ...imagePlugins, ...ttsPlugins]
-    const installedIds = new Set(localPlugins.map(p => p.id))
+    const installedPluginMap = new Map(localPlugins.map(p => [normalizePluginKey(p.id), p]))
+    const installedIds = new Set(installedPluginMap.keys())
+    const marketPluginMap = new Map(marketPlugins.map(p => [normalizePluginKey(p.id), p]))
+    const effectiveDbDir = settings.db_path || defaultPaths?.db_path || ''
+    const derivedBackupDir = effectiveDbDir
+        ? `${effectiveDbDir.replace(/[\\/]+$/, '')}${effectiveDbDir.includes('\\') ? '\\' : '/'}backup`
+        : defaultPaths?.backup_path || ''
+    const effectiveBackupDir = settings.backup_dir || derivedBackupDir
 
     const filteredMarket = marketPlugins.filter(p => {
         const matchKind = kindFilter === 'all' || p.kind.includes(kindFilter)
@@ -981,6 +1131,77 @@ export default function Settings({onBack}: SettingsProps) {
                                                 setSettings(prev => prev ? {...prev, plugins_path: null} : null)
                                             }>重置</Button>
                                         )}
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* 备份 */}
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">备份</h2>
+                                <div className="settings-field">
+                                    <label className="settings-label-wide">备份目录</label>
+                                    <Input
+                                        value={effectiveBackupDir}
+                                        readOnly
+                                        placeholder="数据库目录下的 backup"
+                                        style={{flex: 1}}
+                                    />
+                                    <div className="settings-field-actions">
+                                        <Button size="sm" onClick={handleSelectBackupDir}>浏览</Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={!effectiveBackupDir}
+                                            onClick={() => handleOpenBackupDir(effectiveBackupDir)}
+                                        >
+                                            打开
+                                        </Button>
+                                        {settings.backup_dir && (
+                                            <Button size="sm" variant="outline" onClick={() =>
+                                                setSettings(prev => prev ? {...prev, backup_dir: null} : null)
+                                            }>重置</Button>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="settings-row settings-row--compact">
+                                    <div className="settings-field">
+                                        <label className="settings-label-wide">自动备份</label>
+                                        <input
+                                            className="settings-number-input"
+                                            type="number"
+                                            min={0}
+                                            max={86400}
+                                            step={30}
+                                            value={settings.auto_backup_secs}
+                                            onChange={(event) => handleNumberSettingChange(
+                                                'auto_backup_secs',
+                                                event.target.value,
+                                                300,
+                                                0,
+                                                86400,
+                                            )}
+                                        />
+                                        <span className="settings-span">秒</span>
+                                        <span className="settings-field-hint">0 表示关闭</span>
+                                    </div>
+                                    <div className="settings-field">
+                                        <label className="settings-label-wide">最大备份数量</label>
+                                        <input
+                                            className="settings-number-input"
+                                            type="number"
+                                            min={1}
+                                            max={999}
+                                            step={1}
+                                            value={settings.max_backup_count}
+                                            onChange={(event) => handleNumberSettingChange(
+                                                'max_backup_count',
+                                                event.target.value,
+                                                20,
+                                                1,
+                                                999,
+                                            )}
+                                        />
+                                        <span className="settings-field-hint">按时间戳保留最近的备份组</span>
                                     </div>
                                 </div>
                             </section>
@@ -1124,14 +1345,22 @@ export default function Settings({onBack}: SettingsProps) {
                                     {localPlugins.length === 0 && !loadingLocal ? (
                                         <div className="plugins-empty">暂无已安装插件</div>
                                     ) : (
-                                        localPlugins.map(plugin => (
-                                            <LocalPluginCard
-                                                key={plugin.id}
-                                                plugin={plugin}
-                                                onUninstall={handleUninstall}
-                                                uninstalling={uninstallingId === plugin.id}
-                                            />
-                                        ))
+                                        localPlugins.map(plugin => {
+                                            const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
+                                            const updateVersion = marketPlugin
+                                            && isRemoteVersionNewer(plugin.version, marketPlugin.version)
+                                                ? marketPlugin.version
+                                                : undefined
+                                            return (
+                                                <LocalPluginCard
+                                                    key={plugin.id}
+                                                    plugin={plugin}
+                                                    updateVersion={updateVersion}
+                                                    onUninstall={handleUninstall}
+                                                    uninstalling={uninstallingId === plugin.id}
+                                                />
+                                            )
+                                        })
                                     )}
                                 </div>
                             </section>
@@ -1195,15 +1424,23 @@ export default function Settings({onBack}: SettingsProps) {
                                             {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
                                         </div>
                                     ) : (
-                                        filteredMarket.map(plugin => (
-                                            <MarketPluginCard
-                                                key={plugin.id}
-                                                plugin={plugin}
-                                                installedIds={installedIds}
-                                                onInstall={handleInstall}
-                                                installing={installingIds.has(plugin.id)}
-                                            />
-                                        ))
+                                        filteredMarket.map(plugin => {
+                                            const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
+                                            const hasUpdate = installedPlugin
+                                                ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
+                                                : false
+                                            return (
+                                                <MarketPluginCard
+                                                    key={plugin.id}
+                                                    plugin={plugin}
+                                                    installedIds={installedIds}
+                                                    installedVersion={installedPlugin?.version}
+                                                    hasUpdate={hasUpdate}
+                                                    onInstall={handleInstall}
+                                                    installing={installingIds.has(plugin.id)}
+                                                />
+                                            )
+                                        })
                                     )}
                                 </div>
                             </section>

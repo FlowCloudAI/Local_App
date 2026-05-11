@@ -219,7 +219,7 @@ pub async fn ai_start_contradiction_session(
         .unwrap_or_else(|| request.session_id.clone());
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.run(input_rx);
+    let (event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
     let run_id = Uuid::new_v4().to_string();
     let handle_for_error = handle.clone();
 

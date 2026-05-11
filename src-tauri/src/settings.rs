@@ -27,9 +27,15 @@ pub struct AppSettings {
     /// 编辑器字体大小（px）
     pub editor_font_size: u8,
 
-    // ── 编辑器行为 ─────────────────────────
-    /// 自动保存间隔（秒），0 = 关闭
+    // ── 备份行为 ───────────────────────────
+    /// 历史兼容字段：旧版本词条自动保存间隔。当前不再用于编辑器自动保存。
     pub auto_save_secs: u32,
+    /// 自动备份间隔（秒），0 = 关闭
+    pub auto_backup_secs: u32,
+    /// CSV 自动备份目录。None = 数据库目录下的 backup
+    pub backup_dir: Option<String>,
+    /// 最多保留多少组自动备份
+    pub max_backup_count: u32,
     /// 新建词条时的默认类型
     pub default_entry_type: Option<String>,
 
@@ -52,7 +58,10 @@ impl Default for AppSettings {
             theme: "system".to_string(),
             language: "zh-CN".to_string(),
             editor_font_size: 14,
-            auto_save_secs: 30,
+            auto_save_secs: 0,
+            auto_backup_secs: 300,
+            backup_dir: None,
+            max_backup_count: 20,
             default_entry_type: None,
             llm: LlmDefaults::default(),
             image: ImageDefaults::default(),

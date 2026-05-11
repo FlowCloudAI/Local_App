@@ -58,35 +58,56 @@ body {
     margin-left: auto;
 }
 
-.menu-btn {
+.app-logo {
     width: 3rem;
     height: 3rem;
     padding: 0.3rem;
-    background: transparent;
-    cursor: pointer;
-    border: none;
-    border-radius: var(--fc-radius-md);
-    color: var(--fc-color-text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background var(--fc-transition),
-    color var(--fc-transition),
-    transform var(--fc-transition-fast);
 }
 
-.menu-btn:hover {
-    background: var(--fc-color-bg-elevated);
-    color: var(--fc-color-text);
-}
-
-.menu-btn:active {
-    transform: translateY(1px);
-}
-
-.menu-btn svg {
+.app-logo svg {
     width: 1.75rem;
     height: 1.75rem;
+}
+
+.home-tab {
+    flex: 0 0 auto;
+    min-width: 5rem;
+    max-width: 8rem;
+    height: calc(100% - 0.5rem);
+    padding: var(--fc-space-sm, 8px) var(--fc-space-lg, 16px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fc-space-xs, 4px);
+    border: none;
+    border-radius: var(--fc-radius-md, 4px);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-md, 14px);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--fc-transition), background-color var(--fc-transition);
+}
+
+.home-tab__icon {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+}
+
+.home-tab:hover {
+    color: var(--fc-color-primary);
+    background: var(--fc-color-bg-tertiary);
+}
+
+.home-tab--active,
+.home-tab--active:hover {
+    color: var(--fc-color-primary);
+    background: var(--fc-color-bg);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .window-control-btn {

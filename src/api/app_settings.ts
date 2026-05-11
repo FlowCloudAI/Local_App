@@ -30,6 +30,9 @@ export interface AppSettings {
   language: string
   editor_font_size: number
   auto_save_secs: number
+  auto_backup_secs: number
+  backup_dir: string | null
+  max_backup_count: number
   default_entry_type: string | null
   llm: LlmDefaults
   image: ImageDefaults
@@ -40,6 +43,7 @@ export interface AppSettings {
 export interface DefaultPaths {
   db_path: string
   plugins_path: string
+  backup_path: string
 }
 
 export interface SettingsBootstrap {
@@ -64,6 +68,9 @@ export const setting_get_media_dir = () => command<string>('setting_get_media_di
 
 export const setting_get_default_paths = () =>
   command<DefaultPaths>('setting_get_default_paths')
+
+export const setting_open_backup_dir = (path: string) =>
+  command<void>('setting_open_backup_dir', { path })
 
 export const setting_is_backend_ready = () =>
     command<boolean>('setting_is_backend_ready')

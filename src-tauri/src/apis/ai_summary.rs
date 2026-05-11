@@ -119,7 +119,7 @@ pub async fn ai_generate_entry_summary(
     let is_entry_field_mode = matches!(request.output_mode.as_deref(), Some("entry_field"));
 
     let (input_tx, input_rx) = mpsc::channel::<String>(8);
-    let (mut event_stream, handle) = session.run(input_rx);
+    let (mut event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
 
     if is_entry_field_mode {
         handle

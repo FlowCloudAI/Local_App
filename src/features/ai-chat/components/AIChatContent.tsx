@@ -123,6 +123,7 @@ export default function AIChatContent({
 
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
+    const [inputLimitMessage, setInputLimitMessage] = useState('')
 
     useEffect(() => {
         if (!isPluginMenuOpen) return
@@ -474,6 +475,9 @@ export default function AIChatContent({
         const nextValue = event.target.value
         if (nextValue.length <= MAX_CHARS) {
             ctx.setInputValue(nextValue)
+            if (inputLimitMessage) {
+                setInputLimitMessage('')
+            }
             if (nextValue.includes('[[')) {
                 void ensureProjectEntriesLoaded()
             }
@@ -481,7 +485,9 @@ export default function AIChatContent({
             return
         }
 
+        const overflow = nextValue.length - MAX_CHARS
         ctx.setInputValue(nextValue.slice(0, MAX_CHARS))
+        setInputLimitMessage(`已截断，超出 ${overflow} 字未输入`)
         inputWikiLink.handleMarkdownCursorSync(event.currentTarget)
     }
 
@@ -988,6 +994,11 @@ export default function AIChatContent({
                             placeholder={'请输入消息...'}
                             disabled={ctx.isStreaming}
                         />
+                        {inputLimitMessage && (
+                            <div className="ai-input-limit-hint" role="status">
+                                {inputLimitMessage}
+                            </div>
+                        )}
                         <EntryEditorWikiLink
                             wikiDraft={inputWikiLink.wikiDraft}
                             wikiPopoverPosition={inputWikiLink.wikiPopoverPosition}

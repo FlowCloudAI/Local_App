@@ -192,6 +192,76 @@ function CategoryView({
     }
 
     const displayed = sortEntries(entries, sortMode)
+    const hasVisibleEntries = displayed.length > 0
+    const showLoadingOverlay = loading && hasVisibleEntries
+
+    const renderEntryGrid = () => (
+        <div className="pe-entry-grid">
+            {displayed.map((entry) => {
+                const entryType = entry.type
+                    ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
+                    : null
+                const coverSrc = toEntryCoverSrc(entry.cover)
+                return (
+                    <Card
+                        key={entry.id}
+                        className="pe-entry-card"
+                        imageSlot={(
+                            coverSrc ? (
+                                <img src={coverSrc} alt={entry.title} className="pe-entry-cover"/>
+                            ) : (
+                                <div
+                                    className="pe-entry-placeholder"
+                                    style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
+                                >
+                                    <div className="pe-entry-placeholder__icon">
+                                        {entryType ? (
+                                            <EntryTypeIcon entryType={entryType}
+                                                           className="pe-entry-placeholder__type-icon"/>
+                                        ) : (
+                                            <span
+                                                className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
+                                        )}
+                                    </div>
+                                    <div
+                                        className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
+                                        {placeholderMark(entry.title)}
+                                    </div>
+                                </div>
+                            )
+                        )}
+                        title={entry.title}
+                        description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
+                        extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
+                        tag={entryType ? (
+                            <span className="pe-entry-type-badge"
+                                  style={{'--badge-color': entryType.color} as CSSProperties}>
+                                <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
+                                {entryType.name}
+                            </span>
+                        ) : undefined}
+                        variant="shadow"
+                        hoverable
+                        expandContentOnHover
+                        imageHeight="100%"
+                        contentAreaRatio={0.5}
+                        hoverContentAreaRatio={0.8}
+                        overlayStartOpacity={1}
+                        overlayEndOpacity={0}
+                        onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
+                    />
+                )
+            })}
+            <button
+                type="button"
+                className="pe-entry-create-card"
+                onClick={() => void onRequestCreateEntry?.(categoryId)}
+            >
+                <span className="pe-entry-create-card__plus">+</span>
+                <span className="pe-entry-create-card__label">新建词条</span>
+            </button>
+        </div>
+    )
 
     return (
         <div className="pe-category-view">
@@ -252,143 +322,26 @@ function CategoryView({
                 })}
             </div>
 
-            {loading ? (
-                <div className="pe-entries-status">加载中…</div>
-            ) : noScroll ? (
-                <div className="pe-entry-grid">
-                    {displayed.map((entry) => {
-                        const entryType = entry.type
-                            ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
-                            : null
-                        const coverSrc = toEntryCoverSrc(entry.cover)
-                        return (
-                            <Card
-                                key={entry.id}
-                                className="pe-entry-card"
-                                imageSlot={(
-                                    coverSrc ? (
-                                        <img src={coverSrc} alt={entry.title} className="pe-entry-cover"/>
-                                    ) : (
-                                        <div
-                                            className="pe-entry-placeholder"
-                                            style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
-                                        >
-                                            <div className="pe-entry-placeholder__icon">
-                                                {entryType ? (
-                                                    <EntryTypeIcon entryType={entryType}
-                                                                   className="pe-entry-placeholder__type-icon"/>
-                                                ) : (
-                                                    <span
-                                                        className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
-                                                )}
-                                            </div>
-                                            <div
-                                                className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
-                                                {placeholderMark(entry.title)}
-                                            </div>
-                                        </div>
-                                    )
-                                )}
-                                title={entry.title}
-                                description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
-                                extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
-                                tag={entryType ? (
-                                    <span className="pe-entry-type-badge"
-                                          style={{'--badge-color': entryType.color} as CSSProperties}>
-                                        <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
-                                        {entryType.name}
-                                    </span>
-                                ) : undefined}
-                                variant="shadow"
-                                hoverable
-                                expandContentOnHover
-                                imageHeight="100%"
-                                contentAreaRatio={0.5}
-                                hoverContentAreaRatio={0.8}
-                                overlayStartOpacity={1}
-                                overlayEndOpacity={0}
-                                onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
-                            />
-                        )
-                    })}
-                    <button
-                        type="button"
-                        className="pe-entry-create-card"
-                        onClick={() => void onRequestCreateEntry?.(categoryId)}
-                    >
-                        <span className="pe-entry-create-card__plus">+</span>
-                        <span className="pe-entry-create-card__label">新建词条</span>
-                    </button>
-                </div>
-            ) : (
-                <RollingBox className="pe-entries-scroll" thumbSize="thin">
-                    <div className="pe-entry-grid">
-                        {displayed.map((entry) => {
-                            const entryType = entry.type
-                                ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
-                                : null
-                            const coverSrc = toEntryCoverSrc(entry.cover)
-                            return (
-                                <Card
-                                    key={entry.id}
-                                    className="pe-entry-card"
-                                    imageSlot={(
-                                        coverSrc ? (
-                                            <img src={coverSrc} alt={entry.title} className="pe-entry-cover"/>
-                                        ) : (
-                                            <div
-                                                className="pe-entry-placeholder"
-                                                style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
-                                            >
-                                                <div className="pe-entry-placeholder__icon">
-                                                    {entryType ? (
-                                                        <EntryTypeIcon entryType={entryType}
-                                                                       className="pe-entry-placeholder__type-icon"/>
-                                                    ) : (
-                                                        <span
-                                                            className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
-                                                    )}
-                                                </div>
-                                                <div
-                                                    className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
-                                                    {placeholderMark(entry.title)}
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
-                                    title={entry.title}
-                                    description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
-                                    extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
-                                    tag={entryType ? (
-                                        <span className="pe-entry-type-badge"
-                                              style={{'--badge-color': entryType.color} as CSSProperties}>
-                                            <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
-                                            {entryType.name}
-                                        </span>
-                                    ) : undefined}
-                                    variant="shadow"
-                                    hoverable
-                                    expandContentOnHover
-                                    imageHeight="100%"
-                                    contentAreaRatio={0.5}
-                                    hoverContentAreaRatio={0.8}
-                                    overlayStartOpacity={1}
-                                    overlayEndOpacity={0}
-                                    onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
-                                />
-                            )
-                        })}
-                        <button
-                            type="button"
-                            className="pe-entry-create-card"
-                            onClick={() => void onRequestCreateEntry?.(categoryId)}
-                        >
-                            <span className="pe-entry-create-card__plus">+</span>
-                            <span className="pe-entry-create-card__label">新建词条</span>
-                        </button>
+            <div className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}>
+                {hasVisibleEntries ? (
+                    noScroll ? (
+                        renderEntryGrid()
+                    ) : (
+                        <RollingBox className="pe-entries-scroll" thumbSize="thin">
+                            {renderEntryGrid()}
+                        </RollingBox>
+                    )
+                ) : (
+                    <div className="pe-entries-status">
+                        {loading ? '加载中…' : '暂无符合条件的词条'}
                     </div>
-                </RollingBox>
-            )}
+                )}
+                {showLoadingOverlay && (
+                    <div className="pe-entries-overlay" aria-hidden="true">
+                        <span className="pe-entries-overlay__label">刷新词条中…</span>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

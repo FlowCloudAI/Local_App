@@ -54,6 +54,15 @@ export interface SessionParams {
     maxToolRounds?: number | null
 }
 
+export interface AiFocusContext {
+    projectId: string | null
+    projectName: string | null
+    entryId: string | null
+    entryTitle: string | null
+    editModeEnabled: boolean
+    webSearchEnabled: boolean
+}
+
 export interface AiContextValue {
     plugins: PluginInfo[]
     selectedPlugin: string
@@ -79,6 +88,7 @@ export interface AiContextValue {
     tools: ToolStatus[]
     webSearchEnabled: boolean
     editModeEnabled: boolean
+    focusContext: AiFocusContext
     toggleWebSearch: () => Promise<void>
     toggleEditMode: () => Promise<void>
     sessionParams: SessionParams

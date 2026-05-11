@@ -5,6 +5,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_opener::OpenerExt;
 
 /// 返回平台默认的数据根目录。
 /// - Windows：若 exe 在 C 盘（系统盘，可能不可写）则用 Documents/FlowCloudAI；
@@ -190,15 +191,28 @@ pub async fn setting_get_media_dir(
 pub struct DefaultPaths {
     pub db_path: String,
     pub plugins_path: String,
+    pub backup_path: String,
 }
 
 #[tauri::command]
 pub fn setting_get_default_paths(app: AppHandle) -> Result<DefaultPaths, String> {
     let data_root = default_data_root(&app);
+    let db_path = data_root.join("db");
     Ok(DefaultPaths {
-        db_path: data_root.join("db").to_string_lossy().to_string(),
+        db_path: db_path.to_string_lossy().to_string(),
         plugins_path: data_root.join("plugins").to_string_lossy().to_string(),
+        backup_path: db_path.join("backup").to_string_lossy().to_string(),
     })
+}
+
+/// 确保 CSV 备份目录存在，并在系统文件管理器中打开。
+#[tauri::command]
+pub fn setting_open_backup_dir(app: AppHandle, path: String) -> Result<(), String> {
+    let backup_dir = PathBuf::from(path);
+    std::fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败：{}", e))?;
+    app.opener()
+        .open_path(backup_dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Serialize)]

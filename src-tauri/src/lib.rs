@@ -1,5 +1,6 @@
 mod ai_services;
 mod apis;
+mod auto_backup;
 mod layout;
 mod map;
 mod reports;
@@ -43,6 +44,7 @@ use apis::worldflow::relations::*;
 use apis::worldflow::snapshots::*;
 use apis::worldflow::system::*;
 use apis::worldflow::tags::*;
+use auto_backup::start_auto_backup_worker;
 use layout::cache::LayoutCacheState;
 use template::install_global_template_runtime;
 
@@ -260,6 +262,7 @@ pub fn run() {
                             if let Some(ready_state) = app.try_state::<BackendReadyState>() {
                                 ready_state.mark_ready();
                             }
+                            start_auto_backup_worker(app.clone());
                             app.emit("backend-ready", ()).ok();
                         }) {
                             log::error!("run_on_main_thread failed: {}", e);
@@ -383,6 +386,7 @@ pub fn run() {
             setting_update_settings,
             setting_get_media_dir,
             setting_get_default_paths,
+            setting_open_backup_dir,
             setting_is_backend_ready,
             setting_set_api_key,
             setting_has_api_key,

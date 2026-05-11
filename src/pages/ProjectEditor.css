@@ -1,7 +1,7 @@
 /* ── 布局 ───────────────────────────────────────────────────────────────── */
 
 .pe-layout {
-    --pe-content-min-width: 64rem;
+    --pe-content-min-width: 40rem;
     display: flex;
     height: 100%;
     overflow: hidden;
@@ -211,10 +211,45 @@
     --pe-font-size-entry-date: calc(0.68rem + var(--pe-font-delta-body));
 }
 
+.pe-breadcrumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    height: var(--pe-breadcrumb-height);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, transparent);
+    color: var(--fc-color-text-secondary);
+    font-size: 0.78rem;
+    user-select: none;
+}
+
+.pe-breadcrumb__item {
+    min-width: 0;
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pe-breadcrumb__item:last-child {
+    color: var(--fc-color-text);
+    font-weight: 600;
+}
+
+.pe-breadcrumb__sep {
+    color: color-mix(in srgb, var(--fc-color-text-secondary) 58%, transparent);
+}
+
 .pe-project-view,
 .pe-entry-stack {
     position: absolute;
-    inset: 0;
+    inset: var(--pe-breadcrumb-height) 0 0 0;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -238,7 +273,7 @@
 
 .pe-tool-stack {
     position: absolute;
-    inset: 0;
+    inset: var(--pe-breadcrumb-height) 0 0 0;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -285,6 +320,13 @@
     padding-top: var(--fc-space-xl);
     padding-bottom: var(--fc-space-2xl);
     container-type: inline-size;
+}
+
+.pe-overview-entries {
+    margin-top: var(--fc-space-xl);
+    min-height: 24rem;
+    contain: layout paint;
+    isolation: isolate;
 }
 
 .pe-overview-hero {
@@ -1642,10 +1684,50 @@
     font-size: var(--pe-font-size-status);
 }
 
+.pe-entries-region {
+    position: relative;
+    min-height: 24rem;
+}
+
+.pe-entries-region.is-scrollable {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+}
+
+.pe-entries-region.is-inline {
+    overflow: hidden;
+}
+
 .pe-entries-scroll {
     flex: 1;
     min-height: 0;
     padding: 0.75rem 1rem;
+}
+
+.pe-entries-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 36%, transparent);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+}
+
+.pe-entries-overlay__label {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.7rem;
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--pe-font-size-status);
+    box-shadow: var(--fc-shadow-xs);
 }
 
 .pe-entry-grid {

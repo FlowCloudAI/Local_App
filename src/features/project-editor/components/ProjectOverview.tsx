@@ -310,267 +310,271 @@ function ProjectOverview({
 
     return (
         <RollingBox className="pe-overview fc-page-shell" thumbSize="thin">
-            <section className="pe-overview-hero fc-section-card">
-                <div className="pe-project-cover-card">
-                    <button
-                        type="button"
-                        className={`pe-project-cover${coverSrc ? ' has-image' : ''}`}
-                        onClick={onEditCover}
-                        disabled={coverUpdating}
-                    >
-                        {coverSrc ? (
-                            <img
-                                src={coverSrc}
-                                alt={`${project.name} 项目封面`}
-                                className="pe-project-cover__image"
-                            />
-                        ) : (
-                            <div className="pe-project-cover__placeholder">
-                                <span className="pe-project-cover__mark">{titleMark}</span>
-                                <span className="pe-project-cover__hint">点击设置项目封面</span>
-                            </div>
-                        )}
-                    </button>
-                    <div className="pe-project-cover__actions">
-                        <Button variant="outline" size="sm" onClick={onEditCover} disabled={coverUpdating}>
-                            {coverUpdating ? '保存中…' : coverSrc ? '更换封面' : '设置封面'}
-                        </Button>
-                        {coverSrc && (
-                            <Button variant="ghost" size="sm" onClick={onClearCover} disabled={coverUpdating}>
-                                清除封面
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="pe-overview-hero__content">
-                    <h1 className="pe-overview-title fc-page-title">{project.name}</h1>
-                    {descEditing ? (
-                        <div className="pe-overview-desc-editor">
-                            <textarea
-                                className="pe-overview-desc-textarea"
-                                value={descDraft}
-                                onChange={(e) => setDescDraft(e.target.value)}
-                                rows={3}
-                                autoFocus
-                                placeholder="添加项目描述…"
-                            />
-                            <div className="pe-overview-desc-actions">
-                                <Button size="sm" disabled={descSaving} onClick={() => void handleDescSave()}>
-                                    {descSaving ? '保存中…' : '保存'}
-                                </Button>
-                                <Button variant="ghost" size="sm" disabled={descSaving}
-                                        onClick={() => setDescEditing(false)}>
-                                    取消
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="pe-overview-desc-row">
-                            {project.description ? (
-                                <p className="pe-overview-desc fc-page-subtitle">{project.description}</p>
+                <section className="pe-overview-hero fc-section-card">
+                    <div className="pe-project-cover-card">
+                        <button
+                            type="button"
+                            className={`pe-project-cover${coverSrc ? ' has-image' : ''}`}
+                            onClick={onEditCover}
+                            disabled={coverUpdating}
+                        >
+                            {coverSrc ? (
+                                <img
+                                    src={coverSrc}
+                                    alt={`${project.name} 项目封面`}
+                                    className="pe-project-cover__image"
+                                />
                             ) : (
-                                onDescriptionChange && (
-                                    <p className="pe-overview-desc fc-page-subtitle is-placeholder">暂无描述</p>
-                                )
+                                <div className="pe-project-cover__placeholder">
+                                    <span className="pe-project-cover__mark">{titleMark}</span>
+                                    <span className="pe-project-cover__hint">点击设置项目封面</span>
+                                </div>
                             )}
-                            {onDescriptionChange && (
-                                <Button variant="ghost" size="sm" onClick={handleDescEditStart}>
-                                    {project.description ? '编辑描述' : '添加描述'}
+                        </button>
+                        <div className="pe-project-cover__actions">
+                            <Button variant="outline" size="sm" onClick={onEditCover} disabled={coverUpdating}>
+                                {coverUpdating ? '保存中…' : coverSrc ? '更换封面' : '设置封面'}
+                            </Button>
+                            {coverSrc && (
+                                <Button variant="ghost" size="sm" onClick={onClearCover} disabled={coverUpdating}>
+                                    清除封面
                                 </Button>
                             )}
                         </div>
-                    )}
-                    <div className="pe-overview-meta">
-                        <span>创建于 {formatDate(project.created_at)}</span>
-                        <span className="pe-meta-sep">·</span>
-                        <span>更新于 {formatDate(project.updated_at)}</span>
-                    </div>
-                    <div className="pe-stats-grid">
-                        <StatCard label="词条数" value={entryCount}/>
-                        <StatCard label="分类数" value={categories.length}/>
-                        <StatCard label="词条类型" value={entryTypes.length}/>
-                        <StatCard label="标签数" value={tagCount}/>
-                        <StatCard label="图片数" value={imageCount ?? '--'}/>
-                        <StatCard label="总字数" value={wordCount ?? '--'}/>
-                    </div>
-                    {onDelete && (
-                        <div className="pe-overview-danger-row">
-                            <Button variant="ghost" size="sm" onClick={() => void handleDelete()}>
-                                删除项目
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </section>
-
-            <section className="pe-feature-section fc-section-card">
-                <div className="pe-feature-section__header fc-section-header">
-                    <h2 className="pe-feature-section__title fc-section-title">项目视图</h2>
-                    <p className="pe-feature-section__desc">
-                        这些入口会逐步成为项目的核心浏览方式，关系图谱已可用，其余模块先预留位置。
-                    </p>
-                </div>
-
-                <div className="pe-feature-grid">
-                    <FeatureEntry
-                        title="词条关系图谱"
-                        description="查看人物、组织、地点与关键物件之间的连接结构，直接观察整体关系网。"
-                        onClick={onOpenRelationGraph}
-                    >
-                        <RelationGraphIcon/>
-                    </FeatureEntry>
-                    <FeatureEntry
-                        title="时间线"
-                        description="按事件顺序梳理世界进程、角色行动和关键转折节点。"
-                        onClick={onOpenTimeline}
-                    >
-                        <TimelineIcon/>
-                    </FeatureEntry>
-                    <FeatureEntry
-                        title="矛盾检测"
-                        description="集中检查设定冲突、时间不一致和角色叙述互相打架的地方。"
-                        onClick={onOpenContradiction}
-                    >
-                        <ConflictIcon/>
-                    </FeatureEntry>
-                    <FeatureEntry
-                        title="世界地图"
-                        description="在空间层面串联区域、航线、势力分布和事件发生位置。支持扁平、托尔金、水墨三种渲染风格。"
-                        onClick={onOpenWorldMap}
-                    >
-                        <WorldMapIcon/>
-                    </FeatureEntry>
-                </div>
-            </section>
-
-            <div className="pe-config-grid">
-                <section className="pe-config-section fc-section-card">
-                    <div className="pe-config-section__header fc-section-header">
-                        <div>
-                            <h2 className="pe-feature-section__title fc-section-title">词条类型</h2>
-                            <p className="pe-feature-section__desc">
-                                浏览全部词条类型；自定义类型可直接编辑。
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
                     </div>
 
-                    <RollingBox className="pe-config-list pe-config-list--entry-types" thumbSize="thin">
-                        <div className="pe-config-list__inner pe-entry-type-grid">
-                            {entryTypes.map(entryType => {
-                                const isBuiltin = entryType.kind === 'builtin'
-                                return (
-                                    <article
-                                        key={entryTypeKey(entryType)}
-                                        className="pe-entry-type-item"
-                                        style={{'--pe-config-color': entryType.color} as CSSProperties}
-                                    >
-                                        <div className="pe-entry-type-item__main">
-                                            <div className="pe-entry-type-item__header">
-                                                <div className="pe-entry-type-item__title-row">
-                                                    <span className="pe-entry-type-item__icon">
-                                                        <EntryTypeIcon entryType={entryType}
-                                                                       className="pe-config-item__entry-icon"/>
-                                                    </span>
-                                                    <span className="pe-config-item__title">{entryType.name}</span>
-                                                    <span className="pe-config-item__badge">
-                                                        {isBuiltin ? '内置' : '自定义'}
-                                                    </span>
-                                                </div>
-                                                {!isBuiltin && onEditEntryType && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => onEditEntryType(entryType)}
-                                                    >
-                                                        编辑
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {entryType.description && (
-                                            <p className="pe-entry-type-item__desc">
-                                                {entryType.description}
-                                            </p>
-                                        )}
-                                    </article>
-                                )
-                            })}
+                    <div className="pe-overview-hero__content">
+                        <h1 className="pe-overview-title fc-page-title">{project.name}</h1>
+                        {descEditing ? (
+                            <div className="pe-overview-desc-editor">
+                                <textarea
+                                    className="pe-overview-desc-textarea"
+                                    value={descDraft}
+                                    onChange={(e) => setDescDraft(e.target.value)}
+                                    rows={3}
+                                    autoFocus
+                                    placeholder="添加项目描述…"
+                                />
+                                <div className="pe-overview-desc-actions">
+                                    <Button size="sm" disabled={descSaving} onClick={() => void handleDescSave()}>
+                                        {descSaving ? '保存中…' : '保存'}
+                                    </Button>
+                                    <Button variant="ghost" size="sm" disabled={descSaving}
+                                            onClick={() => setDescEditing(false)}>
+                                        取消
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="pe-overview-desc-row">
+                                {project.description ? (
+                                    <p className="pe-overview-desc fc-page-subtitle">{project.description}</p>
+                                ) : (
+                                    onDescriptionChange && (
+                                        <p className="pe-overview-desc fc-page-subtitle is-placeholder">暂无描述</p>
+                                    )
+                                )}
+                                {onDescriptionChange && (
+                                    <Button variant="ghost" size="sm" onClick={handleDescEditStart}>
+                                        {project.description ? '编辑描述' : '添加描述'}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                        <div className="pe-overview-meta">
+                            <span>创建于 {formatDate(project.created_at)}</span>
+                            <span className="pe-meta-sep">·</span>
+                            <span>更新于 {formatDate(project.updated_at)}</span>
                         </div>
-                    </RollingBox>
+                        <div className="pe-stats-grid">
+                            <StatCard label="词条数" value={entryCount}/>
+                            <StatCard label="分类数" value={categories.length}/>
+                            <StatCard label="词条类型" value={entryTypes.length}/>
+                            <StatCard label="标签数" value={tagCount}/>
+                            <StatCard label="图片数" value={imageCount ?? '--'}/>
+                            <StatCard label="总字数" value={wordCount ?? '--'}/>
+                        </div>
+                        {onDelete && (
+                            <div className="pe-overview-danger-row">
+                                <Button variant="ghost" size="sm" onClick={() => void handleDelete()}>
+                                    删除项目
+                                </Button>
+                            </div>
+                        )}
+                    </div>
                 </section>
 
-                <section className="pe-config-section fc-section-card">
-                    <div className="pe-config-section__header fc-section-header">
-                        <div>
-                            <h2 className="pe-feature-section__title fc-section-title">标签</h2>
-                            <p className="pe-feature-section__desc">
-                                管理标签类型、默认值和默认植入范围。
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
+                <section className="pe-feature-section fc-section-card">
+                    <div className="pe-feature-section__header fc-section-header">
+                        <h2 className="pe-feature-section__title fc-section-title">项目视图</h2>
+                        <p className="pe-feature-section__desc">
+                            这些入口会逐步成为项目的核心浏览方式，关系图谱已可用，其余模块先预留位置。
+                        </p>
                     </div>
 
-                    <RollingBox className="pe-config-list pe-config-list--tags" thumbSize="thin">
-                        <div className="pe-config-list__inner pe-entry-type-grid">
-                            {tagSchemas.map(tag => {
-                                const compactTargets = getCompactTagTargetLabels(tag, entryTypeNameMap)
-                                const defaultValue = getTagDefaultValue(tag)
-                                const hasDescription = Boolean(tag.description?.trim())
-                                return (
-                                    <article key={tag.id} className="pe-entry-type-item pe-entry-type-item--tag">
-                                        <div className="pe-entry-type-item__main">
-                                            <div className="pe-entry-type-item__header">
-                                                <div className="pe-entry-type-item__title-row">
-                                                    <span
-                                                        className="pe-entry-type-item__icon pe-entry-type-item__icon--tag">
-                                                        #
-                                                    </span>
-                                                    <span className="pe-config-item__title">{tag.name}</span>
-                                                    <span
-                                                        className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
-                                                </div>
-                                                {onEditTag && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => onEditTag(tag)}
-                                                    >
-                                                        编辑
-                                                    </Button>
-                                                )}
-                                            </div>
-                                            <div className="pe-tag-config-item__meta-row">
-                                                {defaultValue && (
-                                                    <span
-                                                        className="pe-config-item__badge is-muted">默认值：{defaultValue}</span>
-                                                )}
-                                                {compactTargets.length > 0 ? (
-                                                    compactTargets.map(target => (
-                                                        <span key={`${tag.id}-${target}`}
-                                                              className="pe-tag-target-chip">
-                                                            {target}
+                    <div className="pe-feature-grid">
+                        <FeatureEntry
+                            title="词条关系图谱"
+                            description="查看人物、组织、地点与关键物件之间的连接结构，直接观察整体关系网。"
+                            onClick={onOpenRelationGraph}
+                        >
+                            <RelationGraphIcon/>
+                        </FeatureEntry>
+                        <FeatureEntry
+                            title="时间线"
+                            description="按事件顺序梳理世界进程、角色行动和关键转折节点。"
+                            onClick={onOpenTimeline}
+                        >
+                            <TimelineIcon/>
+                        </FeatureEntry>
+                        <FeatureEntry
+                            title="矛盾检测"
+                            description="集中检查设定冲突、时间不一致和角色叙述互相打架的地方。"
+                            onClick={onOpenContradiction}
+                        >
+                            <ConflictIcon/>
+                        </FeatureEntry>
+                        <FeatureEntry
+                            title="世界地图"
+                            description="在空间层面串联区域、航线、势力分布和事件发生位置。支持扁平、托尔金、水墨三种渲染风格。"
+                            onClick={onOpenWorldMap}
+                        >
+                            <WorldMapIcon/>
+                        </FeatureEntry>
+                    </div>
+                </section>
+
+                <div className="pe-config-grid">
+                    <section className="pe-config-section fc-section-card">
+                        <div className="pe-config-section__header fc-section-header">
+                            <div>
+                                <h2 className="pe-feature-section__title fc-section-title">词条类型</h2>
+                                <p className="pe-feature-section__desc">
+                                    浏览全部词条类型；自定义类型可直接编辑。
+                                </p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
+                        </div>
+
+                        <RollingBox className="pe-config-list pe-config-list--entry-types" thumbSize="thin">
+                            <div className="pe-config-list__inner pe-entry-type-grid">
+                                {entryTypes.map(entryType => {
+                                    const isBuiltin = entryType.kind === 'builtin'
+                                    return (
+                                        <article
+                                            key={entryTypeKey(entryType)}
+                                            className="pe-entry-type-item"
+                                            style={{'--pe-config-color': entryType.color} as CSSProperties}
+                                        >
+                                            <div className="pe-entry-type-item__main">
+                                                <div className="pe-entry-type-item__header">
+                                                    <div className="pe-entry-type-item__title-row">
+                                                        <span className="pe-entry-type-item__icon">
+                                                            <EntryTypeIcon entryType={entryType}
+                                                                           className="pe-config-item__entry-icon"/>
                                                         </span>
-                                                    ))
-                                                ) : (
-                                                    <span className="pe-tag-target-chip is-free">自由标签</span>
-                                                )}
+                                                        <span className="pe-config-item__title">{entryType.name}</span>
+                                                        <span className="pe-config-item__badge">
+                                                            {isBuiltin ? '内置' : '自定义'}
+                                                        </span>
+                                                    </div>
+                                                    {!isBuiltin && onEditEntryType && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => onEditEntryType(entryType)}
+                                                        >
+                                                            编辑
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                        {hasDescription && (
-                                            <p className="pe-entry-type-item__desc">
-                                                {tag.description}
-                                            </p>
-                                        )}
-                                    </article>
-                                )
-                            })}
+                                            {entryType.description && (
+                                                <p className="pe-entry-type-item__desc">
+                                                    {entryType.description}
+                                                </p>
+                                            )}
+                                        </article>
+                                    )
+                                })}
+                            </div>
+                        </RollingBox>
+                    </section>
+
+                    <section className="pe-config-section fc-section-card">
+                        <div className="pe-config-section__header fc-section-header">
+                            <div>
+                                <h2 className="pe-feature-section__title fc-section-title">标签</h2>
+                                <p className="pe-feature-section__desc">
+                                    管理标签类型、默认值和默认植入范围。
+                                </p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
                         </div>
-                    </RollingBox>
-                </section>
-            </div>
-            {children}
+
+                        <RollingBox className="pe-config-list pe-config-list--tags" thumbSize="thin">
+                            <div className="pe-config-list__inner pe-entry-type-grid">
+                                {tagSchemas.map(tag => {
+                                    const compactTargets = getCompactTagTargetLabels(tag, entryTypeNameMap)
+                                    const defaultValue = getTagDefaultValue(tag)
+                                    const hasDescription = Boolean(tag.description?.trim())
+                                    return (
+                                        <article key={tag.id} className="pe-entry-type-item pe-entry-type-item--tag">
+                                            <div className="pe-entry-type-item__main">
+                                                <div className="pe-entry-type-item__header">
+                                                    <div className="pe-entry-type-item__title-row">
+                                                        <span
+                                                            className="pe-entry-type-item__icon pe-entry-type-item__icon--tag">
+                                                            #
+                                                        </span>
+                                                        <span className="pe-config-item__title">{tag.name}</span>
+                                                        <span
+                                                            className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
+                                                    </div>
+                                                    {onEditTag && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => onEditTag(tag)}
+                                                        >
+                                                            编辑
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                                <div className="pe-tag-config-item__meta-row">
+                                                    {defaultValue && (
+                                                        <span
+                                                            className="pe-config-item__badge is-muted">默认值：{defaultValue}</span>
+                                                    )}
+                                                    {compactTargets.length > 0 ? (
+                                                        compactTargets.map(target => (
+                                                            <span key={`${tag.id}-${target}`}
+                                                                  className="pe-tag-target-chip">
+                                                                {target}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="pe-tag-target-chip is-free">自由标签</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {hasDescription && (
+                                                <p className="pe-entry-type-item__desc">
+                                                    {tag.description}
+                                                </p>
+                                            )}
+                                        </article>
+                                    )
+                                })}
+                            </div>
+                        </RollingBox>
+                    </section>
+                </div>
+                {children && (
+                    <div className="pe-overview-entries">
+                        {children}
+                    </div>
+                )}
         </RollingBox>
     )
 }

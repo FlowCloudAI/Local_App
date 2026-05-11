@@ -36,7 +36,6 @@ export default function DesktopApp() {
     const AI_MIN_PANEL_WIDTH = 500
     const win = getCurrentWindow()
     const {showAlert} = useAlert()
-    const initializedTabsRef = useRef(false)
     const windowClosingRef = useRef(false)
 
     const [isMaximized, setIsMaximized] = useState(false)
@@ -105,6 +104,11 @@ export default function DesktopApp() {
         ))
     }, [aiPanelCollapsed, sidePanelContentKey])
 
+    const collapseAiPanel = useCallback(() => {
+        setAiPanelCollapsed(true)
+        setAiPanelMode((prev) => prev === 'fullscreen' ? 'floating' : prev)
+    }, [])
+
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
         setCollapsed(true)
@@ -140,12 +144,6 @@ export default function DesktopApp() {
         setTabs(prev => [...prev, {key: newKey, label, closable: true}])
         setActiveKey(newKey)
     }, [mainContentKey])
-
-    useEffect(() => {
-        if (initializedTabsRef.current || tabs.length > 0) return
-        initializedTabsRef.current = true
-        handleAdd('主页')
-    }, [handleAdd, tabs.length])
 
     // 打开项目标签页
     const handleOpenProject = useCallback((project: Project) => {
@@ -281,7 +279,7 @@ export default function DesktopApp() {
                 }
             } else {
                 setMainContentKey('home')
-                setSelectedKey('home')
+                setSelectedKey('')
             }
             setActiveKey(nextTab?.key ?? '')
         }
@@ -395,7 +393,7 @@ export default function DesktopApp() {
                 }
             } else {
                 setMainContentKey('home')
-                setSelectedKey('home')
+                setSelectedKey('')
             }
             setActiveKey(nextTab?.key ?? '')
         }
@@ -437,7 +435,7 @@ export default function DesktopApp() {
     const handleSideBarSelect = useCallback((key: string) => {
         if (key === 'idea' || key === 'ai-chat' || key === 'snapshot') {
             if (!aiPanelCollapsed && sidePanelContentKey === key) {
-                setAiPanelCollapsed(true)
+                collapseAiPanel()
                 setSelectedKey('')
                 return
             }
@@ -453,9 +451,9 @@ export default function DesktopApp() {
             setSelectedKey('settings')
             setActiveKey('')
             setMainContentKey('settings')
-            setAiPanelCollapsed(true)
+            collapseAiPanel()
         }
-    }, [aiPanelCollapsed, mainContentKey, sidePanelContentKey])
+    }, [aiPanelCollapsed, collapseAiPanel, mainContentKey, sidePanelContentKey])
 
     const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {
         setSelectedKey('ai-chat')
@@ -498,6 +496,7 @@ export default function DesktopApp() {
     const activeEntryTitle = activeEntryMeta
         ? String(tabs.find(tab => tab.key === activeKey)?.label ?? '')
         : null
+    const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
         recentPageKeys
@@ -611,7 +610,7 @@ export default function DesktopApp() {
     return (
         <div className="app-layout">
             <div className="top-bar" data-tauri-drag-region>
-                <button className="menu-btn" data-tauri-drag-region>
+                <div className="app-logo" data-tauri-drag-region aria-hidden="true">
                     <svg
                         data-tauri-drag-region
                         xmlns="http://www.w3.org/2000/svg"
@@ -638,6 +637,30 @@ export default function DesktopApp() {
                             </linearGradient>
                         </defs>
                     </svg>
+                </div>
+                <button
+                    type="button"
+                    className={`home-tab ${isHomeTabActive ? 'home-tab--active' : ''}`}
+                    onClick={handleBackHome}
+                >
+                    <svg
+                        className="home-tab__icon"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M3.5 10.5 12 4l8.5 6.5"/>
+                        <path d="M6.5 9.5V20h11V9.5"/>
+                        <path d="M10 20v-5h4v5"/>
+                    </svg>
+                    主页
                 </button>
                 <div className="tab-bar-wrapper" data-tauri-drag-region>
                     <TabBar
@@ -808,7 +831,7 @@ export default function DesktopApp() {
                                                 (prev) => prev === 'floating' ? 'fullscreen' : 'floating',
                                             )
                                         }
-                                        onToggleCollapsed={() => setAiPanelCollapsed(true)}
+                                        onToggleCollapsed={collapseAiPanel}
                                     />
                                 </div>
                             )}
@@ -821,7 +844,7 @@ export default function DesktopApp() {
                                         className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
                                         panelMode={aiPanelMode}
                                         onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
-                                        onToggleCollapsed={() => setAiPanelCollapsed(true)}
+                                        onToggleCollapsed={collapseAiPanel}
                                     />
                                 </div>
                             )}
@@ -835,7 +858,7 @@ export default function DesktopApp() {
                                             controller={aiController}
                                             panelMode={aiPanelMode}
                                             onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
-                                            onToggleCollapsed={() => setAiPanelCollapsed(true)}
+                                            onToggleCollapsed={collapseAiPanel}
                                             onOpenEntry={handleOpenEntry}
                                         />
                                     </div>

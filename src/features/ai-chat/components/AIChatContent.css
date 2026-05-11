@@ -886,6 +886,13 @@
     cursor: not-allowed;
 }
 
+.ai-input-limit-hint {
+    margin-top: 0.2rem;
+    color: var(--fc-color-warning, var(--fc-color-text-secondary));
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
 .ai-floating-input-inner .entry-editor-wikilink-popover {
     position: absolute;
     z-index: 180;

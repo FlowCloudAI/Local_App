@@ -377,7 +377,7 @@ pub async fn ai_create_character_session(
         .unwrap_or_else(|| input.session_id.clone());
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.run(input_rx);
+    let (event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
     let run_id = Uuid::new_v4().to_string();
 
     spawn_session_event_loop(app, input.session_id.clone(), run_id.clone(), event_stream);

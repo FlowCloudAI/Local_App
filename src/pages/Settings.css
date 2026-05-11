@@ -77,6 +77,7 @@
 .settings-content {
   flex: 1;
     padding: var(--fc-space-md);
+    position: relative;
 }
 
 .settings-container {
@@ -100,6 +101,10 @@
   grid-template-columns: repeat(auto-fit, minmax(18rem, 24rem));
   gap: 1rem 1.5rem;
   align-items: start;
+}
+
+.settings-row--compact {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
 }
 
 .settings-field {
@@ -142,6 +147,23 @@
 .settings-input-small {
   width: 4rem;
   flex-shrink: 0;
+}
+
+.settings-number-input {
+  width: 6rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-md);
+  background: var(--fc-color-bg);
+  color: var(--fc-color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-number-input:focus {
+  outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
+  outline-offset: 1px;
 }
 
 .settings-span {

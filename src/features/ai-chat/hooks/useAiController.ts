@@ -30,6 +30,7 @@ import {
 import {type SessionMessage, useAiSession} from './useAiSession'
 import type {
     AiContextValue,
+    AiFocusContext,
     Conversation,
     Message,
     ReportConversationContext,
@@ -331,6 +332,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const projectNameCacheRef = useRef<Map<string, string>>(new Map())
     // Map value: snippet string（含空字符串），undefined 表示未缓存
     const entrySnippetCacheRef = useRef<Map<string, string>>(new Map())
+    const entryTitleCacheRef = useRef<Map<string, string>>(new Map())
+    const [focusContext, setFocusContext] = useState<AiFocusContext>({
+        projectId: focus.projectId,
+        projectName: null,
+        entryId: focus.entryId,
+        entryTitle: null,
+        editModeEnabled,
+        webSearchEnabled,
+    })
 
     const activeConversation = useMemo(
         () => conversations.find((conversation) => conversation.id === activeConversationId),
@@ -487,11 +497,51 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (e) => {
             entrySnippetCacheRef.current.delete(e.payload.entry_id)
+            entryTitleCacheRef.current.delete(e.payload.entry_id)
         })
         return () => {
             unlisten.then(fn => fn())
         }
     }, [])
+
+    useEffect(() => {
+        let cancelled = false
+
+        const loadFocusContext = async () => {
+            const [projectResult, entryResult] = await Promise.allSettled([
+                focus.projectId ? (async () => {
+                    const cached = projectNameCacheRef.current.get(focus.projectId!)
+                    if (cached !== undefined) return cached
+                    const project = await db_get_project(focus.projectId!)
+                    projectNameCacheRef.current.set(focus.projectId!, project.name)
+                    return project.name
+                })() : Promise.resolve(null),
+                focus.entryId ? (async () => {
+                    const cached = entryTitleCacheRef.current.get(focus.entryId!)
+                    if (cached !== undefined) return cached
+                    const entry = await db_get_entry(focus.entryId!)
+                    entryTitleCacheRef.current.set(focus.entryId!, entry.title)
+                    return entry.title
+                })() : Promise.resolve(null),
+            ])
+
+            if (cancelled) return
+            setFocusContext({
+                projectId: focus.projectId,
+                projectName: projectResult.status === 'fulfilled' ? projectResult.value : null,
+                entryId: focus.entryId,
+                entryTitle: entryResult.status === 'fulfilled' ? entryResult.value : null,
+                editModeEnabled,
+                webSearchEnabled,
+            })
+        }
+
+        void loadFocusContext()
+
+        return () => {
+            cancelled = true
+        }
+    }, [editModeEnabled, focus.entryId, focus.projectId, webSearchEnabled])
 
     const resolveContextPayload = useCallback(async (
         projectId: string | null,
@@ -1138,6 +1188,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         tools,
         webSearchEnabled,
         editModeEnabled,
+        focusContext,
         toggleWebSearch,
         toggleEditMode,
         sessionParams,
@@ -1160,7 +1211,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         switchBranch: session.switchBranch,
     }), [
         plugins, selectedPlugin, selectedModel, conversations, activeConversationId,
-        messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled,
+        messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
