@@ -104,10 +104,25 @@ export default function DesktopApp() {
         ))
     }, [aiPanelCollapsed, sidePanelContentKey])
 
-    const collapseAiPanel = useCallback(() => {
-        setAiPanelCollapsed(true)
-        setAiPanelMode((prev) => prev === 'fullscreen' ? 'floating' : prev)
+    const clearSidePanelSelection = useCallback(() => {
+        setSelectedKey(prev => (
+            prev === 'idea' || prev === 'ai-chat' || prev === 'snapshot'
+                ? ''
+                : prev
+        ))
     }, [])
+
+    const handleAiPanelCollapsedChange = useCallback((nextCollapsed: boolean) => {
+        setAiPanelCollapsed(nextCollapsed)
+        if (nextCollapsed) {
+            clearSidePanelSelection()
+        }
+    }, [clearSidePanelSelection])
+
+    const collapseAiPanel = useCallback(() => {
+        handleAiPanelCollapsedChange(true)
+        setAiPanelMode((prev) => prev === 'fullscreen' ? 'floating' : prev)
+    }, [handleAiPanelCollapsedChange])
 
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
@@ -810,7 +825,7 @@ export default function DesktopApp() {
                         minWidth={AI_MIN_PANEL_WIDTH}
                         maxWidthRatio={0.7}
                         collapsed={aiPanelCollapsed}
-                        onCollapsedChange={setAiPanelCollapsed}
+                        onCollapsedChange={handleAiPanelCollapsedChange}
                         onWidthChange={setAiPanelWidth}
                         onModeChange={setAiPanelMode}
                         className="ai-shell"

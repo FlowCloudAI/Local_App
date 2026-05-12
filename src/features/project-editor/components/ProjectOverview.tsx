@@ -10,7 +10,6 @@ import {
     type TagSchema,
 } from '../../../api'
 import EntryTypeIcon from './EntryTypeIcon'
-import '../../../shared/ui/layout/WorkspaceScaffold.css'
 
 function parseDateMs(s?: string | null): number {
     if (!s) return 0
@@ -35,8 +34,8 @@ function formatDate(s?: string | null): string {
 function StatCard({label, value}: { label: string; value: number | string }) {
     return (
         <div className="pe-stat-card">
-            <span className="pe-stat-value">{value}</span>
             <span className="pe-stat-label">{label}</span>
+            <span className="pe-stat-value">{value}</span>
         </div>
     )
 }
@@ -309,8 +308,8 @@ function ProjectOverview({
     }
 
     return (
-        <RollingBox className="pe-overview fc-page-shell" thumbSize="thin">
-                <section className="pe-overview-hero fc-section-card">
+        <RollingBox className="pe-overview" thumbSize="thin">
+                <section className="pe-overview-hero">
                     <div className="pe-project-cover-card">
                         <button
                             type="button"
@@ -344,7 +343,7 @@ function ProjectOverview({
                     </div>
 
                     <div className="pe-overview-hero__content">
-                        <h1 className="pe-overview-title fc-page-title">{project.name}</h1>
+                        <h1 className="pe-overview-title">{project.name}</h1>
                         {descEditing ? (
                             <div className="pe-overview-desc-editor">
                                 <textarea
@@ -368,10 +367,10 @@ function ProjectOverview({
                         ) : (
                             <div className="pe-overview-desc-row">
                                 {project.description ? (
-                                    <p className="pe-overview-desc fc-page-subtitle">{project.description}</p>
+                                    <p className="pe-overview-desc">{project.description}</p>
                                 ) : (
                                     onDescriptionChange && (
-                                        <p className="pe-overview-desc fc-page-subtitle is-placeholder">暂无描述</p>
+                                        <p className="pe-overview-desc is-placeholder">暂无描述</p>
                                     )
                                 )}
                                 {onDescriptionChange && (
@@ -404,9 +403,9 @@ function ProjectOverview({
                     </div>
                 </section>
 
-                <section className="pe-feature-section fc-section-card">
-                    <div className="pe-feature-section__header fc-section-header">
-                        <h2 className="pe-feature-section__title fc-section-title">项目视图</h2>
+                <section className="pe-feature-section">
+                    <div className="pe-feature-section__header">
+                        <h2 className="pe-feature-section__title">项目视图</h2>
                         <p className="pe-feature-section__desc">
                             这些入口会逐步成为项目的核心浏览方式，关系图谱已可用，其余模块先预留位置。
                         </p>
@@ -445,10 +444,10 @@ function ProjectOverview({
                 </section>
 
                 <div className="pe-config-grid">
-                    <section className="pe-config-section fc-section-card">
-                        <div className="pe-config-section__header fc-section-header">
+                    <section className="pe-config-section">
+                        <div className="pe-config-section__header">
                             <div>
-                                <h2 className="pe-feature-section__title fc-section-title">词条类型</h2>
+                                <h2 className="pe-feature-section__title">词条类型</h2>
                                 <p className="pe-feature-section__desc">
                                     浏览全部词条类型；自定义类型可直接编辑。
                                 </p>
@@ -501,10 +500,10 @@ function ProjectOverview({
                         </RollingBox>
                     </section>
 
-                    <section className="pe-config-section fc-section-card">
-                        <div className="pe-config-section__header fc-section-header">
+                    <section className="pe-config-section">
+                        <div className="pe-config-section__header">
                             <div>
-                                <h2 className="pe-feature-section__title fc-section-title">标签</h2>
+                                <h2 className="pe-feature-section__title">标签</h2>
                                 <p className="pe-feature-section__desc">
                                     管理标签类型、默认值和默认植入范围。
                                 </p>

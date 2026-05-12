@@ -537,8 +537,13 @@
     z-index: 1;
 }
 
-.ai-messages-container .fc-roll {
+.ai-messages-container.fc-roll {
+    overflow-x: hidden;
+    overflow-y: auto;
     scroll-behavior: smooth;
+}
+
+.ai-messages-container > .fc-roll__content {
     padding: 1rem 1.5rem;
 }
 
@@ -599,8 +604,12 @@
     gap: 16px;
     width: 100%;
     max-width: var(--ai-chat-content-max-width);
-    margin: 1rem auto 220px;
+    margin: 0 auto 220px;
     padding-inline: 1.5rem;
+}
+
+.ai-report-context-bar + .ai-messages-list {
+    margin-top: 1rem;
 }
 
 .ai-messages-list .message-box-item--assistant {
@@ -693,7 +702,7 @@
     gap: var(--fc-space-sm);
     width: calc(100% - 3rem);
     max-width: var(--ai-chat-content-max-width);
-    margin: 1rem auto 0;
+    margin: 0 auto;
     padding: var(--fc-space-md) var(--fc-space-lg);
     border-color: var(--fc-color-warning-border);
     border-radius: var(--fc-radius-md);
