@@ -5,18 +5,19 @@
 }
 
 body {
-    background: var(--fc-color-bg);
+    background: var(--fc-color-bg-secondary);
     color: var(--fc-color-text);
     font-family: "Microsoft YaHei UI", var(--fc-font-family), sans-serif;
 }
 
 /* 主容器 */
 .app-layout {
+    --app-drag-handle-width: 8px;
     display: flex;
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: var(--fc-color-bg);
+    background: var(--fc-color-bg-secondary);
     color: var(--fc-color-text);
 }
 
@@ -29,7 +30,7 @@ body {
     padding: var(--fc-space-xs);
     height: 3rem;
     background: var(--fc-color-bg-secondary);
-    border-bottom: 1px solid var(--fc-color-border);
+    border-bottom: none;
     flex-shrink: 0;
     user-select: none;
 }
@@ -132,8 +133,10 @@ body {
 .main-content {
     display: flex;
     height: 100%;
+    padding-left: var(--app-drag-handle-width);
+    padding-bottom: var(--app-drag-handle-width);
     overflow: hidden;
-    background: var(--fc-color-bg);
+    background: var(--fc-color-bg-secondary);
 }
 
 .workspace-content {
@@ -143,6 +146,7 @@ body {
     display: flex;
     overflow: hidden;
     position: relative;
+    background: var(--fc-color-bg-secondary);
 }
 
 .page-container {
@@ -150,8 +154,12 @@ body {
     min-width: 0;
     min-height: 0;
     position: relative;
+    z-index: 2;
     overflow: hidden;
     background: var(--fc-color-bg);
+    border-radius: var(--fc-radius-xl);
+    outline: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
+    outline-offset: -1px;
 }
 
 .page-container.is-hidden-for-ai-chat {
@@ -163,7 +171,7 @@ body {
 }
 
 .page-wrapper {
-    padding: 0.1rem;
+    padding: 0;
     position: absolute;
     top: 0;
     left: 0;
@@ -276,4 +284,5 @@ body {
     user-select: none;
     z-index: 1001;  /* 高于 AI 右侧面板的 1000 */
     position: relative;  /* 确保 z-index 生效 */
+    border-left-color: var(--fc-color-bg-secondary) !important;
 }

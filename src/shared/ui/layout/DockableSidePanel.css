@@ -1,7 +1,9 @@
 .dockable-side-panel {
-    --dockable-side-panel-handle-width: 8px;
+    --dockable-side-panel-handle-width: var(--app-drag-handle-width, 8px);
     --dockable-side-panel-handle-gutter: 8px;
-    --dockable-side-panel-collapsed-width: 8px;
+    --dockable-side-panel-handle-gap-height: 48px;
+    --dockable-side-panel-handle-gap-half: 24px;
+    --dockable-side-panel-collapsed-width: 0px;
 }
 
 .dockable-side-panel {
@@ -10,21 +12,29 @@
     display: flex;
     overflow: hidden;
     background: var(--fc-color-bg);
+    position: relative;
 }
 
 .dockable-side-panel--fullscreen {
     flex: 1;
     height: 100%;
     padding: 0;
+    border-radius: var(--fc-radius-xl);
 }
 
 .dockable-side-panel--floating {
     position: relative;
+    z-index: 2;
     height: 100%;
     flex-shrink: 0;
-    border-left: 1px solid var(--fc-color-border);
+    margin-left: var(--dockable-side-panel-handle-width);
+    border-left: none;
+    border-radius: var(--fc-radius-xl);
+    outline: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
+    outline-offset: -1px;
+    overflow: visible;
     width: var(--dsp-width);
-    transition: width 0.18s ease, border-color 0.15s ease;
+    transition: width 0.18s ease, border-color 0.15s ease, outline-color 0.15s ease;
 }
 
 /* 正常拖拽：无 transition */
@@ -40,6 +50,7 @@
 .dockable-side-panel--floating.is-collapsed {
     width: var(--dockable-side-panel-collapsed-width);
     border-left-color: transparent;
+    outline-color: transparent;
 }
 
 .dockable-side-panel--floating.is-collapse-preview {
@@ -56,11 +67,12 @@
     min-height: 0;
     display: flex;
     overflow: hidden;
+    border-radius: inherit;
     transition: opacity 0.15s ease, padding-left 0.15s ease;
 }
 
 .dockable-side-panel--floating .dockable-side-panel__body {
-    padding-left: var(--dockable-side-panel-handle-gutter);
+    padding-left: 0;
 }
 
 .dockable-side-panel--floating.is-collapsed .dockable-side-panel__body,
@@ -76,7 +88,7 @@
 
 .dockable-side-panel__resize-handle {
     position: absolute;
-    left: 0;
+    left: calc(var(--dockable-side-panel-handle-width) * -1);
     top: 0;
     bottom: 0;
     width: var(--dockable-side-panel-handle-width);
@@ -98,18 +110,33 @@
     left: 50%;
     width: 2px;
     transform: translateX(-50%);
-    background: color-mix(in srgb, var(--fc-color-border) 88%, transparent);
-    transition: background 0.1s ease, width 0.1s ease;
+    background: linear-gradient(
+            180deg,
+            transparent 0%,
+            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 12%,
+            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 24%,
+            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% - var(--dockable-side-panel-handle-gap-height)),
+            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% - var(--dockable-side-panel-handle-gap-half)),
+            transparent calc(50% - var(--dockable-side-panel-handle-gap-half)),
+            transparent calc(50% + var(--dockable-side-panel-handle-gap-half)),
+            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% + var(--dockable-side-panel-handle-gap-half)),
+            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% + var(--dockable-side-panel-handle-gap-height)),
+            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 76%,
+            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 88%,
+            transparent 100%
+    );
+    opacity: 0;
+    transition: opacity 0.14s ease, width 0.1s ease;
 }
 
 .dockable-side-panel__resize-grip {
     position: relative;
     z-index: 1;
     width: var(--dockable-side-panel-handle-width);
-    height: 48px;
+    height: var(--dockable-side-panel-handle-gap-height);
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 92%, var(--fc-color-bg));
+    border: 1px solid transparent;
+    background: transparent;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -146,14 +173,14 @@
 
 .dockable-side-panel__resize-handle:hover::before,
 .dockable-side-panel__resize-handle.is-dragging::before {
-    background: color-mix(in srgb, var(--fc-color-primary) 55%, transparent);
+    opacity: 1;
 }
 
 .dockable-side-panel__resize-handle:hover .dockable-side-panel__resize-grip,
 .dockable-side-panel__resize-handle.is-dragging .dockable-side-panel__resize-grip {
-    transform: scale(1.03);
-    border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-primary) 18%, var(--fc-color-bg-secondary));
+    transform: none;
+    border-color: transparent;
+    background: transparent;
 }
 
 .dockable-side-panel__resize-handle:hover .dockable-side-panel__resize-dot,

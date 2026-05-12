@@ -45,7 +45,8 @@
     min-height: 3rem;
     padding: var(--fc-space-md) var(--fc-space-lg);
     border-bottom: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-secondary);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    backdrop-filter: blur(10px);
 }
 
 .idea-page__sidebar-topbar-title,

@@ -1,13 +1,13 @@
-import React, {
-    memo,
-    type MouseEvent as ReactMouseEvent,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState
-} from 'react'
-import {type CategoryTreeNode, DeleteDialog, type DropPosition, flatToTree, Tree, type TreeViewportRowsPayload, useAlert} from 'flowcloudai-ui'
+import React, {memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {
+    type CategoryTreeNode,
+    DeleteDialog,
+    type DropPosition,
+    flatToTree,
+    Tree,
+    type TreeViewportRowsPayload,
+    useAlert
+} from 'flowcloudai-ui'
 import {listen} from '@tauri-apps/api/event'
 import {
     type Category,
@@ -25,18 +25,18 @@ import {
     db_get_entry,
     db_get_project,
     db_get_project_stats,
-    db_list_entries,
     db_list_all_entry_types,
     db_list_categories,
+    db_list_entries,
     db_list_tag_schemas,
     db_update_category,
     db_update_project,
     ENTRY_CREATED,
     ENTRY_DELETED,
     ENTRY_UPDATED,
+    type EntryBrief,
     type EntryCreatedEvent,
     type EntryDeletedEvent,
-    type EntryBrief,
     type EntryTypeView,
     type EntryUpdatedEvent,
     type Project,
@@ -91,6 +91,12 @@ interface Props {
 
 type Selection = { kind: 'project' } | { kind: 'category'; id: string }
 type ProjectPanel = 'overview' | 'relation-graph' | 'timeline' | 'contradiction' | 'world-map'
+type BreadcrumbItem = {
+    key: string
+    label: string
+    onClick: () => void
+    current?: boolean
+}
 
 const PROJECT_PANEL_LABELS: Record<ProjectPanel, string> = {
     overview: '项目概览',
@@ -683,39 +689,112 @@ function ProjectEditorInner({
     const visibleEntryIds = useMemo(() => openEntryIds.slice(-10), [openEntryIds])
     const hasActiveEntry = Boolean(activeEntryId)
     const hasActiveTool = Boolean(activeToolPanel)
-    const selectedCategoryPathNames = useMemo(() => {
-        if (selection.kind !== 'category') return [] as string[]
+    const handleBreadcrumbProjectClick = useCallback(() => {
+        setSelectedKey(ROOT_ID)
+        setSelection({kind: 'project'})
+        if (activeEntryId || activeToolPanel) {
+            void onBackToProject?.(projectId)
+        }
+    }, [activeEntryId, activeToolPanel, onBackToProject, projectId])
+
+    const handleBreadcrumbCategoryClick = useCallback((categoryId: string) => {
+        setSelectedKey(categoryId)
+        setSelection({kind: 'category', id: categoryId})
+        if (activeEntryId || activeToolPanel) {
+            void onBackToProject?.(projectId)
+        }
+    }, [activeEntryId, activeToolPanel, onBackToProject, projectId])
+
+    const handleBreadcrumbEntryClick = useCallback(() => {
+        if (!activeEntryId) return
+        onOpenEntry?.(projectId, {
+            id: activeEntryId,
+            title: activeEntryTitle || '词条',
+        })
+    }, [activeEntryId, activeEntryTitle, onOpenEntry, projectId])
+
+    const handleBreadcrumbToolClick = useCallback(() => {
+        if (!activeToolPanel || activeToolPanel === 'overview') return
+        handleOpenProjectPanel(activeToolPanel)
+    }, [activeToolPanel, handleOpenProjectPanel])
+
+    const selectedCategoryPathItems = useMemo(() => {
+        if (selection.kind !== 'category') return [] as Array<{ id: string; name: string }>
 
         const categoryMap = new Map(categories.map((category) => [category.id, category]))
-        const names: string[] = []
+        const items: Array<{ id: string; name: string }> = []
         const visited = new Set<string>()
         let current = categoryMap.get(selection.id) ?? null
 
         while (current && !visited.has(current.id)) {
             visited.add(current.id)
-            names.push(current.name)
+            items.push({id: current.id, name: current.name})
             current = current.parent_id ? (categoryMap.get(current.parent_id) ?? null) : null
         }
 
-        names.reverse()
-        return names
+        items.reverse()
+        return items
     }, [categories, selection])
 
+    const selectedCategoryPathNames = useMemo(
+        () => selectedCategoryPathItems.map((category) => category.name),
+        [selectedCategoryPathItems],
+    )
+
     const breadcrumbItems = useMemo(() => {
-        const items = ['项目', project?.name ?? '加载中']
+        const items: BreadcrumbItem[] = [
+            {
+                key: 'project-list',
+                label: '项目',
+                onClick: handleBreadcrumbProjectClick,
+            },
+            {
+                key: `project-${projectId}`,
+                label: project?.name ?? '加载中',
+                onClick: handleBreadcrumbProjectClick,
+            },
+        ]
         if (selection.kind === 'category') {
-            items.push(...selectedCategoryPathNames)
+            for (const category of selectedCategoryPathItems) {
+                items.push({
+                    key: `category-${category.id}`,
+                    label: category.name,
+                    onClick: () => handleBreadcrumbCategoryClick(category.id),
+                })
+            }
         }
         if (activeEntryId) {
-            items.push(activeEntryTitle || '词条')
+            items.push({
+                key: `entry-${activeEntryId}`,
+                label: activeEntryTitle || '词条',
+                onClick: handleBreadcrumbEntryClick,
+                current: true,
+            })
             return items
         }
         if (activeToolPanel) {
-            items.push(PROJECT_PANEL_LABELS[activeToolPanel])
+            items.push({
+                key: `tool-${activeToolPanel}`,
+                label: PROJECT_PANEL_LABELS[activeToolPanel],
+                onClick: handleBreadcrumbToolClick,
+                current: true,
+            })
             return items
         }
         return items
-    }, [activeEntryId, activeEntryTitle, activeToolPanel, project?.name, selectedCategoryPathNames, selection.kind])
+    }, [
+        activeEntryId,
+        activeEntryTitle,
+        activeToolPanel,
+        handleBreadcrumbCategoryClick,
+        handleBreadcrumbEntryClick,
+        handleBreadcrumbProjectClick,
+        handleBreadcrumbToolClick,
+        project?.name,
+        projectId,
+        selectedCategoryPathItems,
+        selection.kind,
+    ])
 
     const projectViewLabel = useMemo(() => {
         const projectName = project?.name ?? '加载中'
@@ -789,9 +868,16 @@ function ProjectEditorInner({
             <div className="pe-content">
                 <nav className="pe-breadcrumb" aria-label="当前位置">
                     {breadcrumbItems.map((item, index) => (
-                        <React.Fragment key={`${item}-${index}`}>
+                        <React.Fragment key={item.key}>
                             {index > 0 && <span className="pe-breadcrumb__sep">/</span>}
-                            <span className="pe-breadcrumb__item" title={item}>{item}</span>
+                            <button
+                                type="button"
+                                className={`pe-breadcrumb__item${item.current ? ' is-current' : ''}`}
+                                title={item.label}
+                                onClick={item.onClick}
+                            >
+                                {item.label}
+                            </button>
                         </React.Fragment>
                     ))}
                 </nav>

@@ -2,10 +2,13 @@
 
 .pe-layout {
     --pe-content-min-width: 40rem;
+    --pe-divider-width: 8px;
+    --pe-divider-handle-gap-height: 48px;
+    --pe-divider-handle-gap-half: 24px;
     display: flex;
     height: 100%;
     overflow: hidden;
-    background: var(--fc-color-bg);
+    background: var(--fc-color-bg-secondary);
 }
 
 .pe-loading {
@@ -25,7 +28,7 @@
     height: 100%;
     overflow: hidden;
     background: var(--fc-color-bg-secondary);
-    border-right: 1px solid var(--fc-color-border);
+    border-right: none;
     display: flex;
     flex-direction: column;
     transition: width 0.05s ease, border-color 0.15s ease;
@@ -113,7 +116,7 @@
 /* ── 分隔条 ──────────────────────────────────────────────────────────────── */
 
 .pe-divider {
-    width: 8px;
+    width: var(--pe-divider-width);
     flex-shrink: 0;
     cursor: col-resize;
     position: relative;
@@ -133,18 +136,33 @@
     left: 50%;
     width: 2px;
     transform: translateX(-50%);
-    background: color-mix(in srgb, var(--fc-color-border) 88%, transparent);
-    transition: background 0.1s ease, width 0.1s ease;
+    background: linear-gradient(
+            180deg,
+            transparent 0%,
+            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 12%,
+            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 24%,
+            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% - var(--pe-divider-handle-gap-height)),
+            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% - var(--pe-divider-handle-gap-half)),
+            transparent calc(50% - var(--pe-divider-handle-gap-half)),
+            transparent calc(50% + var(--pe-divider-handle-gap-half)),
+            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% + var(--pe-divider-handle-gap-half)),
+            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% + var(--pe-divider-handle-gap-height)),
+            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 76%,
+            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 88%,
+            transparent 100%
+    );
+    opacity: 0;
+    transition: opacity 0.14s ease, width 0.1s ease;
 }
 
 .pe-divider-handle {
     position: relative;
     z-index: 1;
-    width: 8px;
-    height: 48px;
+    width: var(--pe-divider-width);
+    height: var(--pe-divider-handle-gap-height);
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 92%, var(--fc-color-bg));
+    border: 1px solid transparent;
+    background: transparent;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -168,14 +186,14 @@
 .pe-divider:hover::before,
 .pe-divider.is-dragging::before {
     width: 2px;
-    background: color-mix(in srgb, var(--fc-color-primary) 55%, transparent);
+    opacity: 1;
 }
 
 .pe-divider:hover .pe-divider-handle,
 .pe-divider.is-dragging .pe-divider-handle {
-    transform: scale(1.03);
-    border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-primary) 18%, var(--fc-color-bg-secondary));
+    transform: none;
+    border-color: transparent;
+    background: transparent;
 }
 
 .pe-divider:hover .pe-divider-dot,
@@ -193,6 +211,7 @@
     display: flex;
     flex-direction: column;
     position: relative;
+    border-radius: var(--fc-radius-xl) 0 0 var(--fc-radius-xl);
     --pe-breadcrumb-height: 2.25rem;
     --pe-font-delta-title: 5px;
     --pe-font-delta-body: 3px;
@@ -230,14 +249,30 @@
 }
 
 .pe-breadcrumb__item {
+    display: inline-flex;
+    align-items: center;
     min-width: 0;
     max-width: 18rem;
+    padding: 0.12rem 0.28rem;
+    border: 0;
+    border-radius: var(--fc-radius-sm);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
-.pe-breadcrumb__item:last-child {
+.pe-breadcrumb__item:hover {
+    color: var(--fc-color-text);
+}
+
+.pe-breadcrumb__item:last-child,
+.pe-breadcrumb__item.is-current {
     color: var(--fc-color-text);
     font-weight: 600;
 }
