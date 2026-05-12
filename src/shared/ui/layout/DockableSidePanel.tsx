@@ -13,6 +13,14 @@ import './DockableSidePanel.css'
 export type DockableSidePanelMode = 'fullscreen' | 'floating'
 const PANEL_COLLAPSE_THRESHOLD_RATIO = 1 / 5
 const FULLSCREEN_TRIGGER_DISTANCE = 150
+const FULLSCREEN_TRANSITION_MS = 180
+
+interface PanelRect {
+    top: number
+    left: number
+    width: number
+    height: number
+}
 
 interface DockableSidePanelProps {
     mode: DockableSidePanelMode
@@ -44,12 +52,9 @@ export default function DockableSidePanel({
     const rootRef = useRef<HTMLElement | null>(null)
     // 仅用于控制 CSS class（mousedown/mouseup 各切一次）
     const [isDraggingClass, setIsDraggingClass] = useState(false)
-    const [fullscreenRect, setFullscreenRect] = useState<{
-        top: number
-        left: number
-        width: number
-        height: number
-    } | null>(null)
+    const [fullscreenRect, setFullscreenRect] = useState<PanelRect | null>(null)
+    const [fullscreenTransform, setFullscreenTransform] = useState<string | undefined>()
+    const [fullscreenTransitionEnabled, setFullscreenTransitionEnabled] = useState(false)
     const [dragHint, setDragHint] = useState('')
 
     const isDraggingRef = useRef(false)
@@ -58,14 +63,115 @@ export default function DockableSidePanel({
     const dragStartXRef = useRef(0)
     const dragStartWidthRef = useRef(0)
     const lastExpandedWidthRef = useRef(width)
+    const lastFloatingRectRef = useRef<PanelRect | null>(null)
+    const previousModeRef = useRef<DockableSidePanelMode>(mode)
+    const fullscreenAnimationRafRef = useRef<number | null>(null)
+    const fullscreenAnimationTimerRef = useRef<number | null>(null)
+    const collapseRestoreTimerRef = useRef<number | null>(null)
     // mousedown 时已是 collapsed 状态，等待第一次 mousemove 再激活拖拽
     const pendingExpandRef = useRef(false)
+
+    const readPanelRect = useCallback((rect: DOMRect): PanelRect => ({
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+    }), [])
+
+    const readFullscreenTargetRect = useCallback((): PanelRect | null => {
+        const parent = rootRef.current?.parentElement
+        if (!parent) return null
+        return readPanelRect(parent.getBoundingClientRect())
+    }, [readPanelRect])
+
+    const clearFullscreenAnimation = useCallback(() => {
+        if (fullscreenAnimationRafRef.current !== null) {
+            window.cancelAnimationFrame(fullscreenAnimationRafRef.current)
+            fullscreenAnimationRafRef.current = null
+        }
+        if (fullscreenAnimationTimerRef.current !== null) {
+            window.clearTimeout(fullscreenAnimationTimerRef.current)
+            fullscreenAnimationTimerRef.current = null
+        }
+    }, [])
+
+    const finishFullscreenAnimation = useCallback(() => {
+        clearFullscreenAnimation()
+        setFullscreenTransitionEnabled(false)
+        setFullscreenTransform(undefined)
+    }, [clearFullscreenAnimation])
+
+    const clearCollapseRestore = useCallback(() => {
+        if (collapseRestoreTimerRef.current !== null) {
+            window.clearTimeout(collapseRestoreTimerRef.current)
+            collapseRestoreTimerRef.current = null
+        }
+        rootRef.current?.classList.remove('is-collapse-restoring')
+    }, [])
+
+    const startFullscreenEnterAnimation = useCallback((targetRect: PanelRect) => {
+        const rootRect = rootRef.current ? readPanelRect(rootRef.current.getBoundingClientRect()) : null
+        const startRect = lastFloatingRectRef.current ?? rootRect ?? targetRect
+        const translateX = startRect.left - targetRect.left
+        const translateY = startRect.top - targetRect.top
+        const scaleX = targetRect.width > 0 ? startRect.width / targetRect.width : 1
+        const scaleY = targetRect.height > 0 ? startRect.height / targetRect.height : 1
+        const inverseTransform = `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`
+
+        clearFullscreenAnimation()
+        setFullscreenRect(targetRect)
+        setFullscreenTransitionEnabled(false)
+        setFullscreenTransform(inverseTransform)
+
+        fullscreenAnimationRafRef.current = window.requestAnimationFrame(() => {
+            const el = rootRef.current
+            if (el) {
+                el.getBoundingClientRect()
+            }
+            fullscreenAnimationRafRef.current = window.requestAnimationFrame(() => {
+                setFullscreenTransitionEnabled(true)
+                setFullscreenTransform('none')
+            })
+        })
+        fullscreenAnimationTimerRef.current = window.setTimeout(
+            finishFullscreenAnimation,
+            FULLSCREEN_TRANSITION_MS + 60,
+        )
+    }, [clearFullscreenAnimation, finishFullscreenAnimation, readPanelRect])
 
     useEffect(() => {
         if (mode === 'floating' && !collapsed) {
             lastExpandedWidthRef.current = width
         }
     }, [collapsed, mode, width])
+
+    useLayoutEffect(() => {
+        if (mode !== 'floating') return
+
+        const el = rootRef.current
+        if (!el) return
+
+        const syncFloatingRect = () => {
+            lastFloatingRectRef.current = readPanelRect(el.getBoundingClientRect())
+        }
+
+        syncFloatingRect()
+        window.addEventListener('resize', syncFloatingRect)
+
+        if (typeof ResizeObserver === 'undefined') {
+            return () => {
+                window.removeEventListener('resize', syncFloatingRect)
+            }
+        }
+
+        const observer = new ResizeObserver(syncFloatingRect)
+        observer.observe(el)
+
+        return () => {
+            observer.disconnect()
+            window.removeEventListener('resize', syncFloatingRect)
+        }
+    }, [mode, readPanelRect])
 
     // 非拖拽期间，props 变化时同步 CSS 变量到 DOM
     useEffect(() => {
@@ -83,21 +189,26 @@ export default function DockableSidePanel({
     }, [mode, collapsed, width])
 
     useLayoutEffect(() => {
-        if (mode !== 'fullscreen') return
+        const previousMode = previousModeRef.current
+        previousModeRef.current = mode
 
-        const updateFullscreenRect = () => {
-            const parent = rootRef.current?.parentElement
-            if (!parent) return
-            const rect = parent.getBoundingClientRect()
-            setFullscreenRect({
-                top: rect.top,
-                left: rect.left,
-                width: rect.width,
-                height: rect.height,
-            })
+        if (mode !== 'fullscreen') {
+            finishFullscreenAnimation()
+            return
         }
 
-        updateFullscreenRect()
+        const targetRect = readFullscreenTargetRect()
+        if (previousMode === 'floating' && targetRect) {
+            startFullscreenEnterAnimation(targetRect)
+        } else if (targetRect) {
+            setFullscreenRect(targetRect)
+        }
+
+        const updateFullscreenRect = () => {
+            const rect = readFullscreenTargetRect()
+            if (!rect) return
+            setFullscreenRect(rect)
+        }
 
         const parent = rootRef.current?.parentElement
         if (!parent || typeof ResizeObserver === 'undefined') {
@@ -118,7 +229,12 @@ export default function DockableSidePanel({
             observer.disconnect()
             window.removeEventListener('resize', updateFullscreenRect)
         }
-    }, [mode])
+    }, [finishFullscreenAnimation, mode, readFullscreenTargetRect, startFullscreenEnterAnimation])
+
+    useEffect(() => () => {
+        clearFullscreenAnimation()
+        clearCollapseRestore()
+    }, [clearCollapseRestore, clearFullscreenAnimation])
 
     const handleResizeStart = useCallback((event: ReactMouseEvent) => {
         if (mode !== 'floating') return
@@ -175,6 +291,18 @@ export default function DockableSidePanel({
             const wasFullscreenPreview = isFullscreenPreviewRef.current
             isCollapsePreviewRef.current = shouldCollapse
             isFullscreenPreviewRef.current = shouldFullscreen
+            if (wasCollapsePreview && !shouldCollapse) {
+                el.classList.add('is-collapse-restoring')
+                if (collapseRestoreTimerRef.current !== null) {
+                    window.clearTimeout(collapseRestoreTimerRef.current)
+                }
+                collapseRestoreTimerRef.current = window.setTimeout(() => {
+                    el.classList.remove('is-collapse-restoring')
+                    collapseRestoreTimerRef.current = null
+                }, 160)
+            } else if (shouldCollapse) {
+                clearCollapseRestore()
+            }
             if (shouldCollapse !== wasCollapsePreview) {
                 el.classList.toggle('is-collapse-preview', shouldCollapse)
             }
@@ -214,10 +342,14 @@ export default function DockableSidePanel({
             isFullscreenPreviewRef.current = false
             setIsDraggingClass(false)
             setDragHint('')
+            clearCollapseRestore()
             el?.classList.remove('is-collapse-preview')
             el?.classList.remove('is-fullscreen-preview')
 
             if (shouldFullscreen) {
+                if (el) {
+                    lastFloatingRectRef.current = readPanelRect(el.getBoundingClientRect())
+                }
                 onModeChange?.('fullscreen')
             } else if (shouldCollapse) {
                 onCollapsedChange?.(true)
@@ -243,14 +375,16 @@ export default function DockableSidePanel({
                 document.body.style.cursor = ''
                 document.body.style.userSelect = ''
             }
+            clearCollapseRestore()
         }
-    }, [maxWidthRatio, minWidth, onCollapsedChange, onModeChange, onWidthChange])
+    }, [clearCollapseRestore, maxWidthRatio, minWidth, onCollapsedChange, onModeChange, onWidthChange, readPanelRect])
 
     const rootClassName = [
         'dockable-side-panel',
         `dockable-side-panel--${mode}`,
         mode === 'floating' && isDraggingClass ? 'is-dragging' : '',
         mode === 'floating' && collapsed ? 'is-collapsed' : '',
+        mode === 'fullscreen' && fullscreenTransitionEnabled ? 'is-fullscreen-animating' : '',
         className,
     ].filter(Boolean).join(' ')
 
@@ -264,6 +398,8 @@ export default function DockableSidePanel({
                 width: fullscreenRect.width,
                 height: fullscreenRect.height,
                 zIndex: 1000,
+                transform: fullscreenTransform,
+                transformOrigin: 'top left',
             }
         }
         // floating 模式下宽度由 CSS 变量 --dsp-width 控制，不通过 inline style

@@ -4,6 +4,7 @@
     --dockable-side-panel-handle-gap-height: 48px;
     --dockable-side-panel-handle-gap-half: 24px;
     --dockable-side-panel-collapsed-width: 0px;
+    --dsp-width: 0px;
 }
 
 .dockable-side-panel {
@@ -22,6 +23,13 @@
     border-radius: var(--fc-radius-xl);
 }
 
+.dockable-side-panel--fullscreen.is-fullscreen-animating {
+    transition:
+            transform 0.18s ease,
+            border-radius 0.18s ease;
+    will-change: transform;
+}
+
 .dockable-side-panel--floating {
     position: relative;
     z-index: 2;
@@ -33,7 +41,7 @@
     outline: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
     outline-offset: -1px;
     overflow: visible;
-    width: var(--dsp-width);
+    width: var(--dsp-width, 0px);
     transition: width 0.18s ease, border-color 0.15s ease, outline-color 0.15s ease;
 }
 
@@ -45,6 +53,11 @@
 /* 跨过阈值进入 collapse preview：transition 重新开启，面板在用户手里就开始动画 */
 .dockable-side-panel--floating.is-dragging.is-collapse-preview {
     transition: width 0.14s ease, border-color 0.15s ease;
+}
+
+/* 从收起预览拖回普通宽度时，短暂恢复 transition，避免跳开 */
+.dockable-side-panel--floating.is-dragging.is-collapse-restoring {
+    transition: width 0.14s ease, border-color 0.15s ease, outline-color 0.15s ease;
 }
 
 .dockable-side-panel--floating.is-collapsed {
@@ -84,6 +97,10 @@
 
 .dockable-side-panel--floating.is-dragging .dockable-side-panel__body {
     transition: none;
+}
+
+.dockable-side-panel--floating.is-dragging.is-collapse-restoring .dockable-side-panel__body {
+    transition: opacity 0.15s ease, padding-left 0.15s ease;
 }
 
 .dockable-side-panel__resize-handle {

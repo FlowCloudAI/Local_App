@@ -228,6 +228,13 @@ body {
     background: var(--fc-color-bg);
 }
 
+.ai-shell.dockable-side-panel--fullscreen,
+.ai-shell.dockable-side-panel--fullscreen .dockable-side-panel__body,
+.side-panel-stack.is-panel-fullscreen,
+.side-panel-layer.is-panel-fullscreen {
+    background: var(--fc-color-bg-secondary);
+}
+
 .side-panel-layer {
     position: absolute;
     inset: 0;

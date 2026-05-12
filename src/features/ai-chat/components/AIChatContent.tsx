@@ -11,8 +11,9 @@ import {
     setting_get_settings,
     setting_has_api_key,
 } from '../../../api'
-import type {AiContextValue} from '../model/AiControllerTypes'
+import type {AiContextValue, Conversation} from '../model/AiControllerTypes'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
+import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
 import useLinkPreview from '../../entries/hooks/useLinkPreview'
 import useWikiLink from '../../entries/hooks/useWikiLink'
@@ -33,6 +34,31 @@ const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
+type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
+
+const AI_CONVERSATION_FILTER_OPTIONS: Array<{ key: AiConversationFilter; label: string }> = [
+    {key: 'all', label: '全部'},
+    {key: 'default', label: '通用'},
+    {key: 'character', label: '角色聊天'},
+    {key: 'report', label: '矛盾检测'},
+]
+
+function matchesConversationFilter(conversation: Conversation, filter: AiConversationFilter) {
+    if (filter === 'all') return true
+    if (filter === 'default') return !conversation.mode || conversation.mode === 'default'
+    if (filter === 'character') return conversation.mode === 'character'
+    if (filter === 'report') return conversation.mode === 'report'
+    return false
+}
+
+function buildConversationSearchText(conversation: Conversation) {
+    return [
+        conversation.title,
+        conversation.characterName,
+        conversation.reportContext?.projectName,
+        conversation.reportContext?.scopeSummary,
+    ].filter(Boolean).join(' ').toLocaleLowerCase()
+}
 
 function buildAiChatEntryHref(link: InternalEntryLink): string {
     const params = new URLSearchParams()
@@ -100,6 +126,8 @@ export default function AIChatContent({
 
     const [renamingId, setRenamingId] = useState<string | null>(null)
     const [renameValue, setRenameValue] = useState('')
+    const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
+    const [conversationSearch, setConversationSearch] = useState('')
     const renameInputRef = useRef<HTMLInputElement>(null)
 
     const startRename = (event: React.MouseEvent, conv: { id: string; title: string }) => {
@@ -170,6 +198,16 @@ export default function AIChatContent({
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
+    const filteredConversations = useMemo(() => {
+        const keyword = conversationSearch.trim().toLocaleLowerCase()
+
+        return ctx.conversations.filter((conversation) => {
+            if (!matchesConversationFilter(conversation, conversationFilter)) return false
+            if (!keyword) return true
+            return buildConversationSearchText(conversation).includes(keyword)
+        })
+    }, [conversationFilter, conversationSearch, ctx.conversations])
+    const hasConversationSearch = conversationSearch.trim().length > 0
     const focusContextItems = useMemo(() => {
         const focusContext = ctx.focusContext
         return [
@@ -644,7 +682,22 @@ export default function AIChatContent({
                             </svg>
                         </button>
                     </div>
-                    <div className="ai-sidebar-top-actions">
+                    <div className="ai-sidebar-controls dock-panel-sidebar-controls">
+                        <div className="dock-panel-control-group">
+                            <span className="dock-panel-control-label">类型</span>
+                            <DockPanelSegmentedControl
+                                options={AI_CONVERSATION_FILTER_OPTIONS}
+                                value={conversationFilter}
+                                onChange={setConversationFilter}
+                                ariaLabel="AI 对话类型"
+                            />
+                        </div>
+                        <DockPanelSearchInput
+                            value={conversationSearch}
+                            onChange={setConversationSearch}
+                            placeholder="搜索对话"
+                            ariaLabel="搜索 AI 对话"
+                        />
                         <button className="ai-sidebar-new-btn" onClick={() => void ctx.createNewConversation()}
                                 title="新对话">
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
@@ -659,7 +712,12 @@ export default function AIChatContent({
                     {ctx.conversations.length === 0 && (
                         <div className="ai-empty-history"><p>暂无历史对话</p></div>
                     )}
-                    {ctx.conversations.map((conv) => (
+                    {ctx.conversations.length > 0 && filteredConversations.length === 0 && (
+                        <div className="ai-empty-history">
+                            <p>{hasConversationSearch ? '没有匹配的对话' : '当前类型下没有对话'}</p>
+                        </div>
+                    )}
+                    {filteredConversations.map((conv) => (
                         <div
                             key={conv.id}
                             className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}`}

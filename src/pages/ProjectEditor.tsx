@@ -157,6 +157,7 @@ function ProjectEditorInner({
     const isDragging = useRef(false)
     const layoutRef = useRef<HTMLDivElement>(null)
     const lastExpandedWidthRef = useRef(TREE_DEFAULT_PX)
+    const collapseRestoreTimerRef = useRef<number | null>(null)
 
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
@@ -328,10 +329,22 @@ function ProjectEditorInner({
         layoutRef.current?.style.setProperty('--pe-tree-width', '0px')
     }, [])
 
+    const clearCollapseRestore = useCallback(() => {
+        if (collapseRestoreTimerRef.current !== null) {
+            window.clearTimeout(collapseRestoreTimerRef.current)
+            collapseRestoreTimerRef.current = null
+        }
+        layoutRef.current?.classList.remove('is-divider-collapse-restoring')
+    }, [])
+
+    useEffect(() => () => {
+        clearCollapseRestore()
+    }, [clearCollapseRestore])
+
     const handleDividerMouseDown = (e: ReactMouseEvent) => {
         e.preventDefault()
         isDragging.current = true
-        setDividerDragging(true)
+        setDividerDragging(!treeCollapsed)
         const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
         const minPx = rootFontSize * parseFloat(TREE_MIN_WIDTH)
         const maxPx = rootFontSize * parseFloat(TREE_MAX_WIDTH)
@@ -340,19 +353,39 @@ function ProjectEditorInner({
         const collapseThreshold = startWidth * TREE_COLLAPSE_THRESHOLD_RATIO
         let currentWidth = startWidth
         let shouldCollapse = false
+        let pendingExpand = treeCollapsed
         const layout = layoutRef.current
         const collapsePreviewClassName = 'is-divider-collapse-preview'
+        const collapseRestoreClassName = 'is-divider-collapse-restoring'
 
         if (treeCollapsed) {
             setTreeCollapsed(false)
             layout?.style.setProperty('--pe-tree-width', `${startWidth}px`)
         }
         layout?.classList.remove(collapsePreviewClassName)
+        clearCollapseRestore()
 
         const onMove = (ev: MouseEvent) => {
+            if (pendingExpand) {
+                pendingExpand = false
+                setDividerDragging(true)
+            }
+            const wasCollapsePreview = shouldCollapse
             const rawWidth = startWidth + ev.clientX - startX
             currentWidth = Math.min(maxPx, Math.max(minPx, rawWidth))
             shouldCollapse = rawWidth <= collapseThreshold
+            if (wasCollapsePreview && !shouldCollapse) {
+                layout?.classList.add(collapseRestoreClassName)
+                if (collapseRestoreTimerRef.current !== null) {
+                    window.clearTimeout(collapseRestoreTimerRef.current)
+                }
+                collapseRestoreTimerRef.current = window.setTimeout(() => {
+                    layout?.classList.remove(collapseRestoreClassName)
+                    collapseRestoreTimerRef.current = null
+                }, 160)
+            } else if (shouldCollapse) {
+                clearCollapseRestore()
+            }
             layout?.classList.toggle(collapsePreviewClassName, shouldCollapse)
             // 直接写 CSS 变量，完全绕过 React 渲染
             layout?.style.setProperty('--pe-tree-width', shouldCollapse ? '0px' : `${currentWidth}px`)
@@ -360,6 +393,7 @@ function ProjectEditorInner({
         const onUp = () => {
             isDragging.current = false
             layout?.classList.remove(collapsePreviewClassName)
+            clearCollapseRestore()
             if (shouldCollapse) {
                 setDividerDragging(false)
                 setTreeCollapsed(true)

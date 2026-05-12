@@ -42,6 +42,11 @@
     transition: width 0.14s ease, border-color 0.15s ease;
 }
 
+/* 从收起预览拖回普通宽度时，短暂恢复宽度过渡，避免展开跳变 */
+.pe-layout.is-divider-dragging.is-divider-collapse-restoring .pe-tree-panel {
+    transition: width 0.14s ease, border-color 0.15s ease;
+}
+
 .pe-layout.is-tree-collapsed .pe-tree-panel {
     border-right-color: transparent;
 }

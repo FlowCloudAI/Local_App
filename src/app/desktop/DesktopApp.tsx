@@ -113,11 +113,19 @@ export default function DesktopApp() {
     }, [])
 
     const handleAiPanelCollapsedChange = useCallback((nextCollapsed: boolean) => {
+        const wasCollapsed = aiPanelCollapsed
         setAiPanelCollapsed(nextCollapsed)
         if (nextCollapsed) {
             clearSidePanelSelection()
+            return
         }
-    }, [clearSidePanelSelection])
+        if (wasCollapsed) {
+            setSelectedKey(sidePanelContentKey)
+            if (mainContentKey === 'settings') {
+                setMainContentKey('home')
+            }
+        }
+    }, [aiPanelCollapsed, clearSidePanelSelection, mainContentKey, sidePanelContentKey])
 
     const collapseAiPanel = useCallback(() => {
         handleAiPanelCollapsedChange(true)
@@ -831,10 +839,10 @@ export default function DesktopApp() {
                         className="ai-shell"
                         handleTitle="拖拽调整宽度"
                     >
-                        <div className="side-panel-stack">
+                        <div className={`side-panel-stack${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}>
                             {mountedSidePanelKeys.includes('idea') && (
                                 <div
-                                    className={`side-panel-layer ${sidePanelContentKey === 'idea' ? 'active' : ''}`}
+                                    className={`side-panel-layer ${sidePanelContentKey === 'idea' ? 'active' : ''}${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}
                                     aria-hidden={sidePanelContentKey !== 'idea'}
                                 >
                                     <Idea
@@ -852,7 +860,7 @@ export default function DesktopApp() {
                             )}
                             {mountedSidePanelKeys.includes('snapshot') && (
                                 <div
-                                    className={`side-panel-layer ${sidePanelContentKey === 'snapshot' ? 'active' : ''}`}
+                                    className={`side-panel-layer ${sidePanelContentKey === 'snapshot' ? 'active' : ''}${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}
                                     aria-hidden={sidePanelContentKey !== 'snapshot'}
                                 >
                                     <SnapshotPanel
@@ -864,7 +872,7 @@ export default function DesktopApp() {
                             )}
                             {mountedSidePanelKeys.includes('ai-chat') && (
                                 <div
-                                    className={`side-panel-layer ${sidePanelContentKey === 'ai-chat' ? 'active' : ''}`}
+                                    className={`side-panel-layer ${sidePanelContentKey === 'ai-chat' ? 'active' : ''}${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}
                                     aria-hidden={sidePanelContentKey !== 'ai-chat'}
                                 >
                                     <div className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

@@ -57,12 +57,12 @@
 
 /* 侧边栏顶部新建按钮 */
 .ai-sidebar-top {
-    padding: 0 0 var(--fc-space-sm);
+    padding: 0;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--fc-space-sm);
-    border-bottom: 1px solid var(--dock-panel-border-color);
+    gap: 0;
+    border-bottom: 0;
 }
 
 .ai-sidebar-topbar {

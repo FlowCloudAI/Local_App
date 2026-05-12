@@ -17,6 +17,7 @@ import {
     type IdeaNoteStatus,
     type Project,
 } from '../api'
+import {DockPanelSearchInput, DockPanelSegmentedControl} from '../shared/ui/layout/DockPanelSidebarControls'
 import '../shared/ui/layout/DockPanelScaffold.css'
 import './Idea.css'
 
@@ -125,6 +126,7 @@ export default function Idea({
     const [statusMessage, setStatusMessage] = useState('输入内容后会自动保存')
     const [viewMode, setViewMode] = useState<IdeaViewMode>('all')
     const [projectFilter, setProjectFilter] = useState<ProjectFilterMode>('all')
+    const [ideaSearch, setIdeaSearch] = useState('')
     const [compactLayout, setCompactLayout] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
@@ -133,6 +135,27 @@ export default function Idea({
         [ideaNotes, selectedIdeaId],
     )
     const selectedIdeaProjectId = selectedIdea?.project_id ?? null
+    const projectNameById = useMemo(
+        () => new Map(projects.map((project) => [project.id, project.name])),
+        [projects],
+    )
+    const visibleIdeaNotes = useMemo(() => {
+        const keyword = ideaSearch.trim().toLocaleLowerCase()
+        if (!keyword) return ideaNotes
+
+        return ideaNotes.filter((idea) => {
+            const projectName = idea.project_id ? projectNameById.get(idea.project_id) : '未归属'
+            const searchableText = [
+                idea.title,
+                idea.content,
+                getIdeaStatusLabel(idea.status),
+                projectName,
+            ].filter(Boolean).join(' ').toLocaleLowerCase()
+
+            return searchableText.includes(keyword)
+        })
+    }, [ideaNotes, ideaSearch, projectNameById])
+    const hasIdeaSearch = ideaSearch.trim().length > 0
 
     useEffect(() => {
         selectedIdeaIdRef.current = selectedIdeaId
@@ -663,7 +686,7 @@ export default function Idea({
     return (
         <div
             ref={layoutRef}
-            className={`idea-page${compactLayout ? ' is-compact' : ''}${compactLayout && sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+            className={`idea-page${panelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}${compactLayout ? ' is-compact' : ''}${compactLayout && sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
         >
             <div className="idea-page__shell">
                 {compactLayout && !sidebarCollapsed ? (
@@ -693,24 +716,18 @@ export default function Idea({
                                 </button>
                             ) : null}
                         </div>
-                        <div className="idea-page__toolbar">
-                            <div className="idea-page__toolbar-group">
-                                <span className="idea-page__toolbar-label">视图</span>
-                                <div className="idea-page__segmented">
-                                    {IDEA_VIEW_OPTIONS.map((item) => (
-                                        <button
-                                            key={item.key}
-                                            type="button"
-                                            className={`idea-page__segmented-item${viewMode === item.key ? ' is-active' : ''}`}
-                                            onClick={() => setViewMode(item.key)}
-                                        >
-                                            {item.label}
-                                        </button>
-                                    ))}
-                                </div>
+                        <div className="idea-page__toolbar dock-panel-sidebar-controls">
+                            <div className="dock-panel-control-group">
+                                <span className="dock-panel-control-label">视图</span>
+                                <DockPanelSegmentedControl
+                                    options={IDEA_VIEW_OPTIONS}
+                                    value={viewMode}
+                                    onChange={setViewMode}
+                                    ariaLabel="灵感便签视图"
+                                />
                             </div>
-                            <div className="idea-page__toolbar-group idea-page__toolbar-group--project">
-                                <span className="idea-page__toolbar-label">项目</span>
+                            <div className="dock-panel-control-group idea-page__toolbar-group--project">
+                                <span className="dock-panel-control-label">项目</span>
                                 <Select
                                     className="idea-page__project-select"
                                     value={projectFilter}
@@ -718,12 +735,18 @@ export default function Idea({
                                     onChange={(value) => setProjectFilter(String(value))}
                                 />
                             </div>
+                            <DockPanelSearchInput
+                                value={ideaSearch}
+                                onChange={setIdeaSearch}
+                                placeholder="搜索便签"
+                                ariaLabel="搜索灵感便签"
+                            />
                         </div>
 
                         <div className="idea-page__sidebar-header">
                             <div className="idea-page__sidebar-list-meta">
                                 <span className="idea-page__sidebar-list-title">便签列表</span>
-                                <span className="idea-page__sidebar-count">{ideaNotes.length}</span>
+                                <span className="idea-page__sidebar-count">{visibleIdeaNotes.length}</span>
                             </div>
                             <Button variant="ghost" onClick={handleCreateBlankIdea}>新建便签</Button>
                         </div>
@@ -731,10 +754,12 @@ export default function Idea({
                         <div className="idea-page__list">
                             {loading ? (
                                 <div className="idea-page__empty">正在加载便签…</div>
-                            ) : ideaNotes.length === 0 ? (
-                                <div className="idea-page__empty">当前筛选下还没有便签，右侧直接开始记录。</div>
+                            ) : visibleIdeaNotes.length === 0 ? (
+                                <div className="idea-page__empty">
+                                    {hasIdeaSearch ? '没有匹配的便签。' : '当前筛选下还没有便签，右侧直接开始记录。'}
+                                </div>
                             ) : (
-                                ideaNotes.map((idea) => {
+                                visibleIdeaNotes.map((idea) => {
                                     const active = idea.id === selectedIdeaId
                                     return (
                                         <button
