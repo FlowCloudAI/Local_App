@@ -1,0 +1,21 @@
+:where(.idea-page, .ai-chat-layout, .snapshot-panel) {
+    --dock-panel-bg: var(--fc-color-bg);
+    --dock-panel-sidebar-bg: var(--fc-color-bg-secondary);
+    --dock-panel-topbar-bg: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    --dock-panel-border-color: color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    --dock-panel-hover-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
+    --dock-panel-active-bg: color-mix(in srgb, var(--fc-color-primary) 10%, var(--fc-color-bg));
+    --dock-panel-active-border: color-mix(in srgb, var(--fc-color-primary) 46%, var(--fc-color-border));
+    --dock-panel-sidebar-width: 20rem;
+    --dock-panel-topbar-height: 3rem;
+    --dock-panel-topbar-padding-x: var(--fc-space-md);
+    --dock-panel-sidebar-control-padding-x: var(--dock-panel-list-padding);
+    --dock-panel-icon-button-size: 2rem;
+    --dock-panel-icon-button-radius: var(--fc-radius-md);
+    --dock-panel-title-size: var(--fc-font-size-sm);
+    --dock-panel-title-weight: var(--fc-font-weight-semibold, 600);
+    --dock-panel-list-padding: var(--fc-space-sm);
+    --dock-panel-list-item-radius: var(--fc-radius-md);
+    --dock-panel-list-item-padding: 0.72rem 0.75rem;
+    --dock-panel-control-radius: var(--fc-radius-md);
+}

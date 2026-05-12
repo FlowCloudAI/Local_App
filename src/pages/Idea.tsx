@@ -17,6 +17,7 @@ import {
     type IdeaNoteStatus,
     type Project,
 } from '../api'
+import '../shared/ui/layout/DockPanelScaffold.css'
 import './Idea.css'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'

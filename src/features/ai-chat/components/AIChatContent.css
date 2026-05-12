@@ -15,7 +15,7 @@
     display: block;
     width: 100%;
     height: 100%;
-    background: var(--fc-color-bg);
+    background: var(--dock-panel-bg);
     overflow: hidden;
     position: relative;
 }
@@ -27,24 +27,24 @@
     left: 0;
     bottom: 0;
     z-index: 120;
-    width: 220px;
-    min-width: 220px;
-    border-right: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-secondary);
+    width: var(--dock-panel-sidebar-width);
+    min-width: var(--dock-panel-sidebar-width);
+    border-right: 1px solid var(--dock-panel-border-color);
+    background: var(--dock-panel-sidebar-bg);
     display: flex;
     flex-direction: column;
     transition: transform 0.1s ease-out, opacity 0.1s ease-out;
     overflow: hidden;
     height: 100%;
-    padding-top: 6px;
-    box-shadow: 12px 0 28px rgba(0, 0, 0, 0.18);
+    padding-top: 0;
+    box-shadow: none;
 }
 
 /* 宽屏时侧边栏更宽 */
 @container ai-chat (min-width: 900px) {
     .ai-sidebar {
-        width: 260px;
-        min-width: 260px;
+        width: var(--dock-panel-sidebar-width);
+        min-width: var(--dock-panel-sidebar-width);
     }
 }
 
@@ -57,43 +57,52 @@
 
 /* 侧边栏顶部新建按钮 */
 .ai-sidebar-top {
-    padding: 6px 8px 8px;
+    padding: 0 0 var(--fc-space-sm);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fc-space-sm);
+    border-bottom: 1px solid var(--dock-panel-border-color);
 }
 
 .ai-sidebar-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: var(--fc-space-sm);
+    box-sizing: border-box;
+    height: var(--dock-panel-topbar-height);
+    min-height: var(--dock-panel-topbar-height);
+    padding: 0 var(--dock-panel-topbar-padding-x);
+    background: transparent;
+    font-size: var(--dock-panel-title-size);
+    line-height: 1.2;
 }
 
 .ai-sidebar-topbar-title {
     min-width: 0;
-    font-size: 0.85rem;
-    font-weight: var(--fc-font-weight-medium);
-    color: var(--fc-color-text-secondary);
+    font-size: var(--dock-panel-title-size);
+    font-weight: var(--dock-panel-title-weight);
+    color: var(--fc-color-text);
 }
 
 .ai-sidebar-top-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fc-space-sm);
+    padding: 0 var(--dock-panel-list-padding);
 }
 
 .ai-sidebar-new-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--fc-space-xs);
     width: 100%;
     justify-content: center;
-    padding: 5px 8px;
-    font-size: 0.82rem;
+    padding: 0.45rem 0.65rem;
+    font-size: var(--fc-font-size-sm);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--dock-panel-control-radius);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -101,18 +110,18 @@
 }
 
 .ai-sidebar-new-btn:hover {
-    background: var(--fc-color-bg-elevated);
+    background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
 
 .ai-sidebar-close-btn {
-    width: 28px;
-    height: 28px;
+    width: var(--dock-panel-icon-button-size);
+    height: var(--dock-panel-icon-button-size);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--dock-panel-icon-button-radius);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -121,7 +130,7 @@
 }
 
 .ai-sidebar-close-btn:hover {
-    background: var(--fc-color-bg-elevated);
+    background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
 
@@ -129,7 +138,7 @@
 .ai-conversations-list {
     flex: 1;
     overflow-y: auto;
-    padding: 0.5rem;
+    padding: var(--dock-panel-list-padding);
 }
 
 .ai-conversations-list::-webkit-scrollbar {
@@ -152,12 +161,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.6rem 0.5rem;
-    margin-bottom: 0.25rem;
-    border-radius: var(--fc-radius-md);
+    padding: var(--dock-panel-list-item-padding);
+    margin-bottom: var(--fc-space-xs);
+    border-radius: var(--dock-panel-list-item-radius);
     cursor: pointer;
     border: 1px solid transparent;
-    transition: background 0.15s;
+    transition: background 0.15s, border-color 0.15s;
 }
 
 .ai-conversation-item.is-character,
@@ -167,13 +176,13 @@
 }
 
 .ai-conversation-item:hover {
-    background: var(--fc-color-bg-elevated);
-    border-color: var(--fc-color-border);
+    background: var(--dock-panel-hover-bg);
+    border-color: var(--dock-panel-active-border);
 }
 
 .ai-conversation-item.active {
-    background: var(--fc-color-primary-subtle);
-    border-color: var(--fc-color-info-border);
+    background: var(--dock-panel-active-bg);
+    border-color: var(--dock-panel-active-border);
 }
 
 .ai-conversation-item.is-character.active {
@@ -287,7 +296,7 @@
     font-size: 0.85rem;
     font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text);
-    background: var(--fc-color-bg);
+    background: var(--dock-panel-bg);
     border: 1px solid var(--fc-color-primary);
     border-radius: 4px;
     padding: 1px 4px;
@@ -356,22 +365,26 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 var(--fc-space-sm);
-    min-height: 3rem;
-    border-bottom: 1px solid var(--fc-color-border);
+    padding: 0 var(--dock-panel-topbar-padding-x);
+    box-sizing: border-box;
+    height: var(--dock-panel-topbar-height);
+    min-height: var(--dock-panel-topbar-height);
+    border-bottom: 1px solid var(--dock-panel-border-color);
     flex-shrink: 0;
     gap: var(--fc-space-xs);
     position: relative;
     z-index: 5;
     overflow: visible;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    background: var(--dock-panel-topbar-bg);
     backdrop-filter: blur(10px);
+    font-size: var(--dock-panel-title-size);
+    line-height: 1.2;
 }
 
 .ai-topbar-left {
     display: flex;
     align-items: center;
-    gap: var(--fc-space-2xs, 0.125rem);
+    gap: var(--fc-space-xs);
     min-width: 0;
     flex: 1;
 }
@@ -379,16 +392,16 @@
 .ai-topbar-right {
     display: flex;
     align-items: center;
-    gap: var(--fc-space-2xs, 0.125rem);
+    gap: var(--fc-space-xs);
     flex-shrink: 0;
 }
 
 .ai-topbar-toggle,
 .ai-topbar-new-chat {
-    width: 2rem;
-    height: 2rem;
+    width: var(--dock-panel-icon-button-size);
+    height: var(--dock-panel-icon-button-size);
     border: none;
-    border-radius: var(--fc-radius-md);
+    border-radius: var(--dock-panel-icon-button-radius);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -402,7 +415,7 @@
 
 .ai-topbar-toggle:hover,
 .ai-topbar-new-chat:hover {
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
+    background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
 
@@ -414,7 +427,7 @@
     padding: 0.38rem 0.65rem;
     font-size: var(--fc-font-size-sm);
     border: none;
-    border-radius: var(--fc-radius-md);
+    border-radius: var(--dock-panel-control-radius);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -424,7 +437,7 @@
 }
 
 .ai-topbar-btn:hover {
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
+    background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
 
@@ -444,8 +457,8 @@
     top: calc(100% + 6px);
     left: 0;
     background: var(--fc-color-bg-elevated);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
+    border: 1px solid var(--dock-panel-border-color);
+    border-radius: var(--dock-panel-control-radius);
     padding: var(--fc-space-2xs, 0.125rem);
     min-width: 160px;
     max-height: 280px;
@@ -483,11 +496,11 @@
 }
 
 .ai-plugin-menu-item:hover {
-    background: var(--fc-color-bg-secondary);
+    background: var(--dock-panel-hover-bg);
 }
 
 .ai-plugin-menu-item.active {
-    background: var(--fc-color-primary-subtle);
+    background: var(--dock-panel-active-bg);
     color: var(--fc-color-primary);
     font-weight: var(--fc-font-weight-medium);
 }
@@ -509,8 +522,8 @@
     flex-shrink: 1;
     padding: 0.22rem 0.5rem;
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 82%, transparent);
+    border: 1px solid var(--dock-panel-border-color);
+    background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text-secondary);
     font-size: 0.72rem;
     line-height: 1.25;
@@ -847,7 +860,7 @@
     padding: var(--fc-space-md) var(--fc-space-lg);
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--fc-color-border);
+    border: 1px solid var(--dock-panel-border-color);
     box-shadow: var(--fc-shadow-md);
     transition: border-color 0.16s ease, box-shadow 0.16s ease;
     width: 100%;
@@ -992,7 +1005,7 @@
     padding: 0.36rem 0.72rem;
     font-size: var(--fc-font-size-sm);
     border: none;
-    border-radius: var(--fc-radius-md);
+    border-radius: var(--dock-panel-control-radius);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -1002,12 +1015,12 @@
 }
 
 .ai-toolbar-btn:hover {
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent);
+    background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
 
 .ai-toolbar-btn.active {
-    background: var(--fc-color-primary-subtle);
+    background: var(--dock-panel-active-bg);
     color: var(--fc-color-primary);
     font-weight: var(--fc-font-weight-medium);
 }
@@ -1025,9 +1038,9 @@
     position: absolute;
     bottom: calc(100% + 6px);
     left: 0;
-    background: var(--fc-color-bg-secondary);
-    border: 1px solid var(--fc-color-border);
-    border-radius: 10px;
+    background: var(--fc-color-bg-elevated);
+    border: 1px solid var(--dock-panel-border-color);
+    border-radius: var(--dock-panel-control-radius);
     padding: 4px;
     min-width: 180px;
     max-height: 280px;
@@ -1054,7 +1067,7 @@
     padding: 6px 10px;
     font-size: 0.82rem;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--dock-panel-control-radius);
     background: transparent;
     color: var(--fc-color-text);
     cursor: pointer;
@@ -1065,11 +1078,11 @@
 }
 
 .ai-model-menu-item:hover {
-    background: var(--fc-color-bg-elevated);
+    background: var(--dock-panel-hover-bg);
 }
 
 .ai-model-menu-item.active {
-    background: var(--fc-color-primary-subtle);
+    background: var(--dock-panel-active-bg);
     color: var(--fc-color-primary);
     font-weight: var(--fc-font-weight-medium);
 }

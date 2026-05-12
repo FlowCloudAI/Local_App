@@ -26,6 +26,7 @@ import {
 } from '../../entries/lib/entryMarkdown'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
+import '../../../shared/ui/layout/DockPanelScaffold.css'
 import './AIChatContent.css'
 
 const MAX_CHARS = 4000

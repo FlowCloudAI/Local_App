@@ -856,7 +856,6 @@ export default function DesktopApp() {
                                     aria-hidden={sidePanelContentKey !== 'snapshot'}
                                 >
                                     <SnapshotPanel
-                                        className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
                                         panelMode={aiPanelMode}
                                         onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
                                         onToggleCollapsed={collapseAiPanel}

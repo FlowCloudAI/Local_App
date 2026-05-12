@@ -15,6 +15,7 @@ import {
     type SnapshotGraphNode,
 } from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
+import '../../../shared/ui/layout/DockPanelScaffold.css'
 import './SnapshotPanel.css'
 
 interface SnapshotPanelProps {
@@ -323,7 +324,7 @@ export default function SnapshotPanel({
                                 </>
                             ) : (
                                 <>
-                                    <path d="M4 4h3M4 4v3M12 4h-3M12 4v3M4 12h3M4 12v-3M12 12h-3M12 12v-3"/>
+                                    <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
                                 </>
                             )}
                         </svg>
