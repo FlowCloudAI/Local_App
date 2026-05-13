@@ -442,8 +442,8 @@
 }
 
 .ai-topbar-btn.active {
-    background: var(--fc-color-primary-subtle);
-    color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
+    color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
 }
 
 /* ========== 插件切换弹出菜单（向下展开） ========== */
@@ -500,8 +500,8 @@
 }
 
 .ai-plugin-menu-item.active {
-    background: var(--dock-panel-active-bg);
-    color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
+    color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
     font-weight: var(--fc-font-weight-medium);
 }
 
@@ -1025,6 +1025,11 @@
     font-weight: var(--fc-font-weight-medium);
 }
 
+.ai-floating-toolbar .ai-toolbar-btn.active {
+    background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
+    color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
+}
+
 .ai-toolbar-btn svg {
     flex-shrink: 0;
 }
@@ -1082,8 +1087,8 @@
 }
 
 .ai-model-menu-item.active {
-    background: var(--dock-panel-active-bg);
-    color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
+    color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
     font-weight: var(--fc-font-weight-medium);
 }
 

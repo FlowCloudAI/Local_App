@@ -68,8 +68,9 @@ export default function DockableSidePanel({
     const fullscreenAnimationRafRef = useRef<number | null>(null)
     const fullscreenAnimationTimerRef = useRef<number | null>(null)
     const collapseRestoreTimerRef = useRef<number | null>(null)
-    // mousedown 时已是 collapsed 状态，等待第一次 mousemove 再激活拖拽
+    // mousedown 时已是 collapsed 状态，等待鼠标移动到展开后的手柄位置再激活拖拽
     const pendingExpandRef = useRef(false)
+    const pendingExpandHandleXRef = useRef(0)
 
     const readPanelRect = useCallback((rect: DOMRect): PanelRect => ({
         top: rect.top,
@@ -248,8 +249,9 @@ export default function DockableSidePanel({
 
         const el = rootRef.current
         if (collapsed) {
-            // 收起状态下点击手柄：先触发展开（保留 transition），等到真正移动再激活拖拽模式
+            // 收起状态下点击手柄：先触发展开（保留 transition），等鼠标追上新手柄位置再激活拖拽
             pendingExpandRef.current = true
+            pendingExpandHandleXRef.current = event.clientX - dragStartWidthRef.current
             onCollapsedChange?.(false)
             el?.style.setProperty('--dsp-width', `${dragStartWidthRef.current}px`)
         } else {
@@ -267,9 +269,13 @@ export default function DockableSidePanel({
             const el = rootRef.current
             if (!el) return
 
-            // 从收起状态展开后第一次移动：此时才真正进入拖拽，关闭 transition
             if (pendingExpandRef.current) {
+                if (event.clientX > pendingExpandHandleXRef.current) {
+                    setDragHint('移到手柄位置后拖拽')
+                    return
+                }
                 pendingExpandRef.current = false
+                dragStartXRef.current = pendingExpandHandleXRef.current
                 setIsDraggingClass(true)
             }
 

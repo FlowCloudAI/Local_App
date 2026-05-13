@@ -354,6 +354,8 @@ function ProjectEditorInner({
         let currentWidth = startWidth
         let shouldCollapse = false
         let pendingExpand = treeCollapsed
+        let dragStartX = startX
+        const pendingExpandHandleX = startX + startWidth
         const layout = layoutRef.current
         const collapsePreviewClassName = 'is-divider-collapse-preview'
         const collapseRestoreClassName = 'is-divider-collapse-restoring'
@@ -367,11 +369,13 @@ function ProjectEditorInner({
 
         const onMove = (ev: MouseEvent) => {
             if (pendingExpand) {
+                if (ev.clientX < pendingExpandHandleX) return
                 pendingExpand = false
+                dragStartX = pendingExpandHandleX
                 setDividerDragging(true)
             }
             const wasCollapsePreview = shouldCollapse
-            const rawWidth = startWidth + ev.clientX - startX
+            const rawWidth = startWidth + ev.clientX - dragStartX
             currentWidth = Math.min(maxPx, Math.max(minPx, rawWidth))
             shouldCollapse = rawWidth <= collapseThreshold
             if (wasCollapsePreview && !shouldCollapse) {

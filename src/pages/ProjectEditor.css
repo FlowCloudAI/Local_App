@@ -1787,6 +1787,24 @@
     gap: 1rem;
 }
 
+.pe-entry-virtual-grid {
+    position: relative;
+    width: 100%;
+    min-height: 20rem;
+}
+
+.pe-entry-virtual-cell {
+    position: absolute;
+    box-sizing: border-box;
+}
+
+.pe-entry-virtual-cell .pe-entry-card,
+.pe-entry-virtual-cell .pe-entry-create-card {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+}
+
 .pe-entry-create-card {
     aspect-ratio: 3 / 4;
     display: flex;

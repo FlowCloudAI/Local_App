@@ -1,5 +1,14 @@
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {type CSSProperties, memo, type ReactNode, useState} from 'react'
+import {
+    Children,
+    cloneElement,
+    type CSSProperties,
+    isValidElement,
+    memo,
+    type ReactNode,
+    useCallback,
+    useState,
+} from 'react'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     type Category,
@@ -63,6 +72,10 @@ interface ProjectOverviewProps {
     onDelete?: () => void | Promise<void>
     onDescriptionChange?: (description: string) => void | Promise<void>
     children?: ReactNode
+}
+
+interface ProjectOverviewVirtualChildProps {
+    virtualScrollElement?: HTMLElement | null
 }
 
 function toProjectImageSrc(coverPath?: string | null): string | undefined {
@@ -269,10 +282,18 @@ function ProjectOverview({
     const [descEditing, setDescEditing] = useState(false)
     const [descDraft, setDescDraft] = useState('')
     const [descSaving, setDescSaving] = useState(false)
+    const [overviewScrollElement, setOverviewScrollElement] = useState<HTMLDivElement | null>(null)
 
     const entryTypeNameMap = getEntryTypeNameMap(entryTypes)
     const coverSrc = toProjectImageSrc(project.cover_path)
     const titleMark = project.name?.trim()?.[0] ?? '项'
+    const setOverviewScrollRef = useCallback((node: HTMLDivElement | null) => {
+        setOverviewScrollElement(node)
+    }, [])
+    const childrenWithScrollElement = Children.map(children, child => {
+        if (!isValidElement<ProjectOverviewVirtualChildProps>(child)) return child
+        return cloneElement(child, {virtualScrollElement: overviewScrollElement})
+    })
 
     async function handleDelete() {
         if (!onDelete) return
@@ -308,7 +329,7 @@ function ProjectOverview({
     }
 
     return (
-        <RollingBox className="pe-overview" thumbSize="thin">
+        <RollingBox ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin">
                 <section className="pe-overview-hero">
                     <div className="pe-project-cover-card">
                         <button
@@ -571,7 +592,7 @@ function ProjectOverview({
                 </div>
                 {children && (
                     <div className="pe-overview-entries">
-                        {children}
+                        {childrenWithScrollElement}
                     </div>
                 )}
         </RollingBox>

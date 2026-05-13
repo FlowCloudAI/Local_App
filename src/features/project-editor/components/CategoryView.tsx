@@ -1,5 +1,5 @@
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {type CSSProperties, memo, useCallback, useEffect, useRef, useState} from 'react'
+import {type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
 import EntryTypeIcon from './EntryTypeIcon'
@@ -10,6 +10,11 @@ const SORT_OPTIONS: Array<{ key: Exclude<SortMode, 'name-asc' | 'name-desc'>; la
     {key: 'updated-desc', label: '更新时间'},
     {key: 'updated-asc', label: '创建时间'},
 ]
+const ENTRY_GRID_GAP = 16
+const ENTRY_GRID_MIN_COLUMN_WIDTH = 248
+const ENTRY_GRID_DEFAULT_WIDTH = 960
+const ENTRY_GRID_FALLBACK_VIEWPORT_HEIGHT = 900
+const ENTRY_GRID_OVERSCAN_ROWS = 2
 
 function parseDateMs(s?: string | null): number {
     if (!s) return 0
@@ -58,6 +63,236 @@ function sortEntries(entries: EntryBrief[], mode: SortMode): EntryBrief[] {
     })
 }
 
+interface EntryCardItemProps {
+    entry: EntryBrief
+    entryTypes: EntryTypeView[]
+    onOpenEntry?: (entry: { id: string; title: string }) => void
+}
+
+function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
+    const entryType = entry.type
+        ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
+        : null
+    const coverSrc = toEntryCoverSrc(entry.cover)
+
+    return (
+        <Card
+            className="pe-entry-card"
+            imageSlot={(
+                coverSrc ? (
+                    <img src={coverSrc} alt={entry.title} className="pe-entry-cover"/>
+                ) : (
+                    <div
+                        className="pe-entry-placeholder"
+                        style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
+                    >
+                        <div className="pe-entry-placeholder__icon">
+                            {entryType ? (
+                                <EntryTypeIcon entryType={entryType}
+                                               className="pe-entry-placeholder__type-icon"/>
+                            ) : (
+                                <span className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
+                            )}
+                        </div>
+                        <div className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
+                            {placeholderMark(entry.title)}
+                        </div>
+                    </div>
+                )
+            )}
+            title={entry.title}
+            description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
+            extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
+            tag={entryType ? (
+                <span className="pe-entry-type-badge"
+                      style={{'--badge-color': entryType.color} as CSSProperties}>
+                    <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
+                    {entryType.name}
+                </span>
+            ) : undefined}
+            variant="shadow"
+            hoverable
+            expandContentOnHover
+            imageHeight="100%"
+            contentAreaRatio={0.5}
+            hoverContentAreaRatio={0.8}
+            overlayStartOpacity={1}
+            overlayEndOpacity={0}
+            onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
+        />
+    )
+}
+
+function CreateEntryCard({
+                             categoryId,
+                             onRequestCreateEntry,
+                         }: {
+    categoryId: string | null
+    onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
+}) {
+    return (
+        <button
+            type="button"
+            className="pe-entry-create-card"
+            onClick={() => void onRequestCreateEntry?.(categoryId)}
+        >
+            <span className="pe-entry-create-card__plus">+</span>
+            <span className="pe-entry-create-card__label">新建词条</span>
+        </button>
+    )
+}
+
+interface VirtualEntryGridProps {
+    entries: EntryBrief[]
+    entryTypes: EntryTypeView[]
+    categoryId: string | null
+    scrollElement?: HTMLElement | null
+    onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
+    onOpenEntry?: (entry: { id: string; title: string }) => void
+}
+
+interface VirtualGridViewport {
+    width: number
+    top: number
+    bottom: number
+}
+
+function VirtualEntryGrid({
+                              entries,
+                              entryTypes,
+                              categoryId,
+                              scrollElement,
+                              onRequestCreateEntry,
+                              onOpenEntry,
+                          }: VirtualEntryGridProps) {
+    const rootRef = useRef<HTMLDivElement | null>(null)
+    const measureFrameRef = useRef<number | null>(null)
+    const [viewport, setViewport] = useState<VirtualGridViewport>({
+        width: ENTRY_GRID_DEFAULT_WIDTH,
+        top: 0,
+        bottom: ENTRY_GRID_FALLBACK_VIEWPORT_HEIGHT,
+    })
+
+    const measureViewport = useCallback(() => {
+        const root = rootRef.current
+        if (!root) return
+
+        const rootRect = root.getBoundingClientRect()
+        const scrollRect = scrollElement?.getBoundingClientRect()
+        const nextWidth = rootRect.width || ENTRY_GRID_DEFAULT_WIDTH
+        const nextTop = scrollRect ? scrollRect.top - rootRect.top : 0
+        const nextBottom = scrollRect ? scrollRect.bottom - rootRect.top : window.innerHeight - rootRect.top
+
+        setViewport(current => {
+            if (
+                Math.abs(current.width - nextWidth) < 1 &&
+                Math.abs(current.top - nextTop) < 1 &&
+                Math.abs(current.bottom - nextBottom) < 1
+            ) {
+                return current
+            }
+            return {
+                width: nextWidth,
+                top: nextTop,
+                bottom: nextBottom,
+            }
+        })
+    }, [scrollElement])
+
+    const scheduleMeasure = useCallback(() => {
+        if (measureFrameRef.current !== null) return
+        measureFrameRef.current = window.requestAnimationFrame(() => {
+            measureFrameRef.current = null
+            measureViewport()
+        })
+    }, [measureViewport])
+
+    useLayoutEffect(() => {
+        measureViewport()
+
+        const scrollTarget: HTMLElement | Window = scrollElement ?? window
+        scrollTarget.addEventListener('scroll', scheduleMeasure, {passive: true})
+        window.addEventListener('resize', scheduleMeasure)
+
+        const resizeObserver = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(scheduleMeasure)
+            : null
+        if (rootRef.current) resizeObserver?.observe(rootRef.current)
+        if (scrollElement) resizeObserver?.observe(scrollElement)
+
+        return () => {
+            scrollTarget.removeEventListener('scroll', scheduleMeasure)
+            window.removeEventListener('resize', scheduleMeasure)
+            resizeObserver?.disconnect()
+            if (measureFrameRef.current !== null) {
+                window.cancelAnimationFrame(measureFrameRef.current)
+                measureFrameRef.current = null
+            }
+        }
+    }, [measureViewport, scheduleMeasure, scrollElement])
+
+    const gridWidth = Math.max(1, viewport.width)
+    const columnCount = Math.max(1, Math.floor((gridWidth + ENTRY_GRID_GAP) / (ENTRY_GRID_MIN_COLUMN_WIDTH + ENTRY_GRID_GAP)))
+    const columnWidth = Math.max(1, Math.floor((gridWidth - ENTRY_GRID_GAP * (columnCount - 1)) / columnCount))
+    const rowHeight = Math.round(columnWidth * 4 / 3)
+    const rowPitch = rowHeight + ENTRY_GRID_GAP
+    const itemCount = entries.length + 1
+    const rowCount = Math.ceil(itemCount / columnCount)
+    const gridHeight = rowCount > 0
+        ? rowCount * rowHeight + Math.max(0, rowCount - 1) * ENTRY_GRID_GAP
+        : rowHeight
+    const visibleTop = Math.max(0, Math.min(gridHeight, viewport.top))
+    const visibleBottom = Math.max(visibleTop, Math.min(gridHeight, viewport.bottom))
+    const startRow = Math.max(0, Math.floor(visibleTop / rowPitch) - ENTRY_GRID_OVERSCAN_ROWS)
+    const endRow = Math.min(rowCount - 1, Math.ceil(visibleBottom / rowPitch) + ENTRY_GRID_OVERSCAN_ROWS)
+    const cells = []
+
+    for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
+        for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+            const itemIndex = rowIndex * columnCount + columnIndex
+            if (itemIndex >= itemCount) break
+
+            const entry = entries[itemIndex]
+            const isCreateCard = itemIndex === entries.length
+            cells.push((
+                <div
+                    key={isCreateCard ? '__create__' : entry.id}
+                    className="pe-entry-virtual-cell"
+                    style={{
+                        left: columnIndex * (columnWidth + ENTRY_GRID_GAP),
+                        top: rowIndex * rowPitch,
+                        width: columnWidth,
+                        height: rowHeight,
+                    }}
+                >
+                    {isCreateCard ? (
+                        <CreateEntryCard
+                            categoryId={categoryId}
+                            onRequestCreateEntry={onRequestCreateEntry}
+                        />
+                    ) : (
+                        <EntryCardItem
+                            entry={entry}
+                            entryTypes={entryTypes}
+                            onOpenEntry={onOpenEntry}
+                        />
+                    )}
+                </div>
+            ))
+        }
+    }
+
+    return (
+        <div
+            ref={rootRef}
+            className="pe-entry-virtual-grid"
+            style={{height: gridHeight}}
+        >
+            {cells}
+        </div>
+    )
+}
+
 interface CategoryViewProps {
     categoryId: string | null
     categoryName?: string
@@ -66,6 +301,7 @@ interface CategoryViewProps {
     prefetchedEntries?: EntryBrief[]
     refreshToken?: number
     noScroll?: boolean
+    virtualScrollElement?: HTMLElement | null
     onDefaultEntriesLoaded?: (categoryId: string | null, entries: EntryBrief[]) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
     onOpenEntry?: (entry: { id: string; title: string }) => void
@@ -79,6 +315,7 @@ function CategoryView({
                           prefetchedEntries,
                           refreshToken = 0,
                           noScroll = false,
+                          virtualScrollElement,
                           onDefaultEntriesLoaded,
                           onRequestCreateEntry,
                           onOpenEntry
@@ -191,75 +428,24 @@ function CategoryView({
         }, 300)
     }
 
-    const displayed = sortEntries(entries, sortMode)
+    const displayed = useMemo(() => sortEntries(entries, sortMode), [entries, sortMode])
     const hasVisibleEntries = displayed.length > 0
     const showLoadingOverlay = loading && hasVisibleEntries
 
     const renderEntryGrid = () => (
         <div className="pe-entry-grid">
-            {displayed.map((entry) => {
-                const entryType = entry.type
-                    ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
-                    : null
-                const coverSrc = toEntryCoverSrc(entry.cover)
-                return (
-                    <Card
-                        key={entry.id}
-                        className="pe-entry-card"
-                        imageSlot={(
-                            coverSrc ? (
-                                <img src={coverSrc} alt={entry.title} className="pe-entry-cover"/>
-                            ) : (
-                                <div
-                                    className="pe-entry-placeholder"
-                                    style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
-                                >
-                                    <div className="pe-entry-placeholder__icon">
-                                        {entryType ? (
-                                            <EntryTypeIcon entryType={entryType}
-                                                           className="pe-entry-placeholder__type-icon"/>
-                                        ) : (
-                                            <span
-                                                className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
-                                        )}
-                                    </div>
-                                    <div
-                                        className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
-                                        {placeholderMark(entry.title)}
-                                    </div>
-                                </div>
-                            )
-                        )}
-                        title={entry.title}
-                        description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
-                        extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
-                        tag={entryType ? (
-                            <span className="pe-entry-type-badge"
-                                  style={{'--badge-color': entryType.color} as CSSProperties}>
-                                <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
-                                {entryType.name}
-                            </span>
-                        ) : undefined}
-                        variant="shadow"
-                        hoverable
-                        expandContentOnHover
-                        imageHeight="100%"
-                        contentAreaRatio={0.5}
-                        hoverContentAreaRatio={0.8}
-                        overlayStartOpacity={1}
-                        overlayEndOpacity={0}
-                        onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
-                    />
-                )
-            })}
-            <button
-                type="button"
-                className="pe-entry-create-card"
-                onClick={() => void onRequestCreateEntry?.(categoryId)}
-            >
-                <span className="pe-entry-create-card__plus">+</span>
-                <span className="pe-entry-create-card__label">新建词条</span>
-            </button>
+            {displayed.map((entry) => (
+                <EntryCardItem
+                    key={entry.id}
+                    entry={entry}
+                    entryTypes={entryTypes}
+                    onOpenEntry={onOpenEntry}
+                />
+            ))}
+            <CreateEntryCard
+                categoryId={categoryId}
+                onRequestCreateEntry={onRequestCreateEntry}
+            />
         </div>
     )
 
@@ -325,7 +511,14 @@ function CategoryView({
             <div className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}>
                 {hasVisibleEntries ? (
                     noScroll ? (
-                        renderEntryGrid()
+                        <VirtualEntryGrid
+                            entries={displayed}
+                            entryTypes={entryTypes}
+                            categoryId={categoryId}
+                            scrollElement={virtualScrollElement}
+                            onRequestCreateEntry={onRequestCreateEntry}
+                            onOpenEntry={onOpenEntry}
+                        />
                     ) : (
                         <RollingBox className="pe-entries-scroll" thumbSize="thin">
                             {renderEntryGrid()}
