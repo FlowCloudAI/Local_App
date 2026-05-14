@@ -1,9 +1,14 @@
 .project-list-page {
+  min-height: 100%;
+  display: grid;
+  gap: var(--fc-space-lg);
   user-select: none;
 }
 
 .project-list-header {
-    margin-bottom: var(--fc-space-xl);
+    margin-bottom: var(--fc-space-lg);
+    padding-bottom: var(--fc-space-md);
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
 }
 
 .project-list-title-block {
@@ -28,34 +33,40 @@
 .project-home-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-  gap: var(--fc-space-lg);
-  margin-bottom: var(--fc-space-xl);
+  gap: 0;
+  margin-bottom: 0;
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
+  border-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-bg-elevated) 68%, transparent);
+  overflow: hidden;
 }
 
 .project-home-hero__main {
   min-width: 0;
   display: grid;
-  gap: var(--fc-space-lg);
+  align-content: space-between;
+  gap: var(--fc-space-xl);
+  padding: var(--fc-space-xl);
+  border-right: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
 }
 
 .project-home-continue-card,
 .project-home-panel {
-  border: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
-  border-radius: var(--fc-radius-xl);
-  background: var(--fc-color-bg-elevated);
-  box-shadow: var(--fc-shadow-xs);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .project-home-continue-card {
-  min-height: 15rem;
-  padding: clamp(1.25rem, 2.6vw, 2rem);
+  min-height: 0;
+  max-width: 42rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: var(--fc-space-sm);
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-primary) 18%, transparent), transparent 34%),
-    linear-gradient(135deg, color-mix(in srgb, var(--fc-color-bg-elevated) 92%, var(--fc-color-primary-subtle)), var(--fc-color-bg-elevated));
+  background: transparent;
 }
 
 .project-home-eyebrow {
@@ -96,14 +107,19 @@
 .project-home-side {
   display: grid;
   align-content: start;
-  gap: var(--fc-space-md);
+  gap: 0;
   min-width: 0;
+  background: color-mix(in srgb, var(--fc-color-bg) 62%, transparent);
 }
 
 .project-home-panel {
   padding: var(--fc-space-lg);
   display: grid;
-  gap: var(--fc-space-md);
+  gap: var(--fc-space-sm);
+}
+
+.project-home-panel + .project-home-panel {
+  border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
 }
 
 .project-home-panel h2 {
@@ -122,13 +138,13 @@
 .project-home-recent-item,
 .project-home-help-item {
   width: 100%;
-  border: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
-  border-radius: var(--fc-radius-md);
-  background: color-mix(in srgb, var(--fc-color-bg) 74%, transparent);
+  border: none;
+  border-radius: var(--fc-radius-sm);
+  background: transparent;
   color: var(--fc-color-text);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
 .project-home-recent-item {
@@ -148,9 +164,7 @@
 .project-home-action-item:hover,
 .project-home-recent-item:hover,
 .project-home-help-item:hover {
-  border-color: color-mix(in srgb, var(--fc-color-primary) 44%, var(--fc-color-border));
-  background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg-elevated));
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg));
 }
 
 .project-home-action-item span {
@@ -207,6 +221,15 @@
     gap: var(--fc-space-sm);
 }
 
+.project-home-workbench {
+  min-width: 0;
+  padding: var(--fc-space-lg);
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
+  border-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-bg-elevated) 70%, transparent);
+  overflow: hidden;
+}
+
 .project-list-refresh {
   flex-shrink: 0;
 }
@@ -253,6 +276,8 @@
 
 .project-list-feedback {
     margin-bottom: var(--fc-space-lg);
+    background: color-mix(in srgb, var(--fc-color-bg) 82%, transparent);
+    border-color: color-mix(in srgb, var(--fc-color-border) 78%, transparent);
 }
 
 .project-list-feedback.error {
@@ -265,6 +290,11 @@
   gap: 1rem;
 }
 
+.project-list-grid > .project-list-feedback {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+}
+
 .project-list-empty-state {
   min-height: calc(100vh - 15rem);
   display: grid;
@@ -274,6 +304,13 @@
 
 .project-list-empty-panel {
   min-height: 28rem;
+}
+
+.project-home-workbench .project-list-empty-panel.fc-empty-state-card {
+  border-color: color-mix(in srgb, var(--fc-color-border) 78%, transparent);
+  border-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-bg) 84%, transparent);
+  box-shadow: none;
 }
 
 .project-list-empty-mark {
@@ -292,11 +329,14 @@
   aspect-ratio: 3 / 4;
   position: relative;
   border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+  border-radius: var(--fc-radius-md);
+  box-shadow: none;
   overflow: hidden;
 }
 
 .project-list-card.fc-card {
   background: var(--fc-color-bg-tertiary);
+  box-shadow: none;
 }
 
 .project-list-create-card {
@@ -310,17 +350,15 @@
   padding: 1.25rem;
   border-radius: var(--fc-radius-md);
   border: 1px dashed color-mix(in srgb, var(--fc-color-primary) 46%, var(--fc-color-border));
-  background: color-mix(in srgb, var(--fc-color-primary-subtle) 62%, transparent);
+  background: color-mix(in srgb, var(--fc-color-primary-subtle) 36%, transparent);
   color: var(--fc-color-primary);
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .project-list-create-card:hover {
-  transform: translateY(-2px);
   border-color: var(--fc-color-primary);
-  background: color-mix(in srgb, var(--fc-color-primary-subtle) 82%, transparent);
-  box-shadow: var(--fc-shadow-md);
+  background: color-mix(in srgb, var(--fc-color-primary-subtle) 54%, transparent);
 }
 
 .project-list-create-card__plus {
@@ -438,6 +476,11 @@
 @media (max-width: 840px) {
   .project-home-hero {
     grid-template-columns: 1fr;
+  }
+
+  .project-home-hero__main {
+    border-right: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
   }
 
   .project-list-toolbar {
