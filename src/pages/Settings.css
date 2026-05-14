@@ -417,12 +417,11 @@
 .templates-detail-section {
     box-sizing: border-box;
     display: flex;
-    flex: 1;
+    flex: 0 0 auto;
     flex-direction: column;
     margin-bottom: 0;
-    min-height: 0;
+    min-height: 100%;
     padding: var(--fc-space-lg);
-    overflow: hidden;
 }
 
 .templates-detail-toolbar-actions {
@@ -489,9 +488,7 @@
 }
 
 .templates-detail-disclosure {
-    flex: 0 1 auto;
-    min-height: 0;
-    max-height: min(18rem, 36%);
+    flex: 0 0 auto;
     margin-bottom: 0.75rem;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
@@ -499,14 +496,8 @@
     overflow: hidden;
 }
 
-.templates-detail-disclosure[open] {
-    display: flex;
-    flex-direction: column;
-}
-
 .templates-detail-disclosure-summary {
     display: flex;
-    flex: 0 0 auto;
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
@@ -551,11 +542,9 @@
 
 .templates-detail-grid {
     display: grid;
-    min-height: 0;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 0.75rem;
     padding: 0.75rem;
-    overflow: auto;
 }
 
 .templates-detail-card {
@@ -647,9 +636,9 @@
 
 .templates-editor-shell {
     display: flex;
-    flex: 1 1 0;
+    flex: 1 0 auto;
     flex-direction: column;
-    min-height: 0;
+    min-height: clamp(24rem, 52vh, 42rem);
     padding: 0.75rem;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
