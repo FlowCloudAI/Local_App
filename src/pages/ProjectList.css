@@ -111,12 +111,14 @@
   line-height: 1.2;
 }
 
+.project-home-action-list,
 .project-home-recent-list,
 .project-home-help-list {
   display: grid;
   gap: var(--fc-space-xs);
 }
 
+.project-home-action-item,
 .project-home-recent-item,
 .project-home-help-item {
   width: 100%;
@@ -137,11 +139,28 @@
   padding: 0.68rem 0.75rem;
 }
 
+.project-home-action-item {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.project-home-action-item:hover,
 .project-home-recent-item:hover,
 .project-home-help-item:hover {
   border-color: color-mix(in srgb, var(--fc-color-primary) 44%, var(--fc-color-border));
   background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg-elevated));
   transform: translateY(-1px);
+}
+
+.project-home-action-item span {
+  font-weight: var(--fc-font-weight-semibold, 600);
+}
+
+.project-home-action-item small {
+  color: var(--fc-color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .project-home-recent-item__type {

@@ -159,6 +159,53 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         })
     const projectCountLabel = hasLoadedProjects ? projects.length : '-'
     const filteredProjectCountLabel = hasLoadedProjects ? filteredProjects.length : '-'
+    const quickActions = useMemo<Array<{
+        key: string
+        title: string
+        description: string
+        target?: HomeActivityTarget
+        onClick?: () => void
+    }>>(() => [
+        {
+            key: 'new-world',
+            title: '开始一个新世界',
+            description: '创建新的世界观项目。',
+            onClick: () => setCreatorOpen(true),
+        },
+        {
+            key: 'idea',
+            title: '记录灵感',
+            description: '先把想法放进灵感收件箱。',
+            target: {
+                type: 'idea',
+                id: 'idea-panel',
+                title: '灵感收件箱',
+                subtitle: '快速记录',
+            },
+        },
+        {
+            key: 'ai-chat',
+            title: '打开 AI 助手',
+            description: '让 AI 帮你整理设定、扩写片段或检查问题。',
+            target: {
+                type: 'conversation',
+                id: 'ai-chat-panel',
+                title: 'AI 助手',
+                subtitle: '创作辅助',
+            },
+        },
+        {
+            key: 'snapshot',
+            title: '查看快照',
+            description: '回看最近保存的版本和分支。',
+            target: {
+                type: 'snapshot',
+                id: 'snapshot-panel',
+                title: '快照',
+                subtitle: '版本记录',
+            },
+        },
+    ], [])
     const recentItems = useMemo(() => {
         const continueItem = dashboard.continueItem
         return dashboard.recentItems
@@ -239,6 +286,30 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             </div>
                         </div>
                         <aside className="project-home-side">
+                            <section className="project-home-panel">
+                                <h2>快速开始</h2>
+                                <div className="project-home-action-list">
+                                    {quickActions.map(action => (
+                                        <button
+                                            key={action.key}
+                                            type="button"
+                                            className="project-home-action-item"
+                                            onClick={() => {
+                                                if (action.onClick) {
+                                                    action.onClick()
+                                                    return
+                                                }
+                                                if (action.target) {
+                                                    openDashboardTarget(action.target)
+                                                }
+                                            }}
+                                        >
+                                            <span>{action.title}</span>
+                                            <small>{action.description}</small>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
                             <section className="project-home-panel">
                                 <h2>最近内容</h2>
                                 {recentItems.length > 0 ? (
