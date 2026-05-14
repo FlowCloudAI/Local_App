@@ -17,6 +17,7 @@ import ProjectList from '../../pages/ProjectList.tsx'
 import Settings from '../../pages/Settings'
 import DockableSidePanel from '../../shared/ui/layout/DockableSidePanel'
 import type {ReportConversationContext} from '../../features/ai-chat/model/AiControllerTypes'
+import {recordHomeActivity, saveHomeLastSession, type HomeActivityTarget} from '../../features/home/homeActivity'
 
 type EntryTabMeta = {
     projectId: string
@@ -163,6 +164,46 @@ export default function DesktopApp() {
         }
     }, [])
 
+    const recordTabActivity = useCallback((tabKey: string) => {
+        const tabLabel = String(tabs.find(tab => tab.key === tabKey)?.label ?? '')
+        const projectId = projectTabMap[tabKey]
+        if (projectId) {
+            recordHomeActivity({
+                type: 'project',
+                id: projectId,
+                projectId,
+                title: tabLabel || '未命名世界',
+                subtitle: '项目',
+            })
+            return
+        }
+
+        const entryMeta = entryTabMap[tabKey]
+        if (entryMeta) {
+            recordHomeActivity({
+                type: 'entry',
+                id: entryMeta.entryId,
+                projectId: entryMeta.projectId,
+                entryId: entryMeta.entryId,
+                title: tabLabel || '未命名词条',
+                subtitle: '词条',
+            })
+            return
+        }
+
+        const toolMeta = toolTabMap[tabKey]
+        if (toolMeta) {
+            recordHomeActivity({
+                type: 'tool',
+                id: `${toolMeta.projectId}:${toolMeta.panel}`,
+                projectId: toolMeta.projectId,
+                panel: toolMeta.panel,
+                title: tabLabel || getProjectToolLabel('项目', toolMeta.panel),
+                subtitle: '项目工具',
+            })
+        }
+    }, [entryTabMap, getProjectToolLabel, projectTabMap, tabs, toolTabMap])
+
     // 新增标签（通用）
     const handleAdd = useCallback((label = '新标签') => {
         if (mainContentKey === 'settings') {
@@ -184,6 +225,15 @@ export default function DesktopApp() {
         })
         setProjectTabMap(prev => prev[tabKey] === project.id ? prev : {...prev, [tabKey]: project.id})
         setActiveKey(tabKey)
+        recordHomeActivity({
+            type: 'project',
+            id: project.id,
+            projectId: project.id,
+            title: project.name,
+            subtitle: '项目',
+            description: project.description,
+            updatedAt: project.updated_at ?? project.created_at ?? null,
+        })
         touchRecentPage(tabKey)
         showHomeWorkspace()
     }, [showHomeWorkspace, touchRecentPage])
@@ -203,14 +253,22 @@ export default function DesktopApp() {
             },
         }))
         setActiveKey(tabKey)
+        recordHomeActivity({
+            type: 'entry',
+            id: entry.id,
+            projectId,
+            entryId: entry.id,
+            title: entry.title,
+            subtitle: '词条',
+        })
         touchRecentPage(tabKey)
         showHomeWorkspace()
     }, [showHomeWorkspace, touchRecentPage])
 
     const handleOpenProjectTool = useCallback((panel: ProjectToolPanel, project: { id: string; name: string }) => {
         const tabKey = `tool-${project.id}-${panel}`
+        const label = getProjectToolLabel(project.name, panel)
         setTabs((prev) => {
-            const label = getProjectToolLabel(project.name, panel)
             const index = prev.findIndex((tab) => tab.key === tabKey)
             if (index === -1) return [...prev, {key: tabKey, label, closable: true}]
             return prev.map((tab) => tab.key === tabKey ? {...tab, label, closable: true} : tab)
@@ -223,6 +281,14 @@ export default function DesktopApp() {
             },
         }))
         setActiveKey(tabKey)
+        recordHomeActivity({
+            type: 'tool',
+            id: `${project.id}:${panel}`,
+            projectId: project.id,
+            panel,
+            title: label,
+            subtitle: project.name,
+        })
         touchRecentPage(tabKey)
         showHomeWorkspace()
     }, [getProjectToolLabel, showHomeWorkspace, touchRecentPage])
@@ -260,9 +326,10 @@ export default function DesktopApp() {
     const activateProjectTab = useCallback((projectId: string) => {
         const tabKey = `proj-${projectId}`
         setActiveKey(tabKey)
+        recordTabActivity(tabKey)
         touchRecentPage(tabKey)
         showHomeWorkspace()
-    }, [showHomeWorkspace, touchRecentPage])
+    }, [recordTabActivity, showHomeWorkspace, touchRecentPage])
 
     const handleBackToProject = useCallback((projectId: string) => {
         activateProjectTab(projectId)
@@ -341,6 +408,7 @@ export default function DesktopApp() {
                     setSelectedKey('')
                 }
                 if (shouldShowHomeWorkspace) {
+                    recordTabActivity(key)
                     touchRecentPage(key)
                 }
                 showHomeWorkspace()
@@ -353,11 +421,12 @@ export default function DesktopApp() {
                 setSelectedKey('')
             }
             if (shouldShowHomeWorkspace) {
+                recordTabActivity(key)
                 touchRecentPage(key)
             }
             showHomeWorkspace()
         }
-    }, [activeKey, entryTabMap, mainContentKey, projectTabMap, showHomeWorkspace, toolTabMap, touchRecentPage])
+    }, [activeKey, entryTabMap, mainContentKey, projectTabMap, recordTabActivity, showHomeWorkspace, toolTabMap, touchRecentPage])
 
     // 删除标签
     const handleClose = useCallback(async (key: string) => {
@@ -497,6 +566,14 @@ export default function DesktopApp() {
         if (activeKey !== entryTabKey) {
             setActiveKey(entryTabKey)
         }
+        recordHomeActivity({
+            type: 'entry',
+            id: entry.id,
+            projectId,
+            entryId: entry.id,
+            title: entry.title,
+            subtitle: '角色对话',
+        })
         touchRecentPage(entryTabKey)
         showHomeWorkspace()
         try {
@@ -534,6 +611,59 @@ export default function DesktopApp() {
     const activeEntryTitle = activeEntryMeta
         ? String(tabs.find(tab => tab.key === activeKey)?.label ?? '')
         : null
+    const activeHomeTarget = useMemo<HomeActivityTarget | null>(() => {
+        const tabTitle = String(tabs.find(tab => tab.key === activeKey)?.label ?? '')
+        const projectId = projectTabMap[activeKey]
+        if (projectId) {
+            return {
+                type: 'project',
+                id: projectId,
+                projectId,
+                title: tabTitle || '未命名世界',
+                subtitle: '项目',
+            }
+        }
+
+        const entryMeta = entryTabMap[activeKey]
+        if (entryMeta) {
+            return {
+                type: 'entry',
+                id: entryMeta.entryId,
+                projectId: entryMeta.projectId,
+                entryId: entryMeta.entryId,
+                title: tabTitle || '未命名词条',
+                subtitle: '词条',
+            }
+        }
+
+        const toolMeta = toolTabMap[activeKey]
+        if (toolMeta) {
+            return {
+                type: 'tool',
+                id: `${toolMeta.projectId}:${toolMeta.panel}`,
+                projectId: toolMeta.projectId,
+                panel: toolMeta.panel,
+                title: tabTitle || getProjectToolLabel('项目', toolMeta.panel),
+                subtitle: '项目工具',
+            }
+        }
+
+        return null
+    }, [activeKey, entryTabMap, getProjectToolLabel, projectTabMap, tabs, toolTabMap])
+
+    useEffect(() => {
+        saveHomeLastSession({
+            target: activeHomeTarget,
+            mainContentKey,
+            activeTabKey: activeKey || null,
+            sidePanel: {
+                contentKey: sidePanelContentKey,
+                collapsed: aiPanelCollapsed,
+                mode: aiPanelMode,
+            },
+        })
+    }, [activeHomeTarget, activeKey, aiPanelCollapsed, aiPanelMode, mainContentKey, sidePanelContentKey])
+
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
