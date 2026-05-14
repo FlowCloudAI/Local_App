@@ -320,7 +320,11 @@
 }
 
 .templates-tree-shell {
-    min-height: 520px;
+    display: flex;
+    flex-direction: column;
+    height: clamp(32rem, 62vh, 44rem);
+    min-width: 0;
+    min-height: 0;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-xl);
     background: var(--fc-color-bg-elevated);

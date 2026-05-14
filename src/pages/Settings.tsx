@@ -1,3 +1,4 @@
+import {logger} from '../shared/logger'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     Button,
@@ -246,7 +247,7 @@ export default function Settings({onBack}: SettingsProps) {
         try {
             await ai_close_all_sessions()
         } catch (error) {
-            console.error('关闭 AI 会话失败:', error)
+            logger.error('关闭 AI 会话失败:', error)
         }
     }, [])
 
@@ -332,18 +333,18 @@ export default function Settings({onBack}: SettingsProps) {
     }, [])
 
     useEffect(() => {
-        loadData().catch(console.error)
-        getVersion().then(setAppVersion).catch(console.error)
+        loadData().catch(logger.error)
+        getVersion().then(setAppVersion).catch(logger.error)
     }, [loadData])
 
     useEffect(() => {
-        closeIdleAiSessions().catch(console.error)
+        closeIdleAiSessions().catch(logger.error)
     }, [closeIdleAiSessions])
 
     // 后端异步初始化完成后重新加载（AiState 在 DB 就绪后才 manage）
     useEffect(() => {
         const unlisten = listen('backend-ready', () => {
-            loadData().catch(console.error)
+            loadData().catch(logger.error)
         })
         return () => {
             unlisten.then(f => f())
@@ -353,8 +354,8 @@ export default function Settings({onBack}: SettingsProps) {
     useEffect(() => {
         if (activeTab !== 'ai' || pluginDirectoryLoaded) return
         setPluginDirectoryLoaded(true)
-        loadLocal().catch(console.error)
-        loadMarket().catch(console.error)
+        loadLocal().catch(logger.error)
+        loadMarket().catch(logger.error)
     }, [activeTab, loadLocal, loadMarket, pluginDirectoryLoaded])
 
     useEffect(() => {
@@ -429,7 +430,7 @@ export default function Settings({onBack}: SettingsProps) {
             }
         } catch (error) {
             const message = String(error)
-            console.error('设置保存失败:', error)
+            logger.error('设置保存失败:', error)
             void showAlert(`设置保存失败：${message}`, 'error')
         }
     }, [showAlert])
@@ -487,7 +488,7 @@ export default function Settings({onBack}: SettingsProps) {
     const handleOpenDir = useCallback((path: string) => {
         if (!path) return
         open_in_file_manager(path).catch((err) => {
-            console.error('打开目录失败', err)
+            logger.error('打开目录失败', err)
             void showAlert(`打开目录失败：${String(err)}`, 'error', 'toast', 2200)
         })
     }, [showAlert])
@@ -555,7 +556,7 @@ export default function Settings({onBack}: SettingsProps) {
     const handleOpenBackupDir = useCallback((path: string) => {
         if (!path) return
         setting_open_backup_dir(path).catch((err) => {
-            console.error('打开备份目录失败', err)
+            logger.error('打开备份目录失败', err)
             void showAlert(`打开备份目录失败：${String(err)}`, 'error', 'toast', 2200)
         })
     }, [showAlert])
@@ -732,11 +733,14 @@ export default function Settings({onBack}: SettingsProps) {
                 return Array.from(new Set(metas.map(meta => `group:${meta.group}`)))
             })
         } catch (error) {
-            setTemplateListError(String(error))
+            const message = String(error)
+            logger.error('提示词模板目录加载失败:', error)
+            setTemplateListError(message)
+            void showAlert(`提示词模板目录加载失败：${message}`, 'error', 'toast', 3000)
         } finally {
             setTemplateListLoading(false)
         }
-    }, [])
+    }, [showAlert])
 
     useEffect(() => {
         if (
@@ -745,7 +749,7 @@ export default function Settings({onBack}: SettingsProps) {
             !templateListLoading &&
             !templateListError
         ) {
-            loadTemplateList().catch(console.error)
+            loadTemplateList().catch(logger.error)
         }
     }, [activeTab, loadTemplateList, templateListError, templateListLoading, templateMetas.length])
 
@@ -1058,7 +1062,7 @@ export default function Settings({onBack}: SettingsProps) {
                         用量统计
                     </button>
                 </aside>
-                <RollingBox className="settings-scroll-area" thumbSize={'thin'}>
+                <RollingBox axis="y" className="settings-scroll-area" thumbSize={'thin'}>
                     <div className="settings-content">
                     {activeTab === 'system' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
@@ -1081,7 +1085,7 @@ export default function Settings({onBack}: SettingsProps) {
                                         style={{flex: 1}}
                                     />
                                     <div className="settings-field-actions">
-                                        <Button size={"sm"} variant="outline"
+                                        <Button type="button" size={"sm"} variant="outline"
                                                 onClick={() => handleOpenDir(configDir)}>
                                             打开
                                         </Button>
@@ -1096,7 +1100,7 @@ export default function Settings({onBack}: SettingsProps) {
                                         style={{flex: 1}}
                                     />
                                     <div className="settings-field-actions">
-                                        <Button size={"sm"} onClick={handleSelectMediaDir}>浏览</Button>
+                                        <Button type="button" size={"sm"} onClick={handleSelectMediaDir}>浏览</Button>
                                     </div>
                                 </div>
                                 <div className="settings-field">
@@ -1108,9 +1112,9 @@ export default function Settings({onBack}: SettingsProps) {
                                         style={{flex: 1}}
                                     />
                                     <div className="settings-field-actions">
-                                        <Button size={"sm"} onClick={handleSelectDbPath}>浏览</Button>
+                                        <Button type="button" size={"sm"} onClick={handleSelectDbPath}>浏览</Button>
                                         {settings.db_path && defaultPaths && settings.db_path !== defaultPaths.db_path && (
-                                            <Button size={"sm"} variant="outline" onClick={() =>
+                                            <Button type="button" size={"sm"} variant="outline" onClick={() =>
                                                 setSettings(prev => prev ? {...prev, db_path: null} : null)
                                             }>重置</Button>
                                         )}
@@ -1125,9 +1129,9 @@ export default function Settings({onBack}: SettingsProps) {
                                         style={{flex: 1}}
                                     />
                                     <div className="settings-field-actions">
-                                        <Button size={"sm"} onClick={handleSelectPluginsPath}>浏览</Button>
+                                        <Button type="button" size={"sm"} onClick={handleSelectPluginsPath}>浏览</Button>
                                         {settings.plugins_path && defaultPaths && settings.plugins_path !== defaultPaths.plugins_path && (
-                                            <Button size={"sm"} variant="outline" onClick={() =>
+                                            <Button type="button" size={"sm"} variant="outline" onClick={() =>
                                                 setSettings(prev => prev ? {...prev, plugins_path: null} : null)
                                             }>重置</Button>
                                         )}
@@ -1147,8 +1151,8 @@ export default function Settings({onBack}: SettingsProps) {
                                         style={{flex: 1}}
                                     />
                                     <div className="settings-field-actions">
-                                        <Button size="sm" onClick={handleSelectBackupDir}>浏览</Button>
-                                        <Button
+                                        <Button type="button" size="sm" onClick={handleSelectBackupDir}>浏览</Button>
+                                        <Button type="button"
                                             size="sm"
                                             variant="outline"
                                             disabled={!effectiveBackupDir}
@@ -1157,7 +1161,7 @@ export default function Settings({onBack}: SettingsProps) {
                                             打开
                                         </Button>
                                         {settings.backup_dir && (
-                                            <Button size="sm" variant="outline" onClick={() =>
+                                            <Button type="button" size="sm" variant="outline" onClick={() =>
                                                 setSettings(prev => prev ? {...prev, backup_dir: null} : null)
                                             }>重置</Button>
                                         )}
@@ -1248,7 +1252,7 @@ export default function Settings({onBack}: SettingsProps) {
                                     />
                                     <span className="settings-span">{settings.editor_font_size}px</span>
                                     {settings.editor_font_size !== 14 && (
-                                        <Button size="sm" variant="outline" style={{marginLeft: 8}} onClick={() =>
+                                        <Button type="button" size="sm" variant="outline" style={{marginLeft: 8}} onClick={() =>
                                             setSettings(prev => prev ? {...prev, editor_font_size: 14} : null)
                                         }>恢复默认</Button>
                                     )}
@@ -1272,7 +1276,7 @@ export default function Settings({onBack}: SettingsProps) {
                                         type="button"
                                         className="settings-about-link"
                                         onClick={() => {
-                                            void openUrl('https://www.flowcloudai.cn').catch(console.error)
+                                            void openUrl('https://www.flowcloudai.cn').catch(logger.error)
                                         }}
                                     >
                                         https://www.flowcloudai.cn
@@ -1280,13 +1284,13 @@ export default function Settings({onBack}: SettingsProps) {
                                 </div>
                                 <div className="settings-field">
                                     <label className="settings-label-wide">用户知情同意书</label>
-                                    <Button variant="outline" size="sm" onClick={() => setLicenseModalOpen(true)}>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setLicenseModalOpen(true)}>
                                         查看
                                     </Button>
                                 </div>
                                 <div className="settings-field">
                                     <label className="settings-label-wide">日志目录</label>
-                                    <Button
+                                    <Button type="button"
                                         variant="outline"
                                         size="sm"
                                         disabled={!configDir}
@@ -1302,7 +1306,7 @@ export default function Settings({onBack}: SettingsProps) {
 
                             {/* 操作按钮 */}
                             <div className="settings-footer">
-                                <Button variant="outline" onClick={handleReset}>重置为默认</Button>
+                                <Button type="button" variant="outline" onClick={handleReset}>重置为默认</Button>
                             </div>
                         </div>
                     )}
@@ -1328,7 +1332,7 @@ export default function Settings({onBack}: SettingsProps) {
                             <section className="settings-section fc-section-card">
                                 <div className="plugins-section-header">
                                     <h2 className="plugins-section-title fc-section-title">已安装</h2>
-                                    <Button
+                                    <Button type="button"
                                         variant="outline"
                                         size="sm"
                                         disabled={loadingLocal}
@@ -1370,21 +1374,21 @@ export default function Settings({onBack}: SettingsProps) {
                                 <div className="plugins-section-header">
                                     <h2 className="plugins-section-title fc-section-title">插件库</h2>
                                     <div className="plugins-section-actions">
-                                        <Button
+                                        <Button type="button"
                                             size="sm"
                                             disabled={installingLocalFile}
                                             onClick={handleInstallFromFile}
                                         >
                                             {installingLocalFile ? '安装中…' : '安装本地插件'}
                                         </Button>
-                                        <Button
+                                        <Button type="button"
                                             variant="outline"
                                             size="sm"
                                             onClick={handleUploadLocalPlugin}
                                         >
                                             上传本地插件
                                         </Button>
-                                        <Button
+                                        <Button type="button"
                                             variant="outline"
                                             size="sm"
                                             disabled={loadingMarket}
@@ -1590,14 +1594,14 @@ export default function Settings({onBack}: SettingsProps) {
                                                                 <>
                                                                     <span
                                                                         className="settings-api-key-status">已配置</span>
-                                                                    <Button
+                                                                    <Button type="button"
                                                                         variant="outline"
                                                                         size="sm"
                                                                         onClick={() => handleConfigureApiKey(plugin.id)}
                                                                     >
                                                                         重新配置
                                                                     </Button>
-                                                                    <Button
+                                                                    <Button type="button"
                                                                         variant="danger"
                                                                         size="sm"
                                                                         onClick={() => handleDeleteApiKey(plugin.id)}
@@ -1606,7 +1610,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                                     </Button>
                                                                 </>
                                                             ) : (
-                                                                <Button
+                                                                <Button type="button"
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() => handleConfigureApiKey(plugin.id)}
@@ -1637,7 +1641,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                                     style={{flex: 1}}
                                                                 />
                                                                 <div className="settings-api-key-form-actions">
-                                                                    <Button
+                                                                    <Button type="button"
                                                                         variant="outline"
                                                                         size="sm"
                                                                         onClick={() => {
@@ -1682,7 +1686,7 @@ export default function Settings({onBack}: SettingsProps) {
                                 <div className="settings-empty-state" style={{color: 'var(--fc-color-danger)'}}>
                                     加载失败：{usageError}
                                     <div style={{marginTop: 8}}>
-                                        <Button size="sm" variant="outline" onClick={loadUsageStats}>重试</Button>
+                                        <Button type="button" size="sm" variant="outline" onClick={loadUsageStats}>重试</Button>
                                     </div>
                                 </div>
                             ) : (
@@ -1766,7 +1770,7 @@ export default function Settings({onBack}: SettingsProps) {
                             {/* 刷新按钮 */}
                             {!usageLoading && !usageError && (
                                 <div className="settings-row" style={{marginTop: 8}}>
-                                    <Button size="sm" variant="outline" onClick={loadUsageStats}>
+                                    <Button type="button" size="sm" variant="outline" onClick={loadUsageStats}>
                                         刷新数据
                                     </Button>
                                 </div>
@@ -1792,7 +1796,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                 </p>
                                             </div>
                                             <div className="templates-catalog-actions">
-                                                <Button
+                                                <Button type="button"
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => {
@@ -1801,12 +1805,12 @@ export default function Settings({onBack}: SettingsProps) {
                                                 >
                                                     打开本地路径
                                                 </Button>
-                                                <Button
+                                                <Button type="button"
                                                     variant="outline"
                                                     size="sm"
                                                     disabled={templateListLoading}
                                                     onClick={() => {
-                                                        loadTemplateList().catch(console.error)
+                                                        loadTemplateList().catch(logger.error)
                                                     }}
                                                 >
                                                     {templateListLoading ? '刷新中…' : '刷新'}
@@ -1819,11 +1823,11 @@ export default function Settings({onBack}: SettingsProps) {
                                                  style={{color: 'var(--fc-color-danger)'}}>
                                                 加载失败：{templateListError}
                                                 <div style={{marginTop: 8}}>
-                                                    <Button
+                                                    <Button type="button"
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => {
-                                                            loadTemplateList().catch(console.error)
+                                                            loadTemplateList().catch(logger.error)
                                                         }}
                                                     >
                                                         重试
@@ -1844,7 +1848,6 @@ export default function Settings({onBack}: SettingsProps) {
                                                     onSelect={handleTemplateTreeSelect}
                                                     searchable
                                                     searchPlaceholder="搜索名称"
-                                                    scrollHeight="100%"
                                                     collapseDuration={0.13}
                                                     indentSize={7}
                                                     renderTitle={(node: CategoryTreeNode) => {
@@ -1860,8 +1863,6 @@ export default function Settings({onBack}: SettingsProps) {
                                                             <div className="templates-tree-item">
                                                                 <div
                                                                     className="templates-tree-item-name">{row.name}</div>
-                                                                <div
-                                                                    className="templates-tree-item-path">{row.relative_path}</div>
                                                             </div>
                                                         )
                                                     }}
@@ -1879,7 +1880,7 @@ export default function Settings({onBack}: SettingsProps) {
                                 {templateView === 'detail' && (
                                     <section className="settings-section fc-section-card templates-detail-section">
                                         <div className="templates-detail-toolbar">
-                                            <Button
+                                            <Button type="button"
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => {
@@ -1889,7 +1890,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                 返回
                                             </Button>
                                             <div className="templates-detail-toolbar-actions">
-                                                <Button
+                                                <Button type="button"
                                                     variant="outline"
                                                     size="sm"
                                                     disabled={!templateDocument}
@@ -1899,7 +1900,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                 >
                                                     打开本地路径
                                                 </Button>
-                                                <Button
+                                                <Button type="button"
                                                     variant="outline"
                                                     size="sm"
                                                     disabled={!templateDocument || templateRestoring || templateSaving}
@@ -1909,7 +1910,7 @@ export default function Settings({onBack}: SettingsProps) {
                                                 >
                                                     {templateRestoring ? '恢复中...' : '恢复默认'}
                                                 </Button>
-                                                <Button
+                                                <Button type="button"
                                                     size="sm"
                                                     disabled={!templateDocument || !templateIsDirty || templateSaving || templateDocumentLoading}
                                                     onClick={() => {
