@@ -1,8 +1,8 @@
+import {logger} from '../../../shared/logger'
 import {type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
 import {
     ai_build_character_project_snapshot,
-    ai_close_session,
     ai_delete_conversation,
     ai_disable_tool,
     ai_enable_tool,
@@ -32,6 +32,7 @@ import type {
     AiContextValue,
     AiFocusContext,
     Conversation,
+    ConversationRuntimeState,
     Message,
     ReportConversationContext,
     SessionParams,
@@ -42,6 +43,13 @@ const generateTitleFromMessage = (content: string): string => {
     const cleaned = content.trim().replace(/\s+/g, ' ')
     if (cleaned.length <= 20) return cleaned
     return `${cleaned.slice(0, 20)}...`
+}
+
+const createAiTraceId = () => `ai_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+const buildAiLogPreview = (content: string) => {
+    const normalized = content.trim().replace(/\s+/g, ' ')
+    return normalized.length > 120 ? `${normalized.slice(0, 120)}...` : normalized
 }
 
 const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
@@ -120,7 +128,7 @@ function writeStoredCharacterConversationMetaMap(conversations: Conversation[]) 
         })
         window.localStorage.setItem(CHARACTER_CONVERSATION_META_STORAGE_KEY, JSON.stringify(stored))
     } catch {
-        console.warn('写入特殊会话元数据缓存失败')
+        logger.warn('写入特殊会话元数据缓存失败')
     }
 }
 
@@ -311,6 +319,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
+    const [unreadConversationIds, setUnreadConversationIds] = useState<Record<string, boolean>>({})
     const [conversationMetaLoaded, setConversationMetaLoaded] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
     const [autoScroll, setAutoScroll] = useState(true)
@@ -323,6 +332,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const [tools, setTools] = useState<ToolStatus[]>([])
     const [webSearchEnabled, setWebSearchEnabled] = useState(true)
     const [editModeEnabled, setEditModeEnabled] = useState(true)
+
+    const conversationsRef = useRef(conversations)
+    useEffect(() => {
+        conversationsRef.current = conversations
+    }, [conversations])
 
     const focusRef = useRef(focus)
     useEffect(() => {
@@ -413,6 +427,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const onMessage = useCallback((message: SessionMessage) => {
         const targetConversationId =
             runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
+        const resolvedConversationId = targetConversationId
+            ?? conversationsRef.current.find((conversation) => (
+                conversation.sessionId === message.sessionId && conversation.runId === message.runId
+            ))?.id
+            ?? null
 
         setConversations((prev) => prev.map((conversation) => {
             const matchedByRuntime =
@@ -432,13 +451,87 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 }],
             }
         }))
+        if (resolvedConversationId) {
+            setUnreadConversationIds((prev) => {
+                const next = {...prev}
+                if (resolvedConversationId === activeConversationIdRef.current) {
+                    delete next[resolvedConversationId]
+                } else {
+                    next[resolvedConversationId] = true
+                }
+                return next
+            })
+        }
+    }, [])
+
+    const onUserTurnBegin = useCallback((payload: { sessionId: string; runId: string; nodeId: number }) => {
+        const targetConversationId =
+            runtimeConversationRef.current[runtimeConversationKey(payload.sessionId, payload.runId)]
+
+        setConversations((prev) => prev.map((conversation) => {
+            const matchedByRuntime =
+                conversation.sessionId === payload.sessionId && conversation.runId === payload.runId
+            const matchedByMap = targetConversationId != null && conversation.id === targetConversationId
+            if (!matchedByRuntime && !matchedByMap) return conversation
+
+            const targetIndex = [...conversation.messages]
+                .reverse()
+                .findIndex((message) => message.role === 'user' && message.nodeId == null)
+            if (targetIndex === -1) return conversation
+
+            const actualIndex = conversation.messages.length - 1 - targetIndex
+            const targetMessage = conversation.messages[actualIndex]
+            if (!targetMessage || targetMessage.role !== 'user' || targetMessage.nodeId != null) {
+                return conversation
+            }
+
+            const nextMessages = [...conversation.messages]
+            nextMessages[actualIndex] = {
+                ...targetMessage,
+                nodeId: payload.nodeId,
+            }
+
+            return {
+                ...conversation,
+                messages: nextMessages,
+            }
+        }))
     }, [])
 
     const onError = useCallback((message: string) => {
-        console.error('[useAiController]', message)
+        logger.error('[useAiController]', message)
     }, [])
 
-    const session = useAiSession({onMessage, onError})
+    const session = useAiSession({onMessage, onUserTurnBegin, onError})
+
+    const selectConversation = useCallback((convId: string | null) => {
+        activeConversationIdRef.current = convId
+        setActiveConversationId(convId)
+        const conversation = convId
+            ? conversationsRef.current.find((item) => item.id === convId)
+            : null
+        session.activateSession(conversation?.sessionId ?? null, conversation?.runId ?? null)
+        if (convId) {
+            setUnreadConversationIds((prev) => {
+                if (!prev[convId]) return prev
+                const next = {...prev}
+                delete next[convId]
+                return next
+            })
+        }
+    }, [session])
+
+    const conversationRuntime = useMemo<Record<string, ConversationRuntimeState>>(() => {
+        const result: Record<string, ConversationRuntimeState> = {}
+        conversations.forEach((conversation) => {
+            const isStreaming = conversation.runId ? Boolean(session.streamingByRun[conversation.runId]) : false
+            result[conversation.id] = {
+                isStreaming,
+                hasUnreadReply: !isStreaming && Boolean(unreadConversationIds[conversation.id]),
+            }
+        })
+        return result
+    }, [conversations, session.streamingByRun, unreadConversationIds])
 
     useEffect(() => {
         const currentConversationId = activeConversationIdRef.current
@@ -623,7 +716,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         let mounted = true
         refreshAiSidebarState(true).catch((error) => {
             if (!mounted) return
-            console.error('初始化 AI 侧栏状态失败', error)
+            logger.error('初始化 AI 侧栏状态失败', error)
         })
         return () => {
             mounted = false
@@ -633,7 +726,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         const handler = () => {
             refreshAiSidebarState(false).catch((error) => {
-                console.error('插件变更后刷新 AI 插件列表失败', error)
+                logger.error('插件变更后刷新 AI 插件列表失败', error)
             })
         }
         window.addEventListener('fc:plugins-changed', handler)
@@ -643,7 +736,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         const unlisten = listen('backend-ready', () => {
             refreshAiSidebarState(true).catch((error) => {
-                console.error('后端就绪后刷新 AI 侧栏状态失败', error)
+                logger.error('后端就绪后刷新 AI 侧栏状态失败', error)
             })
         })
         return () => {
@@ -688,7 +781,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (!conversationMetaLoaded) return
         writeStoredCharacterConversationMetaMap(conversations)
         void ai_save_character_conversation_meta(buildCharacterConversationMetaMap(conversations)).catch((error) => {
-            console.warn('写入特殊会话元数据文件失败', error)
+            logger.warn('写入特殊会话元数据文件失败', error)
         })
     }, [conversationMetaLoaded, conversations])
 
@@ -704,15 +797,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     useEffect(() => {
         if (!session.sessionId) return
-        void ai_update_session(session.sessionId, {thinking: sessionParams.thinking}).catch(console.error)
+        void ai_update_session(session.sessionId, {thinking: sessionParams.thinking}).catch(logger.error)
     }, [sessionParams, session.sessionId])
 
     const createNewConversation = useCallback(async () => {
-        if (session.isStreaming) {
-            abortControllerRef.current?.abort()
-        }
-        await session.closeSession()
+        session.activateSession(null, null)
         setActiveConversationId(null)
+        activeConversationIdRef.current = null
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
@@ -757,10 +848,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setSelectedModel(model)
         setConversations((prev) => [conversation, ...prev])
         setActiveConversationId(conversation.id)
+        activeConversationIdRef.current = conversation.id
+        session.activateSession(null, null)
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
-    }, [])
+    }, [session])
 
     const startCharacterConversation = useCallback(async ({projectId, entryId}: {
         projectId: string
@@ -768,17 +861,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }) => {
         if (!selectedPlugin || !selectedModel) {
             throw new Error('当前 AI 插件或模型尚未准备好，请稍后重试。')
-        }
-        if (session.isStreaming) {
-            abortControllerRef.current?.abort()
-            await session.cancelSession()
-        }
-
-        const currentConv = activeConversationRef.current
-        if (currentConv?.sessionId) {
-            await session.closeSession(currentConv.sessionId)
-        } else {
-            await session.closeSession()
         }
 
         const built = await ai_build_character_project_snapshot(projectId, entryId)
@@ -816,6 +898,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             ] = created.conversationId
         setConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)])
         setActiveConversationId(conversation.id)
+        activeConversationIdRef.current = conversation.id
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
@@ -832,12 +915,20 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const switchConversation = useCallback(async (convId: string) => {
         if (convId === activeConversationIdRef.current) return
         setActiveConversationId(convId)
+        activeConversationIdRef.current = convId
+        setUnreadConversationIds((prev) => {
+            if (!prev[convId]) return prev
+            const next = {...prev}
+            delete next[convId]
+            return next
+        })
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
 
-        const targetConv = conversations.find((conversation) => conversation.id === convId)
+        const targetConv = conversationsRef.current.find((conversation) => conversation.id === convId)
         if (targetConv) {
+            session.activateSession(targetConv.sessionId, targetConv.runId)
             setSelectedPlugin(targetConv.pluginId)
             setSelectedModel(targetConv.model)
 
@@ -852,33 +943,41 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 }
             }
         }
-    }, [conversations])
+    }, [session])
 
     const deleteConversation = useCallback(async (convId: string, event?: MouseEvent) => {
         event?.stopPropagation()
-        const conv = conversations.find((conversation) => conversation.id === convId)
-
-        if (activeConversationIdRef.current === convId && session.isStreaming) {
-            await session.cancelSession(conv?.sessionId)
-        }
+        const conv = conversationsRef.current.find((conversation) => conversation.id === convId)
 
         if (conv?.sessionId) {
-            await ai_close_session(conv.sessionId).catch(console.error)
+            await session.closeSession(conv.sessionId)
         }
         if (conv && !conv.id.startsWith('conv_')) {
-            await ai_delete_conversation(conv.id).catch(console.error)
+            await ai_delete_conversation(conv.id).catch(logger.error)
         }
 
         setConversations((prev) => prev.filter((conversation) => conversation.id !== convId))
+        setUnreadConversationIds((prev) => {
+            if (!prev[convId]) return prev
+            const next = {...prev}
+            delete next[convId]
+            return next
+        })
+        Object.entries(runtimeConversationRef.current).forEach(([key, mappedConvId]) => {
+            if (mappedConvId === convId) {
+                delete runtimeConversationRef.current[key]
+            }
+        })
 
         if (activeConversationIdRef.current === convId) {
-            await session.closeSession()
+            session.activateSession(null, null)
             setActiveConversationId(null)
+            activeConversationIdRef.current = null
             setInputValue('')
             setEditingMessageId(null)
             setAutoScroll(true)
         }
-    }, [conversations, session])
+    }, [session])
 
     const renameConversation = useCallback(async (convId: string, title: string) => {
         const trimmed = title.trim()
@@ -886,135 +985,227 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setConversations((prev) => prev.map((conversation) =>
             conversation.id === convId ? {...conversation, title: trimmed} : conversation,
         ))
-        await ai_rename_conversation(convId, trimmed).catch(console.error)
+        await ai_rename_conversation(convId, trimmed).catch(logger.error)
     }, [])
 
     const sendMessage = useCallback(async (content: string) => {
         const trimmed = content.trim()
-        if (!trimmed || session.isStreaming) return
+        if (!trimmed) return
 
-        let currentConvId = activeConversationRef.current?.id ?? null
-        let effectiveConvId = currentConvId
+        const traceId = createAiTraceId()
+        const activeConv = activeConversationRef.current ?? null
+        logger.log('[useAiController][发送链路] 用户触发发送', {
+            traceId,
+            activeConversationId: activeConv?.id ?? null,
+            hasSession: Boolean(activeConv?.sessionId),
+            sessionId: activeConv?.sessionId ?? null,
+            runId: activeConv?.runId ?? null,
+            pluginId: activeConv?.pluginId ?? selectedPlugin,
+            model: activeConv?.model ?? selectedModel,
+            messageLength: trimmed.length,
+            messageChars: [...trimmed].length,
+            messagePreview: buildAiLogPreview(trimmed),
+        })
+        if (activeConv?.runId && session.isRunStreaming(activeConv.runId)) return
 
-        if (!currentConvId) {
-            const draftConversationId = `conv_${Date.now()}`
-            const draftConversation: Conversation = {
-                id: draftConversationId,
-                title: '新对话',
-                messages: [],
+        const draftConversation: Conversation | null = activeConv ? null : {
+            id: `conv_${Date.now()}`,
+            title: '新对话',
+            messages: [],
+            pluginId: selectedPlugin,
+            model: selectedModel,
+            sessionId: null,
+            runId: null,
+            timestamp: Date.now(),
+            mode: 'default',
+            characterEntryId: null,
+            characterName: null,
+            backgroundImageUrl: null,
+            characterVoiceId: null,
+            characterAutoPlay: null,
+            reportContext: null,
+            reportSeeded: false,
+        }
+        const currentConv = activeConv ?? draftConversation
+        if (!currentConv) return
+        const currentConvId = currentConv.id
+
+        if (draftConversation) {
+            logger.log('[useAiController][发送链路] 当前没有激活对话，创建前端草稿对话', {
+                traceId,
+                draftConversationId: draftConversation.id,
                 pluginId: selectedPlugin,
                 model: selectedModel,
-                sessionId: null,
-                runId: null,
-                timestamp: Date.now(),
-                mode: 'default',
-                characterEntryId: null,
-                characterName: null,
-                backgroundImageUrl: null,
-                characterVoiceId: null,
-                characterAutoPlay: null,
-                reportContext: null,
-                reportSeeded: false,
-            }
-            currentConvId = draftConversationId
-            effectiveConvId = draftConversationId
+            })
             setConversations((prev) => [draftConversation, ...prev])
-            setActiveConversationId(draftConversationId)
+            setActiveConversationId(draftConversation.id)
+            activeConversationIdRef.current = draftConversation.id
+            session.activateSession(null, null)
             setAutoScroll(true)
         }
 
         abortControllerRef.current = new AbortController()
 
-        let sessionForcedClosed = false
+        let sessionClosedForEdit = false
 
         if (editingMessageId) {
-            const conv = activeConversationRef.current
-            if (conv) {
-                const editIdx = conv.messages.findIndex((message) => message.id === editingMessageId)
-                if (editIdx !== -1) {
+            const editIdx = currentConv.messages.findIndex((message) => message.id === editingMessageId)
+            if (editIdx !== -1) {
+                setConversations((prev) => prev.map((conversation) =>
+                    conversation.id === currentConvId
+                        ? {...conversation, messages: conversation.messages.slice(0, editIdx)}
+                        : conversation,
+                ))
+                const precedingMsg = editIdx > 0 ? currentConv.messages[editIdx - 1] : null
+                if (precedingMsg?.nodeId && currentConv.sessionId && currentConv.runId) {
+                    session.activateSession(currentConv.sessionId, currentConv.runId)
+                    await session.checkoutForEdit(precedingMsg.nodeId, currentConv.sessionId, currentConv.runId)
+                } else if (currentConv.sessionId) {
+                    await session.closeSession(currentConv.sessionId)
+                    sessionClosedForEdit = true
                     setConversations((prev) => prev.map((conversation) =>
                         conversation.id === currentConvId
-                            ? {...conversation, messages: conversation.messages.slice(0, editIdx)}
+                            ? {...conversation, sessionId: null, runId: null}
                             : conversation,
                     ))
-                    const precedingMsg = editIdx > 0 ? conv.messages[editIdx - 1] : null
-                    if (precedingMsg?.nodeId && conv.sessionId === session.sessionId) {
-                        await session.checkoutForEdit(precedingMsg.nodeId)
-                    } else if (session.sessionId) {
-                        await session.closeSession()
-                        sessionForcedClosed = true
-                    }
                 }
             }
             setEditingMessageId(null)
         }
 
-        const sessionBelongsHere = !sessionForcedClosed && session.sessionId != null
-            && session.sessionId === activeConversationRef.current?.sessionId
-            && session.runId != null
-            && session.runId === activeConversationRef.current?.runId
+        const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
+        const existingRunId = sessionClosedForEdit ? null : currentConv.runId
+        const preparedSession = await (async (): Promise<{ sid: string; runId: string; conversationId: string } | null> => {
+            if (existingSid && existingRunId) {
+                logger.log('[useAiController][发送链路] 复用当前对话已有后端会话', {
+                    traceId,
+                    conversationId: currentConvId,
+                    sessionId: existingSid,
+                    runId: existingRunId,
+                })
+                session.activateSession(existingSid, existingRunId)
+                runtimeConversationRef.current[runtimeConversationKey(existingSid, existingRunId)] = currentConvId
+                return {sid: existingSid, runId: existingRunId, conversationId: currentConvId}
+            }
 
-        if (session.sessionId && !sessionBelongsHere) {
-            await session.closeSession()
-        }
-
-        let currentSid = sessionBelongsHere ? session.sessionId : null
-
-        if (!currentSid) {
+            logger.log('[useAiController][发送链路] 开始同步工具状态', {
+                traceId,
+                conversationId: currentConvId,
+                toolCount: tools.length,
+            })
             await new Promise<void>((resolve) => {
                 setTools((latest) => {
                     Promise.all(
-                        latest.map((tool) => tool.enabled ? ai_enable_tool(tool.name) : ai_disable_tool(tool.name)),
-                    ).catch(console.error).finally(resolve)
+                        latest.map(async (tool) => {
+                            try {
+                                if (tool.enabled) {
+                                    await ai_enable_tool(tool.name)
+                                } else {
+                                    await ai_disable_tool(tool.name)
+                                }
+                            } catch (error) {
+                                logger.warn('[useAiController][发送链路] 工具状态同步单项失败', {
+                                    traceId,
+                                    toolName: tool.name,
+                                    enabled: tool.enabled,
+                                    error,
+                                })
+                            }
+                        }),
+                    ).finally(resolve)
                     return latest
                 })
+            })
+            logger.log('[useAiController][发送链路] 工具状态同步完成，准备创建后端会话', {
+                traceId,
+                conversationId: currentConvId,
             })
 
             const isPending = currentConvId.startsWith('conv_')
             const desiredSessionId = isPending ? undefined : currentConvId
-            const created = await session.createSession(selectedPlugin, selectedModel, desiredSessionId, sessionParams.maxToolRounds)
-            if (!created) return
-
-            currentSid = created.sessionId
+            const created = await session.createSession(
+                selectedPlugin,
+                selectedModel,
+                desiredSessionId,
+                sessionParams.maxToolRounds,
+                traceId,
+            )
+            if (!created) return null
+            logger.log('[useAiController][发送链路] 后端会话创建完成', {
+                traceId,
+                requestedConversationId: desiredSessionId ?? null,
+                resolvedConversationId: created.conversationId,
+                sessionId: created.sessionId,
+                runId: created.runId,
+            })
 
             // 立即同步 sessionParams，避免首轮对话使用旧默认值
-            ai_update_session(currentSid, {thinking: sessionParamsRef.current.thinking}).catch(() => {})
+            ai_update_session(created.sessionId, {thinking: sessionParamsRef.current.thinking}).then(() => {
+                logger.log('[useAiController][发送链路] 会话参数同步完成', {
+                    traceId,
+                    sessionId: created.sessionId,
+                    thinking: sessionParamsRef.current.thinking,
+                })
+            }).catch((error) => {
+                logger.warn('[useAiController][发送链路] 会话参数同步失败', {
+                    traceId,
+                    sessionId: created.sessionId,
+                    error,
+                })
+            })
 
             // 兜底推送：session 刚建立时 effect 可能尚未触发，确保首轮 assemble 有上下文
             try {
                 const ctx = await resolveContextPayload(focusRef.current.projectId, focusRef.current.entryId)
-                await ai_set_task_context(currentSid!, ctx)
-            } catch {
-                // 上下文推送失败不阻塞发送
+                logger.log('[useAiController][发送链路] 准备推送任务上下文', {
+                    traceId,
+                    sessionId: created.sessionId,
+                    projectId: ctx.attributes?.project_id ?? null,
+                    entryId: ctx.attributes?.entry_id ?? null,
+                    readOnly: ctx.flags?.read_only ?? null,
+                })
+                await ai_set_task_context(created.sessionId, ctx)
+                logger.log('[useAiController][发送链路] 任务上下文推送完成', {
+                    traceId,
+                    sessionId: created.sessionId,
+                })
+            } catch (error) {
+                logger.warn('[useAiController][发送链路] 任务上下文推送失败，继续发送消息', {
+                    traceId,
+                    sessionId: created.sessionId,
+                    error,
+                })
             }
 
+            const nextConversationId = isPending ? created.conversationId : currentConvId
+            runtimeConversationRef.current[
+                runtimeConversationKey(created.sessionId, created.runId)
+                ] = nextConversationId
+
             if (isPending) {
-                effectiveConvId = created.conversationId
-                runtimeConversationRef.current[
-                    runtimeConversationKey(created.sessionId, created.runId)
-                    ] = created.conversationId
                 setConversations((prev) => prev.map((conversation) =>
                     conversation.id === currentConvId
-                        ? {...conversation, id: created.conversationId, sessionId: currentSid!, runId: created.runId}
+                        ? {...conversation, id: created.conversationId, sessionId: created.sessionId, runId: created.runId}
                         : conversation,
                 ))
                 setActiveConversationId(created.conversationId)
+                activeConversationIdRef.current = created.conversationId
             } else {
-                runtimeConversationRef.current[
-                    runtimeConversationKey(created.sessionId, created.runId)
-                    ] = currentConvId
                 setConversations((prev) => prev.map((conversation) =>
                     conversation.id === currentConvId
-                        ? {...conversation, sessionId: currentSid!, runId: created.runId}
+                        ? {...conversation, sessionId: created.sessionId, runId: created.runId}
                         : conversation,
                 ))
             }
-        }
 
-        const actualPrompt = activeConversationRef.current?.mode === 'report'
-        && !activeConversationRef.current.reportSeeded
-        && activeConversationRef.current.reportContext
-            ? buildReportBootstrapPrompt(activeConversationRef.current.reportContext, trimmed)
+            return {sid: created.sessionId, runId: created.runId, conversationId: nextConversationId}
+        })()
+        if (!preparedSession) return
+
+        const actualPrompt = currentConv.mode === 'report'
+        && !currentConv.reportSeeded
+        && currentConv.reportContext
+            ? buildReportBootstrapPrompt(currentConv.reportContext, trimmed)
             : trimmed
 
         const userMessage: Message = {
@@ -1025,7 +1216,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         setConversations((prev) => prev.map((conversation) => {
-            if (conversation.id !== effectiveConvId) return conversation
+            if (conversation.id !== preparedSession.conversationId) return conversation
             const isFirstMessage = conversation.messages.length === 0
             return {
                 ...conversation,
@@ -1038,43 +1229,53 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }))
 
         setInputValue('')
-        await session.sendMessage(actualPrompt, currentSid!)
-    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds])
+        logger.log('[useAiController][发送链路] 用户消息已写入前端状态，准备进入 session 发送', {
+            traceId,
+            conversationId: preparedSession.conversationId,
+            sessionId: preparedSession.sid,
+            runId: preparedSession.runId,
+            actualPromptLength: actualPrompt.length,
+            isReportBootstrap: actualPrompt !== trimmed,
+        })
+        await session.sendMessage(actualPrompt, preparedSession.sid, preparedSession.runId, traceId)
+    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length])
 
     const stopStreaming = useCallback(() => {
         abortControllerRef.current?.abort()
-        void session.cancelSession()
+        const conv = activeConversationRef.current
+        void session.cancelSession(conv?.sessionId)
     }, [session])
 
     const regenerateMessage = useCallback(async (messageId: string) => {
-        console.log('[useAiController] 进入重说', {
+        logger.log('[useAiController] 进入重说', {
             messageId,
             activeConversationId: activeConversationIdRef.current,
             sessionId: session.sessionId,
             isStreaming: session.isStreaming,
         })
-        if (session.isStreaming) {
-            console.warn('[useAiController] 重说被阻止：当前仍在流式输出中，尝试取消后重试', {
-                isStreaming: session.isStreaming,
+        const conv = conversationsRef.current.find((conversation) => conversation.id === activeConversationIdRef.current)
+        if (!conv) {
+            logger.warn('[useAiController] 重说被阻止：未找到对话')
+            return
+        }
+
+        if (conv.runId && session.isRunStreaming(conv.runId)) {
+            logger.warn('[useAiController] 重说被阻止：当前仍在流式输出中，尝试取消后重试', {
+                isStreaming: session.isRunStreaming(conv.runId),
                 blocksLen: session.blocks.length,
-                sessionId: session.sessionId,
+                sessionId: conv.sessionId,
             })
-            await session.cancelSession()
+            await session.cancelSession(conv.sessionId)
             await new Promise(resolve => setTimeout(resolve, 100))
-            if (session.isStreaming) {
-                console.error('[useAiController] 重说失败：取消后仍处于流式状态，无法继续')
+            if (session.isRunStreaming(conv.runId)) {
+                logger.error('[useAiController] 重说失败：取消后仍处于流式状态，无法继续')
                 return
             }
-        }
-        const conv = conversations.find((conversation) => conversation.id === activeConversationIdRef.current)
-        if (!conv) {
-            console.warn('[useAiController] 重说被阻止：未找到对话')
-            return
         }
 
         const messageIndex = conv.messages.findIndex((message) => message.id === messageId)
         if (messageIndex === -1) {
-            console.warn('[useAiController] 重说被阻止：未找到目标消息', {
+            logger.warn('[useAiController] 重说被阻止：未找到目标消息', {
                 messageId,
                 convMessageIds: conv.messages.map(m => m.id),
             })
@@ -1086,7 +1287,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             .reverse()
             .find((message) => message.role === 'user')
         if (!precedingUserMsg?.nodeId) {
-            console.warn('[useAiController] 重说失败：上一条用户消息缺少 nodeId', {
+            logger.warn('[useAiController] 重说失败：上一条用户消息缺少 nodeId', {
                 conversationId: conv.id,
                 sessionId: conv.sessionId,
                 targetMessageId: messageId,
@@ -1096,22 +1297,21 @@ export function useAiController(focus: AiFocus): AiContextValue {
             return
         }
 
-        // 确保有活跃 session：不存在或不匹配时关闭旧 session 并创建新 session
-        let currentSid = session.sessionId
-        const sessionBelongsHere = currentSid != null && currentSid === conv.sessionId
-
-        if (currentSid && !sessionBelongsHere) {
-            await session.closeSession()
-            currentSid = null
+        let currentSid = conv.sessionId
+        let currentRunId = conv.runId
+        if (currentSid && currentRunId) {
+            session.activateSession(currentSid, currentRunId)
+            runtimeConversationRef.current[runtimeConversationKey(currentSid, currentRunId)] = conv.id
         }
 
-        if (!currentSid) {
+        if (!currentSid || !currentRunId) {
             const created = await session.createSession(conv.pluginId, conv.model, conv.id, sessionParams.maxToolRounds)
             if (!created) {
-                console.error('[useAiController] 重说失败：无法创建会话')
+                logger.error('[useAiController] 重说失败：无法创建会话')
                 return
             }
             currentSid = created.sessionId
+            currentRunId = created.runId
             runtimeConversationRef.current[
                 runtimeConversationKey(created.sessionId, created.runId)
             ] = conv.id
@@ -1134,8 +1334,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 : conversation,
         ))
         setAutoScroll(true)
-        await session.checkout(precedingUserMsg.nodeId)
-    }, [conversations, session, sessionParams.maxToolRounds, resolveContextPayload])
+        await session.checkout(precedingUserMsg.nodeId, currentSid, currentRunId)
+    }, [session, sessionParams.maxToolRounds, resolveContextPayload])
 
     const editMessage = useCallback((messageId: string) => {
         const conv = conversations.find((conversation) => conversation.id === activeConversationIdRef.current)
@@ -1154,7 +1354,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             const ops = tools
                 .filter((tool) => webNames.includes(tool.name))
                 .map((tool) => next ? ai_enable_tool(tool.name) : ai_disable_tool(tool.name))
-            await Promise.all(ops).catch(console.error)
+            await Promise.all(ops).catch(logger.error)
         }
     }, [session.sessionId, tools, webSearchEnabled])
 
@@ -1175,7 +1375,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setSelectedModel,
         conversations,
         activeConversationId,
-        setActiveConversationId,
+        setActiveConversationId: selectConversation,
         messages,
         sendMessage,
         stopStreaming,
@@ -1195,6 +1395,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setSessionParams,
         isStreaming: session.isStreaming,
         streamingBlocks: session.blocks,
+        conversationRuntime,
         sidebarCollapsed,
         setSidebarCollapsed,
         autoScroll,
@@ -1212,11 +1413,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }), [
         plugins, selectedPlugin, selectedModel, conversations, activeConversationId,
         messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
-        sessionParams, session.isStreaming, session.blocks, sidebarCollapsed, autoScroll,
+        sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
-        session.getBranchInfo, session.switchBranch,
+        selectConversation, session.getBranchInfo, session.switchBranch,
     ])
 }
 

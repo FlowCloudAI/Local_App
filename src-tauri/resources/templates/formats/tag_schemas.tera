@@ -1,5 +1,9 @@
+{% if items | length == 0 %}
+该项目未定义任何标签
+{% else %}
 项目标签定义：
 
 {% for item in items %}
 {{ item }}
 {% endfor %}
+{% endif %}

@@ -12,8 +12,8 @@ pub(super) use uuid::Uuid;
 #[cfg(not(target_os = "android"))]
 pub(super) use worldflow_core::WorldflowError;
 pub(super) use worldflow_core::{
-    models::*, CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps, IdeaNoteOps,
-    ProjectOps, SqliteDb, TagSchemaOps,
+    CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps, IdeaNoteOps, ProjectOps,
+    SqliteDb, TagSchemaOps, models::*,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -961,7 +961,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                 {drawingShape ? '绘制中图形' : selectedShape ? '图形属性' : selectedLocation ? '地点属性' : activeMapId ? '地图属性' : '操作提示'}
                             </span>
                         </div>
-                        <RollingBox
+                        <RollingBox axis="y"
                             className="wm-sidebar__body"
                             thumbSize="thin"
                             interceptWheel={(event) => {

@@ -338,18 +338,18 @@ export function MapShapeEditorWorkbench({
                             </p>
                         </div>
                         <div className="fc-map-shape-editor__toolbar">
-                            <Button size="xs" variant="secondary"
+                            <Button type="button" size="xs" variant="secondary"
                                     onClick={() => setViewBox(createInitialMapShapeEditorViewBox(canvas))}>
                                 重置视图
                             </Button>
-                            <Button size="xs" variant={drawingShape ? 'danger' : 'primary'}
+                            <Button type="button" size="xs" variant={drawingShape ? 'danger' : 'primary'}
                                     onClick={drawingShape ? () => setDrawingShape(null) : handleAddShape}>
                                 {drawingShape ? '取消绘制' : '新增图形'}
                             </Button>
-                            <Button size="xs" variant="secondary" onClick={handleAddLocation}>
+                            <Button type="button" size="xs" variant="secondary" onClick={handleAddLocation}>
                                 新增关键地点
                             </Button>
-                            <Button size="xs" onClick={() => void handleSubmit()}>
+                            <Button type="button" size="xs" onClick={() => void handleSubmit()}>
                                 提交预览
                             </Button>
                         </div>
@@ -504,7 +504,7 @@ export function MapShapeEditorWorkbench({
                                             ))}
                                         </div>
                                     ) : null}
-                                    <Button size="sm" variant="danger"
+                                    <Button type="button" size="sm" variant="danger"
                                             onClick={() => deleteLocation(selectedLocation.id)}>
                                         删除关键地点
                                     </Button>

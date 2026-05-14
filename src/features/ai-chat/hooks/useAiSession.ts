@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
 import {type MessageBoxBlock, type ToolCallInfo} from 'flowcloudai-ui'
@@ -52,14 +53,16 @@ export interface SessionIdentity {
 interface UseAiSessionOptions {
     /** 一轮对话完成时调用（助手消息已完整） */
     onMessage: (msg: SessionMessage) => void
+    /** 用户轮次开始时调用，用于给对应会话回填节点 ID */
+    onUserTurnBegin?: (payload: { sessionId: string; runId: string; nodeId: number }) => void
     /** 会话级错误时调用 */
     onError: (msg: string) => void
 }
 
-export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
+export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSessionOptions) {
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [runId, setRunId] = useState<string | null>(null)
-    const [isStreaming, setIsStreaming] = useState(false)
+    const [streamingByRun, setStreamingByRun] = useState<Record<string, boolean>>({})
     const [blocks, setBlocks] = useState<MessageBoxBlock[]>([])
     const [lastUserNodeId, setLastUserNodeId] = useState<number | null>(null)
 
@@ -69,12 +72,18 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
     // 每个用户轮次（非工具续轮）的起始节点 ID
     // 用于 regenerate：checkout 到此节点后后端免等直接重跑
     const lastUserNodeIdRef = useRef<number | null>(null)
+    const lastUserNodeIdByRunRef = useRef<Record<string, number | null>>({})
     const blocksByRunRef = useRef<Record<string, MessageBoxBlock[]>>({})
     const processingNodeIdByRunRef = useRef<Record<string, number | null>>({})
+    const sessionIdByRunRef = useRef<Record<string, string>>({})
+    const streamingByRunRef = useRef<Record<string, boolean>>({})
+    const eventSeenAfterSendByRunRef = useRef<Record<string, boolean>>({})
+    const lastEventNameByRunRef = useRef<Record<string, string>>({})
+    const traceIdByRunRef = useRef<Record<string, string>>({})
     const sessionIdRef = useRef<string | null>(null)
     const runIdRef = useRef<string | null>(null)
-    // 标记下一个 TurnBegin 是用户发起的（非工具续轮）
-    const expectUserTurnRef = useRef(false)
+    // 标记每个 run 的下一个 TurnBegin 是用户发起的（非工具续轮）
+    const expectUserTurnByRunRef = useRef<Record<string, boolean>>({})
 
     // 分支导航
     const [treeNodes, setTreeNodes] = useState<ConversationNode[]>([])
@@ -84,10 +93,14 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
 
     // 通过 ref 访问回调，避免 event listener 内部 stale closure
     const onMessageRef = useRef(onMessage)
+    const onUserTurnBeginRef = useRef(onUserTurnBegin)
     const onErrorRef = useRef(onError)
     useEffect(() => {
         onMessageRef.current = onMessage
     }, [onMessage])
+    useEffect(() => {
+        onUserTurnBeginRef.current = onUserTurnBegin
+    }, [onUserTurnBegin])
     useEffect(() => {
         onErrorRef.current = onError
     }, [onError])
@@ -98,19 +111,96 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         runIdRef.current = runId
     }, [runId])
 
+    const syncActiveRunView = useCallback((nextRunId: string | null) => {
+        setBlocks(nextRunId ? (blocksByRunRef.current[nextRunId] ?? []) : [])
+        const nextLastUserNodeId = nextRunId ? (lastUserNodeIdByRunRef.current[nextRunId] ?? null) : null
+        lastUserNodeIdRef.current = nextLastUserNodeId
+        setLastUserNodeId(nextLastUserNodeId)
+    }, [])
+
+    const setRunStreaming = useCallback((targetRunId: string, streaming: boolean) => {
+        const next = {...streamingByRunRef.current}
+        if (streaming) {
+            next[targetRunId] = true
+        } else {
+            delete next[targetRunId]
+        }
+        streamingByRunRef.current = next
+        setStreamingByRun(next)
+    }, [])
+
+    const clearRunState = useCallback((targetRunId: string) => {
+        delete blocksByRunRef.current[targetRunId]
+        delete processingNodeIdByRunRef.current[targetRunId]
+        delete sessionIdByRunRef.current[targetRunId]
+        delete lastUserNodeIdByRunRef.current[targetRunId]
+        delete expectUserTurnByRunRef.current[targetRunId]
+        delete eventSeenAfterSendByRunRef.current[targetRunId]
+        delete lastEventNameByRunRef.current[targetRunId]
+        delete traceIdByRunRef.current[targetRunId]
+        setRunStreaming(targetRunId, false)
+        if (runIdRef.current === targetRunId) {
+            sessionIdRef.current = null
+            runIdRef.current = null
+            setSessionId(null)
+            setRunId(null)
+            syncActiveRunView(null)
+        }
+    }, [setRunStreaming, syncActiveRunView])
+
+    const activateSession = useCallback((nextSessionId: string | null, nextRunId: string | null) => {
+        sessionIdRef.current = nextSessionId
+        runIdRef.current = nextRunId
+        setSessionId(nextSessionId)
+        setRunId(nextRunId)
+        if (nextSessionId && nextRunId) {
+            sessionIdByRunRef.current[nextRunId] = nextSessionId
+        }
+        syncActiveRunView(nextRunId)
+    }, [syncActiveRunView])
+
+    const markRunEvent = useCallback((eventName: string, targetRunId: string) => {
+        eventSeenAfterSendByRunRef.current[targetRunId] = true
+        lastEventNameByRunRef.current[targetRunId] = eventName
+        logger.debug('[useAiSession][事件链路] 收到 AI 事件', {
+            eventName,
+            runId: targetRunId,
+            activeRunId: runIdRef.current,
+        })
+    }, [])
+
+    const scheduleTurnBeginWatchdog = useCallback((payload: AiEventTurnBegin) => {
+        window.setTimeout(() => {
+            const rid = payload.run_id
+            if (
+                streamingByRunRef.current[rid]
+                && lastEventNameByRunRef.current[rid] === 'ai:turn_begin'
+            ) {
+                logger.warn('[useAiSession][事件链路] 已进入 AI 轮次，但 15 秒内没有收到下游事件', {
+                    traceId: traceIdByRunRef.current[rid] ?? null,
+                    sessionId: payload.session_id,
+                    runId: rid,
+                    turnId: payload.turn_id,
+                    nodeId: payload.node_id,
+                    activeSessionId: sessionIdRef.current,
+                    activeRunId: runIdRef.current,
+                    hint: '卡点位于 flowcloudai_client 的 snapshot/orchestrator/prepare_request/http_send/stream_read 阶段。',
+                })
+            }
+        }, 15000)
+    }, [])
+
     useEffect(() => {
         queueMicrotask(() => {
-            setBlocks(runId ? (blocksByRunRef.current[runId] ?? []) : [])
-            if (!runId) {
-                setLastUserNodeId(null)
-            }
+            syncActiveRunView(runId)
         })
-    }, [runId])
+    }, [runId, syncActiveRunView])
 
     // ── 事件监听（仅注册一次） ────────────────────────────────
     useEffect(() => {
         const unlistenReady = listen<AiEventReady>('ai:ready', event => {
-            console.log('[useAiSession][ready]', {
+            markRunEvent('ai:ready', event.payload.run_id)
+            logger.log('[useAiSession][ready]', {
                 sessionId: event.payload.session_id,
                 runId: event.payload.run_id,
             })
@@ -118,25 +208,37 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
 
         // 只记录用户发起轮次的起始节点（工具续轮不更新）
         const unlistenTurnBegin = listen<AiEventTurnBegin>('ai:turn_begin', event => {
-            console.log('[useAiSession][turn_begin]', {
+            markRunEvent('ai:turn_begin', event.payload.run_id)
+            scheduleTurnBeginWatchdog(event.payload)
+            logger.log('[useAiSession][turn_begin]', {
                 sessionId: event.payload.session_id,
                 runId: event.payload.run_id,
                 turnId: event.payload.turn_id,
                 nodeId: event.payload.node_id,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
-                expectUserTurn: expectUserTurnRef.current,
+                expectUserTurn: Boolean(expectUserTurnByRunRef.current[event.payload.run_id]),
             })
-            if (expectUserTurnRef.current && event.payload.run_id === runIdRef.current) {
-                lastUserNodeIdRef.current = event.payload.node_id
-                setLastUserNodeId(event.payload.node_id)
-                expectUserTurnRef.current = false
+            sessionIdByRunRef.current[event.payload.run_id] = event.payload.session_id
+            if (expectUserTurnByRunRef.current[event.payload.run_id]) {
+                lastUserNodeIdByRunRef.current[event.payload.run_id] = event.payload.node_id
+                if (event.payload.run_id === runIdRef.current) {
+                    lastUserNodeIdRef.current = event.payload.node_id
+                    setLastUserNodeId(event.payload.node_id)
+                }
+                onUserTurnBeginRef.current?.({
+                    sessionId: event.payload.session_id,
+                    runId: event.payload.run_id,
+                    nodeId: event.payload.node_id,
+                })
+                delete expectUserTurnByRunRef.current[event.payload.run_id]
             }
             processingNodeIdByRunRef.current[event.payload.run_id] = event.payload.node_id
         })
 
         const unlistenDelta = listen<AiEventDelta>('ai:delta', event => {
-            console.log('[useAiSession][delta]', {
+            markRunEvent('ai:delta', event.payload.run_id)
+            logger.log('[useAiSession][delta]', {
                 runId: event.payload.run_id,
                 textLen: event.payload.text.length,
                 text: event.payload.text,
@@ -157,7 +259,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenReasoning = listen<AiEventReasoning>('ai:reasoning', event => {
-            console.log('[useAiSession][reasoning]', {
+            markRunEvent('ai:reasoning', event.payload.run_id)
+            logger.log('[useAiSession][reasoning]', {
                 runId: event.payload.run_id,
                 textLen: event.payload.text.length,
                 text: event.payload.text,
@@ -178,7 +281,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenToolCall = listen<AiEventToolCall>('ai:tool_call', event => {
-            console.log('[useAiSession][tool_call]', {
+            markRunEvent('ai:tool_call', event.payload.run_id)
+            logger.log('[useAiSession][tool_call]', {
                 runId: event.payload.run_id,
                 index: event.payload.index,
                 name: event.payload.name,
@@ -264,7 +368,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         })
 
         const unlistenToolResult = listen<AiEventToolResult>('ai:tool_result', event => {
-            console.log('[useAiSession][tool_result]', {
+            markRunEvent('ai:tool_result', event.payload.run_id)
+            logger.log('[useAiSession][tool_result]', {
                 runId: event.payload.run_id,
                 index: event.payload.index,
                 isError: event.payload.is_error,
@@ -309,7 +414,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
             const {session_id: sid, run_id: rid, status, node_id} = event.payload
-            console.log('[useAiSession][turn_end]', {
+            markRunEvent('ai:turn_end', rid)
+            logger.log('[useAiSession][turn_end]', {
                 sessionId: sid,
                 runId: rid,
                 status,
@@ -338,7 +444,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                     .map(b => (b as { content: string }).content)
                     .join('')
                 if (contentText || reasoningText || finalBlocks.length > 0) {
-                    console.log('[useAiSession][queueAssistant]', {
+                    logger.log('[useAiSession][queueAssistant]', {
                         sessionId: sid,
                         runId: rid,
                         contentLength: contentText.length,
@@ -360,7 +466,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
 
                 queueMicrotask(() => {
                     const queued = [...messageQueueRef.current]
-                    console.log('[useAiSession][flushQueue]', {
+                    logger.log('[useAiSession][flushQueue]', {
                         currentRunId: runIdRef.current,
                         queued: queued.map(item => ({
                             sessionId: item.sessionId,
@@ -372,9 +478,9 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                     messageQueueRef.current = []
                     queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
+                    setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
-                        setIsStreaming(false)
                         setTreeRefreshCounter(c => c + 1)
                     }
                 })
@@ -383,9 +489,9 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                 onErrorRef.current(`对话失败: ${status.slice(6)}`)
                 queueMicrotask(() => {
                     delete blocksByRunRef.current[rid]
+                    setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
-                        setIsStreaming(false)
                     }
                 })
             } else if (status === 'cancelled' || status === 'interrupted') {
@@ -425,16 +531,17 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                     messageQueueRef.current = []
                     queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
+                    setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
-                        setIsStreaming(false)
                     }
                 })
             }
         })
 
         const unlistenError = listen<AiEventError>('ai:error', event => {
-            console.error('[useAiSession] ai:error event', {
+            markRunEvent('ai:error', event.payload.run_id)
+            logger.error('[useAiSession] ai:error event', {
                 payload: event.payload,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
@@ -442,8 +549,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             onErrorRef.current(`AI 错误: ${event.payload.error}`)
             queueMicrotask(() => {
                 delete blocksByRunRef.current[event.payload.run_id]
+                setRunStreaming(event.payload.run_id, false)
                 if (runIdRef.current === event.payload.run_id) {
-                    setIsStreaming(false)
                     setBlocks([])
                 }
             })
@@ -466,7 +573,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             unlistenError.then(fn => fn())
             unlistenBranchChanged.then(fn => fn())
         }
-    }, []) // 空依赖——回调通过 ref 访问
+    }, [markRunEvent, scheduleTurnBeginWatchdog, setRunStreaming]) // 回调通过 ref 访问
 
     // 分支树刷新
     const refreshTree = useCallback(async () => {
@@ -494,6 +601,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         /** 复用已有对话时传入其 id，避免后端创建重复记录；不传则生成新 id */
         conversationId?: string,
         maxToolRounds?: number | null,
+        traceId?: string,
     ): Promise<SessionIdentity | null> => {
         const newId = `session_${Date.now()}`
         try {
@@ -504,13 +612,14 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                 maxToolRounds: maxToolRounds ?? null,
                 // 续聊时告知后端回放历史，新对话不传
                 conversationId: conversationId ?? null,
+                clientTraceId: traceId ?? null,
             })
-            console.log('[useAiSession][createSession]', created)
-            sessionIdRef.current = created.session_id
-            runIdRef.current = created.run_id
-            setSessionId(created.session_id)
-            setRunId(created.run_id)
-            lastUserNodeIdRef.current = null
+            logger.log('[useAiSession][createSession]', {
+                traceId: traceId ?? null,
+                ...created,
+            })
+            lastUserNodeIdByRunRef.current[created.run_id] = null
+            activateSession(created.session_id, created.run_id)
             return {
                 sessionId: created.session_id,
                 conversationId: created.conversation_id,
@@ -520,7 +629,7 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             onErrorRef.current(`创建会话失败: ${e}`)
             return null
         }
-    }, [])
+    }, [activateSession])
 
     const createCharacterSession = useCallback(async (
         pluginId: string,
@@ -541,11 +650,8 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
                 model,
                 maxToolRounds: params.maxToolRounds ?? null,
             })
-            sessionIdRef.current = created.session_id
-            runIdRef.current = created.run_id
-            setSessionId(created.session_id)
-            setRunId(created.run_id)
-            lastUserNodeIdRef.current = null
+            lastUserNodeIdByRunRef.current[created.run_id] = null
+            activateSession(created.session_id, created.run_id)
             return {
                 sessionId: created.session_id,
                 conversationId: created.conversation_id,
@@ -555,38 +661,81 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
             onErrorRef.current(`创建角色会话失败: ${e}`)
             return null
         }
-    }, [])
+    }, [activateSession])
 
     /** 关闭会话并重置流式状态。传入 sid 可关闭非当前会话（用于删除对话）。 */
     const closeSession = useCallback(async (overrideSid?: string | null) => {
-        const target = overrideSid !== undefined ? overrideSid : sessionId
+        const target = overrideSid !== undefined ? overrideSid : sessionIdRef.current
         if (target) {
-            await ai_close_session(target).catch(console.error)
+            await ai_close_session(target).catch(logger.error)
         }
-        setSessionId(null)
-        setRunId(null)
-        lastUserNodeIdRef.current = null
-        setBlocks([])
-        setIsStreaming(false)
-    }, [sessionId])
+        const targetRunIds = Object.entries(sessionIdByRunRef.current)
+            .filter(([, sid]) => sid === target)
+            .map(([rid]) => rid)
+        targetRunIds.forEach(clearRunState)
+        if (!target || target === sessionIdRef.current) {
+            activateSession(null, null)
+        }
+    }, [activateSession, clearRunState])
 
     const cancelSession = useCallback(async (overrideSid?: string | null) => {
         const target = overrideSid !== undefined ? overrideSid : sessionIdRef.current
         if (!target) return
-        await ai_cancel_session(target).catch(console.error)
+        await ai_cancel_session(target).catch(logger.error)
     }, [])
 
-    const sendMessage = useCallback(async (content: string, sid: string) => {
-        expectUserTurnRef.current = true
-        setIsStreaming(true)
-        setBlocks([])
-        try {
-            await ai_send_message(sid, content)
-        } catch (e) {
-            onErrorRef.current(`发送失败: ${e}`)
-            setIsStreaming(false)
+    const sendMessage = useCallback(async (content: string, sid: string, rid: string, traceId: string) => {
+        expectUserTurnByRunRef.current[rid] = true
+        eventSeenAfterSendByRunRef.current[rid] = false
+        traceIdByRunRef.current[rid] = traceId
+        blocksByRunRef.current[rid] = []
+        setRunStreaming(rid, true)
+        if (runIdRef.current === rid) {
+            setBlocks([])
         }
-    }, [])
+        logger.log('[useAiSession][发送链路] 准备调用后端发送消息', {
+            traceId,
+            sessionId: sid,
+            runId: rid,
+            contentLength: content.length,
+            contentChars: [...content].length,
+            activeSessionId: sessionIdRef.current,
+            activeRunId: runIdRef.current,
+        })
+        window.setTimeout(() => {
+            if (
+                streamingByRunRef.current[rid]
+                && eventSeenAfterSendByRunRef.current[rid] === false
+            ) {
+                logger.warn('[useAiSession][发送链路] 消息已提交后端，但 8 秒内没有收到任何 AI 事件', {
+                    traceId,
+                    sessionId: sid,
+                    runId: rid,
+                    contentLength: content.length,
+                    activeSessionId: sessionIdRef.current,
+                    activeRunId: runIdRef.current,
+                })
+            }
+        }, 8000)
+        try {
+            await ai_send_message(sid, content, traceId)
+            logger.log('[useAiSession][发送链路] 后端发送命令已返回成功', {
+                traceId,
+                sessionId: sid,
+                runId: rid,
+            })
+        } catch (e) {
+            logger.error('[useAiSession][发送链路] 后端发送命令失败', {
+                traceId,
+                sessionId: sid,
+                runId: rid,
+                error: e,
+            })
+            onErrorRef.current(`发送失败: ${e}`)
+            delete expectUserTurnByRunRef.current[rid]
+            setRunStreaming(rid, false)
+        }
+    }, [setRunStreaming])
 
     /**
      * Checkout 到指定节点（重说 / 分支 / 历史回退）。
@@ -594,31 +743,47 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
      * - 目标节点 role 为 assistant → drive loop 继续等待用户输入
      * 返回 true 表示指令已发送。
      */
-    const checkout = useCallback(async (nodeId: number): Promise<boolean> => {
-        const sid = sessionIdRef.current
-        if (!sid) return false
+    const checkout = useCallback(async (
+        nodeId: number,
+        overrideSid?: string | null,
+        overrideRunId?: string | null,
+    ): Promise<boolean> => {
+        const sid = overrideSid !== undefined ? overrideSid : sessionIdRef.current
+        const rid = overrideRunId !== undefined ? overrideRunId : runIdRef.current
+        if (!sid || !rid) return false
         try {
             await ai_checkout(sid, nodeId)
-            expectUserTurnRef.current = true
-            setIsStreaming(true)
-            setBlocks([])
+            expectUserTurnByRunRef.current[rid] = true
+            blocksByRunRef.current[rid] = []
+            setRunStreaming(rid, true)
+            if (runIdRef.current === rid) {
+                setBlocks([])
+            }
             return true
         } catch {
             return false
         }
-    }, [])
+    }, [setRunStreaming])
 
     /**
      * 编辑模式专用 checkout：checkout 到 assistant 节点，让 session 等待新输入。
      * 不设 isStreaming=true，避免 UI 提前进入流式状态。
      */
-    const checkoutForEdit = useCallback(async (nodeId: number): Promise<boolean> => {
-        const sid = sessionIdRef.current
-        if (!sid) return false
+    const checkoutForEdit = useCallback(async (
+        nodeId: number,
+        overrideSid?: string | null,
+        overrideRunId?: string | null,
+    ): Promise<boolean> => {
+        const sid = overrideSid !== undefined ? overrideSid : sessionIdRef.current
+        const rid = overrideRunId !== undefined ? overrideRunId : runIdRef.current
+        if (!sid || !rid) return false
         try {
             await ai_checkout(sid, nodeId)
-            expectUserTurnRef.current = true
-            setBlocks([])
+            expectUserTurnByRunRef.current[rid] = true
+            blocksByRunRef.current[rid] = []
+            if (runIdRef.current === rid) {
+                setBlocks([])
+            }
             return true
         } catch {
             return false
@@ -628,13 +793,13 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
     /** 切换插件（下一轮对话生效） */
     const switchPlugin = useCallback(async (pluginId: string) => {
         if (!sessionId) return
-        await ai_switch_plugin(sessionId, pluginId).catch(console.error)
+        await ai_switch_plugin(sessionId, pluginId).catch(logger.error)
     }, [sessionId])
 
     /** 运行时更新模型（立即生效） */
     const updateModel = useCallback(async (model: string) => {
         if (!sessionId) return
-        await ai_update_session(sessionId, {model}).catch(console.error)
+        await ai_update_session(sessionId, {model}).catch(logger.error)
     }, [sessionId])
 
     // ── 分支导航 ─────────────────────────────────────────────
@@ -692,18 +857,26 @@ export function useAiSession({onMessage, onError}: UseAiSessionOptions) {
         }
     }, [])
 
+    const isStreaming = runId ? Boolean(streamingByRun[runId]) : false
+    const isRunStreaming = (targetRunId?: string | null) => (
+        targetRunId ? Boolean(streamingByRunRef.current[targetRunId]) : false
+    )
+
     return {
         sessionId,
         runId,
         isStreaming,
+        streamingByRun,
         blocks,
         /** 当前用户轮次的起始节点 ID（用于 checkout / 重说），state 版本供 effect 依赖 */
         lastUserNodeId,
         lastUserNodeIdRef,
         createSession,
         createCharacterSession,
+        activateSession,
         closeSession,
         cancelSession,
+        isRunStreaming,
         sendMessage,
         checkout,
         checkoutForEdit,

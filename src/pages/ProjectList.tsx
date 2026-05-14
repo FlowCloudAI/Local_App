@@ -1,7 +1,7 @@
 import {type CSSProperties, memo, useCallback, useEffect, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
-import {db_count_entries, db_list_projects, type Project} from '../api'
+import {db_list_projects, type Project} from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
@@ -46,7 +46,6 @@ function asOptionalString(value: unknown): string | null | undefined {
 
 function ProjectList({onOpenProject}: ProjectListProps) {
     const [projects, setProjects] = useState<Project[]>([])
-    const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(false)
     const [hasLoadedProjects, setHasLoadedProjects] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -60,15 +59,6 @@ function ProjectList({onOpenProject}: ProjectListProps) {
         try {
             const nextProjects = await db_list_projects()
             setProjects(nextProjects)
-
-            const countEntries = await Promise.all(
-                nextProjects.map(async project => {
-                    const count = await db_count_entries({projectId: project.id})
-                    return [project.id, count] as const
-                })
-            )
-
-            setEntryCounts(Object.fromEntries(countEntries))
         } catch (e) {
             setError(String(e))
         } finally {
@@ -123,7 +113,7 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                 onCreated={() => void loadProjects()}
                 existingNames={projects.map(p => p.name)}
             />
-            <RollingBox style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
+            <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
                     <div className="project-list-header fc-page-header">
                         <div className="project-list-title-block fc-page-title-block">
@@ -133,13 +123,13 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                             </p>
                         </div>
                         <div className="project-list-header-actions fc-page-header-actions">
-                            <Button
+                            <Button type="button"
                                 size="sm"
                                 onClick={() => setCreatorOpen(true)}
                             >
                                 新建世界观
                             </Button>
-                            <Button
+                            <Button type="button"
                                 className="project-list-refresh"
                                 variant="outline"
                                 size="sm"
@@ -196,7 +186,7 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                                 <p className="project-list-empty-copy fc-empty-state-copy">
                                     从一名角色、一个物品、一处地点开始，构建属于你的世界
                                 </p>
-                                <Button size="lg" onClick={() => setCreatorOpen(true)}>创建你的第一个世界</Button>
+                                <Button type="button" size="lg" onClick={() => setCreatorOpen(true)}>创建你的第一个世界</Button>
                             </div>
                         </section>
                     ) : hasLoadedProjects || loading || error ? (
@@ -212,7 +202,6 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                                     const createdAt = asOptionalString(project.created_at)
                                     const image = toProjectImageSrc(coverPath)
                                     const timestampLabel = formatDate(updatedAt ?? createdAt)
-                                    const entryCount = entryCounts[project.id] ?? 0
 
                                     return (
                                         <div
@@ -232,7 +221,6 @@ function ProjectList({onOpenProject}: ProjectListProps) {
                                                 extraInfo={(
                                                     <div className="project-list-meta">
                                                         <span>最近更新 {timestampLabel}</span>
-                                                        <span>{entryCount} 个词条</span>
                                                     </div>
                                                 )}
                                                 variant="shadow"

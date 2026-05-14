@@ -1906,15 +1906,20 @@
 }
 
 .pe-entry-type-badge {
+    --badge-accent: var(--badge-color, var(--fc-color-primary));
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
     font-size: var(--pe-font-size-entry-badge);
+    font-weight: 500;
     padding: 0.1rem 0.45rem;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--badge-color, var(--fc-color-primary)) 15%, transparent);
-    color: var(--badge-color, var(--fc-color-primary));
+    border: 1px solid color-mix(in srgb, var(--badge-accent) 58%, rgba(255, 255, 255, 0.32));
+    background: rgba(8, 10, 18, 0.64);
+    color: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.22);
     align-self: flex-start;
+    backdrop-filter: blur(4px);
 }
 
 .pe-entry-type-badge-icon {
@@ -1925,6 +1930,7 @@
     height: 1.05em;
     flex-shrink: 0;
     line-height: 1;
+    color: color-mix(in srgb, var(--badge-accent, var(--fc-color-primary)) 82%, #fff 18%);
 }
 
 .pe-entry-date {

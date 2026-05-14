@@ -7,7 +7,7 @@ use crate::template::{
 /// 返回模板目录所需的全部元数据。
 #[tauri::command]
 pub fn template_list() -> Result<Vec<TemplateMeta>, String> {
-    Ok(list_template_meta())
+    list_template_meta().map_err(|e| e.to_string())
 }
 
 /// 返回当前生效的模板内容和元数据。
@@ -22,7 +22,7 @@ pub fn template_get_default(id: String) -> Result<String, String> {
     get_default_template_content(&id).map_err(|e| e.to_string())
 }
 
-/// 返回用户自定义提示词模板目录。
+/// 返回当前提示词模板源目录。
 #[tauri::command]
 pub fn template_get_local_root_dir() -> Result<String, String> {
     get_template_local_root_dir().map_err(|e| e.to_string())

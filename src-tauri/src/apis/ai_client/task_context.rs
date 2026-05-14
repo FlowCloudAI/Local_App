@@ -22,6 +22,18 @@ pub async fn ai_set_task_context(
     session_id: String,
     ctx: TaskContextDto,
 ) -> Result<(), String> {
+    let project_id = ctx.project_id;
+    let task_type = ctx.task_type.unwrap_or_default();
+    let attributes = ctx.attributes.unwrap_or_default();
+    let flags = ctx.flags.unwrap_or_default();
+    log::info!(
+        "[ai_set_task_context][recv] session_id={} project_id={:?} task_type={} attributes={} flags={}",
+        session_id,
+        project_id,
+        task_type,
+        attributes.len(),
+        flags.len()
+    );
     let handle = {
         let sessions = ai_state.sessions.lock().await;
         sessions
@@ -30,13 +42,22 @@ pub async fn ai_set_task_context(
             .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
     };
 
-    handle
+    let result = handle
         .set_task_context(TaskContext {
-            project_id: ctx.project_id,
-            task_type: ctx.task_type.unwrap_or_default(),
-            attributes: ctx.attributes.unwrap_or_default(),
-            flags: ctx.flags.unwrap_or_default(),
+            project_id,
+            task_type,
+            attributes,
+            flags,
             ..Default::default()
         })
-        .await
+        .await;
+    match &result {
+        Ok(()) => log::info!("[ai_set_task_context][queued] session_id={}", session_id),
+        Err(error) => log::warn!(
+            "[ai_set_task_context][failed] session_id={} error={}",
+            session_id,
+            error
+        ),
+    }
+    result
 }

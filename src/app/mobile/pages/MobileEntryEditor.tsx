@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -52,7 +53,7 @@ export default function MobileEntryEditor({pop, replace, setAiFocus, params}: Pr
             setCategoryId(entry.category_id ?? null)
             setCategories(cats)
             setEntryTypes(types)
-        }).catch(console.error).finally(() => setLoading(false))
+        }).catch(logger.error).finally(() => setLoading(false))
     }, [entryId, projectId])
 
     const handleSave = useCallback(async () => {
@@ -96,8 +97,8 @@ export default function MobileEntryEditor({pop, replace, setAiFocus, params}: Pr
              style={{padding: '12px 16px', display: 'flex', flexDirection: 'column', minHeight: 0}}>
             {/* 保存按钮 */}
             <div style={{display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'flex-end'}}>
-                <Button size="sm" variant="outline" onClick={pop} disabled={saving}>取消</Button>
-                <Button size="sm" onClick={handleSave} disabled={saving}>
+                <Button type="button" size="sm" variant="outline" onClick={pop} disabled={saving}>取消</Button>
+                <Button type="button" size="sm" onClick={handleSave} disabled={saving}>
                     {saving ? '保存中…' : '保存'}
                 </Button>
             </div>

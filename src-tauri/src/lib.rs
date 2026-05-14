@@ -53,8 +53,8 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use tauri::{
-    http::{header::CONTENT_TYPE, Response, StatusCode}, AppHandle, Emitter, Manager, Runtime,
-    UriSchemeContext,
+    AppHandle, Emitter, Manager, Runtime, UriSchemeContext,
+    http::{Response, StatusCode, header::CONTENT_TYPE},
 };
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log;
@@ -70,12 +70,24 @@ pub struct SettingsState {
 }
 
 fn resolve_template_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
+    let mut candidates: Vec<(&str, PathBuf)> = Vec::new();
+
+    if let Some(exe_template_dir) = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.join("templates")))
+    {
+        candidates.push(("exe", exe_template_dir));
+    }
+
     #[cfg(debug_assertions)]
     {
         let _ = app;
-        Ok(PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("resources")
-            .join("templates"))
+        candidates.push((
+            "dev",
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("resources")
+                .join("templates"),
+        ));
     }
 
     #[cfg(not(debug_assertions))]
@@ -84,8 +96,37 @@ fn resolve_template_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
             .path()
             .resource_dir()
             .map_err(|e| anyhow::anyhow!("解析模板资源目录失败: {}", e))?;
-        Ok(resource_dir.join("templates"))
+        candidates.push(("resource", resource_dir.join("templates")));
     }
+
+    for (source, path) in &candidates {
+        if is_template_dir(path) {
+            log::info!("模板目录解析完成 source={} path={}", source, path.display());
+            return Ok(path.clone());
+        }
+        if path.exists() {
+            log::warn!(
+                "跳过无效模板目录 source={} path={}，未找到分层模板文件",
+                source,
+                path.display()
+            );
+        }
+    }
+
+    let fallback = candidates
+        .into_iter()
+        .next()
+        .map(|(_, path)| path)
+        .ok_or_else(|| anyhow::anyhow!("无法解析模板目录"))?;
+    log::warn!(
+        "未找到实际存在的模板目录，将使用默认路径并依赖内嵌模板 source=fallback path={}",
+        fallback.display()
+    );
+    Ok(fallback)
+}
+
+fn is_template_dir(path: &Path) -> bool {
+    path.join("sense").join("app_system.tera").is_file()
 }
 
 // ── 入口 ──────────────────────────────────────────────────────────────────────
@@ -108,7 +149,7 @@ pub fn run() {
             // ── 日志初始化 ────────────────────────────────────────────────────────
             // release 模式：写入 settings.json 同目录（app_config_dir）；
             //   文件目标过滤至 Info 级，避免 wasmtime/cranelift Debug 噪音。
-            // debug 模式：仅 stdout，保留 Debug 级别。
+            // debug 模式：仅 stdout，只对自有 crate 保留 Debug 级别。
             {
                 #[cfg(not(debug_assertions))]
                 let log_config_dir = app
@@ -119,16 +160,21 @@ pub fn run() {
 
                 let log_builder = tauri_plugin_log::Builder::new()
                     .level(log::LevelFilter::Info)
+                    .level_for("app_lib", log::LevelFilter::Debug)
+                    .level_for("FlowCloudAI", log::LevelFilter::Debug)
+                    .level_for("flowcloudai_client", log::LevelFilter::Debug)
+                    .level_for("worldflow_core", log::LevelFilter::Debug)
                     .target(
                         tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout).filter(
                             |meta| {
-                                // 过滤 sqlx 和 hyper 的 debug 日志，避免刷屏
+                                // 过滤第三方依赖的高频诊断日志，避免启动时刷屏。
                                 let target = meta.target();
                                 !target.starts_with("sqlx::")
                                     && !target.starts_with("hyper")
                                     && !target.starts_with("hyper_util")
                                     && !target.starts_with("h2::")
                                     && !target.starts_with("reqwest::")
+                                    && !target.starts_with("cranelift_codegen::timing")
                             },
                         ),
                     );
@@ -269,7 +315,10 @@ pub fn run() {
                             fatal(&app_handle, &format!("run_on_main_thread failed: {}", e));
                         }
                     }
-                    Err(e) => fatal(&app_handle, &format!("数据库初始化失败: {}", e)),
+                    Err(e) => {
+                        log::error!("数据库初始化失败: {}", e);
+                        fatal(&app_handle, &format!("数据库初始化失败: {}", e));
+                    }
                 }
             });
 
@@ -307,6 +356,7 @@ pub fn run() {
             db_create_entries_bulk,
             db_optimize_fts,
             import_entry_images,
+            db_ensure_project_cover_thumbnails,
             open_entry_image_path,
             // 标签模式
             db_create_tag_schema,

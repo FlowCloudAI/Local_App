@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
@@ -270,6 +271,7 @@ export default function AIChatContent({
             onOpenEntry?.(linkPreviewProjectId, entry)
         },
     })
+    const {closeLinkPreview} = linkPreview
 
     useEffect(() => {
         projectEntriesStatusRef.current = 'idle'
@@ -277,8 +279,8 @@ export default function AIChatContent({
         projectEntriesRef.current = []
         setProjectEntries([])
         setEntryCache({})
-        linkPreview.closeLinkPreview()
-    }, [linkPreview.closeLinkPreview, linkPreviewProjectId])
+        closeLinkPreview()
+    }, [closeLinkPreview, linkPreviewProjectId])
 
     const inputWikiLink = useWikiLink({
         entryId: ctx.focusContext.entryId ?? '',
@@ -717,12 +719,19 @@ export default function AIChatContent({
                             <p>{hasConversationSearch ? '没有匹配的对话' : '当前类型下没有对话'}</p>
                         </div>
                     )}
-                    {filteredConversations.map((conv) => (
+                    {filteredConversations.map((conv) => {
+                        const runtime = ctx.conversationRuntime[conv.id]
+                        const isConversationStreaming = Boolean(runtime?.isStreaming)
+                        const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
+                        return (
                         <div
                             key={conv.id}
-                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}`}
+                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
                             onClick={() => renamingId !== conv.id && void ctx.switchConversation(conv.id)}
                         >
+                            {!isConversationStreaming && hasUnreadReply && (
+                                <span className="ai-conversation-unread-dot" aria-hidden="true"/>
+                            )}
                             {conv.mode === 'character' && (
                                 <div className="ai-conversation-avatar" aria-hidden="true">
                                     {conv.backgroundImageUrl ? (
@@ -790,7 +799,8 @@ export default function AIChatContent({
                                 </button>
                             </div>
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </aside>
 
@@ -914,7 +924,7 @@ export default function AIChatContent({
                     </div>
                 </div>
 
-                <RollingBox
+                <RollingBox axis="y"
                     className="ai-messages-container"
                     ref={messagesContainerRef}
                     onScroll={() => {
@@ -974,7 +984,7 @@ export default function AIChatContent({
                                         : undefined}
                                     onRegenerate={message.role === 'assistant'
                                         ? () => {
-                                            console.log('[AIChatContent] 点击重说', {
+                                            logger.log('[AIChatContent] 点击重说', {
                                                 messageId: message.id,
                                                 conversationId: ctx.activeConversationId,
                                             })
@@ -1051,7 +1061,6 @@ export default function AIChatContent({
                             onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
                             onBlur={() => inputWikiLink.handleTextareaBlur()}
                             placeholder={'请输入消息...'}
-                            disabled={ctx.isStreaming}
                         />
                         {inputLimitMessage && (
                             <div className="ai-input-limit-hint" role="status">
@@ -1166,8 +1175,8 @@ export default function AIChatContent({
                                         }}
                                         title="停止生成"
                                     >
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                            <rect x="6" y="6" width="12" height="12"/>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                            <rect x="6" y="6" width="12" height="12" rx="3" fill="currentColor"/>
                                         </svg>
                                     </button>
                                 ) : (
@@ -1181,9 +1190,11 @@ export default function AIChatContent({
                                         disabled={!ctx.inputValue.trim()}
                                         title={sendDisabledReason || '发送'}
                                     >
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                             stroke="currentColor" strokeWidth="2">
-                                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"
+                                             strokeLinejoin="round">
+                                            <path d="M12 20V4"/>
+                                            <path d="M4.5 11.5L12 4l7.5 7.5"/>
                                         </svg>
                                     </button>
                                 )}

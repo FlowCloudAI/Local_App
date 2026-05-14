@@ -83,6 +83,13 @@ export interface ProjectStats {
     wordCount: number
 }
 
+export interface CoverThumbnailMigrationSummary {
+    scanned: number
+    generated: number
+    skipped: number
+    failed: number
+}
+
 export interface ProjectTimelineData {
     events: ProjectTimelineEvent[]
     yearStart?: number | null
@@ -275,8 +282,8 @@ export interface RelationGraphData {
     edges: RelationGraphEdge[]
 }
 
-export const log_message = (level: LogLevel, message: string) =>
-    command<void>('log_message', {level, message})
+export const log_message = (level: LogLevel, message: string, source?: string) =>
+    command<void>('log_message', {level, message, source})
 
 export const open_in_file_manager = (path: string) =>
     command<void>('open_in_file_manager', {path})
@@ -465,6 +472,9 @@ export const import_entry_images = (projectId: string, filePaths: string[]) =>
 
 export const import_remote_images = (projectId: string, urls: string[]) =>
     command<FCImage[]>('import_remote_images', {projectId, urls})
+
+export const db_ensure_project_cover_thumbnails = (projectId: string) =>
+    command<CoverThumbnailMigrationSummary>('db_ensure_project_cover_thumbnails', {projectId})
 
 export const open_entry_image_path = (path: string) =>
     command<void>('open_entry_image_path', {path})

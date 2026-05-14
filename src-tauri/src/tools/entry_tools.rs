@@ -10,6 +10,17 @@ use tokio::sync::Mutex;
 // ── 词条操作分派枚举 ─────────────────────────────────────────────────────────
 
 enum EntryOp {
+    GetEntriesDev {
+        key: String,
+        kind: Option<String>,
+        info: Option<Vec<tools::EntryInfo>>,
+        sort: Option<String>,
+        limit: Option<usize>,
+    },
+    GetEntryDev {
+        keys: Vec<String>,
+        info: Option<Vec<tools::EntryInfo>>,
+    },
     SearchEntries {
         project_id: String,
         query: String,
@@ -108,6 +119,24 @@ async fn dispatch_entry_op(
 ) -> anyhow::Result<String> {
     use EntryOp::*;
     match op {
+        GetEntriesDev {
+            key,
+            kind,
+            info,
+            sort,
+            limit,
+        } => {
+            let guard = state.lock().await;
+            tools::get_entries_dev(&*guard, &key, kind.as_deref(), info, sort.as_deref(), limit)
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
+        GetEntryDev { keys, info } => {
+            let guard = state.lock().await;
+            tools::get_entry_dev(&*guard, &keys, info)
+                .await
+                .map_err(|e| anyhow::anyhow!("{}", e))
+        }
         SearchEntries {
             project_id,
             query,
@@ -521,6 +550,145 @@ async fn dispatch_entry_op(
 
 /// 注册词条相关工具（查询、列表、更新）
 pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
+    registry.register_async::<WorldflowToolState, _>(
+        "get_entries_dev",
+        "开发版：按项目或分类的名称/ID 获取词条轻量列表，返回词条标题、ID 和类型；可按词条类型名称/ID/key 过滤",
+        vec![
+            ToolFunctionArg::new("key", "string")
+                .required(true)
+                .desc("项目或分类的名称/ID；同名命中多个范围时会返回候选而不是自动猜测"),
+            ToolFunctionArg::new("kind", "string")
+                .desc("可选：词条类型名称、内置 key 或自定义类型 ID"),
+            ToolFunctionArg::new("info", "array")
+                .desc("可选：EntryInfo 字符串数组；目前 SUM/SUMMARY/FULL 会为列表追加摘要"),
+            ToolFunctionArg::new("sort", "string")
+                .desc("可选：排序字段，支持 title、created_at、updated_at；前缀 - 表示倒序，例如 -updated_at"),
+            ToolFunctionArg::new("limit", "integer")
+                .desc("可选：返回数量上限")
+                .min(1)
+                .max(500),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
+            let result = (|| -> anyhow::Result<EntryOp> {
+                let key = arg_str(args, "key")?.to_string();
+                let kind = args
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let info = parse_entry_info_arg(args.get("info"))?;
+                let sort = args
+                    .get("sort")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                Ok(EntryOp::GetEntriesDev {
+                    key,
+                    kind,
+                    info,
+                    sort,
+                    limit,
+                })
+            })();
+            let op = match result {
+                Ok(op) => op,
+                Err(e) => return Box::pin(async move { Err(e) }),
+            };
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
+        },
+    );
+
+    registry.register_async::<WorldflowToolState, _>(
+        "list_entries_dev",
+        "开发版：get_entries_dev 的语义化别名；按项目或分类的名称/ID 获取词条轻量列表，可按类型、摘要、排序和数量限制控制输出",
+        vec![
+            ToolFunctionArg::new("key", "string")
+                .required(true)
+                .desc("项目或分类的名称/ID；同名命中多个范围时会返回候选而不是自动猜测"),
+            ToolFunctionArg::new("kind", "string")
+                .desc("可选：词条类型名称、内置 key 或自定义类型 ID"),
+            ToolFunctionArg::new("info", "array")
+                .desc("可选：EntryInfo 字符串数组；目前 SUM/SUMMARY/FULL 会为列表追加摘要"),
+            ToolFunctionArg::new("sort", "string")
+                .desc("可选：排序字段，支持 title、created_at、updated_at；前缀 - 表示倒序，例如 -updated_at"),
+            ToolFunctionArg::new("limit", "integer")
+                .desc("可选：返回数量上限")
+                .min(1)
+                .max(500),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
+            let result = (|| -> anyhow::Result<EntryOp> {
+                let key = arg_str(args, "key")?.to_string();
+                let kind = args
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let info = parse_entry_info_arg(args.get("info"))?;
+                let sort = args
+                    .get("sort")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                Ok(EntryOp::GetEntriesDev {
+                    key,
+                    kind,
+                    info,
+                    sort,
+                    limit,
+                })
+            })();
+            let op = match result {
+                Ok(op) => op,
+                Err(e) => return Box::pin(async move { Err(e) }),
+            };
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
+        },
+    );
+
+    registry.register_async::<WorldflowToolState, _>(
+        "get_entry_dev",
+        "开发版：按词条名称/ID 获取高密度词条上下文；支持 keys 批量查询，默认返回全量，可用 info 选择 TITLE、TYPE、SUM、TAG、CONTENT、RELATIONS",
+        vec![
+            ToolFunctionArg::new("key", "string")
+                .desc("词条名称或ID；名称命中多个词条时会返回候选而不是自动猜测"),
+            ToolFunctionArg::new("keys", "array")
+                .desc("可选：词条名称或ID数组；用于一次获取多个词条上下文"),
+            ToolFunctionArg::new("info", "array")
+                .desc("可选：EntryInfo 字符串数组。支持 FULL、TITLE、TYPE、SUM/SUMMARY、TAG/TAGS、CONTENT、RELATIONS；不传或空数组默认 FULL"),
+        ],
+        |_state, args| {
+            let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
+            let result = (|| -> anyhow::Result<EntryOp> {
+                let mut keys = Vec::new();
+                if let Some(key) = args
+                    .get("key")
+                    .and_then(|v| v.as_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                {
+                    keys.push(key.to_string());
+                }
+                if let Some(value) = args.get("keys") {
+                    keys.extend(parse_string_array_arg(value, "keys")?);
+                }
+                if keys.is_empty() {
+                    anyhow::bail!("必须提供 key 或 keys");
+                }
+                let info = parse_entry_info_arg(args.get("info"))?;
+                Ok(EntryOp::GetEntryDev { keys, info })
+            })();
+            let op = match result {
+                Ok(op) => op,
+                Err(e) => return Box::pin(async move { Err(e) }),
+            };
+            Box::pin(dispatch_entry_op(app_state, app_handle, op))
+        },
+    );
+
     registry.register_async::<WorldflowToolState, _>(
         "search_entries",
         "在项目中全文搜索词条，返回匹配的词条简报列表",
@@ -1169,6 +1337,66 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
     );
 
     Ok(())
+}
+
+fn parse_string_array_arg(value: &serde_json::Value, name: &str) -> anyhow::Result<Vec<String>> {
+    let Some(items) = value.as_array() else {
+        anyhow::bail!("{} 必须是字符串数组", name);
+    };
+
+    let mut parsed = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(text) = item.as_str() else {
+            anyhow::bail!("{} 数组只能包含字符串", name);
+        };
+        let text = text.trim();
+        if !text.is_empty() {
+            parsed.push(text.to_string());
+        }
+    }
+    Ok(parsed)
+}
+
+fn parse_entry_info_arg(
+    value: Option<&serde_json::Value>,
+) -> anyhow::Result<Option<Vec<tools::EntryInfo>>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    if value.is_null() {
+        return Ok(None);
+    }
+
+    if let Some(text) = value.as_str() {
+        let text = text.trim();
+        if text.is_empty() {
+            return Ok(None);
+        }
+        let items = text
+            .split(',')
+            .map(|part| tools::EntryInfo::parse(part.trim()).map_err(anyhow::Error::msg))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(Some(items));
+    }
+
+    let Some(items) = value.as_array() else {
+        anyhow::bail!("info 必须是字符串数组，或用逗号分隔的字符串");
+    };
+
+    if items.is_empty() {
+        return Ok(None);
+    }
+
+    let mut parsed = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(name) = item.as_str() else {
+            anyhow::bail!("info 数组只能包含字符串");
+        };
+        parsed.push(tools::EntryInfo::parse(name).map_err(anyhow::Error::msg)?);
+    }
+
+    Ok(Some(parsed))
 }
 
 fn parse_relation_direction(s: &str) -> anyhow::Result<worldflow_core::models::RelationDirection> {

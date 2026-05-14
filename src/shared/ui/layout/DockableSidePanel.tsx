@@ -62,7 +62,6 @@ export default function DockableSidePanel({
     const isFullscreenPreviewRef = useRef(false)
     const dragStartXRef = useRef(0)
     const dragStartWidthRef = useRef(0)
-    const lastExpandedWidthRef = useRef(width)
     const lastFloatingRectRef = useRef<PanelRect | null>(null)
     const previousModeRef = useRef<DockableSidePanelMode>(mode)
     const fullscreenAnimationRafRef = useRef<number | null>(null)
@@ -139,12 +138,6 @@ export default function DockableSidePanel({
             FULLSCREEN_TRANSITION_MS + 60,
         )
     }, [clearFullscreenAnimation, finishFullscreenAnimation, readPanelRect])
-
-    useEffect(() => {
-        if (mode === 'floating' && !collapsed) {
-            lastExpandedWidthRef.current = width
-        }
-    }, [collapsed, mode, width])
 
     useLayoutEffect(() => {
         if (mode !== 'floating') return
@@ -245,7 +238,7 @@ export default function DockableSidePanel({
         isFullscreenPreviewRef.current = false
         setDragHint('调整宽度')
         dragStartXRef.current = event.clientX
-        dragStartWidthRef.current = collapsed ? (lastExpandedWidthRef.current || width || minWidth) : width
+        dragStartWidthRef.current = collapsed ? minWidth : width
 
         const el = rootRef.current
         if (collapsed) {

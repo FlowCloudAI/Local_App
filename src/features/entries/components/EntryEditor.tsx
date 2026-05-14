@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {listen} from '@tauri-apps/api/event'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
@@ -236,7 +237,7 @@ export default function EntryEditor({
                 setEditorFontSize(settings.editor_font_size ?? 14)
             })
             .catch((loadError) => {
-                console.error('加载编辑器字体设置失败', loadError)
+                logger.error('加载编辑器字体设置失败', loadError)
             })
 
         function handleFontSizeChange(event: Event) {
@@ -287,7 +288,7 @@ export default function EntryEditor({
             })
             .catch((loadError) => {
                 if (cancelled) return
-                console.error('加载 TTS 音色列表失败', loadError)
+                logger.error('加载 TTS 音色列表失败', loadError)
                 setTtsVoiceSelectable(false)
                 setTtsVoicePluginName(null)
                 setTtsVoiceOptions([{value: '', label: '音色列表加载失败'}])
@@ -648,7 +649,7 @@ export default function EntryEditor({
             ))
             await showAlert('已生成摘要', 'success', 'nonInvasive', 1500)
         } catch (summaryError) {
-            console.error('generate summary failed', summaryError)
+            logger.error('generate summary failed', summaryError)
             const message = summaryError instanceof Error ? summaryError.message : '生成摘要失败'
             await showAlert(message, 'error', 'toast', 2200)
         } finally {
@@ -797,7 +798,7 @@ export default function EntryEditor({
             }
 
             void reloadEntryFromDatabase('external').catch((e) => {
-                console.error('reload entry after AI update failed', e)
+                logger.error('reload entry after AI update failed', e)
                 void showAlert('词条已更新，但页面刷新失败，请手动重新打开词条。', 'warning', 'toast', 2200)
             })
         })
@@ -1022,7 +1023,7 @@ export default function EntryEditor({
 
     return (
         <div className="entry-editor-page">
-            <RollingBox className="entry-editor-page__scroll" thumbSize="thin">
+            <RollingBox axis="y" className="entry-editor-page__scroll" thumbSize="thin">
                 <div className="entry-editor-shell">
                     <section className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}>
                         <div className="entry-editor-workspace__header">
@@ -1061,11 +1062,11 @@ export default function EntryEditor({
                                         编辑
                                     </button>
                                 </div>
-                                <Button size="sm" disabled={!canSave} onClick={() => void handleSave()}>
+                                <Button type="button" size="sm" disabled={!canSave} onClick={() => void handleSave()}>
                                     {saving ? '保存中…' : '保存修改'}
                                 </Button>
                                 {onDelete && (
-                                    <Button
+                                    <Button type="button"
                                         variant="ghost"
                                         size="sm"
                                         className="entry-editor-delete-button"
@@ -1191,7 +1192,7 @@ export default function EntryEditor({
                                         }
                                         if (isSafeExternalHref(href)) {
                                             void openUrl(href).catch((error) => {
-                                                console.error('open external link failed', error)
+                                                logger.error('open external link failed', error)
                                                 void showAlert('打开链接失败', 'error', 'toast', 1500)
                                             })
                                             return

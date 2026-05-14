@@ -49,6 +49,11 @@ export interface Conversation {
     reportSeeded?: boolean
 }
 
+export interface ConversationRuntimeState {
+    isStreaming: boolean
+    hasUnreadReply: boolean
+}
+
 export interface SessionParams {
     thinking: boolean
     maxToolRounds?: number | null
@@ -96,6 +101,7 @@ export interface AiContextValue {
 
     isStreaming: boolean
     streamingBlocks: MessageBoxBlock[]
+    conversationRuntime: Record<string, ConversationRuntimeState>
 
     sidebarCollapsed: boolean
     setSidebarCollapsed: (v: boolean | ((prev: boolean) => boolean)) => void

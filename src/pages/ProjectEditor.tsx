@@ -1,3 +1,4 @@
+import {logger} from '../shared/logger'
 import React, {memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     type CategoryTreeNode,
@@ -22,6 +23,7 @@ import {
     db_delete_category,
     db_delete_entry,
     db_delete_project,
+    db_ensure_project_cover_thumbnails,
     db_get_entry,
     db_get_project,
     db_get_project_stats,
@@ -193,7 +195,7 @@ function ProjectEditorInner({
             const nextProject = await db_get_project(projectId)
             setProject(nextProject)
         } catch (e) {
-            console.error('refresh project failed', e)
+            logger.error('refresh project failed', e)
         }
     }, [projectId])
 
@@ -224,7 +226,7 @@ function ProjectEditorInner({
             setEntryCount(data.entryCount)
             setTagSchemas(data.tagSchemas)
         } catch (e) {
-            console.error('ProjectEditor load failed', e)
+            logger.error('ProjectEditor load failed', e)
         }
     }, [fetchAll])
 
@@ -233,6 +235,11 @@ function ProjectEditorInner({
 
         void (async () => {
             try {
+                try {
+                    await db_ensure_project_cover_thumbnails(projectId)
+                } catch (error) {
+                    logger.warn('project cover thumbnail migration failed', error)
+                }
                 const data = await fetchAll()
                 if (cancelled) return
                 setProject(data.project)
@@ -242,7 +249,7 @@ function ProjectEditorInner({
                 setTagSchemas(data.tagSchemas)
             } catch (e) {
                 if (!cancelled) {
-                    console.error('ProjectEditor load failed', e)
+                    logger.error('ProjectEditor load failed', e)
                 }
             }
         })()
@@ -254,7 +261,7 @@ function ProjectEditorInner({
                 setImageCount(stats.imageCount)
                 setWordCount(stats.wordCount)
             } catch (e) {
-                if (!cancelled) console.error('ProjectEditor stats load failed', e)
+                if (!cancelled) logger.error('ProjectEditor stats load failed', e)
             }
         })()
 
@@ -658,7 +665,7 @@ function ProjectEditorInner({
             await refreshProject()
             touchProjectUpdatedAt()
         } catch (e) {
-            console.error('move category failed', e)
+            logger.error('move category failed', e)
             void loadAll()
         }
     }
@@ -704,7 +711,7 @@ function ProjectEditorInner({
             })
             storePrefetchedEntries(categoryId, entries)
         } catch (error) {
-            console.error('prefetch category entries failed', {
+            logger.error('prefetch category entries failed', {
                 projectId,
                 categoryId,
                 error,

@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import MarkdownPreview from '@uiw/react-markdown-preview'
 import {useCallback, useEffect, useState} from 'react'
 import {Button, useTheme} from 'flowcloudai-ui'
@@ -43,7 +44,7 @@ export default function MobileEntryDetail({push, navigateToTab, setAiFocus, para
         ]).then(([e, types]) => {
             setEntry(e)
             setEntryTypes(types)
-        }).catch(console.error).finally(() => setLoading(false))
+        }).catch(logger.error).finally(() => setLoading(false))
     }, [entryId, projectId])
 
     const handleEdit = useCallback(() => {
@@ -114,8 +115,8 @@ export default function MobileEntryDetail({push, navigateToTab, setAiFocus, para
 
             {/* 底部操作栏 */}
             <div className="mobile-bottom-bar" style={{marginTop: 24}}>
-                <Button variant="outline" onClick={handleAiDiscuss}>AI 讨论</Button>
-                <Button onClick={handleEdit}>编辑</Button>
+                <Button type="button" variant="outline" onClick={handleAiDiscuss}>AI 讨论</Button>
+                <Button type="button" onClick={handleEdit}>编辑</Button>
             </div>
         </div>
     )

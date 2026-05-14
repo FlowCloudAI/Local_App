@@ -53,7 +53,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "resources/templates/**/*": "templates/"
+      "resources/templates": "templates"
     },
     "licenseFile": "nsis/license.rtf",
     "fileAssociations": [

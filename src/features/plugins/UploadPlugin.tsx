@@ -109,7 +109,7 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
                                 placeholder="请选择 .fcplug 文件"
                                 className="upload-plugin-file-input"
                             />
-                            <Button
+                            <Button type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => void handlePickFile()}
@@ -140,10 +140,10 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
                 </div>
 
                 <div className="upload-plugin-footer">
-                    <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+                    <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
                         取消
                     </Button>
-                    <Button size="sm" onClick={() => void handleSubmit()} disabled={!canSubmit}>
+                    <Button type="button" size="sm" onClick={() => void handleSubmit()} disabled={!canSubmit}>
                         {submitting ? '上传中…' : '上传'}
                     </Button>
                 </div>

@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useState} from 'react'
 import {Button, Select, useAlert, useTheme} from 'flowcloudai-ui'
 import {
@@ -36,7 +37,7 @@ export default function MobileSettings(_props: Props) {
             setPlugins(plugs)
             setSettings(s)
             setSelectedPlugin(current => current || s?.llm?.plugin_id || plugs[0]?.id || '')
-        }).catch(console.error).finally(() => setLoading(false))
+        }).catch(logger.error).finally(() => setLoading(false))
     }, [])
 
     useEffect(() => {
@@ -72,7 +73,7 @@ export default function MobileSettings(_props: Props) {
         try {
             await exit_app()
         } catch (e) {
-            console.error('退出失败', e)
+            logger.error('退出失败', e)
         }
     }, [showAlert])
 
@@ -147,7 +148,7 @@ export default function MobileSettings(_props: Props) {
                 </div>
             </div>
 
-            <Button onClick={handleSave} style={{width: '100%', marginBottom: 12}}>保存设置</Button>
+            <Button type="button" onClick={handleSave} style={{width: '100%', marginBottom: 12}}>保存设置</Button>
 
             {/* 关于 */}
             <div style={{
@@ -160,7 +161,7 @@ export default function MobileSettings(_props: Props) {
             </div>
 
             {/* 退出 */}
-            <Button variant="ghost" onClick={handleExit}
+            <Button type="button" variant="ghost" onClick={handleExit}
                     style={{width: '100%', color: 'var(--fc-color-error)'}}>
                 退出应用
             </Button>

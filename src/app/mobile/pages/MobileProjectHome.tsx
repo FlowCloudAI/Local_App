@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useState} from 'react'
 import {Button} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
@@ -47,7 +48,7 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
             setProject(p)
             setCategories(cats)
             setStats(s)
-        }).catch(console.error).finally(() => setLoading(false))
+        }).catch(logger.error).finally(() => setLoading(false))
     }, [projectId])
 
     const handleCreateEntry = useCallback(async (categoryId: string | null) => {
@@ -60,7 +61,7 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
             setAiFocus({projectId, entryId: created.id})
             push({type: 'entryEditor', params: {projectId, entryId: created.id, displayName: '未命名词条'}})
         } catch (e) {
-            console.error('新建词条失败', e)
+            logger.error('新建词条失败', e)
         }
     }, [projectId, push, setAiFocus])
 
@@ -118,8 +119,8 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
             </div>
 
             <div style={{display: 'flex', gap: 8, marginBottom: 20}}>
-                <Button size="sm" onClick={() => handleCreateEntry(null)}>+ 新建词条</Button>
-                <Button size="sm" variant="outline" onClick={handleOpenAi}>AI 讨论</Button>
+                <Button type="button" size="sm" onClick={() => handleCreateEntry(null)}>+ 新建词条</Button>
+                <Button type="button" size="sm" variant="outline" onClick={handleOpenAi}>AI 讨论</Button>
             </div>
 
             <button

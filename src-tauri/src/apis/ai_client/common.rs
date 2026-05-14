@@ -14,6 +14,11 @@ pub(super) use std::collections::HashMap;
 pub(super) use std::fs::File;
 pub(super) use std::io::{Read, Write};
 pub(super) use std::path::Path;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
+use std::time::Duration;
 pub(super) use tauri::{AppHandle, Emitter, Manager, State};
 pub(super) use tokio::sync::mpsc;
 pub(super) use uuid::Uuid;
@@ -190,6 +195,103 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
     }
 }
 
+fn schedule_turn_begin_stall_watchdog(
+    app: AppHandle,
+    session_id: String,
+    run_id: String,
+    turn_id: u64,
+    node_id: u64,
+    event_seq: Arc<AtomicU64>,
+    turn_begin_seq: u64,
+    delay_secs: u64,
+) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(delay_secs)).await;
+        if event_seq.load(Ordering::Relaxed) != turn_begin_seq {
+            return;
+        }
+
+        let ai_state = app.state::<AiState>();
+        let snapshot_target = {
+            let sessions = ai_state.sessions.lock().await;
+            sessions.get(&session_id).map(|entry| {
+                (
+                    entry.handle.clone(),
+                    entry.kind.clone(),
+                    entry.plugin_id.clone(),
+                    entry.model.clone(),
+                    sessions.len(),
+                )
+            })
+        };
+        if let Some((handle, kind, plugin_id, model, active_count)) = snapshot_target {
+            log::warn!(
+                "[ai:turn_stall] session_id={} run_id={} turn_id={} node_id={} stalled_secs={} kind={:?} plugin_id={} model={} active_count={} hint=turn_begin 后没有收到 delta/tool/turn_end/error，卡点在 client 内部的 snapshot/orchestrator/prepare_request/http_send/stream_read 阶段",
+                session_id,
+                run_id,
+                turn_id,
+                node_id,
+                delay_secs,
+                kind,
+                plugin_id,
+                model,
+                active_count
+            );
+            log::warn!(
+                "[ai:turn_stall_snapshot][start] session_id={} run_id={} stalled_secs={} timeout_secs=3",
+                session_id,
+                run_id,
+                delay_secs
+            );
+            match tokio::time::timeout(Duration::from_secs(3), handle.get_conversation()).await {
+                Ok(req) => {
+                    let tool_count = req.tools.as_ref().map_or(0, Vec::len);
+                    let content_chars: usize = req
+                        .messages
+                        .iter()
+                        .filter_map(|message| message.content.as_ref())
+                        .map(|content| content.chars().count())
+                        .sum();
+                    let last_role = req
+                        .messages
+                        .last()
+                        .map(|message| message.role.as_str())
+                        .unwrap_or("<none>");
+                    log::warn!(
+                        "[ai:turn_stall_snapshot] session_id={} run_id={} stalled_secs={} snapshot_read=ok messages={} last_role={} content_chars={} tool_count={} stream={:?} thinking_set={}",
+                        session_id,
+                        run_id,
+                        delay_secs,
+                        req.messages.len(),
+                        last_role,
+                        content_chars,
+                        tool_count,
+                        req.stream,
+                        req.thinking.is_some()
+                    );
+                }
+                Err(_) => {
+                    log::warn!(
+                        "[ai:turn_stall_snapshot] session_id={} run_id={} stalled_secs={} snapshot_read=timeout timeout_secs=3 hint=读取 session 快照超时，优先检查 conversation/tree 锁或快照线性化",
+                        session_id,
+                        run_id,
+                        delay_secs
+                    );
+                }
+            }
+        } else {
+            log::warn!(
+                "[ai:turn_stall] session_id={} run_id={} turn_id={} node_id={} stalled_secs={} session_missing=true hint=turn_begin 后没有收到下游事件，但 session 已不在活动表中",
+                session_id,
+                run_id,
+                turn_id,
+                node_id,
+                delay_secs
+            );
+        }
+    });
+}
+
 pub(crate) fn spawn_session_event_loop<S>(
     app: AppHandle,
     session_id: String,
@@ -202,8 +304,11 @@ pub(crate) fn spawn_session_event_loop<S>(
     let rid = run_id.clone();
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
+        log::info!("[ai:event_loop][start] session_id={} run_id={}", sid, rid);
         futures::pin_mut!(event_stream);
+        let event_seq = Arc::new(AtomicU64::new(0));
         while let Some(ev) = event_stream.next().await {
+            let current_event_seq = event_seq.fetch_add(1, Ordering::Relaxed) + 1;
             match ev {
                 SessionEvent::NeedInput => {
                     log::info!("[ai:ready] session_id={} run_id={}", sid, rid);
@@ -225,6 +330,18 @@ pub(crate) fn spawn_session_event_loop<S>(
                         turn_id,
                         node_id
                     );
+                    for delay_secs in [15_u64, 45, 90] {
+                        schedule_turn_begin_stall_watchdog(
+                            app_clone.clone(),
+                            sid.clone(),
+                            rid.clone(),
+                            turn_id,
+                            node_id,
+                            Arc::clone(&event_seq),
+                            current_event_seq,
+                            delay_secs,
+                        );
+                    }
                     app_clone
                         .emit(
                             "ai:turn_begin",
@@ -372,6 +489,11 @@ pub(crate) fn spawn_session_event_loop<S>(
             }
         }
 
+        log::info!(
+            "[ai:event_loop][finished] session_id={} run_id={}",
+            sid,
+            rid
+        );
         cleanup_session_state(&app_clone, &sid, &rid).await;
     });
 }

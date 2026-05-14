@@ -496,8 +496,20 @@ impl TemplateEngine {
 impl TemplateRuntime {
     fn new(builtin_dir: PathBuf, override_dir: PathBuf) -> Result<Self> {
         let builtin_sources = load_builtin_template_sources(&builtin_dir)?;
-        let sources = load_merged_template_sources(&builtin_sources, &override_dir)?;
-        let engine = TemplateEngine::from_sources(&sources)?;
+        let sources = match load_merged_template_sources(&builtin_sources, &override_dir) {
+            Ok(sources) => sources,
+            Err(error) => {
+                log::warn!("模板覆盖目录读取失败，将仅使用内置模板初始化：{}", error);
+                builtin_sources.clone()
+            }
+        };
+        let engine = match TemplateEngine::from_sources(&sources) {
+            Ok(engine) => engine,
+            Err(error) => {
+                log::warn!("模板覆盖内容校验失败，将仅使用内置模板初始化：{}", error);
+                TemplateEngine::from_sources(&builtin_sources)?
+            }
+        };
         Ok(Self {
             builtin_dir,
             builtin_sources,
@@ -515,8 +527,14 @@ pub fn install_global_template_runtime(builtin_dir: PathBuf, override_dir: PathB
     Ok(())
 }
 
-pub fn list_template_meta() -> Vec<TemplateMeta> {
-    TEMPLATE_REGISTRY.to_vec()
+pub fn list_template_meta() -> Result<Vec<TemplateMeta>> {
+    let runtime = global_template_runtime()?;
+    let runtime = runtime
+        .read()
+        .map_err(|_| anyhow::anyhow!("模板运行时读取失败"))?;
+    fs::create_dir_all(&runtime.override_dir)
+        .with_context(|| format!("创建模板目录失败：{}", runtime.override_dir.display()))?;
+    Ok(TEMPLATE_REGISTRY.to_vec())
 }
 
 pub fn get_template_document(id: &str) -> Result<TemplateDocument> {
@@ -542,10 +560,19 @@ pub fn get_template_local_root_dir() -> Result<String> {
         .read()
         .map_err(|_| anyhow::anyhow!("模板运行时读取失败"))?;
 
-    fs::create_dir_all(&runtime.override_dir)
-        .with_context(|| format!("创建模板目录失败：{}", runtime.override_dir.display()))?;
+    if runtime
+        .builtin_dir
+        .join("sense")
+        .join("app_system.tera")
+        .is_file()
+    {
+        return Ok(runtime.builtin_dir.to_string_lossy().into_owned());
+    }
 
-    Ok(runtime.override_dir.to_string_lossy().into_owned())
+    Err(anyhow::anyhow!(
+        "当前模板源目录不存在，实际路径：{}",
+        runtime.builtin_dir.display()
+    ))
 }
 
 pub fn get_template_effective_path(id: &str) -> Result<String> {
@@ -1000,6 +1027,12 @@ mod tests {
     }
 
     #[test]
+    fn embedded_templates_can_be_parsed() {
+        let sources = load_embedded_template_sources().unwrap();
+        TemplateEngine::from_sources(&sources).unwrap();
+    }
+
+    #[test]
     fn invalid_template_save_returns_validation_error() {
         let dirs = TestDirs::new();
         let mut runtime =
@@ -1048,7 +1081,7 @@ mod tests {
             find_template_meta("sense/app_system").unwrap(),
             "新的系统提示".to_string(),
         )
-            .unwrap();
+        .unwrap();
 
         let rendered = runtime
             .engine
@@ -1091,7 +1124,7 @@ mod tests {
             find_template_meta("sense/app_system").unwrap(),
             "默认系统提示".to_string(),
         )
-            .unwrap();
+        .unwrap();
 
         assert!(!document.is_override);
         assert!(!override_path.exists());

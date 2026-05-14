@@ -115,10 +115,20 @@ pub async fn db_get_relation_graph_data(
         .await
         .map_err(|e| e.to_string())?;
     let node_ids = entries.iter().map(|entry| entry.id).collect::<HashSet<_>>();
+    let valid_relations = relations
+        .into_iter()
+        .filter(|relation| node_ids.contains(&relation.a_id) && node_ids.contains(&relation.b_id))
+        .collect::<Vec<_>>();
+    let mut connected_node_ids = HashSet::new();
+    for relation in &valid_relations {
+        connected_node_ids.insert(relation.a_id);
+        connected_node_ids.insert(relation.b_id);
+    }
 
     Ok(RelationGraphData {
         nodes: entries
             .into_iter()
+            .filter(|entry| connected_node_ids.contains(&entry.id))
             .map(|entry| RelationGraphNode {
                 id: entry.id.to_string(),
                 label: entry.title.clone(),
@@ -127,9 +137,8 @@ pub async fn db_get_relation_graph_data(
                 cover_image: entry.cover,
             })
             .collect(),
-        edges: relations
+        edges: valid_relations
             .into_iter()
-            .filter(|relation| node_ids.contains(&relation.a_id) && node_ids.contains(&relation.b_id))
             .map(|relation| RelationGraphEdge {
                 id: relation.id.to_string(),
                 source: relation.a_id.to_string(),

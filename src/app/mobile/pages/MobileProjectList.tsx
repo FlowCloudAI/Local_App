@@ -110,13 +110,13 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                     onValueChange={setSearchText}
                     style={{flex: 1}}
                 />
-                <Button size="sm" onClick={() => setCreatorOpen(true)}>新建</Button>
+                <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>新建</Button>
             </div>
 
             {projects.length === 0 && !loading ? (
                 <div className="mobile-page__empty">
                     <p>还没有任何项目</p>
-                    <Button onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
+                    <Button type="button" onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
                 </div>
             ) : (
                 <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>

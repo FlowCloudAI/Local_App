@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {type EntryTag, type TagSchema} from '../../../api'
 import {CHARACTER_VOICE_AUTO_PLAY_TAG, CHARACTER_VOICE_ID_TAG} from '../lib/characterVoice'
 
@@ -46,7 +47,7 @@ export function normalizeTagTargets(target?: TagSchema['target'] | string | null
 export function isSchemaImplantedForType(schema: TagSchema, entryType?: string | null): boolean {
     const normalizedType = normalizeEntryType(entryType)
     if (!normalizedType) {
-        console.log('[entryTagUtils] 未设置词条类型，跳过 target 匹配', {
+        logger.log('[entryTagUtils] 未设置词条类型，跳过 target 匹配', {
             schemaId: schema.id,
             schemaName: schema.name,
             schemaTarget: schema.target,
@@ -55,7 +56,7 @@ export function isSchemaImplantedForType(schema: TagSchema, entryType?: string |
     }
     const normalizedTargets = normalizeTagTargets(schema.target)
     const matched = normalizedTargets.includes(normalizedType)
-    console.log('[entryTagUtils] target 匹配结果', {
+    logger.log('[entryTagUtils] target 匹配结果', {
         schemaId: schema.id,
         schemaName: schema.name,
         normalizedType,
@@ -113,7 +114,7 @@ export function ensureTypeTargetTagValues(
     addedSchemaIds: string[]
 } {
     const targetSchemas = tagSchemas.filter(schema => isSchemaImplantedForType(schema, entryType))
-    console.log('[entryTagUtils] 开始补齐类型目标标签', {
+    logger.log('[entryTagUtils] 开始补齐类型目标标签', {
         entryType,
         existingTagKeys: Object.keys(tags),
         targetSchemaIds: targetSchemas.map(schema => schema.id),
@@ -131,7 +132,7 @@ export function ensureTypeTargetTagValues(
 
     targetSchemas.forEach(schema => {
         if (hasSchemaTagKey(nextTags, schema)) {
-            console.log('[entryTagUtils] 标签已存在，跳过自动补齐', {
+            logger.log('[entryTagUtils] 标签已存在，跳过自动补齐', {
                 schemaId: schema.id,
                 schemaName: schema.name,
             })
@@ -142,14 +143,14 @@ export function ensureTypeTargetTagValues(
         }
         nextTags[schema.id] = getSchemaDefaultValue(schema)
         addedSchemaIds.push(schema.id)
-        console.log('[entryTagUtils] 自动补齐标签', {
+        logger.log('[entryTagUtils] 自动补齐标签', {
             schemaId: schema.id,
             schemaName: schema.name,
             defaultValue: nextTags[schema.id],
         })
     })
 
-    console.log('[entryTagUtils] 类型目标标签补齐完成', {
+    logger.log('[entryTagUtils] 类型目标标签补齐完成', {
         entryType,
         addedSchemaIds,
         nextTags,
@@ -204,7 +205,7 @@ export function buildEntryTagsPayload(
     })
     const preservedExtras = [...preservedExtraByName.values()].filter(tag => !reservedExtraNames.has(tag.name ?? ''))
     const merged = [...preservedExtras, ...nextReservedExtras, ...schemaTags]
-    console.log('[entryTagUtils] 生成词条标签 payload', {
+    logger.log('[entryTagUtils] 生成词条标签 payload', {
         draftTags,
         schemaTagCount: schemaTags.length,
         preservedExtraCount: preservedExtras.length + nextReservedExtras.length,

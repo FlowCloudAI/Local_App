@@ -1,3 +1,4 @@
+import {logger} from '../shared/logger'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
@@ -260,7 +261,7 @@ export default function Idea({
                     : '空白便签，开始输入后会自动创建',
             )
         } catch (error) {
-            console.error('加载灵感便签失败', error)
+            logger.error('加载灵感便签失败', error)
             setStatusMessage(error instanceof Error ? error.message : '加载灵感便签失败')
             setSaveState('error')
         } finally {
@@ -273,7 +274,7 @@ export default function Idea({
         try {
             setProjects(await db_list_projects())
         } catch (error) {
-            console.error('加载项目列表失败', error)
+            logger.error('加载项目列表失败', error)
         }
     }, [])
 
@@ -332,7 +333,7 @@ export default function Idea({
                 setConvertEntryType(null)
             } catch (error) {
                 if (cancelled) return
-                console.error('加载转词条配置失败', error)
+                logger.error('加载转词条配置失败', error)
                 setCategories([])
                 setEntryTypes([])
                 setConvertCategoryId(null)
@@ -410,7 +411,7 @@ export default function Idea({
                         setSaveState('saved')
                         setStatusMessage(`已保存于 ${formatIdeaTime(updated.updated_at)}`)
                     } catch (error) {
-                        console.error('更新灵感便签失败', error)
+                        logger.error('更新灵感便签失败', error)
                         setSaveState('error')
                         setStatusMessage(error instanceof Error ? error.message : '自动保存失败')
                     }
@@ -449,7 +450,7 @@ export default function Idea({
                         await loadIdeaNotes(created.id)
                     }
                 } catch (error) {
-                    console.error('创建灵感便签失败', error)
+                    logger.error('创建灵感便签失败', error)
                     setSaveState('error')
                     setStatusMessage(error instanceof Error ? error.message : '创建便签失败')
                 }
@@ -486,7 +487,7 @@ export default function Idea({
             setStatusMessage(`状态已更新为「${getIdeaStatusLabel(updated.status)}」`)
             await loadIdeaNotes(updated.id)
         } catch (error) {
-            console.error('更新便签状态失败', error)
+            logger.error('更新便签状态失败', error)
             setSaveState('error')
             setStatusMessage(error instanceof Error ? error.message : '更新状态失败')
         }
@@ -503,7 +504,7 @@ export default function Idea({
             setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === updated.id ? updated : item)))
             setStatusMessage(updated.pinned ? '已置顶当前便签' : '已取消置顶')
         } catch (error) {
-            console.error('更新置顶状态失败', error)
+            logger.error('更新置顶状态失败', error)
             setSaveState('error')
             setStatusMessage(error instanceof Error ? error.message : '更新置顶状态失败')
         }
@@ -534,7 +535,7 @@ export default function Idea({
                     await loadIdeaNotes(updated.id)
                 }
             } catch (error) {
-                console.error('更新便签所属项目失败', error)
+                logger.error('更新便签所属项目失败', error)
                 setSaveState('error')
                 setStatusMessage(error instanceof Error ? error.message : '更新所属项目失败')
             }
@@ -553,7 +554,7 @@ export default function Idea({
             setSaveState('saved')
             setStatusMessage('已打开关联词条')
         } catch (error) {
-            console.error('打开关联词条失败', error)
+            logger.error('打开关联词条失败', error)
             setSaveState('error')
             setStatusMessage(error instanceof Error ? error.message : '打开关联词条失败')
         }
@@ -645,7 +646,7 @@ export default function Idea({
                 })
             }
         } catch (error) {
-            console.error('转为词条失败', error)
+            logger.error('转为词条失败', error)
             setSaveState('error')
             setStatusMessage(error instanceof Error ? error.message : '转为词条失败')
         } finally {
@@ -677,7 +678,7 @@ export default function Idea({
             await loadIdeaNotes()
             setStatusMessage('便签已删除，输入内容后会自动创建新的便签')
         } catch (error) {
-            console.error('删除灵感便签失败', error)
+            logger.error('删除灵感便签失败', error)
             setSaveState('error')
             setStatusMessage(error instanceof Error ? error.message : '删除便签失败')
         }
@@ -748,7 +749,7 @@ export default function Idea({
                                 <span className="idea-page__sidebar-list-title">便签列表</span>
                                 <span className="idea-page__sidebar-count">{visibleIdeaNotes.length}</span>
                             </div>
-                            <Button variant="ghost" onClick={handleCreateBlankIdea}>新建便签</Button>
+                            <Button type="button" variant="ghost" onClick={handleCreateBlankIdea}>新建便签</Button>
                         </div>
 
                         <div className="idea-page__list">
@@ -851,8 +852,8 @@ export default function Idea({
                                     <p className={`idea-page__status idea-page__status--${saveState}`}>{statusMessage}</p>
                                 </div>
                                 <div className="idea-page__actions">
-                                    <Button variant="ghost" onClick={handleCreateBlankIdea}>空白便签</Button>
-                                    <Button variant="ghost" disabled={!selectedIdea}
+                                    <Button type="button" variant="ghost" onClick={handleCreateBlankIdea}>空白便签</Button>
+                                    <Button type="button" variant="ghost" disabled={!selectedIdea}
                                             onClick={() => void handleDeleteCurrentIdea()}>
                                         删除
                                     </Button>
@@ -910,14 +911,14 @@ export default function Idea({
                                     )}
                                 </div>
                                 <div className="idea-page__actions idea-page__actions--secondary">
-                                    <Button
+                                    <Button type="button"
                                         variant="ghost"
                                         disabled={!selectedIdea || converting || Boolean(selectedIdea?.converted_entry_id)}
                                         onClick={() => setOpenAfterConvert((prev) => !prev)}
                                     >
                                         转后打开：{openAfterConvert ? '开' : '关'}
                                     </Button>
-                                    <Button
+                                    <Button type="button"
                                         variant="ghost"
                                         disabled={!selectedIdea || converting}
                                         onClick={() => void handleConvertToEntry()}
@@ -944,7 +945,7 @@ export default function Idea({
                                     ))}
                                 </div>
                                 <div className="idea-page__quick-actions">
-                                    <Button variant="ghost" disabled={!selectedIdea}
+                                    <Button type="button" variant="ghost" disabled={!selectedIdea}
                                             onClick={() => void handleTogglePinned()}>
                                         {selectedIdea?.pinned ? '取消置顶' : '置顶'}
                                     </Button>

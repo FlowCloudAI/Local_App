@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -141,7 +142,7 @@ function ProjectContradictionPanel({
     useEffect(() => {
         ai_list_plugins('llm')
             .then((list) => setPlugins(list))
-            .catch((err) => console.warn('[ContradictionPanel] 获取插件列表失败', err))
+            .catch((err) => logger.warn('[ContradictionPanel] 获取插件列表失败', err))
     }, [])
 
     const [historyItems, setHistoryItems] = useState<ContradictionReportHistoryItem[]>([])
@@ -161,7 +162,7 @@ function ProjectContradictionPanel({
             const msg = String(payload?.message ?? '')
             if (msg) {
                 setProgressMessage(msg)
-                console.log('[ContradictionPanel] 进度:', msg)
+                logger.log('[ContradictionPanel] 进度:', msg)
             }
         }).then((fn) => {
             unlistenFn = fn
@@ -178,10 +179,10 @@ function ProjectContradictionPanel({
             const payload = event.payload as Record<string, unknown>
             const text = String(payload?.text ?? '')
             debugRawRef.current = text
-            console.log('[ContradictionPanel] 原始 AI 响应（完整）:', text)
+            logger.log('[ContradictionPanel] 原始 AI 响应（完整）:', text)
             const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) ?? text.match(/{[\s\S]*"overview"[\s\S]*}/)
             if (jsonMatch) {
-                console.log('[ContradictionPanel] 提取的 JSON 候选:', jsonMatch[1] ?? jsonMatch[0])
+                logger.log('[ContradictionPanel] 提取的 JSON 候选:', jsonMatch[1] ?? jsonMatch[0])
             }
         }).then((fn) => {
             unlistenFn = fn
@@ -204,7 +205,7 @@ function ProjectContradictionPanel({
                 setActiveRecord(null)
             }
         } catch (error) {
-            console.error('加载矛盾检测历史失败', error)
+            logger.error('加载矛盾检测历史失败', error)
             await showAlert(`加载矛盾检测历史失败：${String(error)}`, 'error', 'toast', 2600)
         } finally {
             setHistoryLoading(false)
@@ -226,7 +227,7 @@ function ProjectContradictionPanel({
             })
             .catch(async (error) => {
                 if (cancelled) return
-                console.error('加载矛盾检测报告失败', error)
+                logger.error('加载矛盾检测报告失败', error)
                 await showAlert(`加载报告失败：${String(error)}`, 'error', 'toast', 2600)
             })
             .finally(() => {
@@ -252,14 +253,14 @@ function ProjectContradictionPanel({
                 model: effectiveModel,
                 projectId,
             }
-            console.log('[ProjectContradictionPanel] start contradiction session', startInput)
+            logger.log('[ProjectContradictionPanel] start contradiction session', startInput)
             const result = await ai_start_contradiction_session(startInput)
-            console.log('[ProjectContradictionPanel] 矛盾检测原始返回（完整）:', JSON.stringify(result, null, 2))
-            console.log('[ProjectContradictionPanel] report 字段:', JSON.stringify(result.report, null, 2))
+            logger.log('[ProjectContradictionPanel] 矛盾检测原始返回（完整）:', JSON.stringify(result, null, 2))
+            logger.log('[ProjectContradictionPanel] report 字段:', JSON.stringify(result.report, null, 2))
             const record = await ai_get_contradiction_report_entry(result.reportId)
-            console.log('[ProjectContradictionPanel] 持久化报告记录（完整）:', JSON.stringify(record, null, 2))
+            logger.log('[ProjectContradictionPanel] 持久化报告记录（完整）:', JSON.stringify(record, null, 2))
             if (debugRawRef.current) {
-                console.log('[ProjectContradictionPanel] 本次检测的原始 AI 输出:', debugRawRef.current)
+                logger.log('[ProjectContradictionPanel] 本次检测的原始 AI 输出:', debugRawRef.current)
             }
             if (!record) {
                 throw new Error('新生成的矛盾报告未能写入历史记录')
@@ -277,7 +278,7 @@ function ProjectContradictionPanel({
             }
             await showAlert('矛盾检测完成，右侧已为这份报告新建讨论对话。', 'success', 'toast', 2200)
         } catch (error) {
-            console.error('[ProjectContradictionPanel] 生成矛盾检测报告失败', {
+            logger.error('[ProjectContradictionPanel] 生成矛盾检测报告失败', {
                 error,
                 message: error instanceof Error ? error.message : String(error),
                 stack: error instanceof Error ? error.stack : undefined,
@@ -310,7 +311,7 @@ function ProjectContradictionPanel({
             }
             await showAlert('报告已删除。', 'success', 'toast', 1600)
         } catch (error) {
-            console.error('删除矛盾检测报告失败', error)
+            logger.error('删除矛盾检测报告失败', error)
             await showAlert(`删除报告失败：${String(error)}`, 'error', 'toast', 2600)
         }
     }, [historyItems, selectedReportId, showAlert, setSelectedReportId])
@@ -411,11 +412,11 @@ function ProjectContradictionPanel({
                             />
                         )}
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => void loadHistory()}
+                    <Button type="button" variant="outline" size="sm" onClick={() => void loadHistory()}
                             disabled={historyLoading || generating}>
                         刷新历史
                     </Button>
-                    <Button variant="primary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
+                    <Button type="button" variant="primary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
                         {generating ? (
                             <span>{progressMessage ?? '检测中…'}</span>
                         ) : '生成新报告'}
@@ -429,7 +430,7 @@ function ProjectContradictionPanel({
                         <h3 className="pe-contradiction-section__title fc-section-title">历史报告</h3>
                         <span className="pe-contradiction-section__meta">{historyItems.length} 份</span>
                     </div>
-                    <RollingBox className="pe-contradiction-history__scroll" thumbSize="thin">
+                    <RollingBox axis="y" className="pe-contradiction-history__scroll" thumbSize="thin">
                         <div className="pe-contradiction-history__list">
                             {historyLoading && historyItems.length === 0 ? (
                                 <div className="pe-contradiction-empty">正在加载历史报告…</div>
@@ -459,7 +460,7 @@ function ProjectContradictionPanel({
                                         </div>
                                     </button>
                                     <div className="fc-op-item__actions">
-                                        <Button
+                                        <Button type="button"
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => void handleDelete(item.reportId)}
@@ -484,7 +485,7 @@ function ProjectContradictionPanel({
                         </div>
                     ) : (
                         <div className="pe-contradiction-report__body">
-                            <RollingBox className="pe-contradiction-report__scroll" thumbSize="thin">
+                            <RollingBox axis="y" className="pe-contradiction-report__scroll" thumbSize="thin">
                                 <div className="pe-contradiction-report__content">
                                     <div className="pe-contradiction-report__hero">
                                         <div className="pe-contradiction-report__hero-main">
@@ -498,7 +499,7 @@ function ProjectContradictionPanel({
                                             <p className="pe-contradiction-report__overview">{activeRecord.report.overview}</p>
                                         </div>
                                         <div className="pe-contradiction-report__hero-actions">
-                                            <Button variant="outline" size="sm"
+                                            <Button type="button" variant="outline" size="sm"
                                                     onClick={() => void handleStartDiscussion()}>
                                                 在右侧继续讨论
                                             </Button>

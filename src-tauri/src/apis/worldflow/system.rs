@@ -9,13 +9,18 @@ pub struct PlatformInfo {
 }
 
 #[tauri::command]
-pub fn log_message(level: &str, message: &str) {
+pub fn log_message(level: &str, message: &str, source: Option<String>) {
+    let message = match source.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(source) => format!("[{source}] {message}"),
+        None => message.to_string(),
+    };
+
     match level {
-        "info" => log::info!("{}", message),
-        "error" => log::error!("{}", message),
-        "debug" => log::debug!("{}", message),
-        "warn" => log::warn!("{}", message),
-        _ => log::debug!("{}", message),
+        "info" => log::info!("{message}"),
+        "error" => log::error!("{message}"),
+        "debug" => log::debug!("{message}"),
+        "warn" => log::warn!("{message}"),
+        _ => log::debug!("{message}"),
     }
 }
 

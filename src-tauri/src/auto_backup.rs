@@ -47,7 +47,9 @@ async fn run_csv_backup(app: &AppHandle) -> Result<()> {
     let settings_state = app
         .try_state::<SettingsState>()
         .context("设置状态尚未初始化")?;
-    let paths = app.try_state::<PathsState>().context("路径状态尚未初始化")?;
+    let paths = app
+        .try_state::<PathsState>()
+        .context("路径状态尚未初始化")?;
     let app_state = app
         .try_state::<Arc<Mutex<AppState>>>()
         .context("数据库状态尚未初始化")?;
@@ -197,7 +199,8 @@ async fn write_csv_record(file: &mut tokio::fs::File, fields: &[String]) -> Resu
 }
 
 fn push_csv_field(output: &mut String, value: &str) {
-    let needs_quotes = value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r');
+    let needs_quotes =
+        value.contains(',') || value.contains('"') || value.contains('\n') || value.contains('\r');
     if !needs_quotes {
         output.push_str(value);
         return;

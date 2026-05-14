@@ -295,7 +295,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                 </div>
                 <div className="fc-op-header__actions">
                     {selectedEvent && onOpenEntry && (
-                        <Button
+                        <Button type="button"
                             size="sm"
                             variant="outline"
                             onClick={() => onOpenEntry({id: selectedEvent.id, title: selectedEvent.title})}
@@ -303,7 +303,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                             打开当前词条
                         </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => void loadTimeline()} disabled={loading}>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void loadTimeline()} disabled={loading}>
                         {loading ? '刷新中' : '刷新'}
                     </Button>
                 </div>

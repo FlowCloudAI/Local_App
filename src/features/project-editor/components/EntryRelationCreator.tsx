@@ -79,7 +79,7 @@ export default function EntryRelationCreator({
     return (
         <div className="entry-relation-editor">
             <div className="entry-relation-editor__header">
-                <Button size="sm" variant="outline" disabled={disabled} onClick={handleDraftAdd}>
+                <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={handleDraftAdd}>
                     + 新增关系
                 </Button>
             </div>
@@ -139,7 +139,7 @@ export default function EntryRelationCreator({
                                     </div>
 
                                     <div className="entry-relation-editor__actions">
-                                        <Button
+                                        <Button type="button"
                                             size="sm"
                                             variant="outline"
                                             disabled={!otherEntry}
@@ -150,7 +150,7 @@ export default function EntryRelationCreator({
                                         >
                                             打开关联词条
                                         </Button>
-                                        <Button
+                                        <Button type="button"
                                             size="sm"
                                             variant="outline"
                                             disabled={disabled}

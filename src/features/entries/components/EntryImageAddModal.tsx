@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
@@ -66,7 +67,7 @@ export default function EntryImageAddModal({
                 }
             })
             .catch((err) => {
-                console.error('[EntryImageAddModal] 插件加载失败:', err)
+                logger.error('[EntryImageAddModal] 插件加载失败:', err)
             })
     }, [open])
 
@@ -220,7 +221,7 @@ export default function EntryImageAddModal({
                             <p className="entry-image-add-local-desc">
                                 从本地文件系统选择图片文件，支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。
                             </p>
-                            <Button size="sm" onClick={handleLocalUpload}>
+                            <Button type="button" size="sm" onClick={handleLocalUpload}>
                                 选择本地图片
                             </Button>
                         </div>
@@ -282,7 +283,7 @@ export default function EntryImageAddModal({
                             </div>
 
                             <div className="entry-image-add-ai__actions">
-                                <Button
+                                <Button type="button"
                                     size="sm"
                                     disabled={!canGenerate || generateState === 'generating'}
                                     onClick={() => void handleGenerate()}
@@ -322,7 +323,7 @@ export default function EntryImageAddModal({
                                         ))}
                                     </div>
                                     <div className="entry-image-add-ai__results-footer">
-                                        <Button
+                                        <Button type="button"
                                             size="sm"
                                             variant="primary"
                                             onClick={handleAddToEntry}

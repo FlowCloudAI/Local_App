@@ -388,7 +388,7 @@ export default function ProjectCoverPickerModal({
                             <p className="pe-cover-picker__hint">
                                 从本地文件系统导入一张图片，导入后会直接设为项目封面。
                             </p>
-                            <Button size="sm" onClick={() => void handleLocalUpload()} disabled={applying}>
+                            <Button type="button" size="sm" onClick={() => void handleLocalUpload()} disabled={applying}>
                                 选择本地图片
                             </Button>
                         </div>
@@ -451,7 +451,7 @@ export default function ProjectCoverPickerModal({
                             </div>
 
                             <div className="pe-cover-picker__actions">
-                                <Button
+                                <Button type="button"
                                     size="sm"
                                     onClick={() => void handleGenerate()}
                                     disabled={!canGenerate || generateState === 'generating' || applying}
@@ -492,7 +492,7 @@ export default function ProjectCoverPickerModal({
                                         ))}
                                     </div>
                                     <div className="pe-cover-picker__results-footer">
-                                        <Button
+                                        <Button type="button"
                                             size="sm"
                                             variant="primary"
                                             onClick={() => void handleAddAiCover()}

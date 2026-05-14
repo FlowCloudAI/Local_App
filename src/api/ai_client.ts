@@ -22,6 +22,7 @@ export interface AiCreateLlmSessionParams {
     maxToolRounds?: number | null
   /** 续聊已有对话时传入其 ID，后端将回放历史并覆写原文件 */
   conversationId?: string | null
+    clientTraceId?: string | null
 }
 
 export interface AiCreateLlmSessionResult {
@@ -221,8 +222,9 @@ export const ai_create_llm_session = ({
   model,
   temperature,
   maxTokens,
-                                          maxToolRounds,
-                                          conversationId,
+                                           maxToolRounds,
+                                           conversationId,
+                                           clientTraceId,
 }: AiCreateLlmSessionParams) =>
     command<AiCreateLlmSessionResult>('ai_create_llm_session', {
     sessionId,
@@ -232,6 +234,7 @@ export const ai_create_llm_session = ({
     maxTokens,
         maxToolRounds,
         conversationId,
+        clientTraceId,
   })
 
 export const ai_create_character_session = ({
@@ -260,8 +263,8 @@ export const ai_create_character_session = ({
 export const ai_build_character_project_snapshot = (projectId: string, entryId: string) =>
     command<AiBuildCharacterProjectSnapshotResult>('ai_build_character_project_snapshot', {projectId, entryId})
 
-export const ai_send_message = (sessionId: string, message: string) =>
-  command<void>('ai_send_message', { sessionId, message })
+export const ai_send_message = (sessionId: string, message: string, clientTraceId?: string) =>
+  command<void>('ai_send_message', { sessionId, message, clientTraceId })
 
 export const ai_close_session = (sessionId: string) =>
   command<void>('ai_close_session', { sessionId })

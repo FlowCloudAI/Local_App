@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import type {Message} from '../../../features/ai-chat/model/AiControllerTypes'
+import './MobileAiChat.css'
 
 interface Props {
     aiFocus: AiFocus
@@ -110,7 +111,7 @@ export default function MobileAiChat({aiFocus}: Props) {
         conversations, activeConversationId, setActiveConversationId,
         messages, sendMessage, stopStreaming,
         inputValue, setInputValue, isStreaming, streamingBlocks,
-        switchConversation, createNewConversation, deleteConversation,
+        conversationRuntime, switchConversation, createNewConversation, deleteConversation,
     } = controller
 
     const [showConvList, setShowConvList] = useState(false)
@@ -155,7 +156,7 @@ export default function MobileAiChat({aiFocus}: Props) {
                 <p style={{color: 'var(--fc-color-text-secondary)', textAlign: 'center', margin: 0}}>
                     与 AI 讨论你的世界观项目，获取创作建议、检查设定矛盾、或与角色对话
                 </p>
-                <Button onClick={handleNewConv}>开始新对话</Button>
+                <Button type="button" onClick={handleNewConv}>开始新对话</Button>
             </div>
         )
     }
@@ -194,7 +195,7 @@ export default function MobileAiChat({aiFocus}: Props) {
                         {contextLabel}
                     </span>
                 )}
-                <Button size="sm" variant="ghost" onClick={handleNewConv} style={{marginLeft: 'auto', flexShrink: 0}}>+
+                <Button type="button" size="sm" variant="ghost" onClick={handleNewConv} style={{marginLeft: 'auto', flexShrink: 0}}>+
                     新建</Button>
             </div>
 
@@ -206,17 +207,22 @@ export default function MobileAiChat({aiFocus}: Props) {
                     borderBottom: '1px solid var(--fc-color-border)',
                     padding: '4px 8px',
                 }}>
-                    {conversations.map(conv => (
+                    {conversations.map(conv => {
+                        const runtime = conversationRuntime[conv.id]
+                        const isConversationStreaming = Boolean(runtime?.isStreaming)
+                        const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
+                        return (
                         <div
                             key={conv.id}
+                            className={`mobile-ai-conversation-item ${conv.id === activeConversationId ? 'active' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
                             onClick={() => handleSelectConv(conv.id)}
                             style={{
-                                padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
                                 background: conv.id === activeConversationId ? 'var(--fc-color-bg-secondary)' : 'transparent',
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                fontSize: 'var(--fc-font-size-sm)',
                             }}
                         >
+                            {!isConversationStreaming && hasUnreadReply && (
+                                <span className="mobile-ai-conversation-unread-dot" aria-hidden="true"/>
+                            )}
                             <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                                 {conv.title}
                                 <div style={{
@@ -237,7 +243,8 @@ export default function MobileAiChat({aiFocus}: Props) {
                                 删除
                             </button>
                         </div>
-                    ))}
+                        )
+                    })}
                 </div>
             )}
 
@@ -312,7 +319,7 @@ export default function MobileAiChat({aiFocus}: Props) {
                         fontFamily: 'inherit',
                     }}
                 />
-                <Button
+                <Button type="button"
                     size="sm"
                     onClick={isStreaming ? stopStreaming : () => {
                         void handleSend()

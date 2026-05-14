@@ -1,5 +1,5 @@
 use super::common::*;
-use super::images::copy_entry_images;
+use super::images::{copy_entry_images, prepare_entry_cover_path};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -38,7 +38,11 @@ pub struct SaveEntryBundleResponse {
 }
 
 fn normalize_entry_compare_text(value: &str) -> String {
-    value.replace("\r\n", "\n").replace('\r', "\n").trim().to_string()
+    value
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .trim()
+        .to_string()
 }
 
 fn normalize_entry_lookup_title(value: &str) -> String {
@@ -93,7 +97,10 @@ fn parse_internal_entry_links(content: &str) -> Vec<(Option<Uuid>, String)> {
         let id_close = id_start + id_close_rel;
         let title = content[title_start..title_close].trim();
         if !title.is_empty() && !title.contains('\n') {
-            links.push((parse_entry_uri(&content[id_start..id_close]), title.to_string()));
+            links.push((
+                parse_entry_uri(&content[id_start..id_close]),
+                title.to_string(),
+            ));
         }
         offset = id_close + 1;
     }
@@ -116,9 +123,24 @@ fn resolve_relation_payload(
 
     let content = normalize_entry_compare_text(draft.content.as_deref().unwrap_or_default());
     match draft.direction.as_str() {
-        "incoming" => Ok((other_entry_id, *entry_id, RelationDirection::OneWay, content)),
-        "two_way" => Ok((*entry_id, other_entry_id, RelationDirection::TwoWay, content)),
-        _ => Ok((*entry_id, other_entry_id, RelationDirection::OneWay, content)),
+        "incoming" => Ok((
+            other_entry_id,
+            *entry_id,
+            RelationDirection::OneWay,
+            content,
+        )),
+        "two_way" => Ok((
+            *entry_id,
+            other_entry_id,
+            RelationDirection::TwoWay,
+            content,
+        )),
+        _ => Ok((
+            *entry_id,
+            other_entry_id,
+            RelationDirection::OneWay,
+            content,
+        )),
     }
 }
 
@@ -140,6 +162,8 @@ pub async fn db_create_entry(
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
     let images = copy_entry_images(paths.inner(), &project_id, images)?;
+    let cover_path =
+        prepare_entry_cover_path(paths.inner(), &project_id, images.as_deref()).flatten();
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
     let entry = db
@@ -152,6 +176,7 @@ pub async fn db_create_entry(
             r#type,
             tags,
             images,
+            cover_path,
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -561,6 +586,8 @@ pub async fn db_update_entry(
     let db = state.sqlite_db.lock().await;
     let current_entry = db.get_entry(&id).await.map_err(|e| e.to_string())?;
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, images)?;
+    let cover_path =
+        prepare_entry_cover_path(paths.inner(), &current_entry.project_id, images.as_deref());
     let category_id = category_id
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
@@ -579,6 +606,7 @@ pub async fn db_update_entry(
                 r#type: Some(r#type),
                 tags,
                 images,
+                cover_path,
             },
         )
         .await
@@ -636,6 +664,8 @@ pub async fn db_save_entry_bundle(
     }
 
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, input.images)?;
+    let cover_path =
+        prepare_entry_cover_path(paths.inner(), &current_entry.project_id, images.as_deref());
     let entry = db
         .update_entry(
             &entry_id,
@@ -647,6 +677,7 @@ pub async fn db_save_entry_bundle(
                 r#type: Some(input.r#type),
                 tags: input.tags,
                 images,
+                cover_path,
             },
         )
         .await
@@ -661,7 +692,9 @@ pub async fn db_save_entry_bundle(
         .map(|entry| (normalize_entry_lookup_title(&entry.title), entry.id))
         .collect::<HashMap<_, _>>();
     let mut target_ids = Vec::<Uuid>::new();
-    for (entry_id_from_link, title) in parse_internal_entry_links(input.content.as_deref().unwrap_or_default()) {
+    for (entry_id_from_link, title) in
+        parse_internal_entry_links(input.content.as_deref().unwrap_or_default())
+    {
         if let Some(id) = entry_id_from_link {
             target_ids.push(id);
             continue;
@@ -706,8 +739,8 @@ pub async fn db_save_entry_bundle(
                 relation,
                 content,
             })
-                .await
-                .map_err(|e| e.to_string())?;
+            .await
+            .map_err(|e| e.to_string())?;
             continue;
         };
 
@@ -722,8 +755,8 @@ pub async fn db_save_entry_bundle(
                 relation,
                 content,
             })
-                .await
-                .map_err(|e| e.to_string())?;
+            .await
+            .map_err(|e| e.to_string())?;
             continue;
         }
 
@@ -737,8 +770,8 @@ pub async fn db_save_entry_bundle(
                     content: Some(content),
                 },
             )
-                .await
-                .map_err(|e| e.to_string())?;
+            .await
+            .map_err(|e| e.to_string())?;
         }
     }
 

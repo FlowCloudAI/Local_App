@@ -1,3 +1,4 @@
+import {logger} from '../../shared/logger'
 import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
@@ -103,7 +104,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         await exit_app()
                     } catch (error) {
                         closingRef.current = false
-                        console.error('关闭移动端窗口失败', error)
+                        logger.error('关闭移动端窗口失败', error)
                     }
                 }
             })()

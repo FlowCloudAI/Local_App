@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
 import {
@@ -40,7 +41,7 @@ export default function AiConfirmModal() {
     const respond = async (confirmed: boolean) => {
         if (!pending || busy) return
         setBusy(true)
-        await confirm_entry_edit(pending.data.request_id, confirmed).catch(console.error)
+        await confirm_entry_edit(pending.data.request_id, confirmed).catch(logger.error)
         setPending(null)
         setBusy(false)
     }

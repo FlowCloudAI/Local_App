@@ -1,3 +1,4 @@
+import {logger} from '../../shared/logger'
 import '../../App.css'
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
 import {type Project, setting_is_backend_ready} from '../../api'
@@ -31,9 +32,9 @@ type ProjectToolTabMeta = {
 
 type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
 type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot'
+const AI_MIN_PANEL_WIDTH = 500
 
 export default function DesktopApp() {
-    const AI_MIN_PANEL_WIDTH = 500
     const win = getCurrentWindow()
     const {showAlert} = useAlert()
     const windowClosingRef = useRef(false)
@@ -88,7 +89,7 @@ export default function DesktopApp() {
                 if (ready) markBackendReady()
             })
             .catch((error) => {
-                console.warn('检查后端启动状态失败', error)
+                logger.warn('检查后端启动状态失败', error)
             })
 
         return () => {
@@ -114,6 +115,9 @@ export default function DesktopApp() {
 
     const handleAiPanelCollapsedChange = useCallback((nextCollapsed: boolean) => {
         const wasCollapsed = aiPanelCollapsed
+        if (!nextCollapsed && wasCollapsed) {
+            setAiPanelWidth(AI_MIN_PANEL_WIDTH)
+        }
         setAiPanelCollapsed(nextCollapsed)
         if (nextCollapsed) {
             clearSidePanelSelection()
@@ -121,16 +125,18 @@ export default function DesktopApp() {
         }
         if (wasCollapsed) {
             setSelectedKey(sidePanelContentKey)
-            if (mainContentKey === 'settings') {
-                setMainContentKey('home')
-            }
         }
-    }, [aiPanelCollapsed, clearSidePanelSelection, mainContentKey, sidePanelContentKey])
+    }, [aiPanelCollapsed, clearSidePanelSelection, sidePanelContentKey])
 
     const collapseAiPanel = useCallback(() => {
         handleAiPanelCollapsedChange(true)
         setAiPanelMode((prev) => prev === 'fullscreen' ? 'floating' : prev)
     }, [handleAiPanelCollapsedChange])
+
+    const expandAiPanelToMinWidth = useCallback(() => {
+        setAiPanelWidth(AI_MIN_PANEL_WIDTH)
+        setAiPanelCollapsed(false)
+    }, [])
 
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
@@ -464,9 +470,10 @@ export default function DesktopApp() {
             }
             setSelectedKey(key)
             setSidePanelContentKey(key as SidePanelContentKey)
-            setAiPanelCollapsed(false)
-            if (mainContentKey === 'settings') {
-                setMainContentKey('home')
+            if (aiPanelCollapsed) {
+                expandAiPanelToMinWidth()
+            } else {
+                setAiPanelCollapsed(false)
             }
             return
         }
@@ -476,12 +483,16 @@ export default function DesktopApp() {
             setMainContentKey('settings')
             collapseAiPanel()
         }
-    }, [aiPanelCollapsed, collapseAiPanel, mainContentKey, sidePanelContentKey])
+    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, sidePanelContentKey])
 
     const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {
         setSelectedKey('ai-chat')
         setSidePanelContentKey('ai-chat')
-        setAiPanelCollapsed(false)
+        if (aiPanelCollapsed) {
+            expandAiPanelToMinWidth()
+        } else {
+            setAiPanelCollapsed(false)
+        }
         const entryTabKey = `entry-${projectId}-${entry.id}`
         if (activeKey !== entryTabKey) {
             setActiveKey(entryTabKey)
@@ -494,9 +505,9 @@ export default function DesktopApp() {
                 entryId: entry.id,
             })
         } catch (error) {
-            console.error('启动角色对话失败', error)
+            logger.error('启动角色对话失败', error)
         }
-    }, [activeKey, aiController, showHomeWorkspace, touchRecentPage])
+    }, [activeKey, aiController, aiPanelCollapsed, expandAiPanelToMinWidth, showHomeWorkspace, touchRecentPage])
 
     const handleStartReportDiscussion = useCallback(async (params: {
         title: string
@@ -506,13 +517,17 @@ export default function DesktopApp() {
     }) => {
         setSelectedKey('ai-chat')
         setSidePanelContentKey('ai-chat')
-        setAiPanelCollapsed(false)
+        if (aiPanelCollapsed) {
+            expandAiPanelToMinWidth()
+        } else {
+            setAiPanelCollapsed(false)
+        }
         try {
             await aiController.startReportDiscussion(params)
         } catch (error) {
-            console.error('启动报告讨论失败', error)
+            logger.error('启动报告讨论失败', error)
         }
-    }, [aiController])
+    }, [aiController, aiPanelCollapsed, expandAiPanelToMinWidth])
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
@@ -711,7 +726,7 @@ export default function DesktopApp() {
                     />
                 </div>
                 <div className="top-bar-actions" data-tauri-drag-region>
-                    <Button
+                    <Button type="button"
                         className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.minimize()}
@@ -731,7 +746,7 @@ export default function DesktopApp() {
                             <line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
                     </Button>
-                    <Button
+                    <Button type="button"
                         className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.toggleMaximize()}
@@ -758,7 +773,7 @@ export default function DesktopApp() {
                             )}
                         </svg>
                     </Button>
-                    <Button
+                    <Button type="button"
                         className="window-control-btn window-control-btn--danger"
                         variant="ghost"
                         onClick={handleWindowClose}

@@ -22,23 +22,97 @@ pub async fn ai_create_llm_session(
     max_tokens: Option<i64>,
     max_tool_rounds: Option<i32>,
     conversation_id: Option<String>,
+    client_trace_id: Option<String>,
 ) -> Result<CreateLlmSessionResult, String> {
-    let api_key = ApiKeyStore::get(&plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
+    let trace_id = client_trace_id.as_deref().unwrap_or("none");
+    log::info!(
+        "[ai_create_llm_session][recv] trace_id={} session_id={} plugin_id={} model={:?} conversation_id={:?} temperature={:?} max_tokens={:?} max_tool_rounds={:?}",
+        trace_id,
+        session_id,
+        plugin_id,
+        model,
+        conversation_id,
+        temperature,
+        max_tokens,
+        max_tool_rounds
+    );
+    let api_key = match ApiKeyStore::get(&plugin_id) {
+        Some(api_key) => api_key,
+        None => {
+            log::warn!(
+                "[ai_create_llm_session][missing_api_key] trace_id={} session_id={} plugin_id={}",
+                trace_id,
+                session_id,
+                plugin_id
+            );
+            return Err(format!(
+                "插件 '{}' 未配置 API Key，请在设置中配置",
+                plugin_id
+            ));
+        }
+    };
 
+    log::info!(
+        "[ai_create_llm_session][lock_client_start] trace_id={} session_id={} plugin_id={}",
+        trace_id,
+        session_id,
+        plugin_id
+    );
     let client = ai_state.client.lock().await;
+    log::info!(
+        "[ai_create_llm_session][lock_client_done] trace_id={} session_id={} plugin_id={}",
+        trace_id,
+        session_id,
+        plugin_id
+    );
     let registry = client.tool_registry().clone();
     let config = max_tool_rounds.map(|rounds| SessionConfig {
         max_tool_rounds: rounds as usize,
         ..Default::default()
     });
-    let mut session = match conversation_id {
-        Some(ref conv_id) => client
-            .resume_llm_session(&plugin_id, &api_key, conv_id, config)
-            .map_err(|e| e.to_string())?,
-        None => client
-            .create_llm_session(&plugin_id, &api_key, config)
-            .map_err(|e| e.to_string())?,
+    let mut session = match conversation_id.as_deref() {
+        Some(conv_id) => {
+            log::info!(
+                "[ai_create_llm_session][resume_start] trace_id={} session_id={} plugin_id={} conversation_id={}",
+                trace_id,
+                session_id,
+                plugin_id,
+                conv_id
+            );
+            client
+                .resume_llm_session(&plugin_id, &api_key, conv_id, config)
+                .map_err(|e| {
+                    log::error!(
+                        "[ai_create_llm_session][resume_failed] trace_id={} session_id={} plugin_id={} conversation_id={} error={}",
+                        trace_id,
+                        session_id,
+                        plugin_id,
+                        conv_id,
+                        e
+                    );
+                    e.to_string()
+                })?
+        }
+        None => {
+            log::info!(
+                "[ai_create_llm_session][create_start] trace_id={} session_id={} plugin_id={}",
+                trace_id,
+                session_id,
+                plugin_id
+            );
+            client
+                .create_llm_session(&plugin_id, &api_key, config)
+                .map_err(|e| {
+                    log::error!(
+                        "[ai_create_llm_session][create_failed] trace_id={} session_id={} plugin_id={} error={}",
+                        trace_id,
+                        session_id,
+                        plugin_id,
+                        e
+                    );
+                    e.to_string()
+                })?
+        }
     };
     drop(client);
     session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
@@ -54,34 +128,69 @@ pub async fn ai_create_llm_session(
         session.set_max_tokens(n).await;
     }
     session.set_stream(true).await;
+    log::info!(
+        "[ai_create_llm_session][configured] trace_id={} session_id={} plugin_id={} model={}",
+        trace_id,
+        session_id,
+        plugin_id,
+        resolved_model
+    );
     let resolved_conversation_id = session
         .conversation_id()
         .map(str::to_string)
         .unwrap_or_else(|| session_id.clone());
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
+    log::info!(
+        "[ai_create_llm_session][try_run_start] trace_id={} session_id={} conversation_id={}",
+        trace_id,
+        session_id,
+        resolved_conversation_id
+    );
+    let (event_stream, handle) = session.try_run(input_rx).map_err(|e| {
+        log::error!(
+            "[ai_create_llm_session][try_run_failed] trace_id={} session_id={} conversation_id={} error={}",
+            trace_id,
+            session_id,
+            resolved_conversation_id,
+            e
+        );
+        e.to_string()
+    })?;
     let run_id = Uuid::new_v4().to_string();
     log::info!(
-        "[ai_create_llm_session] conversation_id={} session_id={} run_id={}",
+        "[ai_create_llm_session][run_started] trace_id={} conversation_id={} session_id={} run_id={} plugin_id={} model={}",
+        trace_id,
         resolved_conversation_id,
         session_id,
-        run_id
+        run_id,
+        plugin_id,
+        resolved_model
     );
 
     spawn_session_event_loop(app, session_id.clone(), run_id.clone(), event_stream);
 
-    ai_state.sessions.lock().await.insert(
-        session_id.clone(),
-        crate::SessionEntry {
-            run_id: run_id.clone(),
-            input_tx,
-            handle,
-            kind: AiSessionKind::General,
-            model: resolved_model,
-            plugin_id: plugin_id.clone(),
-        },
-    );
+    {
+        let mut sessions = ai_state.sessions.lock().await;
+        sessions.insert(
+            session_id.clone(),
+            crate::SessionEntry {
+                run_id: run_id.clone(),
+                input_tx,
+                handle,
+                kind: AiSessionKind::General,
+                model: resolved_model.clone(),
+                plugin_id: plugin_id.clone(),
+            },
+        );
+        log::info!(
+            "[ai_create_llm_session][registered] trace_id={} session_id={} run_id={} active_count={}",
+            trace_id,
+            session_id,
+            run_id,
+            sessions.len()
+        );
+    }
 
     Ok(CreateLlmSessionResult {
         session_id,
@@ -211,6 +320,36 @@ pub async fn ai_update_session(
             return Err("参数 'topLogprobs' 不能为负数".to_string());
         }
     }
+    let changed_fields = [
+        params.model.is_some().then_some("model"),
+        params.temperature.is_some().then_some("temperature"),
+        params.max_tokens.is_some().then_some("maxTokens"),
+        params.stream.is_some().then_some("stream"),
+        params.thinking.is_some().then_some("thinking"),
+        params
+            .frequency_penalty
+            .is_some()
+            .then_some("frequencyPenalty"),
+        params
+            .presence_penalty
+            .is_some()
+            .then_some("presencePenalty"),
+        params.top_p.is_some().then_some("topP"),
+        params.stop.is_some().then_some("stop"),
+        params.response_format.is_some().then_some("responseFormat"),
+        params.n.is_some().then_some("n"),
+        params.tool_choice.is_some().then_some("toolChoice"),
+        params.logprobs.is_some().then_some("logprobs"),
+        params.top_logprobs.is_some().then_some("topLogprobs"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    log::info!(
+        "[ai_update_session][recv] session_id={} fields={:?}",
+        session_id,
+        changed_fields
+    );
 
     let handle = {
         let sessions = ai_state.sessions.lock().await;
@@ -274,8 +413,23 @@ pub async fn ai_update_session(
             }
         })
         .await;
+    log::info!(
+        "[ai_update_session][applied] session_id={} fields={:?}",
+        session_id,
+        changed_fields
+    );
 
     Ok(())
+}
+
+fn message_log_preview(message: &str) -> String {
+    let normalized = message.split_whitespace().collect::<Vec<_>>().join(" ");
+    let preview: String = normalized.chars().take(120).collect();
+    if normalized.chars().count() > 120 {
+        format!("{}...", preview)
+    } else {
+        preview
+    }
 }
 
 /// 向指定会话发送用户消息
@@ -284,19 +438,88 @@ pub async fn ai_send_message(
     ai_state: State<'_, AiState>,
     session_id: String,
     message: String,
+    client_trace_id: Option<String>,
 ) -> Result<(), String> {
-    let input_tx = {
+    let trace_id = client_trace_id.as_deref().unwrap_or("none");
+    let message_bytes = message.len();
+    let message_chars = message.chars().count();
+    let preview = message_log_preview(&message);
+    log::info!(
+        "[ai_send_message][recv] trace_id={} session_id={} bytes={} chars={} preview={:?}",
+        trace_id,
+        session_id,
+        message_bytes,
+        message_chars,
+        preview
+    );
+
+    let (input_tx, run_id, plugin_id, model, kind, channel_capacity, channel_max_capacity) = {
         let sessions = ai_state.sessions.lock().await;
-        sessions
-            .get(&session_id)
-            .map(|entry| entry.input_tx.clone())
-            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+        let active_count = sessions.len();
+        let Some(entry) = sessions.get(&session_id) else {
+            let active_session_ids = sessions.keys().cloned().collect::<Vec<_>>();
+            log::warn!(
+                "[ai_send_message][missing_session] trace_id={} session_id={} active_count={} active_session_ids={:?}",
+                trace_id,
+                session_id,
+                active_count,
+                active_session_ids
+            );
+            return Err(format!("Session '{}' 不存在", session_id));
+        };
+        log::info!(
+            "[ai_send_message][session_found] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} active_count={} channel_capacity={} channel_max_capacity={}",
+            trace_id,
+            session_id,
+            entry.run_id,
+            entry.kind,
+            entry.plugin_id,
+            entry.model,
+            active_count,
+            entry.input_tx.capacity(),
+            entry.input_tx.max_capacity()
+        );
+        (
+            entry.input_tx.clone(),
+            entry.run_id.clone(),
+            entry.plugin_id.clone(),
+            entry.model.clone(),
+            entry.kind.clone(),
+            entry.input_tx.capacity(),
+            entry.input_tx.max_capacity(),
+        )
     };
 
     input_tx
         .send(message)
         .await
-        .map_err(|_| format!("Session '{}' 已关闭", session_id))
+        .map_err(|_| {
+            log::error!(
+                "[ai_send_message][channel_closed] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={}",
+                trace_id,
+                session_id,
+                run_id,
+                kind,
+                plugin_id,
+                model
+            );
+            format!("Session '{}' 已关闭", session_id)
+        })?;
+    log::info!(
+        "[ai_send_message][queued] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} bytes={} chars={} previous_capacity={} previous_max_capacity={} current_capacity={}",
+        trace_id,
+        session_id,
+        run_id,
+        kind,
+        plugin_id,
+        model,
+        message_bytes,
+        message_chars,
+        channel_capacity,
+        channel_max_capacity,
+        input_tx.capacity()
+    );
+    Ok(())
 }
 
 /// 取消当前进行中的 LLM 轮次

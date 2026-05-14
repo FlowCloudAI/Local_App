@@ -239,21 +239,21 @@ export default function EntryImageLightbox({
                         {currentImage?.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
                     </div>
                     <div className="entry-editor-lightbox__actions">
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => setViewMode((current) => current === 'preview' ? 'gallery' : 'preview')}
                         >
                             {viewMode === 'preview' ? '缩略图' : '大图预览'}
                         </Button>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => onSetCover(currentIndex)}
                         >
                             设为主图
                         </Button>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => handleZoomOut()}
@@ -261,7 +261,7 @@ export default function EntryImageLightbox({
                         >
                             缩小
                         </Button>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => updateScale(MIN_SCALE)}
@@ -269,7 +269,7 @@ export default function EntryImageLightbox({
                         >
                             100%
                         </Button>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => handleZoomIn()}
@@ -278,21 +278,21 @@ export default function EntryImageLightbox({
                             放大
                         </Button>
                         <span>{Math.round(scale * 100)}%</span>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => void handleOpenLocalPath()}
                         >
                             打开所在文件夹
                         </Button>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={() => void handleRemoveClick()}
                         >
                             移除
                         </Button>
-                        <Button
+                        <Button type="button"
                             variant="outline"
                             size="sm"
                             onClick={onClose}

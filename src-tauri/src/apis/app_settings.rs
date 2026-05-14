@@ -1,4 +1,4 @@
-use crate::apis::ai_client::plugins::{list_plugins_for_kind, PluginInfo};
+use crate::apis::ai_client::plugins::{PluginInfo, list_plugins_for_kind};
 use crate::state::{BackendReadyState, SearchEngineState};
 use crate::{AiState, ApiKeyStore, AppSettings, SettingsState};
 use serde::Serialize;

@@ -3,9 +3,9 @@ use anyhow::Result;
 use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use worldflow_core::SqliteDb;
 
 // ── 搜索引擎状态 ─────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import {
@@ -57,7 +58,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
             }
             setEntries(result)
         } catch (e) {
-            console.error('加载词条失败', e)
+            logger.error('加载词条失败', e)
         } finally {
             setLoading(false)
         }
@@ -85,7 +86,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
             setAiFocus({projectId, entryId: created.id})
             push({type: 'entryEditor', params: {projectId, entryId: created.id, displayName: '未命名词条'}})
         } catch (e) {
-            console.error('新建词条失败', e)
+            logger.error('新建词条失败', e)
         }
     }
 
@@ -103,7 +104,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                     onValueChange={handleSearch}
                     style={{flex: 1}}
                 />
-                <Button size="sm" onClick={handleCreateEntry}>新建</Button>
+                <Button type="button" size="sm" onClick={handleCreateEntry}>新建</Button>
             </div>
 
             {/* 类型筛选 */}
@@ -157,7 +158,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
             ) : entries.length === 0 ? (
                 <div className="mobile-page__empty">
                     <p>暂无词条</p>
-                    <Button size="sm" onClick={handleCreateEntry}>新建第一个词条</Button>
+                    <Button type="button" size="sm" onClick={handleCreateEntry}>新建第一个词条</Button>
                 </div>
             ) : (
                 <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>

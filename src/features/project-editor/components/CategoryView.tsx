@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
@@ -80,7 +81,14 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
             className="pe-entry-card"
             imageSlot={(
                 coverSrc ? (
-                    <img src={coverSrc} alt={entry.title} className="pe-entry-cover"/>
+                    <img
+                        src={coverSrc}
+                        alt={entry.title}
+                        className="pe-entry-cover"
+                        loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
+                    />
                 ) : (
                     <div
                         className="pe-entry-placeholder"
@@ -335,7 +343,7 @@ function CategoryView({
         const trimmedQuery = query.trim()
         const requestLabel = trimmedQuery ? 'search' : 'list'
         const silent = options?.silent ?? false
-        console.info('[CategoryView] 开始加载词条', {
+        logger.info('[CategoryView] 开始加载词条', {
             requestLabel,
             projectId,
             categoryId,
@@ -364,7 +372,7 @@ function CategoryView({
                     offset: 0,
                 })
             }
-            console.info('[CategoryView] 词条加载完成', {
+            logger.info('[CategoryView] 词条加载完成', {
                 requestLabel,
                 resultCount: result.length,
                 resultPreview: result.slice(0, 5).map((entry) => ({
@@ -379,7 +387,7 @@ function CategoryView({
                 onDefaultEntriesLoaded?.(categoryId, result)
             }
         } catch (e) {
-            console.error('[CategoryView] 词条加载失败', {
+            logger.error('[CategoryView] 词条加载失败', {
                 requestLabel,
                 projectId,
                 categoryId,
@@ -409,7 +417,7 @@ function CategoryView({
     }, [])
 
     const handleSearchChange = (value: string) => {
-        console.info('[CategoryView] 搜索框输入变化', {
+        logger.info('[CategoryView] 搜索框输入变化', {
             value,
             trimmedValue: value.trim(),
             categoryId,
@@ -418,7 +426,7 @@ function CategoryView({
         setSearchText(value)
         if (searchTimer.current) clearTimeout(searchTimer.current)
         searchTimer.current = setTimeout(() => {
-            console.info('[CategoryView] 触发防抖搜索', {
+            logger.info('[CategoryView] 触发防抖搜索', {
                 value,
                 trimmedValue: value.trim(),
                 categoryId,
@@ -461,7 +469,7 @@ function CategoryView({
                         onValueChange={handleSearchChange}
                     />
                     <div className="pe-category-toolbar-actions">
-                        <Button size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
+                        <Button type="button" size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
                             + 新建词条
                         </Button>
                     </div>
@@ -520,7 +528,7 @@ function CategoryView({
                             onOpenEntry={onOpenEntry}
                         />
                     ) : (
-                        <RollingBox className="pe-entries-scroll" thumbSize="thin">
+                        <RollingBox axis="y" className="pe-entries-scroll" thumbSize="thin">
                             {renderEntryGrid()}
                         </RollingBox>
                     )

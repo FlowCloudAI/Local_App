@@ -100,7 +100,7 @@ export function LocalPluginCard({plugin, updateVersion, onUninstall, uninstallin
                 )}
             </div>
             <div className="plugin-card-actions">
-                <Button
+                <Button type="button"
                     variant="danger"
                     size="sm"
                     disabled={uninstalling}
@@ -153,7 +153,7 @@ export function MarketPluginCard({
             <div className="plugin-card-actions">
                 {installed ? (
                     hasUpdate ? (
-                        <Button
+                        <Button type="button"
                             variant="primary"
                             size="sm"
                             disabled={installing}
@@ -162,10 +162,10 @@ export function MarketPluginCard({
                             {installing ? '更新中…' : '更新'}
                         </Button>
                     ) : (
-                        <Button variant="outline" size="sm" disabled>已安装</Button>
+                        <Button type="button" variant="outline" size="sm" disabled>已安装</Button>
                     )
                 ) : (
-                    <Button
+                    <Button type="button"
                         variant="primary"
                         size="sm"
                         disabled={installing}

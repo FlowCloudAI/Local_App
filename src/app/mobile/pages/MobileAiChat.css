@@ -1,0 +1,44 @@
+.mobile-ai-conversation-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: var(--fc-font-size-sm);
+    touch-action: manipulation;
+}
+
+.mobile-ai-conversation-item.is-streaming {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 52%, var(--fc-color-border));
+    animation: mobile-ai-conversation-streaming-pulse 1.55s ease-in-out infinite;
+}
+
+.mobile-ai-conversation-unread-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--fc-radius-full, 999px);
+    background: var(--fc-color-primary);
+    box-shadow: 0 0 0 0.16rem color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+    flex-shrink: 0;
+}
+
+@keyframes mobile-ai-conversation-streaming-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--fc-color-primary) 24%, transparent);
+    }
+
+    50% {
+        box-shadow: 0 0 0 0.32rem color-mix(in srgb, var(--fc-color-primary) 0%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-ai-conversation-item.is-streaming {
+        animation: none;
+        box-shadow: 0 0 0 0.12rem color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
+    }
+}

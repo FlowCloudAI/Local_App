@@ -452,17 +452,17 @@ export default function TagCreator({
 
                 <div className="tag-creator-footer">
                     {isEditMode ? (
-                        <Button variant="ghost" size="sm" onClick={() => void handleDelete()} disabled={submitting}>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => void handleDelete()} disabled={submitting}>
                             删除
                         </Button>
                     ) : (
                         <span/>
                     )}
                     <div className="tag-creator-footer__actions">
-                        <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+                        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
                             取消
                         </Button>
-                        <Button size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+                        <Button type="button" size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
                             {submitting ? (isEditMode ? '保存中…' : '创建中…') : (isEditMode ? '保存' : '创建')}
                         </Button>
                     </div>

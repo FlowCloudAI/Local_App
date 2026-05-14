@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -60,7 +61,7 @@ export default function MobileIdea(_props: Props) {
             setIdeas(notes)
             setProjects(projs)
         } catch (e) {
-            console.error('加载灵感失败', e)
+            logger.error('加载灵感失败', e)
         } finally {
             setLoading(false)
         }
@@ -129,7 +130,7 @@ export default function MobileIdea(_props: Props) {
             await db_update_idea_note({id, status: status as IdeaNote['status']})
             setIdeas(prev => prev.map(i => i.id === id ? {...i, status: status as IdeaNote['status']} : i))
         } catch (e) {
-            console.error('更新状态失败', e)
+            logger.error('更新状态失败', e)
         }
     }
 
@@ -174,14 +175,14 @@ export default function MobileIdea(_props: Props) {
                         style={{marginTop: 8}}
                     />
                     <div style={{display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end'}}>
-                        <Button size="sm" variant="ghost" onClick={handleCancelDraft}>取消</Button>
-                        <Button size="sm" onClick={handleConfirmDraft} disabled={!draftContent.trim()}>保存</Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={handleCancelDraft}>取消</Button>
+                        <Button type="button" size="sm" onClick={handleConfirmDraft} disabled={!draftContent.trim()}>保存</Button>
                     </div>
                 </div>
             ) : (
                 <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
-                    <Button size="sm" onClick={handleCreate}>+ 新建</Button>
-                    <Button size="sm" variant="outline" onClick={load} disabled={loading}>刷新</Button>
+                    <Button type="button" size="sm" onClick={handleCreate}>+ 新建</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={load} disabled={loading}>刷新</Button>
                 </div>
             )}
 
@@ -208,7 +209,7 @@ export default function MobileIdea(_props: Props) {
             ) : ideas.length === 0 ? (
                 <div className="mobile-page__empty">
                     <p>暂无灵感笔记</p>
-                    <Button size="sm" onClick={handleCreate}>记一笔</Button>
+                    <Button type="button" size="sm" onClick={handleCreate}>记一笔</Button>
                 </div>
             ) : (
                 <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
@@ -248,9 +249,9 @@ export default function MobileIdea(_props: Props) {
                                         placeholder="关联项目"
                                     />
                                     <div style={{display: 'flex', gap: 6, justifyContent: 'flex-end'}}>
-                                        <Button size="sm" variant="ghost"
+                                        <Button type="button" size="sm" variant="ghost"
                                                 onClick={() => setEditingId(null)}>取消</Button>
-                                        <Button size="sm" onClick={() => handleSave(idea.id)}>保存</Button>
+                                        <Button type="button" size="sm" onClick={() => handleSave(idea.id)}>保存</Button>
                                     </div>
                                 </div>
                             ) : (

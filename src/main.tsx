@@ -1,3 +1,4 @@
+import {logger} from './shared/logger'
 import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
@@ -9,18 +10,18 @@ import './i18n' // 初始化 i18n
 // JS 运行时错误 & 未捕获 Promise rejection
 window.addEventListener('error', (e) => {
     const src = e.filename ? ` @ ${e.filename}:${e.lineno}` : ''
-    console.error(`[GlobalError] ${e.message}${src}`)
+    logger.error(`[GlobalError] ${e.message}${src}`)
 })
 window.addEventListener('unhandledrejection', (e) => {
     const reason = e.reason instanceof Error
         ? `${e.reason.message}\n${e.reason.stack ?? ''}`
         : String(e.reason)
-    console.error(`[UnhandledRejection] ${reason.slice(0, 400)}`)
+    logger.error(`[UnhandledRejection] ${reason.slice(0, 400)}`)
 })
 
 // CSP 违规（能精确定位被拦截的资源/指令）
 document.addEventListener('securitypolicyviolation', (e) => {
-    console.error(`[CSPViolation] directive="${e.violatedDirective}" blocked="${e.blockedURI}" src="${e.sourceFile}:${e.lineNumber}"`)
+    logger.error(`[CSPViolation] directive="${e.violatedDirective}" blocked="${e.blockedURI}" src="${e.sourceFile}:${e.lineNumber}"`)
 })
 
 function isTauriRuntime(): boolean {
@@ -50,12 +51,12 @@ const initApp = async () => {
     if (settingsResult.status === 'fulfilled' && settingsResult.value.theme) {
         initialTheme = settingsResult.value.theme
     } else if (settingsResult.status === 'rejected') {
-        console.warn('Failed to load settings, using default theme:', settingsResult.reason)
+        logger.warn('Failed to load settings, using default theme:', settingsResult.reason)
     }
     if (platformResult.status === 'fulfilled') {
         platformInfo = platformResult.value
     } else {
-        console.warn('Failed to load platform info, using fallback:', platformResult.reason)
+        logger.warn('Failed to load platform info, using fallback:', platformResult.reason)
     }
 
     if (isTauriRuntime()) {
@@ -72,7 +73,7 @@ const initApp = async () => {
     // data-theme 已同步写入，下一帧再显示窗口，确保浏览器绘制的第一帧已带有正确主题
     if (platformInfo.windowControls) {
         requestAnimationFrame(() => {
-            showWindow().catch(console.error)
+            showWindow().catch(logger.error)
         })
     }
 
@@ -86,4 +87,4 @@ const initApp = async () => {
     )
 }
 
-initApp().catch(console.error)
+initApp().catch(logger.error)

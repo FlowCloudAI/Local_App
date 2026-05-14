@@ -1,3 +1,4 @@
+import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -163,7 +164,7 @@ export default function SnapshotPanel({
             setGraph(snapshotGraph)
             setActiveBranch(snapshotGraph.activeBranch)
         } catch (error) {
-            console.error('加载快照图失败', error)
+            logger.error('加载快照图失败', error)
             void showAlert('加载版本信息失败', 'error')
         } finally {
             setLoading(false)
@@ -185,7 +186,7 @@ export default function SnapshotPanel({
             void showAlert(created ? '快照已创建' : '没有新变更，无需快照', created ? 'success' : 'info', 'nonInvasive', 2200)
             if (created) await load()
         } catch (error) {
-            console.error('创建快照失败', error)
+            logger.error('创建快照失败', error)
             void showAlert('创建快照失败', 'error')
         } finally {
             setSaving(false)
@@ -205,7 +206,7 @@ export default function SnapshotPanel({
             void showAlert('分支已创建', 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            console.error('创建分支失败', error)
+            logger.error('创建分支失败', error)
             void showAlert('创建分支失败', 'error')
         }
     }, [load, newBranchName, showAlert])
@@ -226,7 +227,7 @@ export default function SnapshotPanel({
             void showAlert(`已切换到分支「${branchName}」`, 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            console.error('切换分支失败', error)
+            logger.error('切换分支失败', error)
             void showAlert('切换分支失败', 'error')
         } finally {
             setBranchSwitching(false)
@@ -247,7 +248,7 @@ export default function SnapshotPanel({
             void showAlert('回退成功', 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            console.error('回退失败', error)
+            logger.error('回退失败', error)
             void showAlert('回退失败', 'error')
         } finally {
             setActionId(null)
@@ -278,7 +279,7 @@ export default function SnapshotPanel({
             void showAlert(parts.length > 0 ? `已恢复: ${parts.join(', ')}` : '无新增记录', 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            console.error('追加恢复失败', error)
+            logger.error('追加恢复失败', error)
             void showAlert('追加恢复失败', 'error')
         } finally {
             setActionId(null)
@@ -447,7 +448,7 @@ export default function SnapshotPanel({
                                                 ))}
                                             </span>
                                             <span className="snapshot-panel__item-actions">
-                                                <Button
+                                                <Button type="button"
                                                     variant="ghost"
                                                     size="sm"
                                                     disabled={actionId === row.node.id}
@@ -455,7 +456,7 @@ export default function SnapshotPanel({
                                                 >
                                                     回退
                                                 </Button>
-                                                <Button
+                                                <Button type="button"
                                                     variant="ghost"
                                                     size="sm"
                                                     disabled={actionId === row.node.id}
@@ -494,7 +495,7 @@ export default function SnapshotPanel({
                                 value={newBranchName}
                                 onValueChange={setNewBranchName}
                             />
-                            <Button
+                            <Button type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => void handleCreateBranch()}
@@ -516,7 +517,7 @@ export default function SnapshotPanel({
                                 rows={4}
                             />
                             <div className="snapshot-panel__save-actions">
-                                <Button variant="primary" size="sm" onClick={() => void handleSnapshot()}
+                                <Button type="button" variant="primary" size="sm" onClick={() => void handleSnapshot()}
                                         disabled={loading || saving}>
                                     保存
                                 </Button>

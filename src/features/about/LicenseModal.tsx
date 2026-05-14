@@ -42,7 +42,7 @@ export default function LicenseModal({open, onClose}: LicenseModalProps) {
                     </button>
                 </div>
 
-                <RollingBox className="license-modal-body" thumbSize="thin">
+                <RollingBox axis="y" className="license-modal-body" thumbSize="thin">
                     <p className="license-modal-intro">{LICENSE_INTRO}</p>
                     {LICENSE_SECTIONS.map((section) => (
                         <section key={section.heading} className="license-modal-section">
@@ -53,7 +53,7 @@ export default function LicenseModal({open, onClose}: LicenseModalProps) {
                 </RollingBox>
 
                 <div className="license-modal-footer">
-                    <Button size="sm" onClick={onClose}>已阅读</Button>
+                    <Button type="button" size="sm" onClick={onClose}>已阅读</Button>
                 </div>
             </div>
         </div>,

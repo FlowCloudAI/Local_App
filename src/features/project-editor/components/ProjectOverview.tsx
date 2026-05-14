@@ -329,7 +329,7 @@ function ProjectOverview({
     }
 
     return (
-        <RollingBox ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin">
+        <RollingBox axis="y" ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin">
                 <section className="pe-overview-hero">
                     <div className="pe-project-cover-card">
                         <button
@@ -352,11 +352,11 @@ function ProjectOverview({
                             )}
                         </button>
                         <div className="pe-project-cover__actions">
-                            <Button variant="outline" size="sm" onClick={onEditCover} disabled={coverUpdating}>
+                            <Button type="button" variant="outline" size="sm" onClick={onEditCover} disabled={coverUpdating}>
                                 {coverUpdating ? '保存中…' : coverSrc ? '更换封面' : '设置封面'}
                             </Button>
                             {coverSrc && (
-                                <Button variant="ghost" size="sm" onClick={onClearCover} disabled={coverUpdating}>
+                                <Button type="button" variant="ghost" size="sm" onClick={onClearCover} disabled={coverUpdating}>
                                     清除封面
                                 </Button>
                             )}
@@ -376,10 +376,10 @@ function ProjectOverview({
                                     placeholder="添加项目描述…"
                                 />
                                 <div className="pe-overview-desc-actions">
-                                    <Button size="sm" disabled={descSaving} onClick={() => void handleDescSave()}>
+                                    <Button type="button" size="sm" disabled={descSaving} onClick={() => void handleDescSave()}>
                                         {descSaving ? '保存中…' : '保存'}
                                     </Button>
-                                    <Button variant="ghost" size="sm" disabled={descSaving}
+                                    <Button type="button" variant="ghost" size="sm" disabled={descSaving}
                                             onClick={() => setDescEditing(false)}>
                                         取消
                                     </Button>
@@ -395,7 +395,7 @@ function ProjectOverview({
                                     )
                                 )}
                                 {onDescriptionChange && (
-                                    <Button variant="ghost" size="sm" onClick={handleDescEditStart}>
+                                    <Button type="button" variant="ghost" size="sm" onClick={handleDescEditStart}>
                                         {project.description ? '编辑描述' : '添加描述'}
                                     </Button>
                                 )}
@@ -416,7 +416,7 @@ function ProjectOverview({
                         </div>
                         {onDelete && (
                             <div className="pe-overview-danger-row">
-                                <Button variant="ghost" size="sm" onClick={() => void handleDelete()}>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => void handleDelete()}>
                                     删除项目
                                 </Button>
                             </div>
@@ -473,10 +473,10 @@ function ProjectOverview({
                                     浏览全部词条类型；自定义类型可直接编辑。
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
+                            <Button type="button" variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
                         </div>
 
-                        <RollingBox className="pe-config-list pe-config-list--entry-types" thumbSize="thin">
+                        <RollingBox axis="y" className="pe-config-list pe-config-list--entry-types" thumbSize="thin">
                             <div className="pe-config-list__inner pe-entry-type-grid">
                                 {entryTypes.map(entryType => {
                                     const isBuiltin = entryType.kind === 'builtin'
@@ -499,7 +499,7 @@ function ProjectOverview({
                                                         </span>
                                                     </div>
                                                     {!isBuiltin && onEditEntryType && (
-                                                        <Button
+                                                        <Button type="button"
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => onEditEntryType(entryType)}
@@ -529,10 +529,10 @@ function ProjectOverview({
                                     管理标签类型、默认值和默认植入范围。
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
+                            <Button type="button" variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
                         </div>
 
-                        <RollingBox className="pe-config-list pe-config-list--tags" thumbSize="thin">
+                        <RollingBox axis="y" className="pe-config-list pe-config-list--tags" thumbSize="thin">
                             <div className="pe-config-list__inner pe-entry-type-grid">
                                 {tagSchemas.map(tag => {
                                     const compactTargets = getCompactTagTargetLabels(tag, entryTypeNameMap)
@@ -552,7 +552,7 @@ function ProjectOverview({
                                                             className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
                                                     </div>
                                                     {onEditTag && (
-                                                        <Button
+                                                        <Button type="button"
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => onEditTag(tag)}

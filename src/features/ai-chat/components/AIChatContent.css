@@ -185,6 +185,11 @@
     border-color: var(--dock-panel-active-border);
 }
 
+.ai-conversation-item.is-streaming {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 52%, var(--fc-color-border));
+    animation: ai-conversation-streaming-pulse 1.55s ease-in-out infinite;
+}
+
 .ai-conversation-item.is-character.active {
     background: color-mix(in srgb, var(--fc-color-primary-subtle) 72%, rgba(255, 255, 255, 0.08));
     border-color: color-mix(in srgb, var(--fc-color-primary) 40%, var(--fc-color-border));
@@ -193,6 +198,16 @@
 .ai-conversation-item.is-report.active {
     background: color-mix(in srgb, var(--fc-color-warning-bg, rgba(217, 130, 43, 0.16)) 78%, transparent);
     border-color: color-mix(in srgb, var(--fc-color-warning, #d9822b) 46%, var(--fc-color-border));
+}
+
+.ai-conversation-unread-dot {
+    width: 0.52rem;
+    height: 0.52rem;
+    margin-right: 0.42rem;
+    border-radius: var(--fc-radius-full, 999px);
+    background: var(--fc-color-primary);
+    box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+    flex-shrink: 0;
 }
 
 .ai-conversation-avatar {
@@ -302,6 +317,24 @@
     padding: 1px 4px;
     outline: none;
     font-family: inherit;
+}
+
+@keyframes ai-conversation-streaming-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--fc-color-primary) 24%, transparent);
+    }
+
+    50% {
+        box-shadow: 0 0 0 0.34rem color-mix(in srgb, var(--fc-color-primary) 0%, transparent);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-conversation-item.is-streaming {
+        animation: none;
+        box-shadow: 0 0 0 0.12rem color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
+    }
 }
 
 /* ========== 侧边栏遮罩（窄屏点击收回） ========== */
@@ -431,7 +464,7 @@
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
-    transition: background 0.16s ease, color 0.16s ease;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
     white-space: nowrap;
     font-weight: var(--fc-font-weight-medium);
 }
@@ -873,11 +906,6 @@
     backdrop-filter: blur(12px);
 }
 
-.ai-floating-input-inner:focus-within {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 42%, var(--fc-color-border));
-    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
-}
-
 .ai-floating-textarea {
     width: 100%;
     min-height: 60px;
@@ -1025,8 +1053,13 @@
     font-weight: var(--fc-font-weight-medium);
 }
 
+.ai-floating-toolbar > .ai-toolbar-btn {
+    border: 1px solid var(--fc-color-border);
+}
+
 .ai-floating-toolbar .ai-toolbar-btn.active {
     background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
+    border-color: var(--fc-color-primary);
     color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
 }
 
@@ -1135,8 +1168,8 @@
     height: 40px;
     border: none;
     border-radius: 50%;
-    background: var(--fc-color-danger);
-    color: var(--fc-color-text-on-primary);
+    background: var(--fc-color-primary);
+    color: #ffffff;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1145,6 +1178,6 @@
 }
 
 .ai-floating-stop-btn:hover {
-    background: var(--fc-color-danger-hover);
+    background: var(--fc-color-primary-hover);
     transform: scale(1.05);
 }

@@ -1,17 +1,17 @@
-use crate::apis::ai_client::{spawn_session_event_loop, CreateLlmSessionResult};
+use crate::apis::ai_client::{CreateLlmSessionResult, spawn_session_event_loop};
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
 use crate::{AiSessionKind, AiState, ApiKeyStore, AppState};
 use flowcloudai_client::llm::config::SessionConfig;
-use flowcloudai_client::{sense::Sense, DefaultOrchestrator};
+use flowcloudai_client::{DefaultOrchestrator, sense::Sense};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use uuid::Uuid;
 use worldflow_core::{
-    models::{Category, Entry, EntryBrief, EntryFilter, EntryTag, FCImage, TagSchema}, CategoryOps, EntryOps, EntryRelationOps, ProjectOps,
-    TagSchemaOps,
+    CategoryOps, EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps,
+    models::{Category, Entry, EntryBrief, EntryFilter, EntryTag, FCImage, TagSchema},
 };
 
 const CHARACTER_SNAPSHOT_SCAN_LIMIT: usize = 1000;
@@ -119,13 +119,15 @@ fn map_tag_schemas(
 ) -> Vec<crate::senses::character_sense::CharacterTagSchemaSnapshot> {
     schemas
         .iter()
-        .map(|schema| crate::senses::character_sense::CharacterTagSchemaSnapshot {
-            id: schema.id.to_string(),
-            name: schema.name.clone(),
-            description: schema.description.clone(),
-            r#type: schema.r#type.clone(),
-            target: schema_target_list(schema),
-        })
+        .map(
+            |schema| crate::senses::character_sense::CharacterTagSchemaSnapshot {
+                id: schema.id.to_string(),
+                name: schema.name.clone(),
+                description: schema.description.clone(),
+                r#type: schema.r#type.clone(),
+                target: schema_target_list(schema),
+            },
+        )
         .collect()
 }
 
@@ -139,7 +141,10 @@ fn map_entry_snapshot(
         id: entry.id.to_string(),
         title: entry.title.clone(),
         summary: {
-            let summary = truncate_text(entry.summary.as_deref().unwrap_or_default(), ENTRY_SUMMARY_LIMIT);
+            let summary = truncate_text(
+                entry.summary.as_deref().unwrap_or_default(),
+                ENTRY_SUMMARY_LIMIT,
+            );
             (!summary.is_empty()).then_some(summary)
         },
         content: {
@@ -182,13 +187,15 @@ fn map_character_relations(
 ) -> Vec<crate::senses::character_sense::CharacterRelationSnapshot> {
     relations
         .iter()
-        .map(|relation| crate::senses::character_sense::CharacterRelationSnapshot {
-            id: relation.id.to_string(),
-            from_entry_id: relation.a_id.to_string(),
-            to_entry_id: relation.b_id.to_string(),
-            relation: relation.relation.as_str().to_string(),
-            content: truncate_text(&relation.content, RELATION_CONTENT_LIMIT),
-        })
+        .map(
+            |relation| crate::senses::character_sense::CharacterRelationSnapshot {
+                id: relation.id.to_string(),
+                from_entry_id: relation.a_id.to_string(),
+                to_entry_id: relation.b_id.to_string(),
+                relation: relation.relation.as_str().to_string(),
+                content: truncate_text(&relation.content, RELATION_CONTENT_LIMIT),
+            },
+        )
         .collect()
 }
 
@@ -214,7 +221,12 @@ fn read_character_voice_config(
             continue;
         };
         if name == CHARACTER_VOICE_ID_TAG {
-            if let Some(value) = tag.value.as_str().map(str::trim).filter(|value| !value.is_empty()) {
+            if let Some(value) = tag
+                .value
+                .as_str()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
                 voice_id = Some(value.to_string());
             }
         }
@@ -239,7 +251,10 @@ pub async fn ai_build_character_project_snapshot(
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
 
-    let project = db.get_project(&project_id).await.map_err(|e| e.to_string())?;
+    let project = db
+        .get_project(&project_id)
+        .await
+        .map_err(|e| e.to_string())?;
     let categories = db
         .list_categories(&project_id)
         .await
@@ -269,7 +284,10 @@ pub async fn ai_build_character_project_snapshot(
             all_entries.push(entry);
         }
     }
-    if !all_entries.iter().any(|entry| entry.id == character_entry.id) {
+    if !all_entries
+        .iter()
+        .any(|entry| entry.id == character_entry.id)
+    {
         all_entries.push(character_entry.clone());
     }
 
@@ -290,7 +308,12 @@ pub async fn ai_build_character_project_snapshot(
             if entry.id == character_entry.id {
                 target_snapshot.clone()
             } else {
-                map_entry_snapshot(entry, &category_path_map, &tag_schema_names, ENTRY_CONTENT_LIMIT)
+                map_entry_snapshot(
+                    entry,
+                    &category_path_map,
+                    &tag_schema_names,
+                    ENTRY_CONTENT_LIMIT,
+                )
             }
         })
         .collect::<Vec<_>>();
@@ -304,23 +327,27 @@ pub async fn ai_build_character_project_snapshot(
                 id: project.id.to_string(),
                 name: project.name,
                 description: {
-                    let description =
-                        truncate_text(project.description.as_deref().unwrap_or_default(), ENTRY_SUMMARY_LIMIT);
+                    let description = truncate_text(
+                        project.description.as_deref().unwrap_or_default(),
+                        ENTRY_SUMMARY_LIMIT,
+                    );
                     (!description.is_empty()).then_some(description)
                 },
             },
             target_character: target_snapshot,
             categories: categories
                 .iter()
-                .map(|category| crate::senses::character_sense::CharacterCategorySnapshot {
-                    id: category.id.to_string(),
-                    name: category.name.clone(),
-                    parent_id: category.parent_id.map(|id| id.to_string()),
-                    path: category_path_map
-                        .get(&category.id)
-                        .cloned()
-                        .unwrap_or_else(|| vec![category.name.clone()]),
-                })
+                .map(
+                    |category| crate::senses::character_sense::CharacterCategorySnapshot {
+                        id: category.id.to_string(),
+                        name: category.name.clone(),
+                        parent_id: category.parent_id.map(|id| id.to_string()),
+                        path: category_path_map
+                            .get(&category.id)
+                            .cloned()
+                            .unwrap_or_else(|| vec![category.name.clone()]),
+                    },
+                )
                 .collect(),
             tag_schemas: map_tag_schemas(&tag_schemas),
             entries,

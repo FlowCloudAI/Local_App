@@ -175,7 +175,7 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                     </p>
                 </div>
                 <div className="fc-op-header__actions">
-                    <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
+                    <Button type="button" size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
                         {dataLoading ? '刷新中' : '刷新'}
                     </Button>
                 </div>
@@ -225,7 +225,7 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                 ) : dataError ? (
                     <div className="fc-op-viewport-empty">无法展示关系图，请先处理数据加载错误。</div>
                 ) : nodes.length === 0 ? (
-                    <div className="fc-op-viewport-empty">当前项目还没有词条，暂时无法生成关系图。</div>
+                    <div className="fc-op-viewport-empty">当前项目还没有可展示的词条关系，请先为词条建立关系连接。</div>
                 ) : (
                     <RelationGraph
                         key={graphKey}

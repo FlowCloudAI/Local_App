@@ -510,7 +510,789 @@ pub mod format {
     // （已移除：format_category 和 format_project — 由统一工具返回消息替代）
 }
 
+/// 开发版词条信息选择器。
+/// FULL 表示一次性返回完整上下文；其他值用于限制返回字段，降低工具输出体积。
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum EntryInfo {
+    Full,
+    Title,
+    Type,
+    Summary,
+    Tag,
+    Content,
+    Relations,
+}
+
+impl EntryInfo {
+    pub fn parse(name: &str) -> Result<Self, String> {
+        match name.trim().to_ascii_uppercase().as_str() {
+            "FULL" => Ok(Self::Full),
+            "TITLE" => Ok(Self::Title),
+            "TYPE" => Ok(Self::Type),
+            "SUM" | "SUMMARY" => Ok(Self::Summary),
+            "TAG" | "TAGS" => Ok(Self::Tag),
+            "CONTENT" => Ok(Self::Content),
+            "RELATION" | "RELATIONS" => Ok(Self::Relations),
+            other => Err(format!(
+                "未知 EntryInfo「{}」，可用值：FULL、TITLE、TYPE、SUM、TAG、CONTENT、RELATIONS",
+                other
+            )),
+        }
+    }
+
+    fn normalize(input: Option<Vec<Self>>) -> Vec<Self> {
+        match input {
+            Some(items) if !items.is_empty() => items,
+            _ => vec![Self::Full],
+        }
+    }
+
+    fn wants(items: &[Self], target: Self) -> bool {
+        items.contains(&Self::Full) || items.contains(&target)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EntryListScopeKind {
+    Project,
+    Category,
+}
+
+impl EntryListScopeKind {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Project => "项目",
+            Self::Category => "分类",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct EntryListScope {
+    kind: EntryListScopeKind,
+    id: Uuid,
+    name: String,
+    project_id: Uuid,
+    project_name: String,
+    category_ids: Option<Vec<Uuid>>,
+}
+
+#[derive(Clone, Debug)]
+struct EntryTitleCandidate {
+    entry_id: Uuid,
+    title: String,
+    project_id: Uuid,
+    project_name: String,
+    entry_type: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct EntryListItemDev {
+    id: Uuid,
+    title: String,
+    entry_type: Option<String>,
+    summary: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
 // ============ 内部工具函数（不暴露给前端） ============
+
+/// 开发版：按项目或分类名称/ID 列出词条标题、ID 和类型。
+/// 分类范围默认包含其全部子分类，避免 AI 需要手动遍历分类树。
+pub async fn get_entries_dev(
+    state: &AppState,
+    key: &str,
+    kind: Option<&str>,
+    info: Option<Vec<EntryInfo>>,
+    sort: Option<&str>,
+    limit: Option<usize>,
+) -> Result<String, String> {
+    let key = key.trim();
+    if key.is_empty() {
+        return Err("key 不能为空".to_string());
+    }
+
+    let db = state.sqlite_db.lock().await;
+
+    let scope = if let Ok(id) = Uuid::parse_str(key) {
+        if let Ok(project) = db.get_project(&id).await {
+            EntryListScope {
+                kind: EntryListScopeKind::Project,
+                id: project.id,
+                name: project.name.clone(),
+                project_id: project.id,
+                project_name: project.name,
+                category_ids: None,
+            }
+        } else if let Ok(category) = db.get_category(&id).await {
+            let project = db
+                .get_project(&category.project_id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let categories = db
+                .list_categories(&category.project_id)
+                .await
+                .map_err(|e| e.to_string())?;
+            EntryListScope {
+                kind: EntryListScopeKind::Category,
+                id: category.id,
+                name: category.name,
+                project_id: category.project_id,
+                project_name: project.name,
+                category_ids: Some(collect_subtree_ids(category.id, &categories)),
+            }
+        } else {
+            return Err(format!("未找到项目或分类：{}", key));
+        }
+    } else {
+        let projects = db.list_projects().await.map_err(|e| e.to_string())?;
+        let mut exact_candidates = Vec::new();
+        let mut relaxed_candidates = Vec::new();
+
+        for project in &projects {
+            let project_scope = EntryListScope {
+                kind: EntryListScopeKind::Project,
+                id: project.id,
+                name: project.name.clone(),
+                project_id: project.id,
+                project_name: project.name.clone(),
+                category_ids: None,
+            };
+            if project.name == key {
+                exact_candidates.push(project_scope.clone());
+            } else if project.name.eq_ignore_ascii_case(key) {
+                relaxed_candidates.push(project_scope);
+            }
+
+            let categories = db
+                .list_categories(&project.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            for category in &categories {
+                let category_scope = EntryListScope {
+                    kind: EntryListScopeKind::Category,
+                    id: category.id,
+                    name: category.name.clone(),
+                    project_id: project.id,
+                    project_name: project.name.clone(),
+                    category_ids: Some(collect_subtree_ids(category.id, &categories)),
+                };
+                if category.name == key {
+                    exact_candidates.push(category_scope.clone());
+                } else if category.name.eq_ignore_ascii_case(key) {
+                    relaxed_candidates.push(category_scope);
+                }
+            }
+        }
+
+        let candidates = if exact_candidates.is_empty() {
+            relaxed_candidates
+        } else {
+            exact_candidates
+        };
+
+        match candidates.len() {
+            0 => return Err(format!("未找到项目或分类：{}", key)),
+            1 => candidates.into_iter().next().unwrap(),
+            _ => {
+                return Err(format!(
+                    "key「{}」命中多个项目/分类，请改用 ID：\n{}",
+                    key,
+                    format_entry_scope_candidates_dev(&candidates)
+                ));
+            }
+        }
+    };
+
+    let entry_types = db
+        .list_all_entry_types(&scope.project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let entry_type_filter = match kind.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(value) => Some(resolve_entry_type_filter_dev(value, &entry_types)?),
+        None => None,
+    };
+
+    let mut entries = Vec::new();
+    if let Some(category_ids) = &scope.category_ids {
+        for category_id in category_ids {
+            let mut offset = 0usize;
+            loop {
+                let batch = db
+                    .list_entries(
+                        &scope.project_id,
+                        EntryFilter {
+                            category_id: Some(category_id),
+                            entry_type: entry_type_filter.as_deref(),
+                        },
+                        200,
+                        offset,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let batch_len = batch.len();
+                entries.extend(batch);
+                if batch_len < 200 {
+                    break;
+                }
+                offset += 200;
+            }
+        }
+    } else {
+        let mut offset = 0usize;
+        loop {
+            let batch = db
+                .list_entries(
+                    &scope.project_id,
+                    EntryFilter {
+                        category_id: None,
+                        entry_type: entry_type_filter.as_deref(),
+                    },
+                    200,
+                    offset,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            let batch_len = batch.len();
+            entries.extend(batch);
+            if batch_len < 200 {
+                break;
+            }
+            offset += 200;
+        }
+    }
+
+    let include_summary = info
+        .as_ref()
+        .map(|items| EntryInfo::wants(items, EntryInfo::Summary))
+        .unwrap_or(false);
+
+    let mut list_items = Vec::with_capacity(entries.len());
+    for brief in entries {
+        let entry = db.get_entry(&brief.id).await.map_err(|e| e.to_string())?;
+        list_items.push(EntryListItemDev {
+            id: entry.id,
+            title: entry.title,
+            entry_type: entry.r#type,
+            summary: entry.summary,
+            created_at: entry.created_at.to_string(),
+            updated_at: entry.updated_at.to_string(),
+        });
+    }
+
+    sort_entry_list_items_dev(&mut list_items, sort)?;
+    if let Some(limit) = limit {
+        list_items.truncate(limit);
+    }
+
+    let mut result = String::new();
+    result.push_str("# 词条列表（dev）\n\n");
+    result.push_str(&format!(
+        "范围：{}「{}」\n范围ID：{}\n所属项目：{} ({})\n",
+        scope.kind.label(),
+        scope.name,
+        scope.id,
+        scope.project_name,
+        scope.project_id
+    ));
+    if let Some(kind) = kind.map(str::trim).filter(|s| !s.is_empty()) {
+        result.push_str(&format!("类型筛选：{}\n", kind));
+    }
+    if let Some(sort) = sort.map(str::trim).filter(|s| !s.is_empty()) {
+        result.push_str(&format!("排序：{}\n", sort));
+    }
+    if let Some(limit) = limit {
+        result.push_str(&format!("数量上限：{}\n", limit));
+    }
+    result.push_str(&format!("词条数量：{}\n\n", list_items.len()));
+
+    if list_items.is_empty() {
+        result.push_str("未找到符合条件的词条");
+        return Ok(result);
+    }
+
+    for (index, entry) in list_items.iter().enumerate() {
+        result.push_str(&format!(
+            "{}. {} | ID: {} | 类型: {} | 创建: {} | 更新: {}\n",
+            index + 1,
+            entry.title,
+            entry.id,
+            format_entry_type_value_dev(entry.entry_type.as_deref(), &entry_types),
+            entry.created_at,
+            entry.updated_at
+        ));
+        if include_summary {
+            result.push_str(&format!(
+                "   摘要：{}\n",
+                entry.summary.as_deref().unwrap_or("无摘要")
+            ));
+        }
+    }
+
+    Ok(result)
+}
+
+/// 开发版：按词条名称/ID 获取高密度词条上下文。
+/// 默认 FULL 会一次性补齐类型、分类路径、标签定义、关系对端和图片状态。
+pub async fn get_entry_dev(
+    state: &AppState,
+    keys: &[String],
+    info: Option<Vec<EntryInfo>>,
+) -> Result<String, String> {
+    if keys.is_empty() {
+        return Err("必须提供 key 或 keys".to_string());
+    }
+
+    let requested = EntryInfo::normalize(info);
+    let db = state.sqlite_db.lock().await;
+    let mut outputs = Vec::with_capacity(keys.len());
+
+    for key in keys {
+        let key = key.trim();
+        if key.is_empty() {
+            return Err("key 不能为空".to_string());
+        }
+
+        let entry = if let Ok(id) = Uuid::parse_str(key) {
+            db.get_entry(&id).await.map_err(|e| e.to_string())?
+        } else {
+            let projects = db.list_projects().await.map_err(|e| e.to_string())?;
+            let mut exact_candidates = Vec::new();
+            let mut relaxed_candidates = Vec::new();
+
+            for project in &projects {
+                let mut offset = 0usize;
+                loop {
+                    let batch = db
+                        .list_entries(
+                            &project.id,
+                            EntryFilter {
+                                category_id: None,
+                                entry_type: None,
+                            },
+                            200,
+                            offset,
+                        )
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let batch_len = batch.len();
+                    for brief in batch {
+                        let candidate = EntryTitleCandidate {
+                            entry_id: brief.id,
+                            title: brief.title.clone(),
+                            project_id: project.id,
+                            project_name: project.name.clone(),
+                            entry_type: brief.r#type.clone(),
+                        };
+                        if brief.title == key {
+                            exact_candidates.push(candidate);
+                        } else if brief.title.eq_ignore_ascii_case(key) {
+                            relaxed_candidates.push(candidate);
+                        }
+                    }
+                    if batch_len < 200 {
+                        break;
+                    }
+                    offset += 200;
+                }
+            }
+
+            let candidates = if exact_candidates.is_empty() {
+                relaxed_candidates
+            } else {
+                exact_candidates
+            };
+
+            match candidates.len() {
+                0 => return Err(format!("未找到词条：{}", key)),
+                1 => db
+                    .get_entry(&candidates[0].entry_id)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                _ => {
+                    return Err(format!(
+                        "词条名「{}」命中多个候选，请改用 ID：\n{}",
+                        key,
+                        format_entry_title_candidates_dev(&candidates)
+                    ));
+                }
+            }
+        };
+
+        let project = db
+            .get_project(&entry.project_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let categories = db
+            .list_categories(&entry.project_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        let entry_types = db
+            .list_all_entry_types(&entry.project_id)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let category_text = entry
+            .category_id
+            .map(|category_id| build_category_path_dev(&categories, category_id))
+            .unwrap_or_else(|| "未分类".to_string());
+
+        let mut result = String::new();
+        result.push_str("# 词条上下文（dev）\n\n");
+        result.push_str("## 标识\n\n");
+        result.push_str(&format!("- 标题：{}\n", entry.title));
+        result.push_str(&format!("- 词条ID：{}\n", entry.id));
+        result.push_str(&format!("- 项目：{} ({})\n", project.name, project.id));
+        result.push_str(&format!("- 分类路径：{}\n", category_text));
+        result.push_str(&format!("- 创建时间：{}\n", entry.created_at));
+        result.push_str(&format!("- 更新时间：{}\n", entry.updated_at));
+
+        if EntryInfo::wants(&requested, EntryInfo::Type) {
+            result.push_str("\n## 类型\n\n");
+            result.push_str(&format!(
+                "{}\n",
+                format_entry_type_value_dev(entry.r#type.as_deref(), &entry_types)
+            ));
+        }
+
+        if EntryInfo::wants(&requested, EntryInfo::Summary) {
+            result.push_str("\n## 摘要\n\n");
+            result.push_str(entry.summary.as_deref().unwrap_or("无摘要"));
+            result.push('\n');
+        }
+
+        if EntryInfo::wants(&requested, EntryInfo::Tag) {
+            let schemas = db
+                .list_tag_schemas(&entry.project_id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let schema_map = schemas
+                .iter()
+                .map(|schema| (schema.id, schema))
+                .collect::<std::collections::HashMap<_, _>>();
+
+            result.push_str("\n## 标签\n\n");
+            if entry.tags.0.is_empty() {
+                result.push_str("无标签\n");
+            } else {
+                for tag in &entry.tags.0 {
+                    if let Some(schema) = schema_map.get(&tag.schema_id) {
+                        result.push_str(&format!(
+                            "- {} (schema_id: {}, 类型: {}, 目标: {}): {}\n",
+                            schema.name,
+                            schema.id,
+                            schema.r#type,
+                            schema.target,
+                            format_json_value_dev(&tag.value)
+                        ));
+                        if let Some(description) = &schema.description {
+                            result.push_str(&format!("  描述：{}\n", description));
+                        }
+                        if let Some(default_value) = &schema.default_val {
+                            result.push_str(&format!("  默认值：{}\n", default_value));
+                        }
+                    } else {
+                        result.push_str(&format!(
+                            "- 未知标签定义 (schema_id: {}): {}\n",
+                            tag.schema_id,
+                            format_json_value_dev(&tag.value)
+                        ));
+                    }
+                }
+            }
+        }
+
+        if EntryInfo::wants(&requested, EntryInfo::Content) {
+            result.push_str("\n## 正文\n\n");
+            if entry.content.is_empty() {
+                result.push_str("正文为空\n");
+            } else {
+                result.push_str(&entry.content);
+                result.push('\n');
+            }
+        }
+
+        if EntryInfo::wants(&requested, EntryInfo::Relations) {
+            let relations = db
+                .list_relations_for_entry(&entry.id)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            result.push_str("\n## 关系\n\n");
+            if relations.is_empty() {
+                result.push_str("无关系\n");
+            } else {
+                for relation in &relations {
+                    let peer_id = if relation.a_id == entry.id {
+                        relation.b_id
+                    } else {
+                        relation.a_id
+                    };
+                    let direction = match relation.relation {
+                        RelationDirection::TwoWay => "双向".to_string(),
+                        RelationDirection::OneWay if relation.a_id == entry.id => {
+                            "当前词条 -> 对方".to_string()
+                        }
+                        RelationDirection::OneWay => "对方 -> 当前词条".to_string(),
+                    };
+
+                    if let Ok(peer) = db.get_entry(&peer_id).await {
+                        result.push_str(&format!(
+                            "- {} | 关系ID: {} | 对方：{} ({}) | 对方类型：{}\n",
+                            direction,
+                            relation.id,
+                            peer.title,
+                            peer.id,
+                            format_entry_type_value_dev(peer.r#type.as_deref(), &entry_types)
+                        ));
+                        if let Some(summary) = &peer.summary {
+                            result.push_str(&format!("  对方摘要：{}\n", summary));
+                        }
+                        result.push_str(&format!("  关系描述：{}\n", relation.content));
+                    } else {
+                        result.push_str(&format!(
+                            "- {} | 关系ID: {} | 对方ID：{}\n  关系描述：{}\n",
+                            direction, relation.id, peer_id, relation.content
+                        ));
+                    }
+                }
+            }
+        }
+
+        if requested.contains(&EntryInfo::Full) {
+            result.push_str("\n## 图片\n\n");
+            result.push_str(&format!("- 图库图片数：{}\n", entry.images.0.len()));
+            result.push_str(&format!(
+                "- 卡片封面路径：{}\n",
+                entry.cover_path.as_deref().unwrap_or("无")
+            ));
+            let original_cover = entry
+                .images
+                .0
+                .iter()
+                .find(|image| image.is_cover)
+                .map(|image| image.path.display().to_string())
+                .unwrap_or_else(|| "无".to_string());
+            result.push_str(&format!("- 图库主图原图：{}\n", original_cover));
+        }
+
+        outputs.push(result);
+    }
+
+    if outputs.len() == 1 {
+        Ok(outputs.remove(0))
+    } else {
+        let mut result = String::from("# 批量词条上下文（dev）\n\n");
+        result.push_str(&outputs.join("\n\n---\n\n"));
+        Ok(result)
+    }
+}
+
+fn format_entry_scope_candidates_dev(candidates: &[EntryListScope]) -> String {
+    candidates
+        .iter()
+        .map(|candidate| {
+            format!(
+                "- {}「{}」 ID: {}，所属项目：{} ({})",
+                candidate.kind.label(),
+                candidate.name,
+                candidate.id,
+                candidate.project_name,
+                candidate.project_id
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn sort_entry_list_items_dev(
+    entries: &mut [EntryListItemDev],
+    sort: Option<&str>,
+) -> Result<(), String> {
+    let sort = sort
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("title");
+    let (descending, field) = sort
+        .strip_prefix('-')
+        .map(|field| (true, field))
+        .unwrap_or((false, sort));
+
+    match field {
+        "title" => entries.sort_by(|a, b| a.title.cmp(&b.title).then_with(|| a.id.cmp(&b.id))),
+        "created_at" => entries.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then_with(|| a.title.cmp(&b.title))
+                .then_with(|| a.id.cmp(&b.id))
+        }),
+        "updated_at" => entries.sort_by(|a, b| {
+            a.updated_at
+                .cmp(&b.updated_at)
+                .then_with(|| a.title.cmp(&b.title))
+                .then_with(|| a.id.cmp(&b.id))
+        }),
+        other => {
+            return Err(format!(
+                "未知 sort「{}」，可用值：title、created_at、updated_at，也可加 - 前缀倒序",
+                other
+            ));
+        }
+    }
+
+    if descending {
+        entries.reverse();
+    }
+
+    Ok(())
+}
+
+fn format_entry_title_candidates_dev(candidates: &[EntryTitleCandidate]) -> String {
+    candidates
+        .iter()
+        .map(|candidate| {
+            let type_text = candidate.entry_type.as_deref().unwrap_or("未设置");
+            format!(
+                "- {} | ID: {} | 项目：{} ({}) | 类型：{}",
+                candidate.title,
+                candidate.entry_id,
+                candidate.project_name,
+                candidate.project_id,
+                type_text
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn resolve_entry_type_filter_dev(kind: &str, types: &[EntryTypeView]) -> Result<String, String> {
+    let kind = kind.trim();
+    if kind.is_empty() {
+        return Err("kind 不能为空".to_string());
+    }
+
+    let mut matches = Vec::new();
+    for entry_type in types {
+        match entry_type {
+            EntryTypeView::Builtin { key, name, .. } => {
+                let key_value = key.to_string();
+                let name_value = name.to_string();
+                if key_value == kind
+                    || name_value == kind
+                    || key_value.eq_ignore_ascii_case(kind)
+                    || name_value.eq_ignore_ascii_case(kind)
+                {
+                    matches.push((
+                        key_value.clone(),
+                        format!("{} (内置 key: {})", name_value, key_value),
+                    ));
+                }
+            }
+            EntryTypeView::Custom(custom) => {
+                let id_value = custom.id.to_string();
+                if id_value == kind
+                    || custom.name == kind
+                    || id_value.eq_ignore_ascii_case(kind)
+                    || custom.name.eq_ignore_ascii_case(kind)
+                {
+                    matches.push((
+                        id_value.clone(),
+                        format!("{} (自定义 id: {})", custom.name, id_value),
+                    ));
+                }
+            }
+        }
+    }
+
+    match matches.len() {
+        0 => Err(format!(
+            "未找到词条类型「{}」。可用类型：\n{}",
+            kind,
+            format_available_entry_types_dev(types)
+        )),
+        1 => Ok(matches.remove(0).0),
+        _ => Err(format!(
+            "词条类型「{}」命中多个候选，请改用 key 或 ID：\n{}",
+            kind,
+            matches
+                .iter()
+                .map(|(_, label)| format!("- {}", label))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )),
+    }
+}
+
+fn format_available_entry_types_dev(types: &[EntryTypeView]) -> String {
+    if types.is_empty() {
+        return "无可用词条类型".to_string();
+    }
+
+    types
+        .iter()
+        .map(|entry_type| match entry_type {
+            EntryTypeView::Builtin { key, name, .. } => {
+                format!("- {} (内置 key: {})", name, key)
+            }
+            EntryTypeView::Custom(custom) => {
+                format!("- {} (自定义 id: {})", custom.name, custom.id)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn format_entry_type_value_dev(entry_type: Option<&str>, types: &[EntryTypeView]) -> String {
+    let Some(raw) = entry_type.map(str::trim).filter(|value| !value.is_empty()) else {
+        return "未设置".to_string();
+    };
+
+    for entry_type in types {
+        match entry_type {
+            EntryTypeView::Builtin { key, name, .. } if key.to_string() == raw => {
+                return format!("{} (内置 key: {})", name, key);
+            }
+            EntryTypeView::Custom(custom) if custom.id.to_string() == raw => {
+                return format!("{} (自定义 id: {})", custom.name, custom.id);
+            }
+            _ => {}
+        }
+    }
+
+    raw.to_string()
+}
+
+fn build_category_path_dev(categories: &[Category], category_id: Uuid) -> String {
+    let mut parts = Vec::new();
+    let mut current = Some(category_id);
+    let mut seen = std::collections::HashSet::new();
+
+    while let Some(id) = current {
+        if !seen.insert(id) {
+            parts.push(format!("循环引用分类({})", id));
+            break;
+        }
+
+        let Some(category) = categories.iter().find(|category| category.id == id) else {
+            parts.push(format!("未知分类({})", id));
+            break;
+        };
+
+        parts.push(category.name.clone());
+        current = category.parent_id;
+    }
+
+    parts.reverse();
+    parts.join(" / ")
+}
+
+fn format_json_value_dev(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(text) => text.clone(),
+        other => other.to_string(),
+    }
+}
 
 /// 创建词条
 pub async fn create_entry(
@@ -534,6 +1316,7 @@ pub async fn create_entry(
         r#type: entry_type,
         tags: None,
         images: None,
+        cover_path: None,
     })
     .await
     .map_err(|e| e.to_string())
@@ -808,6 +1591,7 @@ pub async fn update_entry_fields(
             r#type: entry_type,
             tags: None,
             images: None,
+            cover_path: None,
         },
     )
     .await
@@ -832,6 +1616,7 @@ pub async fn update_entry_content(
             r#type: None,
             tags: None,
             images: None,
+            cover_path: None,
         },
     )
     .await
@@ -874,6 +1659,7 @@ pub async fn add_entry_tag(
             r#type: None,
             tags: Some(tags),
             images: None,
+            cover_path: None,
         },
     )
     .await
@@ -911,6 +1697,7 @@ pub async fn remove_entry_tag(
             r#type: None,
             tags: Some(tags),
             images: None,
+            cover_path: None,
         },
     )
     .await
@@ -935,6 +1722,7 @@ pub async fn update_entry_tags(
             r#type: None,
             tags: Some(tags),
             images: None,
+            cover_path: None,
         },
     )
     .await
@@ -1149,6 +1937,7 @@ pub async fn delete_category_move_to_parent(
                     r#type: None,
                     tags: None,
                     images: None,
+                    cover_path: None,
                 },
             )
             .await
@@ -1196,6 +1985,7 @@ pub async fn move_entry(
             r#type: None,
             tags: None,
             images: None,
+            cover_path: None,
         },
     )
     .await
