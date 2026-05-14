@@ -499,9 +499,9 @@
 .templates-detail-disclosure-summary {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.65rem;
     flex-wrap: wrap;
-    padding: 0.7rem 0.9rem;
+    padding: 0.6rem 0.8rem;
     cursor: pointer;
     user-select: none;
     list-style: none;
@@ -542,24 +542,36 @@
 
 .templates-detail-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 0.75rem;
-    padding: 0.75rem;
+    grid-template-areas:
+        "purpose params"
+        "usage params";
+    grid-template-columns: minmax(14rem, 0.75fr) minmax(0, 2.25fr);
+    gap: 0.55rem;
+    align-items: start;
+    padding: 0.6rem;
 }
 
 .templates-detail-card {
-    padding: 0.85rem 0.9rem;
+    padding: 0.65rem 0.7rem;
     border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
+    border-radius: var(--fc-radius-md);
     background: var(--fc-color-bg-secondary);
 }
 
+.templates-detail-card:nth-child(1) {
+    grid-area: purpose;
+}
+
+.templates-detail-card:nth-child(2) {
+    grid-area: usage;
+}
+
 .templates-detail-card--params {
-    grid-column: 1 / -1;
+    grid-area: params;
 }
 
 .templates-detail-label {
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.35rem;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-semibold);
@@ -571,23 +583,27 @@
     margin: 0;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    line-height: 1.7;
+    line-height: 1.55;
 }
 
 .templates-param-list {
     display: grid;
-    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.45rem;
 }
 
 .templates-param-item {
-    padding: 0.7rem 0.8rem;
+    display: grid;
+    grid-template-columns: minmax(6.5rem, max-content) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.25rem 0.65rem;
+    padding: 0.48rem 0.6rem;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 86%, transparent);
     border-radius: var(--fc-radius-md);
     background: color-mix(in srgb, var(--fc-color-bg) 96%, var(--fc-color-primary) 4%);
 }
 
 .templates-param-name {
-    margin-bottom: 0.25rem;
     font-size: var(--fc-font-size-sm);
     font-weight: var(--fc-font-weight-semibold);
     color: var(--fc-color-text);
@@ -597,7 +613,21 @@
 .templates-param-desc {
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
-    line-height: 1.65;
+    line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+    .templates-detail-grid {
+        grid-template-areas:
+            "purpose"
+            "usage"
+            "params";
+        grid-template-columns: 1fr;
+    }
+
+    .templates-param-item {
+        grid-template-columns: 1fr;
+    }
 }
 
 .templates-error-panel {
