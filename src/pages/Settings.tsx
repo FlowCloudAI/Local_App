@@ -1778,7 +1778,7 @@ export default function Settings({onBack}: SettingsProps) {
                         </div>
                     )}
                         {activeTab === 'templates' && (
-                            <div className="settings-container fc-page-shell">
+                            <div className="settings-container fc-page-shell settings-template-shell">
                                 <div className="settings-title fc-page-header">
                                     <div className="fc-page-title-block">
                                         <h1 className="fc-page-title">提示词模板</h1>
@@ -1786,8 +1786,9 @@ export default function Settings({onBack}: SettingsProps) {
                                     </div>
                                 </div>
 
+                                <div className="templates-workspace">
                                 {templateView === 'list' && (
-                                    <section className="settings-section fc-section-card">
+                                    <section className="settings-section fc-section-card templates-catalog-section">
                                         <div className="templates-catalog-header">
                                             <div>
                                                 <h2 className="settings-section-title fc-section-title">模板目录</h2>
@@ -2018,13 +2019,15 @@ export default function Settings({onBack}: SettingsProps) {
                                                                         setTemplatePageError(null)
                                                                     }
                                                                 }}
-                                                                minHeight={540}
+                                                                height="100%"
+                                                                minHeight={0}
                                                                 fontSize={settings.editor_font_size}
                                                                 lineHeight={24}
                                                                 wordWrap="on"
                                                                 diagnostics={templateDiagnostics}
                                                                 placeholder="请输入提示词模板内容"
                                                                 className="templates-editor"
+                                                                style={{minHeight: 0}}
                                                             />
                                                         </>
                                                     )}
@@ -2037,6 +2040,7 @@ export default function Settings({onBack}: SettingsProps) {
                                         )}
                                     </section>
                             )}
+                                </div>
                         </div>
                     )}
                     </div>
