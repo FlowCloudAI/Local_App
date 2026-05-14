@@ -14,8 +14,174 @@
   line-height: 1.1;
 }
 
+.project-list-section-title {
+  margin: 0;
+  color: var(--fc-color-text);
+  font-size: clamp(1.35rem, 1.8vw, 1.75rem);
+  line-height: 1.15;
+}
+
 .project-list-subtitle {
     max-width: 40rem;
+}
+
+.project-home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  gap: var(--fc-space-lg);
+  margin-bottom: var(--fc-space-xl);
+}
+
+.project-home-hero__main {
+  min-width: 0;
+  display: grid;
+  gap: var(--fc-space-lg);
+}
+
+.project-home-continue-card,
+.project-home-panel {
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
+  border-radius: var(--fc-radius-xl);
+  background: var(--fc-color-bg-elevated);
+  box-shadow: var(--fc-shadow-xs);
+}
+
+.project-home-continue-card {
+  min-height: 15rem;
+  padding: clamp(1.25rem, 2.6vw, 2rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--fc-space-sm);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-primary) 18%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--fc-color-bg-elevated) 92%, var(--fc-color-primary-subtle)), var(--fc-color-bg-elevated));
+}
+
+.project-home-eyebrow {
+  width: fit-content;
+  padding: 0.24rem 0.56rem;
+  border-radius: var(--fc-radius-full, 999px);
+  background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+  color: var(--fc-color-primary);
+  font-size: var(--fc-font-size-xs);
+  font-weight: var(--fc-font-weight-semibold, 600);
+}
+
+.project-home-continue-card h2,
+.project-home-panel h2 {
+  margin: 0;
+  color: var(--fc-color-text);
+}
+
+.project-home-continue-card h2 {
+  font-size: clamp(1.55rem, 2.3vw, 2.2rem);
+  line-height: 1.12;
+}
+
+.project-home-continue-card p,
+.project-home-muted {
+  margin: 0;
+  color: var(--fc-color-text-secondary);
+  line-height: 1.7;
+}
+
+.project-home-continue-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  margin-top: var(--fc-space-sm);
+}
+
+.project-home-side {
+  display: grid;
+  align-content: start;
+  gap: var(--fc-space-md);
+  min-width: 0;
+}
+
+.project-home-panel {
+  padding: var(--fc-space-lg);
+  display: grid;
+  gap: var(--fc-space-md);
+}
+
+.project-home-panel h2 {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.project-home-recent-list,
+.project-home-help-list {
+  display: grid;
+  gap: var(--fc-space-xs);
+}
+
+.project-home-recent-item,
+.project-home-help-item {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
+  border-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-bg) 74%, transparent);
+  color: var(--fc-color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.project-home-recent-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  padding: 0.68rem 0.75rem;
+}
+
+.project-home-recent-item:hover,
+.project-home-help-item:hover {
+  border-color: color-mix(in srgb, var(--fc-color-primary) 44%, var(--fc-color-border));
+  background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg-elevated));
+  transform: translateY(-1px);
+}
+
+.project-home-recent-item__type {
+  padding: 0.12rem 0.42rem;
+  border-radius: var(--fc-radius-full, 999px);
+  background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+  color: var(--fc-color-primary);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.project-home-recent-item__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fc-font-weight-medium);
+}
+
+.project-home-recent-item__time {
+  color: var(--fc-color-text-secondary);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.project-home-help-item {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.78rem 0.85rem;
+}
+
+.project-home-help-item span {
+  font-weight: var(--fc-font-weight-semibold, 600);
+}
+
+.project-home-help-item small {
+  color: var(--fc-color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
 .project-list-header-actions {
@@ -251,6 +417,10 @@
 }
 
 @media (max-width: 840px) {
+  .project-home-hero {
+    grid-template-columns: 1fr;
+  }
+
   .project-list-toolbar {
     grid-template-columns: 1fr;
   }

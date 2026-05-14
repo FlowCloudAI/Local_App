@@ -1,13 +1,21 @@
-import {type CSSProperties, memo, useCallback, useEffect, useState} from 'react'
+import {type CSSProperties, memo, useCallback, useEffect, useMemo, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_list_projects, type Project} from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
+import {
+    HOME_ACTIVITY_CHANGED_EVENT,
+    loadHomeDashboardData,
+    type HomeActivityRecord,
+    type HomeActivityTarget,
+    type HomeDashboardData,
+} from '../features/home/homeActivity'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
 interface ProjectListProps {
     onOpenProject?: (project: Project) => void
+    onOpenHomeTarget?: (target: HomeActivityTarget) => void
 }
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
@@ -40,11 +48,47 @@ function formatDate(value?: string | null): string {
         day: '2-digit',
     }).format(timestamp)
 }
+
+function formatRelativeTime(value?: string | null): string {
+    const timestamp = parseDateValue(value)
+    if (!timestamp) return '时间未知'
+
+    const diffMs = Date.now() - timestamp
+    const minute = 60 * 1000
+    const hour = 60 * minute
+    const day = 24 * hour
+
+    if (diffMs < minute) return '刚刚'
+    if (diffMs < hour) return `${Math.floor(diffMs / minute)} 分钟前`
+    if (diffMs < day) return `${Math.floor(diffMs / hour)} 小时前`
+    if (diffMs < 7 * day) return `${Math.floor(diffMs / day)} 天前`
+    return formatDate(value)
+}
+
 function asOptionalString(value: unknown): string | null | undefined {
     return typeof value === 'string' || value == null ? value : undefined
 }
 
-function ProjectList({onOpenProject}: ProjectListProps) {
+function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
+    switch (type) {
+        case 'project':
+            return '世界'
+        case 'entry':
+            return '词条'
+        case 'tool':
+            return '工具'
+        case 'idea':
+            return '灵感'
+        case 'conversation':
+            return '对话'
+        case 'snapshot':
+            return '快照'
+        case 'help':
+            return '帮助'
+    }
+}
+
+function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(false)
     const [hasLoadedProjects, setHasLoadedProjects] = useState(false)
@@ -52,6 +96,7 @@ function ProjectList({onOpenProject}: ProjectListProps) {
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
 
     const loadProjects = useCallback(async () => {
         setLoading(true)
@@ -76,6 +121,16 @@ function ProjectList({onOpenProject}: ProjectListProps) {
         window.addEventListener('fc:project-list-changed', handler)
         return () => window.removeEventListener('fc:project-list-changed', handler)
     }, [loadProjects])
+
+    useEffect(() => {
+        const refreshDashboard = () => setDashboard(loadHomeDashboardData())
+        window.addEventListener(HOME_ACTIVITY_CHANGED_EVENT, refreshDashboard)
+        window.addEventListener('storage', refreshDashboard)
+        return () => {
+            window.removeEventListener(HOME_ACTIVITY_CHANGED_EVENT, refreshDashboard)
+            window.removeEventListener('storage', refreshDashboard)
+        }
+    }, [])
 
     const query = searchText.trim().toLowerCase()
     const filteredProjects = projects
@@ -104,6 +159,37 @@ function ProjectList({onOpenProject}: ProjectListProps) {
         })
     const projectCountLabel = hasLoadedProjects ? projects.length : '-'
     const filteredProjectCountLabel = hasLoadedProjects ? filteredProjects.length : '-'
+    const recentItems = useMemo(() => {
+        const continueItem = dashboard.continueItem
+        return dashboard.recentItems
+            .filter(item => !continueItem || item.type !== continueItem.type || item.id !== continueItem.id)
+            .slice(0, 5)
+    }, [dashboard.continueItem, dashboard.recentItems])
+
+    const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
+        if (target.type === 'project') {
+            const projectId = target.projectId ?? target.id
+            const project = projects.find(item => item.id === projectId)
+            if (project) {
+                onOpenProject?.(project)
+                return
+            }
+        }
+        onOpenHomeTarget?.(target)
+    }, [onOpenHomeTarget, onOpenProject, projects])
+
+    const renderRecentItem = (item: HomeActivityRecord) => (
+        <button
+            key={item.key}
+            type="button"
+            className="project-home-recent-item"
+            onClick={() => openDashboardTarget(item)}
+        >
+            <span className="project-home-recent-item__type">{getTargetTypeLabel(item.type)}</span>
+            <span className="project-home-recent-item__title">{item.title}</span>
+            <span className="project-home-recent-item__time">{formatRelativeTime(item.lastOpenedAt)}</span>
+        </button>
+    )
 
     return (
         <>
@@ -115,21 +201,86 @@ function ProjectList({onOpenProject}: ProjectListProps) {
             />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
+                    <section className="project-home-hero">
+                        <div className="project-home-hero__main">
+                            <div className="project-list-title-block fc-page-title-block">
+                                <h1 className="project-list-title fc-page-title">创作首页</h1>
+                                <p className="project-list-subtitle fc-page-subtitle">
+                                    回到正在构建的世界，继续整理角色、地点和灵感。
+                                </p>
+                            </div>
+                            <div className="project-home-continue-card">
+                                {dashboard.continueItem ? (
+                                    <>
+                                        <span className="project-home-eyebrow">继续创作</span>
+                                        <h2>{dashboard.continueItem.title}</h2>
+                                        <p>
+                                            {dashboard.continueItem.subtitle || getTargetTypeLabel(dashboard.continueItem.type)}
+                                            {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
+                                        </p>
+                                        <div className="project-home-continue-card__actions">
+                                            <Button type="button" onClick={() => openDashboardTarget(dashboard.continueItem!)}>
+                                                继续
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="project-home-eyebrow">开始创作</span>
+                                        <h2>给新的世界一个起点</h2>
+                                        <p>创建世界观后，最近编辑、上次打开和常用内容会出现在这里。</p>
+                                        <div className="project-home-continue-card__actions">
+                                            <Button type="button" onClick={() => setCreatorOpen(true)}>
+                                                开始一个新世界
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <aside className="project-home-side">
+                            <section className="project-home-panel">
+                                <h2>最近内容</h2>
+                                {recentItems.length > 0 ? (
+                                    <div className="project-home-recent-list">
+                                        {recentItems.map(renderRecentItem)}
+                                    </div>
+                                ) : (
+                                    <p className="project-home-muted">打开项目或词条后，会在这里保留回到现场的入口。</p>
+                                )}
+                            </section>
+                            <section className="project-home-panel">
+                                <h2>帮助</h2>
+                                <div className="project-home-help-list">
+                                    {dashboard.helpLinks.map(link => (
+                                        <button
+                                            key={link.key}
+                                            type="button"
+                                            className="project-home-help-item"
+                                            onClick={() => openDashboardTarget(link.target)}
+                                        >
+                                            <span>{link.title}</span>
+                                            <small>{link.description}</small>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        </aside>
+                    </section>
+
                     <div className="project-list-header fc-page-header">
                         <div className="project-list-title-block fc-page-title-block">
-                            <h1 className="project-list-title fc-page-title">项目</h1>
+                            <h2 className="project-list-section-title">我的世界</h2>
                             <p className="project-list-subtitle fc-page-subtitle">
-                                浏览你的世界观项目。
+                                你正在构建 {projectCountLabel} 个世界。
                             </p>
                         </div>
                         <div className="project-list-header-actions fc-page-header-actions">
-                            <Button type="button"
-                                size="sm"
-                                onClick={() => setCreatorOpen(true)}
-                            >
-                                新建世界观
+                            <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>
+                                开始一个新世界
                             </Button>
-                            <Button type="button"
+                            <Button
+                                type="button"
                                 className="project-list-refresh"
                                 variant="outline"
                                 size="sm"

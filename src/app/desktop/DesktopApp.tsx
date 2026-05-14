@@ -606,6 +606,51 @@ export default function DesktopApp() {
         }
     }, [aiController, aiPanelCollapsed, expandAiPanelToMinWidth])
 
+    const handleOpenHomeTarget = useCallback((target: HomeActivityTarget) => {
+        switch (target.type) {
+            case 'project':
+                handleOpenProject({
+                    id: target.projectId ?? target.id,
+                    name: target.title,
+                    description: target.description ?? null,
+                })
+                return
+            case 'entry':
+                if (!target.projectId || !target.entryId) return
+                handleOpenEntry(target.projectId, {
+                    id: target.entryId,
+                    title: target.title,
+                })
+                return
+            case 'tool':
+                if (!target.projectId || !target.panel) return
+                handleOpenProjectTool(target.panel, {
+                    id: target.projectId,
+                    name: target.subtitle || target.title,
+                })
+                return
+            case 'idea':
+                recordHomeActivity(target)
+                handleSideBarSelect('idea')
+                return
+            case 'conversation':
+                recordHomeActivity(target)
+                handleSideBarSelect('ai-chat')
+                return
+            case 'snapshot':
+                recordHomeActivity(target)
+                handleSideBarSelect('snapshot')
+                return
+            case 'help':
+                recordHomeActivity(target)
+                setSelectedKey('settings')
+                setActiveKey('')
+                setMainContentKey('settings')
+                collapseAiPanel()
+                return
+        }
+    }, [collapseAiPanel, handleOpenEntry, handleOpenProject, handleOpenProjectTool, handleSideBarSelect])
+
     const activeHomeProjectId = projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
     const activeEntryTitle = activeEntryMeta
@@ -932,7 +977,10 @@ export default function DesktopApp() {
                         <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
                             <div className="home-page-stack">
                                 <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
-                                    <ProjectList onOpenProject={handleOpenProject}/>
+                                    <ProjectList
+                                        onOpenProject={handleOpenProject}
+                                        onOpenHomeTarget={handleOpenHomeTarget}
+                                    />
                                 </div>
                                 {homeProjectIds.map(projectId => (
                                     <div
