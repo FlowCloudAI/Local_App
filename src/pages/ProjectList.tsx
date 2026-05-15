@@ -285,31 +285,34 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                 )}
                             </div>
                         </div>
-                        <aside className="project-home-side">
-                            <section className="project-home-panel">
-                                <h2>快速开始</h2>
-                                <div className="project-home-action-list">
-                                    {quickActions.map(action => (
-                                        <button
-                                            key={action.key}
-                                            type="button"
-                                            className="project-home-action-item"
-                                            onClick={() => {
-                                                if (action.onClick) {
-                                                    action.onClick()
-                                                    return
-                                                }
-                                                if (action.target) {
-                                                    openDashboardTarget(action.target)
-                                                }
-                                            }}
-                                        >
-                                            <span>{action.title}</span>
-                                            <small>{action.description}</small>
-                                        </button>
-                                    ))}
-                                </div>
-                            </section>
+                    </section>
+
+                    <section className="project-home-panel project-home-panel--quick">
+                        <h2>快速开始</h2>
+                        <div className="project-home-action-list">
+                            {quickActions.map(action => (
+                                <button
+                                    key={action.key}
+                                    type="button"
+                                    className="project-home-action-item"
+                                    onClick={() => {
+                                        if (action.onClick) {
+                                            action.onClick()
+                                            return
+                                        }
+                                        if (action.target) {
+                                            openDashboardTarget(action.target)
+                                        }
+                                    }}
+                                >
+                                    <span>{action.title}</span>
+                                    <small>{action.description}</small>
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    <div className="project-home-side">
                             <section className="project-home-panel">
                                 <h2>最近内容</h2>
                                 {recentItems.length > 0 ? (
@@ -336,8 +339,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     ))}
                                 </div>
                             </section>
-                        </aside>
-                    </section>
+                    </div>
 
                     <section className="project-home-workbench">
                         <div className="project-list-header fc-page-header">

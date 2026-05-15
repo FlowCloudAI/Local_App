@@ -29,20 +29,17 @@
 }
 
 .project-home-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-  gap: var(--fc-space-xl);
-  align-items: start;
   margin-bottom: var(--fc-space-xl);
-  padding-bottom: var(--fc-space-xl);
+  padding-bottom: var(--fc-space-lg);
   border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
 }
 
 .project-home-hero__main {
   min-width: 0;
   display: grid;
-  align-content: start;
-  gap: var(--fc-space-lg);
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
+  align-items: end;
+  gap: var(--fc-space-xl);
 }
 
 .project-home-continue-card,
@@ -55,7 +52,7 @@
 
 .project-home-continue-card {
   min-height: 0;
-  max-width: 42rem;
+  max-width: none;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -81,8 +78,8 @@
 }
 
 .project-home-continue-card h2 {
-  font-size: clamp(1.55rem, 2.3vw, 2.2rem);
-  line-height: 1.12;
+  font-size: clamp(1.25rem, 1rem + 0.75vw, 1.65rem);
+  line-height: 1.2;
 }
 
 .project-home-continue-card p,
@@ -101,9 +98,13 @@
 
 .project-home-side {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
-  gap: var(--fc-space-lg);
+  gap: var(--fc-space-xl);
   min-width: 0;
+  margin-bottom: var(--fc-space-xl);
+  padding-bottom: var(--fc-space-xl);
+  border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
 }
 
 .project-home-panel {
@@ -118,6 +119,16 @@
   border-bottom: none;
 }
 
+.project-home-panel--quick {
+  margin-bottom: var(--fc-space-xl);
+  padding-bottom: var(--fc-space-xl);
+}
+
+.project-home-side .project-home-panel {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .project-home-panel h2 {
   font-size: 1rem;
   line-height: 1.2;
@@ -128,6 +139,12 @@
 .project-home-help-list {
   display: grid;
   gap: var(--fc-space-xs);
+}
+
+.project-home-panel--quick .project-home-action-list,
+.project-home-help-list {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
 }
 
 .project-home-action-item,
@@ -154,7 +171,9 @@
 .project-home-action-item {
   display: grid;
   gap: 0.32rem;
-  padding: 0.8rem 0.9rem;
+  padding: 0.78rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+  background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
 }
 
 .project-home-action-item:hover,
@@ -200,7 +219,9 @@
 .project-home-help-item {
   display: grid;
   gap: 0.28rem;
-  padding: 0.78rem 0.85rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+  background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
 }
 
 .project-home-help-item span {
@@ -469,7 +490,8 @@
 }
 
 @media (max-width: 840px) {
-  .project-home-hero {
+  .project-home-hero__main,
+  .project-home-side {
     grid-template-columns: 1fr;
   }
 
