@@ -47,6 +47,7 @@
 }
 
 .project-home-continue-card {
+  width: 100%;
   min-height: 0;
   max-width: none;
   padding: 0.78rem 0.9rem;
@@ -57,6 +58,11 @@
   border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
   border-radius: var(--fc-radius-md);
   background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .project-home-eyebrow {
@@ -69,18 +75,19 @@
   font-weight: var(--fc-font-weight-semibold, 600);
 }
 
-.project-home-continue-card h3,
 .project-home-panel h2 {
   margin: 0;
   color: var(--fc-color-text);
 }
 
-.project-home-continue-card h3 {
+.project-home-continue-card__title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--fc-color-text);
   font-size: clamp(1.05rem, 0.96rem + 0.35vw, 1.25rem);
+  font-weight: var(--fc-font-weight-semibold, 600);
   line-height: 1.2;
 }
 
@@ -94,13 +101,18 @@
 .project-home-continue-card__topline {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--fc-space-md);
   min-width: 0;
 }
 
-.project-home-continue-card__topline button {
-  flex-shrink: 0;
+.project-home-continue-card:hover {
+  border-color: color-mix(in srgb, var(--fc-color-primary) 42%, var(--fc-color-border));
+  background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg));
+}
+
+.project-home-continue-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 60%, transparent);
+  outline-offset: 2px;
 }
 
 .project-home-side {

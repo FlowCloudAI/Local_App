@@ -261,15 +261,22 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
                     <section className="project-home-panel project-home-panel--quick">
                         <h2>快速开始</h2>
-                        <div className="project-home-continue-card">
+                        <button
+                            type="button"
+                            className="project-home-continue-card"
+                            onClick={() => {
+                                if (dashboard.continueItem) {
+                                    openDashboardTarget(dashboard.continueItem)
+                                    return
+                                }
+                                setCreatorOpen(true)
+                            }}
+                        >
                             {dashboard.continueItem ? (
                                 <>
                                     <span className="project-home-eyebrow">继续创作</span>
                                     <div className="project-home-continue-card__topline">
-                                        <h3>{dashboard.continueItem.title}</h3>
-                                        <Button type="button" size="sm" onClick={() => openDashboardTarget(dashboard.continueItem!)}>
-                                            继续
-                                        </Button>
+                                        <span className="project-home-continue-card__title">{dashboard.continueItem.title}</span>
                                     </div>
                                     <p>
                                         {dashboard.continueItem.subtitle || getTargetTypeLabel(dashboard.continueItem.type)}
@@ -280,15 +287,12 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                 <>
                                     <span className="project-home-eyebrow">开始创作</span>
                                     <div className="project-home-continue-card__topline">
-                                        <h3>给新的世界一个起点</h3>
-                                        <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>
-                                            开始一个新世界
-                                        </Button>
+                                        <span className="project-home-continue-card__title">给新的世界一个起点</span>
                                     </div>
                                     <p>创建世界观后，最近编辑、上次打开和常用内容会出现在这里。</p>
                                 </>
                             )}
-                        </div>
+                        </button>
                         <div className="project-home-action-list">
                             {quickActions.map(action => (
                                 <button
