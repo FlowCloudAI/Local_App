@@ -256,39 +256,39 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     回到正在构建的世界，继续整理角色、地点和灵感。
                                 </p>
                             </div>
-                            <div className="project-home-continue-card">
-                                {dashboard.continueItem ? (
-                                    <>
-                                        <span className="project-home-eyebrow">继续创作</span>
-                                        <h2>{dashboard.continueItem.title}</h2>
-                                        <p>
-                                            {dashboard.continueItem.subtitle || getTargetTypeLabel(dashboard.continueItem.type)}
-                                            {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
-                                        </p>
-                                        <div className="project-home-continue-card__actions">
-                                            <Button type="button" onClick={() => openDashboardTarget(dashboard.continueItem!)}>
-                                                继续
-                                            </Button>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="project-home-eyebrow">开始创作</span>
-                                        <h2>给新的世界一个起点</h2>
-                                        <p>创建世界观后，最近编辑、上次打开和常用内容会出现在这里。</p>
-                                        <div className="project-home-continue-card__actions">
-                                            <Button type="button" onClick={() => setCreatorOpen(true)}>
-                                                开始一个新世界
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
                         </div>
                     </section>
 
                     <section className="project-home-panel project-home-panel--quick">
                         <h2>快速开始</h2>
+                        <div className="project-home-continue-card">
+                            {dashboard.continueItem ? (
+                                <>
+                                    <span className="project-home-eyebrow">继续创作</span>
+                                    <div className="project-home-continue-card__topline">
+                                        <h3>{dashboard.continueItem.title}</h3>
+                                        <Button type="button" size="sm" onClick={() => openDashboardTarget(dashboard.continueItem!)}>
+                                            继续
+                                        </Button>
+                                    </div>
+                                    <p>
+                                        {dashboard.continueItem.subtitle || getTargetTypeLabel(dashboard.continueItem.type)}
+                                        {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="project-home-eyebrow">开始创作</span>
+                                    <div className="project-home-continue-card__topline">
+                                        <h3>给新的世界一个起点</h3>
+                                        <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>
+                                            开始一个新世界
+                                        </Button>
+                                    </div>
+                                    <p>创建世界观后，最近编辑、上次打开和常用内容会出现在这里。</p>
+                                </>
+                            )}
+                        </div>
                         <div className="project-home-action-list">
                             {quickActions.map(action => (
                                 <button
