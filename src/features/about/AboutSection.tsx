@@ -42,7 +42,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
     return (
         <>
             <section className="settings-section fc-section-card about-section">
-                <h2 className="settings-section-title fc-section-title">关于</h2>
+                <h2 className="settings-section-title fc-section-title">应用信息</h2>
                 <div className="settings-field">
                     <label className="settings-label-wide">当前版本</label>
                     <span className="about-section-value">{appVersion || '加载中…'}</span>

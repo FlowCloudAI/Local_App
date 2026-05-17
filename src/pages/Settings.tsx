@@ -59,7 +59,7 @@ import UploadPlugin from '../features/plugins/UploadPlugin'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
-type SettingsTab = 'system' | 'ai' | 'templates' | 'usage'
+type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
 
 type TemplateView = 'list' | 'detail'
 
@@ -961,6 +961,12 @@ export default function Settings({onBack}: SettingsProps) {
                         >
                             用量统计
                         </button>
+                        <button
+                            className={`settings-sidebar-item ${activeTab === 'about' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('about')}
+                        >
+                            关于
+                        </button>
                     </aside>
                     <div className="settings-content" style={{padding: '20px'}}>加载中...</div>
                 </div>
@@ -1055,6 +1061,12 @@ export default function Settings({onBack}: SettingsProps) {
                         onClick={() => setActiveTab('usage')}
                     >
                         用量统计
+                    </button>
+                    <button
+                        className={`settings-sidebar-item ${activeTab === 'about' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('about')}
+                    >
+                        关于
                     </button>
                 </aside>
                 <RollingBox axis="y" className="settings-scroll-area" thumbSize={'thin'}>
@@ -1254,12 +1266,22 @@ export default function Settings({onBack}: SettingsProps) {
                                 </div>
                             </section>
 
-                            <AboutSection configDir={configDir} onOpenDir={handleOpenDir}/>
-
                             {/* 操作按钮 */}
                             <div className="settings-footer">
                                 <Button type="button" variant="outline" onClick={handleReset}>重置为默认</Button>
                             </div>
+                        </div>
+                    )}
+                    {activeTab === 'about' && (
+                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+                            <div className="settings-title fc-page-header">
+                                <div className="fc-page-title-block">
+                                    <h1 className="fc-page-title">关于</h1>
+                                    <p className="fc-page-subtitle">查看应用版本、官方渠道和许可信息。</p>
+                                </div>
+                            </div>
+
+                            <AboutSection configDir={configDir} onOpenDir={handleOpenDir}/>
                         </div>
                     )}
                     {activeTab === 'ai' && (
