@@ -1015,8 +1015,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2.65rem;
-    height: 2.65rem;
+    width: 2.85rem;
+    height: 2.85rem;
     border-radius: var(--fc-radius-md);
     background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     color: var(--fc-color-primary);
@@ -1024,8 +1024,8 @@
 }
 
 .pe-feature-entry__icon svg {
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 1.55rem;
+    height: 1.55rem;
     overflow: visible;
 }
 
