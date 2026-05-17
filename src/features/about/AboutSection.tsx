@@ -127,7 +127,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             <section className="settings-section fc-section-card about-section-hero">
                 <div className="about-section-brand">
                     <div className="about-section-brand-mark" aria-hidden="true">
-                        FC
+                        <img className="about-section-brand-icon" src="/icon.svg" alt=""/>
                     </div>
                     <div className="about-section-brand-copy">
                         <div className="about-section-kicker">FlowCloudAI</div>
