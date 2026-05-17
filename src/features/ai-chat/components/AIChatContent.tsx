@@ -1,7 +1,9 @@
 import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
+    ai_export_conversation,
     ai_list_plugins,
     ai_play_tts,
     db_get_entry,
@@ -9,6 +11,7 @@ import {
     type Entry,
     type EntryBrief,
     type PluginInfo,
+    type ConversationExportFormat,
     setting_get_settings,
     setting_has_api_key,
 } from '../../../api'
@@ -72,6 +75,18 @@ function buildConversationSearchText(conversation: Conversation) {
         conversation.reportContext?.projectName,
         conversation.reportContext?.scopeSummary,
     ].filter(Boolean).join(' ').toLocaleLowerCase()
+}
+
+function buildConversationExportFileName(conversation: Conversation, format: ConversationExportFormat) {
+    const extension = format === 'json' ? 'json' : 'md'
+    const safeTitle = conversation.title
+        .split('')
+        .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80)
+    return `${safeTitle || 'AI会话'}.${extension}`
 }
 
 function buildAiChatEntryHref(link: InternalEntryLink): string {
@@ -144,6 +159,7 @@ export default function AIChatContent({
     const [conversationStatusFilter, setConversationStatusFilter] = useState<AiConversationStatusFilter>('active')
     const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
     const [conversationSearch, setConversationSearch] = useState('')
+    const [exportMenuConversationId, setExportMenuConversationId] = useState<string | null>(null)
     const renameInputRef = useRef<HTMLInputElement>(null)
 
     const startRename = (event: React.MouseEvent, conv: { id: string; title: string }) => {
@@ -551,6 +567,38 @@ export default function AIChatContent({
         inputWikiLink.handleMarkdownCursorSync(event.currentTarget)
     }
 
+    const handleExportConversation = useCallback(async (
+        event: React.MouseEvent,
+        conversation: Conversation,
+        format: ConversationExportFormat,
+    ) => {
+        event.stopPropagation()
+        setExportMenuConversationId(null)
+
+        if (conversation.id.startsWith('conv_')) {
+            await showAlert('这条会话尚未写入历史，发送消息后再导出。', 'warning', 'toast', 2200)
+            return
+        }
+
+        const isJson = format === 'json'
+        const selectedPath = await saveFileDialog({
+            defaultPath: buildConversationExportFileName(conversation, format),
+            filters: [{
+                name: isJson ? 'JSON' : 'Markdown',
+                extensions: [isJson ? 'json' : 'md'],
+            }],
+        })
+
+        if (!selectedPath) return
+
+        try {
+            await ai_export_conversation(conversation.id, selectedPath, format)
+            await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'toast', 1800)
+        } catch (error) {
+            await showAlert(`导出会话失败：${String(error)}`, 'error', 'toast', 2600)
+        }
+    }, [showAlert])
+
     const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
         const text = content.trim()
         if (!text) {
@@ -761,6 +809,7 @@ export default function AIChatContent({
                             conv.mode === 'character' ? '角色对话' : null,
                             conv.mode === 'report' ? '矛盾检测' : null,
                         ].filter(Boolean).join(' · ')
+                        const canExportConversation = !conv.id.startsWith('conv_')
                         return (
                         <div
                             key={conv.id}
@@ -843,6 +892,35 @@ export default function AIChatContent({
                                         <path d="M8.5 1.5a1.414 1.414 0 012 2L3.5 10.5l-3 .5.5-3 7.5-6.5z"/>
                                     </svg>
                                 </button>
+                                <div className="ai-conversation-export">
+                                    <button
+                                        className={`ai-conversation-action-btn ${exportMenuConversationId === conv.id ? 'active' : ''}`}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            if (!canExportConversation) return
+                                            setExportMenuConversationId((current) => current === conv.id ? null : conv.id)
+                                        }}
+                                        disabled={!canExportConversation}
+                                        title={canExportConversation ? '导出' : '发送消息后可导出'}
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                                             strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M6 1.5v6"/>
+                                            <path d="M3.7 5.2L6 7.5l2.3-2.3"/>
+                                            <path d="M2 8.5v1.8h8V8.5"/>
+                                        </svg>
+                                    </button>
+                                    {exportMenuConversationId === conv.id && (
+                                        <div className="ai-conversation-export-menu" onClick={(event) => event.stopPropagation()}>
+                                            <button onClick={(event) => void handleExportConversation(event, conv, 'markdown')}>
+                                                Markdown
+                                            </button>
+                                            <button onClick={(event) => void handleExportConversation(event, conv, 'json')}>
+                                                JSON
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <button
                                     className="ai-conversation-action-btn ai-conversation-action-btn--danger"
                                     onClick={(event) => void ctx.deleteConversation(conv.id, event)}

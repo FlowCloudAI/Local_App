@@ -311,9 +311,52 @@
     color: var(--fc-color-text);
 }
 
+.ai-conversation-action-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.ai-conversation-action-btn:disabled:hover {
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+}
+
 .ai-conversation-action-btn.active {
     color: var(--fc-color-primary);
     background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
+}
+
+.ai-conversation-export {
+    position: relative;
+}
+
+.ai-conversation-export-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 20;
+    min-width: 104px;
+    padding: 4px;
+    border: 1px solid var(--dock-panel-border-color);
+    border-radius: var(--dock-panel-control-radius);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-sm);
+}
+
+.ai-conversation-export-menu button {
+    width: 100%;
+    border: none;
+    border-radius: var(--dock-panel-control-radius);
+    background: transparent;
+    color: var(--fc-color-text);
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 5px 8px;
+    text-align: left;
+}
+
+.ai-conversation-export-menu button:hover {
+    background: var(--dock-panel-hover-bg);
 }
 
 .ai-conversation-action-btn--danger:hover {

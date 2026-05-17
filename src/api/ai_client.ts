@@ -347,6 +347,8 @@ export interface ConversationUiState {
     archivedAt?: string | null
 }
 
+export type ConversationExportFormat = 'markdown' | 'json'
+
 export interface ConversationNodeMessage {
   role: string
   content: string | null
@@ -454,6 +456,9 @@ export const ai_list_conversations = () =>
 
 export const ai_get_conversation = (id: string) =>
     command<StoredConversation | null>('ai_get_conversation', {id})
+
+export const ai_export_conversation = (id: string, path: string, format: ConversationExportFormat) =>
+    command<void>('ai_export_conversation', {id, path, format})
 
 export const ai_delete_conversation = (id: string) =>
     command<void>('ai_delete_conversation', {id})

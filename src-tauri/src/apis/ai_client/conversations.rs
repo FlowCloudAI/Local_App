@@ -19,6 +19,32 @@ pub async fn ai_get_conversation(
     Ok(client.ai_get_conversation(&id))
 }
 
+/// 导出指定对话到用户选择的文件路径。
+#[tauri::command]
+pub async fn ai_export_conversation(
+    ai_state: State<'_, AiState>,
+    id: String,
+    path: String,
+    format: String,
+) -> Result<(), String> {
+    let conversation = {
+        let client = ai_state.client.lock().await;
+        client
+            .ai_get_conversation(&id)
+            .ok_or_else(|| format!("未找到会话：{}", id))?
+    };
+
+    let content = match format.as_str() {
+        "json" => serde_json::to_string_pretty(&conversation)
+            .map_err(|e| format!("序列化会话 JSON 失败: {}", e))?,
+        "markdown" | "md" => render_conversation_markdown(&conversation)?,
+        other => return Err(format!("不支持的导出格式：{}", other)),
+    };
+
+    std::fs::write(&path, content)
+        .map_err(|e| format!("写入导出文件失败 {:?}: {}", path, e))
+}
+
 /// 删除指定对话文件
 #[tauri::command]
 pub async fn ai_delete_conversation(
@@ -136,4 +162,68 @@ pub fn ai_save_conversation_ui_state(
     }
     std::fs::rename(&temp_path, &path)
         .map_err(|e| format!("保存会话 UI 状态失败 {:?}: {}", path, e))
+}
+
+fn render_conversation_markdown(conversation: &StoredConversation) -> Result<String, String> {
+    let mut output = String::new();
+    output.push_str(&format!("# {}\n\n", conversation.meta.title));
+    output.push_str(&format!("- 会话 ID：{}\n", conversation.meta.id));
+    output.push_str(&format!("- 插件：{}\n", conversation.meta.plugin_id));
+    output.push_str(&format!("- 模型：{}\n", conversation.meta.model));
+    output.push_str(&format!("- 创建时间：{}\n", conversation.meta.created_at));
+    output.push_str(&format!("- 更新时间：{}\n\n", conversation.meta.updated_at));
+    output.push_str("## 消息\n\n");
+
+    for (index, message) in conversation.messages.iter().enumerate() {
+        output.push_str(&format!(
+            "### {}. {}\n\n",
+            index + 1,
+            message_role_label(&message.role)
+        ));
+        output.push_str(&format!("- 时间：{}\n", message.timestamp));
+        if let Some(node_id) = message.node_id {
+            output.push_str(&format!("- 节点：{}\n", node_id));
+        }
+        if let Some(turn_id) = message.turn_id {
+            output.push_str(&format!("- 轮次：{}\n", turn_id));
+        }
+        output.push('\n');
+
+        if let Some(content) = message.content.as_deref().filter(|content| !content.is_empty()) {
+            output.push_str(content);
+            output.push_str("\n\n");
+        } else {
+            output.push_str("（无正文）\n\n");
+        }
+
+        if let Some(reasoning) = message.reasoning.as_deref().filter(|reasoning| !reasoning.is_empty()) {
+            output.push_str("#### 推理过程\n\n");
+            output.push_str(reasoning);
+            output.push_str("\n\n");
+        }
+
+        if let Some(tool_call_id) = message.tool_call_id.as_deref().filter(|tool_call_id| !tool_call_id.is_empty()) {
+            output.push_str(&format!("#### 工具调用 ID\n\n{}\n\n", tool_call_id));
+        }
+
+        if let Some(tool_calls) = message.tool_calls.as_ref().filter(|tool_calls| !tool_calls.is_empty()) {
+            let json = serde_json::to_string_pretty(tool_calls)
+                .map_err(|e| format!("序列化工具调用失败: {}", e))?;
+            output.push_str("#### 工具调用\n\n```json\n");
+            output.push_str(&json);
+            output.push_str("\n```\n\n");
+        }
+    }
+
+    Ok(output)
+}
+
+fn message_role_label(role: &str) -> &str {
+    match role {
+        "user" => "用户",
+        "assistant" => "助手",
+        "system" => "系统",
+        "tool" => "工具",
+        _ => role,
+    }
 }
