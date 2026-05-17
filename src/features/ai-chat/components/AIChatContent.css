@@ -200,6 +200,14 @@
     border-color: color-mix(in srgb, var(--fc-color-warning, #d9822b) 46%, var(--fc-color-border));
 }
 
+.ai-conversation-item.is-pinned {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 28%, transparent);
+}
+
+.ai-conversation-item.is-archived {
+    opacity: 0.78;
+}
+
 .ai-conversation-unread-dot {
     width: 0.52rem;
     height: 0.52rem;
@@ -278,7 +286,9 @@
     transition: opacity 0.15s;
 }
 
-.ai-conversation-item:hover .ai-conversation-actions {
+.ai-conversation-item:hover .ai-conversation-actions,
+.ai-conversation-item.active .ai-conversation-actions,
+.ai-conversation-item.is-pinned .ai-conversation-actions {
     opacity: 1;
 }
 
@@ -299,6 +309,11 @@
 .ai-conversation-action-btn:hover {
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text);
+}
+
+.ai-conversation-action-btn.active {
+    color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
 }
 
 .ai-conversation-action-btn--danger:hover {
@@ -934,6 +949,31 @@
 .ai-floating-textarea:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.ai-archived-input-hint {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
+    padding-bottom: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: 0.78rem;
+}
+
+.ai-archived-input-hint button {
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--dock-panel-control-radius);
+    background: transparent;
+    color: var(--fc-color-primary);
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 0.2rem 0.5rem;
+    white-space: nowrap;
+}
+
+.ai-archived-input-hint button:hover {
+    background: var(--dock-panel-hover-bg);
 }
 
 .ai-input-limit-hint {

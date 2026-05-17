@@ -8,15 +8,18 @@ import {
     ai_enable_tool,
     ai_get_character_conversation_meta,
     ai_get_conversation,
+    ai_get_conversation_ui_state,
     ai_list_conversations,
     ai_list_plugins,
     ai_list_tools,
     ai_rename_conversation,
     ai_save_character_conversation_meta,
+    ai_save_conversation_ui_state,
     ai_set_task_context,
     ai_update_session,
     type AppSettings,
     type CharacterConversationMeta,
+    type ConversationUiState,
     db_get_entry,
     db_get_project,
     ENTRY_UPDATED,
@@ -167,6 +170,18 @@ function buildCharacterConversationMetaMap(conversations: Conversation[]): Recor
         }
     })
     return metadata
+}
+
+function buildConversationUiStateMap(conversations: Conversation[]): Record<string, ConversationUiState> {
+    const state: Record<string, ConversationUiState> = {}
+    conversations.forEach((conversation) => {
+        if (!conversation.pinnedAt && !conversation.archivedAt) return
+        state[conversation.id] = {
+            pinnedAt: conversation.pinnedAt ?? null,
+            archivedAt: conversation.archivedAt ?? null,
+        }
+    })
+    return state
 }
 
 const storedToMessages = (messages: StoredMessage[]): Message[] => {
@@ -747,11 +762,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         let mounted = true
         const init = async () => {
-            const [metas, fileMetaMap] = await Promise.all([
+            const [metas, fileMetaMap, uiStateMap] = await Promise.all([
                 ai_list_conversations().catch(
                     () => [] as Awaited<ReturnType<typeof ai_list_conversations>>,
                 ),
                 ai_get_character_conversation_meta().catch(() => ({} as Record<string, CharacterConversationMeta>)),
+                ai_get_conversation_ui_state().catch(() => ({} as Record<string, ConversationUiState>)),
             ])
             if (!mounted) return
 
@@ -760,7 +776,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     ...readStoredCharacterConversationMetaMap(),
                     ...normalizeStoredSpecialConversationMetaMap(fileMetaMap),
                 }
-                const convs: Conversation[] = metas.map((meta) => buildConversationFromMeta(meta, storedMetaMap))
+                const convs: Conversation[] = metas.map((meta) => (
+                    buildConversationFromMeta(meta, storedMetaMap, uiStateMap)
+                ))
 
                 setConversations(convs)
                 setActiveConversationId(null)
@@ -782,6 +800,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
         writeStoredCharacterConversationMetaMap(conversations)
         void ai_save_character_conversation_meta(buildCharacterConversationMetaMap(conversations)).catch((error) => {
             logger.warn('写入特殊会话元数据文件失败', error)
+        })
+        void ai_save_conversation_ui_state(buildConversationUiStateMap(conversations)).catch((error) => {
+            logger.warn('写入会话 UI 状态失败', error)
         })
     }, [conversationMetaLoaded, conversations])
 
@@ -834,6 +855,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             sessionId: null,
             runId: null,
             timestamp: Date.now(),
+            pinnedAt: null,
+            archivedAt: null,
             mode: 'report',
             characterEntryId: null,
             characterName: null,
@@ -884,6 +907,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             sessionId: created.sessionId,
             runId: created.runId,
             timestamp: Date.now(),
+            pinnedAt: null,
+            archivedAt: null,
             mode: 'character',
             characterEntryId: entryId,
             characterName: built.characterEntry.title,
@@ -988,12 +1013,38 @@ export function useAiController(focus: AiFocus): AiContextValue {
         await ai_rename_conversation(convId, trimmed).catch(logger.error)
     }, [])
 
+    const toggleConversationPinned = useCallback((convId: string, event?: MouseEvent) => {
+        event?.stopPropagation()
+        setConversations((prev) => prev.map((conversation) =>
+            conversation.id === convId
+                ? {...conversation, pinnedAt: conversation.pinnedAt ? null : new Date().toISOString()}
+                : conversation,
+        ))
+    }, [])
+
+    const toggleConversationArchived = useCallback((convId: string, event?: MouseEvent) => {
+        event?.stopPropagation()
+        const nextArchivedAt = conversationsRef.current.find((conversation) => conversation.id === convId)?.archivedAt
+            ? null
+            : new Date().toISOString()
+        setConversations((prev) => prev.map((conversation) =>
+            conversation.id === convId
+                ? {...conversation, archivedAt: nextArchivedAt}
+                : conversation,
+        ))
+        if (activeConversationIdRef.current === convId && nextArchivedAt) {
+            setInputValue('')
+            setEditingMessageId(null)
+        }
+    }, [])
+
     const sendMessage = useCallback(async (content: string) => {
         const trimmed = content.trim()
         if (!trimmed) return
 
         const traceId = createAiTraceId()
         const activeConv = activeConversationRef.current ?? null
+        if (activeConv?.archivedAt) return
         logger.log('[useAiController][发送链路] 用户触发发送', {
             traceId,
             activeConversationId: activeConv?.id ?? null,
@@ -1017,6 +1068,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             sessionId: null,
             runId: null,
             timestamp: Date.now(),
+            pinnedAt: null,
+            archivedAt: null,
             mode: 'default',
             characterEntryId: null,
             characterName: null,
@@ -1407,6 +1460,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         switchConversation,
         deleteConversation,
         renameConversation,
+        toggleConversationPinned,
+        toggleConversationArchived,
         activeConversation,
         getBranchInfo: session.getBranchInfo,
         switchBranch: session.switchBranch,
@@ -1416,7 +1471,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
-        renameConversation, startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
+        renameConversation, toggleConversationPinned, toggleConversationArchived,
+        startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
         selectConversation, session.getBranchInfo, session.switchBranch,
     ])
 }
@@ -1424,8 +1480,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
 function buildConversationFromMeta(
     meta: Awaited<ReturnType<typeof ai_list_conversations>>[number],
     storedMetaMap: Record<string, StoredCharacterConversationMeta>,
+    uiStateMap: Record<string, ConversationUiState>,
 ): Conversation {
     const storedMeta = storedMetaMap[meta.id]
+    const uiState = uiStateMap[meta.id]
     const isReport = storedMeta?.mode === 'report' || Boolean(storedMeta?.reportContext)
     const characterMeta = isReport ? null : (storedMeta ?? inferCharacterConversationMeta(meta.title))
     const isCharacter = Boolean(characterMeta)
@@ -1439,6 +1497,8 @@ function buildConversationFromMeta(
         sessionId: null,
         runId: null,
         timestamp: new Date(meta.updated_at).getTime(),
+        pinnedAt: uiState?.pinnedAt ?? null,
+        archivedAt: uiState?.archivedAt ?? null,
         mode: isReport ? 'report' : isCharacter ? 'character' : 'default',
         characterEntryId: characterMeta?.characterEntryId ?? null,
         characterName: characterMeta?.characterName ?? null,

@@ -101,6 +101,13 @@ pub struct CharacterConversationMeta {
     pub report_seeded: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationUiState {
+    pub pinned_at: Option<String>,
+    pub archived_at: Option<String>,
+}
+
 pub(super) fn character_conversation_meta_path(
     paths: &PathsState,
 ) -> Result<std::path::PathBuf, String> {
@@ -112,6 +119,19 @@ pub(super) fn character_conversation_meta_path(
         .join("chats")
         .join("metadata")
         .join("character_conversations.json"))
+}
+
+pub(super) fn conversation_ui_state_path(
+    paths: &PathsState,
+) -> Result<std::path::PathBuf, String> {
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
+    Ok(db_dir
+        .join("chats")
+        .join("metadata")
+        .join("conversation_ui_state.json"))
 }
 
 #[derive(Serialize, Clone)]

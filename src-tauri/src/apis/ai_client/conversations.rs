@@ -90,3 +90,50 @@ pub fn ai_save_character_conversation_meta(
     std::fs::rename(&temp_path, &path)
         .map_err(|e| format!("保存特殊对话元数据失败 {:?}: {}", path, e))
 }
+
+/// 读取通用会话 UI 状态。顶置、归档等展示状态独立于对话历史文件保存。
+#[tauri::command]
+pub fn ai_get_conversation_ui_state(
+    paths: State<'_, PathsState>,
+) -> Result<HashMap<String, ConversationUiState>, String> {
+    let path = conversation_ui_state_path(paths.inner())?;
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取会话 UI 状态失败 {:?}: {}", path, e))?;
+    serde_json::from_str::<HashMap<String, ConversationUiState>>(&content)
+        .map_err(|e| format!("解析会话 UI 状态失败 {:?}: {}", path, e))
+}
+
+/// 覆盖写入通用会话 UI 状态。
+#[tauri::command]
+pub fn ai_save_conversation_ui_state(
+    paths: State<'_, PathsState>,
+    state: HashMap<String, ConversationUiState>,
+) -> Result<(), String> {
+    let path = conversation_ui_state_path(paths.inner())?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("创建会话 UI 状态目录失败 {:?}: {}", parent, e))?;
+    }
+
+    let json = serde_json::to_string_pretty(&state)
+        .map_err(|e| format!("序列化会话 UI 状态失败: {}", e))?;
+    let temp_path = path.with_extension("json.tmp");
+    {
+        let mut file = std::fs::File::create(&temp_path)
+            .map_err(|e| format!("创建会话 UI 状态临时文件失败 {:?}: {}", temp_path, e))?;
+        file.write_all(json.as_bytes())
+            .map_err(|e| format!("写入会话 UI 状态失败 {:?}: {}", temp_path, e))?;
+        file.flush()
+            .map_err(|e| format!("刷新会话 UI 状态失败 {:?}: {}", temp_path, e))?;
+    }
+    if path.exists() {
+        std::fs::remove_file(&path)
+            .map_err(|e| format!("移除旧会话 UI 状态失败 {:?}: {}", path, e))?;
+    }
+    std::fs::rename(&temp_path, &path)
+        .map_err(|e| format!("保存会话 UI 状态失败 {:?}: {}", path, e))
+}

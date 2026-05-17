@@ -199,15 +199,6 @@ export interface AiEventError {
   error: string
 }
 
-export const AI_EVENT_READY = 'ai:ready'
-export const AI_EVENT_DELTA = 'ai:delta'
-export const AI_EVENT_REASONING = 'ai:reasoning'
-export const AI_EVENT_TURN_BEGIN = 'ai:turn_begin'
-export const AI_EVENT_TOOL_CALL = 'ai:tool_call'
-export const AI_EVENT_TOOL_RESULT = 'ai:tool_result'
-export const AI_EVENT_TURN_END = 'ai:turn_end'
-export const AI_EVENT_ERROR = 'ai:error'
-
 export interface ToolStatus {
     name: string
     enabled: boolean
@@ -351,6 +342,11 @@ export interface CharacterConversationMeta {
     reportSeeded?: boolean | null
 }
 
+export interface ConversationUiState {
+    pinnedAt?: string | null
+    archivedAt?: string | null
+}
+
 export interface ConversationNodeMessage {
   role: string
   content: string | null
@@ -470,6 +466,12 @@ export const ai_get_character_conversation_meta = () =>
 
 export const ai_save_character_conversation_meta = (metadata: Record<string, CharacterConversationMeta>) =>
     command<void>('ai_save_character_conversation_meta', {metadata})
+
+export const ai_get_conversation_ui_state = () =>
+    command<Record<string, ConversationUiState>>('ai_get_conversation_ui_state')
+
+export const ai_save_conversation_ui_state = (state: Record<string, ConversationUiState>) =>
+    command<void>('ai_save_conversation_ui_state', {state})
 
 // ── 编辑确认 ──────────────────────────────────────────────────────────────────
 

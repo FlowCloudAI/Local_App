@@ -36,6 +36,7 @@ const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
+type AiConversationStatusFilter = 'active' | 'archived'
 
 const AI_CONVERSATION_FILTER_OPTIONS: Array<{ key: AiConversationFilter; label: string }> = [
     {key: 'all', label: '全部'},
@@ -44,12 +45,24 @@ const AI_CONVERSATION_FILTER_OPTIONS: Array<{ key: AiConversationFilter; label: 
     {key: 'report', label: '矛盾检测'},
 ]
 
+const AI_CONVERSATION_STATUS_OPTIONS: Array<{ key: AiConversationStatusFilter; label: string }> = [
+    {key: 'active', label: '当前'},
+    {key: 'archived', label: '归档'},
+]
+
 function matchesConversationFilter(conversation: Conversation, filter: AiConversationFilter) {
     if (filter === 'all') return true
     if (filter === 'default') return !conversation.mode || conversation.mode === 'default'
     if (filter === 'character') return conversation.mode === 'character'
     if (filter === 'report') return conversation.mode === 'report'
     return false
+}
+
+function compareConversationsForList(a: Conversation, b: Conversation) {
+    const pinnedDiff = Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt))
+    if (pinnedDiff !== 0) return pinnedDiff
+    if (a.pinnedAt && b.pinnedAt) return b.pinnedAt.localeCompare(a.pinnedAt)
+    return b.timestamp - a.timestamp
 }
 
 function buildConversationSearchText(conversation: Conversation) {
@@ -123,10 +136,12 @@ export default function AIChatContent({
     const activeConversation = ctx.activeConversation
     const isCharacterConversation = activeConversation?.mode === 'character'
     const isReportConversation = activeConversation?.mode === 'report'
+    const isArchivedConversation = Boolean(activeConversation?.archivedAt)
     const {showAlert} = useAlert()
 
     const [renamingId, setRenamingId] = useState<string | null>(null)
     const [renameValue, setRenameValue] = useState('')
+    const [conversationStatusFilter, setConversationStatusFilter] = useState<AiConversationStatusFilter>('active')
     const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
     const [conversationSearch, setConversationSearch] = useState('')
     const renameInputRef = useRef<HTMLInputElement>(null)
@@ -203,11 +218,13 @@ export default function AIChatContent({
         const keyword = conversationSearch.trim().toLocaleLowerCase()
 
         return ctx.conversations.filter((conversation) => {
+            if (conversationStatusFilter === 'active' && conversation.archivedAt) return false
+            if (conversationStatusFilter === 'archived' && !conversation.archivedAt) return false
             if (!matchesConversationFilter(conversation, conversationFilter)) return false
             if (!keyword) return true
             return buildConversationSearchText(conversation).includes(keyword)
-        })
-    }, [conversationFilter, conversationSearch, ctx.conversations])
+        }).sort(compareConversationsForList)
+    }, [conversationFilter, conversationSearch, conversationStatusFilter, ctx.conversations])
     const hasConversationSearch = conversationSearch.trim().length > 0
     const focusContextItems = useMemo(() => {
         const focusContext = ctx.focusContext
@@ -296,11 +313,13 @@ export default function AIChatContent({
         },
         canCreateEntry: false,
     })
-    const sendDisabledReason = ctx.isStreaming
-        ? '正在生成中'
-        : !ctx.inputValue.trim()
-            ? '请输入消息'
-            : ''
+    const sendDisabledReason = isArchivedConversation
+        ? '取消归档后继续对话'
+        : ctx.isStreaming
+            ? '正在生成中'
+            : !ctx.inputValue.trim()
+                ? '请输入消息'
+                : ''
 
     useLayoutEffect(() => {
         if (!showFocusContext) {
@@ -486,10 +505,10 @@ export default function AIChatContent({
 
     const handleSendCurrentInput = useCallback(async () => {
         const rawInput = ctx.inputValue
-        if (!rawInput.trim() || ctx.isStreaming) return
+        if (isArchivedConversation || !rawInput.trim() || ctx.isStreaming) return
         const nextInput = await standardizeInputWikiLinks(rawInput)
         await ctx.sendMessage(nextInput)
-    }, [ctx, standardizeInputWikiLinks])
+    }, [ctx, isArchivedConversation, standardizeInputWikiLinks])
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         inputWikiLink.handleWikiKeyDown(event)
@@ -507,7 +526,7 @@ export default function AIChatContent({
 
         if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
             event.preventDefault()
-            if (!ctx.inputValue.trim() || ctx.isStreaming) return
+            if (isArchivedConversation || !ctx.inputValue.trim() || ctx.isStreaming) return
             void handleSendCurrentInput()
         }
     }
@@ -686,6 +705,15 @@ export default function AIChatContent({
                     </div>
                     <div className="ai-sidebar-controls dock-panel-sidebar-controls">
                         <div className="dock-panel-control-group">
+                            <span className="dock-panel-control-label">状态</span>
+                            <DockPanelSegmentedControl
+                                options={AI_CONVERSATION_STATUS_OPTIONS}
+                                value={conversationStatusFilter}
+                                onChange={setConversationStatusFilter}
+                                ariaLabel="AI 对话状态"
+                            />
+                        </div>
+                        <div className="dock-panel-control-group">
                             <span className="dock-panel-control-label">类型</span>
                             <DockPanelSegmentedControl
                                 options={AI_CONVERSATION_FILTER_OPTIONS}
@@ -716,17 +744,27 @@ export default function AIChatContent({
                     )}
                     {ctx.conversations.length > 0 && filteredConversations.length === 0 && (
                         <div className="ai-empty-history">
-                            <p>{hasConversationSearch ? '没有匹配的对话' : '当前类型下没有对话'}</p>
+                            <p>{hasConversationSearch
+                                ? '没有匹配的对话'
+                                : conversationStatusFilter === 'archived'
+                                    ? '暂无归档对话'
+                                    : '当前类型下没有对话'}</p>
                         </div>
                     )}
                     {filteredConversations.map((conv) => {
                         const runtime = ctx.conversationRuntime[conv.id]
                         const isConversationStreaming = Boolean(runtime?.isStreaming)
                         const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
+                        const conversationTags = [
+                            conv.pinnedAt ? '已顶置' : null,
+                            conv.archivedAt ? '已归档' : null,
+                            conv.mode === 'character' ? '角色对话' : null,
+                            conv.mode === 'report' ? '矛盾检测' : null,
+                        ].filter(Boolean).join(' · ')
                         return (
                         <div
                             key={conv.id}
-                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
+                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}${conv.pinnedAt ? ' is-pinned' : ''}${conv.archivedAt ? ' is-archived' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
                             onClick={() => renamingId !== conv.id && void ctx.switchConversation(conv.id)}
                         >
                             {!isConversationStreaming && hasUnreadReply && (
@@ -765,16 +803,36 @@ export default function AIChatContent({
                                 ) : (
                                     <>
                                         <div className="ai-conversation-title" title={conv.title}>{conv.title}</div>
-                                        {conv.mode === 'character' && (
-                                            <div className="ai-conversation-subtitle">角色对话</div>
-                                        )}
-                                        {conv.mode === 'report' && (
-                                            <div className="ai-conversation-subtitle">矛盾检测</div>
+                                        {conversationTags && (
+                                            <div className="ai-conversation-subtitle">{conversationTags}</div>
                                         )}
                                     </>
                                 )}
                             </div>
                             <div className="ai-conversation-actions">
+                                <button
+                                    className={`ai-conversation-action-btn ${conv.pinnedAt ? 'active' : ''}`}
+                                    onClick={(event) => ctx.toggleConversationPinned(conv.id, event)}
+                                    title={conv.pinnedAt ? '取消顶置' : '顶置'}
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                                         strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M4.2 1.5h3.6l-.6 3.1 2.1 2H2.7l2.1-2-.6-3.1z"/>
+                                        <path d="M6 6.6v3.9"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    className={`ai-conversation-action-btn ${conv.archivedAt ? 'active' : ''}`}
+                                    onClick={(event) => ctx.toggleConversationArchived(conv.id, event)}
+                                    title={conv.archivedAt ? '取消归档' : '归档'}
+                                >
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                                         strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M2 3.5h8v6H2z"/>
+                                        <path d="M1.5 2h9v1.5h-9z"/>
+                                        <path d="M4.5 6h3"/>
+                                    </svg>
+                                </button>
                                 <button
                                     className="ai-conversation-action-btn"
                                     onClick={(event) => startRename(event, conv)}
@@ -1049,6 +1107,17 @@ export default function AIChatContent({
                                 </button>
                             </div>
                         )}
+                        {isArchivedConversation && activeConversation && (
+                            <div className="ai-archived-input-hint" role="status">
+                                <span>会话已归档，取消归档后可继续对话。</span>
+                                <button
+                                    type="button"
+                                    onClick={(event) => ctx.toggleConversationArchived(activeConversation.id, event)}
+                                >
+                                    取消归档
+                                </button>
+                            </div>
+                        )}
                         <textarea
                             ref={textareaRef}
                             className="ai-floating-textarea"
@@ -1060,7 +1129,8 @@ export default function AIChatContent({
                             onSelect={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
                             onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
                             onBlur={() => inputWikiLink.handleTextareaBlur()}
-                            placeholder={'请输入消息...'}
+                            disabled={isArchivedConversation}
+                            placeholder={isArchivedConversation ? '取消归档后继续对话' : '请输入消息...'}
                         />
                         {inputLimitMessage && (
                             <div className="ai-input-limit-hint" role="status">
@@ -1187,7 +1257,7 @@ export default function AIChatContent({
                                             if (!ctx.inputValue.trim()) return
                                             void handleSendCurrentInput()
                                         }}
-                                        disabled={!ctx.inputValue.trim()}
+                                        disabled={Boolean(sendDisabledReason)}
                                         title={sendDisabledReason || '发送'}
                                     >
                                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none"

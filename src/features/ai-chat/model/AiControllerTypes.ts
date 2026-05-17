@@ -39,6 +39,8 @@ export interface Conversation {
     sessionId: string | null
     runId: string | null
     timestamp: number
+    pinnedAt?: string | null
+    archivedAt?: string | null
     mode?: 'default' | 'character' | 'report'
     characterEntryId?: string | null
     characterName?: string | null
@@ -123,6 +125,8 @@ export interface AiContextValue {
     switchConversation: (convId: string) => Promise<void>
     deleteConversation: (convId: string, e?: React.MouseEvent) => Promise<void>
     renameConversation: (convId: string, title: string) => Promise<void>
+    toggleConversationPinned: (convId: string, e?: React.MouseEvent) => void
+    toggleConversationArchived: (convId: string, e?: React.MouseEvent) => void
     activeConversation: Conversation | undefined
     getBranchInfo: (nodeId: number) => { branchIndex: number; branchTotal: number } | null
     switchBranch: (nodeId: number, direction: 'prev' | 'next') => Promise<boolean>

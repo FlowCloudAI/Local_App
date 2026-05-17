@@ -426,6 +426,8 @@ pub fn run() {
             ai_rename_conversation,
             ai_get_character_conversation_meta,
             ai_save_character_conversation_meta,
+            ai_get_conversation_ui_state,
+            ai_save_conversation_ui_state,
             confirm_entry_edit,
             ai_set_task_context,
             ai_get_usage_summary,
