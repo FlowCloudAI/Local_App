@@ -10,6 +10,7 @@ import './AboutSection.css'
 const OFFICIAL_SITE_URL = 'https://www.flowcloudai.cn'
 const OFFICIAL_GITHUB_URL = 'https://github.com/FlowCloudAI/Local_App'
 const OFFICIAL_EMAIL = 'flowcloudai@163.com'
+const RELEASE_DATE = '2026-05-17'
 
 interface AboutSectionProps {
     configDir: string
@@ -141,6 +142,10 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                     <div className="about-section-meta-item">
                         <span className="about-section-meta-label">当前版本</span>
                         <span className="about-section-meta-value">{appVersion || '加载中…'}</span>
+                    </div>
+                    <div className="about-section-meta-item">
+                        <span className="about-section-meta-label">发布日期</span>
+                        <span className="about-section-meta-value">{RELEASE_DATE}</span>
                     </div>
                     <div className="about-section-meta-item">
                         <span className="about-section-meta-label">开源协议</span>

@@ -58,9 +58,9 @@
 
 .about-section-meta {
     display: grid;
-    grid-template-columns: repeat(2, minmax(7.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
     gap: 0.75rem;
-    min-width: min(100%, 18rem);
+    min-width: min(100%, 26rem);
 }
 
 .about-section-meta-item {
