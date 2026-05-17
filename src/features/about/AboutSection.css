@@ -102,20 +102,13 @@
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 72%, transparent);
     padding: 0.9rem;
     color: var(--fc-color-text);
-    cursor: pointer;
     text-align: left;
-    transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .about-section-channel:hover {
     border-color: color-mix(in srgb, var(--about-section-channel-color) 44%, var(--fc-color-border));
     background: color-mix(in srgb, var(--about-section-channel-color) 7%, var(--fc-color-bg-elevated));
-    transform: translateY(-1px);
-}
-
-.about-section-channel:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--about-section-channel-color) 70%, transparent);
-    outline-offset: 2px;
 }
 
 .about-section-channel--site {
@@ -173,6 +166,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.22rem;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -199,6 +193,10 @@
 
 .about-section-channel--github .about-section-channel-value {
     color: var(--fc-color-primary);
+}
+
+.about-section-channel-action {
+    flex: 0 0 auto;
 }
 
 .about-section-actions {
@@ -263,5 +261,14 @@
     .about-section-action-row {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .about-section-channel {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .about-section-channel-action {
+        margin-left: 3.55rem;
     }
 }

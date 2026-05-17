@@ -1,14 +1,14 @@
 import {useCallback, useEffect, useState, type ReactNode} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
 import {openUrl} from '@tauri-apps/plugin-opener'
-import {Button} from 'flowcloudai-ui'
+import {Button, useAlert} from 'flowcloudai-ui'
 import {logger} from '../../shared/logger'
 import LicenseModal from './LicenseModal'
 import githubInvertocat from './assets/github-invertocat.png'
 import './AboutSection.css'
 
 const OFFICIAL_SITE_URL = 'https://www.flowcloudai.cn'
-const OFFICIAL_GITHUB_URL = 'https://github.com/FlowCloudAI'
+const OFFICIAL_GITHUB_URL = 'https://github.com/FlowCloudAI/Local_App'
 const OFFICIAL_EMAIL = 'flowcloudai@163.com'
 
 interface AboutSectionProps {
@@ -21,7 +21,8 @@ interface OfficialLink {
     label: string
     value: string
     description: string
-    url: string
+    action: 'open' | 'copy'
+    url?: string
     icon: ReactNode
     tone: 'site' | 'github' | 'mail'
 }
@@ -48,6 +49,7 @@ function MailIcon() {
 }
 
 export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) {
+    const {showAlert} = useAlert()
     const [appVersion, setAppVersion] = useState<string>('')
     const [licenseModalOpen, setLicenseModalOpen] = useState(false)
 
@@ -71,12 +73,23 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
         void openUrl(url).catch(logger.error)
     }, [])
 
+    const handleCopyEmail = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(OFFICIAL_EMAIL)
+            void showAlert('邮箱已复制', 'success', 'toast', 1600)
+        } catch (error) {
+            logger.error('复制官方邮箱失败:', error)
+            void showAlert(`复制邮箱失败：${String(error)}`, 'error', 'toast', 2200)
+        }
+    }, [showAlert])
+
     const officialLinks: OfficialLink[] = [
         {
             id: 'site',
             label: '官网',
             value: OFFICIAL_SITE_URL,
             description: '产品主页与发布信息',
+            action: 'open',
             url: OFFICIAL_SITE_URL,
             icon: <WebsiteIcon/>,
             tone: 'site',
@@ -85,7 +98,8 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             id: 'github',
             label: '官方 GitHub',
             value: OFFICIAL_GITHUB_URL,
-            description: '组织主页与开源项目',
+            description: '桌面应用源码仓库',
+            action: 'open',
             url: OFFICIAL_GITHUB_URL,
             icon: (
                 <img
@@ -102,7 +116,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             label: '官方邮箱',
             value: OFFICIAL_EMAIL,
             description: '反馈、合作与支持联系',
-            url: `mailto:${OFFICIAL_EMAIL}`,
+            action: 'copy',
             icon: <MailIcon/>,
             tone: 'mail',
         },
@@ -137,11 +151,9 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
 
             <section className="settings-section about-section-channel-grid" aria-label="官方渠道">
                 {officialLinks.map(link => (
-                    <button
+                    <div
                         key={link.id}
-                        type="button"
                         className={`about-section-channel about-section-channel--${link.tone}`}
-                        onClick={() => handleOpenUrl(link.url)}
                     >
                         <span className="about-section-channel-icon">{link.icon}</span>
                         <span className="about-section-channel-copy">
@@ -149,7 +161,24 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                             <span className="about-section-channel-description">{link.description}</span>
                             <span className="about-section-channel-value">{link.value}</span>
                         </span>
-                    </button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="about-section-channel-action"
+                            onClick={() => {
+                                if (link.action === 'copy') {
+                                    void handleCopyEmail()
+                                    return
+                                }
+                                if (link.url) {
+                                    handleOpenUrl(link.url)
+                                }
+                            }}
+                        >
+                            {link.action === 'copy' ? '复制' : '打开'}
+                        </Button>
+                    </div>
                 ))}
             </section>
 
