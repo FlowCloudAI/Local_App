@@ -69,6 +69,8 @@ interface ProjectOverviewProps {
     onEditCover?: () => void
     onClearCover?: () => void
     coverUpdating?: boolean
+    onExport?: () => void | Promise<void>
+    exporting?: boolean
     onDelete?: () => void | Promise<void>
     onDescriptionChange?: (description: string) => void | Promise<void>
     children?: ReactNode
@@ -308,6 +310,8 @@ function ProjectOverview({
                              onEditCover,
                              onClearCover,
                              coverUpdating = false,
+                             onExport,
+                             exporting = false,
                              onDelete,
                              onDescriptionChange,
                              children,
@@ -448,6 +452,19 @@ function ProjectOverview({
                             <StatCard label="图片数" value={imageCount ?? '--'}/>
                             <StatCard label="总字数" value={wordCount ?? '--'}/>
                         </div>
+                        {onExport && (
+                            <div className="pe-overview-action-row">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => void onExport()}
+                                    disabled={exporting}
+                                >
+                                    {exporting ? '导出中…' : '导出世界'}
+                                </Button>
+                            </div>
+                        )}
                         {onDelete && (
                             <div className="pe-overview-danger-row">
                                 <Button type="button" variant="ghost" size="sm" onClick={() => void handleDelete()}>

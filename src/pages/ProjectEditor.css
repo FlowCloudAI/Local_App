@@ -451,6 +451,14 @@
     gap: var(--fc-space-xs);
 }
 
+.pe-overview-action-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-sm);
+    margin-top: var(--fc-space-lg);
+    flex-wrap: wrap;
+}
+
 .pe-overview-danger-row {
     margin-top: var(--fc-space-lg);
     padding-top: var(--fc-space-md);

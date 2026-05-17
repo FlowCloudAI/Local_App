@@ -36,6 +36,7 @@ use apis::webview_control::*;
 use apis::worldflow::categories::*;
 use apis::worldflow::entries::*;
 use apis::worldflow::entry_types::*;
+use apis::worldflow::fcworld::*;
 use apis::worldflow::ideas::*;
 use apis::worldflow::images::*;
 use apis::worldflow::links::*;
@@ -336,6 +337,7 @@ pub fn run() {
             db_list_projects,
             db_update_project,
             db_delete_project,
+            db_export_project_fcworld,
             // 分类
             db_create_category,
             db_get_category,

@@ -10,6 +10,7 @@ import {
     useAlert
 } from 'flowcloudai-ui'
 import {listen} from '@tauri-apps/api/event'
+import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {
     type Category,
     CATEGORY_CREATED,
@@ -24,6 +25,7 @@ import {
     db_delete_entry,
     db_delete_project,
     db_ensure_project_cover_thumbnails,
+    db_export_project_fcworld,
     db_get_entry,
     db_get_project,
     db_get_project_stats,
@@ -108,6 +110,17 @@ const PROJECT_PANEL_LABELS: Record<ProjectPanel, string> = {
     'world-map': '世界地图',
 }
 
+function buildProjectExportFileName(projectName: string): string {
+    const safeName = projectName
+        .split('')
+        .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80)
+    return `${safeName || '世界观'}.fcworld`
+}
+
 function getCategoryCacheKey(categoryId: string | null): string {
     return categoryId ?? ALL_ENTRIES_CACHE_KEY
 }
@@ -175,6 +188,7 @@ function ProjectEditorInner({
     const [editingEntryType, setEditingEntryType] = useState<CustomEntryType | null>(null)
     const [coverPickerOpen, setCoverPickerOpen] = useState(false)
     const [coverUpdating, setCoverUpdating] = useState(false)
+    const [exporting, setExporting] = useState(false)
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
@@ -474,6 +488,35 @@ function ProjectEditorInner({
             setCoverUpdating(false)
         }
     }, [projectId, showAlert, touchProjectUpdatedAt])
+
+    const handleExportProject = useCallback(async () => {
+        if (!project || exporting) return
+
+        const selectedPath = await saveFileDialog({
+            defaultPath: buildProjectExportFileName(project.name),
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath) return
+
+        setExporting(true)
+        try {
+            const result = await db_export_project_fcworld(projectId, selectedPath)
+            const warningText = result.warnings.length > 0 ? `，${result.warnings.length} 条警告` : ''
+            await showAlert(
+                `世界已导出：${result.assetCount} 个资源，${result.mapCount} 张地图${warningText}。`,
+                'success',
+                'nonInvasive',
+                1400,
+            )
+        } catch (error) {
+            await showAlert(`导出世界失败：${String(error)}`, 'error', 'toast', 3200)
+        } finally {
+            setExporting(false)
+        }
+    }, [exporting, project, projectId, showAlert])
 
     const handleCreate = async (parentKey: string | null): Promise<string> => {
         const actualParentId = (!parentKey || parentKey === ROOT_ID) ? null : parentKey
@@ -970,6 +1013,8 @@ function ProjectEditorInner({
                                 })()
                             }}
                             coverUpdating={coverUpdating}
+                            onExport={handleExportProject}
+                            exporting={exporting}
                             onDescriptionChange={async (description) => {
                                 const updated = await db_update_project({id: projectId, description})
                                 setProject((current) => current ? {...current, description: updated.description} : current)

@@ -90,6 +90,16 @@ export interface CoverThumbnailMigrationSummary {
     failed: number
 }
 
+export interface FcworldExportResult {
+    outputPath: string
+    packageId: string
+    projectId: string
+    assetCount: number
+    mapCount: number
+    fileSize: number
+    warnings: string[]
+}
+
 export interface ProjectTimelineData {
     events: ProjectTimelineEvent[]
     yearStart?: number | null
@@ -320,6 +330,9 @@ export const db_update_project = (input: UpdateProjectInput) => {
 
 export const db_delete_project = (id: string) =>
     command<void>('db_delete_project', {id})
+
+export const db_export_project_fcworld = (projectId: string, outputPath: string) =>
+    command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath})
 
 export const db_create_category = ({
                                        projectId,
