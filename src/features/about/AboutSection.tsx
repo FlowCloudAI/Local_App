@@ -1,9 +1,10 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useState, type ReactNode} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
 import {openUrl} from '@tauri-apps/plugin-opener'
 import {Button} from 'flowcloudai-ui'
 import {logger} from '../../shared/logger'
 import LicenseModal from './LicenseModal'
+import githubInvertocat from './assets/github-invertocat.png'
 import './AboutSection.css'
 
 const OFFICIAL_SITE_URL = 'https://www.flowcloudai.cn'
@@ -13,6 +14,37 @@ const OFFICIAL_EMAIL = 'flowcloudai@163.com'
 interface AboutSectionProps {
     configDir: string
     onOpenDir: (path: string) => void
+}
+
+interface OfficialLink {
+    id: string
+    label: string
+    value: string
+    description: string
+    url: string
+    icon: ReactNode
+    tone: 'site' | 'github' | 'mail'
+}
+
+function WebsiteIcon() {
+    return (
+        <svg className="about-section-svg-icon" viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="16" cy="16" r="10.5"/>
+            <path d="M5.5 16h21M16 5.5c3 3.2 4.5 6.7 4.5 10.5S19 23.3 16 26.5M16 5.5c-3 3.2-4.5 6.7-4.5 10.5s1.5 7.3 4.5 10.5"/>
+            <path d="M8.4 9.2c2 .9 4.5 1.4 7.6 1.4s5.6-.5 7.6-1.4M8.4 22.8c2-.9 4.5-1.4 7.6-1.4s5.6.5 7.6 1.4"/>
+            <circle className="about-section-svg-node" cx="24" cy="8" r="2.2"/>
+            <circle className="about-section-svg-node" cx="7" cy="20.5" r="2"/>
+        </svg>
+    )
+}
+
+function MailIcon() {
+    return (
+        <svg className="about-section-svg-icon" viewBox="0 0 32 32" aria-hidden="true">
+            <rect x="5" y="8" width="22" height="16" rx="3"/>
+            <path d="M7 10.5l9 7 9-7M7.5 22l7-6M24.5 22l-7-6"/>
+        </svg>
+    )
 }
 
 export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) {
@@ -39,56 +71,106 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
         void openUrl(url).catch(logger.error)
     }, [])
 
+    const officialLinks: OfficialLink[] = [
+        {
+            id: 'site',
+            label: '官网',
+            value: OFFICIAL_SITE_URL,
+            description: '产品主页与发布信息',
+            url: OFFICIAL_SITE_URL,
+            icon: <WebsiteIcon/>,
+            tone: 'site',
+        },
+        {
+            id: 'github',
+            label: '官方 GitHub',
+            value: OFFICIAL_GITHUB_URL,
+            description: '组织主页与开源项目',
+            url: OFFICIAL_GITHUB_URL,
+            icon: (
+                <img
+                    className="about-section-github-mark"
+                    src={githubInvertocat}
+                    alt=""
+                    aria-hidden="true"
+                />
+            ),
+            tone: 'github',
+        },
+        {
+            id: 'mail',
+            label: '官方邮箱',
+            value: OFFICIAL_EMAIL,
+            description: '反馈、合作与支持联系',
+            url: `mailto:${OFFICIAL_EMAIL}`,
+            icon: <MailIcon/>,
+            tone: 'mail',
+        },
+    ]
+
     return (
         <>
-            <section className="settings-section fc-section-card about-section">
-                <h2 className="settings-section-title fc-section-title">应用信息</h2>
-                <div className="settings-field">
-                    <label className="settings-label-wide">当前版本</label>
-                    <span className="about-section-value">{appVersion || '加载中…'}</span>
+            <section className="settings-section fc-section-card about-section-hero">
+                <div className="about-section-brand">
+                    <div className="about-section-brand-mark" aria-hidden="true">
+                        FC
+                    </div>
+                    <div className="about-section-brand-copy">
+                        <div className="about-section-kicker">FlowCloudAI</div>
+                        <h2 className="about-section-title">流云AI</h2>
+                        <p className="about-section-summary">
+                            桌面端创意写作与知识管理应用。
+                        </p>
+                    </div>
                 </div>
-                <div className="settings-field">
-                    <label className="settings-label-wide">开源协议</label>
-                    <span className="about-section-value">MIT License</span>
+                <div className="about-section-meta">
+                    <div className="about-section-meta-item">
+                        <span className="about-section-meta-label">当前版本</span>
+                        <span className="about-section-meta-value">{appVersion || '加载中…'}</span>
+                    </div>
+                    <div className="about-section-meta-item">
+                        <span className="about-section-meta-label">开源协议</span>
+                        <span className="about-section-meta-value">MIT License</span>
+                    </div>
                 </div>
-                <div className="settings-field">
-                    <label className="settings-label-wide">官网</label>
+            </section>
+
+            <section className="settings-section about-section-channel-grid" aria-label="官方渠道">
+                {officialLinks.map(link => (
                     <button
+                        key={link.id}
                         type="button"
-                        className="about-section-link"
-                        onClick={() => handleOpenUrl(OFFICIAL_SITE_URL)}
+                        className={`about-section-channel about-section-channel--${link.tone}`}
+                        onClick={() => handleOpenUrl(link.url)}
                     >
-                        {OFFICIAL_SITE_URL}
+                        <span className="about-section-channel-icon">{link.icon}</span>
+                        <span className="about-section-channel-copy">
+                            <span className="about-section-channel-label">{link.label}</span>
+                            <span className="about-section-channel-description">{link.description}</span>
+                            <span className="about-section-channel-value">{link.value}</span>
+                        </span>
                     </button>
-                </div>
-                <div className="settings-field">
-                    <label className="settings-label-wide">官方 GitHub</label>
-                    <button
-                        type="button"
-                        className="about-section-link"
-                        onClick={() => handleOpenUrl(OFFICIAL_GITHUB_URL)}
-                    >
-                        {OFFICIAL_GITHUB_URL}
-                    </button>
-                </div>
-                <div className="settings-field">
-                    <label className="settings-label-wide">官方邮箱</label>
-                    <button
-                        type="button"
-                        className="about-section-link"
-                        onClick={() => handleOpenUrl(`mailto:${OFFICIAL_EMAIL}`)}
-                    >
-                        {OFFICIAL_EMAIL}
-                    </button>
-                </div>
-                <div className="settings-field">
-                    <label className="settings-label-wide">用户知情同意书</label>
+                ))}
+            </section>
+
+            <section className="settings-section fc-section-card about-section-actions">
+                <h2 className="settings-section-title fc-section-title">许可与诊断</h2>
+                <div className="about-section-action-row">
+                    <div className="about-section-action-copy">
+                        <span className="about-section-action-title">用户知情同意书</span>
+                        <span className="about-section-action-desc">查看应用使用中的数据与权限说明。</span>
+                    </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => setLicenseModalOpen(true)}>
                         查看
                     </Button>
                 </div>
-                <div className="settings-field">
-                    <label className="settings-label-wide">日志目录</label>
+                <div className="about-section-action-row">
+                    <div className="about-section-action-copy">
+                        <span className="about-section-action-title">日志目录</span>
+                        <span className="about-section-action-desc">
+                            app.log 位于配置目录内，仅 release 构建写入。
+                        </span>
+                    </div>
                     <Button type="button"
                         variant="outline"
                         size="sm"
@@ -97,9 +179,6 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                     >
                         打开
                     </Button>
-                    <span className="settings-field-hint about-section-log-hint">
-                        日志文件 app.log 位于配置目录内（仅 release 构建写入）
-                    </span>
                 </div>
             </section>
             <LicenseModal open={licenseModalOpen} onClose={() => setLicenseModalOpen(false)}/>
