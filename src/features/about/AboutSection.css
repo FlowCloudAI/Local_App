@@ -1,0 +1,24 @@
+.about-section-value {
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.about-section-link {
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: var(--fc-color-primary);
+    font-size: var(--fc-font-size-sm);
+    cursor: pointer;
+    text-align: left;
+    word-break: break-all;
+}
+
+.about-section-link:hover {
+    text-decoration: underline;
+}
+
+.about-section-log-hint {
+    margin-left: 0.5rem;
+}

@@ -16,11 +16,9 @@ import {
     useTheme
 } from 'flowcloudai-ui'
 import {open} from '@tauri-apps/plugin-dialog'
-import {openUrl} from '@tauri-apps/plugin-opener'
 import {appConfigDir} from '@tauri-apps/api/path'
-import {getVersion} from '@tauri-apps/api/app'
 import {listen} from '@tauri-apps/api/event'
-import LicenseModal from '../features/about/LicenseModal'
+import AboutSection from '../features/about/AboutSection'
 import {
     ai_close_all_sessions,
     ai_get_usage_by_model,
@@ -169,8 +167,6 @@ export default function Settings({onBack}: SettingsProps) {
     const [mediaDir, setMediaDir] = useState<string>('')
     const [defaultPaths, setDefaultPaths] = useState<DefaultPaths | null>(null)
     const [configDir, setConfigDir] = useState<string>('')
-    const [appVersion, setAppVersion] = useState<string>('')
-    const [licenseModalOpen, setLicenseModalOpen] = useState(false)
     const settingsSaveSuccessNoticeEnabledRef = useRef(false)
 
     // ── 模板配置状态 ──
@@ -334,7 +330,6 @@ export default function Settings({onBack}: SettingsProps) {
 
     useEffect(() => {
         loadData().catch(logger.error)
-        getVersion().then(setAppVersion).catch(logger.error)
     }, [loadData])
 
     useEffect(() => {
@@ -1259,50 +1254,7 @@ export default function Settings({onBack}: SettingsProps) {
                                 </div>
                             </section>
 
-                            {/* 关于 */}
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">关于</h2>
-                                <div className="settings-field">
-                                    <label className="settings-label-wide">当前版本</label>
-                                    <span className="settings-about-value">{appVersion || '加载中…'}</span>
-                                </div>
-                                <div className="settings-field">
-                                    <label className="settings-label-wide">开源协议</label>
-                                    <span className="settings-about-value">MIT License</span>
-                                </div>
-                                <div className="settings-field">
-                                    <label className="settings-label-wide">官网</label>
-                                    <button
-                                        type="button"
-                                        className="settings-about-link"
-                                        onClick={() => {
-                                            void openUrl('https://www.flowcloudai.cn').catch(logger.error)
-                                        }}
-                                    >
-                                        https://www.flowcloudai.cn
-                                    </button>
-                                </div>
-                                <div className="settings-field">
-                                    <label className="settings-label-wide">用户知情同意书</label>
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setLicenseModalOpen(true)}>
-                                        查看
-                                    </Button>
-                                </div>
-                                <div className="settings-field">
-                                    <label className="settings-label-wide">日志目录</label>
-                                    <Button type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={!configDir}
-                                        onClick={() => handleOpenDir(configDir)}
-                                    >
-                                        打开
-                                    </Button>
-                                    <span className="settings-field-hint" style={{marginLeft: '0.5rem'}}>
-                                        日志文件 app.log 位于配置目录内（仅 release 构建写入）
-                                    </span>
-                                </div>
-                            </section>
+                            <AboutSection configDir={configDir} onOpenDir={handleOpenDir}/>
 
                             {/* 操作按钮 */}
                             <div className="settings-footer">
@@ -2046,7 +1998,6 @@ export default function Settings({onBack}: SettingsProps) {
                     </div>
                 </RollingBox>
             </div>
-            <LicenseModal open={licenseModalOpen} onClose={() => setLicenseModalOpen(false)}/>
         </div>
     )
 }

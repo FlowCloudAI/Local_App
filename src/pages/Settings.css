@@ -853,26 +853,6 @@
     margin: 0;
 }
 
-.settings-about-value {
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-variant-numeric: tabular-nums;
-}
-
-.settings-about-link {
-    border: none;
-    background: transparent;
-    padding: 0;
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-sm);
-    cursor: pointer;
-    text-align: left;
-}
-
-.settings-about-link:hover {
-    text-decoration: underline;
-}
-
 /* ── 用量统计 ── */
 
 .usage-stats-grid {
