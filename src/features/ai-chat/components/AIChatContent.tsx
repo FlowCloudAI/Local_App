@@ -159,11 +159,12 @@ export default function AIChatContent({
     const [conversationStatusFilter, setConversationStatusFilter] = useState<AiConversationStatusFilter>('active')
     const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
     const [conversationSearch, setConversationSearch] = useState('')
-    const [exportMenuConversationId, setExportMenuConversationId] = useState<string | null>(null)
+    const [actionMenuConversationId, setActionMenuConversationId] = useState<string | null>(null)
     const renameInputRef = useRef<HTMLInputElement>(null)
 
     const startRename = (event: React.MouseEvent, conv: { id: string; title: string }) => {
         event.stopPropagation()
+        setActionMenuConversationId(null)
         setRenamingId(conv.id)
         setRenameValue(conv.title)
         setTimeout(() => renameInputRef.current?.select(), 0)
@@ -178,6 +179,17 @@ export default function AIChatContent({
         if (event.key === 'Enter') void commitRename()
         if (event.key === 'Escape') setRenamingId(null)
     }
+
+    useEffect(() => {
+        if (!actionMenuConversationId) return
+        const handleClick = (event: MouseEvent) => {
+            const target = event.target as Element | null
+            if (target?.closest('.ai-conversation-action-menu, .ai-conversation-more-btn')) return
+            setActionMenuConversationId(null)
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [actionMenuConversationId])
 
     const [isPluginMenuOpen, setIsPluginMenuOpen] = useState(false)
     const pluginSwitcherRef = useRef<HTMLDivElement>(null)
@@ -573,7 +585,7 @@ export default function AIChatContent({
         format: ConversationExportFormat,
     ) => {
         event.stopPropagation()
-        setExportMenuConversationId(null)
+        setActionMenuConversationId(null)
 
         if (conversation.id.startsWith('conv_')) {
             await showAlert('这条会话尚未写入历史，发送消息后再导出。', 'warning', 'toast', 2200)
@@ -593,11 +605,19 @@ export default function AIChatContent({
 
         try {
             await ai_export_conversation(conversation.id, selectedPath, format)
-            await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'toast', 1800)
+            await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'nonInvasive', 1000)
         } catch (error) {
             await showAlert(`导出会话失败：${String(error)}`, 'error', 'toast', 2600)
         }
     }, [showAlert])
+
+    const handleDeleteConversation = useCallback(async (event: React.MouseEvent, conversation: Conversation) => {
+        event.stopPropagation()
+        setActionMenuConversationId(null)
+        const confirmed = await showAlert(`确定删除对话「${conversation.title}」？`, 'warning', 'confirm')
+        if (confirmed !== 'yes') return
+        await ctx.deleteConversation(conversation.id)
+    }, [ctx, showAlert])
 
     const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
         const text = content.trim()
@@ -814,7 +834,15 @@ export default function AIChatContent({
                         <div
                             key={conv.id}
                             className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}${conv.pinnedAt ? ' is-pinned' : ''}${conv.archivedAt ? ' is-archived' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
-                            onClick={() => renamingId !== conv.id && void ctx.switchConversation(conv.id)}
+                            onClick={() => {
+                                setActionMenuConversationId(null)
+                                if (renamingId !== conv.id) void ctx.switchConversation(conv.id)
+                            }}
+                            onContextMenu={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                setActionMenuConversationId(conv.id)
+                            }}
                         >
                             {!isConversationStreaming && hasUnreadReply && (
                                 <span className="ai-conversation-unread-dot" aria-hidden="true"/>
@@ -860,79 +888,56 @@ export default function AIChatContent({
                             </div>
                             <div className="ai-conversation-actions">
                                 <button
-                                    className={`ai-conversation-action-btn ${conv.pinnedAt ? 'active' : ''}`}
-                                    onClick={(event) => ctx.toggleConversationPinned(conv.id, event)}
-                                    title={conv.pinnedAt ? '取消顶置' : '顶置'}
+                                    className={`ai-conversation-action-btn ai-conversation-more-btn ${actionMenuConversationId === conv.id ? 'active' : ''}`}
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        setActionMenuConversationId((current) => current === conv.id ? null : conv.id)
+                                    }}
+                                    title="更多操作"
                                 >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
-                                         strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M4.2 1.5h3.6l-.6 3.1 2.1 2H2.7l2.1-2-.6-3.1z"/>
-                                        <path d="M6 6.6v3.9"/>
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                        <circle cx="3.5" cy="7" r="1" fill="currentColor"/>
+                                        <circle cx="7" cy="7" r="1" fill="currentColor"/>
+                                        <circle cx="10.5" cy="7" r="1" fill="currentColor"/>
                                     </svg>
                                 </button>
-                                <button
-                                    className={`ai-conversation-action-btn ${conv.archivedAt ? 'active' : ''}`}
-                                    onClick={(event) => ctx.toggleConversationArchived(conv.id, event)}
-                                    title={conv.archivedAt ? '取消归档' : '归档'}
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
-                                         strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M2 3.5h8v6H2z"/>
-                                        <path d="M1.5 2h9v1.5h-9z"/>
-                                        <path d="M4.5 6h3"/>
-                                    </svg>
-                                </button>
-                                <button
-                                    className="ai-conversation-action-btn"
-                                    onClick={(event) => startRename(event, conv)}
-                                    title="重命名"
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
-                                         strokeWidth="1.3">
-                                        <path d="M8.5 1.5a1.414 1.414 0 012 2L3.5 10.5l-3 .5.5-3 7.5-6.5z"/>
-                                    </svg>
-                                </button>
-                                <div className="ai-conversation-export">
-                                    <button
-                                        className={`ai-conversation-action-btn ${exportMenuConversationId === conv.id ? 'active' : ''}`}
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            if (!canExportConversation) return
-                                            setExportMenuConversationId((current) => current === conv.id ? null : conv.id)
-                                        }}
-                                        disabled={!canExportConversation}
-                                        title={canExportConversation ? '导出' : '发送消息后可导出'}
-                                    >
-                                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
-                                             strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M6 1.5v6"/>
-                                            <path d="M3.7 5.2L6 7.5l2.3-2.3"/>
-                                            <path d="M2 8.5v1.8h8V8.5"/>
-                                        </svg>
-                                    </button>
-                                    {exportMenuConversationId === conv.id && (
-                                        <div className="ai-conversation-export-menu" onClick={(event) => event.stopPropagation()}>
-                                            <button onClick={(event) => void handleExportConversation(event, conv, 'markdown')}>
-                                                Markdown
-                                            </button>
-                                            <button onClick={(event) => void handleExportConversation(event, conv, 'json')}>
-                                                JSON
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                <button
-                                    className="ai-conversation-action-btn ai-conversation-action-btn--danger"
-                                    onClick={(event) => void ctx.deleteConversation(conv.id, event)}
-                                    title="删除"
-                                >
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                        <path
-                                            d="M1.5 3h9M4 3V2a.857.857 0 01.857-.857h2.286A.857.857 0 018 2v1m-6 0v7a1.286 1.286 0 001.286 1.286h5.428A1.286 1.286 0 0010 10V3M4.857 5.143v3.428M7.143 5.143v3.428"
-                                            stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"
-                                            strokeLinejoin="round"/>
-                                    </svg>
-                                </button>
+                                {actionMenuConversationId === conv.id && (
+                                    <div className="ai-conversation-action-menu" onClick={(event) => event.stopPropagation()}>
+                                        <button onClick={(event) => {
+                                            ctx.toggleConversationPinned(conv.id, event)
+                                            setActionMenuConversationId(null)
+                                        }}>
+                                            {conv.pinnedAt ? '取消顶置' : '顶置'}
+                                        </button>
+                                        <button onClick={(event) => {
+                                            ctx.toggleConversationArchived(conv.id, event)
+                                            setActionMenuConversationId(null)
+                                        }}>
+                                            {conv.archivedAt ? '取消归档' : '归档'}
+                                        </button>
+                                        <button onClick={(event) => startRename(event, conv)}>
+                                            重命名
+                                        </button>
+                                        <button
+                                            disabled={!canExportConversation}
+                                            onClick={(event) => void handleExportConversation(event, conv, 'markdown')}
+                                        >
+                                            导出 Markdown
+                                        </button>
+                                        <button
+                                            disabled={!canExportConversation}
+                                            onClick={(event) => void handleExportConversation(event, conv, 'json')}
+                                        >
+                                            导出 JSON
+                                        </button>
+                                        <button
+                                            className="danger"
+                                            onClick={(event) => void handleDeleteConversation(event, conv)}
+                                        >
+                                            删除
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         )
