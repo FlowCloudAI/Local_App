@@ -190,11 +190,15 @@
 
 .about-section-channel-value {
     overflow: hidden;
-    color: var(--about-section-channel-color);
+    color: var(--about-section-channel-link-color, var(--about-section-channel-color));
     font-size: var(--fc-font-size-xs);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.about-section-channel--github .about-section-channel-value {
+    color: var(--fc-color-primary);
 }
 
 .about-section-actions {
