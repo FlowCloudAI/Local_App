@@ -33,7 +33,7 @@
 .about-section-kicker {
     margin-bottom: 0.2rem;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
     font-weight: 600;
 }
 
@@ -72,7 +72,7 @@
 
 .about-section-meta-label {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
 }
 
 .about-section-meta-value {
@@ -184,14 +184,14 @@
 
 .about-section-channel-description {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
     line-height: var(--fc-line-height-normal);
 }
 
 .about-section-channel-value {
     overflow: hidden;
     color: var(--about-section-channel-link-color, var(--about-section-channel-color));
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -245,7 +245,7 @@
 
 .about-section-action-desc {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
     line-height: var(--fc-line-height-normal);
 }
 
