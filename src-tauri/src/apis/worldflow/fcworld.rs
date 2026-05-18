@@ -9,7 +9,8 @@ use std::io::Write;
 use zip::{ZipWriter, write::SimpleFileOptions};
 
 use worldflow_core::{
-    CsvExportItem, ProjectCsvExport, ProjectOps, WorldflowCsvTable, models::Project,
+    CsvExportItem, CsvImportBundle, CsvImportMode, CsvImportResult, ProjectCsvExport, ProjectOps,
+    WorldflowCsvTable, models::Project,
 };
 
 mod import;
@@ -29,6 +30,34 @@ pub struct FcworldExportResult {
     pub asset_count: usize,
     pub map_count: usize,
     pub file_size: u64,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FcworldImportRows {
+    pub projects: usize,
+    pub categories: usize,
+    pub entries: usize,
+    pub tag_schemas: usize,
+    pub entry_types: usize,
+    pub relations: usize,
+    pub links: usize,
+    pub idea_notes: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FcworldImportResult {
+    pub input_path: String,
+    pub package_id: String,
+    pub source_project_id: String,
+    pub project_id: String,
+    pub project_name: String,
+    pub asset_count: usize,
+    pub map_count: usize,
+    pub file_size: u64,
+    pub imported_rows: FcworldImportRows,
     pub warnings: Vec<String>,
 }
 
@@ -998,6 +1027,204 @@ fn write_fcworld_package(
     Ok(metadata.len())
 }
 
+impl From<CsvImportResult> for FcworldImportRows {
+    fn from(value: CsvImportResult) -> Self {
+        Self {
+            projects: value.projects,
+            categories: value.categories,
+            entries: value.entries,
+            tag_schemas: value.tag_schemas,
+            entry_types: value.entry_types,
+            relations: value.relations,
+            links: value.links,
+            idea_notes: value.idea_notes,
+        }
+    }
+}
+
+fn count_import_csv_rows(content: &str, table: WorldflowCsvTable) -> Result<usize, String> {
+    if content.trim().is_empty() {
+        return Ok(0);
+    }
+    let mut reader = csv::Reader::from_reader(content.as_bytes());
+    let mut count = 0usize;
+    for record in reader.records() {
+        record.map_err(|e| format!("解析导入 CSV 行数失败 {}: {e}", table.file_name()))?;
+        count += 1;
+    }
+    Ok(count)
+}
+
+fn expected_import_rows(
+    items: &[worldflow_core::CsvImportItem],
+) -> Result<FcworldImportRows, String> {
+    let mut rows = FcworldImportRows::default();
+    for item in items {
+        let count = count_import_csv_rows(&item.content, item.table)?;
+        match item.table {
+            WorldflowCsvTable::Projects => rows.projects = count,
+            WorldflowCsvTable::Categories => rows.categories = count,
+            WorldflowCsvTable::TagSchemas => rows.tag_schemas = count,
+            WorldflowCsvTable::EntryTypes => rows.entry_types = count,
+            WorldflowCsvTable::Entries => rows.entries = count,
+            WorldflowCsvTable::EntryRelations => rows.relations = count,
+            WorldflowCsvTable::EntryLinks => rows.links = count,
+            WorldflowCsvTable::IdeaNotes => rows.idea_notes = count,
+        }
+    }
+    Ok(rows)
+}
+
+fn write_prepared_import_files(package: &import::PreparedFcworldImport, paths: &PathsState) -> Result<(), String> {
+    if !package.assets.is_empty() {
+        let image_dir = import::import_images_dir(paths, &package.new_project_id)?;
+        std::fs::create_dir_all(&image_dir)
+            .map_err(|e| format!("创建导入图片目录失败 {:?}: {e}", image_dir))?;
+    }
+
+    for asset in &package.assets {
+        if let Some(parent) = asset.target_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建导入资源目录失败 {:?}: {e}", parent))?;
+        }
+        if asset.target_path.exists() {
+            return Err(format!("导入资源目标已存在: {:?}", asset.target_path));
+        }
+        std::fs::write(&asset.target_path, &asset.bytes)
+            .map_err(|e| format!("写入导入资源失败 {:?}: {e}", asset.target_path))?;
+    }
+
+    let map_path = map_store_path(paths, &package.new_project_id)?;
+    if let Some(parent) = map_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("创建导入地图目录失败 {:?}: {e}", parent))?;
+    }
+    if map_path.exists() {
+        return Err(format!("导入地图目标已存在: {:?}", map_path));
+    }
+    std::fs::write(&map_path, &package.maps_json)
+        .map_err(|e| format!("写入导入地图失败 {:?}: {e}", map_path))
+}
+
+fn cleanup_prepared_import_files(package: &import::PreparedFcworldImport, paths: &PathsState) -> Result<(), String> {
+    let mut errors = Vec::new();
+    let image_dir = import::import_images_dir(paths, &package.new_project_id)?;
+    if image_dir.exists() {
+        if let Err(error) = std::fs::remove_dir_all(&image_dir) {
+            errors.push(format!("清理图片目录失败 {:?}: {error}", image_dir));
+        }
+    }
+
+    let map_path = map_store_path(paths, &package.new_project_id)?;
+    if map_path.exists() {
+        if let Err(error) = std::fs::remove_file(&map_path) {
+            errors.push(format!("清理地图文件失败 {:?}: {error}", map_path));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("；"))
+    }
+}
+
+fn cleanup_after_file_write_error(
+    package: &import::PreparedFcworldImport,
+    paths: &PathsState,
+    reason: String,
+) -> String {
+    match cleanup_prepared_import_files(package, paths) {
+        Ok(()) => reason,
+        Err(cleanup_error) => format!("{reason}；清理导入临时文件失败，需要人工介入：{cleanup_error}"),
+    }
+}
+
+async fn rollback_after_import_row_mismatch(
+    db: &SqliteDb,
+    package: &import::PreparedFcworldImport,
+    paths: &PathsState,
+    reason: String,
+) -> String {
+    let mut errors = Vec::new();
+    if let Err(error) = db.delete_project(&package.new_project_id).await {
+        errors.push(format!("回滚数据库项目失败: {error}"));
+    }
+    if let Err(error) = cleanup_prepared_import_files(package, paths) {
+        errors.push(error);
+    }
+
+    if errors.is_empty() {
+        reason
+    } else {
+        format!("{reason}；回滚失败，需要人工介入：{}", errors.join("；"))
+    }
+}
+
+async fn import_fcworld_package_to_db(
+    db: &SqliteDb,
+    paths: &PathsState,
+    input_path: &Path,
+) -> Result<FcworldImportResult, String> {
+    let existing_names = db
+        .list_projects()
+        .await
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .map(|project| project.name)
+        .collect::<Vec<_>>();
+    let validated =
+        import::read_and_validate_fcworld_package(input_path, db.worldflow_schema_version())?;
+    let prepared = import::prepare_fcworld_import(validated, paths, &existing_names)?;
+    let expected_rows = expected_import_rows(&prepared.csv_items)?;
+
+    if let Err(error) = write_prepared_import_files(&prepared, paths) {
+        return Err(cleanup_after_file_write_error(&prepared, paths, error));
+    }
+
+    let import_result = match db
+        .import_csvs(
+            CsvImportBundle {
+                items: prepared.csv_items.clone(),
+            },
+            CsvImportMode::Merge,
+        )
+        .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            let reason = format!("写入导入数据库失败: {error}");
+            return match cleanup_prepared_import_files(&prepared, paths) {
+                Ok(()) => Err(reason),
+                Err(cleanup_error) => Err(format!(
+                    "{reason}；清理导入文件失败，需要人工介入：{cleanup_error}"
+                )),
+            };
+        }
+    };
+
+    let actual_rows = FcworldImportRows::from(import_result);
+    if actual_rows != expected_rows {
+        let reason = format!(
+            "fcworld 导入行数不匹配: expected={expected_rows:?} actual={actual_rows:?}"
+        );
+        return Err(rollback_after_import_row_mismatch(db, &prepared, paths, reason).await);
+    }
+
+    Ok(FcworldImportResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        package_id: prepared.package_id,
+        source_project_id: prepared.source_project_id,
+        project_id: prepared.new_project_id.to_string(),
+        project_name: prepared.project_name,
+        asset_count: prepared.asset_count,
+        map_count: prepared.map_count,
+        file_size: prepared.input_file_size,
+        imported_rows: actual_rows,
+        warnings: prepared.warnings,
+    })
+}
+
 #[tauri::command]
 pub async fn db_export_project_fcworld(
     state: State<'_, Arc<Mutex<AppState>>>,
@@ -1033,6 +1260,18 @@ pub async fn db_export_project_fcworld(
     })
 }
 
+#[tauri::command]
+pub async fn db_import_project_fcworld(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    paths: State<'_, PathsState>,
+    input_path: String,
+) -> Result<FcworldImportResult, String> {
+    let input_path_buf = PathBuf::from(&input_path);
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    import_fcworld_package_to_db(&db, paths.inner(), &input_path_buf).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1041,7 +1280,7 @@ mod tests {
     use tempfile::TempDir;
     use worldflow_core::{
         EntryOps, ProjectOps, SqliteDb, TagSchemaOps,
-        models::{CreateEntry, CreateProject, CreateTagSchema, EntryTag, FCImage},
+        models::{CreateEntry, CreateProject, CreateTagSchema, EntryFilter, EntryTag, FCImage},
     };
     use zip::ZipArchive;
 
@@ -1442,5 +1681,101 @@ mod tests {
         assert!(prepared.maps_json.contains("data:image/png;base64"));
         assert!(!prepared.maps_json.contains(&target.id.to_string()));
         assert!(!prepared.maps_json.contains("assets/images/"));
+    }
+
+    #[tokio::test]
+    async fn imports_fcworld_as_new_project_with_assets_and_empty_maps() {
+        let (temp, db, paths) = new_test_db("fcworld_import_full").await;
+        let image_dir = temp.path().join("images");
+        let project_cover = image_dir.join("project-cover.png");
+        let entry_image = image_dir.join("entry-image.png");
+        let entry_cover = image_dir.join("entry-cover.png");
+        create_image(&project_cover);
+        create_image(&entry_image);
+        create_image(&entry_cover);
+
+        let project = db
+            .create_project(CreateProject {
+                name: "可导入世界".to_string(),
+                description: Some("导入测试".to_string()),
+                cover_image: Some(project_cover.to_string_lossy().to_string()),
+            })
+            .await
+            .expect("创建项目失败");
+        db.create_entry(CreateEntry {
+            project_id: project.id,
+            category_id: None,
+            title: "角色".to_string(),
+            summary: None,
+            content: Some("正文".to_string()),
+            r#type: Some("character".to_string()),
+            tags: None,
+            images: Some(vec![FCImage {
+                path: entry_image.clone(),
+                is_cover: true,
+                caption: Some("图注".to_string()),
+            }]),
+            cover_path: Some(entry_cover.to_string_lossy().to_string()),
+        })
+        .await
+        .expect("创建词条失败");
+
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package = prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let output_path = temp.path().join("可导入世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let result = import_fcworld_package_to_db(&db, &paths, &output_path)
+            .await
+            .expect("导入 fcworld 失败");
+        let new_project_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
+        let imported_project = db
+            .get_project(&new_project_id)
+            .await
+            .expect("应写入新项目");
+        assert_ne!(new_project_id, project.id);
+        assert_eq!(imported_project.name, "可导入世界（导入）");
+        assert_eq!(result.imported_rows.projects, 1);
+        assert_eq!(result.imported_rows.entries, 1);
+        assert_eq!(result.asset_count, 3);
+        assert_eq!(result.map_count, 0);
+
+        let import_image_dir = paths
+            .db_path
+            .parent()
+            .unwrap()
+            .join("images")
+            .join(new_project_id.to_string());
+        let cover_path = imported_project.cover_image.expect("项目封面应导入");
+        assert!(Path::new(&cover_path).starts_with(&import_image_dir));
+        assert!(Path::new(&cover_path).exists());
+
+        let entries = db
+            .list_entries(&new_project_id, EntryFilter::default(), 100, 0)
+            .await
+            .expect("读取导入词条列表失败");
+        assert_eq!(entries.len(), 1);
+        let imported_entry = db.get_entry(&entries[0].id).await.expect("读取导入词条失败");
+        assert_eq!(imported_entry.images.0.len(), 1);
+        assert!(imported_entry.images.0[0].path.starts_with(&import_image_dir));
+        assert!(imported_entry.images.0[0].path.exists());
+        let imported_cover = imported_entry.cover_path.expect("词条封面应导入");
+        assert!(Path::new(&imported_cover).starts_with(&import_image_dir));
+        assert!(Path::new(&imported_cover).exists());
+
+        let imported_maps_path = paths
+            .db_path
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(format!("{new_project_id}.json"));
+        let maps_json = std::fs::read_to_string(imported_maps_path).expect("应写入空地图文件");
+        let maps_value: Value = serde_json::from_str(&maps_json).expect("地图文件应为 JSON");
+        assert_eq!(maps_value["projectId"], new_project_id.to_string());
+        assert_eq!(maps_value["maps"].as_array().unwrap().len(), 0);
     }
 }

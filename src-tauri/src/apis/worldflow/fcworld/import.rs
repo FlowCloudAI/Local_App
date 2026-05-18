@@ -37,13 +37,14 @@ pub(super) struct ImportIdMaps {
 
 #[derive(Debug, Clone)]
 pub(super) struct PreparedImportAsset {
-    pub package_path: String,
     pub target_path: PathBuf,
     pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct PreparedFcworldImport {
+    pub package_id: String,
+    pub source_project_id: String,
     pub new_project_id: Uuid,
     pub project_name: String,
     pub csv_items: Vec<worldflow_core::CsvImportItem>,
@@ -53,6 +54,7 @@ pub(super) struct PreparedFcworldImport {
     pub map_count: usize,
     pub input_file_size: u64,
     pub warnings: Vec<String>,
+    #[cfg(test)]
     pub id_maps: ImportIdMaps,
 }
 
@@ -530,7 +532,7 @@ fn imported_asset_file_name(asset: &FcworldAsset) -> Result<String, String> {
     Ok(format!("{stem}.{extension}"))
 }
 
-fn import_images_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
+pub(super) fn import_images_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
     let db_dir = paths
         .db_path
         .parent()
@@ -556,7 +558,6 @@ fn prepare_import_assets(
         let target_path = target_dir.join(imported_asset_file_name(asset)?);
         by_package_path.insert(asset.path.clone(), target_path.clone());
         prepared.push(PreparedImportAsset {
-            package_path: asset.path.clone(),
             target_path,
             bytes,
         });
@@ -1130,6 +1131,8 @@ pub(super) fn prepare_fcworld_import(
     let (maps_json, map_count) = rewrite_maps_json_for_import(&package, &id_maps, &new_project_id)?;
 
     Ok(PreparedFcworldImport {
+        package_id: package.manifest.package_id.clone(),
+        source_project_id: package.manifest.world.source_project_id.clone(),
         new_project_id,
         project_name,
         csv_items,
@@ -1139,6 +1142,7 @@ pub(super) fn prepare_fcworld_import(
         map_count,
         input_file_size: package.input_file_size,
         warnings: Vec::new(),
+        #[cfg(test)]
         id_maps,
     })
 }
