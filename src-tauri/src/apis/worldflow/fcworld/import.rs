@@ -844,15 +844,28 @@ fn rewrite_entry_relations_csv(content: &str, id_maps: &ImportIdMaps) -> Result<
     let project_index = header_index(&headers, "project_id")?;
     let a_index = header_index(&headers, "a_id")?;
     let b_index = header_index(&headers, "b_id")?;
+    let relation_index = header_index(&headers, "relation")?;
     for row in &mut rows {
         let old_id = row.get(id_index).cloned().unwrap_or_default();
         let old_project_id = row.get(project_index).cloned().unwrap_or_default();
         let old_a_id = row.get(a_index).cloned().unwrap_or_default();
         let old_b_id = row.get(b_index).cloned().unwrap_or_default();
+        let relation = row.get(relation_index).cloned().unwrap_or_default();
+        let mut new_a_id = required_mapped_id(&id_maps.entries, &old_a_id, "entry_relations.a_id")?;
+        let mut new_b_id = required_mapped_id(&id_maps.entries, &old_b_id, "entry_relations.b_id")?;
+        if relation == "two_way" {
+            let parsed_a = Uuid::parse_str(&new_a_id)
+                .map_err(|e| format!("entry_relations.a_id 不是合法 UUID: {new_a_id}: {e}"))?;
+            let parsed_b = Uuid::parse_str(&new_b_id)
+                .map_err(|e| format!("entry_relations.b_id 不是合法 UUID: {new_b_id}: {e}"))?;
+            if parsed_a > parsed_b {
+                std::mem::swap(&mut new_a_id, &mut new_b_id);
+            }
+        }
         set_field(row, id_index, required_mapped_id(&id_maps.entry_relations, &old_id, "entry_relations.id")?, "entry_relations.csv")?;
         set_field(row, project_index, required_mapped_id(&id_maps.projects, &old_project_id, "entry_relations.project_id")?, "entry_relations.csv")?;
-        set_field(row, a_index, required_mapped_id(&id_maps.entries, &old_a_id, "entry_relations.a_id")?, "entry_relations.csv")?;
-        set_field(row, b_index, required_mapped_id(&id_maps.entries, &old_b_id, "entry_relations.b_id")?, "entry_relations.csv")?;
+        set_field(row, a_index, new_a_id, "entry_relations.csv")?;
+        set_field(row, b_index, new_b_id, "entry_relations.csv")?;
     }
     write_csv_records(&headers, &rows)
 }
@@ -1145,4 +1158,87 @@ pub(super) fn prepare_fcworld_import(
         #[cfg(test)]
         id_maps,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rewrite_entry_relations_sorts_two_way_after_id_mapping() {
+        let old_project_id = "11111111-1111-1111-1111-111111111111".to_string();
+        let new_project_id = "22222222-2222-2222-2222-222222222222".to_string();
+        let old_relation_id = "33333333-3333-3333-3333-333333333333".to_string();
+        let new_relation_id = "44444444-4444-4444-4444-444444444444".to_string();
+        let old_a_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa".to_string();
+        let old_b_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb".to_string();
+        let high_new_id = "ffffffff-ffff-ffff-ffff-ffffffffffff".to_string();
+        let low_new_id = "00000000-0000-0000-0000-000000000001".to_string();
+
+        let mut id_maps = ImportIdMaps::default();
+        id_maps
+            .projects
+            .insert(old_project_id.clone(), new_project_id.clone());
+        id_maps
+            .entry_relations
+            .insert(old_relation_id.clone(), new_relation_id.clone());
+        id_maps.entries.insert(old_a_id.clone(), high_new_id.clone());
+        id_maps.entries.insert(old_b_id.clone(), low_new_id.clone());
+
+        let content = format!(
+            "id,project_id,a_id,b_id,relation,content,created_at,updated_at\n{old_relation_id},{old_project_id},{old_a_id},{old_b_id},two_way,同盟,2026-05-18T00:00:00Z,2026-05-18T00:00:00Z\n"
+        );
+        let rewritten =
+            rewrite_entry_relations_csv(&content, &id_maps).expect("双向关系应可重写");
+        let mut reader = csv::Reader::from_reader(rewritten.as_bytes());
+        let headers = reader.headers().expect("应有表头").clone();
+        let a_index = header_index(&headers, "a_id").expect("应有 a_id");
+        let b_index = header_index(&headers, "b_id").expect("应有 b_id");
+        let relation_index = header_index(&headers, "relation").expect("应有 relation");
+        let row = reader
+            .records()
+            .next()
+            .expect("应有关系记录")
+            .expect("关系记录应合法");
+
+        assert_eq!(row.get(a_index), Some(low_new_id.as_str()));
+        assert_eq!(row.get(b_index), Some(high_new_id.as_str()));
+        assert_eq!(row.get(relation_index), Some("two_way"));
+    }
+
+    #[test]
+    fn rewrite_entry_relations_keeps_one_way_direction() {
+        let old_project_id = "11111111-1111-1111-1111-111111111111".to_string();
+        let new_project_id = "22222222-2222-2222-2222-222222222222".to_string();
+        let old_relation_id = "33333333-3333-3333-3333-333333333333".to_string();
+        let new_relation_id = "44444444-4444-4444-4444-444444444444".to_string();
+        let old_a_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa".to_string();
+        let old_b_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb".to_string();
+        let high_new_id = "ffffffff-ffff-ffff-ffff-ffffffffffff".to_string();
+        let low_new_id = "00000000-0000-0000-0000-000000000001".to_string();
+
+        let mut id_maps = ImportIdMaps::default();
+        id_maps.projects.insert(old_project_id.clone(), new_project_id);
+        id_maps.entry_relations.insert(old_relation_id.clone(), new_relation_id);
+        id_maps.entries.insert(old_a_id.clone(), high_new_id.clone());
+        id_maps.entries.insert(old_b_id.clone(), low_new_id.clone());
+
+        let content = format!(
+            "id,project_id,a_id,b_id,relation,content,created_at,updated_at\n{old_relation_id},{old_project_id},{old_a_id},{old_b_id},one_way,指向,2026-05-18T00:00:00Z,2026-05-18T00:00:00Z\n"
+        );
+        let rewritten =
+            rewrite_entry_relations_csv(&content, &id_maps).expect("单向关系应可重写");
+        let mut reader = csv::Reader::from_reader(rewritten.as_bytes());
+        let headers = reader.headers().expect("应有表头").clone();
+        let a_index = header_index(&headers, "a_id").expect("应有 a_id");
+        let b_index = header_index(&headers, "b_id").expect("应有 b_id");
+        let row = reader
+            .records()
+            .next()
+            .expect("应有关系记录")
+            .expect("关系记录应合法");
+
+        assert_eq!(row.get(a_index), Some(high_new_id.as_str()));
+        assert_eq!(row.get(b_index), Some(low_new_id.as_str()));
+    }
 }
