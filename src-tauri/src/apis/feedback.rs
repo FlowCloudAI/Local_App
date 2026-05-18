@@ -1,9 +1,16 @@
 use crate::NetworkState;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
 use tauri::State;
+use tokio::sync::Mutex;
 
 const FEEDBACK_ENDPOINT: &str = "https://www.flowcloudai.cn/api/v1/feedback";
+const FEEDBACK_SUBMIT_INTERVAL: Duration = Duration::from_secs(10);
+static LAST_FEEDBACK_SUBMIT_AT: LazyLock<Mutex<Option<Instant>>> = LazyLock::new(|| Mutex::new(None));
 
 #[derive(Debug, Deserialize)]
 pub struct FeedbackPayload {
@@ -33,6 +40,7 @@ pub async fn submit_public_feedback(
     if content.is_empty() {
         return Err("反馈内容不能为空".into());
     }
+    check_submit_interval().await?;
 
     let body = json!({
         "kind": kind,
@@ -80,4 +88,19 @@ pub async fn submit_public_feedback(
             .map(str::to_string),
         ok: value.get("ok").and_then(|value| value.as_bool()).unwrap_or(true),
     })
+}
+
+async fn check_submit_interval() -> Result<(), String> {
+    let now = Instant::now();
+    let mut last_submit_at = LAST_FEEDBACK_SUBMIT_AT.lock().await;
+    if let Some(last) = *last_submit_at {
+        let elapsed = now.duration_since(last);
+        if elapsed < FEEDBACK_SUBMIT_INTERVAL {
+            let remaining = FEEDBACK_SUBMIT_INTERVAL - elapsed;
+            let seconds = remaining.as_secs() + u64::from(remaining.subsec_nanos() > 0);
+            return Err(format!("提交太频繁，请 {seconds} 秒后再试"));
+        }
+    }
+    *last_submit_at = Some(now);
+    Ok(())
 }
