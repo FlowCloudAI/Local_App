@@ -12,7 +12,9 @@ import {
     type Project,
 } from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
+import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
+import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {
     HOME_ACTIVITY_CHANGED_EVENT,
     loadHomeDashboardData,
@@ -110,6 +112,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
+    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
 
     const loadProjects = useCallback(async () => {
         setLoading(true)
@@ -263,22 +266,28 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
         setImporting(true)
         try {
-            const preview = await db_preview_project_fcworld(selectedPath)
+            const previewOperationId = startProgress('import', '检查导入包')
+            const preview = await db_preview_project_fcworld(selectedPath, previewOperationId)
             if (preview.duplicateProject) {
+                closeProgress()
                 setImportConflict(preview)
                 return
             }
+            closeProgress()
+            const importOperationId = startProgress('import', '导入世界')
             const result = await db_import_project_fcworld(selectedPath, {
                 mode: 'rename',
                 projectName: preview.projectName,
-            })
+            }, importOperationId)
+            closeProgress()
             await openImportedProject(result)
         } catch (error) {
+            closeProgress()
             await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
         } finally {
             setImporting(false)
         }
-    }, [importing, openImportedProject, showAlert])
+    }, [closeProgress, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictCancel = useCallback(() => {
         if (!importing) setImportConflict(null)
@@ -288,18 +297,21 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         if (!importConflict || importing) return
         setImporting(true)
         try {
+            const operationId = startProgress('import', '导入世界')
             const result = await db_import_project_fcworld(importConflict.inputPath, {
                 mode: 'rename',
                 projectName,
-            })
+            }, operationId)
+            closeProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (error) {
+            closeProgress()
             await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
         } finally {
             setImporting(false)
         }
-    }, [importConflict, importing, openImportedProject, showAlert])
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
@@ -312,18 +324,21 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
         setImporting(true)
         try {
+            const operationId = startProgress('import', '导入世界')
             const result = await db_import_project_fcworld(importConflict.inputPath, {
                 mode: 'overwrite',
                 overwriteProjectId: importConflict.duplicateProject.projectId,
-            })
+            }, operationId)
+            closeProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (error) {
+            closeProgress()
             await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
         } finally {
             setImporting(false)
         }
-    }, [importConflict, importing, openImportedProject, showAlert])
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button
@@ -355,6 +370,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 onRename={projectName => void handleImportConflictRename(projectName)}
                 onOverwrite={() => void handleImportConflictOverwrite()}
             />
+            <FcworldProgressDialog progress={fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
                     <section className="project-home-hero">

@@ -12,8 +12,10 @@ import {
     type FcworldImportResult,
     type Project,
 } from '../../../api'
+import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
+import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 
@@ -49,6 +51,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
     const [searchText, setSearchText] = useState('')
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
+    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -126,22 +129,28 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
 
         setImporting(true)
         try {
-            const preview = await db_preview_project_fcworld(selectedPath)
+            const previewOperationId = startProgress('import', '检查导入包')
+            const preview = await db_preview_project_fcworld(selectedPath, previewOperationId)
             if (preview.duplicateProject) {
+                closeProgress()
                 setImportConflict(preview)
                 return
             }
+            closeProgress()
+            const importOperationId = startProgress('import', '导入世界')
             const result = await db_import_project_fcworld(selectedPath, {
                 mode: 'rename',
                 projectName: preview.projectName,
-            })
+            }, importOperationId)
+            closeProgress()
             await openImportedProject(result)
         } catch (e) {
+            closeProgress()
             await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
         } finally {
             setImporting(false)
         }
-    }, [importing, openImportedProject, showAlert])
+    }, [closeProgress, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictCancel = useCallback(() => {
         if (!importing) setImportConflict(null)
@@ -151,18 +160,21 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         if (!importConflict || importing) return
         setImporting(true)
         try {
+            const operationId = startProgress('import', '导入世界')
             const result = await db_import_project_fcworld(importConflict.inputPath, {
                 mode: 'rename',
                 projectName,
-            })
+            }, operationId)
+            closeProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (e) {
+            closeProgress()
             await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
         } finally {
             setImporting(false)
         }
-    }, [importConflict, importing, openImportedProject, showAlert])
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
@@ -175,18 +187,21 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
 
         setImporting(true)
         try {
+            const operationId = startProgress('import', '导入世界')
             const result = await db_import_project_fcworld(importConflict.inputPath, {
                 mode: 'overwrite',
                 overwriteProjectId: importConflict.duplicateProject.projectId,
-            })
+            }, operationId)
+            closeProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (e) {
+            closeProgress()
             await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
         } finally {
             setImporting(false)
         }
-    }, [importConflict, importing, openImportedProject, showAlert])
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     if (loading && projects.length === 0) {
         return <div className="mobile-page__loading">加载中…</div>
@@ -213,6 +228,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 onRename={projectName => void handleImportConflictRename(projectName)}
                 onOverwrite={() => void handleImportConflictOverwrite()}
             />
+            <FcworldProgressDialog progress={fcworldProgress} />
 
             <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
                 <Input

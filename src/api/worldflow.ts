@@ -147,6 +147,22 @@ export interface FcworldImportOptions {
     overwriteProjectId?: string | null
 }
 
+export type FcworldProgressKind = 'import' | 'export'
+export type FcworldProgressStatus = 'running' | 'done' | 'error'
+
+export interface FcworldProgressEvent {
+    operationId: string
+    kind: FcworldProgressKind
+    phase: string
+    message: string
+    current: number
+    total: number
+    percent: number
+    status: FcworldProgressStatus
+}
+
+export const FCWORLD_PROGRESS_EVENT = 'fcworld:progress'
+
 export interface ProjectTimelineData {
     events: ProjectTimelineEvent[]
     yearStart?: number | null
@@ -378,14 +394,18 @@ export const db_update_project = (input: UpdateProjectInput) => {
 export const db_delete_project = (id: string) =>
     command<void>('db_delete_project', {id})
 
-export const db_export_project_fcworld = (projectId: string, outputPath: string) =>
-    command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath})
+export const db_export_project_fcworld = (projectId: string, outputPath: string, operationId?: string) =>
+    command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath, operationId})
 
-export const db_preview_project_fcworld = (inputPath: string) =>
-    command<FcworldImportPreview>('db_preview_project_fcworld', {inputPath})
+export const db_preview_project_fcworld = (inputPath: string, operationId?: string) =>
+    command<FcworldImportPreview>('db_preview_project_fcworld', {inputPath, operationId})
 
-export const db_import_project_fcworld = (inputPath: string, options?: FcworldImportOptions) =>
-    command<FcworldImportResult>('db_import_project_fcworld', {inputPath, options})
+export const db_import_project_fcworld = (
+    inputPath: string,
+    options?: FcworldImportOptions,
+    operationId?: string,
+) =>
+    command<FcworldImportResult>('db_import_project_fcworld', {inputPath, options, operationId})
 
 export const db_create_category = ({
                                        projectId,

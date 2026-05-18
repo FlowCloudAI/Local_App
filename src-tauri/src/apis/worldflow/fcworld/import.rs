@@ -14,6 +14,19 @@ const KNOWN_ASSET_KINDS: &[&str] = &[
 ];
 
 #[derive(Debug, Clone)]
+pub(super) enum FcworldPackageProgress {
+    AddTotal {
+        amount: usize,
+        phase: &'static str,
+        message: String,
+    },
+    Step {
+        phase: &'static str,
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub(super) struct ValidatedFcworldPackage {
     pub manifest: FcworldManifest,
     pub csv_items: Vec<worldflow_core::CsvImportItem>,
@@ -77,7 +90,18 @@ fn validate_package_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_known_zip_entries(zip: &mut ZipArchive<File>) -> Result<HashSet<String>, String> {
+fn validate_known_zip_entries_with_progress<F>(
+    zip: &mut ZipArchive<File>,
+    progress: &mut F,
+) -> Result<HashSet<String>, String>
+where
+    F: FnMut(FcworldPackageProgress),
+{
+    progress(FcworldPackageProgress::AddTotal {
+        amount: zip.len(),
+        phase: "validate_zip",
+        message: "检查导入包文件项".to_string(),
+    });
     let mut names = HashSet::new();
     for index in 0..zip.len() {
         let file = zip
@@ -103,6 +127,10 @@ fn validate_known_zip_entries(zip: &mut ZipArchive<File>) -> Result<HashSet<Stri
         if !known {
             return Err(format!("zip 包含未知文件项: {name}"));
         }
+        progress(FcworldPackageProgress::Step {
+            phase: "validate_zip",
+            message: format!("已检查文件项：{name}"),
+        });
     }
     Ok(names)
 }
@@ -191,10 +219,19 @@ fn validate_manifest(
     Ok(manifest)
 }
 
-fn validate_csv_items(
+fn validate_csv_items_with_progress_inner<F>(
     zip: &mut ZipArchive<File>,
     manifest: &FcworldManifest,
-) -> Result<Vec<worldflow_core::CsvImportItem>, String> {
+    progress: &mut F,
+) -> Result<Vec<worldflow_core::CsvImportItem>, String>
+where
+    F: FnMut(FcworldPackageProgress),
+{
+    progress(FcworldPackageProgress::AddTotal {
+        amount: WorldflowCsvTable::ordered().len(),
+        phase: "validate_csv",
+        message: "校验 CSV 数据表".to_string(),
+    });
     let mut items = Vec::with_capacity(WorldflowCsvTable::ordered().len());
     for (index, expected_table) in WorldflowCsvTable::ordered().iter().copied().enumerate() {
         let table_manifest = manifest
@@ -237,15 +274,28 @@ fn validate_csv_items(
             file_name: expected_table.file_name().to_string(),
             content,
         });
+        progress(FcworldPackageProgress::Step {
+            phase: "validate_csv",
+            message: format!("已校验 CSV：{}", expected_table.file_name()),
+        });
     }
     Ok(items)
 }
 
-fn validate_assets_index(
+fn validate_assets_index_with_progress_inner<F>(
     zip: &mut ZipArchive<File>,
     zip_names: &HashSet<String>,
     manifest: &FcworldManifest,
-) -> Result<(FcworldAssetsIndex, HashMap<String, Vec<u8>>), String> {
+    progress: &mut F,
+) -> Result<(FcworldAssetsIndex, HashMap<String, Vec<u8>>), String>
+where
+    F: FnMut(FcworldPackageProgress),
+{
+    progress(FcworldPackageProgress::AddTotal {
+        amount: 1,
+        phase: "validate_assets",
+        message: "读取资源索引".to_string(),
+    });
     let assets_index_json = read_zip_text(zip, ASSETS_INDEX_PATH)?;
     let assets_sha = sha256_hex(assets_index_json.as_bytes());
     if assets_sha != manifest.contents.assets_index.sha256 {
@@ -263,6 +313,15 @@ fn validate_assets_index(
             assets_index.assets.len()
         ));
     }
+    progress(FcworldPackageProgress::Step {
+        phase: "validate_assets",
+        message: "已校验资源索引".to_string(),
+    });
+    progress(FcworldPackageProgress::AddTotal {
+        amount: assets_index.assets.len(),
+        phase: "validate_assets",
+        message: "校验资源文件".to_string(),
+    });
 
     let mut asset_ids = HashSet::new();
     let mut asset_paths = HashSet::new();
@@ -306,6 +365,10 @@ fn validate_assets_index(
             return Err(format!("资源尺寸不匹配: {}", asset.path));
         }
         bytes_by_path.insert(asset.path.clone(), bytes);
+        progress(FcworldPackageProgress::Step {
+            phase: "validate_assets",
+            message: format!("已校验资源：{}", asset.path),
+        });
     }
 
     for name in zip_names
@@ -320,10 +383,19 @@ fn validate_assets_index(
     Ok((assets_index, bytes_by_path))
 }
 
-fn validate_maps_json(
+fn validate_maps_json_with_progress_inner<F>(
     zip: &mut ZipArchive<File>,
     manifest: &FcworldManifest,
-) -> Result<String, String> {
+    progress: &mut F,
+) -> Result<String, String>
+where
+    F: FnMut(FcworldPackageProgress),
+{
+    progress(FcworldPackageProgress::AddTotal {
+        amount: 1,
+        phase: "validate_maps",
+        message: "校验地图数据".to_string(),
+    });
     let maps_json = read_zip_text(zip, MAPS_PATH)?;
     let maps_sha = sha256_hex(maps_json.as_bytes());
     if maps_sha != manifest.contents.maps.sha256 {
@@ -342,13 +414,29 @@ fn validate_maps_json(
             maps.len()
         ));
     }
+    progress(FcworldPackageProgress::Step {
+        phase: "validate_maps",
+        message: "已校验地图数据".to_string(),
+    });
     Ok(maps_json)
 }
 
+#[cfg(test)]
 pub(super) fn read_and_validate_fcworld_package(
     input_path: &Path,
     current_schema_version: u32,
 ) -> Result<ValidatedFcworldPackage, String> {
+    read_and_validate_fcworld_package_with_progress(input_path, current_schema_version, |_| {})
+}
+
+pub(super) fn read_and_validate_fcworld_package_with_progress<F>(
+    input_path: &Path,
+    current_schema_version: u32,
+    mut progress: F,
+) -> Result<ValidatedFcworldPackage, String>
+where
+    F: FnMut(FcworldPackageProgress),
+{
     if !input_path.exists() {
         return Err(format!("导入文件不存在: {:?}", input_path));
     }
@@ -362,14 +450,32 @@ pub(super) fn read_and_validate_fcworld_package(
     let file =
         File::open(input_path).map_err(|e| format!("打开导入文件失败 {:?}: {e}", input_path))?;
     let mut zip = ZipArchive::new(file).map_err(|e| format!("读取 fcworld zip 失败: {e}"))?;
-    let zip_names = validate_known_zip_entries(&mut zip)?;
+    progress(FcworldPackageProgress::AddTotal {
+        amount: 1,
+        phase: "validate_open",
+        message: "读取导入包".to_string(),
+    });
+    progress(FcworldPackageProgress::Step {
+        phase: "validate_open",
+        message: "已读取导入包".to_string(),
+    });
+    let zip_names = validate_known_zip_entries_with_progress(&mut zip, &mut progress)?;
 
+    progress(FcworldPackageProgress::AddTotal {
+        amount: 1,
+        phase: "validate_manifest",
+        message: "校验 manifest".to_string(),
+    });
     let manifest_json = read_zip_text(&mut zip, "manifest.json")?;
     let manifest = validate_manifest(&manifest_json, current_schema_version)?;
-    let csv_items = validate_csv_items(&mut zip, &manifest)?;
+    progress(FcworldPackageProgress::Step {
+        phase: "validate_manifest",
+        message: "已校验 manifest".to_string(),
+    });
+    let csv_items = validate_csv_items_with_progress_inner(&mut zip, &manifest, &mut progress)?;
     let (assets_index, asset_bytes_by_path) =
-        validate_assets_index(&mut zip, &zip_names, &manifest)?;
-    let maps_json = validate_maps_json(&mut zip, &manifest)?;
+        validate_assets_index_with_progress_inner(&mut zip, &zip_names, &manifest, &mut progress)?;
+    let maps_json = validate_maps_json_with_progress_inner(&mut zip, &manifest, &mut progress)?;
 
     Ok(ValidatedFcworldPackage {
         manifest,

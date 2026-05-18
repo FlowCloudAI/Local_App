@@ -6,11 +6,13 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Write;
+use std::sync::Mutex as StdMutex;
+use tauri::Emitter;
 use zip::{ZipWriter, write::SimpleFileOptions};
 
 use worldflow_core::{
-    CsvExportItem, CsvImportBundle, CsvImportMode, CsvImportResult, ProjectCsvExport, ProjectOps,
-    WorldflowCsvTable, models::Project,
+    CsvExportItem, CsvExportScope, CsvImportBundle, CsvImportMode, CsvImportProgressPhase,
+    CsvImportResult, ProjectCsvExport, ProjectOps, WorldflowCsvTable, models::Project,
 };
 
 mod import;
@@ -20,6 +22,7 @@ const FCWORLD_FORMAT_VERSION: u32 = 1;
 const WORLD_DATA_DIR: &str = "data/worldflow/";
 const ASSETS_INDEX_PATH: &str = "assets/index.json";
 const MAPS_PATH: &str = "maps/maps.json";
+const FCWORLD_PROGRESS_EVENT: &str = "fcworld:progress";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +62,144 @@ pub struct FcworldImportResult {
     pub file_size: u64,
     pub imported_rows: FcworldImportRows,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FcworldProgressEvent {
+    pub operation_id: String,
+    pub kind: String,
+    pub phase: String,
+    pub message: String,
+    pub current: usize,
+    pub total: usize,
+    pub percent: u8,
+    pub status: String,
+}
+
+#[derive(Clone)]
+struct FcworldProgressEmitter {
+    app: Option<AppHandle>,
+    operation_id: Option<String>,
+    kind: &'static str,
+}
+
+impl FcworldProgressEmitter {
+    fn new(app: Option<AppHandle>, operation_id: Option<String>, kind: &'static str) -> Self {
+        Self {
+            app,
+            operation_id,
+            kind,
+        }
+    }
+
+    #[cfg(test)]
+    fn disabled(kind: &'static str) -> Self {
+        Self::new(None, None, kind)
+    }
+
+    fn emit(
+        &self,
+        phase: impl Into<String>,
+        message: impl Into<String>,
+        current: usize,
+        total: usize,
+        status: &'static str,
+    ) {
+        let (Some(app), Some(operation_id)) = (&self.app, &self.operation_id) else {
+            return;
+        };
+        let percent = if total == 0 {
+            100
+        } else {
+            ((current.min(total) * 100) / total).min(100) as u8
+        };
+        let _ = app.emit(
+            FCWORLD_PROGRESS_EVENT,
+            FcworldProgressEvent {
+                operation_id: operation_id.clone(),
+                kind: self.kind.to_string(),
+                phase: phase.into(),
+                message: message.into(),
+                current,
+                total,
+                percent,
+                status: status.to_string(),
+            },
+        );
+    }
+
+    fn running(
+        &self,
+        phase: impl Into<String>,
+        message: impl Into<String>,
+        current: usize,
+        total: usize,
+    ) {
+        self.emit(phase, message, current, total, "running");
+    }
+
+    fn done(&self, message: impl Into<String>, total: usize) {
+        self.emit("done", message, total, total, "done");
+    }
+
+    fn error(&self, message: impl Into<String>, current: usize, total: usize) {
+        self.emit("error", message, current, total, "error");
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct FcworldProgressState {
+    current: usize,
+    total: usize,
+}
+
+#[derive(Clone)]
+struct FcworldProgressTracker {
+    emitter: FcworldProgressEmitter,
+    state: Arc<StdMutex<FcworldProgressState>>,
+}
+
+impl FcworldProgressTracker {
+    fn new(emitter: FcworldProgressEmitter, total: usize) -> Self {
+        Self {
+            emitter,
+            state: Arc::new(StdMutex::new(FcworldProgressState { current: 0, total })),
+        }
+    }
+
+    fn add_total(&self, amount: usize, phase: &str, message: impl Into<String>) {
+        if amount == 0 {
+            return;
+        }
+        let mut state = self.state.lock().expect("fcworld progress state poisoned");
+        state.total = state.total.saturating_add(amount);
+        self.emitter
+            .running(phase, message, state.current, state.total);
+    }
+
+    fn step(&self, phase: &str, message: impl Into<String>) {
+        let mut state = self.state.lock().expect("fcworld progress state poisoned");
+        state.current = state.current.saturating_add(1).min(state.total.max(1));
+        self.emitter
+            .running(phase, message, state.current, state.total);
+    }
+
+    fn note(&self, phase: &str, message: impl Into<String>) {
+        let state = self.state.lock().expect("fcworld progress state poisoned");
+        self.emitter
+            .running(phase, message, state.current, state.total);
+    }
+
+    fn done(&self, message: impl Into<String>) {
+        let state = self.state.lock().expect("fcworld progress state poisoned");
+        self.emitter.done(message, state.total);
+    }
+
+    fn error(&self, message: impl Into<String>) {
+        let state = self.state.lock().expect("fcworld progress state poisoned");
+        self.emitter.error(message, state.current, state.total);
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -514,10 +655,14 @@ fn write_csv_records(headers: &StringRecord, rows: &[Vec<String>]) -> Result<Str
     String::from_utf8(bytes).map_err(|e| format!("CSV 内容不是 UTF-8: {}", e))
 }
 
-fn rewrite_project_csv(
+fn rewrite_project_csv<F>(
     item: CsvExportItem,
     collector: &mut AssetCollector,
-) -> Result<CsvRewriteOutput, String> {
+    on_asset: &mut F,
+) -> Result<CsvRewriteOutput, String>
+where
+    F: FnMut(&str),
+{
     if item.row_count == 0 || item.content.trim().is_empty() {
         return Ok(CsvRewriteOutput {
             item,
@@ -557,6 +702,7 @@ fn rewrite_project_csv(
                 "cover_image",
             )?;
             fields[cover_index] = encode_csv_opt_string(Some(&asset.path))?;
+            on_asset(&asset.path);
             cover_asset_id = Some(asset.id);
         }
         rows.push(fields);
@@ -570,11 +716,15 @@ fn rewrite_project_csv(
     })
 }
 
-fn rewrite_entry_images_json(
+fn rewrite_entry_images_json<F>(
     raw: &str,
     entry_id: &str,
     collector: &mut AssetCollector,
-) -> Result<String, String> {
+    on_asset: &mut F,
+) -> Result<String, String>
+where
+    F: FnMut(&str),
+{
     let mut value = serde_json::from_str::<Value>(raw)
         .map_err(|e| format!("解析 entries.images JSON 失败 entry_id={entry_id}: {e}"))?;
     let images = value
@@ -600,6 +750,7 @@ fn rewrite_entry_images_json(
             entry_id,
             "images",
         )?;
+        on_asset(&asset.path);
         object.insert("path".to_string(), Value::String(asset.path));
     }
 
@@ -607,10 +758,14 @@ fn rewrite_entry_images_json(
         .map_err(|e| format!("序列化 entries.images JSON 失败 entry_id={entry_id}: {e}"))
 }
 
-fn rewrite_entries_csv(
+fn rewrite_entries_csv<F>(
     item: CsvExportItem,
     collector: &mut AssetCollector,
-) -> Result<CsvRewriteOutput, String> {
+    on_asset: &mut F,
+) -> Result<CsvRewriteOutput, String>
+where
+    F: FnMut(&str),
+{
     if item.row_count == 0 || item.content.trim().is_empty() {
         return Ok(CsvRewriteOutput {
             item,
@@ -637,7 +792,8 @@ fn rewrite_entries_csv(
         let entry_id = fields.get(id_index).cloned().unwrap_or_default();
 
         if let Some(images) = fields.get(images_index).cloned() {
-            fields[images_index] = rewrite_entry_images_json(&images, &entry_id, collector)?;
+            fields[images_index] =
+                rewrite_entry_images_json(&images, &entry_id, collector, on_asset)?;
         }
 
         let cover_path = fields
@@ -654,6 +810,7 @@ fn rewrite_entries_csv(
                 "cover_path",
             )?;
             fields[cover_index] = encode_csv_opt_string(Some(&asset.path))?;
+            on_asset(&asset.path);
         }
 
         rows.push(fields);
@@ -667,17 +824,21 @@ fn rewrite_entries_csv(
     })
 }
 
-fn rewrite_csv_items(
+fn rewrite_csv_items<F>(
     export: ProjectCsvExport,
     collector: &mut AssetCollector,
-) -> Result<(Vec<CsvExportItem>, Option<String>), String> {
+    on_asset: &mut F,
+) -> Result<(Vec<CsvExportItem>, Option<String>), String>
+where
+    F: FnMut(&str),
+{
     let mut items = Vec::with_capacity(export.items.len());
     let mut cover_asset_id = None;
 
     for item in export.items {
         let output = match item.table {
-            WorldflowCsvTable::Projects => rewrite_project_csv(item, collector)?,
-            WorldflowCsvTable::Entries => rewrite_entries_csv(item, collector)?,
+            WorldflowCsvTable::Projects => rewrite_project_csv(item, collector, on_asset)?,
+            WorldflowCsvTable::Entries => rewrite_entries_csv(item, collector, on_asset)?,
             _ => CsvRewriteOutput {
                 item,
                 project_cover_asset_id: None,
@@ -760,12 +921,16 @@ fn load_map_store_value(paths: &PathsState, project_id: &Uuid) -> Result<Value, 
     }))
 }
 
-fn rewrite_scene_json_background(
+fn rewrite_scene_json_background<F>(
     scene_json: &str,
     map_id: &str,
     collector: &mut AssetCollector,
     reused_background: Option<(&str, &str)>,
-) -> Result<String, String> {
+    on_asset: &mut F,
+) -> Result<String, String>
+where
+    F: FnMut(&str),
+{
     let mut scene = serde_json::from_str::<Value>(scene_json)
         .map_err(|e| format!("解析地图 sceneJson 失败 map_id={map_id}: {e}"))?;
     let Some(url_value) = scene.pointer_mut("/backgroundImage/url") else {
@@ -791,6 +956,7 @@ fn rewrite_scene_json_background(
             map_id,
             "sceneJson.backgroundImage.url",
         )?;
+        on_asset(&asset.path);
         *url_value = Value::String(asset.path);
         return serde_json::to_string(&scene)
             .map_err(|e| format!("序列化地图 sceneJson 失败 map_id={map_id}: {e}"));
@@ -799,11 +965,15 @@ fn rewrite_scene_json_background(
     Ok(scene_json.to_string())
 }
 
-fn rewrite_maps_json(
+fn rewrite_maps_json<F>(
     paths: &PathsState,
     project_id: &Uuid,
     collector: &mut AssetCollector,
-) -> Result<(String, usize), String> {
+    on_asset: &mut F,
+) -> Result<(String, usize), String>
+where
+    F: FnMut(&str),
+{
     let mut value = load_map_store_value(paths, project_id)?;
     let maps = value
         .get_mut("maps")
@@ -832,6 +1002,7 @@ fn rewrite_maps_json(
                         &map_id,
                         "backgroundImageUrl",
                     )?;
+                    on_asset(&asset.path);
                     *background_value = Value::String(asset.path.clone());
                     rewritten_background = Some((background_url, asset.path));
                 }
@@ -848,6 +1019,7 @@ fn rewrite_maps_json(
                         rewritten_background
                             .as_ref()
                             .map(|(old, new)| (old.as_str(), new.as_str())),
+                        on_asset,
                     )?;
                     *scene_value = Value::String(rewritten);
                 }
@@ -858,6 +1030,154 @@ fn rewrite_maps_json(
     serde_json::to_string_pretty(&value)
         .map(|content| (content, map_count))
         .map_err(|e| format!("序列化地图导出数据失败: {}", e))
+}
+
+fn count_project_asset_candidates(item: &CsvExportItem) -> Result<usize, String> {
+    if item.row_count == 0 || item.content.trim().is_empty() {
+        return Ok(0);
+    }
+    let mut reader = csv::Reader::from_reader(item.content.as_bytes());
+    let headers = reader
+        .headers()
+        .map_err(|e| format!("读取 projects.csv 表头失败: {}", e))?
+        .clone();
+    let cover_index = header_index(&headers, "cover_image")?;
+    let mut count = 0usize;
+    for record in reader.records() {
+        let record = record.map_err(|e| format!("读取 projects.csv 记录失败: {}", e))?;
+        let cover_path = record
+            .get(cover_index)
+            .map(decode_csv_opt_string)
+            .transpose()?
+            .flatten();
+        if cover_path
+            .as_deref()
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+        {
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+fn count_entry_images_candidates(raw: &str, entry_id: &str) -> Result<usize, String> {
+    if raw.trim().is_empty() {
+        return Ok(0);
+    }
+    let value = serde_json::from_str::<Value>(raw)
+        .map_err(|e| format!("解析 entries.images JSON 失败 entry_id={entry_id}: {e}"))?;
+    let images = value
+        .as_array()
+        .ok_or_else(|| format!("entries.images 不是数组 entry_id={entry_id}"))?;
+    Ok(images
+        .iter()
+        .filter(|image| {
+            image
+                .get("path")
+                .and_then(Value::as_str)
+                .map(|path| !path.trim().is_empty())
+                .unwrap_or(false)
+        })
+        .count())
+}
+
+fn count_entry_asset_candidates(item: &CsvExportItem) -> Result<usize, String> {
+    if item.row_count == 0 || item.content.trim().is_empty() {
+        return Ok(0);
+    }
+    let mut reader = csv::Reader::from_reader(item.content.as_bytes());
+    let headers = reader
+        .headers()
+        .map_err(|e| format!("读取 entries.csv 表头失败: {}", e))?
+        .clone();
+    let id_index = header_index(&headers, "id")?;
+    let images_index = header_index(&headers, "images")?;
+    let cover_index = header_index(&headers, "cover_path")?;
+    let mut count = 0usize;
+    for record in reader.records() {
+        let record = record.map_err(|e| format!("读取 entries.csv 记录失败: {}", e))?;
+        let entry_id = record.get(id_index).unwrap_or_default();
+        count += count_entry_images_candidates(record.get(images_index).unwrap_or_default(), entry_id)?;
+        let cover_path = record
+            .get(cover_index)
+            .map(decode_csv_opt_string)
+            .transpose()?
+            .flatten();
+        if cover_path
+            .as_deref()
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false)
+        {
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+fn count_scene_background_candidate(
+    scene_json: &str,
+    map_id: &str,
+    reused_background: Option<&str>,
+) -> Result<usize, String> {
+    if scene_json.trim().is_empty() {
+        return Ok(0);
+    }
+    let scene = serde_json::from_str::<Value>(scene_json)
+        .map_err(|e| format!("解析地图 sceneJson 失败 map_id={map_id}: {e}"))?;
+    let Some(url) = scene.pointer("/backgroundImage/url").and_then(Value::as_str) else {
+        return Ok(0);
+    };
+    if is_data_url(url) && reused_background != Some(url) {
+        Ok(1)
+    } else {
+        Ok(0)
+    }
+}
+
+fn count_map_asset_candidates(paths: &PathsState, project_id: &Uuid) -> Result<usize, String> {
+    let value = load_map_store_value(paths, project_id)?;
+    let maps = value
+        .get("maps")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "地图文件缺少 maps 数组".to_string())?;
+    let mut count = 0usize;
+    for map in maps {
+        let Some(object) = map.as_object() else {
+            continue;
+        };
+        let map_id = object
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let background_url = object
+            .get("backgroundImageUrl")
+            .and_then(Value::as_str)
+            .filter(|url| is_data_url(url));
+        if background_url.is_some() {
+            count += 1;
+        }
+        if let Some(scene_json) = object.get("sceneJson").and_then(Value::as_str) {
+            count += count_scene_background_candidate(scene_json, map_id, background_url)?;
+        }
+    }
+    Ok(count)
+}
+
+fn count_export_asset_candidates(
+    paths: &PathsState,
+    project_id: &Uuid,
+    items: &[CsvExportItem],
+) -> Result<usize, String> {
+    let mut count = count_map_asset_candidates(paths, project_id)?;
+    for item in items {
+        count += match item.table {
+            WorldflowCsvTable::Projects => count_project_asset_candidates(item)?,
+            WorldflowCsvTable::Entries => count_entry_asset_candidates(item)?,
+            _ => 0,
+        };
+    }
+    Ok(count)
 }
 
 fn csv_row_count(items: &[CsvExportItem], table: WorldflowCsvTable) -> usize {
@@ -956,15 +1276,29 @@ fn build_manifest(
     serde_json::to_string_pretty(&manifest).map_err(|e| format!("序列化 manifest 失败: {}", e))
 }
 
+#[cfg(test)]
 fn prepare_fcworld_package(
     paths: &PathsState,
     project: Project,
     export: ProjectCsvExport,
 ) -> Result<PreparedFcworldPackage, String> {
+    prepare_fcworld_package_with_progress(paths, project, export, |_| {})
+}
+
+fn prepare_fcworld_package_with_progress<F>(
+    paths: &PathsState,
+    project: Project,
+    export: ProjectCsvExport,
+    mut on_asset: F,
+) -> Result<PreparedFcworldPackage, String>
+where
+    F: FnMut(&str),
+{
     let package_id = Uuid::new_v4().to_string();
     let mut collector = AssetCollector::default();
-    let (csv_items, cover_asset_id) = rewrite_csv_items(export.clone(), &mut collector)?;
-    let (maps_json, map_count) = rewrite_maps_json(paths, &project.id, &mut collector)?;
+    let (csv_items, cover_asset_id) = rewrite_csv_items(export.clone(), &mut collector, &mut on_asset)?;
+    let (maps_json, map_count) =
+        rewrite_maps_json(paths, &project.id, &mut collector, &mut on_asset)?;
     let (index_assets, package_assets) = collector.into_parts();
     let asset_count = index_assets.len();
     let assets_index_json = serde_json::to_string_pretty(&FcworldAssetsIndex {
@@ -1018,10 +1352,22 @@ fn write_zip_entry(
         .map_err(|e| format!("写入 zip 内容失败 {path}: {e}"))
 }
 
+#[cfg(test)]
 fn write_fcworld_package(
     package: &PreparedFcworldPackage,
     output_path: &Path,
 ) -> Result<u64, String> {
+    write_fcworld_package_with_progress(package, output_path, |_| {})
+}
+
+fn write_fcworld_package_with_progress<F>(
+    package: &PreparedFcworldPackage,
+    output_path: &Path,
+    mut on_entry: F,
+) -> Result<u64, String>
+where
+    F: FnMut(&str),
+{
     if let Some(parent) = output_path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -1047,13 +1393,11 @@ fn write_fcworld_package(
         "manifest.json",
         package.manifest_json.as_bytes(),
     )?;
+    on_entry("manifest.json");
     for item in &package.csv_items {
-        write_zip_entry(
-            &mut zip,
-            options,
-            &format!("{WORLD_DATA_DIR}{}", item.file_name),
-            item.content.as_bytes(),
-        )?;
+        let path = format!("{WORLD_DATA_DIR}{}", item.file_name);
+        write_zip_entry(&mut zip, options, &path, item.content.as_bytes())?;
+        on_entry(&path);
     }
     write_zip_entry(
         &mut zip,
@@ -1061,10 +1405,13 @@ fn write_fcworld_package(
         ASSETS_INDEX_PATH,
         package.assets_index_json.as_bytes(),
     )?;
+    on_entry(ASSETS_INDEX_PATH);
     for asset in &package.assets {
         write_zip_entry(&mut zip, options, &asset.path, &asset.bytes)?;
+        on_entry(&asset.path);
     }
     write_zip_entry(&mut zip, options, MAPS_PATH, package.maps_json.as_bytes())?;
+    on_entry(MAPS_PATH);
 
     zip.finish()
         .map_err(|e| format!("完成 zip 写入失败 {:?}: {}", temp_path, e))?;
@@ -1126,6 +1473,31 @@ fn expected_import_rows(
         }
     }
     Ok(rows)
+}
+
+fn total_import_rows(rows: &FcworldImportRows) -> usize {
+    rows.projects
+        + rows.categories
+        + rows.entries
+        + rows.tag_schemas
+        + rows.entry_types
+        + rows.relations
+        + rows.links
+        + rows.idea_notes
+}
+
+fn track_package_validation_progress(
+    tracker: &FcworldProgressTracker,
+    event: import::FcworldPackageProgress,
+) {
+    match event {
+        import::FcworldPackageProgress::AddTotal {
+            amount,
+            phase,
+            message,
+        } => tracker.add_total(amount, phase, message),
+        import::FcworldPackageProgress::Step { phase, message } => tracker.step(phase, message),
+    }
 }
 
 fn normalize_project_name(name: &str) -> String {
@@ -1265,10 +1637,14 @@ fn resolve_import_decision(
     }
 }
 
-fn write_prepared_import_files(
+fn write_prepared_import_files_with_progress<F>(
     package: &import::PreparedFcworldImport,
     paths: &PathsState,
-) -> Result<(), String> {
+    mut on_file: F,
+) -> Result<(), String>
+where
+    F: FnMut(&str),
+{
     if !package.assets.is_empty() {
         let image_dir = import::import_images_dir(paths, &package.new_project_id)?;
         std::fs::create_dir_all(&image_dir)
@@ -1285,6 +1661,8 @@ fn write_prepared_import_files(
         }
         std::fs::write(&asset.target_path, &asset.bytes)
             .map_err(|e| format!("写入导入资源失败 {:?}: {e}", asset.target_path))?;
+        let path_text = asset.target_path.to_string_lossy();
+        on_file(path_text.as_ref());
     }
 
     let map_path = map_store_path(paths, &package.new_project_id)?;
@@ -1296,7 +1674,10 @@ fn write_prepared_import_files(
         return Err(format!("导入地图目标已存在: {:?}", map_path));
     }
     std::fs::write(&map_path, &package.maps_json)
-        .map_err(|e| format!("写入导入地图失败 {:?}: {e}", map_path))
+        .map_err(|e| format!("写入导入地图失败 {:?}: {e}", map_path))?;
+    let path_text = map_path.to_string_lossy();
+    on_file(path_text.as_ref());
+    Ok(())
 }
 
 fn cleanup_prepared_import_files(
@@ -1387,24 +1768,61 @@ async fn import_fcworld_package_to_db(
     paths: &PathsState,
     input_path: &Path,
     options: Option<FcworldImportOptions>,
+    progress: FcworldProgressTracker,
 ) -> Result<FcworldImportResult, String> {
     let existing_projects = db.list_projects().await.map_err(|e| e.to_string())?;
-    let validated =
-        import::read_and_validate_fcworld_package(input_path, db.worldflow_schema_version())?;
+    let progress_for_validation = progress.clone();
+    let validated = import::read_and_validate_fcworld_package_with_progress(
+        input_path,
+        db.worldflow_schema_version(),
+        move |event| track_package_validation_progress(&progress_for_validation, event),
+    )?;
     let decision = resolve_import_decision(&validated, &existing_projects, options)?;
     let prepared = import::prepare_fcworld_import(validated, paths, &decision.project_name)?;
     let expected_rows = expected_import_rows(&prepared.csv_items)?;
 
-    if let Err(error) = write_prepared_import_files(&prepared, paths) {
+    progress.add_total(
+        prepared.assets.len() + 1,
+        "write_files",
+        "写入导入资源和地图",
+    );
+    if let Err(error) = write_prepared_import_files_with_progress(&prepared, paths, |path| {
+        progress.step("write_files", format!("已写入导入文件：{path}"));
+    }) {
         return Err(cleanup_after_file_write_error(&prepared, paths, error));
     }
 
+    let db_row_total = total_import_rows(&expected_rows);
+    progress.add_total(db_row_total, "import_db", "写入导入数据库");
     let import_result = match db
-        .import_csvs(
+        .import_csvs_with_progress(
             CsvImportBundle {
                 items: prepared.csv_items.clone(),
             },
             CsvImportMode::Merge,
+            |event| match event.phase {
+                CsvImportProgressPhase::TableStarted => {
+                    progress.note("import_db", format!("开始写入 {}", event.table.file_name()));
+                }
+                CsvImportProgressPhase::RowProcessed => {
+                    progress.step(
+                        "import_db",
+                        format!(
+                            "写入 {}：{}/{} 行，新增 {} 行",
+                            event.table.file_name(),
+                            event.current,
+                            event.total,
+                            event.inserted
+                        ),
+                    );
+                }
+                CsvImportProgressPhase::TableFinished => {
+                    progress.note(
+                        "import_db",
+                        format!("完成写入 {}", event.table.file_name()),
+                    );
+                }
+            },
         )
         .await
     {
@@ -1428,7 +1846,41 @@ async fn import_fcworld_package_to_db(
     }
 
     let mut warnings = prepared.warnings.clone();
+    progress.add_total(
+        expected_rows.entries,
+        "thumbnails",
+        "生成导入词条主图缩略图",
+    );
+    match super::images::ensure_project_cover_thumbnails_with_progress(
+        db,
+        paths,
+        &prepared.new_project_id,
+        |current, total| {
+            if total > 0 {
+                progress.step(
+                    "thumbnails",
+                    format!("生成主图缩略图：{current}/{total}"),
+                );
+            }
+        },
+    )
+    .await
+    {
+        Ok(summary) => {
+            if summary.failed > 0 {
+                warnings.push(format!(
+                    "{} 个词条主图缩略图生成失败，已保留原图路径",
+                    summary.failed
+                ));
+            }
+        }
+        Err(error) => {
+            warnings.push(format!("导入成功，但生成主图缩略图失败：{error}"));
+        }
+    }
+
     if let Some(target) = decision.overwrite_target {
+        progress.add_total(1, "cleanup", "清理覆盖目标世界观");
         if let Err(error) = db.delete_project(&target.project_id).await {
             let reason = format!("删除覆盖目标世界观失败: {error}");
             return Err(rollback_after_import_row_mismatch(db, &prepared, paths, reason).await);
@@ -1438,6 +1890,7 @@ async fn import_fcworld_package_to_db(
                 "覆盖导入已写入，但清理原世界观文件失败，需要人工介入：{error}"
             ));
         }
+        progress.step("cleanup", "已清理覆盖目标世界观");
         warnings.push(format!("已覆盖原世界观：{}", target.project_name));
     }
 
@@ -1458,10 +1911,15 @@ async fn import_fcworld_package_to_db(
 async fn preview_fcworld_package(
     db: &SqliteDb,
     input_path: &Path,
+    progress: FcworldProgressTracker,
 ) -> Result<FcworldImportPreview, String> {
     let existing_projects = db.list_projects().await.map_err(|e| e.to_string())?;
-    let validated =
-        import::read_and_validate_fcworld_package(input_path, db.worldflow_schema_version())?;
+    let progress_for_validation = progress.clone();
+    let validated = import::read_and_validate_fcworld_package_with_progress(
+        input_path,
+        db.worldflow_schema_version(),
+        move |event| track_package_validation_progress(&progress_for_validation, event),
+    )?;
     Ok(import_preview_from_package(
         input_path,
         &validated,
@@ -1471,64 +1929,131 @@ async fn preview_fcworld_package(
 
 #[tauri::command]
 pub async fn db_export_project_fcworld(
+    app: AppHandle,
     state: State<'_, Arc<Mutex<AppState>>>,
     paths: State<'_, PathsState>,
     project_id: String,
     output_path: String,
+    operation_id: Option<String>,
 ) -> Result<FcworldExportResult, String> {
-    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let output_path_buf = PathBuf::from(&output_path);
+    let progress = FcworldProgressTracker::new(
+        FcworldProgressEmitter::new(Some(app), operation_id, "export"),
+        WorldflowCsvTable::ordered().len(),
+    );
+    let result = async {
+        let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+        let output_path_buf = PathBuf::from(&output_path);
 
-    let (project, export) = {
-        let state = state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
-        let project = db
-            .get_project(&project_id)
-            .await
-            .map_err(|e| e.to_string())?;
-        let export = db
-            .export_project_csvs(project_id)
-            .await
-            .map_err(|e| e.to_string())?;
-        (project, export)
-    };
+        let (project, export) = {
+            let state = state.inner().lock().await;
+            let db = state.sqlite_db.lock().await;
+            let project = db
+                .get_project(&project_id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let mut items = Vec::with_capacity(WorldflowCsvTable::ordered().len());
+            for table in WorldflowCsvTable::ordered() {
+                let item = db
+                    .export_csv_table(*table, CsvExportScope::Project { project_id })
+                    .await
+                    .map_err(|e| e.to_string())?;
+                progress.step("export_csv", format!("已导出 CSV：{}", item.file_name));
+                items.push(item);
+            }
+            let export = ProjectCsvExport {
+                project_id,
+                schema_version: db.worldflow_schema_version(),
+                items,
+            };
+            (project, export)
+        };
 
-    let package = prepare_fcworld_package(paths.inner(), project, export)?;
-    let file_size = write_fcworld_package(&package, &output_path_buf)?;
+        let asset_total = count_export_asset_candidates(paths.inner(), &project_id, &export.items)?;
+        progress.add_total(asset_total, "export_assets", "处理导出图片资源");
+        progress.add_total(1, "export_maps", "处理导出地图数据");
+        let package = prepare_fcworld_package_with_progress(paths.inner(), project, export, |path| {
+            progress.step("export_assets", format!("已处理资源：{path}"));
+        })?;
+        progress.step("export_maps", "已处理地图数据");
 
-    Ok(FcworldExportResult {
-        output_path: output_path_buf.to_string_lossy().to_string(),
-        package_id: package.package_id,
-        project_id: package.project_id.to_string(),
-        asset_count: package.asset_count,
-        map_count: package.map_count,
-        file_size,
-        warnings: package.warnings,
-    })
+        let zip_total = 1 + package.csv_items.len() + 1 + package.assets.len() + 1;
+        progress.add_total(zip_total, "write_zip", "写入 fcworld 压缩包");
+        let file_size = write_fcworld_package_with_progress(&package, &output_path_buf, |path| {
+            progress.step("write_zip", format!("已写入包内文件：{path}"));
+        })?;
+
+        Ok(FcworldExportResult {
+            output_path: output_path_buf.to_string_lossy().to_string(),
+            package_id: package.package_id,
+            project_id: package.project_id.to_string(),
+            asset_count: package.asset_count,
+            map_count: package.map_count,
+            file_size,
+            warnings: package.warnings,
+        })
+    }
+    .await;
+
+    match &result {
+        Ok(_) => progress.done("导出世界完成"),
+        Err(error) => progress.error(format!("导出世界失败：{error}")),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn db_import_project_fcworld(
+    app: AppHandle,
     state: State<'_, Arc<Mutex<AppState>>>,
     paths: State<'_, PathsState>,
     input_path: String,
     options: Option<FcworldImportOptions>,
+    operation_id: Option<String>,
 ) -> Result<FcworldImportResult, String> {
-    let input_path_buf = PathBuf::from(&input_path);
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
-    import_fcworld_package_to_db(&db, paths.inner(), &input_path_buf, options).await
+    let progress = FcworldProgressTracker::new(
+        FcworldProgressEmitter::new(Some(app), operation_id, "import"),
+        0,
+    );
+    let result = async {
+        let input_path_buf = PathBuf::from(&input_path);
+        let state = state.inner().lock().await;
+        let db = state.sqlite_db.lock().await;
+        import_fcworld_package_to_db(&db, paths.inner(), &input_path_buf, options, progress.clone())
+            .await
+    }
+    .await;
+
+    match &result {
+        Ok(_) => progress.done("导入世界完成"),
+        Err(error) => progress.error(format!("导入世界失败：{error}")),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn db_preview_project_fcworld(
+    app: AppHandle,
     state: State<'_, Arc<Mutex<AppState>>>,
     input_path: String,
+    operation_id: Option<String>,
 ) -> Result<FcworldImportPreview, String> {
-    let input_path_buf = PathBuf::from(&input_path);
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
-    preview_fcworld_package(&db, &input_path_buf).await
+    let progress = FcworldProgressTracker::new(
+        FcworldProgressEmitter::new(Some(app), operation_id, "import"),
+        0,
+    );
+    let result = async {
+        let input_path_buf = PathBuf::from(&input_path);
+        let state = state.inner().lock().await;
+        let db = state.sqlite_db.lock().await;
+        preview_fcworld_package(&db, &input_path_buf, progress.clone()).await
+    }
+    .await;
+
+    match &result {
+        Ok(_) => progress.done("导入预检完成"),
+        Err(error) => progress.error(format!("导入预检失败：{error}")),
+    }
+    result
 }
 
 #[cfg(test)]
@@ -1591,6 +2116,10 @@ mod tests {
             std::fs::create_dir_all(parent).expect("创建图片目录失败");
         }
         std::fs::write(path, png_bytes()).expect("写入测试图片失败");
+    }
+
+    fn disabled_import_progress() -> FcworldProgressTracker {
+        FcworldProgressTracker::new(FcworldProgressEmitter::disabled("import"), 0)
     }
 
     #[tokio::test]
@@ -1665,9 +2194,22 @@ mod tests {
             .export_project_csvs(project.id)
             .await
             .expect("导出项目 CSV 失败");
-        let package = prepare_fcworld_package(&paths, project, export).expect("准备 fcworld 失败");
+        let mut asset_progress = Vec::new();
+        let package = prepare_fcworld_package_with_progress(&paths, project, export, |path| {
+            asset_progress.push(path.to_string());
+        })
+        .expect("准备 fcworld 失败");
+        assert_eq!(asset_progress.len(), package.asset_count);
         let output_path = temp.path().join("测试世界.fcworld");
-        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+        let mut zip_progress = Vec::new();
+        write_fcworld_package_with_progress(&package, &output_path, |path| {
+            zip_progress.push(path.to_string());
+        })
+        .expect("写入 fcworld 失败");
+        assert_eq!(
+            zip_progress.len(),
+            1 + package.csv_items.len() + 1 + package.assets.len() + 1
+        );
 
         let file = File::open(&output_path).expect("打开导出包失败");
         let mut zip = ZipArchive::new(file).expect("读取 zip 失败");
@@ -1731,9 +2273,20 @@ mod tests {
             sha256_hex(entries_csv.as_bytes())
         );
 
-        let validated =
-            import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
-                .expect("导出包应通过导入校验");
+        let mut validation_steps = Vec::new();
+        let validated = import::read_and_validate_fcworld_package_with_progress(
+            &output_path,
+            db.worldflow_schema_version(),
+            |event| {
+                if let import::FcworldPackageProgress::Step { phase, .. } = event {
+                    validation_steps.push(phase.to_string());
+                }
+            },
+        )
+        .expect("导出包应通过导入校验");
+        assert!(validation_steps.iter().any(|phase| phase == "validate_csv"));
+        assert!(validation_steps.iter().any(|phase| phase == "validate_assets"));
+        assert!(validation_steps.iter().any(|phase| phase == "validate_maps"));
         assert_eq!(
             validated.csv_items.len(),
             WorldflowCsvTable::ordered().len()
@@ -2016,7 +2569,13 @@ mod tests {
         let output_path = temp.path().join("可导入世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
-        let result = import_fcworld_package_to_db(&db, &paths, &output_path, None)
+        let result = import_fcworld_package_to_db(
+            &db,
+            &paths,
+            &output_path,
+            None,
+            disabled_import_progress(),
+        )
             .await
             .expect("导入 fcworld 失败");
         let new_project_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
@@ -2056,6 +2615,7 @@ mod tests {
         assert!(imported_entry.images.0[0].path.exists());
         let imported_cover = imported_entry.cover_path.expect("词条封面应导入");
         assert!(Path::new(&imported_cover).starts_with(&import_image_dir));
+        assert!(Path::new(&imported_cover).starts_with(import_image_dir.join("thumbs")));
         assert!(Path::new(&imported_cover).exists());
 
         let imported_maps_path = paths
@@ -2091,7 +2651,7 @@ mod tests {
         let output_path = temp.path().join("重名世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
-        let preview = preview_fcworld_package(&db, &output_path)
+        let preview = preview_fcworld_package(&db, &output_path, disabled_import_progress())
             .await
             .expect("预览导入包失败");
 
@@ -2132,6 +2692,7 @@ mod tests {
                 project_name: Some("用户指定导入名".to_string()),
                 overwrite_project_id: None,
             }),
+            disabled_import_progress(),
         )
         .await
         .expect("重命名导入失败");
@@ -2186,6 +2747,7 @@ mod tests {
                 project_name: None,
                 overwrite_project_id: Some(project.id.to_string()),
             }),
+            disabled_import_progress(),
         )
         .await
         .expect("覆盖导入失败");
