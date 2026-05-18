@@ -4,7 +4,10 @@
 /gen/schemas
 /gen/schemas/*
 /icons/
+!/icons/
 /icons/*
+!/icons/file-types/
+!/icons/file-types/*.svg
 /target-codex-layout/
 /target-codex-layout-release/
 /target-codex-layoutQ4ZCm2/
