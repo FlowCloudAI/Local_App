@@ -25,6 +25,7 @@ use apis::ai_client::usage::*;
 use apis::ai_contradiction::*;
 use apis::ai_summary::*;
 use apis::app_settings::*;
+use apis::feedback::*;
 use apis::layout::*;
 use apis::map::*;
 use apis::map_persistence::*;
@@ -448,6 +449,7 @@ pub fn run() {
             setting_set_api_key,
             setting_has_api_key,
             setting_delete_api_key,
+            submit_public_feedback,
             template_list,
             template_get,
             template_get_default,

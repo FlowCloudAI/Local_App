@@ -213,6 +213,84 @@
     margin-bottom: 0.1rem;
 }
 
+.about-section-feedback {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.about-section-feedback-grid {
+    display: grid;
+    grid-template-columns: minmax(8rem, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.85rem;
+}
+
+.about-section-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    font-weight: 600;
+}
+
+.about-section-field input,
+.about-section-field select,
+.about-section-field textarea {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-surface);
+    color: var(--fc-color-text);
+    font: inherit;
+    font-weight: 500;
+    outline: none;
+    transition:
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        background 0.16s ease;
+}
+
+.about-section-field input,
+.about-section-field select {
+    height: 2.35rem;
+    padding: 0 0.75rem;
+}
+
+.about-section-field textarea {
+    min-height: 7rem;
+    resize: vertical;
+    padding: 0.7rem 0.75rem;
+    line-height: var(--fc-line-height-normal);
+}
+
+.about-section-field input:focus,
+.about-section-field select:focus,
+.about-section-field textarea:focus {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 72%, var(--fc-color-border));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
+}
+
+.about-section-field input::placeholder,
+.about-section-field textarea::placeholder {
+    color: var(--fc-color-text-tertiary);
+}
+
+.about-section-field--wide {
+    width: 100%;
+}
+
+.about-section-feedback-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
 .about-section-action-row {
     display: flex;
     align-items: center;
@@ -274,5 +352,14 @@
 
     .about-section-channel-action {
         margin-left: 3.55rem;
+    }
+
+    .about-section-feedback-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .about-section-feedback-actions {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
