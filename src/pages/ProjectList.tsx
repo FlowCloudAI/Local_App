@@ -1,8 +1,20 @@
 import {type CSSProperties, memo, useCallback, useEffect, useMemo, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
-import {db_list_projects, type Project} from '../api'
+import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
+import {
+    db_get_project,
+    db_import_project_fcworld,
+    db_list_projects,
+    db_preview_project_fcworld,
+    type FcworldImportPreview,
+    type FcworldImportResult,
+    type Project,
+} from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
+import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
+import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
+import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {
     HOME_ACTIVITY_CHANGED_EVENT,
     loadHomeDashboardData,
@@ -89,14 +101,18 @@ function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
 }
 
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
+    const {showAlert} = useAlert()
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(false)
+    const [importing, setImporting] = useState(false)
     const [hasLoadedProjects, setHasLoadedProjects] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
+    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
 
     const loadProjects = useCallback(async () => {
         setLoading(true)
@@ -225,6 +241,105 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         onOpenHomeTarget?.(target)
     }, [onOpenHomeTarget, onOpenProject, projects])
 
+    const openImportedProject = useCallback(async (result: FcworldImportResult) => {
+        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+        const importedProject = await db_get_project(result.projectId)
+        await showAlert(
+            `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源，${result.mapCount} 张地图。`,
+            'success',
+            'nonInvasive',
+            1600,
+        )
+        onOpenProject?.(importedProject)
+    }, [onOpenProject, showAlert])
+
+    const handleImportProject = useCallback(async () => {
+        if (importing) return
+        const selectedPath = await openFileDialog({
+            multiple: false,
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath || Array.isArray(selectedPath)) return
+
+        setImporting(true)
+        try {
+            const previewOperationId = startProgress('import', '检查导入包')
+            const preview = await db_preview_project_fcworld(selectedPath, previewOperationId)
+            if (preview.duplicateProject) {
+                closeProgress()
+                setImportConflict(preview)
+                return
+            }
+            closeProgress()
+            const importOperationId = startProgress('import', '导入世界')
+            const result = await db_import_project_fcworld(selectedPath, {
+                mode: 'rename',
+                projectName: preview.projectName,
+            }, importOperationId)
+            closeProgress()
+            await openImportedProject(result)
+        } catch (error) {
+            closeProgress()
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+        } finally {
+            setImporting(false)
+        }
+    }, [closeProgress, importing, openImportedProject, showAlert, startProgress])
+
+    const handleImportConflictCancel = useCallback(() => {
+        if (!importing) setImportConflict(null)
+    }, [importing])
+
+    const handleImportConflictRename = useCallback(async (projectName: string) => {
+        if (!importConflict || importing) return
+        setImporting(true)
+        try {
+            const operationId = startProgress('import', '导入世界')
+            const result = await db_import_project_fcworld(importConflict.inputPath, {
+                mode: 'rename',
+                projectName,
+            }, operationId)
+            closeProgress()
+            setImportConflict(null)
+            await openImportedProject(result)
+        } catch (error) {
+            closeProgress()
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+        } finally {
+            setImporting(false)
+        }
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+
+    const handleImportConflictOverwrite = useCallback(async () => {
+        if (!importConflict?.duplicateProject || importing) return
+        const confirmed = await showAlert(
+            '选择覆盖后，原世界观的数据会丢失。确定覆盖吗？',
+            'warning',
+            'confirm',
+        )
+        if (confirmed !== 'yes') return
+
+        setImporting(true)
+        try {
+            const operationId = startProgress('import', '导入世界')
+            const result = await db_import_project_fcworld(importConflict.inputPath, {
+                mode: 'overwrite',
+                overwriteProjectId: importConflict.duplicateProject.projectId,
+            }, operationId)
+            closeProgress()
+            setImportConflict(null)
+            await openImportedProject(result)
+        } catch (error) {
+            closeProgress()
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+        } finally {
+            setImporting(false)
+        }
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button
             key={item.key}
@@ -246,6 +361,16 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 onCreated={() => void loadProjects()}
                 existingNames={projects.map(p => p.name)}
             />
+            <ProjectImportConflictDialog
+                open={Boolean(importConflict)}
+                preview={importConflict}
+                existingNames={projects.map(p => p.name)}
+                busy={importing}
+                onCancel={handleImportConflictCancel}
+                onRename={projectName => void handleImportConflictRename(projectName)}
+                onOverwrite={() => void handleImportConflictOverwrite()}
+            />
+            <FcworldProgressDialog progress={fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
                     <section className="project-home-hero">
@@ -356,6 +481,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             <div className="project-list-header-actions fc-page-header-actions">
                                 <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>
                                     开始一个新世界
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={importing}
+                                    onClick={() => void handleImportProject()}
+                                >
+                                    {importing ? '导入中…' : '导入世界'}
                                 </Button>
                                 <Button
                                     type="button"

@@ -2,6 +2,7 @@ pub(crate) mod categories;
 pub(crate) mod common;
 pub(crate) mod entries;
 pub(crate) mod entry_types;
+pub(crate) mod fcworld;
 pub(crate) mod ideas;
 pub(crate) mod images;
 pub(crate) mod links;

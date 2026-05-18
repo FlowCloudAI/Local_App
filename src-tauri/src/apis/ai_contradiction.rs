@@ -213,10 +213,7 @@ pub async fn ai_start_contradiction_session(
     }
     session.set_stream(true).await;
 
-    let conversation_id = session
-        .conversation_id()
-        .map(str::to_string)
-        .unwrap_or_else(|| request.session_id.clone());
+    let conversation_id = request.session_id.clone();
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
     let (event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
@@ -257,6 +254,7 @@ pub async fn ai_start_contradiction_session(
             run_id: run_id.clone(),
             input_tx: input_tx.clone(),
             handle,
+            conversation_id: conversation_id.clone(),
             kind: AiSessionKind::Contradiction,
             model: resolved_model,
             plugin_id: request.plugin_id.clone(),

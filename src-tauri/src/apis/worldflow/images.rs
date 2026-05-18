@@ -155,6 +155,128 @@ pub struct CoverThumbnailMigrationSummary {
     pub failed: usize,
 }
 
+pub(super) async fn ensure_project_cover_thumbnails_with_progress<F>(
+    db: &SqliteDb,
+    paths: &PathsState,
+    project_id: &Uuid,
+    mut progress: F,
+) -> Result<CoverThumbnailMigrationSummary, String>
+where
+    F: FnMut(usize, usize),
+{
+    let mut entries = Vec::new();
+    let mut offset = 0usize;
+    const PAGE_SIZE: usize = 200;
+
+    loop {
+        let batch = db
+            .list_entries(project_id, EntryFilter::default(), PAGE_SIZE, offset)
+            .await
+            .map_err(|e| e.to_string())?;
+        if batch.is_empty() {
+            break;
+        }
+        let batch_len = batch.len();
+        for brief in batch {
+            entries.push(db.get_entry(&brief.id).await.map_err(|e| e.to_string())?);
+        }
+        offset += batch_len;
+        if batch_len < PAGE_SIZE {
+            break;
+        }
+    }
+
+    let total = entries.len();
+    let mut summary = CoverThumbnailMigrationSummary {
+        scanned: 0,
+        generated: 0,
+        skipped: 0,
+        failed: 0,
+    };
+
+    for entry in entries {
+        summary.scanned += 1;
+        let cover_image = entry.images.0.iter().find(|image| image.is_cover);
+        let Some(cover_image) = cover_image else {
+            if entry.cover_path.is_some() {
+                db.update_entry(
+                    &entry.id,
+                    UpdateEntry {
+                        category_id: None,
+                        title: None,
+                        summary: None,
+                        content: None,
+                        r#type: None,
+                        tags: None,
+                        images: None,
+                        cover_path: Some(None),
+                    },
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                summary.generated += 1;
+            } else {
+                summary.skipped += 1;
+            }
+            progress(summary.scanned, total);
+            continue;
+        };
+
+        if entry
+            .cover_path
+            .as_deref()
+            .map(Path::new)
+            .map(is_valid_cover_thumbnail)
+            .unwrap_or(false)
+        {
+            summary.skipped += 1;
+            progress(summary.scanned, total);
+            continue;
+        }
+
+        let thumb_path = match create_entry_cover_thumbnail(paths, project_id, &cover_image.path) {
+            Ok(path) => path,
+            Err(error) => {
+                summary.failed += 1;
+                log::warn!(
+                    "[cover_thumbnail] 迁移词条主图缩略图失败: entry_id={} path={:?} error={}",
+                    entry.id,
+                    cover_image.path,
+                    error
+                );
+                progress(summary.scanned, total);
+                continue;
+            }
+        };
+        let next_cover_path = thumb_path.to_string_lossy().to_string();
+        if entry.cover_path.as_deref() == Some(next_cover_path.as_str()) {
+            summary.skipped += 1;
+            progress(summary.scanned, total);
+            continue;
+        }
+
+        db.update_entry(
+            &entry.id,
+            UpdateEntry {
+                category_id: None,
+                title: None,
+                summary: None,
+                content: None,
+                r#type: None,
+                tags: None,
+                images: None,
+                cover_path: Some(Some(next_cover_path)),
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+        summary.generated += 1;
+        progress(summary.scanned, total);
+    }
+
+    Ok(summary)
+}
+
 #[tauri::command]
 pub fn open_entry_image_path(
     app: AppHandle,
@@ -346,120 +468,7 @@ pub async fn db_ensure_project_cover_thumbnails(
     project_id: String,
 ) -> Result<CoverThumbnailMigrationSummary, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let entries = {
-        let state = state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
-        let mut entries = Vec::new();
-        let mut offset = 0usize;
-        const PAGE_SIZE: usize = 200;
-
-        loop {
-            let batch = db
-                .list_entries(&project_id, EntryFilter::default(), PAGE_SIZE, offset)
-                .await
-                .map_err(|e| e.to_string())?;
-            if batch.is_empty() {
-                break;
-            }
-            let batch_len = batch.len();
-            for brief in batch {
-                entries.push(db.get_entry(&brief.id).await.map_err(|e| e.to_string())?);
-            }
-            offset += batch_len;
-            if batch_len < PAGE_SIZE {
-                break;
-            }
-        }
-
-        entries
-    };
-
-    let mut summary = CoverThumbnailMigrationSummary {
-        scanned: 0,
-        generated: 0,
-        skipped: 0,
-        failed: 0,
-    };
-
-    for entry in entries {
-        summary.scanned += 1;
-        let cover_image = entry.images.0.iter().find(|image| image.is_cover);
-        let Some(cover_image) = cover_image else {
-            if entry.cover_path.is_some() {
-                let state = state.inner().lock().await;
-                let db = state.sqlite_db.lock().await;
-                db.update_entry(
-                    &entry.id,
-                    UpdateEntry {
-                        category_id: None,
-                        title: None,
-                        summary: None,
-                        content: None,
-                        r#type: None,
-                        tags: None,
-                        images: None,
-                        cover_path: Some(None),
-                    },
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-                summary.generated += 1;
-            } else {
-                summary.skipped += 1;
-            }
-            continue;
-        };
-
-        if entry
-            .cover_path
-            .as_deref()
-            .map(Path::new)
-            .map(is_valid_cover_thumbnail)
-            .unwrap_or(false)
-        {
-            summary.skipped += 1;
-            continue;
-        }
-
-        let thumb_path =
-            match create_entry_cover_thumbnail(paths.inner(), &project_id, &cover_image.path) {
-                Ok(path) => path,
-                Err(error) => {
-                    summary.failed += 1;
-                    log::warn!(
-                        "[cover_thumbnail] 迁移词条主图缩略图失败: entry_id={} path={:?} error={}",
-                        entry.id,
-                        cover_image.path,
-                        error
-                    );
-                    continue;
-                }
-            };
-        let next_cover_path = thumb_path.to_string_lossy().to_string();
-        if entry.cover_path.as_deref() == Some(next_cover_path.as_str()) {
-            summary.skipped += 1;
-            continue;
-        }
-
-        let state = state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
-        db.update_entry(
-            &entry.id,
-            UpdateEntry {
-                category_id: None,
-                title: None,
-                summary: None,
-                content: None,
-                r#type: None,
-                tags: None,
-                images: None,
-                cover_path: Some(Some(next_cover_path)),
-            },
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-        summary.generated += 1;
-    }
-
-    Ok(summary)
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    ensure_project_cover_thumbnails_with_progress(&db, paths.inner(), &project_id, |_, _| {}).await
 }

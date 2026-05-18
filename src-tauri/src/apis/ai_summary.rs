@@ -99,13 +99,11 @@ pub async fn ai_generate_entry_summary(
         request.output_mode.as_deref(),
     );
 
-    let (mut session, temp_conv_id) = {
+    let mut session = {
         let client = ai_state.client.lock().await;
-        let session = client
+        client
             .create_llm_session(&request.plugin_id, &api_key, None)
-            .map_err(|e| e.to_string())?;
-        let temp_conv_id = session.conversation_id().map(str::to_string);
-        (session, temp_conv_id)
+            .map_err(|e| e.to_string())?
     };
 
     if let Some(model) = &request.model {
@@ -152,11 +150,6 @@ pub async fn ai_generate_entry_summary(
         Ok(output)
     }
     .await;
-
-    if let Some(conv_id) = temp_conv_id {
-        let client = ai_state.client.lock().await;
-        let _ = client.ai_delete_conversation(&conv_id);
-    }
 
     let output = result?;
     let summary_text = if is_entry_field_mode {

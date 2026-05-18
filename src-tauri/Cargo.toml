@@ -57,6 +57,8 @@ htmd = "0.5"
 base64 = "0.22.1"
 urlencoding = "2"
 zip = { version = "8", default-features = false, features = ["deflate"] }
+csv = "1"
+sha2 = "0.10"
 mime_guess = "2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif", "bmp"] }
 
@@ -79,3 +81,6 @@ worldflow_core = { path = "../../worldflow_core", default-features = false, feat
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
 windows = "0.62"
+
+[dev-dependencies]
+tempfile = "3"

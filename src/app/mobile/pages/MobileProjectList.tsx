@@ -1,8 +1,21 @@
 import {useCallback, useEffect, useState} from 'react'
-import {Button, Card, Input} from 'flowcloudai-ui'
+import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {db_count_entries, db_list_projects, type Project} from '../../../api'
+import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {
+    db_count_entries,
+    db_get_project,
+    db_import_project_fcworld,
+    db_list_projects,
+    db_preview_project_fcworld,
+    type FcworldImportPreview,
+    type FcworldImportResult,
+    type Project,
+} from '../../../api'
+import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
+import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
+import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 
@@ -29,12 +42,16 @@ function formatDate(value?: string | null): string {
 }
 
 export default function MobileProjectList({push, setAiFocus}: Props) {
+    const {showAlert} = useAlert()
     const [projects, setProjects] = useState<Project[]>([])
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(false)
+    const [importing, setImporting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
+    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -86,6 +103,106 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         push({type: 'projectHome', params: {projectId: project.id, displayName: project.name}})
     }, [push, setAiFocus])
 
+    const openImportedProject = useCallback(async (result: FcworldImportResult) => {
+        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+        await load()
+        const project = await db_get_project(result.projectId)
+        await showAlert(
+            `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源。`,
+            'success',
+            'nonInvasive',
+            1400,
+        )
+        handleOpenProject(project)
+    }, [handleOpenProject, load, showAlert])
+
+    const handleImportProject = useCallback(async () => {
+        if (importing) return
+        const selectedPath = await openFileDialog({
+            multiple: false,
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath || Array.isArray(selectedPath)) return
+
+        setImporting(true)
+        try {
+            const previewOperationId = startProgress('import', '检查导入包')
+            const preview = await db_preview_project_fcworld(selectedPath, previewOperationId)
+            if (preview.duplicateProject) {
+                closeProgress()
+                setImportConflict(preview)
+                return
+            }
+            closeProgress()
+            const importOperationId = startProgress('import', '导入世界')
+            const result = await db_import_project_fcworld(selectedPath, {
+                mode: 'rename',
+                projectName: preview.projectName,
+            }, importOperationId)
+            closeProgress()
+            await openImportedProject(result)
+        } catch (e) {
+            closeProgress()
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+        } finally {
+            setImporting(false)
+        }
+    }, [closeProgress, importing, openImportedProject, showAlert, startProgress])
+
+    const handleImportConflictCancel = useCallback(() => {
+        if (!importing) setImportConflict(null)
+    }, [importing])
+
+    const handleImportConflictRename = useCallback(async (projectName: string) => {
+        if (!importConflict || importing) return
+        setImporting(true)
+        try {
+            const operationId = startProgress('import', '导入世界')
+            const result = await db_import_project_fcworld(importConflict.inputPath, {
+                mode: 'rename',
+                projectName,
+            }, operationId)
+            closeProgress()
+            setImportConflict(null)
+            await openImportedProject(result)
+        } catch (e) {
+            closeProgress()
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+        } finally {
+            setImporting(false)
+        }
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+
+    const handleImportConflictOverwrite = useCallback(async () => {
+        if (!importConflict?.duplicateProject || importing) return
+        const confirmed = await showAlert(
+            '选择覆盖后，原世界观的数据会丢失。确定覆盖吗？',
+            'warning',
+            'confirm',
+        )
+        if (confirmed !== 'yes') return
+
+        setImporting(true)
+        try {
+            const operationId = startProgress('import', '导入世界')
+            const result = await db_import_project_fcworld(importConflict.inputPath, {
+                mode: 'overwrite',
+                overwriteProjectId: importConflict.duplicateProject.projectId,
+            }, operationId)
+            closeProgress()
+            setImportConflict(null)
+            await openImportedProject(result)
+        } catch (e) {
+            closeProgress()
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+        } finally {
+            setImporting(false)
+        }
+    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+
     if (loading && projects.length === 0) {
         return <div className="mobile-page__loading">加载中…</div>
     }
@@ -102,6 +219,16 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 onCreated={() => void load()}
                 existingNames={projects.map(p => p.name)}
             />
+            <ProjectImportConflictDialog
+                open={Boolean(importConflict)}
+                preview={importConflict}
+                existingNames={projects.map(p => p.name)}
+                busy={importing}
+                onCancel={handleImportConflictCancel}
+                onRename={projectName => void handleImportConflictRename(projectName)}
+                onOverwrite={() => void handleImportConflictOverwrite()}
+            />
+            <FcworldProgressDialog progress={fcworldProgress} />
 
             <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
                 <Input
@@ -111,6 +238,15 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                     style={{flex: 1}}
                 />
                 <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>新建</Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={importing}
+                    onClick={() => void handleImportProject()}
+                >
+                    {importing ? '导入中…' : '导入'}
+                </Button>
             </div>
 
             {projects.length === 0 && !loading ? (

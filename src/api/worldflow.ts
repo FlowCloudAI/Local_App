@@ -90,6 +90,79 @@ export interface CoverThumbnailMigrationSummary {
     failed: number
 }
 
+export interface FcworldExportResult {
+    outputPath: string
+    packageId: string
+    projectId: string
+    assetCount: number
+    mapCount: number
+    fileSize: number
+    warnings: string[]
+}
+
+export interface FcworldImportRows {
+    projects: number
+    categories: number
+    entries: number
+    tagSchemas: number
+    entryTypes: number
+    relations: number
+    links: number
+    ideaNotes: number
+}
+
+export interface FcworldImportResult {
+    inputPath: string
+    packageId: string
+    sourceProjectId: string
+    projectId: string
+    projectName: string
+    assetCount: number
+    mapCount: number
+    fileSize: number
+    importedRows: FcworldImportRows
+    warnings: string[]
+}
+
+export interface FcworldImportDuplicateProject {
+    projectId: string
+    projectName: string
+}
+
+export interface FcworldImportPreview {
+    inputPath: string
+    packageId: string
+    sourceProjectId: string
+    projectName: string
+    suggestedName: string
+    duplicateProject: FcworldImportDuplicateProject | null
+    assetCount: number
+    mapCount: number
+    fileSize: number
+}
+
+export interface FcworldImportOptions {
+    mode: 'rename' | 'overwrite'
+    projectName?: string | null
+    overwriteProjectId?: string | null
+}
+
+export type FcworldProgressKind = 'import' | 'export'
+export type FcworldProgressStatus = 'running' | 'done' | 'error'
+
+export interface FcworldProgressEvent {
+    operationId: string
+    kind: FcworldProgressKind
+    phase: string
+    message: string
+    current: number
+    total: number
+    percent: number
+    status: FcworldProgressStatus
+}
+
+export const FCWORLD_PROGRESS_EVENT = 'fcworld:progress'
+
 export interface ProjectTimelineData {
     events: ProjectTimelineEvent[]
     yearStart?: number | null
@@ -320,6 +393,19 @@ export const db_update_project = (input: UpdateProjectInput) => {
 
 export const db_delete_project = (id: string) =>
     command<void>('db_delete_project', {id})
+
+export const db_export_project_fcworld = (projectId: string, outputPath: string, operationId?: string) =>
+    command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath, operationId})
+
+export const db_preview_project_fcworld = (inputPath: string, operationId?: string) =>
+    command<FcworldImportPreview>('db_preview_project_fcworld', {inputPath, operationId})
+
+export const db_import_project_fcworld = (
+    inputPath: string,
+    options?: FcworldImportOptions,
+    operationId?: string,
+) =>
+    command<FcworldImportResult>('db_import_project_fcworld', {inputPath, options, operationId})
 
 export const db_create_category = ({
                                        projectId,

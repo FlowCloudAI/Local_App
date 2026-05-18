@@ -59,7 +59,7 @@ export type MapDeckShaderInject = Record<string, string>;
  * 将 `MapDeckShaderInject` 映射表包装在 `LayerExtension` 中，以便
  * 传递给任意图层的 `extensions` prop。
  */
-export function makeInjectExtension(inject: MapDeckShaderInject): LayerExtension {
+function makeInjectExtension(inject: MapDeckShaderInject): LayerExtension {
     return new class FcMapDeckInjectExtension extends LayerExtension {
         static override componentName = 'FcMapDeckInjectExtension';
 
@@ -96,6 +96,13 @@ interface CanvasContextDeviceLike {
         onDevicePixelRatioChange?: (canvasContext: CanvasContext, info: { oldRatio: number }) => void;
     };
 }
+
+type DeckTooltipContent = null | string | {
+    text?: string;
+    html?: string;
+    className?: string;
+    style?: Partial<CSSStyleDeclaration>;
+};
 
 type MutableCanvasContext = Omit<CanvasContext, 'device'> & {
     device?: CanvasContextDeviceLike;
@@ -826,7 +833,7 @@ function normalizeTooltip(
     return null;
 }
 
-function toDeckTooltip(tooltip: MapPreviewTooltip | null): any {
+function toDeckTooltip(tooltip: MapPreviewTooltip | null): DeckTooltipContent {
     if (!tooltip) {
         return null;
     }

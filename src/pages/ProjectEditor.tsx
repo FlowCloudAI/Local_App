@@ -10,6 +10,7 @@ import {
     useAlert
 } from 'flowcloudai-ui'
 import {listen} from '@tauri-apps/api/event'
+import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {
     type Category,
     CATEGORY_CREATED,
@@ -24,6 +25,7 @@ import {
     db_delete_entry,
     db_delete_project,
     db_ensure_project_cover_thumbnails,
+    db_export_project_fcworld,
     db_get_entry,
     db_get_project,
     db_get_project_stats,
@@ -54,6 +56,8 @@ import ProjectOverview from '../features/project-editor/components/ProjectOvervi
 import ProjectCoverPickerModal from '../features/project-editor/components/ProjectCoverPickerModal'
 import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
 import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
+import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
+import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
 import './ProjectEditor.css'
 
@@ -106,6 +110,17 @@ const PROJECT_PANEL_LABELS: Record<ProjectPanel, string> = {
     timeline: '时间线',
     contradiction: '矛盾检测',
     'world-map': '世界地图',
+}
+
+function buildProjectExportFileName(projectName: string): string {
+    const safeName = projectName
+        .split('')
+        .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80)
+    return `${safeName || '世界观'}.fcworld`
 }
 
 function getCategoryCacheKey(categoryId: string | null): string {
@@ -175,6 +190,8 @@ function ProjectEditorInner({
     const [editingEntryType, setEditingEntryType] = useState<CustomEntryType | null>(null)
     const [coverPickerOpen, setCoverPickerOpen] = useState(false)
     const [coverUpdating, setCoverUpdating] = useState(false)
+    const [exporting, setExporting] = useState(false)
+    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
@@ -235,11 +252,6 @@ function ProjectEditorInner({
 
         void (async () => {
             try {
-                try {
-                    await db_ensure_project_cover_thumbnails(projectId)
-                } catch (error) {
-                    logger.warn('project cover thumbnail migration failed', error)
-                }
                 const data = await fetchAll()
                 if (cancelled) return
                 setProject(data.project)
@@ -247,6 +259,22 @@ function ProjectEditorInner({
                 setEntryTypes(data.entryTypes)
                 setEntryCount(data.entryCount)
                 setTagSchemas(data.tagSchemas)
+
+                void (async () => {
+                    try {
+                        const summary = await db_ensure_project_cover_thumbnails(projectId)
+                        if (cancelled || summary.generated === 0) return
+                        const refreshed = await fetchAll()
+                        if (cancelled) return
+                        setProject(refreshed.project)
+                        setCategories(refreshed.categories)
+                        setEntryTypes(refreshed.entryTypes)
+                        setEntryCount(refreshed.entryCount)
+                        setTagSchemas(refreshed.tagSchemas)
+                    } catch (error) {
+                        if (!cancelled) logger.warn('project cover thumbnail migration failed', error)
+                    }
+                })()
             } catch (e) {
                 if (!cancelled) {
                     logger.error('ProjectEditor load failed', e)
@@ -474,6 +502,38 @@ function ProjectEditorInner({
             setCoverUpdating(false)
         }
     }, [projectId, showAlert, touchProjectUpdatedAt])
+
+    const handleExportProject = useCallback(async () => {
+        if (!project || exporting) return
+
+        const selectedPath = await saveFileDialog({
+            defaultPath: buildProjectExportFileName(project.name),
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath) return
+
+        setExporting(true)
+        try {
+            const operationId = startProgress('export', '导出世界')
+            const result = await db_export_project_fcworld(projectId, selectedPath, operationId)
+            closeProgress()
+            const warningText = result.warnings.length > 0 ? `，${result.warnings.length} 条警告` : ''
+            await showAlert(
+                `世界已导出：${result.assetCount} 个资源，${result.mapCount} 张地图${warningText}。`,
+                'success',
+                'nonInvasive',
+                1400,
+            )
+        } catch (error) {
+            closeProgress()
+            await showAlert(`导出世界失败：${String(error)}`, 'error', 'toast', 3200)
+        } finally {
+            setExporting(false)
+        }
+    }, [closeProgress, exporting, project, projectId, showAlert, startProgress])
 
     const handleCreate = async (parentKey: string | null): Promise<string> => {
         const actualParentId = (!parentKey || parentKey === ROOT_ID) ? null : parentKey
@@ -862,6 +922,7 @@ function ProjectEditorInner({
             ref={layoutRef}
             style={{'--pe-tree-width': `${treeCollapsed ? 0 : treeWidth}px`} as React.CSSProperties}
         >
+            <FcworldProgressDialog progress={fcworldProgress} />
             <div className="pe-tree-panel">
                 <div className="pe-tree-panel__header">
                     <button
@@ -970,6 +1031,8 @@ function ProjectEditorInner({
                                 })()
                             }}
                             coverUpdating={coverUpdating}
+                            onExport={handleExportProject}
+                            exporting={exporting}
                             onDescriptionChange={async (description) => {
                                 const updated = await db_update_project({id: projectId, description})
                                 setProject((current) => current ? {...current, description: updated.description} : current)

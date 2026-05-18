@@ -159,7 +159,12 @@ interface SettingsProps {
 
 export default function Settings({onBack}: SettingsProps) {
     const {showAlert} = useAlert()
+    const showAlertRef = useRef(showAlert)
     const [activeTab, setActiveTab] = useState<SettingsTab>('system')
+
+    useEffect(() => {
+        showAlertRef.current = showAlert
+    }, [showAlert])
 
     // ── 系统配置状态 ──
     const [loading, setLoading] = useState(true)
@@ -419,16 +424,16 @@ export default function Settings({onBack}: SettingsProps) {
             const shouldShowSuccessNotice = settingsSaveSuccessNoticeEnabledRef.current
             settingsSaveSuccessNoticeEnabledRef.current = true
             if (migrationMsg) {
-                await showAlert(migrationMsg, 'info', 'toast', 3500)
+                await showAlertRef.current(migrationMsg, 'info', 'toast', 3500)
             } else if (shouldShowSuccessNotice) {
-                void showAlert('设置已保存', 'success', 'nonInvasive', 1200)
+                void showAlertRef.current('设置已保存', 'success', 'nonInvasive', 1200)
             }
         } catch (error) {
             const message = String(error)
             logger.error('设置保存失败:', error)
-            void showAlert(`设置保存失败：${message}`, 'error')
+            void showAlertRef.current(`设置保存失败：${message}`, 'error')
         }
-    }, [showAlert])
+    }, [])
 
     // 自动保存设置
     useEffect(() => {
