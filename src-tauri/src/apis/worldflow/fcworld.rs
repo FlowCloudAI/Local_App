@@ -1040,8 +1040,8 @@ mod tests {
     use std::io::{Cursor, Read};
     use tempfile::TempDir;
     use worldflow_core::{
-        EntryOps, ProjectOps, SqliteDb,
-        models::{CreateEntry, CreateProject, FCImage},
+        EntryOps, ProjectOps, SqliteDb, TagSchemaOps,
+        models::{CreateEntry, CreateProject, CreateTagSchema, EntryTag, FCImage},
     };
     use zip::ZipArchive;
 
@@ -1283,5 +1283,164 @@ mod tests {
             error.contains("maps/maps.json 摘要不匹配"),
             "实际错误: {error}"
         );
+    }
+
+    #[tokio::test]
+    async fn prepares_import_with_new_ids_assets_and_maps() {
+        let (temp, db, paths) = new_test_db("fcworld_prepare_import").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "引用世界".to_string(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        let tag_schema = db
+            .create_tag_schema(CreateTagSchema {
+                project_id: project.id,
+                name: "阵营".to_string(),
+                description: None,
+                r#type: "string".to_string(),
+                target: vec!["character".to_string()],
+                default_val: None,
+                range_min: None,
+                range_max: None,
+                sort_order: None,
+            })
+            .await
+            .expect("创建标签失败");
+        let target = db
+            .create_entry(CreateEntry {
+                project_id: project.id,
+                category_id: None,
+                title: "目标词条".to_string(),
+                summary: None,
+                content: Some("目标正文".to_string()),
+                r#type: Some("character".to_string()),
+                tags: None,
+                images: None,
+                cover_path: None,
+            })
+            .await
+            .expect("创建目标词条失败");
+        db.create_entry(CreateEntry {
+            project_id: project.id,
+            category_id: None,
+            title: "来源词条".to_string(),
+            summary: None,
+            content: Some(format!("[目标](entry://{})", target.id)),
+            r#type: Some("character".to_string()),
+            tags: Some(vec![EntryTag {
+                schema_id: tag_schema.id,
+                value: json!("北境"),
+            }]),
+            images: None,
+            cover_path: None,
+        })
+        .await
+        .expect("创建来源词条失败");
+
+        let map_dir = paths.db_path.parent().unwrap().join("maps");
+        std::fs::create_dir_all(&map_dir).expect("创建地图目录失败");
+        let data_url = png_data_url();
+        let draft_json = serde_json::to_string(&json!({
+            "shapes": [],
+            "keyLocations": [{
+                "id": "loc-1",
+                "name": "地点",
+                "type": "城市",
+                "x": 10,
+                "y": 20,
+                "bizId": target.id.to_string(),
+                "ext": {"linkedEntryId": target.id.to_string()}
+            }]
+        }))
+        .expect("序列化地图草稿失败");
+        let scene_json = serde_json::to_string(&json!({
+            "canvas": {"width": 100, "height": 100},
+            "shapes": [],
+            "keyLocations": [{
+                "id": "loc-1",
+                "name": "地点",
+                "type": "城市",
+                "position": [10, 20],
+                "color": [255, 0, 0, 255],
+                "bizId": target.id.to_string(),
+                "ext": {"linkedEntryId": target.id.to_string()}
+            }],
+            "backgroundImage": {"url": data_url, "fit": "cover"}
+        }))
+        .expect("序列化地图场景失败");
+        std::fs::write(
+            map_dir.join(format!("{}.json", project.id)),
+            serde_json::to_string_pretty(&json!({
+                "projectId": project.id.to_string(),
+                "maps": [{
+                    "id": "map-1",
+                    "name": "引用地图",
+                    "draftJson": draft_json,
+                    "sceneJson": scene_json,
+                    "coastlineParamsJson": null,
+                    "style": "flat",
+                    "backgroundImageUrl": data_url,
+                    "createdAt": "2026-05-17T00:00:00Z",
+                    "updatedAt": "2026-05-17T00:00:00Z"
+                }]
+            }))
+            .expect("序列化地图文件失败"),
+        )
+        .expect("写入地图文件失败");
+
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package = prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let output_path = temp.path().join("引用世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let validated =
+            import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
+                .expect("导出包应可校验");
+        let prepared = import::prepare_fcworld_import(validated, &paths, &[project.name.clone()])
+            .expect("导入数据应可重写");
+        let new_target_id = prepared
+            .id_maps
+            .entries
+            .get(&target.id.to_string())
+            .expect("目标词条应生成新 ID");
+        let new_schema_id = prepared
+            .id_maps
+            .tag_schemas
+            .get(&tag_schema.id.to_string())
+            .expect("标签应生成新 ID");
+        let new_project_id = prepared.new_project_id.to_string();
+
+        assert_ne!(new_project_id, project.id.to_string());
+        assert_eq!(prepared.project_name, "引用世界（导入）");
+        assert_eq!(prepared.map_count, 1);
+        assert_eq!(prepared.asset_count, 1);
+        assert!(prepared.assets.iter().all(|asset| asset
+            .target_path
+            .starts_with(paths.db_path.parent().unwrap().join("images").join(&new_project_id))));
+
+        let entries_csv = prepared
+            .csv_items
+            .iter()
+            .find(|item| item.table == WorldflowCsvTable::Entries)
+            .map(|item| item.content.as_str())
+            .expect("应包含 entries.csv");
+        assert!(entries_csv.contains(&format!("entry://{new_target_id}")));
+        assert!(entries_csv.contains(new_schema_id));
+        assert!(!entries_csv.contains(&target.id.to_string()));
+        assert!(!entries_csv.contains(&tag_schema.id.to_string()));
+
+        assert!(prepared.maps_json.contains(&new_project_id));
+        assert!(prepared.maps_json.contains(new_target_id));
+        assert!(prepared.maps_json.contains("data:image/png;base64"));
+        assert!(!prepared.maps_json.contains(&target.id.to_string()));
+        assert!(!prepared.maps_json.contains("assets/images/"));
     }
 }
