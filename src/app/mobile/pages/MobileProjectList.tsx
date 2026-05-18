@@ -1,7 +1,8 @@
 import {useCallback, useEffect, useState} from 'react'
-import {Button, Card, Input} from 'flowcloudai-ui'
+import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {db_count_entries, db_list_projects, type Project} from '../../../api'
+import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {db_count_entries, db_get_project, db_import_project_fcworld, db_list_projects, type Project} from '../../../api'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -29,9 +30,11 @@ function formatDate(value?: string | null): string {
 }
 
 export default function MobileProjectList({push, setAiFocus}: Props) {
+    const {showAlert} = useAlert()
     const [projects, setProjects] = useState<Project[]>([])
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(false)
+    const [importing, setImporting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [creatorOpen, setCreatorOpen] = useState(false)
@@ -86,6 +89,37 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         push({type: 'projectHome', params: {projectId: project.id, displayName: project.name}})
     }, [push, setAiFocus])
 
+    const handleImportProject = useCallback(async () => {
+        if (importing) return
+        const selectedPath = await openFileDialog({
+            multiple: false,
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath || Array.isArray(selectedPath)) return
+
+        setImporting(true)
+        try {
+            const result = await db_import_project_fcworld(selectedPath)
+            window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+            await load()
+            const project = await db_get_project(result.projectId)
+            await showAlert(
+                `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源。`,
+                'success',
+                'nonInvasive',
+                1400,
+            )
+            handleOpenProject(project)
+        } catch (e) {
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+        } finally {
+            setImporting(false)
+        }
+    }, [handleOpenProject, importing, load, showAlert])
+
     if (loading && projects.length === 0) {
         return <div className="mobile-page__loading">加载中…</div>
     }
@@ -111,6 +145,15 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                     style={{flex: 1}}
                 />
                 <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>新建</Button>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={importing}
+                    onClick={() => void handleImportProject()}
+                >
+                    {importing ? '导入中…' : '导入'}
+                </Button>
             </div>
 
             {projects.length === 0 && !loading ? (

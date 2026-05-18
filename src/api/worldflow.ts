@@ -100,6 +100,30 @@ export interface FcworldExportResult {
     warnings: string[]
 }
 
+export interface FcworldImportRows {
+    projects: number
+    categories: number
+    entries: number
+    tagSchemas: number
+    entryTypes: number
+    relations: number
+    links: number
+    ideaNotes: number
+}
+
+export interface FcworldImportResult {
+    inputPath: string
+    packageId: string
+    sourceProjectId: string
+    projectId: string
+    projectName: string
+    assetCount: number
+    mapCount: number
+    fileSize: number
+    importedRows: FcworldImportRows
+    warnings: string[]
+}
+
 export interface ProjectTimelineData {
     events: ProjectTimelineEvent[]
     yearStart?: number | null
@@ -333,6 +357,9 @@ export const db_delete_project = (id: string) =>
 
 export const db_export_project_fcworld = (projectId: string, outputPath: string) =>
     command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath})
+
+export const db_import_project_fcworld = (inputPath: string) =>
+    command<FcworldImportResult>('db_import_project_fcworld', {inputPath})
 
 export const db_create_category = ({
                                        projectId,

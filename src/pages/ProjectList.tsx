@@ -1,7 +1,8 @@
 import {type CSSProperties, memo, useCallback, useEffect, useMemo, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
-import {db_list_projects, type Project} from '../api'
+import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
+import {db_get_project, db_import_project_fcworld, db_list_projects, type Project} from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
 import {
     HOME_ACTIVITY_CHANGED_EVENT,
@@ -89,8 +90,10 @@ function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
 }
 
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
+    const {showAlert} = useAlert()
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(false)
+    const [importing, setImporting] = useState(false)
     const [hasLoadedProjects, setHasLoadedProjects] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
@@ -225,6 +228,36 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         onOpenHomeTarget?.(target)
     }, [onOpenHomeTarget, onOpenProject, projects])
 
+    const handleImportProject = useCallback(async () => {
+        if (importing) return
+        const selectedPath = await openFileDialog({
+            multiple: false,
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath || Array.isArray(selectedPath)) return
+
+        setImporting(true)
+        try {
+            const result = await db_import_project_fcworld(selectedPath)
+            window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+            const importedProject = await db_get_project(result.projectId)
+            await showAlert(
+                `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源，${result.mapCount} 张地图。`,
+                'success',
+                'nonInvasive',
+                1600,
+            )
+            onOpenProject?.(importedProject)
+        } catch (error) {
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+        } finally {
+            setImporting(false)
+        }
+    }, [importing, onOpenProject, showAlert])
+
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button
             key={item.key}
@@ -356,6 +389,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             <div className="project-list-header-actions fc-page-header-actions">
                                 <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>
                                     开始一个新世界
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={importing}
+                                    onClick={() => void handleImportProject()}
+                                >
+                                    {importing ? '导入中…' : '导入世界'}
                                 </Button>
                                 <Button
                                     type="button"
