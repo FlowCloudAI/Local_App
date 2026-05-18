@@ -157,12 +157,20 @@
     font-size: 0.8rem;
 }
 
+.ai-conversation-row {
+    position: relative;
+    margin-bottom: var(--fc-space-xs);
+}
+
+.ai-conversation-row.is-menu-open {
+    z-index: 60;
+}
+
 .ai-conversation-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: var(--dock-panel-list-item-padding);
-    margin-bottom: var(--fc-space-xs);
     border-radius: var(--dock-panel-list-item-radius);
     cursor: pointer;
     border: 1px solid transparent;
@@ -175,7 +183,8 @@
     align-items: flex-start;
 }
 
-.ai-conversation-item:hover {
+.ai-conversation-row:hover .ai-conversation-item,
+.ai-conversation-row:focus-within .ai-conversation-item {
     background: var(--dock-panel-hover-bg);
     border-color: var(--dock-panel-active-border);
 }
@@ -208,14 +217,69 @@
     opacity: 0.78;
 }
 
+.ai-conversation-leading {
+    width: 1.45rem;
+    min-width: 1.45rem;
+    height: 1.45rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ai-conversation-item.is-character .ai-conversation-leading,
+.ai-conversation-item.is-report .ai-conversation-leading {
+    margin-top: 0.4rem;
+}
+
 .ai-conversation-unread-dot {
     width: 0.52rem;
     height: 0.52rem;
-    margin-right: 0.42rem;
     border-radius: var(--fc-radius-full, 999px);
     background: var(--fc-color-primary);
     box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
     flex-shrink: 0;
+}
+
+.ai-conversation-pin-btn {
+    width: 1.35rem;
+    height: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: var(--fc-radius-sm);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: rotate(-28deg) scale(0.94);
+    transition: background 0.15s, color 0.15s, opacity 0.15s, transform 0.15s;
+}
+
+.ai-conversation-row:hover .ai-conversation-pin-btn,
+.ai-conversation-row:focus-within .ai-conversation-pin-btn,
+.ai-conversation-pin-btn.is-pinned {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ai-conversation-pin-btn:hover {
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+    transform: rotate(-28deg) scale(1.06);
+}
+
+.ai-conversation-pin-btn.is-pinned {
+    color: var(--fc-color-primary);
+    transform: rotate(0deg);
+}
+
+.ai-conversation-pin-btn.is-pinned:hover {
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
+    color: var(--fc-color-primary);
+    transform: rotate(0deg) scale(1.06);
 }
 
 .ai-conversation-avatar {
@@ -278,7 +342,6 @@
 }
 
 .ai-conversation-actions {
-    position: relative;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -287,9 +350,10 @@
     transition: opacity 0.15s;
 }
 
-.ai-conversation-item:hover .ai-conversation-actions,
-.ai-conversation-item.active .ai-conversation-actions,
-.ai-conversation-item.is-pinned .ai-conversation-actions {
+.ai-conversation-row:hover .ai-conversation-actions,
+.ai-conversation-row:focus-within .ai-conversation-actions,
+.ai-conversation-row.is-menu-open .ai-conversation-actions,
+.ai-conversation-item.active .ai-conversation-actions {
     opacity: 1;
 }
 
@@ -329,9 +393,9 @@
 
 .ai-conversation-action-menu {
     position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    z-index: 20;
+    top: calc(100% - 2px);
+    right: 0.35rem;
+    z-index: 70;
     min-width: 132px;
     padding: 4px;
     border: 1px solid var(--dock-panel-border-color);

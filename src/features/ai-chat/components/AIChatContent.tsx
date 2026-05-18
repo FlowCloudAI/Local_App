@@ -823,6 +823,8 @@ export default function AIChatContent({
                         const runtime = ctx.conversationRuntime[conv.id]
                         const isConversationStreaming = Boolean(runtime?.isStreaming)
                         const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
+                        const showUnreadReply = !isConversationStreaming && hasUnreadReply
+                        const pinLabel = conv.pinnedAt ? '取消顶置' : '顶置'
                         const conversationTags = [
                             conv.pinnedAt ? '已顶置' : null,
                             conv.archivedAt ? '已归档' : null,
@@ -831,78 +833,111 @@ export default function AIChatContent({
                         ].filter(Boolean).join(' · ')
                         const canExportConversation = !conv.id.startsWith('conv_')
                         return (
-                        <div
-                            key={conv.id}
-                            className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}${conv.pinnedAt ? ' is-pinned' : ''}${conv.archivedAt ? ' is-archived' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
-                            onClick={() => {
-                                setActionMenuConversationId(null)
-                                if (renamingId !== conv.id) void ctx.switchConversation(conv.id)
-                            }}
-                            onContextMenu={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                setActionMenuConversationId(conv.id)
-                            }}
-                        >
-                            {!isConversationStreaming && hasUnreadReply && (
-                                <span className="ai-conversation-unread-dot" aria-hidden="true"/>
-                            )}
-                            {conv.mode === 'character' && (
-                                <div className="ai-conversation-avatar" aria-hidden="true">
-                                    {conv.backgroundImageUrl ? (
-                                        <img src={conv.backgroundImageUrl} alt={conv.characterName ?? conv.title}/>
-                                    ) : (
-                                        <span>{(conv.characterName ?? conv.title).slice(0, 1) || '角'}</span>
-                                    )}
-                                </div>
-                            )}
-                            {conv.mode === 'report' && (
-                                <div className="ai-conversation-report-icon" aria-hidden="true">
-                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor"
-                                         strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round">
-                                        <path
-                                            d="M8.1 2.7L2.4 12.6a1.4 1.4 0 001.2 2.1h10.8a1.4 1.4 0 001.2-2.1L9.9 2.7a1.04 1.04 0 00-1.8 0z"/>
-                                        <path d="M9 6.2v3.4M9 12.2h.01"/>
-                                    </svg>
-                                </div>
-                            )}
-                            <div className="ai-conversation-info">
-                                {renamingId === conv.id ? (
-                                    <input
-                                        ref={renameInputRef}
-                                        className="ai-conversation-rename-input"
-                                        value={renameValue}
-                                        onChange={(event) => setRenameValue(event.target.value)}
-                                        onKeyDown={handleRenameKey}
-                                        onBlur={() => void commitRename()}
-                                        onClick={(event) => event.stopPropagation()}
-                                    />
-                                ) : (
-                                    <>
-                                        <div className="ai-conversation-title" title={conv.title}>{conv.title}</div>
-                                        {conversationTags && (
-                                            <div className="ai-conversation-subtitle">{conversationTags}</div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                            <div className="ai-conversation-actions">
-                                <button
-                                    className={`ai-conversation-action-btn ai-conversation-more-btn ${actionMenuConversationId === conv.id ? 'active' : ''}`}
-                                    onClick={(event) => {
-                                        event.stopPropagation()
-                                        setActionMenuConversationId((current) => current === conv.id ? null : conv.id)
+                            <div
+                                key={conv.id}
+                                className={`ai-conversation-row ${actionMenuConversationId === conv.id ? 'is-menu-open' : ''}`}
+                                onMouseLeave={() => {
+                                    if (actionMenuConversationId === conv.id) setActionMenuConversationId(null)
+                                }}
+                            >
+                                <div
+                                    className={`ai-conversation-item ${conv.id === ctx.activeConversationId ? 'active' : ''}${conv.mode === 'character' ? ' is-character' : ''}${conv.mode === 'report' ? ' is-report' : ''}${conv.pinnedAt ? ' is-pinned' : ''}${conv.archivedAt ? ' is-archived' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
+                                    onClick={() => {
+                                        setActionMenuConversationId(null)
+                                        if (renamingId !== conv.id) void ctx.switchConversation(conv.id)
                                     }}
-                                    title="更多操作"
+                                    onContextMenu={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        setActionMenuConversationId(conv.id)
+                                    }}
                                 >
-                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                        <circle cx="3.5" cy="7" r="1" fill="currentColor"/>
-                                        <circle cx="7" cy="7" r="1" fill="currentColor"/>
-                                        <circle cx="10.5" cy="7" r="1" fill="currentColor"/>
-                                    </svg>
-                                </button>
+                                    <div className="ai-conversation-leading">
+                                        {showUnreadReply ? (
+                                            <span className="ai-conversation-unread-dot" aria-hidden="true"/>
+                                        ) : (
+                                            <button
+                                                className={`ai-conversation-pin-btn ${conv.pinnedAt ? 'is-pinned' : ''}`}
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    ctx.toggleConversationPinned(conv.id, event)
+                                                }}
+                                                title={pinLabel}
+                                                aria-label={pinLabel}
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
+                                                     stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+                                                     strokeLinejoin="round">
+                                                    <path d="M9.7 2.2l4.1 4.1"/>
+                                                    <path d="M5.5 6.4L3.2 8.7l4.1 4.1 2.3-2.3"/>
+                                                    <path d="M6.3 5.6l4.1 4.1 2.7-2.7L9 2.9 6.3 5.6z"/>
+                                                    <path d="M7.3 12.8L4.6 15"/>
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                    {conv.mode === 'character' && (
+                                        <div className="ai-conversation-avatar" aria-hidden="true">
+                                            {conv.backgroundImageUrl ? (
+                                                <img src={conv.backgroundImageUrl}
+                                                     alt={conv.characterName ?? conv.title}/>
+                                            ) : (
+                                                <span>{(conv.characterName ?? conv.title).slice(0, 1) || '角'}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {conv.mode === 'report' && (
+                                        <div className="ai-conversation-report-icon" aria-hidden="true">
+                                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"
+                                                 stroke="currentColor"
+                                                 strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round">
+                                                <path
+                                                    d="M8.1 2.7L2.4 12.6a1.4 1.4 0 001.2 2.1h10.8a1.4 1.4 0 001.2-2.1L9.9 2.7a1.04 1.04 0 00-1.8 0z"/>
+                                                <path d="M9 6.2v3.4M9 12.2h.01"/>
+                                            </svg>
+                                        </div>
+                                    )}
+                                    <div className="ai-conversation-info">
+                                        {renamingId === conv.id ? (
+                                            <input
+                                                ref={renameInputRef}
+                                                className="ai-conversation-rename-input"
+                                                value={renameValue}
+                                                onChange={(event) => setRenameValue(event.target.value)}
+                                                onKeyDown={handleRenameKey}
+                                                onBlur={() => void commitRename()}
+                                                onClick={(event) => event.stopPropagation()}
+                                            />
+                                        ) : (
+                                            <>
+                                                <div className="ai-conversation-title"
+                                                     title={conv.title}>{conv.title}</div>
+                                                {conversationTags && (
+                                                    <div className="ai-conversation-subtitle">{conversationTags}</div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="ai-conversation-actions">
+                                        <button
+                                            className={`ai-conversation-action-btn ai-conversation-more-btn ${actionMenuConversationId === conv.id ? 'active' : ''}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                setActionMenuConversationId((current) => current === conv.id ? null : conv.id)
+                                            }}
+                                            title="更多操作"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                                <circle cx="3.5" cy="7" r="1" fill="currentColor"/>
+                                                <circle cx="7" cy="7" r="1" fill="currentColor"/>
+                                                <circle cx="10.5" cy="7" r="1" fill="currentColor"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
                                 {actionMenuConversationId === conv.id && (
-                                    <div className="ai-conversation-action-menu" onClick={(event) => event.stopPropagation()}>
+                                    <div className="ai-conversation-action-menu"
+                                         onClick={(event) => event.stopPropagation()}>
                                         <button onClick={(event) => {
                                             ctx.toggleConversationPinned(conv.id, event)
                                             setActionMenuConversationId(null)
@@ -939,7 +974,6 @@ export default function AIChatContent({
                                     </div>
                                 )}
                             </div>
-                        </div>
                         )
                     })}
                 </div>
