@@ -152,15 +152,16 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
 
     const handleImportConflictRename = useCallback(async (projectName: string) => {
         if (!importConflict || importing) return
+        const inputPath = importConflict.inputPath
+        setImportConflict(null)
         setImporting(true)
         try {
             const operationId = startProgress('import', '导入世界')
-            const result = await db_import_project_fcworld(importConflict.inputPath, {
+            const result = await db_import_project_fcworld(inputPath, {
                 mode: 'rename',
                 projectName,
             }, operationId)
             finishProgress()
-            setImportConflict(null)
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
@@ -172,6 +173,8 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
+        const inputPath = importConflict.inputPath
+        const overwriteProjectId = importConflict.duplicateProject.projectId
         const confirmed = await showAlert(
             '选择覆盖后，原世界观的数据会丢失。确定覆盖吗？',
             'warning',
@@ -179,15 +182,15 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         )
         if (confirmed !== 'yes') return
 
+        setImportConflict(null)
         setImporting(true)
         try {
             const operationId = startProgress('import', '导入世界')
-            const result = await db_import_project_fcworld(importConflict.inputPath, {
+            const result = await db_import_project_fcworld(inputPath, {
                 mode: 'overwrite',
-                overwriteProjectId: importConflict.duplicateProject.projectId,
+                overwriteProjectId,
             }, operationId)
             finishProgress()
-            setImportConflict(null)
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
