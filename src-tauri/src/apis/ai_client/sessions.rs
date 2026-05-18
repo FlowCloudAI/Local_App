@@ -15,6 +15,7 @@ use super::common::*;
 pub async fn ai_create_llm_session(
     app: AppHandle,
     ai_state: State<'_, AiState>,
+    paths: State<'_, PathsState>,
     session_id: String,
     plugin_id: String,
     model: Option<String>,
@@ -58,6 +59,20 @@ pub async fn ai_create_llm_session(
         session_id,
         plugin_id
     );
+    let mut restored_head = None;
+    let mut restored_model = None;
+    let mut restored_history = None;
+    let resolved_conversation_id = if let Some(conv_id) = conversation_id.as_deref() {
+        let conversation = chat_store_get_conversation(paths.inner(), conv_id)?
+            .ok_or_else(|| format!("未找到会话：{}", conv_id))?;
+        restored_head = conversation.head;
+        restored_model = Some(conversation.meta.model.clone());
+        restored_history = Some(stored_messages_to_seeds(conversation.messages));
+        conversation.meta.id
+    } else {
+        session_id.clone()
+    };
+
     let client = ai_state.client.lock().await;
     log::info!(
         "[ai_create_llm_session][lock_client_done] trace_id={} session_id={} plugin_id={}",
@@ -70,55 +85,40 @@ pub async fn ai_create_llm_session(
         max_tool_rounds: rounds as usize,
         ..Default::default()
     });
-    let mut session = match conversation_id.as_deref() {
-        Some(conv_id) => {
-            log::info!(
-                "[ai_create_llm_session][resume_start] trace_id={} session_id={} plugin_id={} conversation_id={}",
+    log::info!(
+        "[ai_create_llm_session][create_start] trace_id={} session_id={} plugin_id={} conversation_id={} restored={}",
+        trace_id,
+        session_id,
+        plugin_id,
+        resolved_conversation_id,
+        restored_history.is_some()
+    );
+    let mut session = client
+        .create_llm_session(&plugin_id, &api_key, config)
+        .map_err(|e| {
+            log::error!(
+                "[ai_create_llm_session][create_failed] trace_id={} session_id={} plugin_id={} error={}",
                 trace_id,
                 session_id,
                 plugin_id,
-                conv_id
+                e
             );
-            client
-                .resume_llm_session(&plugin_id, &api_key, conv_id, config)
-                .map_err(|e| {
-                    log::error!(
-                        "[ai_create_llm_session][resume_failed] trace_id={} session_id={} plugin_id={} conversation_id={} error={}",
-                        trace_id,
-                        session_id,
-                        plugin_id,
-                        conv_id,
-                        e
-                    );
-                    e.to_string()
-                })?
-        }
-        None => {
-            log::info!(
-                "[ai_create_llm_session][create_start] trace_id={} session_id={} plugin_id={}",
-                trace_id,
-                session_id,
-                plugin_id
-            );
-            client
-                .create_llm_session(&plugin_id, &api_key, config)
-                .map_err(|e| {
-                    log::error!(
-                        "[ai_create_llm_session][create_failed] trace_id={} session_id={} plugin_id={} error={}",
-                        trace_id,
-                        session_id,
-                        plugin_id,
-                        e
-                    );
-                    e.to_string()
-                })?
-        }
-    };
+            e.to_string()
+        })?;
     drop(client);
+
+    if let Some(history) = restored_history {
+        session.preload_history(history, restored_head);
+    }
     session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
 
-    let resolved_model = model.clone().unwrap_or_else(|| "default".to_string());
-    if let Some(m) = model {
+    let model_to_apply = model
+        .clone()
+        .or_else(|| restored_model.filter(|m| !m.is_empty() && m != "default"));
+    let resolved_model = model_to_apply
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+    if let Some(m) = model_to_apply {
         session.set_model(&m).await;
     }
     if let Some(t) = temperature {
@@ -135,11 +135,6 @@ pub async fn ai_create_llm_session(
         plugin_id,
         resolved_model
     );
-    let resolved_conversation_id = session
-        .conversation_id()
-        .map(str::to_string)
-        .unwrap_or_else(|| session_id.clone());
-
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
     log::info!(
         "[ai_create_llm_session][try_run_start] trace_id={} session_id={} conversation_id={}",
@@ -178,6 +173,7 @@ pub async fn ai_create_llm_session(
                 run_id: run_id.clone(),
                 input_tx,
                 handle,
+                conversation_id: resolved_conversation_id.clone(),
                 kind: AiSessionKind::General,
                 model: resolved_model.clone(),
                 plugin_id: plugin_id.clone(),

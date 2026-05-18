@@ -3,36 +3,30 @@ use super::common::*;
 /// 列出所有已保存对话的元信息，按 updated_at 降序
 #[tauri::command]
 pub async fn ai_list_conversations(
-    ai_state: State<'_, AiState>,
+    paths: State<'_, PathsState>,
 ) -> Result<Vec<ConversationMeta>, String> {
-    let client = ai_state.client.lock().await;
-    Ok(client.ai_list_conversations())
+    chat_store_list_conversations(paths.inner())
 }
 
 /// 返回完整对话（元信息 + 消息列表）
 #[tauri::command]
 pub async fn ai_get_conversation(
-    ai_state: State<'_, AiState>,
+    paths: State<'_, PathsState>,
     id: String,
 ) -> Result<Option<StoredConversation>, String> {
-    let client = ai_state.client.lock().await;
-    Ok(client.ai_get_conversation(&id))
+    chat_store_get_conversation(paths.inner(), &id)
 }
 
 /// 导出指定对话到用户选择的文件路径。
 #[tauri::command]
 pub async fn ai_export_conversation(
-    ai_state: State<'_, AiState>,
+    paths: State<'_, PathsState>,
     id: String,
     path: String,
     format: String,
 ) -> Result<(), String> {
-    let conversation = {
-        let client = ai_state.client.lock().await;
-        client
-            .ai_get_conversation(&id)
-            .ok_or_else(|| format!("未找到会话：{}", id))?
-    };
+    let conversation =
+        chat_store_get_conversation(paths.inner(), &id)?.ok_or_else(|| format!("未找到会话：{}", id))?;
 
     let content = match format.as_str() {
         "json" => serde_json::to_string_pretty(&conversation)
@@ -48,26 +42,20 @@ pub async fn ai_export_conversation(
 /// 删除指定对话文件
 #[tauri::command]
 pub async fn ai_delete_conversation(
-    ai_state: State<'_, AiState>,
+    paths: State<'_, PathsState>,
     id: String,
 ) -> Result<(), String> {
-    let client = ai_state.client.lock().await;
-    client
-        .ai_delete_conversation(&id)
-        .map_err(|e| e.to_string())
+    chat_store_delete_conversation(paths.inner(), &id)
 }
 
 /// 修改对话标题
 #[tauri::command]
 pub async fn ai_rename_conversation(
-    ai_state: State<'_, AiState>,
+    paths: State<'_, PathsState>,
     id: String,
     title: String,
 ) -> Result<(), String> {
-    let client = ai_state.client.lock().await;
-    client
-        .ai_rename_conversation(&id, title)
-        .map_err(|e| e.to_string())
+    chat_store_rename_conversation(paths.inner(), &id, title)
 }
 
 /// 读取特殊对话附加元数据。通用对话存储结构暂不包含这些字段，因此由应用侧单独持久化。

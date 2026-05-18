@@ -5,15 +5,16 @@ pub(super) use crate::PathsState;
 pub(super) use crate::PendingEditsState;
 pub(super) use flowcloudai_client::llm::config::SessionConfig;
 pub(super) use flowcloudai_client::{
-    AudioDecoder, AudioSource, ConversationMeta, DefaultOrchestrator, ImageSession, PluginKind,
-    SessionEvent, StoredConversation, TaskContext, TurnStatus, Usage, image::ImageRequest,
+    AudioDecoder, AudioSource, ConversationNode, ConversationNodeSeed, DefaultOrchestrator,
+    ImageSession, PluginKind, SessionEvent, TaskContext, TurnStatus, Usage, image::ImageRequest,
+    llm::types::{Message, ToolCall},
 };
 pub(super) use futures::StreamExt;
 pub(super) use serde::{Deserialize, Serialize};
 pub(super) use std::collections::HashMap;
 pub(super) use std::fs::File;
 pub(super) use std::io::{Read, Write};
-pub(super) use std::path::Path;
+pub(super) use std::path::{Path, PathBuf};
 use std::sync::{
     Arc,
     atomic::{AtomicU64, Ordering},
@@ -108,6 +109,66 @@ pub struct ConversationUiState {
     pub archived_at: Option<String>,
 }
 
+/// 对话元信息（不含消息体，用于列表展示）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConversationMeta {
+    pub id: String,
+    pub title: String,
+    pub plugin_id: String,
+    pub model: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// App 侧保存的单条对话消息。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<u64>,
+    pub role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    pub timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+/// compact 文本的 App 侧元数据。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredCompact {
+    pub position_node_id: u64,
+    pub text: String,
+    pub created_at: String,
+}
+
+/// App 侧对话文件结构，兼容旧 core v3 JSON。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredConversation {
+    #[serde(default = "default_conversation_schema_version")]
+    pub schema_version: u32,
+    #[serde(flatten)]
+    pub meta: ConversationMeta,
+    pub messages: Vec<StoredMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub head: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compact: Option<StoredCompact>,
+}
+
+fn default_conversation_schema_version() -> u32 {
+    3
+}
+
 pub(super) fn character_conversation_meta_path(
     paths: &PathsState,
 ) -> Result<std::path::PathBuf, String> {
@@ -132,6 +193,258 @@ pub(super) fn conversation_ui_state_path(
         .join("chats")
         .join("metadata")
         .join("conversation_ui_state.json"))
+}
+
+pub(super) fn conversations_dir(paths: &PathsState) -> Result<PathBuf, String> {
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
+    Ok(db_dir.join("chats"))
+}
+
+fn sanitize_conversation_id(id: &str) -> Result<&str, String> {
+    let valid = !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'));
+    if valid {
+        Ok(id)
+    } else {
+        Err("无效的会话 ID".to_string())
+    }
+}
+
+fn conversation_file_path(paths: &PathsState, id: &str) -> Result<PathBuf, String> {
+    let safe_id = sanitize_conversation_id(id)?;
+    Ok(conversations_dir(paths)?.join(format!("{}.json", safe_id)))
+}
+
+pub(super) fn chat_store_list_conversations(
+    paths: &PathsState,
+) -> Result<Vec<ConversationMeta>, String> {
+    let dir = conversations_dir(paths)?;
+    let mut metas = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Ok(metas);
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        match std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|content| serde_json::from_str::<StoredConversation>(&content).ok())
+        {
+            Some(conversation) => metas.push(conversation.meta),
+            None => log::warn!("[chat_store] 解析对话文件失败: path={}", path.display()),
+        }
+    }
+
+    metas.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(metas)
+}
+
+pub(super) fn chat_store_get_conversation(
+    paths: &PathsState,
+    id: &str,
+) -> Result<Option<StoredConversation>, String> {
+    let path = conversation_file_path(paths, id)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("读取对话文件失败 {:?}: {}", path, e))?;
+    serde_json::from_str::<StoredConversation>(&content)
+        .map(Some)
+        .map_err(|e| format!("解析对话文件失败 {:?}: {}", path, e))
+}
+
+pub(super) fn chat_store_save_conversation(
+    paths: &PathsState,
+    conversation: &StoredConversation,
+) -> Result<(), String> {
+    let path = conversation_file_path(paths, &conversation.meta.id)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("创建对话目录失败 {:?}: {}", parent, e))?;
+    }
+
+    let json = serde_json::to_string_pretty(conversation)
+        .map_err(|e| format!("序列化对话失败: {}", e))?;
+    let temp_path = path.with_extension("json.tmp");
+    {
+        let mut file = std::fs::File::create(&temp_path)
+            .map_err(|e| format!("创建对话临时文件失败 {:?}: {}", temp_path, e))?;
+        file.write_all(json.as_bytes())
+            .map_err(|e| format!("写入对话临时文件失败 {:?}: {}", temp_path, e))?;
+        file.flush()
+            .map_err(|e| format!("刷新对话临时文件失败 {:?}: {}", temp_path, e))?;
+    }
+
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| format!("移除旧对话文件失败 {:?}: {}", path, e))?;
+    }
+    std::fs::rename(&temp_path, &path).map_err(|e| format!("保存对话文件失败 {:?}: {}", path, e))
+}
+
+pub(super) fn chat_store_delete_conversation(paths: &PathsState, id: &str) -> Result<(), String> {
+    let path = conversation_file_path(paths, id)?;
+    if !path.exists() {
+        return Err(format!("未找到会话：{}", id));
+    }
+    std::fs::remove_file(&path).map_err(|e| format!("删除对话文件失败 {:?}: {}", path, e))
+}
+
+pub(super) fn chat_store_rename_conversation(
+    paths: &PathsState,
+    id: &str,
+    title: String,
+) -> Result<(), String> {
+    let mut conversation =
+        chat_store_get_conversation(paths, id)?.ok_or_else(|| format!("未找到会话：{}", id))?;
+    conversation.meta.title = title;
+    conversation.meta.updated_at = chrono::Utc::now().to_rfc3339();
+    chat_store_save_conversation(paths, &conversation)
+}
+
+pub(super) fn stored_messages_to_seeds(messages: Vec<StoredMessage>) -> Vec<ConversationNodeSeed> {
+    messages
+        .into_iter()
+        .map(|message| ConversationNodeSeed {
+            node_id: message.node_id,
+            parent: message.parent,
+            turn_id: message.turn_id,
+            timestamp: Some(message.timestamp),
+            message: Message {
+                role: message.role,
+                content: message.content,
+                reasoning_content: message.reasoning,
+                tool_call_id: message.tool_call_id,
+                tool_calls: message.tool_calls,
+            },
+        })
+        .collect()
+}
+
+fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<StoredMessage> {
+    nodes
+        .into_iter()
+        .map(|node| {
+            let message = node.message;
+            StoredMessage {
+                message_id: Some(format!("msg_{}", node.id)),
+                node_id: Some(node.id),
+                turn_id: Some(node.turn_id),
+                parent: node.parent,
+                role: message.role,
+                content: message.content,
+                reasoning: message.reasoning_content,
+                timestamp: node.timestamp,
+                tool_call_id: message.tool_call_id,
+                tool_calls: message.tool_calls,
+            }
+        })
+        .collect()
+}
+
+fn auto_title(messages: &[StoredMessage]) -> String {
+    messages
+        .iter()
+        .find(|message| message.role == "user")
+        .and_then(|message| message.content.as_deref())
+        .map(|content| {
+            let truncated: String = content.chars().take(50).collect();
+            if content.chars().count() > 50 {
+                format!("{}…", truncated)
+            } else {
+                truncated
+            }
+        })
+        .unwrap_or_else(|| "新对话".to_string())
+}
+
+fn chat_store_save_snapshot(
+    paths: &PathsState,
+    conversation_id: &str,
+    plugin_id: &str,
+    model: &str,
+    nodes: Vec<ConversationNode>,
+    head: Option<u64>,
+) -> Result<(), String> {
+    let messages = conversation_nodes_to_stored_messages(nodes);
+    if messages.is_empty() {
+        return Ok(());
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let existing = chat_store_get_conversation(paths, conversation_id)?;
+    let (title, created_at, compact) = match existing {
+        Some(conversation) => (
+            conversation.meta.title,
+            conversation.meta.created_at,
+            conversation.compact,
+        ),
+        None => (auto_title(&messages), now.clone(), None),
+    };
+
+    let conversation = StoredConversation {
+        schema_version: default_conversation_schema_version(),
+        meta: ConversationMeta {
+            id: conversation_id.to_string(),
+            title,
+            plugin_id: plugin_id.to_string(),
+            model: model.to_string(),
+            created_at,
+            updated_at: now,
+        },
+        messages,
+        head,
+        compact,
+    };
+
+    chat_store_save_conversation(paths, &conversation)
+}
+
+async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
+    let snapshot_target = {
+        let ai_state = app.state::<AiState>();
+        let sessions = ai_state.sessions.lock().await;
+        sessions.get(session_id).map(|entry| {
+            (
+                entry.conversation_id.clone(),
+                entry.plugin_id.clone(),
+                entry.model.clone(),
+                entry.handle.clone(),
+            )
+        })
+    };
+
+    let Some((conversation_id, plugin_id, model, handle)) = snapshot_target else {
+        log::warn!("[chat_store] session '{}' 不存在，跳过快照保存", session_id);
+        return;
+    };
+
+    let nodes = handle.get_all_nodes().await;
+    let head = handle.head().await;
+    let paths = app.state::<PathsState>();
+    match chat_store_save_snapshot(paths.inner(), &conversation_id, &plugin_id, &model, nodes, head)
+    {
+        Ok(()) => log::info!(
+            "[chat_store] 已保存会话快照: session_id={} conversation_id={}",
+            session_id,
+            conversation_id
+        ),
+        Err(error) => log::error!(
+            "[chat_store] 保存会话快照失败: session_id={} conversation_id={} error={}",
+            session_id,
+            conversation_id,
+            error
+        ),
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -464,6 +777,9 @@ pub(crate) fn spawn_session_event_loop<S>(
                         node_id,
                         usage.is_some()
                     );
+                    if matches!(&status, TurnStatus::Ok) {
+                        save_session_snapshot(&app_clone, &sid).await;
+                    }
                     if let Some(ref u) = usage {
                         save_api_usage(&app_clone, &sid, u).await;
                     }
@@ -495,6 +811,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                 }
                 SessionEvent::BranchChanged { node_id } => {
                     log::info!("[ai:branch_changed] run_id={} node_id={}", rid, node_id);
+                    save_session_snapshot(&app_clone, &sid).await;
                     app_clone
                         .emit(
                             "ai:branch_changed",

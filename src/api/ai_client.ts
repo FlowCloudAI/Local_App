@@ -20,7 +20,7 @@ export interface AiCreateLlmSessionParams {
   temperature?: number | null
   maxTokens?: number | null
     maxToolRounds?: number | null
-  /** 续聊已有对话时传入其 ID，后端将回放历史并覆写原文件 */
+  /** 续聊已有对话时传入其 ID，App 后端将回放历史并覆写原文件 */
   conversationId?: string | null
     clientTraceId?: string | null
 }
@@ -379,6 +379,7 @@ export interface StoredMessage {
   message_id?: string | null
   node_id?: number | null
   turn_id?: number | null
+  parent?: number | null
   role: string
   content: string | null
   reasoning: string | null
@@ -397,9 +398,17 @@ export interface StoredMessage {
   }[]
 }
 
+export interface StoredCompact {
+  position_node_id: number
+  text: string
+  created_at: string
+}
+
 export interface StoredConversation extends ConversationMeta {
   schema_version?: number
   messages: StoredMessage[]
+  head?: number | null
+  compact?: StoredCompact | null
 }
 
 export interface SummaryResult {

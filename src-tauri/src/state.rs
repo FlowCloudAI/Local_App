@@ -99,6 +99,7 @@ pub(crate) struct SessionEntry {
     pub(crate) run_id: String,
     pub(crate) input_tx: mpsc::Sender<String>,
     pub(crate) handle: SessionHandle,
+    pub(crate) conversation_id: String,
     #[allow(dead_code)]
     pub(crate) kind: AiSessionKind,
     pub(crate) model: String,
@@ -127,7 +128,7 @@ impl AiState {
             .clone()
             .unwrap_or_else(|| PathBuf::from("chats"))
             .join("contradiction_reports");
-        let mut client = FlowCloudAIClient::new(plugins_dir, storage_path)?;
+        let mut client = FlowCloudAIClient::new(plugins_dir, None)?;
 
         std::fs::create_dir_all(&contradiction_reports_dir)?;
 
