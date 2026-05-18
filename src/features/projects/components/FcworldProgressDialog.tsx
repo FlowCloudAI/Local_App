@@ -13,8 +13,8 @@ export default function FcworldProgressDialog({progress}: FcworldProgressDialogP
     const percent = Math.max(0, Math.min(100, progress.percent))
 
     return createPortal(
-        <div className="fcworld-progress-backdrop">
-            <div className="fcworld-progress-dialog" role="dialog" aria-modal="true" aria-label={progress.title}>
+        <div className="fcworld-progress-layer" aria-live="polite">
+            <div className="fcworld-progress-card" role="status" aria-label={progress.title}>
                 <div className="fcworld-progress-header">
                     <span className="fcworld-progress-title">{progress.title}</span>
                     <span className={`fcworld-progress-status is-${progress.status}`}>

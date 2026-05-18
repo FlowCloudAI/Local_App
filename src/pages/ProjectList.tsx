@@ -112,7 +112,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
-    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
+    const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
 
     const loadProjects = useCallback(async () => {
         setLoading(true)
@@ -244,14 +244,8 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
         window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
         const importedProject = await db_get_project(result.projectId)
-        await showAlert(
-            `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源，${result.mapCount} 张地图。`,
-            'success',
-            'nonInvasive',
-            1600,
-        )
         onOpenProject?.(importedProject)
-    }, [onOpenProject, showAlert])
+    }, [onOpenProject])
 
     const handleImportProject = useCallback(async () => {
         if (importing) return
@@ -279,7 +273,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 mode: 'rename',
                 projectName: preview.projectName,
             }, importOperationId)
-            closeProgress()
+            finishProgress()
             await openImportedProject(result)
         } catch (error) {
             closeProgress()
@@ -287,7 +281,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         } finally {
             setImporting(false)
         }
-    }, [closeProgress, importing, openImportedProject, showAlert, startProgress])
+    }, [closeProgress, finishProgress, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictCancel = useCallback(() => {
         if (!importing) setImportConflict(null)
@@ -302,7 +296,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 mode: 'rename',
                 projectName,
             }, operationId)
-            closeProgress()
+            finishProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (error) {
@@ -311,7 +305,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         } finally {
             setImporting(false)
         }
-    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+    }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
@@ -329,7 +323,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 mode: 'overwrite',
                 overwriteProjectId: importConflict.duplicateProject.projectId,
             }, operationId)
-            closeProgress()
+            finishProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (error) {
@@ -338,7 +332,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         } finally {
             setImporting(false)
         }
-    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+    }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button

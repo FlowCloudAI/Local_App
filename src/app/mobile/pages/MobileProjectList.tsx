@@ -51,7 +51,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
     const [searchText, setSearchText] = useState('')
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
-    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
+    const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -107,14 +107,8 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
         await load()
         const project = await db_get_project(result.projectId)
-        await showAlert(
-            `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源。`,
-            'success',
-            'nonInvasive',
-            1400,
-        )
         handleOpenProject(project)
-    }, [handleOpenProject, load, showAlert])
+    }, [handleOpenProject, load])
 
     const handleImportProject = useCallback(async () => {
         if (importing) return
@@ -142,7 +136,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 mode: 'rename',
                 projectName: preview.projectName,
             }, importOperationId)
-            closeProgress()
+            finishProgress()
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
@@ -150,7 +144,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         } finally {
             setImporting(false)
         }
-    }, [closeProgress, importing, openImportedProject, showAlert, startProgress])
+    }, [closeProgress, finishProgress, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictCancel = useCallback(() => {
         if (!importing) setImportConflict(null)
@@ -165,7 +159,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 mode: 'rename',
                 projectName,
             }, operationId)
-            closeProgress()
+            finishProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (e) {
@@ -174,7 +168,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         } finally {
             setImporting(false)
         }
-    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+    }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
@@ -192,7 +186,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 mode: 'overwrite',
                 overwriteProjectId: importConflict.duplicateProject.projectId,
             }, operationId)
-            closeProgress()
+            finishProgress()
             setImportConflict(null)
             await openImportedProject(result)
         } catch (e) {
@@ -201,7 +195,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         } finally {
             setImporting(false)
         }
-    }, [closeProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+    }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     if (loading && projects.length === 0) {
         return <div className="mobile-page__loading">加载中…</div>

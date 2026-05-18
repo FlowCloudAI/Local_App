@@ -104,15 +104,11 @@ impl FcworldProgressEmitter {
         message: impl Into<String>,
         current: usize,
         total: usize,
+        percent: u8,
         status: &'static str,
     ) {
         let (Some(app), Some(operation_id)) = (&self.app, &self.operation_id) else {
             return;
-        };
-        let percent = if total == 0 {
-            100
-        } else {
-            ((current.min(total) * 100) / total).min(100) as u8
         };
         let _ = app.emit(
             FCWORLD_PROGRESS_EVENT,
@@ -128,30 +124,13 @@ impl FcworldProgressEmitter {
             },
         );
     }
-
-    fn running(
-        &self,
-        phase: impl Into<String>,
-        message: impl Into<String>,
-        current: usize,
-        total: usize,
-    ) {
-        self.emit(phase, message, current, total, "running");
-    }
-
-    fn done(&self, message: impl Into<String>, total: usize) {
-        self.emit("done", message, total, total, "done");
-    }
-
-    fn error(&self, message: impl Into<String>, current: usize, total: usize) {
-        self.emit("error", message, current, total, "error");
-    }
 }
 
 #[derive(Debug, Clone, Default)]
 struct FcworldProgressState {
     current: usize,
     total: usize,
+    percent: u8,
 }
 
 #[derive(Clone)]
@@ -164,8 +143,35 @@ impl FcworldProgressTracker {
     fn new(emitter: FcworldProgressEmitter, total: usize) -> Self {
         Self {
             emitter,
-            state: Arc::new(StdMutex::new(FcworldProgressState { current: 0, total })),
+            state: Arc::new(StdMutex::new(FcworldProgressState {
+                current: 0,
+                total,
+                percent: 0,
+            })),
         }
+    }
+
+    fn emit_state(
+        &self,
+        state: &mut FcworldProgressState,
+        phase: impl Into<String>,
+        message: impl Into<String>,
+        status: &'static str,
+    ) {
+        let computed_percent = match status {
+            "done" => 100,
+            _ if state.total == 0 => state.percent,
+            _ => ((state.current.min(state.total) * 100) / state.total).min(100) as u8,
+        };
+        state.percent = state.percent.max(computed_percent);
+        self.emitter.emit(
+            phase,
+            message,
+            state.current,
+            state.total,
+            state.percent,
+            status,
+        );
     }
 
     fn add_total(&self, amount: usize, phase: &str, message: impl Into<String>) {
@@ -174,31 +180,29 @@ impl FcworldProgressTracker {
         }
         let mut state = self.state.lock().expect("fcworld progress state poisoned");
         state.total = state.total.saturating_add(amount);
-        self.emitter
-            .running(phase, message, state.current, state.total);
+        self.emit_state(&mut state, phase, message, "running");
     }
 
     fn step(&self, phase: &str, message: impl Into<String>) {
         let mut state = self.state.lock().expect("fcworld progress state poisoned");
         state.current = state.current.saturating_add(1).min(state.total.max(1));
-        self.emitter
-            .running(phase, message, state.current, state.total);
+        self.emit_state(&mut state, phase, message, "running");
     }
 
     fn note(&self, phase: &str, message: impl Into<String>) {
-        let state = self.state.lock().expect("fcworld progress state poisoned");
-        self.emitter
-            .running(phase, message, state.current, state.total);
+        let mut state = self.state.lock().expect("fcworld progress state poisoned");
+        self.emit_state(&mut state, phase, message, "running");
     }
 
     fn done(&self, message: impl Into<String>) {
-        let state = self.state.lock().expect("fcworld progress state poisoned");
-        self.emitter.done(message, state.total);
+        let mut state = self.state.lock().expect("fcworld progress state poisoned");
+        state.current = state.total;
+        self.emit_state(&mut state, "done", message, "done");
     }
 
     fn error(&self, message: impl Into<String>) {
-        let state = self.state.lock().expect("fcworld progress state poisoned");
-        self.emitter.error(message, state.current, state.total);
+        let mut state = self.state.lock().expect("fcworld progress state poisoned");
+        self.emit_state(&mut state, "error", message, "error");
     }
 }
 

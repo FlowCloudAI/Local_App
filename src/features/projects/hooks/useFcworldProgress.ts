@@ -28,7 +28,15 @@ function createOperationId(): string {
 
 export function useFcworldProgress() {
     const activeOperationIdRef = useRef<string | null>(null)
+    const closeTimerRef = useRef<number | null>(null)
     const [progress, setProgress] = useState<FcworldProgressState | null>(null)
+
+    const clearCloseTimer = useCallback(() => {
+        if (closeTimerRef.current !== null) {
+            window.clearTimeout(closeTimerRef.current)
+            closeTimerRef.current = null
+        }
+    }, [])
 
     useEffect(() => {
         let disposed = false
@@ -47,7 +55,7 @@ export function useFcworldProgress() {
                     message: payload.message,
                     current: payload.current,
                     total: payload.total,
-                    percent: Math.max(0, Math.min(100, payload.percent)),
+                    percent: Math.max(current.percent, Math.max(0, Math.min(100, payload.percent))),
                     status: payload.status,
                 }
             })
@@ -61,11 +69,13 @@ export function useFcworldProgress() {
 
         return () => {
             disposed = true
+            clearCloseTimer()
             unlisten?.()
         }
-    }, [])
+    }, [clearCloseTimer])
 
     const startProgress = useCallback((kind: FcworldProgressKind, title: string) => {
+        clearCloseTimer()
         const operationId = createOperationId()
         activeOperationIdRef.current = operationId
         setProgress({
@@ -80,16 +90,27 @@ export function useFcworldProgress() {
             status: 'running',
         })
         return operationId
-    }, [])
+    }, [clearCloseTimer])
 
     const closeProgress = useCallback(() => {
+        clearCloseTimer()
         activeOperationIdRef.current = null
         setProgress(null)
-    }, [])
+    }, [clearCloseTimer])
+
+    const finishProgress = useCallback((delayMs = 1400) => {
+        clearCloseTimer()
+        closeTimerRef.current = window.setTimeout(() => {
+            activeOperationIdRef.current = null
+            setProgress(null)
+            closeTimerRef.current = null
+        }, delayMs)
+    }, [clearCloseTimer])
 
     return {
         progress,
         startProgress,
         closeProgress,
+        finishProgress,
     }
 }

@@ -191,7 +191,7 @@ function ProjectEditorInner({
     const [coverPickerOpen, setCoverPickerOpen] = useState(false)
     const [coverUpdating, setCoverUpdating] = useState(false)
     const [exporting, setExporting] = useState(false)
-    const {progress: fcworldProgress, startProgress, closeProgress} = useFcworldProgress()
+    const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
@@ -518,22 +518,15 @@ function ProjectEditorInner({
         setExporting(true)
         try {
             const operationId = startProgress('export', '导出世界')
-            const result = await db_export_project_fcworld(projectId, selectedPath, operationId)
-            closeProgress()
-            const warningText = result.warnings.length > 0 ? `，${result.warnings.length} 条警告` : ''
-            await showAlert(
-                `世界已导出：${result.assetCount} 个资源，${result.mapCount} 张地图${warningText}。`,
-                'success',
-                'nonInvasive',
-                1400,
-            )
+            await db_export_project_fcworld(projectId, selectedPath, operationId)
+            finishProgress()
         } catch (error) {
             closeProgress()
             await showAlert(`导出世界失败：${String(error)}`, 'error', 'toast', 3200)
         } finally {
             setExporting(false)
         }
-    }, [closeProgress, exporting, project, projectId, showAlert, startProgress])
+    }, [closeProgress, exporting, finishProgress, project, projectId, showAlert, startProgress])
 
     const handleCreate = async (parentKey: string | null): Promise<string> => {
         const actualParentId = (!parentKey || parentKey === ROOT_ID) ? null : parentKey
