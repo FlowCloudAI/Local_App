@@ -235,43 +235,36 @@
     font-weight: 600;
 }
 
-.about-section-field input,
-.about-section-field textarea {
+.about-section-textarea {
     width: 100%;
     min-width: 0;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
+    border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
-    background: var(--fc-color-surface);
+    background: var(--fc-color-bg);
     color: var(--fc-color-text);
-    font: inherit;
-    font-weight: 500;
+    font-family: var(--fc-font-family), serif;
+    font-size: var(--fc-font-size-md);
+    font-weight: 400;
     outline: none;
     transition:
-        border-color 0.16s ease,
-        box-shadow 0.16s ease,
-        background 0.16s ease;
-}
-
-.about-section-field input {
-    height: 2.35rem;
-    padding: 0 0.75rem;
-}
-
-.about-section-field textarea {
+        border-color var(--fc-transition),
+        box-shadow var(--fc-transition);
     min-height: 7rem;
-    resize: vertical;
     padding: 0.7rem 0.75rem;
     line-height: var(--fc-line-height-normal);
+    resize: vertical;
 }
 
-.about-section-field input:focus,
-.about-section-field textarea:focus {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 72%, var(--fc-color-border));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
+.about-section-textarea:hover {
+    border-color: var(--fc-color-border-hover);
 }
 
-.about-section-field input::placeholder,
-.about-section-field textarea::placeholder {
+.about-section-textarea:focus {
+    border-color: var(--fc-color-primary);
+    box-shadow: 0 0 0 2px var(--fc-color-primary-subtle);
+}
+
+.about-section-textarea::placeholder {
     color: var(--fc-color-text-tertiary);
 }
 
@@ -281,6 +274,11 @@
 
 .about-section-feedback-kind {
     width: 100%;
+}
+
+.about-section-feedback-kind .fc-select__trigger {
+    min-height: 2.5rem;
+    padding: 0 var(--fc-space-md);
 }
 
 .about-section-feedback-actions {

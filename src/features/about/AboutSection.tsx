@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState, type ReactNode} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
 import {openUrl} from '@tauri-apps/plugin-opener'
-import {Button, Select, useAlert} from 'flowcloudai-ui'
+import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {submit_public_feedback, type PublicFeedbackPayload} from '../../api/feedback'
 import {logger} from '../../shared/logger'
 import LicenseModal from './LicenseModal'
@@ -267,26 +267,27 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                     </label>
                     <label className="about-section-field">
                         <span>标题</span>
-                        <input
+                        <Input
                             value={feedbackTitle}
                             maxLength={120}
                             placeholder="可选"
-                            onChange={event => setFeedbackTitle(event.target.value)}
+                            onValueChange={setFeedbackTitle}
                         />
                     </label>
                     <label className="about-section-field">
                         <span>联系方式</span>
-                        <input
+                        <Input
                             value={feedbackContact}
                             maxLength={200}
                             placeholder="可选，邮箱或其他联系方式"
-                            onChange={event => setFeedbackContact(event.target.value)}
+                            onValueChange={setFeedbackContact}
                         />
                     </label>
                 </div>
                 <label className="about-section-field about-section-field--wide">
                     <span>内容</span>
                     <textarea
+                        className="about-section-textarea"
                         value={feedbackContent}
                         maxLength={5000}
                         placeholder="请描述你的建议、遇到的问题或复现步骤。不会自动上传项目数据或日志。"
