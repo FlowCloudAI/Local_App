@@ -236,7 +236,6 @@
 }
 
 .about-section-field input,
-.about-section-field select,
 .about-section-field textarea {
     width: 100%;
     min-width: 0;
@@ -253,8 +252,7 @@
         background 0.16s ease;
 }
 
-.about-section-field input,
-.about-section-field select {
+.about-section-field input {
     height: 2.35rem;
     padding: 0 0.75rem;
 }
@@ -267,7 +265,6 @@
 }
 
 .about-section-field input:focus,
-.about-section-field select:focus,
 .about-section-field textarea:focus {
     border-color: color-mix(in srgb, var(--fc-color-primary) 72%, var(--fc-color-border));
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
@@ -279,6 +276,10 @@
 }
 
 .about-section-field--wide {
+    width: 100%;
+}
+
+.about-section-feedback-kind {
     width: 100%;
 }
 

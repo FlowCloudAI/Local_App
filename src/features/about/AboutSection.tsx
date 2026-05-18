@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState, type ReactNode} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
 import {openUrl} from '@tauri-apps/plugin-opener'
-import {Button, useAlert} from 'flowcloudai-ui'
+import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {submit_public_feedback, type PublicFeedbackPayload} from '../../api/feedback'
 import {logger} from '../../shared/logger'
 import LicenseModal from './LicenseModal'
@@ -255,10 +255,15 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                 <div className="about-section-feedback-grid">
                     <label className="about-section-field">
                         <span>类型</span>
-                        <select value={feedbackKind} onChange={event => setFeedbackKind(event.target.value as PublicFeedbackPayload['kind'])}>
-                            <option value="suggestion">建议</option>
-                            <option value="issue">问题</option>
-                        </select>
+                        <Select
+                            className="about-section-feedback-kind"
+                            value={feedbackKind}
+                            options={[
+                                {value: 'suggestion', label: '建议'},
+                                {value: 'issue', label: '问题'},
+                            ]}
+                            onChange={value => setFeedbackKind(value === 'issue' ? 'issue' : 'suggestion')}
+                        />
                     </label>
                     <label className="about-section-field">
                         <span>标题</span>
