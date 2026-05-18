@@ -128,7 +128,7 @@ impl AiState {
             .clone()
             .unwrap_or_else(|| PathBuf::from("chats"))
             .join("contradiction_reports");
-        let mut client = FlowCloudAIClient::new(plugins_dir, None)?;
+        let mut client = FlowCloudAIClient::new(plugins_dir)?;
 
         std::fs::create_dir_all(&contradiction_reports_dir)?;
 
