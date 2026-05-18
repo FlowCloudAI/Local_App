@@ -1,6 +1,7 @@
 use super::common::*;
 use base64::Engine;
 use csv::StringRecord;
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -10,6 +11,8 @@ use zip::{ZipWriter, write::SimpleFileOptions};
 use worldflow_core::{
     CsvExportItem, ProjectCsvExport, ProjectOps, WorldflowCsvTable, models::Project,
 };
+
+mod import;
 
 const FCWORLD_FORMAT: &str = "com.flowcloudai.fcworld";
 const FCWORLD_FORMAT_VERSION: u32 = 1;
@@ -29,7 +32,7 @@ pub struct FcworldExportResult {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FcworldAssetSource {
     entity_type: String,
@@ -37,7 +40,7 @@ struct FcworldAssetSource {
     field: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FcworldAsset {
     id: String,
@@ -52,7 +55,7 @@ struct FcworldAsset {
     source: FcworldAssetSource,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct FcworldAssetsIndex {
     version: u32,
     assets: Vec<FcworldAsset>,
@@ -97,7 +100,7 @@ struct CsvRewriteOutput {
     project_cover_asset_id: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FcworldManifest {
     format: String,
@@ -110,7 +113,7 @@ struct FcworldManifest {
     contents: ManifestContents,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestGenerator {
     app: String,
@@ -119,14 +122,14 @@ struct ManifestGenerator {
     worldflow_schema_version: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestCompatibility {
     min_app_version: String,
     features: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestWorld {
     source_project_id: String,
@@ -138,7 +141,7 @@ struct ManifestWorld {
     language: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestContents {
     worldflow: ManifestWorldflowContents,
@@ -147,7 +150,7 @@ struct ManifestContents {
     counts: ManifestCounts,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestWorldflowContents {
     path: String,
@@ -155,7 +158,7 @@ struct ManifestWorldflowContents {
     tables: Vec<ManifestCsvTable>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestCsvTable {
     name: String,
@@ -164,7 +167,7 @@ struct ManifestCsvTable {
     sha256: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestFile {
     path: String,
@@ -172,7 +175,7 @@ struct ManifestFile {
     sha256: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManifestCounts {
     categories: usize,
@@ -1217,6 +1220,15 @@ mod tests {
             table_manifest["sha256"].as_str().unwrap(),
             sha256_hex(entries_csv.as_bytes())
         );
+
+        let validated =
+            import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
+                .expect("导出包应通过导入校验");
+        assert_eq!(validated.csv_items.len(), WorldflowCsvTable::ordered().len());
+        assert_eq!(validated.assets_index.assets.len(), 4);
+        assert_eq!(validated.asset_bytes_by_path.len(), 4);
+        assert_eq!(validated.manifest.package_id, package.package_id);
+        assert_eq!(validated.input_file_size, std::fs::metadata(&output_path).unwrap().len());
     }
 
     #[tokio::test]
@@ -1240,5 +1252,36 @@ mod tests {
         let maps: Value = serde_json::from_str(&package.maps_json).expect("解析地图 JSON 失败");
         assert_eq!(maps["maps"].as_array().unwrap().len(), 0);
         assert_eq!(package.map_count, 0);
+    }
+
+    #[tokio::test]
+    async fn rejects_tampered_maps_hash_on_import_validation() {
+        let (temp, db, paths) = new_test_db("fcworld_tampered_maps").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "校验世界".to_string(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+
+        let mut package = prepare_fcworld_package(&paths, project, export).expect("准备 fcworld 失败");
+        package.maps_json.push(' ');
+        let output_path = temp.path().join("篡改地图.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let error =
+            import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
+                .expect_err("篡改地图摘要后应拒绝导入");
+        assert!(
+            error.contains("maps/maps.json 摘要不匹配"),
+            "实际错误: {error}"
+        );
     }
 }
