@@ -560,19 +560,9 @@ pub fn get_template_local_root_dir() -> Result<String> {
         .read()
         .map_err(|_| anyhow::anyhow!("模板运行时读取失败"))?;
 
-    if runtime
-        .builtin_dir
-        .join("sense")
-        .join("app_system.tera")
-        .is_file()
-    {
-        return Ok(runtime.builtin_dir.to_string_lossy().into_owned());
-    }
-
-    Err(anyhow::anyhow!(
-        "当前模板源目录不存在，实际路径：{}",
-        runtime.builtin_dir.display()
-    ))
+    fs::create_dir_all(&runtime.override_dir)
+        .with_context(|| format!("创建模板目录失败：{}", runtime.override_dir.display()))?;
+    Ok(runtime.override_dir.to_string_lossy().into_owned())
 }
 
 pub fn get_template_effective_path(id: &str) -> Result<String> {

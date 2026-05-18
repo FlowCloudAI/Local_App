@@ -1,7 +1,7 @@
 use crate::template::{
-    TemplateDocument, TemplateMeta, TemplateSaveResult, get_default_template_content,
-    get_template_document, get_template_effective_path, get_template_local_root_dir,
-    list_template_meta, save_template_content,
+    get_default_template_content, get_template_document, get_template_effective_path,
+    get_template_local_root_dir, list_template_meta, save_template_content, TemplateDocument,
+    TemplateMeta, TemplateSaveResult,
 };
 
 /// 返回模板目录所需的全部元数据。
@@ -22,7 +22,7 @@ pub fn template_get_default(id: String) -> Result<String, String> {
     get_default_template_content(&id).map_err(|e| e.to_string())
 }
 
-/// 返回当前提示词模板源目录。
+/// 返回当前提示词模板存储目录。
 #[tauri::command]
 pub fn template_get_local_root_dir() -> Result<String, String> {
     get_template_local_root_dir().map_err(|e| e.to_string())
