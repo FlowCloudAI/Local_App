@@ -61,6 +61,54 @@ pub struct FcworldImportResult {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FcworldImportDuplicateProject {
+    pub project_id: String,
+    pub project_name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FcworldImportPreview {
+    pub input_path: String,
+    pub package_id: String,
+    pub source_project_id: String,
+    pub project_name: String,
+    pub suggested_name: String,
+    pub duplicate_project: Option<FcworldImportDuplicateProject>,
+    pub asset_count: usize,
+    pub map_count: usize,
+    pub file_size: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FcworldImportMode {
+    Rename,
+    Overwrite,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FcworldImportOptions {
+    pub mode: FcworldImportMode,
+    pub project_name: Option<String>,
+    pub overwrite_project_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct FcworldOverwriteTarget {
+    project_id: Uuid,
+    project_name: String,
+}
+
+#[derive(Debug, Clone)]
+struct FcworldImportDecision {
+    project_name: String,
+    overwrite_target: Option<FcworldOverwriteTarget>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FcworldAssetSource {
@@ -545,8 +593,13 @@ fn rewrite_entry_images_json(
             continue;
         };
 
-        let asset =
-            collector.add_file_asset(Path::new(&path), "entry_image", "entry", entry_id, "images")?;
+        let asset = collector.add_file_asset(
+            Path::new(&path),
+            "entry_image",
+            "entry",
+            entry_id,
+            "images",
+        )?;
         object.insert("path".to_string(), Value::String(asset.path));
     }
 
@@ -672,8 +725,8 @@ fn load_map_store_value(paths: &PathsState, project_id: &Uuid) -> Result<Value, 
         }));
     }
 
-    let content =
-        std::fs::read_to_string(&path).map_err(|e| format!("读取地图文件失败 {:?}: {}", path, e))?;
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取地图文件失败 {:?}: {}", path, e))?;
     let value = serde_json::from_str::<Value>(&content)
         .map_err(|e| format!("解析地图文件失败 {:?}: {}", path, e))?;
     if value.get("maps").is_some() {
@@ -1075,7 +1128,147 @@ fn expected_import_rows(
     Ok(rows)
 }
 
-fn write_prepared_import_files(package: &import::PreparedFcworldImport, paths: &PathsState) -> Result<(), String> {
+fn normalize_project_name(name: &str) -> String {
+    name.trim().to_lowercase()
+}
+
+fn source_project_name(package: &import::ValidatedFcworldPackage) -> String {
+    match package.manifest.world.name.trim() {
+        "" => "导入世界".to_string(),
+        name => name.to_string(),
+    }
+}
+
+fn project_name_exists(projects: &[Project], name: &str) -> bool {
+    let normalized = normalize_project_name(name);
+    projects
+        .iter()
+        .any(|project| normalize_project_name(&project.name) == normalized)
+}
+
+fn duplicate_project_for_name<'a>(projects: &'a [Project], name: &str) -> Option<&'a Project> {
+    let normalized = normalize_project_name(name);
+    projects
+        .iter()
+        .find(|project| normalize_project_name(&project.name) == normalized)
+}
+
+fn suggested_import_project_name(source_name: &str, projects: &[Project]) -> String {
+    let base = match source_name.trim() {
+        "" => "导入世界",
+        name => name,
+    };
+    if !project_name_exists(projects, base) {
+        return base.to_string();
+    }
+
+    let mut index = 1usize;
+    loop {
+        let candidate = if index == 1 {
+            format!("{base}【导入】")
+        } else {
+            format!("{base}【导入 {index}】")
+        };
+        if !project_name_exists(projects, &candidate) {
+            return candidate;
+        }
+        index += 1;
+    }
+}
+
+fn import_preview_from_package(
+    input_path: &Path,
+    package: &import::ValidatedFcworldPackage,
+    existing_projects: &[Project],
+) -> FcworldImportPreview {
+    let project_name = source_project_name(package);
+    let duplicate_project =
+        duplicate_project_for_name(existing_projects, &project_name).map(|project| {
+            FcworldImportDuplicateProject {
+                project_id: project.id.to_string(),
+                project_name: project.name.clone(),
+            }
+        });
+
+    FcworldImportPreview {
+        input_path: input_path.to_string_lossy().to_string(),
+        package_id: package.manifest.package_id.clone(),
+        source_project_id: package.manifest.world.source_project_id.clone(),
+        project_name: project_name.clone(),
+        suggested_name: suggested_import_project_name(&project_name, existing_projects),
+        duplicate_project,
+        asset_count: package.assets_index.assets.len(),
+        map_count: package.manifest.contents.maps.count,
+        file_size: package.input_file_size,
+    }
+}
+
+fn resolve_import_decision(
+    package: &import::ValidatedFcworldPackage,
+    existing_projects: &[Project],
+    options: Option<FcworldImportOptions>,
+) -> Result<FcworldImportDecision, String> {
+    let source_name = source_project_name(package);
+    let options = options.unwrap_or(FcworldImportOptions {
+        mode: FcworldImportMode::Rename,
+        project_name: None,
+        overwrite_project_id: None,
+    });
+
+    match options.mode {
+        FcworldImportMode::Rename => {
+            let project_name = options
+                .project_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(ToString::to_string)
+                .unwrap_or_else(|| suggested_import_project_name(&source_name, existing_projects));
+            if project_name_exists(existing_projects, &project_name) {
+                return Err(format!(
+                    "已存在名为“{project_name}”的世界观，请选择覆盖或换一个导入名称"
+                ));
+            }
+            Ok(FcworldImportDecision {
+                project_name,
+                overwrite_target: None,
+            })
+        }
+        FcworldImportMode::Overwrite => {
+            let target = if let Some(project_id) = options.overwrite_project_id.as_deref() {
+                let project_id = Uuid::parse_str(project_id)
+                    .map_err(|e| format!("覆盖目标项目 ID 无效: {e}"))?;
+                existing_projects
+                    .iter()
+                    .find(|project| project.id == project_id)
+                    .ok_or_else(|| "覆盖目标世界观不存在".to_string())?
+            } else {
+                duplicate_project_for_name(existing_projects, &source_name)
+                    .ok_or_else(|| "未找到可覆盖的同名世界观".to_string())?
+            };
+
+            if normalize_project_name(&target.name) != normalize_project_name(&source_name) {
+                return Err(format!(
+                    "覆盖目标“{}”与导入世界“{}”名称不一致",
+                    target.name, source_name
+                ));
+            }
+
+            Ok(FcworldImportDecision {
+                project_name: target.name.clone(),
+                overwrite_target: Some(FcworldOverwriteTarget {
+                    project_id: target.id,
+                    project_name: target.name.clone(),
+                }),
+            })
+        }
+    }
+}
+
+fn write_prepared_import_files(
+    package: &import::PreparedFcworldImport,
+    paths: &PathsState,
+) -> Result<(), String> {
     if !package.assets.is_empty() {
         let image_dir = import::import_images_dir(paths, &package.new_project_id)?;
         std::fs::create_dir_all(&image_dir)
@@ -1106,7 +1299,10 @@ fn write_prepared_import_files(package: &import::PreparedFcworldImport, paths: &
         .map_err(|e| format!("写入导入地图失败 {:?}: {e}", map_path))
 }
 
-fn cleanup_prepared_import_files(package: &import::PreparedFcworldImport, paths: &PathsState) -> Result<(), String> {
+fn cleanup_prepared_import_files(
+    package: &import::PreparedFcworldImport,
+    paths: &PathsState,
+) -> Result<(), String> {
     let mut errors = Vec::new();
     let image_dir = import::import_images_dir(paths, &package.new_project_id)?;
     if image_dir.exists() {
@@ -1129,6 +1325,29 @@ fn cleanup_prepared_import_files(package: &import::PreparedFcworldImport, paths:
     }
 }
 
+fn cleanup_project_sidecar_files(paths: &PathsState, project_id: &Uuid) -> Result<(), String> {
+    let mut errors = Vec::new();
+    let image_dir = import::import_images_dir(paths, project_id)?;
+    if image_dir.exists() {
+        if let Err(error) = std::fs::remove_dir_all(&image_dir) {
+            errors.push(format!("清理原世界观图片目录失败 {:?}: {error}", image_dir));
+        }
+    }
+
+    let map_path = map_store_path(paths, project_id)?;
+    if map_path.exists() {
+        if let Err(error) = std::fs::remove_file(&map_path) {
+            errors.push(format!("清理原世界观地图文件失败 {:?}: {error}", map_path));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("；"))
+    }
+}
+
 fn cleanup_after_file_write_error(
     package: &import::PreparedFcworldImport,
     paths: &PathsState,
@@ -1136,7 +1355,9 @@ fn cleanup_after_file_write_error(
 ) -> String {
     match cleanup_prepared_import_files(package, paths) {
         Ok(()) => reason,
-        Err(cleanup_error) => format!("{reason}；清理导入临时文件失败，需要人工介入：{cleanup_error}"),
+        Err(cleanup_error) => {
+            format!("{reason}；清理导入临时文件失败，需要人工介入：{cleanup_error}")
+        }
     }
 }
 
@@ -1165,17 +1386,13 @@ async fn import_fcworld_package_to_db(
     db: &SqliteDb,
     paths: &PathsState,
     input_path: &Path,
+    options: Option<FcworldImportOptions>,
 ) -> Result<FcworldImportResult, String> {
-    let existing_names = db
-        .list_projects()
-        .await
-        .map_err(|e| e.to_string())?
-        .into_iter()
-        .map(|project| project.name)
-        .collect::<Vec<_>>();
+    let existing_projects = db.list_projects().await.map_err(|e| e.to_string())?;
     let validated =
         import::read_and_validate_fcworld_package(input_path, db.worldflow_schema_version())?;
-    let prepared = import::prepare_fcworld_import(validated, paths, &existing_names)?;
+    let decision = resolve_import_decision(&validated, &existing_projects, options)?;
+    let prepared = import::prepare_fcworld_import(validated, paths, &decision.project_name)?;
     let expected_rows = expected_import_rows(&prepared.csv_items)?;
 
     if let Err(error) = write_prepared_import_files(&prepared, paths) {
@@ -1205,10 +1422,23 @@ async fn import_fcworld_package_to_db(
 
     let actual_rows = FcworldImportRows::from(import_result);
     if actual_rows != expected_rows {
-        let reason = format!(
-            "fcworld 导入行数不匹配: expected={expected_rows:?} actual={actual_rows:?}"
-        );
+        let reason =
+            format!("fcworld 导入行数不匹配: expected={expected_rows:?} actual={actual_rows:?}");
         return Err(rollback_after_import_row_mismatch(db, &prepared, paths, reason).await);
+    }
+
+    let mut warnings = prepared.warnings.clone();
+    if let Some(target) = decision.overwrite_target {
+        if let Err(error) = db.delete_project(&target.project_id).await {
+            let reason = format!("删除覆盖目标世界观失败: {error}");
+            return Err(rollback_after_import_row_mismatch(db, &prepared, paths, reason).await);
+        }
+        if let Err(error) = cleanup_project_sidecar_files(paths, &target.project_id) {
+            return Err(format!(
+                "覆盖导入已写入，但清理原世界观文件失败，需要人工介入：{error}"
+            ));
+        }
+        warnings.push(format!("已覆盖原世界观：{}", target.project_name));
     }
 
     Ok(FcworldImportResult {
@@ -1221,8 +1451,22 @@ async fn import_fcworld_package_to_db(
         map_count: prepared.map_count,
         file_size: prepared.input_file_size,
         imported_rows: actual_rows,
-        warnings: prepared.warnings,
+        warnings,
     })
+}
+
+async fn preview_fcworld_package(
+    db: &SqliteDb,
+    input_path: &Path,
+) -> Result<FcworldImportPreview, String> {
+    let existing_projects = db.list_projects().await.map_err(|e| e.to_string())?;
+    let validated =
+        import::read_and_validate_fcworld_package(input_path, db.worldflow_schema_version())?;
+    Ok(import_preview_from_package(
+        input_path,
+        &validated,
+        &existing_projects,
+    ))
 }
 
 #[tauri::command]
@@ -1238,7 +1482,10 @@ pub async fn db_export_project_fcworld(
     let (project, export) = {
         let state = state.inner().lock().await;
         let db = state.sqlite_db.lock().await;
-        let project = db.get_project(&project_id).await.map_err(|e| e.to_string())?;
+        let project = db
+            .get_project(&project_id)
+            .await
+            .map_err(|e| e.to_string())?;
         let export = db
             .export_project_csvs(project_id)
             .await
@@ -1265,11 +1512,23 @@ pub async fn db_import_project_fcworld(
     state: State<'_, Arc<Mutex<AppState>>>,
     paths: State<'_, PathsState>,
     input_path: String,
+    options: Option<FcworldImportOptions>,
 ) -> Result<FcworldImportResult, String> {
     let input_path_buf = PathBuf::from(&input_path);
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
-    import_fcworld_package_to_db(&db, paths.inner(), &input_path_buf).await
+    import_fcworld_package_to_db(&db, paths.inner(), &input_path_buf, options).await
+}
+
+#[tauri::command]
+pub async fn db_preview_project_fcworld(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    input_path: String,
+) -> Result<FcworldImportPreview, String> {
+    let input_path_buf = PathBuf::from(&input_path);
+    let state = state.inner().lock().await;
+    let db = state.sqlite_db.lock().await;
+    preview_fcworld_package(&db, &input_path_buf).await
 }
 
 #[cfg(test)]
@@ -1305,7 +1564,10 @@ mod tests {
         let db_dir = temp.path().join("db");
         std::fs::create_dir_all(&db_dir).expect("创建测试数据库目录失败");
         let db_path = db_dir.join(format!("{prefix}.db"));
-        let database_url = format!("sqlite:{}?mode=rwc", db_path.to_string_lossy().replace('\\', "/"));
+        let database_url = format!(
+            "sqlite:{}?mode=rwc",
+            db_path.to_string_lossy().replace('\\', "/")
+        );
         let db = SqliteDb::new(&database_url)
             .await
             .expect("创建测试数据库失败");
@@ -1409,15 +1671,18 @@ mod tests {
 
         let file = File::open(&output_path).expect("打开导出包失败");
         let mut zip = ZipArchive::new(file).expect("读取 zip 失败");
-        let names = zip.file_names().map(|name| name.to_string()).collect::<Vec<_>>();
+        let names = zip
+            .file_names()
+            .map(|name| name.to_string())
+            .collect::<Vec<_>>();
         assert!(names.contains(&"manifest.json".to_string()));
         assert!(names.contains(&"assets/index.json".to_string()));
         assert!(names.contains(&"maps/maps.json".to_string()));
         assert!(names.contains(&"data/worldflow/projects.csv".to_string()));
         assert!(names.contains(&"data/worldflow/entries.csv".to_string()));
 
-        let manifest: Value =
-            serde_json::from_str(&read_zip_text(&mut zip, "manifest.json")).expect("解析 manifest 失败");
+        let manifest: Value = serde_json::from_str(&read_zip_text(&mut zip, "manifest.json"))
+            .expect("解析 manifest 失败");
         assert_eq!(manifest["format"], FCWORLD_FORMAT);
         assert_eq!(manifest["contents"]["worldflow"]["schemaVersion"], 5);
         assert_eq!(manifest["contents"]["counts"]["entries"], 1);
@@ -1425,12 +1690,18 @@ mod tests {
         assert_eq!(manifest["contents"]["maps"]["count"], 1);
         assert!(manifest["world"]["coverAssetId"].as_str().is_some());
 
-        let assets_index: Value = serde_json::from_str(&read_zip_text(&mut zip, "assets/index.json"))
-            .expect("解析资源索引失败");
+        let assets_index: Value =
+            serde_json::from_str(&read_zip_text(&mut zip, "assets/index.json"))
+                .expect("解析资源索引失败");
         let assets = assets_index["assets"].as_array().expect("资源索引应为数组");
         assert_eq!(assets.len(), 4);
         for asset in assets {
-            assert!(asset["path"].as_str().unwrap().starts_with("assets/images/"));
+            assert!(
+                asset["path"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("assets/images/")
+            );
             assert_eq!(asset["mime"], "image/png");
             assert_eq!(asset["width"], 1);
             assert_eq!(asset["height"], 1);
@@ -1463,11 +1734,17 @@ mod tests {
         let validated =
             import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
                 .expect("导出包应通过导入校验");
-        assert_eq!(validated.csv_items.len(), WorldflowCsvTable::ordered().len());
+        assert_eq!(
+            validated.csv_items.len(),
+            WorldflowCsvTable::ordered().len()
+        );
         assert_eq!(validated.assets_index.assets.len(), 4);
         assert_eq!(validated.asset_bytes_by_path.len(), 4);
         assert_eq!(validated.manifest.package_id, package.package_id);
-        assert_eq!(validated.input_file_size, std::fs::metadata(&output_path).unwrap().len());
+        assert_eq!(
+            validated.input_file_size,
+            std::fs::metadata(&output_path).unwrap().len()
+        );
     }
 
     #[tokio::test]
@@ -1510,7 +1787,8 @@ mod tests {
             .await
             .expect("导出项目 CSV 失败");
 
-        let mut package = prepare_fcworld_package(&paths, project, export).expect("准备 fcworld 失败");
+        let mut package =
+            prepare_fcworld_package(&paths, project, export).expect("准备 fcworld 失败");
         package.maps_json.push(' ');
         let output_path = temp.path().join("篡改地图.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
@@ -1636,14 +1914,15 @@ mod tests {
             .export_project_csvs(project.id)
             .await
             .expect("导出项目 CSV 失败");
-        let package = prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let package =
+            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
         let output_path = temp.path().join("引用世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
         let validated =
             import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
                 .expect("导出包应可校验");
-        let prepared = import::prepare_fcworld_import(validated, &paths, &[project.name.clone()])
+        let prepared = import::prepare_fcworld_import(validated, &paths, "引用世界【导入】")
             .expect("导入数据应可重写");
         let new_target_id = prepared
             .id_maps
@@ -1658,12 +1937,19 @@ mod tests {
         let new_project_id = prepared.new_project_id.to_string();
 
         assert_ne!(new_project_id, project.id.to_string());
-        assert_eq!(prepared.project_name, "引用世界（导入）");
+        assert_eq!(prepared.project_name, "引用世界【导入】");
         assert_eq!(prepared.map_count, 1);
         assert_eq!(prepared.asset_count, 1);
-        assert!(prepared.assets.iter().all(|asset| asset
-            .target_path
-            .starts_with(paths.db_path.parent().unwrap().join("images").join(&new_project_id))));
+        assert!(prepared.assets.iter().all(|asset| {
+            asset.target_path.starts_with(
+                paths
+                    .db_path
+                    .parent()
+                    .unwrap()
+                    .join("images")
+                    .join(&new_project_id),
+            )
+        }));
 
         let entries_csv = prepared
             .csv_items
@@ -1725,20 +2011,18 @@ mod tests {
             .export_project_csvs(project.id)
             .await
             .expect("导出项目 CSV 失败");
-        let package = prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let package =
+            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
         let output_path = temp.path().join("可导入世界.fcworld");
         write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
 
-        let result = import_fcworld_package_to_db(&db, &paths, &output_path)
+        let result = import_fcworld_package_to_db(&db, &paths, &output_path, None)
             .await
             .expect("导入 fcworld 失败");
         let new_project_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
-        let imported_project = db
-            .get_project(&new_project_id)
-            .await
-            .expect("应写入新项目");
+        let imported_project = db.get_project(&new_project_id).await.expect("应写入新项目");
         assert_ne!(new_project_id, project.id);
-        assert_eq!(imported_project.name, "可导入世界（导入）");
+        assert_eq!(imported_project.name, "可导入世界【导入】");
         assert_eq!(result.imported_rows.projects, 1);
         assert_eq!(result.imported_rows.entries, 1);
         assert_eq!(result.asset_count, 3);
@@ -1759,9 +2043,16 @@ mod tests {
             .await
             .expect("读取导入词条列表失败");
         assert_eq!(entries.len(), 1);
-        let imported_entry = db.get_entry(&entries[0].id).await.expect("读取导入词条失败");
+        let imported_entry = db
+            .get_entry(&entries[0].id)
+            .await
+            .expect("读取导入词条失败");
         assert_eq!(imported_entry.images.0.len(), 1);
-        assert!(imported_entry.images.0[0].path.starts_with(&import_image_dir));
+        assert!(
+            imported_entry.images.0[0]
+                .path
+                .starts_with(&import_image_dir)
+        );
         assert!(imported_entry.images.0[0].path.exists());
         let imported_cover = imported_entry.cover_path.expect("词条封面应导入");
         assert!(Path::new(&imported_cover).starts_with(&import_image_dir));
@@ -1777,5 +2068,146 @@ mod tests {
         let maps_value: Value = serde_json::from_str(&maps_json).expect("地图文件应为 JSON");
         assert_eq!(maps_value["projectId"], new_project_id.to_string());
         assert_eq!(maps_value["maps"].as_array().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn previews_duplicate_project_and_suggests_rename() {
+        let (temp, db, paths) = new_test_db("fcworld_import_preview_duplicate").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "重名世界".to_string(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package =
+            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let output_path = temp.path().join("重名世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let preview = preview_fcworld_package(&db, &output_path)
+            .await
+            .expect("预览导入包失败");
+
+        assert_eq!(preview.project_name, "重名世界");
+        assert_eq!(preview.suggested_name, "重名世界【导入】");
+        let duplicate = preview.duplicate_project.expect("应识别同名世界观");
+        assert_eq!(duplicate.project_id, project.id.to_string());
+        assert_eq!(duplicate.project_name, "重名世界");
+    }
+
+    #[tokio::test]
+    async fn imports_duplicate_project_with_custom_rename() {
+        let (temp, db, paths) = new_test_db("fcworld_import_custom_rename").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "可重命名世界".to_string(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package =
+            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let output_path = temp.path().join("可重命名世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let result = import_fcworld_package_to_db(
+            &db,
+            &paths,
+            &output_path,
+            Some(FcworldImportOptions {
+                mode: FcworldImportMode::Rename,
+                project_name: Some("用户指定导入名".to_string()),
+                overwrite_project_id: None,
+            }),
+        )
+        .await
+        .expect("重命名导入失败");
+        let imported_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
+        let imported = db.get_project(&imported_id).await.expect("应写入新项目");
+
+        assert_ne!(imported_id, project.id);
+        assert_eq!(imported.name, "用户指定导入名");
+        assert!(db.get_project(&project.id).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn overwrites_duplicate_project_after_successful_import() {
+        let (temp, db, paths) = new_test_db("fcworld_import_overwrite").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "覆盖世界".to_string(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        db.create_entry(CreateEntry {
+            project_id: project.id,
+            category_id: None,
+            title: "旧词条".to_string(),
+            summary: None,
+            content: Some("将被覆盖导入替换".to_string()),
+            r#type: None,
+            tags: None,
+            images: None,
+            cover_path: None,
+        })
+        .await
+        .expect("创建词条失败");
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package =
+            prepare_fcworld_package(&paths, project.clone(), export).expect("准备 fcworld 失败");
+        let output_path = temp.path().join("覆盖世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+
+        let result = import_fcworld_package_to_db(
+            &db,
+            &paths,
+            &output_path,
+            Some(FcworldImportOptions {
+                mode: FcworldImportMode::Overwrite,
+                project_name: None,
+                overwrite_project_id: Some(project.id.to_string()),
+            }),
+        )
+        .await
+        .expect("覆盖导入失败");
+        let imported_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
+        let imported = db.get_project(&imported_id).await.expect("应写入新项目");
+
+        assert_ne!(imported_id, project.id);
+        assert_eq!(imported.name, "覆盖世界");
+        assert!(db.get_project(&project.id).await.is_err());
+        let projects = db.list_projects().await.expect("读取项目列表失败");
+        assert_eq!(
+            projects
+                .iter()
+                .filter(|project| project.name == "覆盖世界")
+                .count(),
+            1
+        );
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("已覆盖原世界观"))
+        );
     }
 }

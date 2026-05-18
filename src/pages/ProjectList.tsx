@@ -2,8 +2,17 @@ import {type CSSProperties, memo, useCallback, useEffect, useMemo, useState} fro
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
-import {db_get_project, db_import_project_fcworld, db_list_projects, type Project} from '../api'
+import {
+    db_get_project,
+    db_import_project_fcworld,
+    db_list_projects,
+    db_preview_project_fcworld,
+    type FcworldImportPreview,
+    type FcworldImportResult,
+    type Project,
+} from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
+import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
 import {
     HOME_ACTIVITY_CHANGED_EVENT,
     loadHomeDashboardData,
@@ -99,6 +108,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
 
     const loadProjects = useCallback(async () => {
@@ -228,6 +238,18 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         onOpenHomeTarget?.(target)
     }, [onOpenHomeTarget, onOpenProject, projects])
 
+    const openImportedProject = useCallback(async (result: FcworldImportResult) => {
+        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+        const importedProject = await db_get_project(result.projectId)
+        await showAlert(
+            `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源，${result.mapCount} 张地图。`,
+            'success',
+            'nonInvasive',
+            1600,
+        )
+        onOpenProject?.(importedProject)
+    }, [onOpenProject, showAlert])
+
     const handleImportProject = useCallback(async () => {
         if (importing) return
         const selectedPath = await openFileDialog({
@@ -241,22 +263,67 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
         setImporting(true)
         try {
-            const result = await db_import_project_fcworld(selectedPath)
-            window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
-            const importedProject = await db_get_project(result.projectId)
-            await showAlert(
-                `世界已导入：${result.importedRows.entries} 个词条，${result.assetCount} 个资源，${result.mapCount} 张地图。`,
-                'success',
-                'nonInvasive',
-                1600,
-            )
-            onOpenProject?.(importedProject)
+            const preview = await db_preview_project_fcworld(selectedPath)
+            if (preview.duplicateProject) {
+                setImportConflict(preview)
+                return
+            }
+            const result = await db_import_project_fcworld(selectedPath, {
+                mode: 'rename',
+                projectName: preview.projectName,
+            })
+            await openImportedProject(result)
         } catch (error) {
             await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
         } finally {
             setImporting(false)
         }
-    }, [importing, onOpenProject, showAlert])
+    }, [importing, openImportedProject, showAlert])
+
+    const handleImportConflictCancel = useCallback(() => {
+        if (!importing) setImportConflict(null)
+    }, [importing])
+
+    const handleImportConflictRename = useCallback(async (projectName: string) => {
+        if (!importConflict || importing) return
+        setImporting(true)
+        try {
+            const result = await db_import_project_fcworld(importConflict.inputPath, {
+                mode: 'rename',
+                projectName,
+            })
+            setImportConflict(null)
+            await openImportedProject(result)
+        } catch (error) {
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+        } finally {
+            setImporting(false)
+        }
+    }, [importConflict, importing, openImportedProject, showAlert])
+
+    const handleImportConflictOverwrite = useCallback(async () => {
+        if (!importConflict?.duplicateProject || importing) return
+        const confirmed = await showAlert(
+            '选择覆盖后，原世界观的数据会丢失。确定覆盖吗？',
+            'warning',
+            'confirm',
+        )
+        if (confirmed !== 'yes') return
+
+        setImporting(true)
+        try {
+            const result = await db_import_project_fcworld(importConflict.inputPath, {
+                mode: 'overwrite',
+                overwriteProjectId: importConflict.duplicateProject.projectId,
+            })
+            setImportConflict(null)
+            await openImportedProject(result)
+        } catch (error) {
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+        } finally {
+            setImporting(false)
+        }
+    }, [importConflict, importing, openImportedProject, showAlert])
 
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button
@@ -278,6 +345,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 onClose={() => setCreatorOpen(false)}
                 onCreated={() => void loadProjects()}
                 existingNames={projects.map(p => p.name)}
+            />
+            <ProjectImportConflictDialog
+                open={Boolean(importConflict)}
+                preview={importConflict}
+                existingNames={projects.map(p => p.name)}
+                busy={importing}
+                onCancel={handleImportConflictCancel}
+                onRename={projectName => void handleImportConflictRename(projectName)}
+                onOverwrite={() => void handleImportConflictOverwrite()}
             />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">

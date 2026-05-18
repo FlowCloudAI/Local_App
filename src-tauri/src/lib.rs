@@ -339,6 +339,7 @@ pub fn run() {
             db_delete_project,
             db_export_project_fcworld,
             db_import_project_fcworld,
+            db_preview_project_fcworld,
             // 分类
             db_create_category,
             db_get_category,

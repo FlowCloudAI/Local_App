@@ -320,7 +320,10 @@ fn validate_assets_index(
     Ok((assets_index, bytes_by_path))
 }
 
-fn validate_maps_json(zip: &mut ZipArchive<File>, manifest: &FcworldManifest) -> Result<String, String> {
+fn validate_maps_json(
+    zip: &mut ZipArchive<File>,
+    manifest: &FcworldManifest,
+) -> Result<String, String> {
     let maps_json = read_zip_text(zip, MAPS_PATH)?;
     let maps_sha = sha256_hex(maps_json.as_bytes());
     if maps_sha != manifest.contents.maps.sha256 {
@@ -356,7 +359,8 @@ pub(super) fn read_and_validate_fcworld_package(
     let input_file_size = std::fs::metadata(input_path)
         .map_err(|e| format!("读取导入文件信息失败 {:?}: {e}", input_path))?
         .len();
-    let file = File::open(input_path).map_err(|e| format!("打开导入文件失败 {:?}: {e}", input_path))?;
+    let file =
+        File::open(input_path).map_err(|e| format!("打开导入文件失败 {:?}: {e}", input_path))?;
     let mut zip = ZipArchive::new(file).map_err(|e| format!("读取 fcworld zip 失败: {e}"))?;
     let zip_names = validate_known_zip_entries(&mut zip)?;
 
@@ -392,7 +396,10 @@ fn csv_item_content(
         .ok_or_else(|| format!("缺少 CSV 表: {:?}", table))
 }
 
-fn read_csv_rows(content: &str, context: &str) -> Result<Option<(StringRecord, Vec<Vec<String>>)>, String> {
+fn read_csv_rows(
+    content: &str,
+    context: &str,
+) -> Result<Option<(StringRecord, Vec<Vec<String>>)>, String> {
     if content.trim().is_empty() {
         return Ok(None);
     }
@@ -469,7 +476,10 @@ fn collect_import_id_maps(
 ) -> Result<ImportIdMaps, String> {
     let mut projects = collect_id_map(&package.csv_items, WorldflowCsvTable::Projects)?;
     if projects.len() != 1 {
-        return Err(format!("projects.csv 必须包含 1 个项目，实际 {}", projects.len()));
+        return Err(format!(
+            "projects.csv 必须包含 1 个项目，实际 {}",
+            projects.len()
+        ));
     }
     if let Some(value) = projects.values_mut().next() {
         *value = new_project_id.to_string();
@@ -485,32 +495,6 @@ fn collect_import_id_maps(
         entry_links: collect_id_map(&package.csv_items, WorldflowCsvTable::EntryLinks)?,
         idea_notes: collect_id_map(&package.csv_items, WorldflowCsvTable::IdeaNotes)?,
     })
-}
-
-fn unique_import_project_name(source_name: &str, existing_names: &[String]) -> String {
-    let base = match source_name.trim() {
-        "" => "导入世界",
-        value => value,
-    };
-    let normalized_existing = existing_names
-        .iter()
-        .map(|name| name.trim().to_lowercase())
-        .collect::<HashSet<_>>();
-    if !normalized_existing.contains(&base.to_lowercase()) {
-        return base.to_string();
-    }
-    let mut index = 1usize;
-    loop {
-        let candidate = if index == 1 {
-            format!("{base}（导入）")
-        } else {
-            format!("{base}（导入 {index}）")
-        };
-        if !normalized_existing.contains(&candidate.trim().to_lowercase()) {
-            return candidate;
-        }
-        index += 1;
-    }
 }
 
 fn sanitize_asset_file_stem(asset_id: &str) -> Result<String, String> {
@@ -557,10 +541,7 @@ fn prepare_import_assets(
             .ok_or_else(|| format!("资源内容缺失: {}", asset.path))?;
         let target_path = target_dir.join(imported_asset_file_name(asset)?);
         by_package_path.insert(asset.path.clone(), target_path.clone());
-        prepared.push(PreparedImportAsset {
-            target_path,
-            bytes,
-        });
+        prepared.push(PreparedImportAsset { target_path, bytes });
     }
 
     Ok((prepared, by_package_path))
@@ -613,15 +594,18 @@ fn rewrite_entry_images_json_for_import(
         if path.trim().is_empty() {
             continue;
         }
-        let target =
-            target_path_for_package_asset(asset_targets, path, "entries.images")?;
+        let target = target_path_for_package_asset(asset_targets, path, "entries.images")?;
         object.insert("path".to_string(), Value::String(target));
     }
     serde_json::to_string(&value)
         .map_err(|e| format!("序列化 entries.images JSON 失败 entry_id={entry_id}: {e}"))
 }
 
-fn rewrite_entry_tags_json(raw: &str, id_maps: &ImportIdMaps, entry_id: &str) -> Result<String, String> {
+fn rewrite_entry_tags_json(
+    raw: &str,
+    id_maps: &ImportIdMaps,
+    entry_id: &str,
+) -> Result<String, String> {
     if raw.trim().is_empty() {
         return Ok(raw.to_string());
     }
@@ -648,7 +632,10 @@ fn is_entry_href_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '%'
 }
 
-fn rewrite_entry_hrefs(content: &str, entry_map: &HashMap<String, String>) -> Result<String, String> {
+fn rewrite_entry_hrefs(
+    content: &str,
+    entry_map: &HashMap<String, String>,
+) -> Result<String, String> {
     let mut output = String::with_capacity(content.len());
     let mut cursor = 0usize;
     while let Some(offset) = content[cursor..].find("entry://") {
@@ -690,7 +677,7 @@ fn rewrite_projects_csv(
     content: &str,
     id_maps: &ImportIdMaps,
     asset_targets: &HashMap<String, PathBuf>,
-    existing_project_names: &[String],
+    import_project_name: &str,
 ) -> Result<(String, String), String> {
     let Some((headers, mut rows)) = read_csv_rows(content, "projects.csv")? else {
         return Err("projects.csv 不能为空".to_string());
@@ -709,12 +696,15 @@ fn rewrite_projects_csv(
         .ok_or_else(|| "projects.csv 缺少 id".to_string())?
         .to_string();
     let new_project_id = required_mapped_id(&id_maps.projects, &old_project_id, "projects.id")?;
-    let project_name = unique_import_project_name(
-        row.get(name_index).map(String::as_str).unwrap_or_default(),
-        existing_project_names,
-    );
-    let rewritten_cover =
-        rewrite_csv_asset_opt_string(row.get(cover_index).map(String::as_str).unwrap_or_default(), asset_targets, "projects.cover_image")?;
+    let project_name = import_project_name.trim().to_string();
+    if project_name.is_empty() {
+        return Err("导入世界观名称不能为空".to_string());
+    }
+    let rewritten_cover = rewrite_csv_asset_opt_string(
+        row.get(cover_index).map(String::as_str).unwrap_or_default(),
+        asset_targets,
+        "projects.cover_image",
+    )?;
 
     set_field(row, id_index, new_project_id, "projects.csv")?;
     set_field(row, name_index, project_name.clone(), "projects.csv")?;
@@ -736,7 +726,12 @@ fn rewrite_simple_project_table(
     for row in &mut rows {
         let old_id = row.get(id_index).cloned().unwrap_or_default();
         let old_project_id = row.get(project_index).cloned().unwrap_or_default();
-        set_field(row, id_index, required_mapped_id(id_map, &old_id, table.file_name())?, table.file_name())?;
+        set_field(
+            row,
+            id_index,
+            required_mapped_id(id_map, &old_id, table.file_name())?,
+            table.file_name(),
+        )?;
         set_field(
             row,
             project_index,
@@ -758,7 +753,12 @@ fn rewrite_categories_csv(content: &str, id_maps: &ImportIdMaps) -> Result<Strin
         let old_id = row.get(id_index).cloned().unwrap_or_default();
         let old_project_id = row.get(project_index).cloned().unwrap_or_default();
         let old_parent_id = row.get(parent_index).cloned().unwrap_or_default();
-        set_field(row, id_index, required_mapped_id(&id_maps.categories, &old_id, "categories.id")?, "categories.csv")?;
+        set_field(
+            row,
+            id_index,
+            required_mapped_id(&id_maps.categories, &old_id, "categories.id")?,
+            "categories.csv",
+        )?;
         set_field(
             row,
             project_index,
@@ -796,7 +796,9 @@ fn rewrite_entries_csv_for_import(
         let old_category_id = row.get(category_index).cloned().unwrap_or_default();
         let new_id = required_mapped_id(&id_maps.entries, &old_id, "entries.id")?;
         let rewritten_content = rewrite_entry_hrefs(
-            row.get(content_index).map(String::as_str).unwrap_or_default(),
+            row.get(content_index)
+                .map(String::as_str)
+                .unwrap_or_default(),
             &id_maps.entries,
         )?;
         let rewritten_tags = rewrite_entry_tags_json(
@@ -805,7 +807,9 @@ fn rewrite_entries_csv_for_import(
             &old_id,
         )?;
         let rewritten_images = rewrite_entry_images_json_for_import(
-            row.get(images_index).map(String::as_str).unwrap_or_default(),
+            row.get(images_index)
+                .map(String::as_str)
+                .unwrap_or_default(),
             &old_id,
             asset_targets,
         )?;
@@ -862,8 +866,22 @@ fn rewrite_entry_relations_csv(content: &str, id_maps: &ImportIdMaps) -> Result<
                 std::mem::swap(&mut new_a_id, &mut new_b_id);
             }
         }
-        set_field(row, id_index, required_mapped_id(&id_maps.entry_relations, &old_id, "entry_relations.id")?, "entry_relations.csv")?;
-        set_field(row, project_index, required_mapped_id(&id_maps.projects, &old_project_id, "entry_relations.project_id")?, "entry_relations.csv")?;
+        set_field(
+            row,
+            id_index,
+            required_mapped_id(&id_maps.entry_relations, &old_id, "entry_relations.id")?,
+            "entry_relations.csv",
+        )?;
+        set_field(
+            row,
+            project_index,
+            required_mapped_id(
+                &id_maps.projects,
+                &old_project_id,
+                "entry_relations.project_id",
+            )?,
+            "entry_relations.csv",
+        )?;
         set_field(row, a_index, new_a_id, "entry_relations.csv")?;
         set_field(row, b_index, new_b_id, "entry_relations.csv")?;
     }
@@ -883,10 +901,30 @@ fn rewrite_entry_links_csv(content: &str, id_maps: &ImportIdMaps) -> Result<Stri
         let old_project_id = row.get(project_index).cloned().unwrap_or_default();
         let old_a_id = row.get(a_index).cloned().unwrap_or_default();
         let old_b_id = row.get(b_index).cloned().unwrap_or_default();
-        set_field(row, id_index, required_mapped_id(&id_maps.entry_links, &old_id, "entry_links.id")?, "entry_links.csv")?;
-        set_field(row, project_index, required_mapped_id(&id_maps.projects, &old_project_id, "entry_links.project_id")?, "entry_links.csv")?;
-        set_field(row, a_index, required_mapped_id(&id_maps.entries, &old_a_id, "entry_links.a_id")?, "entry_links.csv")?;
-        set_field(row, b_index, required_mapped_id(&id_maps.entries, &old_b_id, "entry_links.b_id")?, "entry_links.csv")?;
+        set_field(
+            row,
+            id_index,
+            required_mapped_id(&id_maps.entry_links, &old_id, "entry_links.id")?,
+            "entry_links.csv",
+        )?;
+        set_field(
+            row,
+            project_index,
+            required_mapped_id(&id_maps.projects, &old_project_id, "entry_links.project_id")?,
+            "entry_links.csv",
+        )?;
+        set_field(
+            row,
+            a_index,
+            required_mapped_id(&id_maps.entries, &old_a_id, "entry_links.a_id")?,
+            "entry_links.csv",
+        )?;
+        set_field(
+            row,
+            b_index,
+            required_mapped_id(&id_maps.entries, &old_b_id, "entry_links.b_id")?,
+            "entry_links.csv",
+        )?;
     }
     write_csv_records(&headers, &rows)
 }
@@ -902,7 +940,12 @@ fn rewrite_idea_notes_csv(content: &str, id_maps: &ImportIdMaps) -> Result<Strin
         let old_id = row.get(id_index).cloned().unwrap_or_default();
         let old_project_id = row.get(project_index).cloned().unwrap_or_default();
         let old_converted_id = row.get(converted_index).cloned().unwrap_or_default();
-        set_field(row, id_index, required_mapped_id(&id_maps.idea_notes, &old_id, "idea_notes.id")?, "idea_notes.csv")?;
+        set_field(
+            row,
+            id_index,
+            required_mapped_id(&id_maps.idea_notes, &old_id, "idea_notes.id")?,
+            "idea_notes.csv",
+        )?;
         set_field(
             row,
             project_index,
@@ -912,7 +955,11 @@ fn rewrite_idea_notes_csv(content: &str, id_maps: &ImportIdMaps) -> Result<Strin
         set_field(
             row,
             converted_index,
-            optional_mapped_id(&id_maps.entries, &old_converted_id, "idea_notes.converted_entry_id")?,
+            optional_mapped_id(
+                &id_maps.entries,
+                &old_converted_id,
+                "idea_notes.converted_entry_id",
+            )?,
             "idea_notes.csv",
         )?;
     }
@@ -923,7 +970,7 @@ fn rewrite_csv_items_for_import(
     package: &ValidatedFcworldPackage,
     id_maps: &ImportIdMaps,
     asset_targets: &HashMap<String, PathBuf>,
-    existing_project_names: &[String],
+    import_project_name: &str,
 ) -> Result<(Vec<worldflow_core::CsvImportItem>, String), String> {
     let mut output = Vec::with_capacity(WorldflowCsvTable::ordered().len());
     let mut project_name = String::new();
@@ -932,28 +979,18 @@ fn rewrite_csv_items_for_import(
         let content = csv_item_content(&package.csv_items, table)?;
         let rewritten = match table {
             WorldflowCsvTable::Projects => {
-                let (content, name) = rewrite_projects_csv(
-                    content,
-                    id_maps,
-                    asset_targets,
-                    existing_project_names,
-                )?;
+                let (content, name) =
+                    rewrite_projects_csv(content, id_maps, asset_targets, import_project_name)?;
                 project_name = name;
                 content
             }
             WorldflowCsvTable::Categories => rewrite_categories_csv(content, id_maps)?,
-            WorldflowCsvTable::TagSchemas => rewrite_simple_project_table(
-                content,
-                table,
-                &id_maps.tag_schemas,
-                id_maps,
-            )?,
-            WorldflowCsvTable::EntryTypes => rewrite_simple_project_table(
-                content,
-                table,
-                &id_maps.entry_types,
-                id_maps,
-            )?,
+            WorldflowCsvTable::TagSchemas => {
+                rewrite_simple_project_table(content, table, &id_maps.tag_schemas, id_maps)?
+            }
+            WorldflowCsvTable::EntryTypes => {
+                rewrite_simple_project_table(content, table, &id_maps.entry_types, id_maps)?
+            }
             WorldflowCsvTable::Entries => {
                 rewrite_entries_csv_for_import(content, id_maps, asset_targets)?
             }
@@ -995,7 +1032,11 @@ fn asset_data_url_by_path(
     Ok(asset_data_url(asset, bytes))
 }
 
-fn rewrite_json_entry_refs(value: &mut Value, id_maps: &ImportIdMaps, strict_linked: bool) -> Result<(), String> {
+fn rewrite_json_entry_refs(
+    value: &mut Value,
+    id_maps: &ImportIdMaps,
+    strict_linked: bool,
+) -> Result<(), String> {
     match value {
         Value::Array(items) => {
             for item in items {
@@ -1130,17 +1171,13 @@ fn rewrite_maps_json_for_import(
 pub(super) fn prepare_fcworld_import(
     package: ValidatedFcworldPackage,
     paths: &PathsState,
-    existing_project_names: &[String],
+    import_project_name: &str,
 ) -> Result<PreparedFcworldImport, String> {
     let new_project_id = Uuid::new_v4();
     let id_maps = collect_import_id_maps(&package, new_project_id)?;
     let (assets, asset_targets) = prepare_import_assets(&package, paths, &new_project_id)?;
-    let (csv_items, project_name) = rewrite_csv_items_for_import(
-        &package,
-        &id_maps,
-        &asset_targets,
-        existing_project_names,
-    )?;
+    let (csv_items, project_name) =
+        rewrite_csv_items_for_import(&package, &id_maps, &asset_targets, import_project_name)?;
     let (maps_json, map_count) = rewrite_maps_json_for_import(&package, &id_maps, &new_project_id)?;
 
     Ok(PreparedFcworldImport {
@@ -1182,14 +1219,15 @@ mod tests {
         id_maps
             .entry_relations
             .insert(old_relation_id.clone(), new_relation_id.clone());
-        id_maps.entries.insert(old_a_id.clone(), high_new_id.clone());
+        id_maps
+            .entries
+            .insert(old_a_id.clone(), high_new_id.clone());
         id_maps.entries.insert(old_b_id.clone(), low_new_id.clone());
 
         let content = format!(
             "id,project_id,a_id,b_id,relation,content,created_at,updated_at\n{old_relation_id},{old_project_id},{old_a_id},{old_b_id},two_way,同盟,2026-05-18T00:00:00Z,2026-05-18T00:00:00Z\n"
         );
-        let rewritten =
-            rewrite_entry_relations_csv(&content, &id_maps).expect("双向关系应可重写");
+        let rewritten = rewrite_entry_relations_csv(&content, &id_maps).expect("双向关系应可重写");
         let mut reader = csv::Reader::from_reader(rewritten.as_bytes());
         let headers = reader.headers().expect("应有表头").clone();
         let a_index = header_index(&headers, "a_id").expect("应有 a_id");
@@ -1218,16 +1256,21 @@ mod tests {
         let low_new_id = "00000000-0000-0000-0000-000000000001".to_string();
 
         let mut id_maps = ImportIdMaps::default();
-        id_maps.projects.insert(old_project_id.clone(), new_project_id);
-        id_maps.entry_relations.insert(old_relation_id.clone(), new_relation_id);
-        id_maps.entries.insert(old_a_id.clone(), high_new_id.clone());
+        id_maps
+            .projects
+            .insert(old_project_id.clone(), new_project_id);
+        id_maps
+            .entry_relations
+            .insert(old_relation_id.clone(), new_relation_id);
+        id_maps
+            .entries
+            .insert(old_a_id.clone(), high_new_id.clone());
         id_maps.entries.insert(old_b_id.clone(), low_new_id.clone());
 
         let content = format!(
             "id,project_id,a_id,b_id,relation,content,created_at,updated_at\n{old_relation_id},{old_project_id},{old_a_id},{old_b_id},one_way,指向,2026-05-18T00:00:00Z,2026-05-18T00:00:00Z\n"
         );
-        let rewritten =
-            rewrite_entry_relations_csv(&content, &id_maps).expect("单向关系应可重写");
+        let rewritten = rewrite_entry_relations_csv(&content, &id_maps).expect("单向关系应可重写");
         let mut reader = csv::Reader::from_reader(rewritten.as_bytes());
         let headers = reader.headers().expect("应有表头").clone();
         let a_index = header_index(&headers, "a_id").expect("应有 a_id");

@@ -1,0 +1,103 @@
+.project-import-conflict-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 520;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 52%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.project-import-conflict-dialog {
+    width: min(100%, 30rem);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.75rem;
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
+}
+
+.project-import-conflict-header {
+    padding: 1.2rem 1.35rem 0;
+}
+
+.project-import-conflict-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--fc-color-text);
+}
+
+.project-import-conflict-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+    padding: 1rem 1.35rem;
+}
+
+.project-import-conflict-message {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--fc-color-text-secondary);
+}
+
+.project-import-conflict-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--fc-color-text-secondary);
+}
+
+.project-import-conflict-input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.5rem;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    font-family: var(--fc-font-family), sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.project-import-conflict-input:focus {
+    border-color: var(--fc-color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+}
+
+.project-import-conflict-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.project-import-conflict-error {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--fc-color-danger, #e53e3e);
+}
+
+.project-import-conflict-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0 1.35rem 1.2rem;
+}
+
+@media (max-width: 520px) {
+    .project-import-conflict-footer {
+        flex-direction: column;
+    }
+
+    .project-import-conflict-footer > button {
+        width: 100%;
+    }
+}

@@ -124,6 +124,29 @@ export interface FcworldImportResult {
     warnings: string[]
 }
 
+export interface FcworldImportDuplicateProject {
+    projectId: string
+    projectName: string
+}
+
+export interface FcworldImportPreview {
+    inputPath: string
+    packageId: string
+    sourceProjectId: string
+    projectName: string
+    suggestedName: string
+    duplicateProject: FcworldImportDuplicateProject | null
+    assetCount: number
+    mapCount: number
+    fileSize: number
+}
+
+export interface FcworldImportOptions {
+    mode: 'rename' | 'overwrite'
+    projectName?: string | null
+    overwriteProjectId?: string | null
+}
+
 export interface ProjectTimelineData {
     events: ProjectTimelineEvent[]
     yearStart?: number | null
@@ -358,8 +381,11 @@ export const db_delete_project = (id: string) =>
 export const db_export_project_fcworld = (projectId: string, outputPath: string) =>
     command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath})
 
-export const db_import_project_fcworld = (inputPath: string) =>
-    command<FcworldImportResult>('db_import_project_fcworld', {inputPath})
+export const db_preview_project_fcworld = (inputPath: string) =>
+    command<FcworldImportPreview>('db_preview_project_fcworld', {inputPath})
+
+export const db_import_project_fcworld = (inputPath: string, options?: FcworldImportOptions) =>
+    command<FcworldImportResult>('db_import_project_fcworld', {inputPath, options})
 
 export const db_create_category = ({
                                        projectId,
