@@ -414,8 +414,8 @@
     position: absolute;
     right: 0.35rem;
     z-index: 70;
-    width: max-content;
-    max-width: calc(100% - 0.7rem);
+    width: 8.8rem;
+    max-width: min(8.8rem, calc(100% - 0.7rem));
     padding: 4px;
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--dock-panel-control-radius);
