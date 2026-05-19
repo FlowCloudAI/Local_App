@@ -7,8 +7,13 @@
     min-height: 0;
     overflow: hidden;
     background: var(--dock-panel-bg);
+    border-radius: var(--fc-radius-xl);
     container-type: inline-size;
     container-name: snapshot-panel;
+}
+
+.ai-shell--content-border-owned .snapshot-panel {
+    border: 1px solid var(--fc-color-border);
 }
 
 .snapshot-panel__header {
