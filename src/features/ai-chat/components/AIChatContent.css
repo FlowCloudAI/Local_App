@@ -412,15 +412,23 @@
 
 .ai-conversation-action-menu {
     position: absolute;
-    top: calc(100% - 2px);
     right: 0.35rem;
     z-index: 70;
-    min-width: 132px;
+    width: max-content;
+    max-width: calc(100% - 0.7rem);
     padding: 4px;
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--dock-panel-control-radius);
     background: var(--fc-color-bg-elevated);
     box-shadow: var(--fc-shadow-sm);
+}
+
+.ai-conversation-action-menu.is-down {
+    top: calc(100% - 2px);
+}
+
+.ai-conversation-action-menu.is-up {
+    bottom: calc(100% - 2px);
 }
 
 .ai-conversation-action-menu button {
@@ -433,6 +441,7 @@
     font-size: 0.78rem;
     padding: 5px 8px;
     text-align: left;
+    white-space: nowrap;
 }
 
 .ai-conversation-action-menu button:hover:not(:disabled) {

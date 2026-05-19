@@ -38,8 +38,10 @@ const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
+const ACTION_MENU_ESTIMATED_HEIGHT = 196
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
+type ActionMenuPlacement = 'up' | 'down'
 
 const AI_CONVERSATION_FILTER_OPTIONS: Array<{ key: AiConversationFilter; label: string }> = [
     {key: 'all', label: '全部'},
@@ -87,6 +89,13 @@ function buildConversationExportFileName(conversation: Conversation, format: Con
         .trim()
         .slice(0, 80)
     return `${safeTitle || 'AI会话'}.${extension}`
+}
+
+function resolveActionMenuPlacement(anchorRect: DOMRect): ActionMenuPlacement {
+    if (typeof window === 'undefined') return 'down'
+    const spaceBelow = window.innerHeight - anchorRect.bottom
+    const spaceAbove = anchorRect.top
+    return spaceBelow >= ACTION_MENU_ESTIMATED_HEIGHT || spaceBelow >= spaceAbove ? 'down' : 'up'
 }
 
 function buildAiChatEntryHref(link: InternalEntryLink): string {
@@ -160,6 +169,7 @@ export default function AIChatContent({
     const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
     const [conversationSearch, setConversationSearch] = useState('')
     const [actionMenuConversationId, setActionMenuConversationId] = useState<string | null>(null)
+    const [actionMenuPlacement, setActionMenuPlacement] = useState<ActionMenuPlacement>('down')
     const renameInputRef = useRef<HTMLInputElement>(null)
 
     const startRename = (event: React.MouseEvent, conv: { id: string; title: string }) => {
@@ -849,6 +859,7 @@ export default function AIChatContent({
                                     onContextMenu={(event) => {
                                         event.preventDefault()
                                         event.stopPropagation()
+                                        setActionMenuPlacement(resolveActionMenuPlacement(event.currentTarget.getBoundingClientRect()))
                                         setActionMenuConversationId(conv.id)
                                     }}
                                 >
@@ -921,7 +932,11 @@ export default function AIChatContent({
                                             className={`ai-conversation-action-btn ai-conversation-more-btn ${actionMenuConversationId === conv.id ? 'active' : ''}`}
                                             onClick={(event) => {
                                                 event.stopPropagation()
-                                                setActionMenuConversationId((current) => current === conv.id ? null : conv.id)
+                                                setActionMenuConversationId((current) => {
+                                                    if (current === conv.id) return null
+                                                    setActionMenuPlacement(resolveActionMenuPlacement(event.currentTarget.getBoundingClientRect()))
+                                                    return conv.id
+                                                })
                                             }}
                                             title="更多操作"
                                         >
@@ -934,7 +949,7 @@ export default function AIChatContent({
                                     </div>
                                 </div>
                                 {actionMenuConversationId === conv.id && (
-                                    <div className="ai-conversation-action-menu"
+                                    <div className={`ai-conversation-action-menu is-${actionMenuPlacement}`}
                                          onClick={(event) => event.stopPropagation()}>
                                         <button onClick={(event) => {
                                             ctx.toggleConversationPinned(conv.id, event)
