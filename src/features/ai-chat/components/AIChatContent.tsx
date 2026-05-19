@@ -865,13 +865,11 @@ export default function AIChatContent({
                                                 title={pinLabel}
                                                 aria-label={pinLabel}
                                             >
-                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
-                                                     stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                                                     stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
                                                      strokeLinejoin="round">
-                                                    <path d="M9.7 2.2l4.1 4.1"/>
-                                                    <path d="M5.5 6.4L3.2 8.7l4.1 4.1 2.3-2.3"/>
-                                                    <path d="M6.3 5.6l4.1 4.1 2.7-2.7L9 2.9 6.3 5.6z"/>
-                                                    <path d="M7.3 12.8L4.6 15"/>
+                                                    <path d="M12 17v5"/>
+                                                    <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a2 2 0 0 1 2-2V3H7v2a2 2 0 0 1 2 2z"/>
                                                 </svg>
                                             </button>
                                         )}
@@ -927,10 +925,10 @@ export default function AIChatContent({
                                             }}
                                             title="更多操作"
                                         >
-                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                                <circle cx="3.5" cy="7" r="1" fill="currentColor"/>
-                                                <circle cx="7" cy="7" r="1" fill="currentColor"/>
-                                                <circle cx="10.5" cy="7" r="1" fill="currentColor"/>
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                                <circle cx="4" cy="8" r="1.35" fill="currentColor"/>
+                                                <circle cx="8" cy="8" r="1.35" fill="currentColor"/>
+                                                <circle cx="12" cy="8" r="1.35" fill="currentColor"/>
                                             </svg>
                                         </button>
                                     </div>

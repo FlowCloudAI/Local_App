@@ -170,7 +170,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--dock-panel-list-item-padding);
+    gap: 0.45rem;
+    padding: 0.36rem 0.38rem;
     border-radius: var(--dock-panel-list-item-radius);
     cursor: pointer;
     border: 1px solid transparent;
@@ -254,8 +255,12 @@
     cursor: pointer;
     opacity: 0;
     pointer-events: none;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.ai-conversation-pin-btn svg {
     transform: rotate(-28deg) scale(0.94);
-    transition: background 0.15s, color 0.15s, opacity 0.15s, transform 0.15s;
+    transition: transform 0.15s;
 }
 
 .ai-conversation-row:hover .ai-conversation-pin-btn,
@@ -268,17 +273,26 @@
 .ai-conversation-pin-btn:hover {
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text);
+}
+
+.ai-conversation-pin-btn:hover svg {
     transform: rotate(-28deg) scale(1.06);
 }
 
 .ai-conversation-pin-btn.is-pinned {
     color: var(--fc-color-primary);
+}
+
+.ai-conversation-pin-btn.is-pinned svg {
     transform: rotate(0deg);
 }
 
 .ai-conversation-pin-btn.is-pinned:hover {
     background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
     color: var(--fc-color-primary);
+}
+
+.ai-conversation-pin-btn.is-pinned:hover svg {
     transform: rotate(0deg) scale(1.06);
 }
 
@@ -374,6 +388,11 @@
 .ai-conversation-action-btn:hover {
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text);
+}
+
+.ai-conversation-more-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 .ai-conversation-action-btn:disabled {
