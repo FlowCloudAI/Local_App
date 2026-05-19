@@ -184,8 +184,8 @@
     align-items: flex-start;
 }
 
-.ai-conversation-row:hover .ai-conversation-item,
-.ai-conversation-row:focus-within .ai-conversation-item {
+.ai-conversation-row:hover .ai-conversation-item:not(.active),
+.ai-conversation-row:focus-within .ai-conversation-item:not(.active) {
     background: var(--dock-panel-hover-bg);
     border-color: var(--dock-panel-active-border);
 }
