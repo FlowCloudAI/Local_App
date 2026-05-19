@@ -932,11 +932,12 @@ export default function AIChatContent({
                                             className={`ai-conversation-action-btn ai-conversation-more-btn ${actionMenuConversationId === conv.id ? 'active' : ''}`}
                                             onClick={(event) => {
                                                 event.stopPropagation()
-                                                setActionMenuConversationId((current) => {
-                                                    if (current === conv.id) return null
-                                                    setActionMenuPlacement(resolveActionMenuPlacement(event.currentTarget.getBoundingClientRect()))
-                                                    return conv.id
-                                                })
+                                                if (actionMenuConversationId === conv.id) {
+                                                    setActionMenuConversationId(null)
+                                                    return
+                                                }
+                                                setActionMenuPlacement(resolveActionMenuPlacement(event.currentTarget.getBoundingClientRect()))
+                                                setActionMenuConversationId(conv.id)
                                             }}
                                             title="更多操作"
                                         >
