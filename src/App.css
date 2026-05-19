@@ -157,9 +157,21 @@ body {
     z-index: 2;
     overflow: hidden;
     background: var(--fc-color-bg);
+    border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-xl);
     outline: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
     outline-offset: -1px;
+}
+
+.page-container--project-editor {
+    border-color: transparent;
+    outline: none;
+    background: transparent;
+}
+
+.page-container--project-editor .pe-content {
+    border: 1px solid var(--fc-color-border);
+    box-sizing: border-box;
 }
 
 .page-container.is-hidden-for-ai-chat {

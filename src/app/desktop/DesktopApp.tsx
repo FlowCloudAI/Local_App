@@ -710,6 +710,11 @@ export default function DesktopApp() {
     }, [activeHomeTarget, activeKey, aiPanelCollapsed, aiPanelMode, mainContentKey, sidePanelContentKey])
 
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
+    const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : sidePanelContentKey
+    const aiShellClassName = [
+        'ai-shell',
+        aiPanelMode === 'fullscreen' ? 'ai-shell--content-border-owned' : '',
+    ].filter(Boolean).join(' ')
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
         recentPageKeys
@@ -973,7 +978,7 @@ export default function DesktopApp() {
             </div>
             <div className="main-content">
                 <div className="workspace-content">
-                    <div className="page-container">
+                    <div className={`page-container ${mainContentKey === 'home' && activeHomeProjectId ? 'page-container--project-editor' : ''}`}>
                         <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
                             <div className="home-page-stack">
                                 <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
@@ -1029,7 +1034,7 @@ export default function DesktopApp() {
                         onCollapsedChange={handleAiPanelCollapsedChange}
                         onWidthChange={setAiPanelWidth}
                         onModeChange={setAiPanelMode}
-                        className="ai-shell"
+                        className={aiShellClassName}
                         handleTitle="拖拽调整宽度"
                     >
                         <div className={`side-panel-stack${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}>
@@ -1086,7 +1091,7 @@ export default function DesktopApp() {
                     className="side-bar"
                     items={menuItems}
                     bottomItems={bottomItems}
-                    selectedKey={selectedKey}
+                    selectedKey={sideBarSelectedKey}
                     collapsed={collapsed}
                     width={130}
                     collapsedWidth={50}
