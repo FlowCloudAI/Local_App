@@ -440,7 +440,9 @@ export default function DockableSidePanel({
             <div className="dockable-side-panel__body">
                 {mains ? (
                     <>
-                        {sides && mode === 'fullscreen' && (
+                        {/* side-stack 仅在 active layer 真实存在 side 节点时渲染，
+                            避免非激活 layer（如 snapshot side）撑出宽度形成空白 */}
+                        {sides && mode === 'fullscreen' && activeKey && sides[activeKey] != null && (
                             <div className="dockable-side-panel__side-stack">
                                 {Object.entries(sides).map(([key, node]) => (
                                     <div
