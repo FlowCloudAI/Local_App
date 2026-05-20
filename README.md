@@ -150,7 +150,7 @@ flowchart TB
 ## 目录结构
 
 ```text
-App/
+app_main/
 ├── src/                      # 前端源码
 │   ├── api/                  # Tauri invoke 封装
 │   ├── app/                  # 应用外壳：desktop / index / mobile
@@ -187,14 +187,14 @@ App/
 - Rust 工具链
 - Tauri v2 所需系统依赖
 - 本仓库相邻目录中的本地依赖：
-  - `../client_core`
-  - `../worldflow_core`
-  - `../ui-library/ui`
+  - `../core_ai_client`
+  - `../core_world_data`
+  - `../lib_ui/ui`
 
 ### 安装与运行
 
 ```bash
-cd App
+cd app_main
 
 # 安装前端依赖
 npm install
@@ -247,7 +247,7 @@ cd src-tauri
 cargo test
 ```
 
-涉及前端代码时，请先阅读根级 `docs/前端风格指南.md`；涉及子系统实现时，请优先查看本目录的 `AGENTS.md` 和相关 `docs/` 设计文档。
+涉及前端代码时，请先阅读根级 `../docs/前端风格指南.md`；涉及子系统实现时，请优先查看本目录的 `AGENTS.md` 和相关 `docs/` 设计文档。
 
 ---
 
@@ -277,3 +277,7 @@ cargo test
 ## 许可证
 
 MIT License
+
+## 贡献方式
+
+提交前请根据改动范围运行 `npm run lint`、`npm run build` 或 `cd src-tauri && cargo test`。涉及前端功能时遵守根级 `../docs/前端风格指南.md`；涉及 Tauri Command、数据库或 AI 插件接口时，同步更新前后端封装和相关设计文档。

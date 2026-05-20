@@ -1,4 +1,4 @@
-// App/src/features/relation-graph/components/RelationGraph/types.ts
+// app_main/src/features/relation-graph/components/RelationGraph/types.ts
 // 前端组件与宿主提供的布局函数之间共享的固定协议类型。
 // 字段名称不可更改 — 它们构成公开约定。
 

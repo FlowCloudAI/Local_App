@@ -46,7 +46,6 @@ pub struct ContradictionReport {
 
 impl ContradictionReport {
     pub fn response_format_json_schema() -> Value {
-        // TODO: 等产品侧确认最终报告字段后，再把 schema 收紧到最终版本。
         json!({
             "type": "json_schema",
             "json_schema": {

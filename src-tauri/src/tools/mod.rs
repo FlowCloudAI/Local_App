@@ -835,7 +835,7 @@ pub async fn get_entries_dev(
 
 /// 开发版：按词条名称/ID 获取高密度词条上下文。
 /// 默认 FULL 会一次性补齐类型、分类路径、标签定义、关系对端和图片状态。
-pub async fn get_entry_dev(
+pub async fn list_entry_dev(
     state: &AppState,
     keys: &[String],
     info: Option<Vec<EntryInfo>>,

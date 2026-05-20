@@ -1,0 +1,12 @@
+{% if items | length == 0 %}
+未找到相关词条
+{% else %}
+找到以下词条：
+
+{% for item in items %}
+{{ item }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% endif %}

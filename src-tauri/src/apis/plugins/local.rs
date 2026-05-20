@@ -39,7 +39,7 @@ pub async fn plugin_install_from_file(
         .map(|p| p.join("images"))
         .unwrap_or_else(|| std::env::temp_dir().join("flowcloudai_images"));
     let path = PathBuf::from(&file_path);
-    let mut client = ai_state.client.lock().await;
+    let client = ai_state.client.lock().await;
     let meta = client
         .install_plugin_from_path(&path)
         .map_err(|e| e.to_string())?;
@@ -54,7 +54,7 @@ pub async fn plugin_uninstall(
     plugin_id: String,
 ) -> Result<(), String> {
     require_no_active_sessions(&ai_state).await?;
-    let mut client = ai_state.client.lock().await;
+    let client = ai_state.client.lock().await;
     client
         .uninstall_plugin(&plugin_id)
         .map_err(|e| e.to_string())

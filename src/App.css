@@ -264,5 +264,13 @@ body {
     z-index: 1001;  /* 高于 AI 右侧面板的 1000 */
     position: relative;  /* 确保 z-index 生效 */
     border-left-color: var(--fc-color-bg-secondary) !important;
-    
+}
+
+.fc-sidebar__icon svg {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+}
+
+.fc-sidebar__footer {
+    border-top: 0 !important;
 }

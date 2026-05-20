@@ -1,0 +1,12 @@
+{% if items | length == 0 %}
+暂无任何项目
+{% else %}
+项目列表：
+
+{% for item in items %}
+{{ item }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% endif %}

@@ -1,0 +1,9 @@
+{% if lines | length == 0 %}
+该项目未定义任何词条类型
+{% else %}
+可用词条类型：
+
+{% for line in lines %}
+{{ line }}
+{% endfor %}
+{% endif %}

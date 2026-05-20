@@ -101,7 +101,7 @@
 .settings-outer .fc-section-card {
   border-color: color-mix(in srgb, var(--fc-color-border) 78%, transparent);
   border-radius: var(--fc-radius-md);
-  background: color-mix(in srgb, var(--fc-color-bg-elevated) 70%, transparent);
+  background: var(--fc-color-bg-secondary);
   box-shadow: none;
 }
 

@@ -119,10 +119,28 @@ function writeJson<T>(key: string, value: T) {
     }
 }
 
-function getActivityTargetKey(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId' | 'panel'>) {
+export function getHomeActivityTargetKey(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId' | 'panel'>) {
     const projectPart = target.projectId ?? ''
     const panelPart = target.panel ?? ''
     return `${target.type}:${projectPart}:${target.id}:${panelPart}`
+}
+
+function getTargetProjectId(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId'>) {
+    return target.type === 'project' ? target.projectId ?? target.id : target.projectId ?? null
+}
+
+function getTargetEntryId(target: Pick<HomeActivityTarget, 'type' | 'id' | 'entryId'>) {
+    return target.type === 'entry' ? target.entryId ?? target.id : null
+}
+
+function isProjectScopedTarget(target: HomeActivityTarget, projectId: string) {
+    return getTargetProjectId(target) === projectId
+}
+
+function isEntryTarget(target: HomeActivityTarget, projectId: string, entryId: string) {
+    return target.type === 'entry'
+        && getTargetProjectId(target) === projectId
+        && getTargetEntryId(target) === entryId
 }
 
 function sortByRecentActivity(records: HomeActivityRecord[]) {
@@ -151,7 +169,7 @@ export function recordHomeActivity(target: HomeActivityTarget) {
     if (!id || !title) return
 
     const now = new Date().toISOString()
-    const key = getActivityTargetKey({...target, id})
+    const key = getHomeActivityTargetKey({...target, id})
     const records = readHomeActivityRecords()
     const existing = records.find(record => record.key === key)
     const nextRecord: HomeActivityRecord = {
@@ -175,13 +193,64 @@ export function recordHomeActivity(target: HomeActivityTarget) {
 }
 
 export function setHomeActivityPinned(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId' | 'panel'>, pinned: boolean) {
-    const key = getActivityTargetKey(target)
+    const key = getHomeActivityTargetKey(target)
     const records = readHomeActivityRecords()
     const nextRecords = records.map(record => (
         record.key === key ? {...record, pinned} : record
     ))
     writeJson(HOME_ACTIVITY_STORAGE_KEY, nextRecords)
     dispatchHomeActivityChanged()
+}
+
+function pruneStoredHomeActivity(
+    nextRecords: HomeActivityRecord[],
+    shouldClearSessionTarget: (target: HomeActivityTarget) => boolean,
+) {
+    writeJson(HOME_ACTIVITY_STORAGE_KEY, nextRecords)
+
+    const session = loadHomeLastSession()
+    if (session?.target && shouldClearSessionTarget(session.target)) {
+        writeJson<HomeLastSession>(HOME_SESSION_STORAGE_KEY, {
+            ...session,
+            target: null,
+            activeTabKey: null,
+            savedAt: new Date().toISOString(),
+        })
+    }
+
+    dispatchHomeActivityChanged()
+}
+
+export function removeHomeActivityTarget(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId' | 'entryId' | 'panel'>) {
+    const key = getHomeActivityTargetKey(target)
+    const records = readHomeActivityRecords()
+    pruneStoredHomeActivity(
+        records.filter(record => record.key !== key),
+        sessionTarget => getHomeActivityTargetKey(sessionTarget) === key,
+    )
+}
+
+export function removeHomeProjectActivity(projectId: string) {
+    const id = projectId.trim()
+    if (!id) return
+
+    const records = readHomeActivityRecords()
+    pruneStoredHomeActivity(
+        records.filter(record => !isProjectScopedTarget(record, id)),
+        sessionTarget => isProjectScopedTarget(sessionTarget, id),
+    )
+}
+
+export function removeHomeEntryActivity(projectId: string, entryId: string) {
+    const normalizedProjectId = projectId.trim()
+    const normalizedEntryId = entryId.trim()
+    if (!normalizedProjectId || !normalizedEntryId) return
+
+    const records = readHomeActivityRecords()
+    pruneStoredHomeActivity(
+        records.filter(record => !isEntryTarget(record, normalizedProjectId, normalizedEntryId)),
+        sessionTarget => isEntryTarget(sessionTarget, normalizedProjectId, normalizedEntryId),
+    )
 }
 
 export function saveHomeLastSession(session: Omit<HomeLastSession, 'savedAt'>) {

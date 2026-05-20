@@ -2,7 +2,6 @@ use crate::AppState;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::sense::sense_state_new;
-use flowcloudai_client::tool::ToolRegistry;
 use std::collections::HashMap;
 use tauri::AppHandle;
 use tauri::Emitter;

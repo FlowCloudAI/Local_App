@@ -1,0 +1,13 @@
+# 项目：{{ name }}
+
+{% if description %}**描述**：{{ description }}
+
+{% endif %}## 词条统计
+
+{% if count_lines | length == 0 %}暂无词条
+{% else %}{% for line in count_lines %}
+{{ line }}
+{% endfor %}{% endif %}
+
+**创建时间**：{{ created_at }}
+**更新时间**：{{ updated_at }}

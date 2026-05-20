@@ -1,4 +1,4 @@
-// App/src/features/relation-graph/components/RelationGraph/RelationGraph.tsx
+// app_main/src/features/relation-graph/components/RelationGraph/RelationGraph.tsx
 
 import {
     createContext,

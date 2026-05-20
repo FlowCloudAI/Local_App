@@ -3,6 +3,7 @@ import {convertFileSrc} from '@tauri-apps/api/core'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
+    db_get_entry,
     db_get_project,
     db_import_project_fcworld,
     db_list_projects,
@@ -16,8 +17,12 @@ import FcworldProgressDialog from '../features/projects/components/FcworldProgre
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
 import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {
+    getHomeActivityTargetKey,
     HOME_ACTIVITY_CHANGED_EVENT,
     loadHomeDashboardData,
+    removeHomeActivityTarget,
+    removeHomeEntryActivity,
+    removeHomeProjectActivity,
     type HomeActivityRecord,
     type HomeActivityTarget,
     type HomeDashboardData,
@@ -27,7 +32,7 @@ import './ProjectList.css'
 
 interface ProjectListProps {
     onOpenProject?: (project: Project) => void
-    onOpenHomeTarget?: (target: HomeActivityTarget) => void
+    onOpenHomeTarget?: (target: HomeActivityTarget) => void | Promise<void>
 }
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
@@ -100,6 +105,29 @@ function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
     }
 }
 
+function isProjectBackedTarget(target: HomeActivityTarget) {
+    return target.type === 'project' || target.type === 'entry' || target.type === 'tool'
+}
+
+function getDashboardProjectId(target: HomeActivityTarget) {
+    return target.type === 'project' ? target.projectId ?? target.id : target.projectId ?? null
+}
+
+function getDashboardEntryId(target: HomeActivityTarget) {
+    return target.type === 'entry' ? target.entryId ?? target.id : null
+}
+
+function collectDashboardTargets(dashboard: HomeDashboardData) {
+    const targets: HomeActivityTarget[] = [
+        ...dashboard.recentItems,
+        ...dashboard.pinnedItems,
+    ]
+    if (dashboard.continueItem) {
+        targets.push(dashboard.continueItem)
+    }
+    return targets
+}
+
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
     const [projects, setProjects] = useState<Project[]>([])
@@ -112,6 +140,9 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
+    const [validEntryTargetKeys, setValidEntryTargetKeys] = useState<Set<string>>(() => new Set())
+    const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
+    const [pendingEntryTargetKeys, setPendingEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
 
     const loadProjects = useCallback(async () => {
@@ -147,6 +178,102 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             window.removeEventListener('storage', refreshDashboard)
         }
     }, [])
+
+    const projectIdSet = useMemo(() => new Set(projects.map(project => project.id)), [projects])
+
+    useEffect(() => {
+        if (!hasLoadedProjects) return
+
+        const entryTargets: Array<{
+            key: string
+            projectId: string
+            entryId: string
+            target: HomeActivityTarget
+        }> = []
+        const invalidKeys = new Set<string>()
+        const missingProjectIds = new Set<string>()
+
+        for (const target of collectDashboardTargets(dashboard)) {
+            const key = getHomeActivityTargetKey(target)
+            const projectId = getDashboardProjectId(target)
+
+            if (isProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
+                invalidKeys.add(key)
+                if (projectId) {
+                    missingProjectIds.add(projectId)
+                } else {
+                    removeHomeActivityTarget(target)
+                }
+                continue
+            }
+
+            if (target.type === 'entry') {
+                const entryId = getDashboardEntryId(target)
+                if (!projectId || !entryId) {
+                    invalidKeys.add(key)
+                    removeHomeActivityTarget(target)
+                    continue
+                }
+                entryTargets.push({key, projectId, entryId, target})
+            }
+        }
+
+        if (invalidKeys.size > 0) {
+            setInvalidHomeTargetKeys(prev => new Set([...prev, ...invalidKeys]))
+        }
+        for (const projectId of missingProjectIds) {
+            removeHomeProjectActivity(projectId)
+        }
+        if (entryTargets.length === 0) return
+
+        const validationKeys = new Set(entryTargets.map(item => item.key))
+        setPendingEntryTargetKeys(prev => new Set([...prev, ...validationKeys]))
+
+        let cancelled = false
+        void (async () => {
+            const validKeys = new Set<string>()
+            const invalidEntryKeys = new Set<string>()
+
+            await Promise.all(entryTargets.map(async item => {
+                try {
+                    const entry = await db_get_entry(item.entryId)
+                    if (entry.project_id !== item.projectId) {
+                        invalidEntryKeys.add(item.key)
+                        removeHomeActivityTarget(item.target)
+                        return
+                    }
+                    validKeys.add(item.key)
+                } catch {
+                    invalidEntryKeys.add(item.key)
+                    removeHomeEntryActivity(item.projectId, item.entryId)
+                }
+            }))
+
+            if (cancelled) return
+
+            setPendingEntryTargetKeys(prev => {
+                const next = new Set(prev)
+                for (const key of validationKeys) next.delete(key)
+                return next
+            })
+            setValidEntryTargetKeys(prev => {
+                const next = new Set(prev)
+                for (const key of invalidEntryKeys) next.delete(key)
+                for (const key of validKeys) next.add(key)
+                return next
+            })
+            setInvalidHomeTargetKeys(prev => {
+                const next = new Set(prev)
+                for (const key of validKeys) next.delete(key)
+                for (const key of invalidEntryKeys) next.add(key)
+                return next
+            })
+        })()
+
+        return () => {
+            cancelled = true
+        }
+    }, [dashboard, hasLoadedProjects, projectIdSet])
 
     const query = searchText.trim().toLowerCase()
     const filteredProjects = projects
@@ -222,24 +349,59 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             },
         },
     ], [])
+    const isVisibleHomeTarget = useCallback((target: HomeActivityTarget) => {
+        const key = getHomeActivityTargetKey(target)
+        if (invalidHomeTargetKeys.has(key)) return false
+
+        if (hasLoadedProjects && isProjectBackedTarget(target)) {
+            const projectId = getDashboardProjectId(target)
+            if (!projectId || !projectIdSet.has(projectId)) return false
+        }
+
+        if (target.type === 'entry' && hasLoadedProjects) {
+            if (pendingEntryTargetKeys.has(key)) return false
+            return validEntryTargetKeys.has(key)
+        }
+
+        return true
+    }, [hasLoadedProjects, invalidHomeTargetKeys, pendingEntryTargetKeys, projectIdSet, validEntryTargetKeys])
+    const visibleRecentItems = useMemo(() => (
+        dashboard.recentItems.filter(item => isVisibleHomeTarget(item))
+    ), [dashboard.recentItems, isVisibleHomeTarget])
+    const continueItem = useMemo(() => {
+        if (dashboard.continueItem && isVisibleHomeTarget(dashboard.continueItem)) {
+            return dashboard.continueItem
+        }
+        return visibleRecentItems[0] ?? null
+    }, [dashboard.continueItem, isVisibleHomeTarget, visibleRecentItems])
     const recentItems = useMemo(() => {
-        const continueItem = dashboard.continueItem
-        return dashboard.recentItems
-            .filter(item => !continueItem || item.type !== continueItem.type || item.id !== continueItem.id)
+        const continueKey = continueItem ? getHomeActivityTargetKey(continueItem) : null
+        return visibleRecentItems
+            .filter(item => !continueKey || getHomeActivityTargetKey(item) !== continueKey)
             .slice(0, 5)
-    }, [dashboard.continueItem, dashboard.recentItems])
+    }, [continueItem, visibleRecentItems])
 
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
+        const projectId = getDashboardProjectId(target)
+        if (hasLoadedProjects && isProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
+            if (projectId) {
+                removeHomeProjectActivity(projectId)
+            } else {
+                removeHomeActivityTarget(target)
+            }
+            void showAlert('这个首页入口指向的内容已不存在，已从首页移除。', 'warning', 'toast', 3000)
+            return
+        }
         if (target.type === 'project') {
-            const projectId = target.projectId ?? target.id
-            const project = projects.find(item => item.id === projectId)
+            const targetProjectId = target.projectId ?? target.id
+            const project = projects.find(item => item.id === targetProjectId)
             if (project) {
                 onOpenProject?.(project)
                 return
             }
         }
-        onOpenHomeTarget?.(target)
-    }, [onOpenHomeTarget, onOpenProject, projects])
+        void onOpenHomeTarget?.(target)
+    }, [hasLoadedProjects, onOpenHomeTarget, onOpenProject, projectIdSet, projects, showAlert])
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
         window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
@@ -387,21 +549,21 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             type="button"
                             className="project-home-continue-card"
                             onClick={() => {
-                                if (dashboard.continueItem) {
-                                    openDashboardTarget(dashboard.continueItem)
+                                if (continueItem) {
+                                    openDashboardTarget(continueItem)
                                     return
                                 }
                                 setCreatorOpen(true)
                             }}
                         >
-                            {dashboard.continueItem ? (
+                            {continueItem ? (
                                 <>
                                     <span className="project-home-eyebrow">继续创作</span>
                                     <div className="project-home-continue-card__topline">
-                                        <span className="project-home-continue-card__title">{dashboard.continueItem.title}</span>
+                                        <span className="project-home-continue-card__title">{continueItem.title}</span>
                                     </div>
                                     <p>
-                                        {dashboard.continueItem.subtitle || getTargetTypeLabel(dashboard.continueItem.type)}
+                                        {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
                                         {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
                                     </p>
                                 </>

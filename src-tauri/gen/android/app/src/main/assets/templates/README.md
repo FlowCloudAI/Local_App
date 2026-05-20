@@ -1,55 +1,99 @@
-# sense/ — AI 系统提示词
+# 提示词模板目录
 
-此目录的模板定义了 AI 的**基础人设**和**回答规则**，在创建会话时一次性加载，贯穿整个会话生命周期。
+本目录存放 FlowCloudAI 的提示词（prompt）和 AI 返回格式模板。所有模板使用 [Tera](https://tera.netlify.app/docs/) 模板引擎渲染，语法类 Jinja2 / Django。
 
----
+## 修改前必读
 
-## `app_system.tera`
+**每个子目录下有 `README.md`，列出了该目录下所有模板的输入参数和复制来源。修改模板前请务必先阅读对应子目录的 README，确保了解每个变量的含义以及模板渲染失败时的硬编码回退逻辑。**
 
-**复制来源：** `src-tauri/src/senses/app_sense.rs` — `AppSense::prompts()`
+## 目录结构
 
-**场景：** 通用 AI 助手会话
+```
+templates/
+├── sense/             # AI 系统提示词（角色扮演、矛盾检测、通用助手）
+├── context/           # 上下文注入模板（词条快照等）
+├── formats/           # 工具返回格式模板（词条列表、标签定义、关系网络等）
+├── contradiction/     # 矛盾检测专用模板（检测提示、摘要生成）
+└── README.md          # 本文件
+```
 
-**输入参数：** 无
+## 各目录作用
 
-**说明：** 定义通用创作助手的基础行为准则：优先基于项目资料回答、保持设定一致性等。
+| 目录               | 作用                      | 调用方                                             |
+|------------------|-------------------------|-------------------------------------------------|
+| `sense/`         | 定义 AI 的基础人设、回答规则、可用工具范围 | `src-tauri/src/senses/`                         |
+| `context/`       | 控制每轮对话向 AI 注入的上下文格式     | `src-tauri/src/ai_services/context_builders.rs` |
+| `formats/`       | 控制工具（读操作）返回给 AI 的结果格式   | `src-tauri/src/tools/mod.rs` 的 `format` 模块      |
+| `contradiction/` | 矛盾检测和摘要生成的任务提示          | `src-tauri/src/ai_services/context_builders.rs` |
 
----
+## 生效方式
 
-## `character_system.tera`
+- **开发环境**：修改模板文件 → 重启 App → 生效
+- **发布环境**：模板随安装包复制到安装目录，替换对应文件后重启生效
 
-**复制来源：** `src-tauri/src/senses/character_sense.rs` — `CharacterSense::prompts()`
+## 回退机制
 
-**场景：** 角色扮演会话（用户对某个角色词条发起聊天）
+所有模板都有硬编码回退：如果模板文件缺失或渲染失败，系统会自动使用原始 Rust 硬编码文案，功能不会退化。日志中会输出 `模板渲染失败` 警告。
 
-**输入参数：**
+## Tera 语法速览
 
-| 变量                     | 类型            | 说明                                       |
-|------------------------|---------------|------------------------------------------|
-| `character_name`       | `String`      | 角色名称（即词条标题）                              |
-| `project_name`         | `String`      | 所属项目名称                                   |
-| `project_description`  | `String`      | 项目描述（无描述时显示"无"）                          |
-| `target_title`         | `String`      | 角色词条标题                                   |
-| `target_entry_type`    | `String`      | 词条类型（未设置时显示"未设置"）                        |
-| `target_category_path` | `String`      | 分类路径（形如 "角色 / 主角"，未分类时显示"未分类"）           |
-| `target_summary`       | `String`      | 词条摘要（无摘要时显示"无"）                          |
-| `target_content`       | `String`      | 词条正文（无内容时显示"无"）                          |
-| `target_tags`          | `String`      | 标签列表（形如 "性别=男；年龄=25"，无标签时显示"无"）          |
-| `related_relations`    | `Vec<String>` | 与该角色直接相关的关系行列表，每行格式：`- A -> B [关系类型] 描述` |
-| `category_lines`       | `Vec<String>` | 项目分类树行列表，每行格式：`- 分类名 (ID)`               |
-| `schema_lines`         | `Vec<String>` | 标签体系行列表，每行格式：`- 标签名 [类型] 目标=XX 说明=XX`    |
-| `world_entry_lines`    | `Vec<String>` | 项目所有世界设定词条的摘要行列表，含有标题、类型、路径、摘要、正文、标签     |
+### 输出变量
 
-**说明：** 角色扮演模板包含四个区块：角色身份约束 → 回答规则 → 当前项目信息 → 角色详细设定。后续区块（关系、标签字典、分类结构、世界设定摘录）在对应数据非空时才出现。
+```tera
+{{ variable_name }}
+```
 
----
+### 条件判断
 
-## `contradiction_system.tera`
+```tera
+{% if variable %}
+  变量有值时输出
+{% else %}
+  变量为空时输出
+{% endif %}
+```
 
-**复制来源：** `src-tauri/src/senses/contradiction_sense.rs` — `ContradictionSense::prompts()`
+### 判断变量是否有值（非空、非零、非空数组）
 
-**场景：** 矛盾检测会话
+```tera
+{% if variable %}        {# 变量存在且非空 #}
+{% if variable | length > 0 %}  {# 显式检查长度 #}
+```
 
-**输入参数：** 无
+### 循环
 
-**说明：** 定义矛盾检测助手的行为准则：优先基于原文证据、证据不足时放入未解决问题、首轮输出 JSON、阶段完成后报告进度。
+```tera
+{% for item in items %}
+{{ item }}
+{% endfor %}
+```
+
+### 循环内变量
+
+```tera
+{% if not loop.last %}    {# 不是最后一项 #}
+{% if loop.first %}       {# 是第一项 #}
+{{ loop.index }}          {# 从 1 开始计数 #}
+```
+
+### 空白控制
+
+```tera
+{% if foo -%}             {# -%} 消除标签后的换行 #}
+{%- if foo %}             {# {%- 消除标签前的换行 #}
+{%- if foo -%}            {# 同时消除前后换行 #}
+```
+
+### 常用过滤器
+
+```tera
+{{ value | length }}      {# 数组/字符串长度 #}
+{{ value | default("默认值") }}  {# 空值时用默认值 #}
+{{ "text" | upper }}      {# 转大写 #}
+```
+
+### 注释
+
+```tera
+{# 这是注释，不会输出 #}
+```

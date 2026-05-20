@@ -1,7 +1,7 @@
 import {logger} from '../../shared/logger'
 import '../../App.css'
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
-import {type Project, setting_is_backend_ready} from '../../api'
+import {db_get_entry, db_get_project, type Project, setting_is_backend_ready} from '../../api'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import type {AiFocus} from '../../features/ai-chat/hooks/useAiController'
@@ -17,7 +17,13 @@ import ProjectList from '../../pages/ProjectList.tsx'
 import Settings from '../../pages/Settings'
 import DockableSidePanel from '../../shared/ui/layout/DockableSidePanel'
 import type {ReportConversationContext} from '../../features/ai-chat/model/AiControllerTypes'
-import {recordHomeActivity, saveHomeLastSession, type HomeActivityTarget} from '../../features/home/homeActivity'
+import {
+    recordHomeActivity,
+    removeHomeEntryActivity,
+    removeHomeProjectActivity,
+    saveHomeLastSession,
+    type HomeActivityTarget,
+} from '../../features/home/homeActivity'
 
 type EntryTabMeta = {
     projectId: string
@@ -70,7 +76,6 @@ export default function DesktopApp() {
     const [mainContentKey, setMainContentKey] = useState<MainContentKey>('home')
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
-    const [collapsed, setCollapsed] = useState(false)
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
@@ -141,7 +146,6 @@ export default function DesktopApp() {
 
     const showHomeWorkspace = useCallback(() => {
         setMainContentKey('home')
-        setCollapsed(true)
     }, [])
 
     const touchRecentPage = useCallback((tabKey: string) => {
@@ -390,12 +394,14 @@ export default function DesktopApp() {
             .filter(([, meta]) => meta.projectId === projectId)
             .map(([key]) => key)
         closeTabsForKeys(new Set([projKey, ...relatedToolKeys, ...relatedEntryKeys]))
+        removeHomeProjectActivity(projectId)
         window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
     }, [closeTabsForKeys, entryTabMap, toolTabMap])
 
     const handleDeleteEntry = useCallback((projectId: string, entryId: string) => {
         const entryKey = `entry-${projectId}-${entryId}`
         closeTabsForKeys(new Set([entryKey]))
+        removeHomeEntryActivity(projectId, entryId)
         activateProjectTab(projectId)
     }, [activateProjectTab, closeTabsForKeys])
 
@@ -606,28 +612,47 @@ export default function DesktopApp() {
         }
     }, [aiController, aiPanelCollapsed, expandAiPanelToMinWidth])
 
-    const handleOpenHomeTarget = useCallback((target: HomeActivityTarget) => {
+    const handleOpenHomeTarget = useCallback(async (target: HomeActivityTarget) => {
         switch (target.type) {
             case 'project':
-                handleOpenProject({
-                    id: target.projectId ?? target.id,
-                    name: target.title,
-                    description: target.description ?? null,
-                })
+                try {
+                    const project = await db_get_project(target.projectId ?? target.id)
+                    handleOpenProject(project)
+                } catch {
+                    removeHomeProjectActivity(target.projectId ?? target.id)
+                    await showAlert('这个项目已被删除，已从首页移除。', 'warning', 'toast', 3000)
+                }
                 return
             case 'entry':
                 if (!target.projectId || !target.entryId) return
-                handleOpenEntry(target.projectId, {
-                    id: target.entryId,
-                    title: target.title,
-                })
+                try {
+                    const entry = await db_get_entry(target.entryId)
+                    if (entry.project_id !== target.projectId) {
+                        removeHomeEntryActivity(target.projectId, target.entryId)
+                        await showAlert('这个词条已不属于原项目，已从首页移除。', 'warning', 'toast', 3000)
+                        return
+                    }
+                    handleOpenEntry(entry.project_id, {
+                        id: entry.id,
+                        title: entry.title,
+                    })
+                } catch {
+                    removeHomeEntryActivity(target.projectId, target.entryId)
+                    await showAlert('这个词条已被删除，已从首页移除。', 'warning', 'toast', 3000)
+                }
                 return
             case 'tool':
                 if (!target.projectId || !target.panel) return
-                handleOpenProjectTool(target.panel, {
-                    id: target.projectId,
-                    name: target.subtitle || target.title,
-                })
+                try {
+                    const project = await db_get_project(target.projectId)
+                    handleOpenProjectTool(target.panel, {
+                        id: project.id,
+                        name: project.name,
+                    })
+                } catch {
+                    removeHomeProjectActivity(target.projectId)
+                    await showAlert('这个项目已被删除，已从首页移除。', 'warning', 'toast', 3000)
+                }
                 return
             case 'idea':
                 recordHomeActivity(target)
@@ -649,7 +674,7 @@ export default function DesktopApp() {
                 collapseAiPanel()
                 return
         }
-    }, [collapseAiPanel, handleOpenEntry, handleOpenProject, handleOpenProjectTool, handleSideBarSelect])
+    }, [collapseAiPanel, handleOpenEntry, handleOpenProject, handleOpenProjectTool, handleSideBarSelect, showAlert])
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
@@ -918,7 +943,6 @@ export default function DesktopApp() {
                 </button>
                 <div className="tab-bar-wrapper" data-tauri-drag-region>
                     <TabBar
-                        background="transparent"
                         variant="floating"
                         tabRadius="md"
                         closable
@@ -1081,11 +1105,11 @@ export default function DesktopApp() {
                     items={menuItems}
                     bottomItems={bottomItems}
                     selectedKey={sideBarSelectedKey}
-                    collapsed={collapsed}
-
+                    collapsed={true}
                     collapsedWidth={50}
+                    anchorState="collapse"
                     onSelect={handleSideBarSelect}
-                    onCollapse={setCollapsed}
+                    onCollapse={() => {}}
                     placement="right"
                 />
             </div>

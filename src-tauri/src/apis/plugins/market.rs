@@ -32,7 +32,7 @@ pub async fn plugin_market_install(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut client = ai_state.client.lock().await;
+    let client = ai_state.client.lock().await;
     let meta = client
         .install_plugin_from_path(&tmp)
         .map_err(|e| e.to_string())?;

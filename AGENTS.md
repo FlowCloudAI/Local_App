@@ -39,35 +39,37 @@
 - **前端**：`@tauri-apps/api`、`@tauri-apps/plugin-*`、`@uiw/react-md-editor`、`@deck.gl/core`/`layers`/`react`/`widgets`、
   `@luma.gl/shadertools`、`react-window`、`classnames`、`react-dropzone`、`i18next-browser-languagedetector`
 - **后端**：`tauri`、`tokio`、`serde`、`serde_json`、`anyhow`、`reqwest`、`keyring`、`uuid`、`zip`、`scraper`、`futures`、`log`、
-  `chrono`、`semver`、`moka`、`tera`、`git2`、`ego-tree`、`htmd`、`base64`、`urlencoding`、`mime_guess`
-- **私有依赖**：
-    - `worldflow_core`：Git 依赖 `ssh://git@github.com/FlowCloudAI/Worldflow_Core`
-    - `flowcloudai_client`：`ssh://git@github.com/FlowCloudAI/AI_Client_Core`
+  `chrono`、`semver`、`moka`、`tera`、`ego-tree`、`htmd`、`base64`、`urlencoding`、`mime_guess`
+- **本地路径依赖**：
+    - `worldflow_core`：`../../core_world_data`
+    - `flowcloudai_client`：`../../core_ai_client`
 
 ---
 
 ## 目录结构
 
 ```
-flowcloudai_app/
+app_main/
 ├── src/                      # 前端源码
 │   ├── api/                  # Tauri invoke 封装（与后端 apis 模块一一对应）
-│   ├── app/                  # 应用根组件（含标签页、侧边栏、窗口控制）
+│   ├── app/                  # 应用外壳：desktop / index / mobile
 │   │   ├── desktop/          # 桌面端布局组件
 │   │   ├── index/            # 应用入口与根组件（AppRoot）
 │   │   └── mobile/           # 移动端布局组件
-│   ├── contexts/             # 前端上下文（如 AiControllerTypes）
+│   ├── contexts/             # 前端上下文（当前为空目录，规划用途）
 │   ├── features/             # 按功能域组织的 React 组件
 │   │   ├── about/            # 关于页面
 │   │   ├── ai-chat/          # AI 对话助手
 │   │   ├── entries/          # 词条系统
+│   │   ├── home/             # 首页概览
 │   │   ├── maps/             # 地图与形状编辑器
+│   │   ├── onboarding/       # 首次使用引导
 │   │   ├── plugins/          # 插件管理
 │   │   ├── project-editor/   # 项目编辑器
 │   │   ├── projects/         # 项目列表与创建
 │   │   ├── relation-graph/   # 词条关系图
 │   │   └── snapshots/        # 快照面板
-│   ├── hooks/                # 全局自定义 Hooks
+│   ├── hooks/                # 全局自定义 Hooks（当前为空目录，规划用途）
 │   ├── i18n/                 # 国际化配置与语言包
 │   ├── pages/                # 页面级组件
 │   ├── shared/               # 共享组件与工具
@@ -83,6 +85,7 @@ flowcloudai_app/
 │   │   │   ├── ai_contradiction.rs
 │   │   │   ├── ai_summary.rs
 │   │   │   ├── app_settings.rs
+│   │   │   ├── feedback.rs
 │   │   │   ├── layout.rs
 │   │   │   ├── map.rs
 │   │   │   ├── map_persistence.rs
@@ -94,6 +97,7 @@ flowcloudai_app/
 │   │   ├── tools/            # AI 工具注册中心与 Worldflow 工具实现
 │   │   ├── senses/           # Sense（模式预设）实现
 │   │   ├── reports/          # 报告生成（矛盾报告、摘要结果）
+│   │   ├── auto_backup.rs    # 自动备份后台任务
 │   │   ├── lib.rs            # Tauri Builder 配置与状态初始化
 │   │   ├── main.rs           # 程序入口
 │   │   ├── template.rs       # Tera 模板引擎与 Prompt 模板
@@ -127,11 +131,17 @@ npm install
 npm run dev
 
 # 启动 Tauri 开发模式（会同时拉起前端 dev server）
-npm run tauri dev
+npm run tauri -- dev
 
 # 生产构建（前端 + Rust）
 npm run build          # 仅构建前端
-npm run tauri build    # 构建完整的桌面应用安装包
+npm run tauri -- build # 构建完整的桌面应用安装包
+
+# 平台构建辅助命令
+npm run tauri:build:windows
+npm run tauri:build:linux
+npm run android:dev
+npm run android:build:apk
 
 # 代码检查
 npm run lint
@@ -236,11 +246,20 @@ cargo test
 
 ---
 
+## 提交信息与 PR 规范
+
+- 提交信息默认使用中文，格式建议为“动词 + 范围 + 目的”，例如 `修正插件市场刷新状态`。
+- 一个提交只包含一个明确任务，不混入格式化、构建产物或无关重构。
+- PR 说明需写明影响的前端页面 / Tauri Command / 数据库接口、运行过的验证命令，以及仍需人工验证的桌面端交互。
+- 涉及前端界面时，先阅读根级 `../docs/前端风格指南.md`，并在说明中标注是否触碰超过 300 行的历史大文件。
+
+---
+
 ## 安全与隐私
 
 - **API 密钥存储**：所有插件的 API Key 均通过系统密钥链（`keyring` crate）保存，**绝不写入 `settings.json` 文件**。
 - **图片访问控制**：应用注册了自定义 URI Scheme `fcimg`，仅允许访问数据库同级目录 `images/` 下的文件，防止路径遍历。
-- **CSP 与权限**：`tauri.conf.json` 中配置了 Content-Security-Policy；`capabilities/default.json` 中仅授予必要的窗口操作与文件打开权限。
+- **CSP 与权限**：`src-tauri/tauri.conf.json` 中配置了 Content-Security-Policy；`src-tauri/capabilities/default.json` 中仅授予必要的窗口操作与文件打开权限。
 - **设置文件**：`settings.json` 存储在系统应用配置目录（`app_config_dir`），不含敏感信息。
 
 ---

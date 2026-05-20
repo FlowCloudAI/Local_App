@@ -287,19 +287,19 @@ export default function Settings({onBack}: SettingsProps) {
             setLlmPlugins(bootstrap.llmPlugins)
             setImagePlugins(bootstrap.imagePlugins)
             setTtsPlugins(bootstrap.ttsPlugins)
-            setMediaDir(bootstrap.mediaDir)
+            setMediaDir(current => current === bootstrap.mediaDir ? current : bootstrap.mediaDir)
             setDefaultPaths(bootstrap.defaultPaths)
             setConfigDir(configDirData)
             setApiKeyStatus(bootstrap.apiKeyStatus)
         } catch (error) {
             const errStr = String(error)
             if (!errStr.includes('state not managed')) {
-                await showAlert('加载设置失败: ' + error, 'error')
+                await showAlertRef.current('加载设置失败: ' + error, 'error')
             }
         } finally {
             setLoading(false)
         }
-    }, [showAlert])
+    }, [])
 
     const loadLocal = useCallback(async () => {
         setLoadingLocal(true)
@@ -420,7 +420,7 @@ export default function Settings({onBack}: SettingsProps) {
             // 新 API 返回迁移摘要字符串（路径变更时自动复制文件），非空则弹窗提示
             const migrationMsg = await setting_update_settings(nextSettings)
             const newMediaDir = await setting_get_media_dir()
-            setMediaDir(newMediaDir)
+            setMediaDir(current => current === newMediaDir ? current : newMediaDir)
             const shouldShowSuccessNotice = settingsSaveSuccessNoticeEnabledRef.current
             settingsSaveSuccessNoticeEnabledRef.current = true
             if (migrationMsg) {
