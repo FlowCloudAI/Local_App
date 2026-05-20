@@ -22,7 +22,7 @@
     flex: 1;
     height: 100%;
     padding: 0;
-    background: var(--dock-panel-sidebar-bg);
+    background: var(--fc-color-bg-secondary);
 }
 
 .dockable-side-panel--fullscreen.is-fullscreen-animating {
@@ -90,10 +90,6 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-}
-
-.dockable-side-panel--fullscreen .side-panel-layer.active {
-    z-index: 2;
 }
 
 /* ===== 双 slot API：side-stack / main-stack 与 layer 互斥切换 ===== */

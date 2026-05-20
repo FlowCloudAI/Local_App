@@ -228,46 +228,6 @@ body {
     z-index: 1;
 }
 
-.side-panel-stack {
-    position: relative;
-    flex: 1;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    overflow: hidden;
-    background: var(--fc-color-bg);
-}
-
-.ai-shell.dockable-side-panel--fullscreen,
-.ai-shell.dockable-side-panel--fullscreen .dockable-side-panel__body,
-.side-panel-stack.is-panel-fullscreen,
-.side-panel-layer.is-panel-fullscreen {
-    background: var(--fc-color-bg-secondary);
-}
-
-.side-panel-layer {
-    position: absolute;
-    inset: 0;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    overflow: hidden;
-    background: var(--fc-color-bg);
-    z-index: 0;
-}
-
-.side-panel-layer.active {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-    z-index: 1;
-}
-
 .is-tauri .fc-roll {
     scrollbar-width: auto;
     scrollbar-color: auto;
@@ -304,4 +264,5 @@ body {
     z-index: 1001;  /* 高于 AI 右侧面板的 1000 */
     position: relative;  /* 确保 z-index 生效 */
     border-left-color: var(--fc-color-bg-secondary) !important;
+    
 }
