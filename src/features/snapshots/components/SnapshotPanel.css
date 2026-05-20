@@ -32,7 +32,7 @@
     flex-shrink: 0;
     overflow: auto;
     border-right: 0;
-    border-top: 1px solid var(--dock-panel-border-color);
+    border-bottom: 1px solid var(--dock-panel-border-color);
 }
 
 /* ===== 左侧 sidebar ===== */

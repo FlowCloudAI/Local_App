@@ -536,13 +536,13 @@ export function useSnapshotPanel({
         return {side: sideContent, main: mainContent}
     }
 
-    // floating 模式：main 在上，side（控制面板）在下，上下分布
+    // floating 模式：side（控制面板）在上，main（提交历史）在下，上下分布
     return {
         side: null,
         main: (
             <div className="snapshot-panel">
-                {mainContent}
                 {sideContent}
+                {mainContent}
             </div>
         ),
     }
