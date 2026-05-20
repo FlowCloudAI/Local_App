@@ -136,7 +136,7 @@ export function useIdeaPanel({
     const [projectFilter, setProjectFilter] = useState<ProjectFilterMode>('all')
     const [ideaSearch, setIdeaSearch] = useState('')
     const [compactLayout, setCompactLayout] = useState(false)
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
     const selectedIdea = useMemo(
         () => ideaNotes.find((item) => item.id === selectedIdeaId) ?? null,
@@ -358,6 +358,10 @@ export function useIdeaPanel({
         if (panelMode === 'fullscreen') {
             setCompactLayout(false)
             setSidebarCollapsed(false)
+            return
+        }
+        if (panelMode === 'floating') {
+            setSidebarCollapsed(true)
         }
     }, [panelMode])
 
@@ -376,7 +380,6 @@ export function useIdeaPanel({
         const updateFromWidth = (width: number) => {
             const isCompact = width <= 960
             setCompactLayout(isCompact)
-            setSidebarCollapsed(isCompact)
         }
 
         // 同步首测，避免先展开再收起的闪烁
@@ -996,7 +999,7 @@ export function useIdeaPanel({
         main: (
             <div
                 ref={setLayoutRef}
-                className={`idea-page${compactLayout ? ' is-compact' : ''}${compactLayout && sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+                className={`idea-page${compactLayout ? ' is-compact' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
             >
                 <div className="idea-page__shell">
                     {compactLayout && !sidebarCollapsed ? (

@@ -440,9 +440,24 @@
     color: color-mix(in srgb, var(--fc-color-text-secondary) 82%, transparent);
 }
 
-.idea-page:not(.is-compact) .idea-page__main-topbar-left .idea-page__sidebar-toggle,
-.idea-page:not(.is-compact) .idea-page__sidebar-topbar .idea-page__sidebar-toggle {
-    display: none;
+.idea-page.sidebar-collapsed .idea-page__shell {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.idea-page.sidebar-collapsed .idea-page__sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 20;
+    width: var(--dock-panel-sidebar-width);
+    max-width: 100%;
+    border-right: 1px solid var(--dock-panel-border-color);
+    box-shadow: var(--fc-shadow-lg);
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform var(--fc-transition), opacity var(--fc-transition);
 }
 
 @container idea-page (max-width: 960px) {
@@ -459,8 +474,8 @@
         width: min(22rem, calc(100% - 2rem));
         max-width: 100%;
         border-right: 1px solid var(--dock-panel-border-color);
-        box-shadow: 12px 0 28px rgba(0, 0, 0, 0.18);
-        transition: transform 0.14s ease-out, opacity 0.14s ease-out;
+        box-shadow: var(--fc-shadow-lg);
+        transition: transform var(--fc-transition), opacity var(--fc-transition);
     }
 
     .idea-page.sidebar-collapsed .idea-page__sidebar {

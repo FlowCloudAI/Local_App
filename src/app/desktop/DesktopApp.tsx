@@ -873,24 +873,30 @@ export default function DesktopApp() {
 
     const HelpIcon = (
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-            <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5"/>
             <path
-                d="M9.8 9.5A2.3 2.3 0 0 1 12.1 7.5c1.35 0 2.4.86 2.4 2.05 0 1.02-.57 1.58-1.45 2.15-.78.5-1.05.86-1.05 1.55v.25"
+                d="M4.5 5.5h5A3.5 3.5 0 0 1 13 9v10.5a3.5 3.5 0 0 0-3.5-3.5h-5V5.5Z"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
-            <path d="M12 16.2h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path
+                d="M19.5 5.5h-5A3.5 3.5 0 0 0 11 9v10.5a3.5 3.5 0 0 1 3.5-3.5h5V5.5Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="M8 8.5h1.8M15 8.5h1.8M8 11h1.8M15 11h1.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>)
 
     const menuItems: SideBarItem[] = [
         {key: 'idea', label: '灵感便签', icon: IdeaIcon},
         {key: 'ai-chat', label: 'AI 对话', icon: AiChatIcon},
         {key: 'snapshot', label: '版本管理', icon: SnapshotIcon},
+        {key: 'help', label: '帮助', icon: HelpIcon},
     ]
     const bottomItems: SideBarItem[] = [
-        {key: 'help', label: '帮助', icon: HelpIcon},
         {key: 'settings', label: '设置', icon: SettingsIcon},
     ]
 

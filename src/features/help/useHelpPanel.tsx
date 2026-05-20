@@ -108,11 +108,22 @@ export function useHelpPanel({
     onToggleCollapsed,
 }: UseHelpPanelOptions = {}): HelpPanelSlots {
     const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey>(() => normalizeTopicKey(topicKey))
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
     useEffect(() => {
         if (!topicKey) return
         setActiveTopicKey(normalizeTopicKey(topicKey))
     }, [topicKey, topicSignal])
+
+    useEffect(() => {
+        if (panelMode === 'fullscreen') {
+            setSidebarCollapsed(false)
+            return
+        }
+        if (panelMode === 'floating') {
+            setSidebarCollapsed(true)
+        }
+    }, [panelMode])
 
     const activeTopic = useMemo(
         () => HELP_TOPICS.find(topic => topic.key === activeTopicKey) ?? HELP_TOPICS[0],
@@ -123,6 +134,18 @@ export function useHelpPanel({
         <DockPanelSide className="help-side">
             <DockPanelTopbar className="help-side__topbar" variant="side">
                 <DockPanelTitle>帮助目录</DockPanelTitle>
+                {panelMode !== 'fullscreen' ? (
+                    <DockPanelIconButton
+                        type="button"
+                        className="help-side__toggle"
+                        onClick={() => setSidebarCollapsed(true)}
+                        title="收起侧边栏"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M10 3 5 8l5 5"/>
+                        </svg>
+                    </DockPanelIconButton>
+                ) : null}
             </DockPanelTopbar>
             <div className="help-side__list">
                 {HELP_TOPICS.map(topic => (
@@ -130,7 +153,12 @@ export function useHelpPanel({
                         key={topic.key}
                         type="button"
                         className={`help-side__item${topic.key === activeTopicKey ? ' is-active' : ''}`}
-                        onClick={() => setActiveTopicKey(topic.key)}
+                        onClick={() => {
+                            setActiveTopicKey(topic.key)
+                            if (panelMode !== 'fullscreen') {
+                                setSidebarCollapsed(true)
+                            }
+                        }}
                     >
                         <span className="help-side__item-title">{topic.label}</span>
                         <span className="help-side__item-summary">{topic.summary}</span>
@@ -143,7 +171,25 @@ export function useHelpPanel({
     const mainContent = (
         <DockPanelMain className="help-main">
             <DockPanelTopbar className="help-main__topbar">
-                <DockPanelTitle>帮助中心</DockPanelTitle>
+                <div className="help-main__topbar-left">
+                    {panelMode !== 'fullscreen' ? (
+                        <DockPanelIconButton
+                            type="button"
+                            className="help-main__sidebar-toggle"
+                            onClick={() => setSidebarCollapsed(prev => !prev)}
+                            title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                {sidebarCollapsed ? (
+                                    <path d="M6 3 11 8l-5 5"/>
+                                ) : (
+                                    <path d="M10 3 5 8l5 5"/>
+                                )}
+                            </svg>
+                        </DockPanelIconButton>
+                    ) : null}
+                    <DockPanelTitle>帮助中心</DockPanelTitle>
+                </div>
                 <div className="help-main__topbar-actions">
                     <DockPanelIconButton
                         type="button"
@@ -198,7 +244,15 @@ export function useHelpPanel({
     return {
         side: null,
         main: (
-            <div className="help-panel">
+            <div className={`help-panel${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
+                {!sidebarCollapsed ? (
+                    <button
+                        type="button"
+                        className="help-panel__sidebar-backdrop"
+                        aria-label="关闭帮助目录"
+                        onClick={() => setSidebarCollapsed(true)}
+                    />
+                ) : null}
                 {sideContent}
                 {mainContent}
             </div>
