@@ -4,10 +4,10 @@
    fullscreen: side/main 各自独立，由 DockableSidePanel 放到对应 slot
    ============================================ */
 
-/* floating 模式整体容器 */
+/* floating 模式整体容器：上下分布（main 在上、控制面板在下） */
 .snapshot-panel {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     height: 100%;
     width: 100%;
     min-width: 0;
@@ -16,6 +16,23 @@
     background: var(--dock-panel-bg);
     container-type: inline-size;
     container-name: snapshot-panel;
+}
+
+/* floating 容器内：main 占大部分高度，side 在底部自适应高度 */
+.snapshot-panel > .snapshot-main {
+    flex: 1;
+    min-height: 0;
+}
+
+.snapshot-panel > .snapshot-side {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    max-height: min(55%, 24rem);
+    flex-shrink: 0;
+    overflow: auto;
+    border-right: 0;
+    border-top: 1px solid var(--dock-panel-border-color);
 }
 
 /* ===== 左侧 sidebar ===== */
