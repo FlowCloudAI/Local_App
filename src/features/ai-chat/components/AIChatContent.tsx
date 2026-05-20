@@ -1,5 +1,6 @@
 import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
@@ -147,6 +148,8 @@ interface AIChatContentProps {
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
+    /** fullscreen 双 slot 模式下，sidebar JSX 会 portal 到这个元素；为 null 时正常 inline 渲染 */
+    sidePortalTarget?: HTMLElement | null
 }
 
 export default function AIChatContent({
@@ -155,6 +158,7 @@ export default function AIChatContent({
                                            onTogglePanelMode,
                                            onToggleCollapsed,
                                            onOpenEntry,
+                                           sidePortalTarget,
                                        }: AIChatContentProps) {
     const ctx = controller
     const activeConversation = ctx.activeConversation
@@ -761,9 +765,9 @@ export default function AIChatContent({
 
     const effectiveRoleplayAutoPlay = activeConversation?.characterAutoPlay ?? roleplayAutoPlayFallback ?? true
 
-    return (
+    const sidebarJsx = (
         <>
-            {!ctx.sidebarCollapsed && (
+            {!ctx.sidebarCollapsed && !sidePortalTarget && (
                 <div className="ai-sidebar-overlay" onClick={() => ctx.setSidebarCollapsed(true)}/>
             )}
             <aside className="ai-sidebar">
@@ -994,6 +998,12 @@ export default function AIChatContent({
                     })}
                 </div>
             </aside>
+        </>
+    )
+
+    return (
+        <>
+            {sidePortalTarget ? createPortal(sidebarJsx, sidePortalTarget) : sidebarJsx}
 
             <main
                 className={`ai-main${isCharacterConversation ? ' is-character' : ''}${isReportConversation ? ' is-report' : ''}`}>

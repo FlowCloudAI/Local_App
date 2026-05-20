@@ -1,4 +1,4 @@
-import {type ReactNode} from 'react'
+import {type ReactNode, useState} from 'react'
 import AIChatContent from './components/AIChatContent'
 import type {DockableSidePanelMode} from '../../shared/ui/layout/DockableSidePanel'
 import type {AiContextValue} from './model/AiControllerTypes'
@@ -17,18 +17,49 @@ export interface AIChatPanelSlots {
 }
 
 /**
- * Phase 1: wrapper-only — 内部仍是 AIChatContent 单体组件。
- * Phase 3 拆分 AIChatSide / AIChatMain 时仅改这个 hook 内部。
+ * AIChat 双 slot 实现（Phase 3）。
+ *
+ * 由于 AIChatContent 内部状态/effect/hook 极多（1400+ 行、56 个 hook 调用），
+ * 不把所有 state 搬到本 hook 内，而是采用 Portal 方案：
+ *   - AIChatContent 仍作为整体单一组件渲染到 main slot，保留所有内部状态
+ *   - fullscreen 模式下提供一个 portal target div 作为 side slot
+ *   - AIChatContent 内部根据 portal target 是否存在，把 sidebar 部分
+ *     createPortal 到 side slot，与 main 共享同一个组件实例的状态
  */
 export function useAIChatPanel({
                                    controller,
+                                   panelMode,
                                    ...rest
                                }: UseAIChatPanelOptions): AIChatPanelSlots {
+    // 用 useState + ref callback 把 portal host 元素暴露给 AIChatContent；
+    // el 挂载时触发 re-render，AIChatContent 拿到非空 target 后才能 portal
+    const [sidePortalEl, setSidePortalEl] = useState<HTMLDivElement | null>(null)
+
+    if (panelMode === 'fullscreen') {
+        return {
+            side: <div className="ai-side-portal-host" ref={setSidePortalEl}/>,
+            main: (
+                <div className="ai-chat-layout">
+                    <AIChatContent
+                        controller={controller}
+                        panelMode={panelMode}
+                        sidePortalTarget={sidePortalEl}
+                        {...rest}
+                    />
+                </div>
+            ),
+        }
+    }
+
     return {
         side: null,
         main: (
             <div className={`ai-chat-layout ${controller.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-                <AIChatContent controller={controller} {...rest} />
+                <AIChatContent
+                    controller={controller}
+                    panelMode={panelMode}
+                    {...rest}
+                />
             </div>
         ),
     }
