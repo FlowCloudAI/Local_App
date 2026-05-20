@@ -1,23 +1,165 @@
+/* ============================================
+   Snapshot 面板：sidebar(左) + main(右) 双 slot 布局
+   floating: 由 .snapshot-panel 容器包住 sidebar + main
+   fullscreen: side/main 各自独立，由 DockableSidePanel 放到对应 slot
+   ============================================ */
+
+/* floating 模式整体容器 */
 .snapshot-panel {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     height: 100%;
     width: 100%;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
     background: var(--dock-panel-bg);
-    border-radius: var(--fc-radius-xl);
     container-type: inline-size;
     container-name: snapshot-panel;
 }
 
-/* 全屏舞台中，snapshot 内部 sidebar 因结构限制位于 panel 内，整体占满舞台 */
-.dockable-side-panel--fullscreen .snapshot-panel {
-    border-radius: 0;
+/* ===== 左侧 sidebar ===== */
+.snapshot-side {
+    width: var(--dock-panel-sidebar-width);
+    min-width: var(--dock-panel-sidebar-width);
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    background: var(--dock-panel-sidebar-bg);
+    border-right: 1px solid var(--dock-panel-border-color);
+    flex-shrink: 0;
 }
 
-.snapshot-panel__header {
+/* fullscreen 模式下 sidebar 融入舞台，由 main 的 border-left 形成分隔 */
+.dockable-side-panel--fullscreen .snapshot-side {
+    background: transparent;
+    border-right: 0;
+}
+
+.snapshot-side__topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
+    box-sizing: border-box;
+    height: var(--dock-panel-topbar-height);
+    min-height: var(--dock-panel-topbar-height);
+    padding: 0 var(--dock-panel-topbar-padding-x);
+    background: transparent;
+    font-size: var(--dock-panel-title-size);
+    line-height: 1.2;
+}
+
+.snapshot-side__topbar-title {
+    min-width: 0;
+    font-size: var(--dock-panel-title-size);
+    font-weight: var(--dock-panel-title-weight);
+    color: var(--fc-color-text);
+}
+
+.snapshot-side__section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-md);
+    flex-shrink: 0;
+    padding: var(--fc-space-md);
+    border-bottom: 1px solid var(--dock-panel-border-color);
+}
+
+.snapshot-side__section:last-child {
+    border-bottom: 0;
+}
+
+.snapshot-side__section-title {
+    margin: 0;
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
+    color: var(--fc-color-text-secondary);
+}
+
+.snapshot-side__branch-row,
+.snapshot-side__branch-create {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-sm);
+}
+
+.snapshot-side__branch-row > :first-child,
+.snapshot-side__branch-create > :first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.snapshot-side__branch-badge {
+    flex-shrink: 0;
+    padding: 0.24rem 0.7rem;
+    border-radius: var(--fc-radius-full);
+    background: var(--dock-panel-bg);
+    color: var(--fc-color-primary);
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
+    border: 1px solid var(--dock-panel-border-color);
+}
+
+.snapshot-side__save-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--fc-space-sm);
+}
+
+.snapshot-side__save-textarea {
+    width: 100%;
+    min-height: 6.25rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--dock-panel-border-color);
+    border-radius: var(--dock-panel-control-radius);
+    background: var(--dock-panel-bg);
+    color: var(--fc-color-text);
+    font: inherit;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.snapshot-side__save-textarea:hover {
+    border-color: var(--dock-panel-active-border);
+}
+
+.snapshot-side__save-textarea:focus {
+    border-color: var(--dock-panel-active-border);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+}
+
+.snapshot-side__save-textarea::placeholder {
+    color: color-mix(in srgb, var(--fc-color-text-secondary) 82%, transparent);
+}
+
+.snapshot-side__save-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ===== 右侧 main ===== */
+.snapshot-main {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--dock-panel-bg);
+}
+
+/* fullscreen 模式下，main 用 border-left 与 sidebar 分隔（仿 pe-content） */
+.dockable-side-panel--fullscreen .snapshot-main {
+    border-left: 1px solid var(--fc-color-border);
+}
+
+.snapshot-main__topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -35,7 +177,7 @@
     line-height: 1.2;
 }
 
-.snapshot-panel__title {
+.snapshot-main__title {
     margin: 0;
     min-width: 0;
     font-size: var(--dock-panel-title-size);
@@ -43,7 +185,7 @@
     color: var(--fc-color-text);
 }
 
-.snapshot-panel__header-actions {
+.snapshot-main__topbar-actions {
     display: flex;
     align-items: center;
     gap: var(--fc-space-xs);
@@ -51,7 +193,7 @@
     flex-shrink: 0;
 }
 
-.snapshot-panel__fullscreen-toggle {
+.snapshot-main__icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -65,36 +207,27 @@
     transition: background 0.16s ease, color 0.16s ease;
 }
 
-.snapshot-panel__fullscreen-toggle:hover {
+.snapshot-main__icon-btn:hover {
     background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
 
-.snapshot-panel__workspace {
+.snapshot-main__viewport {
     display: flex;
     flex: 1;
     min-width: 0;
     min-height: 0;
     padding: var(--fc-space-md);
-    gap: var(--fc-space-md);
     overflow: hidden;
 }
 
-.snapshot-panel__viewport {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.snapshot-panel__empty {
+.snapshot-main__empty {
     width: 100%;
     min-height: 100%;
     margin: 0;
 }
 
-.snapshot-panel__graph {
+.snapshot-main__graph {
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -105,7 +238,7 @@
     padding-right: 4px;
 }
 
-.snapshot-panel__graph-row {
+.snapshot-main__graph-row {
     display: grid;
     grid-template-columns: var(--rail-width, 40px) minmax(0, 1fr);
     align-items: center;
@@ -116,32 +249,32 @@
     transition: background 0.1s ease;
 }
 
-.snapshot-panel__graph-row:hover {
+.snapshot-main__graph-row:hover {
     background: var(--dock-panel-hover-bg);
 }
 
-.snapshot-panel__graph-row.is-active {
+.snapshot-main__graph-row.is-active {
     background: var(--dock-panel-active-bg);
 }
 
-.snapshot-panel__graph-row.is-active:hover {
+.snapshot-main__graph-row.is-active:hover {
     background: var(--dock-panel-active-bg);
 }
 
-.snapshot-panel__graph-rail {
+.snapshot-main__graph-rail {
     position: relative;
     flex-shrink: 0;
     align-self: stretch;
     height: 100%;
 }
 
-.snapshot-panel__graph-rail svg {
+.snapshot-main__graph-rail svg {
     display: block;
     width: 100%;
     height: 100%;
 }
 
-.snapshot-panel__graph-node {
+.snapshot-main__graph-node {
     position: absolute;
     left: 0;
     top: 50%;
@@ -151,14 +284,14 @@
     pointer-events: none;
 }
 
-.snapshot-panel__item {
+.snapshot-main__item {
     display: flex;
     align-items: center;
     gap: 8px;
     min-width: 0;
 }
 
-.snapshot-panel__item-message {
+.snapshot-main__item-message {
     flex: 1;
     min-width: 0;
     font-size: var(--fc-font-size-sm);
@@ -169,14 +302,14 @@
     white-space: nowrap;
 }
 
-.snapshot-panel__item-time {
+.snapshot-main__item-time {
     flex-shrink: 0;
     font-size: var(--fc-font-size-xs);
     color: var(--fc-color-text-tertiary);
     font-variant-numeric: tabular-nums;
 }
 
-.snapshot-panel__item-branches {
+.snapshot-main__item-branches {
     display: flex;
     align-items: center;
     flex-wrap: nowrap;
@@ -188,12 +321,12 @@
     overflow: hidden;
 }
 
-.snapshot-panel__graph-row:hover .snapshot-panel__item-branches {
+.snapshot-main__graph-row:hover .snapshot-main__item-branches {
     opacity: 1;
     pointer-events: auto;
 }
 
-.snapshot-panel__branch-tag {
+.snapshot-main__branch-tag {
     font-size: var(--fc-font-size-xs);
     padding: 1px 7px;
     border-radius: var(--fc-radius-full);
@@ -203,7 +336,7 @@
     flex-shrink: 0;
 }
 
-.snapshot-panel__item-actions {
+.snapshot-main__item-actions {
     display: flex;
     align-items: center;
     gap: 2px;
@@ -213,127 +346,20 @@
     transition: opacity 0.12s ease;
 }
 
-.snapshot-panel__graph-row:hover .snapshot-panel__item-actions {
+.snapshot-main__graph-row:hover .snapshot-main__item-actions {
     opacity: 1;
     pointer-events: auto;
 }
 
-.snapshot-panel__item-actions .fc-btn {
+.snapshot-main__item-actions .fc-btn {
     height: 1.5rem;
     padding: 0 6px;
     font-size: var(--fc-font-size-xs);
 }
 
-.snapshot-panel__sidebar {
-    width: var(--dock-panel-sidebar-width);
-    min-width: var(--dock-panel-sidebar-width);
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow: auto;
-    border-left: 1px solid var(--dock-panel-border-color);
-    background: var(--dock-panel-sidebar-bg);
-}
-
-.snapshot-panel__section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fc-space-md);
-    flex-shrink: 0;
-    padding: var(--fc-space-md);
-    border-bottom: 1px solid var(--dock-panel-border-color);
-}
-
-.snapshot-panel__section-title {
-    margin: 0;
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    color: var(--fc-color-text-secondary);
-}
-
-.snapshot-panel__branch-row,
-.snapshot-panel__branch-create {
-    display: flex;
-    align-items: center;
-    gap: var(--fc-space-sm);
-}
-
-.snapshot-panel__branch-row > :first-child,
-.snapshot-panel__branch-create > :first-child {
-    flex: 1;
-    min-width: 0;
-}
-
-.snapshot-panel__branch-badge {
-    flex-shrink: 0;
-    padding: 0.24rem 0.7rem;
-    border-radius: var(--fc-radius-full);
-    background: var(--dock-panel-bg);
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    border: 1px solid var(--dock-panel-border-color);
-}
-
-.snapshot-panel__save-row {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--fc-space-sm);
-}
-
-.snapshot-panel__save-textarea {
-    width: 100%;
-    min-height: 6.25rem;
-    padding: 0.75rem 0.9rem;
-    border: 1px solid var(--dock-panel-border-color);
-    border-radius: var(--dock-panel-control-radius);
-    background: var(--dock-panel-bg);
-    color: var(--fc-color-text);
-    font: inherit;
-    line-height: 1.6;
-    resize: vertical;
-    outline: none;
-    transition: border-color 0.16s ease, box-shadow 0.16s ease;
-}
-
-.snapshot-panel__save-textarea:hover {
-    border-color: var(--dock-panel-active-border);
-}
-
-.snapshot-panel__save-textarea:focus {
-    border-color: var(--dock-panel-active-border);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
-}
-
-.snapshot-panel__save-textarea::placeholder {
-    color: color-mix(in srgb, var(--fc-color-text-secondary) 82%, transparent);
-}
-
-.snapshot-panel__save-actions {
-    display: flex;
-    justify-content: flex-end;
-}
-
-@container snapshot-panel (max-width: 900px) {
-    .snapshot-panel__workspace {
-        flex-direction: column-reverse;
-        gap: var(--fc-space-md);
-        padding: var(--fc-space-md);
-    }
-
-    .snapshot-panel__sidebar {
-        width: 100%;
-        min-width: 0;
-        overflow: visible;
-        border-left: 0;
-        border-bottom: 1px solid var(--dock-panel-border-color);
-    }
-}
-
+/* ===== 窄屏适配（floating 模式 panel 容器） ===== */
 @container snapshot-panel (max-width: 520px) {
-    .snapshot-panel__branch-row {
+    .snapshot-side__branch-row {
         flex-wrap: wrap;
     }
 }

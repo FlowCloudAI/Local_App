@@ -3,15 +3,15 @@ import '../../App.css'
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
 import {type Project, setting_is_backend_ready} from '../../api'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
-import AIChatContent from '../../features/ai-chat/components/AIChatContent'
 import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import type {AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import {useAiController} from '../../features/ai-chat/hooks/useAiController'
-import SnapshotPanel from '../../features/snapshots/components/SnapshotPanel'
+import {useAIChatPanel} from '../../features/ai-chat/useAIChatPanel'
+import {useSnapshotPanel} from '../../features/snapshots/useSnapshotPanel'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {listen} from '@tauri-apps/api/event'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import Idea from '../../pages/Idea'
+import {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useIdeaPanel} from '../../pages/useIdeaPanel'
 import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
 import Settings from '../../pages/Settings'
@@ -712,6 +712,46 @@ export default function DesktopApp() {
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
     const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : sidePanelContentKey
     const aiShellClassName = 'ai-shell'
+
+    const togglePanelMode = useCallback(() => {
+        setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')
+    }, [])
+
+    const ideaSlots = useIdeaPanel({
+        contextProjectId: aiFocus.projectId,
+        onOpenEntry: handleOpenEntry,
+        panelMode: aiPanelMode,
+        onTogglePanelMode: togglePanelMode,
+        onToggleCollapsed: collapseAiPanel,
+    })
+    const snapshotSlots = useSnapshotPanel({
+        panelMode: aiPanelMode,
+        onTogglePanelMode: togglePanelMode,
+        onToggleCollapsed: collapseAiPanel,
+    })
+    const aiChatSlots = useAIChatPanel({
+        controller: aiController,
+        panelMode: aiPanelMode,
+        onTogglePanelMode: togglePanelMode,
+        onToggleCollapsed: collapseAiPanel,
+        onOpenEntry: handleOpenEntry,
+    })
+
+    const sidePanelSides = useMemo<Record<string, ReactNode>>(() => {
+        const out: Record<string, ReactNode> = {}
+        if (mountedSidePanelKeys.includes('idea')) out.idea = ideaSlots.side
+        if (mountedSidePanelKeys.includes('snapshot')) out.snapshot = snapshotSlots.side
+        if (mountedSidePanelKeys.includes('ai-chat')) out['ai-chat'] = aiChatSlots.side
+        return out
+    }, [mountedSidePanelKeys, ideaSlots.side, snapshotSlots.side, aiChatSlots.side])
+
+    const sidePanelMains = useMemo<Record<string, ReactNode>>(() => {
+        const out: Record<string, ReactNode> = {}
+        if (mountedSidePanelKeys.includes('idea')) out.idea = ideaSlots.main
+        if (mountedSidePanelKeys.includes('snapshot')) out.snapshot = snapshotSlots.main
+        if (mountedSidePanelKeys.includes('ai-chat')) out['ai-chat'] = aiChatSlots.main
+        return out
+    }, [mountedSidePanelKeys, ideaSlots.main, snapshotSlots.main, aiChatSlots.main])
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
         recentPageKeys
@@ -1033,56 +1073,10 @@ export default function DesktopApp() {
                         onModeChange={setAiPanelMode}
                         className={aiShellClassName}
                         handleTitle="拖拽调整宽度"
-                    >
-                        <div className={`side-panel-stack${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}>
-                            {mountedSidePanelKeys.includes('idea') && (
-                                <div
-                                    className={`side-panel-layer ${sidePanelContentKey === 'idea' ? 'active' : ''}${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}
-                                    aria-hidden={sidePanelContentKey !== 'idea'}
-                                >
-                                    <Idea
-                                        contextProjectId={aiFocus.projectId}
-                                        onOpenEntry={handleOpenEntry}
-                                        panelMode={aiPanelMode}
-                                        onTogglePanelMode={() =>
-                                            setAiPanelMode(
-                                                (prev) => prev === 'floating' ? 'fullscreen' : 'floating',
-                                            )
-                                        }
-                                        onToggleCollapsed={collapseAiPanel}
-                                    />
-                                </div>
-                            )}
-                            {mountedSidePanelKeys.includes('snapshot') && (
-                                <div
-                                    className={`side-panel-layer ${sidePanelContentKey === 'snapshot' ? 'active' : ''}${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}
-                                    aria-hidden={sidePanelContentKey !== 'snapshot'}
-                                >
-                                    <SnapshotPanel
-                                        panelMode={aiPanelMode}
-                                        onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
-                                        onToggleCollapsed={collapseAiPanel}
-                                    />
-                                </div>
-                            )}
-                            {mountedSidePanelKeys.includes('ai-chat') && (
-                                <div
-                                    className={`side-panel-layer ${sidePanelContentKey === 'ai-chat' ? 'active' : ''}${aiPanelMode === 'fullscreen' ? ' is-panel-fullscreen' : ''}`}
-                                    aria-hidden={sidePanelContentKey !== 'ai-chat'}
-                                >
-                                    <div className={`ai-chat-layout ${aiController.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-                                        <AIChatContent
-                                            controller={aiController}
-                                            panelMode={aiPanelMode}
-                                            onTogglePanelMode={() => setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')}
-                                            onToggleCollapsed={collapseAiPanel}
-                                            onOpenEntry={handleOpenEntry}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </DockableSidePanel>
+                        sides={sidePanelSides}
+                        mains={sidePanelMains}
+                        activeKey={sidePanelContentKey}
+                    />
                 </div>
                 <SideBar
                     className="side-bar"
