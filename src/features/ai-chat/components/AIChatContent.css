@@ -503,39 +503,32 @@
     cursor: pointer;
 }
 
-/* ========== 全屏模式：侧边栏常驻、融入舞台 ========== */
-.dockable-side-panel--fullscreen .ai-sidebar-overlay {
-    display: none;
-}
-
-.dockable-side-panel--fullscreen .ai-chat-layout {
+/* ========== 全屏模式：sidebar 通过 portal 在 DockableSidePanel side slot 显示 ========== */
+/* portal host 容器（DockableSidePanel side-layer 内的承接元素） */
+.ai-side-portal-host {
     display: flex;
-    flex-direction: row;
-    background: transparent;
+    width: var(--dock-panel-sidebar-width);
+    height: 100%;
+    position: relative;
+    overflow: hidden;
 }
 
-.dockable-side-panel--fullscreen .ai-sidebar {
-    position: relative;
-    top: auto;
-    left: auto;
-    bottom: auto;
+/* portal 后的 sidebar：复用 .ai-sidebar 默认外观，但 override 定位/抽屉行为 */
+.ai-side-portal-host .ai-sidebar {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
     z-index: auto;
-    height: auto;
-    flex-shrink: 0;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
     border-right: 0;
     background: transparent;
 }
 
-.dockable-side-panel--fullscreen .ai-chat-layout.sidebar-collapsed .ai-sidebar {
-    transform: none;
-    opacity: 1;
-    pointer-events: auto;
-}
-
+/* fullscreen 模式 main 作为浮于舞台的圆角卡片 */
 .dockable-side-panel--fullscreen .ai-main {
-    flex: 1;
-    min-width: 0;
-    width: auto;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-xl);
 }

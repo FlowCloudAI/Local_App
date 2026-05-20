@@ -1,4 +1,4 @@
-:where(.idea-page, .idea-page__sidebar, .idea-page__main, .ai-chat-layout, .snapshot-panel, .snapshot-side, .snapshot-main) {
+:where(.idea-page, .idea-page__sidebar, .idea-page__main, .ai-chat-layout, .ai-side-portal-host, .snapshot-panel, .snapshot-side, .snapshot-main) {
     --dock-panel-bg: var(--fc-color-bg);
     --dock-panel-sidebar-bg: var(--fc-color-bg-secondary);
     --dock-panel-topbar-bg: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
