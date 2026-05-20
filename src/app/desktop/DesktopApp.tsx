@@ -7,6 +7,7 @@ import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import type {AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import {useAiController} from '../../features/ai-chat/hooks/useAiController'
 import {useAIChatPanel} from '../../features/ai-chat/useAIChatPanel'
+import {useHelpPanel} from '../../features/help/useHelpPanel'
 import {useSnapshotPanel} from '../../features/snapshots/useSnapshotPanel'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {listen} from '@tauri-apps/api/event'
@@ -38,7 +39,7 @@ type ProjectToolTabMeta = {
 }
 
 type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
-type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot'
+type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
 const AI_MIN_PANEL_WIDTH = 500
 
 export default function DesktopApp() {
@@ -76,6 +77,8 @@ export default function DesktopApp() {
     const [mainContentKey, setMainContentKey] = useState<MainContentKey>('home')
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
+    const [helpTopicKey, setHelpTopicKey] = useState<string | null>(null)
+    const [helpTopicSignal, setHelpTopicSignal] = useState(0)
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
@@ -113,7 +116,7 @@ export default function DesktopApp() {
 
     const clearSidePanelSelection = useCallback(() => {
         setSelectedKey(prev => (
-            prev === 'idea' || prev === 'ai-chat' || prev === 'snapshot'
+            prev === 'idea' || prev === 'ai-chat' || prev === 'snapshot' || prev === 'help'
                 ? ''
                 : prev
         ))
@@ -536,9 +539,9 @@ export default function DesktopApp() {
         }
     }, [handleWindowClose, win])
 
-    const handleSideBarSelect = useCallback((key: string) => {
-        if (key === 'idea' || key === 'ai-chat' || key === 'snapshot') {
-            if (!aiPanelCollapsed && sidePanelContentKey === key) {
+    const handleSideBarSelect = useCallback((key: string, options?: { forceOpen?: boolean }) => {
+        if (key === 'idea' || key === 'ai-chat' || key === 'snapshot' || key === 'help') {
+            if (!aiPanelCollapsed && sidePanelContentKey === key && !options?.forceOpen) {
                 collapseAiPanel()
                 setSelectedKey('')
                 return
@@ -668,13 +671,12 @@ export default function DesktopApp() {
                 return
             case 'help':
                 recordHomeActivity(target)
-                setSelectedKey('settings')
-                setActiveKey('')
-                setMainContentKey('settings')
-                collapseAiPanel()
+                setHelpTopicKey(target.id)
+                setHelpTopicSignal(prev => prev + 1)
+                handleSideBarSelect('help', {forceOpen: true})
                 return
         }
-    }, [collapseAiPanel, handleOpenEntry, handleOpenProject, handleOpenProjectTool, handleSideBarSelect, showAlert])
+    }, [handleOpenEntry, handleOpenProject, handleOpenProjectTool, handleSideBarSelect, showAlert])
 
     const activeHomeProjectId = projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? ''
     const activeEntryMeta = entryTabMap[activeKey] ?? null
@@ -760,22 +762,31 @@ export default function DesktopApp() {
         onToggleCollapsed: collapseAiPanel,
         onOpenEntry: handleOpenEntry,
     })
+    const helpSlots = useHelpPanel({
+        panelMode: aiPanelMode,
+        topicKey: helpTopicKey,
+        topicSignal: helpTopicSignal,
+        onTogglePanelMode: togglePanelMode,
+        onToggleCollapsed: collapseAiPanel,
+    })
 
     const sidePanelSides = useMemo<Record<string, ReactNode>>(() => {
         const out: Record<string, ReactNode> = {}
         if (mountedSidePanelKeys.includes('idea')) out.idea = ideaSlots.side
         if (mountedSidePanelKeys.includes('snapshot')) out.snapshot = snapshotSlots.side
         if (mountedSidePanelKeys.includes('ai-chat')) out['ai-chat'] = aiChatSlots.side
+        if (mountedSidePanelKeys.includes('help')) out.help = helpSlots.side
         return out
-    }, [mountedSidePanelKeys, ideaSlots.side, snapshotSlots.side, aiChatSlots.side])
+    }, [mountedSidePanelKeys, ideaSlots.side, snapshotSlots.side, aiChatSlots.side, helpSlots.side])
 
     const sidePanelMains = useMemo<Record<string, ReactNode>>(() => {
         const out: Record<string, ReactNode> = {}
         if (mountedSidePanelKeys.includes('idea')) out.idea = ideaSlots.main
         if (mountedSidePanelKeys.includes('snapshot')) out.snapshot = snapshotSlots.main
         if (mountedSidePanelKeys.includes('ai-chat')) out['ai-chat'] = aiChatSlots.main
+        if (mountedSidePanelKeys.includes('help')) out.help = helpSlots.main
         return out
-    }, [mountedSidePanelKeys, ideaSlots.main, snapshotSlots.main, aiChatSlots.main])
+    }, [mountedSidePanelKeys, ideaSlots.main, snapshotSlots.main, aiChatSlots.main, helpSlots.main])
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
         recentPageKeys
@@ -860,12 +871,26 @@ export default function DesktopApp() {
             />
         </svg>)
 
+    const HelpIcon = (
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+            <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5"/>
+            <path
+                d="M9.8 9.5A2.3 2.3 0 0 1 12.1 7.5c1.35 0 2.4.86 2.4 2.05 0 1.02-.57 1.58-1.45 2.15-.78.5-1.05.86-1.05 1.55v.25"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="M12 16.2h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>)
+
     const menuItems: SideBarItem[] = [
         {key: 'idea', label: '灵感便签', icon: IdeaIcon},
         {key: 'ai-chat', label: 'AI 对话', icon: AiChatIcon},
         {key: 'snapshot', label: '版本管理', icon: SnapshotIcon},
     ]
     const bottomItems: SideBarItem[] = [
+        {key: 'help', label: '帮助', icon: HelpIcon},
         {key: 'settings', label: '设置', icon: SettingsIcon},
     ]
 
