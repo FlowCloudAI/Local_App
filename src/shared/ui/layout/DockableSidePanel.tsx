@@ -33,12 +33,11 @@ interface DockableSidePanelProps {
     onModeChange?: (mode: DockableSidePanelMode) => void
     className?: string
     handleTitle?: string
-    // 双 slot API（推荐）：side 仅在 fullscreen 渲染，main 始终渲染；每个 stack 内按 activeKey 互斥切换 active 层
+    // 双 slot API：side 仅在 fullscreen 渲染，main 始终渲染；
+    // 每个 stack 内按 activeKey 互斥切换 active 层
     sides?: Record<string, ReactNode>
-    mains?: Record<string, ReactNode>
-    activeKey?: string
-    // 旧 API：单 slot；与 sides/mains 互斥使用，由调用方二选一
-    children?: ReactNode
+    mains: Record<string, ReactNode>
+    activeKey: string
 }
 
 export default function DockableSidePanel({
@@ -55,7 +54,6 @@ export default function DockableSidePanel({
                                               sides,
                                               mains,
                                               activeKey,
-                                              children,
                                           }: DockableSidePanelProps) {
     const rootRef = useRef<HTMLElement | null>(null)
     // 仅用于控制 CSS class（mousedown/mouseup 各切一次）
@@ -438,36 +436,32 @@ export default function DockableSidePanel({
                 </div>
             )}
             <div className="dockable-side-panel__body">
-                {mains ? (
-                    <>
-                        {/* side-stack 仅在 active layer 真实存在 side 节点时渲染，
-                            避免非激活 layer（如 snapshot side）撑出宽度形成空白 */}
-                        {sides && mode === 'fullscreen' && activeKey && sides[activeKey] != null && (
-                            <div className="dockable-side-panel__side-stack">
-                                {Object.entries(sides).map(([key, node]) => (
-                                    <div
-                                        key={key}
-                                        className={`dockable-side-panel__side-layer${key === activeKey ? ' active' : ''}`}
-                                        aria-hidden={key !== activeKey}
-                                    >
-                                        {node}
-                                    </div>
-                                ))}
+                {/* side-stack 仅在 active layer 真实存在 side 节点时渲染，
+                    避免非激活 layer 撑出宽度形成空白 */}
+                {sides && mode === 'fullscreen' && sides[activeKey] != null && (
+                    <div className="dockable-side-panel__side-stack">
+                        {Object.entries(sides).map(([key, node]) => (
+                            <div
+                                key={key}
+                                className={`dockable-side-panel__side-layer${key === activeKey ? ' active' : ''}`}
+                                aria-hidden={key !== activeKey}
+                            >
+                                {node}
                             </div>
-                        )}
-                        <div className="dockable-side-panel__main-stack">
-                            {Object.entries(mains).map(([key, node]) => (
-                                <div
-                                    key={key}
-                                    className={`dockable-side-panel__main-layer${key === activeKey ? ' active' : ''}`}
-                                    aria-hidden={key !== activeKey}
-                                >
-                                    {node}
-                                </div>
-                            ))}
+                        ))}
+                    </div>
+                )}
+                <div className="dockable-side-panel__main-stack">
+                    {Object.entries(mains).map(([key, node]) => (
+                        <div
+                            key={key}
+                            className={`dockable-side-panel__main-layer${key === activeKey ? ' active' : ''}`}
+                            aria-hidden={key !== activeKey}
+                        >
+                            {node}
                         </div>
-                    </>
-                ) : children}
+                    ))}
+                </div>
             </div>
         </section>
     )

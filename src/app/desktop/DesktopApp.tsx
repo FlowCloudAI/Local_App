@@ -711,7 +711,6 @@ export default function DesktopApp() {
 
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
     const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : sidePanelContentKey
-    const aiShellClassName = 'ai-shell'
 
     const togglePanelMode = useCallback(() => {
         setAiPanelMode((prev) => prev === 'floating' ? 'fullscreen' : 'floating')
@@ -1071,7 +1070,6 @@ export default function DesktopApp() {
                         onCollapsedChange={handleAiPanelCollapsedChange}
                         onWidthChange={setAiPanelWidth}
                         onModeChange={setAiPanelMode}
-                        className={aiShellClassName}
                         handleTitle="拖拽调整宽度"
                         sides={sidePanelSides}
                         mains={sidePanelMains}
@@ -1084,7 +1082,7 @@ export default function DesktopApp() {
                     bottomItems={bottomItems}
                     selectedKey={sideBarSelectedKey}
                     collapsed={collapsed}
-                    width={130}
+
                     collapsedWidth={50}
                     onSelect={handleSideBarSelect}
                     onCollapse={setCollapsed}
