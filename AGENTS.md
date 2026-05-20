@@ -164,21 +164,22 @@ npm run lint
 所有前端 API 封装位于 `src/api/`，统一通过 `src/api/base.ts` 中的 `command` 函数调用 Tauri Invoke。`src/api/` 下各文件与后端
 `apis/` 模块一一对应：
 
-| 文件                 | 对应后端模块                     |
-|--------------------|----------------------------|
-| `ai_client.ts`     | `apis/ai_client/`          |
-| `plugins.ts`       | `apis/plugins/`            |
-| `worldflow.ts`     | `apis/worldflow/`          |
-| `app_settings.ts`  | `apis/app_settings.rs`     |
-| `layout.ts`        | `apis/layout.rs`           |
-| `map.ts`           | `apis/map.rs`              |
-| `templates.ts`     | `apis/templates.rs`        |
-| `webview.ts`       | `apis/webview_control.rs`  |
-| `contradiction.ts` | `apis/ai_contradiction.rs` |
-| `snapshot.ts`      | —                          |
-| `api_usage.ts`     | —                          |
-| `idea_note.ts`     | —                          |
-| `platform.ts`      | —                          |
+| 文件                 | 对应后端模块                                      |
+|--------------------|---------------------------------------------|
+| `ai_client.ts`     | `apis/ai_client/`、`apis/ai_character.rs`、`apis/ai_summary.rs` |
+| `api_usage.ts`     | `apis/ai_client/usage.rs`                   |
+| `plugins.ts`       | `apis/plugins/`                             |
+| `worldflow.ts`     | `apis/worldflow/`                           |
+| `idea_note.ts`     | `apis/worldflow/ideas.rs`                   |
+| `snapshot.ts`      | `apis/worldflow/snapshots.rs` / `snapshots_android.rs` |
+| `platform.ts`      | `apis/worldflow/system.rs`                  |
+| `app_settings.ts`  | `apis/app_settings.rs`                      |
+| `layout.ts`        | `apis/layout.rs`                            |
+| `map.ts`           | `apis/map.rs`、`apis/map_persistence.rs`    |
+| `templates.ts`     | `apis/templates.rs`                         |
+| `webview.ts`       | `apis/webview_control.rs`                   |
+| `contradiction.ts` | `apis/ai_contradiction.rs`                  |
+| `feedback.ts`      | `apis/feedback.rs`                          |
 
 ```ts
 import {invoke} from '@tauri-apps/api/core'
