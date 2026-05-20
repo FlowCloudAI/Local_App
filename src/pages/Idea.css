@@ -30,6 +30,13 @@
     overflow: hidden;
 }
 
+/* 全屏 + 双 slot 模式：sidebar 在 DockableSidePanel side-stack 内独立显示，
+   不再被 .idea-page__shell grid 撑宽度，需自带固定宽度 */
+.dockable-side-panel--fullscreen .dockable-side-panel__side-layer > .idea-page__sidebar {
+    width: var(--dock-panel-sidebar-width);
+    height: 100%;
+}
+
 .idea-page__sidebar-inner {
     display: flex;
     flex-direction: column;
