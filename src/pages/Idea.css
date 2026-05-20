@@ -89,7 +89,8 @@
 }
 
 .dockable-side-panel--fullscreen .idea-page__main {
-    border-left: 1px solid var(--fc-color-border);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-xl);
     background: var(--dock-panel-bg);
 }
 

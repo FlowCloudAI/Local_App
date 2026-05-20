@@ -536,8 +536,8 @@
     flex: 1;
     min-width: 0;
     width: auto;
-    border-left: 1px solid var(--fc-color-border);
-    border-radius: 0;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-xl);
 }
 
 /* ========== 右侧主区域 ========== */

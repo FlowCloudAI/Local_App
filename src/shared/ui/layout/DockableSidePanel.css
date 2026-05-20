@@ -40,8 +40,6 @@
     margin-left: var(--dockable-side-panel-handle-width);
     border-left: none;
     border-radius: var(--dock-panel-owned-radius);
-    outline: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
-    outline-offset: -1px;
     overflow: visible;
     width: var(--dsp-width, 0px);
     transition: width 0.18s ease, border-color 0.15s ease, outline-color 0.15s ease;

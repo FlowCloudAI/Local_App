@@ -176,9 +176,10 @@
     background: var(--dock-panel-bg);
 }
 
-/* fullscreen 模式下，main 用 border-left 与 sidebar 分隔（仿 pe-content） */
+/* fullscreen 模式下，main 作为浮于舞台的圆角卡片 */
 .dockable-side-panel--fullscreen .snapshot-main {
-    border-left: 1px solid var(--fc-color-border);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-xl);
 }
 
 .snapshot-main__topbar {
