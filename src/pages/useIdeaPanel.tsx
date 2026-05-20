@@ -112,6 +112,7 @@ export function useIdeaPanel({
     const textareaRef = useRef<HTMLTextAreaElement | null>(null)
     const createRequestIdRef = useRef(0)
     const layoutRef = useRef<HTMLDivElement | null>(null)
+    const layoutObserverRef = useRef<ResizeObserver | null>(null)
     const selectedIdeaIdRef = useRef<string | null>(null)
 
     const [ideaNotes, setIdeaNotes] = useState<IdeaNote[]>([])
@@ -351,18 +352,25 @@ export function useIdeaPanel({
         }
     }, [selectedIdeaId, selectedIdeaProjectId])
 
+    // fullscreen 模式下 .idea-page 容器不渲染，强制非 compact、不收起
     useEffect(() => {
-        // fullscreen 模式下 .idea-page 容器不渲染，ResizeObserver 不工作；
-        // 此时强制非 compact、不收起。切回 floating 时 panelMode 触发重跑，
-        // .idea-page 重新挂载后 ref 拿到新元素，observer 重启。
         if (panelMode === 'fullscreen') {
             setCompactLayout(false)
             setSidebarCollapsed(false)
-            return
+        }
+    }, [panelMode])
+
+    // 用 ref callback：div 挂载/卸载时立即启/停 ResizeObserver，
+    // 不依赖 useEffect 时序，floating ↔ fullscreen 切换稳定。
+    const setLayoutRef = useCallback((el: HTMLDivElement | null) => {
+        layoutRef.current = el
+
+        if (layoutObserverRef.current) {
+            layoutObserverRef.current.disconnect()
+            layoutObserverRef.current = null
         }
 
-        const element = layoutRef.current
-        if (!element || typeof ResizeObserver === 'undefined') return
+        if (!el || typeof ResizeObserver === 'undefined') return
 
         const updateFromWidth = (width: number) => {
             const isCompact = width <= 960
@@ -370,8 +378,8 @@ export function useIdeaPanel({
             setSidebarCollapsed(isCompact)
         }
 
-        // 同步获取初始宽度，避免先展开再收起的闪烁/动画
-        const rect = element.getBoundingClientRect()
+        // 同步首测，避免先展开再收起的闪烁
+        const rect = el.getBoundingClientRect()
         updateFromWidth(rect.width)
 
         const observer = new ResizeObserver((entries) => {
@@ -379,10 +387,15 @@ export function useIdeaPanel({
             if (!entry) return
             updateFromWidth(entry.contentRect.width)
         })
+        observer.observe(el)
+        layoutObserverRef.current = observer
+    }, [])
 
-        observer.observe(element)
-        return () => observer.disconnect()
-    }, [panelMode])
+    // 组件 unmount 时清理 observer
+    useEffect(() => () => {
+        layoutObserverRef.current?.disconnect()
+        layoutObserverRef.current = null
+    }, [])
 
     useEffect(() => {
         if (!initialized || loading) return
@@ -981,7 +994,7 @@ export function useIdeaPanel({
         side: null,
         main: (
             <div
-                ref={layoutRef}
+                ref={setLayoutRef}
                 className={`idea-page${compactLayout ? ' is-compact' : ''}${compactLayout && sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
             >
                 <div className="idea-page__shell">

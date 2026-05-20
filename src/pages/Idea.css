@@ -96,6 +96,8 @@
 }
 
 .dockable-side-panel--fullscreen .idea-page__main {
+    flex: 1;
+    min-width: 0;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-xl);
     background: var(--dock-panel-bg);
