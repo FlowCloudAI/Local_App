@@ -19,6 +19,7 @@ import {
     type Project,
 } from '../api'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../shared/ui/layout/DockPanelSidebarControls'
+import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../shared/ui/layout/DockPanelScaffold'
 import '../shared/ui/layout/DockPanelScaffold.css'
 import './Idea.css'
 
@@ -714,12 +715,12 @@ export function useIdeaPanel({
     // ===== JSX 拆分：sideContent / mainContent / backdrop =====
 
     const sideContent = (
-        <aside className="idea-page__sidebar">
+        <DockPanelSide className="idea-page__sidebar">
             <div className="idea-page__sidebar-inner">
-                <div className="idea-page__sidebar-topbar">
-                    <div className="idea-page__sidebar-topbar-title">灵感导航</div>
+                <DockPanelTopbar className="idea-page__sidebar-topbar" variant="side">
+                    <DockPanelTitle className="idea-page__sidebar-topbar-title">灵感导航</DockPanelTitle>
                     {compactLayout ? (
-                        <button
+                        <DockPanelIconButton
                             type="button"
                             className="idea-page__sidebar-toggle"
                             onClick={() => setSidebarCollapsed(true)}
@@ -729,9 +730,9 @@ export function useIdeaPanel({
                                  strokeWidth="1.5">
                                 <path d="M10 3L5 8L10 13"/>
                             </svg>
-                        </button>
+                        </DockPanelIconButton>
                     ) : null}
-                </div>
+                </DockPanelTopbar>
                 <div className="idea-page__toolbar dock-panel-sidebar-controls">
                     <div className="dock-panel-control-group">
                         <span className="dock-panel-control-label">视图</span>
@@ -801,15 +802,15 @@ export function useIdeaPanel({
                     )}
                 </div>
             </div>
-        </aside>
+        </DockPanelSide>
     )
 
     const mainContent = (
-        <main className="idea-page__main">
-            <div className="idea-page__main-topbar">
+        <DockPanelMain className="idea-page__main">
+            <DockPanelTopbar className="idea-page__main-topbar">
                 <div className="idea-page__main-topbar-left">
                     {panelMode !== 'fullscreen' && (
-                        <button
+                        <DockPanelIconButton
                             type="button"
                             className="idea-page__sidebar-toggle"
                             onClick={() => setSidebarCollapsed((prev) => !prev)}
@@ -823,12 +824,12 @@ export function useIdeaPanel({
                                     <path d="M10 3L5 8L10 13"/>
                                 )}
                             </svg>
-                        </button>
+                        </DockPanelIconButton>
                     )}
-                    <div className="idea-page__main-title">灵感便签</div>
+                    <DockPanelTitle className="idea-page__main-title">灵感便签</DockPanelTitle>
                 </div>
                 <div className="idea-page__main-topbar-right">
-                    <button
+                    <DockPanelIconButton
                         type="button"
                         className="idea-page__sidebar-toggle idea-page__fullscreen-toggle"
                         onClick={() => onTogglePanelMode?.()}
@@ -842,8 +843,8 @@ export function useIdeaPanel({
                                 <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
                             )}
                         </svg>
-                    </button>
-                    <button
+                    </DockPanelIconButton>
+                    <DockPanelIconButton
                         type="button"
                         className="idea-page__sidebar-toggle idea-page__collapse-toggle"
                         onClick={() => onToggleCollapsed?.()}
@@ -853,9 +854,9 @@ export function useIdeaPanel({
                              strokeWidth="1.5">
                             <path d="M6 4l4 4-4 4"/>
                         </svg>
-                    </button>
+                    </DockPanelIconButton>
                 </div>
-            </div>
+            </DockPanelTopbar>
 
             <section className="idea-page__editor">
                 <div className="idea-page__editor-header">
@@ -981,7 +982,7 @@ export function useIdeaPanel({
                     />
                 </div>
             </section>
-        </main>
+        </DockPanelMain>
     )
 
     if (panelMode === 'fullscreen') {

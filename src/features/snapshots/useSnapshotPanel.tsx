@@ -17,6 +17,7 @@ import {
 } from '../../api'
 import '../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../shared/ui/layout/DockPanelScaffold.css'
+import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../shared/ui/layout/DockPanelScaffold'
 import './components/SnapshotPanel.css'
 
 interface UseSnapshotPanelOptions {
@@ -310,9 +311,9 @@ export function useSnapshotPanel({
     const midY = RAIL_PX / 2
 
     const sideTopbar = (
-        <div className="snapshot-side__topbar">
-            <div className="snapshot-side__topbar-title">版本管理</div>
-        </div>
+        <DockPanelTopbar className="snapshot-side__topbar" variant="side">
+            <DockPanelTitle className="snapshot-side__topbar-title">版本管理</DockPanelTitle>
+        </DockPanelTopbar>
     )
 
     const sideSections = (
@@ -369,17 +370,17 @@ export function useSnapshotPanel({
     )
 
     const sideContent = (
-        <aside className="snapshot-side">
+        <DockPanelSide className="snapshot-side">
             {sideTopbar}
             {sideSections}
-        </aside>
+        </DockPanelSide>
     )
 
     const mainTopbar = (
-        <div className="snapshot-main__topbar">
-            <div className="snapshot-main__title">提交历史</div>
+        <DockPanelTopbar className="snapshot-main__topbar">
+            <DockPanelTitle className="snapshot-main__title">提交历史</DockPanelTitle>
             <div className="snapshot-main__topbar-actions">
-                <button
+                <DockPanelIconButton
                     type="button"
                     className="snapshot-main__icon-btn"
                     onClick={() => onTogglePanelMode?.()}
@@ -393,8 +394,8 @@ export function useSnapshotPanel({
                             <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
                         )}
                     </svg>
-                </button>
-                <button
+                </DockPanelIconButton>
+                <DockPanelIconButton
                     type="button"
                     className="snapshot-main__icon-btn"
                     onClick={() => onToggleCollapsed?.()}
@@ -404,9 +405,9 @@ export function useSnapshotPanel({
                          strokeWidth="1.5">
                         <path d="M6 4l4 4-4 4"/>
                     </svg>
-                </button>
+                </DockPanelIconButton>
             </div>
-        </div>
+        </DockPanelTopbar>
     )
 
     const mainViewport = (
@@ -543,10 +544,10 @@ export function useSnapshotPanel({
     )
 
     const mainContent = (
-        <div className="snapshot-main">
+        <DockPanelMain className="snapshot-main">
             {mainTopbar}
             {mainViewport}
-        </div>
+        </DockPanelMain>
     )
 
     if (panelMode === 'fullscreen') {
@@ -559,9 +560,9 @@ export function useSnapshotPanel({
         main: (
             <div className="snapshot-panel">
                 {mainTopbar}
-                <aside className="snapshot-side">
+                <DockPanelSide className="snapshot-side">
                     {sideSections}
-                </aside>
+                </DockPanelSide>
                 {mainViewport}
             </div>
         ),

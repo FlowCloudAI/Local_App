@@ -19,6 +19,7 @@ import {
 import type {AiContextValue, Conversation} from '../model/AiControllerTypes'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
+import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
 import useLinkPreview from '../../entries/hooks/useLinkPreview'
 import useWikiLink from '../../entries/hooks/useWikiLink'
@@ -770,12 +771,12 @@ export default function AIChatContent({
             {!ctx.sidebarCollapsed && !sidePortalTarget && (
                 <div className="ai-sidebar-overlay" onClick={() => ctx.setSidebarCollapsed(true)}/>
             )}
-            <aside className="ai-sidebar">
+            <DockPanelSide className="ai-sidebar">
                 <div className="ai-sidebar-top">
-                    <div className="ai-sidebar-topbar">
-                        <div className="ai-sidebar-topbar-title">对话列表</div>
+                    <DockPanelTopbar className="ai-sidebar-topbar" variant="side">
+                        <DockPanelTitle className="ai-sidebar-topbar-title">对话列表</DockPanelTitle>
                         {panelMode !== 'fullscreen' && (
-                            <button
+                            <DockPanelIconButton
                                 className="ai-sidebar-close-btn"
                                 onClick={() => ctx.setSidebarCollapsed(true)}
                                 title="收起侧边栏"
@@ -784,9 +785,9 @@ export default function AIChatContent({
                                      strokeWidth="1.5">
                                     <path d="M9 2L4 7L9 12"/>
                                 </svg>
-                            </button>
+                            </DockPanelIconButton>
                         )}
-                    </div>
+                    </DockPanelTopbar>
                     <div className="ai-sidebar-controls dock-panel-sidebar-controls">
                         <div className="dock-panel-control-group">
                             <span className="dock-panel-control-label">状态</span>
@@ -997,7 +998,7 @@ export default function AIChatContent({
                         )
                     })}
                 </div>
-            </aside>
+            </DockPanelSide>
         </>
     )
 
@@ -1005,7 +1006,7 @@ export default function AIChatContent({
         <>
             {sidePortalTarget ? createPortal(sidebarJsx, sidePortalTarget) : sidebarJsx}
 
-            <main
+            <DockPanelMain
                 className={`ai-main${isCharacterConversation ? ' is-character' : ''}${isReportConversation ? ' is-report' : ''}`}>
                 {isCharacterConversation && activeConversation?.backgroundImageUrl && (
                     <div className="ai-main-background" aria-hidden="true">
@@ -1013,10 +1014,10 @@ export default function AIChatContent({
                              alt={activeConversation.characterName ?? '角色背景'}/>
                     </div>
                 )}
-                <div className="ai-topbar">
+                <DockPanelTopbar className="ai-topbar">
                     <div className="ai-topbar-left">
                         {panelMode !== 'fullscreen' && (
-                            <button
+                            <DockPanelIconButton
                                 className="ai-topbar-toggle"
                                 onClick={() => ctx.setSidebarCollapsed((prev) => !prev)}
                                 title={ctx.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
@@ -1029,7 +1030,7 @@ export default function AIChatContent({
                                         <path d="M10 3L5 8L10 13"/>
                                     )}
                                 </svg>
-                            </button>
+                            </DockPanelIconButton>
                         )}
                         <div className="ai-plugin-switcher" ref={pluginSwitcherRef}>
                             {isPluginMenuOpen && (
@@ -1086,7 +1087,7 @@ export default function AIChatContent({
                         )}
                     </div>
                     <div className="ai-topbar-right">
-                        <button
+                        <DockPanelIconButton
                             className="ai-topbar-new-chat"
                             onClick={() => void ctx.createNewConversation()}
                             title="新对话"
@@ -1095,8 +1096,8 @@ export default function AIChatContent({
                                  strokeWidth="1.5">
                                 <path d="M8 3v10M3 8h10"/>
                             </svg>
-                        </button>
-                        <button
+                        </DockPanelIconButton>
+                        <DockPanelIconButton
                             className="ai-topbar-toggle"
                             onClick={() => onTogglePanelMode?.()}
                             title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
@@ -1113,8 +1114,8 @@ export default function AIChatContent({
                                     </>
                                 )}
                             </svg>
-                        </button>
-                        <button
+                        </DockPanelIconButton>
+                        <DockPanelIconButton
                             className="ai-topbar-toggle"
                             onClick={() => onToggleCollapsed?.()}
                             title="最小化"
@@ -1123,9 +1124,9 @@ export default function AIChatContent({
                                  strokeWidth="1.5">
                                 <path d="M6 4l4 4-4 4"/>
                             </svg>
-                        </button>
+                        </DockPanelIconButton>
                     </div>
-                </div>
+                </DockPanelTopbar>
 
                 <RollingBox axis="y"
                     className="ai-messages-container"
@@ -1417,7 +1418,7 @@ export default function AIChatContent({
                         </div>
                     </div>
                 </div>
-            </main>
+            </DockPanelMain>
         </>
     )
 }
