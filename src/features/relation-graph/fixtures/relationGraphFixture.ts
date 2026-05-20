@@ -1,5 +1,5 @@
 import {convertFileSrc} from '@tauri-apps/api/core'
-import type {RelationEdgeInput, RelationNodeInput} from 'flowcloudai-ui'
+import type {RelationEdgeInput, RelationNodeInput} from '../components/RelationGraph/types'
 import type {EntryBrief, EntryRelation, RelationDirection} from '../../../api'
 
 const DEMO_PROJECT_ID = 'project-silver-harbor'

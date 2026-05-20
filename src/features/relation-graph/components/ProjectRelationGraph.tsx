@@ -1,14 +1,14 @@
 import {useCallback, useEffect, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {
-    Button,
-    type LayoutFunction,
-    type LayoutRequest,
-    type LayoutResponse,
-    RelationGraph,
-    type RelationLayoutState,
-    type RelationNodeInput,
-} from 'flowcloudai-ui'
+import {Button} from 'flowcloudai-ui'
+import {RelationGraph} from './RelationGraph/RelationGraph'
+import type {
+    LayoutFunction,
+    LayoutRequest,
+    LayoutResponse,
+    RelationLayoutState,
+    RelationNodeInput,
+} from './RelationGraph/types'
 import {compute_layout, db_get_relation_graph_data, type RelationGraphEdge, type RelationGraphNode,} from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectRelationGraph.css'
