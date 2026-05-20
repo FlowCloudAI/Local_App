@@ -309,11 +309,14 @@ export function useSnapshotPanel({
     const RAIL_OVERLAP = 2
     const midY = RAIL_PX / 2
 
-    const sideContent = (
-        <aside className="snapshot-side">
-            <div className="snapshot-side__topbar">
-                <div className="snapshot-side__topbar-title">版本管理</div>
-            </div>
+    const sideTopbar = (
+        <div className="snapshot-side__topbar">
+            <div className="snapshot-side__topbar-title">版本管理</div>
+        </div>
+    )
+
+    const sideSections = (
+        <>
             <div className="snapshot-side__section">
                 <div className="snapshot-side__section-title">当前分支</div>
                 <div className="snapshot-side__branch-row">
@@ -362,44 +365,52 @@ export function useSnapshotPanel({
                     </div>
                 </div>
             </div>
+        </>
+    )
+
+    const sideContent = (
+        <aside className="snapshot-side">
+            {sideTopbar}
+            {sideSections}
         </aside>
     )
 
-    const mainContent = (
-        <div className="snapshot-main">
-            <div className="snapshot-main__topbar">
-                <div className="snapshot-main__title">提交历史</div>
-                <div className="snapshot-main__topbar-actions">
-                    <button
-                        type="button"
-                        className="snapshot-main__icon-btn"
-                        onClick={() => onTogglePanelMode?.()}
-                        title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
-                    >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                             strokeWidth="1.5">
-                            {panelMode === 'fullscreen' ? (
-                                <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
-                            ) : (
-                                <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
-                            )}
-                        </svg>
-                    </button>
-                    <button
-                        type="button"
-                        className="snapshot-main__icon-btn"
-                        onClick={() => onToggleCollapsed?.()}
-                        title="最小化"
-                    >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                             strokeWidth="1.5">
-                            <path d="M6 4l4 4-4 4"/>
-                        </svg>
-                    </button>
-                </div>
+    const mainTopbar = (
+        <div className="snapshot-main__topbar">
+            <div className="snapshot-main__title">提交历史</div>
+            <div className="snapshot-main__topbar-actions">
+                <button
+                    type="button"
+                    className="snapshot-main__icon-btn"
+                    onClick={() => onTogglePanelMode?.()}
+                    title={panelMode === 'fullscreen' ? '退出全屏' : '全屏模式'}
+                >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                         strokeWidth="1.5">
+                        {panelMode === 'fullscreen' ? (
+                            <path d="M4 10v2h2M10 12h2v-2M12 4v2h-2M6 4H4v2"/>
+                        ) : (
+                            <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
+                        )}
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    className="snapshot-main__icon-btn"
+                    onClick={() => onToggleCollapsed?.()}
+                    title="最小化"
+                >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                         strokeWidth="1.5">
+                        <path d="M6 4l4 4-4 4"/>
+                    </svg>
+                </button>
             </div>
+        </div>
+    )
 
-            <div className="snapshot-main__viewport">
+    const mainViewport = (
+        <div className="snapshot-main__viewport">
                 {loading && graphRows.length === 0 ? (
                     <div className="snapshot-main__empty fc-empty-state-card">
                         <span className="fc-empty-state-mark">Snapshot</span>
@@ -529,6 +540,12 @@ export function useSnapshotPanel({
                     </div>
                 )}
             </div>
+    )
+
+    const mainContent = (
+        <div className="snapshot-main">
+            {mainTopbar}
+            {mainViewport}
         </div>
     )
 
@@ -536,13 +553,16 @@ export function useSnapshotPanel({
         return {side: sideContent, main: mainContent}
     }
 
-    // floating 模式：side（控制面板）在上，main（提交历史）在下，上下分布
+    // floating 模式：head 常驻顶部，下面是 side（控制面板），底部是 main viewport
     return {
         side: null,
         main: (
             <div className="snapshot-panel">
-                {sideContent}
-                {mainContent}
+                {mainTopbar}
+                <aside className="snapshot-side">
+                    {sideSections}
+                </aside>
+                {mainViewport}
             </div>
         ),
     }

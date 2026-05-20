@@ -18,10 +18,10 @@
     container-name: snapshot-panel;
 }
 
-/* floating 容器内：main 占大部分高度，side 在底部自适应高度 */
-.snapshot-panel > .snapshot-main {
-    flex: 1;
-    min-height: 0;
+/* floating 容器内：
+   顺序 = main topbar(顶) -> side(中间，控制面板) -> main viewport(底，提交图) */
+.snapshot-panel > .snapshot-main__topbar {
+    flex-shrink: 0;
 }
 
 .snapshot-panel > .snapshot-side {
@@ -33,6 +33,11 @@
     overflow: auto;
     border-right: 0;
     border-bottom: 1px solid var(--dock-panel-border-color);
+}
+
+.snapshot-panel > .snapshot-main__viewport {
+    flex: 1;
+    min-height: 0;
 }
 
 /* ===== 左侧 sidebar ===== */
