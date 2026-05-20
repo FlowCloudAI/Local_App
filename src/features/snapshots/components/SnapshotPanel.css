@@ -18,12 +18,6 @@
     container-name: snapshot-panel;
 }
 
-/* floating 容器内：
-   顺序 = main topbar(顶) -> side(中间，控制面板) -> main viewport(底，提交图) */
-.snapshot-panel > .snapshot-main__topbar {
-    flex-shrink: 0;
-}
-
 .snapshot-panel > .snapshot-side {
     width: 100%;
     min-width: 0;
@@ -42,43 +36,7 @@
 
 /* ===== 左侧 sidebar ===== */
 .snapshot-side {
-    width: var(--dock-panel-sidebar-width);
-    min-width: var(--dock-panel-sidebar-width);
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
     overflow: auto;
-    background: var(--dock-panel-sidebar-bg);
-    border-right: 1px solid var(--dock-panel-border-color);
-    flex-shrink: 0;
-}
-
-/* fullscreen 模式下 sidebar 融入舞台，由 main 的 border-left 形成分隔 */
-.dockable-side-panel--fullscreen .snapshot-side {
-    background: transparent;
-    border-right: 0;
-}
-
-.snapshot-side__topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fc-space-sm);
-    box-sizing: border-box;
-    height: var(--dock-panel-topbar-height);
-    min-height: var(--dock-panel-topbar-height);
-    padding: 0 var(--dock-panel-topbar-padding-x);
-    background: transparent;
-    font-size: var(--dock-panel-title-size);
-    line-height: 1.2;
-}
-
-.snapshot-side__topbar-title {
-    min-width: 0;
-    font-size: var(--dock-panel-title-size);
-    font-weight: var(--dock-panel-title-weight);
-    color: var(--fc-color-text);
 }
 
 .snapshot-side__section {
@@ -165,74 +123,12 @@
     justify-content: flex-end;
 }
 
-/* ===== 右侧 main ===== */
-.snapshot-main {
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--dock-panel-bg);
-}
-
-/* fullscreen 模式下，main 作为浮于舞台的圆角卡片 */
-.dockable-side-panel--fullscreen .snapshot-main {
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-xl);
-}
-
-.snapshot-main__topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fc-space-sm);
-    flex-shrink: 0;
-    width: 100%;
-    box-sizing: border-box;
-    height: var(--dock-panel-topbar-height);
-    min-height: var(--dock-panel-topbar-height);
-    padding: 0 var(--dock-panel-topbar-padding-x);
-    border-bottom: 1px solid var(--dock-panel-border-color);
-    background: var(--dock-panel-topbar-bg);
-    backdrop-filter: blur(10px);
-    font-size: var(--dock-panel-title-size);
-    line-height: 1.2;
-}
-
-.snapshot-main__title {
-    margin: 0;
-    min-width: 0;
-    font-size: var(--dock-panel-title-size);
-    font-weight: var(--dock-panel-title-weight);
-    color: var(--fc-color-text);
-}
-
 .snapshot-main__topbar-actions {
     display: flex;
     align-items: center;
     gap: var(--fc-space-xs);
     margin-left: auto;
     flex-shrink: 0;
-}
-
-.snapshot-main__icon-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--dock-panel-icon-button-size);
-    height: var(--dock-panel-icon-button-size);
-    border: none;
-    border-radius: var(--dock-panel-icon-button-radius);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    transition: background 0.16s ease, color 0.16s ease;
-}
-
-.snapshot-main__icon-btn:hover {
-    background: var(--dock-panel-hover-bg);
-    color: var(--fc-color-text);
 }
 
 .snapshot-main__viewport {

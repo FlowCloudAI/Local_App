@@ -22,19 +22,7 @@
 }
 
 .idea-page__sidebar {
-    position: relative;
-    min-height: 0;
     min-width: 0;
-    border-right: 1px solid var(--dock-panel-border-color);
-    background: var(--dock-panel-sidebar-bg);
-    overflow: hidden;
-}
-
-/* 全屏 + 双 slot 模式：sidebar 在 DockableSidePanel side-stack 内独立显示，
-   不再被 .idea-page__shell grid 撑宽度，需自带固定宽度 */
-.dockable-side-panel--fullscreen .dockable-side-panel__side-layer > .idea-page__sidebar {
-    width: var(--dock-panel-sidebar-width);
-    height: 100%;
 }
 
 .idea-page__sidebar-inner {
@@ -44,63 +32,9 @@
     min-height: 0;
 }
 
-.idea-page__sidebar-topbar,
-.idea-page__main-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fc-space-sm);
-    box-sizing: border-box;
-    height: var(--dock-panel-topbar-height);
-    min-height: var(--dock-panel-topbar-height);
-    padding: 0 var(--dock-panel-topbar-padding-x);
-    border-bottom: 1px solid var(--dock-panel-border-color);
-    background: var(--dock-panel-topbar-bg);
-    backdrop-filter: blur(10px);
-    font-size: var(--dock-panel-title-size);
-    line-height: 1.2;
-}
-
-.idea-page__sidebar-topbar {
-    border-bottom: 0;
-    background: transparent;
-    backdrop-filter: none;
-}
-
-.idea-page__sidebar-topbar-title,
-.idea-page__main-title {
-    min-width: 0;
-    font-size: var(--dock-panel-title-size);
-    font-weight: var(--dock-panel-title-weight);
-    color: var(--fc-color-text);
-}
-
-.idea-page__main {
-    position: relative;
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: var(--dock-panel-bg);
-    overflow: hidden;
-}
-
-/* 全屏：sidebar 融入舞台，main 用 border-left 与 sidebar 分隔（同 ProjectEditor pe-content 风格） */
+/* 全屏：sidebar 融入舞台，main 由共享骨架呈现为圆角工作区 */
 .dockable-side-panel--fullscreen .idea-page {
     background: transparent;
-}
-
-.dockable-side-panel--fullscreen .idea-page__sidebar {
-    border-right: 0;
-    background: transparent;
-}
-
-.dockable-side-panel--fullscreen .idea-page__main {
-    flex: 1;
-    min-width: 0;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-xl);
-    background: var(--dock-panel-bg);
 }
 
 .idea-page__main-topbar-left {
@@ -115,26 +49,6 @@
     align-items: center;
     gap: var(--fc-space-xs);
     flex-shrink: 0;
-}
-
-.idea-page__sidebar-toggle {
-    width: var(--dock-panel-icon-button-size);
-    height: var(--dock-panel-icon-button-size);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: var(--dock-panel-icon-button-radius);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-    flex-shrink: 0;
-}
-
-.idea-page__sidebar-toggle:hover {
-    background: var(--dock-panel-hover-bg);
-    color: var(--fc-color-text);
 }
 
 .idea-page__sidebar-backdrop {

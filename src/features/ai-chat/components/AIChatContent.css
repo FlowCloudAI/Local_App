@@ -27,25 +27,9 @@
     left: 0;
     bottom: 0;
     z-index: 120;
-    width: var(--dock-panel-sidebar-width);
-    min-width: var(--dock-panel-sidebar-width);
-    border-right: 1px solid var(--dock-panel-border-color);
-    background: var(--dock-panel-sidebar-bg);
-    display: flex;
-    flex-direction: column;
     transition: transform 0.1s ease-out, opacity 0.1s ease-out;
-    overflow: hidden;
-    height: 100%;
     padding-top: 0;
     box-shadow: none;
-}
-
-/* 宽屏时侧边栏更宽 */
-@container ai-chat (min-width: 900px) {
-    .ai-sidebar {
-        width: var(--dock-panel-sidebar-width);
-        min-width: var(--dock-panel-sidebar-width);
-    }
 }
 
 /* 折叠时隐藏（宽屏）*/
@@ -63,27 +47,6 @@
     flex-direction: column;
     gap: 0;
     border-bottom: 0;
-}
-
-.ai-sidebar-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fc-space-sm);
-    box-sizing: border-box;
-    height: var(--dock-panel-topbar-height);
-    min-height: var(--dock-panel-topbar-height);
-    padding: 0 var(--dock-panel-topbar-padding-x);
-    background: transparent;
-    font-size: var(--dock-panel-title-size);
-    line-height: 1.2;
-}
-
-.ai-sidebar-topbar-title {
-    min-width: 0;
-    font-size: var(--dock-panel-title-size);
-    font-weight: var(--dock-panel-title-weight);
-    color: var(--fc-color-text);
 }
 
 .ai-sidebar-top-actions {
@@ -110,26 +73,6 @@
 }
 
 .ai-sidebar-new-btn:hover {
-    background: var(--dock-panel-hover-bg);
-    color: var(--fc-color-text);
-}
-
-.ai-sidebar-close-btn {
-    width: var(--dock-panel-icon-button-size);
-    height: var(--dock-panel-icon-button-size);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: var(--dock-panel-icon-button-radius);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-}
-
-.ai-sidebar-close-btn:hover {
     background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
@@ -527,24 +470,10 @@
     background: transparent;
 }
 
-/* fullscreen 模式 main 作为浮于舞台的圆角卡片 */
-.dockable-side-panel--fullscreen .ai-main {
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-xl);
-}
-
 /* ========== 右侧主区域 ========== */
 .ai-main {
     --ai-chat-content-max-width: 840px;
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    background: var(--fc-color-bg);
     border-radius: var(--fc-radius-xl);
-    position: relative;
-    height: 100%;
 }
 
 .ai-main.is-character {
@@ -583,23 +512,10 @@
 
 /* ========== 顶部栏 ========== */
 .ai-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--dock-panel-topbar-padding-x);
-    box-sizing: border-box;
-    height: var(--dock-panel-topbar-height);
-    min-height: var(--dock-panel-topbar-height);
-    border-bottom: 1px solid var(--dock-panel-border-color);
-    flex-shrink: 0;
     gap: var(--fc-space-xs);
     position: relative;
     z-index: 5;
     overflow: visible;
-    background: var(--dock-panel-topbar-bg);
-    backdrop-filter: blur(10px);
-    font-size: var(--dock-panel-title-size);
-    line-height: 1.2;
 }
 
 .ai-topbar-left {
@@ -615,29 +531,6 @@
     align-items: center;
     gap: var(--fc-space-xs);
     flex-shrink: 0;
-}
-
-.ai-topbar-toggle,
-.ai-topbar-new-chat {
-    width: var(--dock-panel-icon-button-size);
-    height: var(--dock-panel-icon-button-size);
-    border: none;
-    border-radius: var(--dock-panel-icon-button-radius);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    padding: 0;
-    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
-}
-
-.ai-topbar-toggle:hover,
-.ai-topbar-new-chat:hover {
-    background: var(--dock-panel-hover-bg);
-    color: var(--fc-color-text);
 }
 
 /* ========== 顶部栏按钮（插件切换等） ========== */
