@@ -12,8 +12,9 @@
     container-name: snapshot-panel;
 }
 
-.ai-shell--content-border-owned .snapshot-panel {
-    border: 1px solid var(--fc-color-border);
+/* 全屏舞台中，snapshot 内部 sidebar 因结构限制位于 panel 内，整体占满舞台 */
+.dockable-side-panel--fullscreen .snapshot-panel {
+    border-radius: 0;
 }
 
 .snapshot-panel__header {

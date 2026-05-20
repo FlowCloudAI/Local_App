@@ -770,16 +770,18 @@ export default function AIChatContent({
                 <div className="ai-sidebar-top">
                     <div className="ai-sidebar-topbar">
                         <div className="ai-sidebar-topbar-title">对话列表</div>
-                        <button
-                            className="ai-sidebar-close-btn"
-                            onClick={() => ctx.setSidebarCollapsed(true)}
-                            title="收起侧边栏"
-                        >
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
-                                 strokeWidth="1.5">
-                                <path d="M9 2L4 7L9 12"/>
-                            </svg>
-                        </button>
+                        {panelMode !== 'fullscreen' && (
+                            <button
+                                className="ai-sidebar-close-btn"
+                                onClick={() => ctx.setSidebarCollapsed(true)}
+                                title="收起侧边栏"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                                     strokeWidth="1.5">
+                                    <path d="M9 2L4 7L9 12"/>
+                                </svg>
+                            </button>
+                        )}
                     </div>
                     <div className="ai-sidebar-controls dock-panel-sidebar-controls">
                         <div className="dock-panel-control-group">
@@ -1003,20 +1005,22 @@ export default function AIChatContent({
                 )}
                 <div className="ai-topbar">
                     <div className="ai-topbar-left">
-                        <button
-                            className="ai-topbar-toggle"
-                            onClick={() => ctx.setSidebarCollapsed((prev) => !prev)}
-                            title={ctx.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                 strokeWidth="1.5">
-                                {ctx.sidebarCollapsed ? (
-                                    <path d="M6 3L11 8L6 13"/>
-                                ) : (
-                                    <path d="M10 3L5 8L10 13"/>
-                                )}
-                            </svg>
-                        </button>
+                        {panelMode !== 'fullscreen' && (
+                            <button
+                                className="ai-topbar-toggle"
+                                onClick={() => ctx.setSidebarCollapsed((prev) => !prev)}
+                                title={ctx.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                     strokeWidth="1.5">
+                                    {ctx.sidebarCollapsed ? (
+                                        <path d="M6 3L11 8L6 13"/>
+                                    ) : (
+                                        <path d="M10 3L5 8L10 13"/>
+                                    )}
+                                </svg>
+                            </button>
+                        )}
                         <div className="ai-plugin-switcher" ref={pluginSwitcherRef}>
                             {isPluginMenuOpen && (
                                 <div className="ai-plugin-menu">

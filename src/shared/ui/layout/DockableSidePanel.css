@@ -22,7 +22,7 @@
     flex: 1;
     height: 100%;
     padding: 0;
-    border-radius: var(--dock-panel-owned-radius);
+    background: var(--dock-panel-sidebar-bg);
 }
 
 .dockable-side-panel--fullscreen.is-fullscreen-animating {
@@ -88,17 +88,51 @@
     transition: opacity 0.15s ease, padding-left 0.15s ease;
 }
 
-.ai-shell--content-border-owned.dockable-side-panel--fullscreen .dockable-side-panel__body {
+.dockable-side-panel--fullscreen .dockable-side-panel__body {
     border: 0;
     border-radius: 0;
+    background: transparent;
 }
 
-.ai-shell--content-border-owned.dockable-side-panel--fullscreen {
-    border-radius: 0;
-}
-
-.ai-shell--content-border-owned.dockable-side-panel--fullscreen .side-panel-layer.active {
+.dockable-side-panel--fullscreen .side-panel-layer.active {
     z-index: 2;
+}
+
+/* ===== 双 slot API：side-stack / main-stack 与 layer 互斥切换 ===== */
+.dockable-side-panel__side-stack {
+    display: grid;
+    grid-template-areas: "layer";
+    flex-shrink: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.dockable-side-panel__main-stack {
+    display: grid;
+    grid-template-areas: "layer";
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.dockable-side-panel__side-layer,
+.dockable-side-panel__main-layer {
+    grid-area: layer;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.dockable-side-panel__side-layer.active,
+.dockable-side-panel__main-layer.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .dockable-side-panel--floating .dockable-side-panel__body {

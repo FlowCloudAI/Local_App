@@ -78,24 +78,19 @@
     overflow: hidden;
 }
 
-.idea-page.is-panel-fullscreen {
-    background: var(--dock-panel-sidebar-bg);
+/* 全屏：sidebar 融入舞台，main 用 border-left 与 sidebar 分隔（同 ProjectEditor pe-content 风格） */
+.dockable-side-panel--fullscreen .idea-page {
+    background: transparent;
 }
 
-.idea-page.is-panel-fullscreen .idea-page__shell {
-    background: var(--dock-panel-sidebar-bg);
-}
-
-.idea-page.is-panel-fullscreen:not(.is-compact) .idea-page__sidebar {
-    z-index: 0;
+.dockable-side-panel--fullscreen .idea-page__sidebar {
     border-right: 0;
+    background: transparent;
 }
 
-.ai-shell--content-border-owned .idea-page.is-panel-fullscreen:not(.is-compact) .idea-page__main {
-    z-index: 3;
-    box-sizing: border-box;
-    border: var(--dock-panel-owned-border);
-    border-radius: var(--fc-radius-xl);
+.dockable-side-panel--fullscreen .idea-page__main {
+    border-left: 1px solid var(--fc-color-border);
+    background: var(--dock-panel-bg);
 }
 
 .idea-page__main-topbar-left {

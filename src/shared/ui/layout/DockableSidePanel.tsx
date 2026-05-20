@@ -33,7 +33,12 @@ interface DockableSidePanelProps {
     onModeChange?: (mode: DockableSidePanelMode) => void
     className?: string
     handleTitle?: string
-    children: ReactNode
+    // 双 slot API（推荐）：side 仅在 fullscreen 渲染，main 始终渲染；每个 stack 内按 activeKey 互斥切换 active 层
+    sides?: Record<string, ReactNode>
+    mains?: Record<string, ReactNode>
+    activeKey?: string
+    // 旧 API：单 slot；与 sides/mains 互斥使用，由调用方二选一
+    children?: ReactNode
 }
 
 export default function DockableSidePanel({
@@ -47,6 +52,9 @@ export default function DockableSidePanel({
                                               onModeChange,
                                               className = '',
                                               handleTitle = '拖拽调整宽度',
+                                              sides,
+                                              mains,
+                                              activeKey,
                                               children,
                                           }: DockableSidePanelProps) {
     const rootRef = useRef<HTMLElement | null>(null)
@@ -430,7 +438,34 @@ export default function DockableSidePanel({
                 </div>
             )}
             <div className="dockable-side-panel__body">
-                {children}
+                {mains ? (
+                    <>
+                        {sides && mode === 'fullscreen' && (
+                            <div className="dockable-side-panel__side-stack">
+                                {Object.entries(sides).map(([key, node]) => (
+                                    <div
+                                        key={key}
+                                        className={`dockable-side-panel__side-layer${key === activeKey ? ' active' : ''}`}
+                                        aria-hidden={key !== activeKey}
+                                    >
+                                        {node}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="dockable-side-panel__main-stack">
+                            {Object.entries(mains).map(([key, node]) => (
+                                <div
+                                    key={key}
+                                    className={`dockable-side-panel__main-layer${key === activeKey ? ' active' : ''}`}
+                                    aria-hidden={key !== activeKey}
+                                >
+                                    {node}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : children}
             </div>
         </section>
     )

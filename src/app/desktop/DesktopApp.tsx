@@ -711,10 +711,7 @@ export default function DesktopApp() {
 
     const isHomeTabActive = activeKey === '' && mainContentKey === 'home'
     const sideBarSelectedKey = aiPanelCollapsed ? selectedKey : sidePanelContentKey
-    const aiShellClassName = [
-        'ai-shell',
-        aiPanelMode === 'fullscreen' ? 'ai-shell--content-border-owned' : '',
-    ].filter(Boolean).join(' ')
+    const aiShellClassName = 'ai-shell'
     const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
         recentPageKeys

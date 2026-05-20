@@ -503,6 +503,43 @@
     cursor: pointer;
 }
 
+/* ========== 全屏模式：侧边栏常驻、融入舞台 ========== */
+.dockable-side-panel--fullscreen .ai-sidebar-overlay {
+    display: none;
+}
+
+.dockable-side-panel--fullscreen .ai-chat-layout {
+    display: flex;
+    flex-direction: row;
+    background: transparent;
+}
+
+.dockable-side-panel--fullscreen .ai-sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    z-index: auto;
+    height: auto;
+    flex-shrink: 0;
+    border-right: 0;
+    background: transparent;
+}
+
+.dockable-side-panel--fullscreen .ai-chat-layout.sidebar-collapsed .ai-sidebar {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.dockable-side-panel--fullscreen .ai-main {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    border-left: 1px solid var(--fc-color-border);
+    border-radius: 0;
+}
+
 /* ========== 右侧主区域 ========== */
 .ai-main {
     --ai-chat-content-max-width: 840px;
@@ -515,10 +552,6 @@
     border-radius: var(--fc-radius-xl);
     position: relative;
     height: 100%;
-}
-
-.ai-shell--content-border-owned .ai-main {
-    border: 1px solid var(--fc-color-border);
 }
 
 .ai-main.is-character {
@@ -654,7 +687,7 @@
     background: var(--fc-color-bg-elevated);
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--dock-panel-control-radius);
-    padding: var(--fc-space-2xs, 0.125rem);
+    padding: 0.125rem;
     min-width: 160px;
     max-height: 280px;
     overflow-y: auto;
@@ -946,7 +979,7 @@
 .ai-report-context-title strong {
     min-width: 0;
     color: var(--fc-color-text);
-    font-weight: var(--fc-font-weight-semibold);
+    font-weight: var(--fc-font-weight-bold);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
