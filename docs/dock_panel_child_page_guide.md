@@ -169,8 +169,11 @@ export function useXxxPanel(options: UseXxxPanelOptions): XxxPanelSlots {
 1. 扩展 `SidePanelContentKey`。
 2. 调用新 hook，拿到 `{side, main}`。
 3. 在 `sidePanelSides` 和 `sidePanelMains` 中按 key 注册。
-4. 在侧边栏菜单中增加入口。
-5. 保证 `mountedSidePanelKeys` 能覆盖该 key。
+4. 在 `SideBar` 的 `menuItems` 或 `bottomItems` 中增加对应入口，提供稳定的 `key`、中文 `label` 和图标。
+5. 在 `handleSideBarSelect` 中处理该 `key`，保证点击入口能打开、切换或折叠对应 Dock 子页面。
+6. 保证 `mountedSidePanelKeys` 能覆盖该 key。
+
+没有 `SideBar` 入口的 Dock 子页面不算完整接入。除非是内部临时调试页，否则不要只通过首页卡片、快捷按钮或其他业务入口打开。
 
 不要直接绕过 `DockableSidePanel` 自己挂载右侧页面。
 
