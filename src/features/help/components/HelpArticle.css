@@ -204,7 +204,10 @@
 }
 
 .help-main--floating .help-doc__toc-title {
-    display: none;
+    margin-bottom: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    font-weight: var(--fc-font-weight-normal, 400);
 }
 
 .help-main--floating .help-doc__toc-list {
