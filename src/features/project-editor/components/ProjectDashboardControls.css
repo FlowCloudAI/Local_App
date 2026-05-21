@@ -144,7 +144,6 @@
 }
 
 @container (max-width: 1060px) {
-    .pe-dashboard-status-strip,
     .pe-dashboard-layout {
         grid-template-columns: 1fr;
     }
@@ -169,7 +168,11 @@
         align-items: flex-start;
     }
 
-    .pe-dashboard-kpi-strip,
+    .pe-dashboard-kpi--health {
+        grid-column: auto;
+    }
+
+    .pe-dashboard-status-strip,
     .pe-dashboard-structure-grid {
         grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
     }

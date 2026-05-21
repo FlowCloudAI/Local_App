@@ -39,8 +39,8 @@
 }
 
 .pe-dashboard-status-strip {
-    grid-template-columns: minmax(16rem, 0.9fr) minmax(0, 2.1fr);
-    align-items: start;
+    grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr));
+    align-items: stretch;
 }
 
 .pe-dashboard-layout {
@@ -57,7 +57,6 @@
 }
 
 .pe-dashboard-panel,
-.pe-dashboard-status-card,
 .pe-dashboard-metric,
 .pe-dashboard-kpi,
 .pe-dashboard-distribution-block {
@@ -66,8 +65,7 @@
     background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
 }
 
-.pe-dashboard-panel,
-.pe-dashboard-status-card {
+.pe-dashboard-panel {
     display: flex;
     flex-direction: column;
     gap: var(--fc-space-sm);
@@ -115,16 +113,10 @@
     font-size: var(--fc-font-size-xs);
 }
 
-.pe-dashboard-kpi-strip,
 .pe-dashboard-distribution-grid,
 .pe-dashboard-structure-grid {
     display: grid;
     gap: var(--fc-space-sm);
-}
-
-.pe-dashboard-kpi-strip {
-    grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr));
-    align-self: start;
 }
 
 .pe-dashboard-kpi,
@@ -137,7 +129,13 @@
 }
 
 .pe-dashboard-kpi {
-    min-height: 4.25rem;
+    justify-content: center;
+    min-height: 4.4rem;
+}
+
+.pe-dashboard-kpi--health {
+    grid-column: span 2;
+    padding: var(--fc-space-md);
 }
 
 .pe-dashboard-kpi--ok {

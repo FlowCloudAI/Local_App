@@ -60,8 +60,9 @@ export function DashboardMetric({label, value, hint, muted}: {
 }
 
 export function DashboardKpiStrip({items}: { items: DashboardKpiItem[] }) {
+    // 不渲染外层包裹，直接作为父级 status-strip 网格的同级单元，便于与健康卡片对齐
     return (
-        <div className="pe-dashboard-kpi-strip">
+        <>
             {items.map(item => (
                 <article
                     key={item.key}
@@ -72,7 +73,7 @@ export function DashboardKpiStrip({items}: { items: DashboardKpiItem[] }) {
                     <span className="pe-dashboard-kpi__hint">{item.hint}</span>
                 </article>
             ))}
-        </div>
+        </>
     )
 }
 

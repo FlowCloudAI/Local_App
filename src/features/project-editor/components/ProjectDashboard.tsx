@@ -35,20 +35,20 @@ function ProjectDashboard(props: ProjectDashboardProps) {
             </div>
 
             <div className="pe-dashboard-status-strip">
-                <div className="pe-dashboard-status-card">
+                <article className="pe-dashboard-kpi pe-dashboard-kpi--health">
                     <HealthMeter score={dashboard.structureScore}/>
-                    <div className="pe-dashboard-checks">
-                        {dashboard.structureChecks.map(item => (
-                            <span
-                                key={item.label}
-                                className={`pe-dashboard-check ${item.passed ? 'is-passed' : 'is-missing'}`}
-                            >
-                                {item.label}
-                            </span>
-                        ))}
-                    </div>
-                </div>
+                </article>
                 <DashboardKpiStrip items={dashboard.kpiItems}/>
+            </div>
+            <div className="pe-dashboard-checks">
+                {dashboard.structureChecks.map(item => (
+                    <span
+                        key={item.label}
+                        className={`pe-dashboard-check ${item.passed ? 'is-passed' : 'is-missing'}`}
+                    >
+                        {item.label}
+                    </span>
+                ))}
             </div>
 
             <div className="pe-dashboard-layout">
