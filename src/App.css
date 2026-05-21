@@ -165,6 +165,7 @@ body {
 
 .page-container--project-editor {
     border-color: transparent;
+    border-radius: 0;
     outline: none;
     background: transparent;
 }
@@ -260,6 +261,7 @@ body {
 }
 
 .side-bar {
+    --sidebar-item-hover-bg: var(--sidebar-item-bg, transparent);
     user-select: none;
     z-index: 1001;  /* 高于 AI 右侧面板的 1000 */
     position: relative;  /* 确保 z-index 生效 */

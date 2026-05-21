@@ -216,7 +216,7 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    border-radius: var(--fc-radius-xl) 0 0 var(--fc-radius-xl);
+    border-radius: var(--fc-radius-xl);
     --pe-breadcrumb-height: 2.25rem;
     --pe-font-delta-title: 5px;
     --pe-font-delta-body: 3px;
