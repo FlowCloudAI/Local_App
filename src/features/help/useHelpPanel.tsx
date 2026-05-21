@@ -58,6 +58,7 @@ export function useHelpPanel({
     onTogglePanelMode,
     onToggleCollapsed,
 }: UseHelpPanelOptions = {}): HelpPanelSlots {
+    const resolvedPanelMode = panelMode ?? 'floating'
     const [activeModuleKey, setActiveModuleKey] = useState<HelpModuleKey | null>(null)
     const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey | null>(null)
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
@@ -170,7 +171,7 @@ export function useHelpPanel({
     )
 
     const mainContent = (
-        <DockPanelMain className="help-main">
+        <DockPanelMain className={`help-main help-main--${resolvedPanelMode}`}>
             <DockPanelTopbar className="help-main__topbar">
                 <div className="help-main__topbar-left">
                     {panelMode !== 'fullscreen' && sidebarCollapsed ? (

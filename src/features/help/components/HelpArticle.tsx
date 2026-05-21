@@ -43,7 +43,7 @@ export default function HelpArticle({
                 </header>
 
                 <nav className="help-doc__toc" aria-label="本篇目录">
-                    <div className="help-doc__toc-title">本篇目录</div>
+                    <div className="help-doc__toc-title">本篇目录：</div>
                     <div className="help-doc__toc-list">
                         {topic.sections.map((section, index) => (
                             <button
