@@ -204,8 +204,8 @@
 }
 
 .help-main--floating .help-doc__toc-title {
-    margin-bottom: var(--fc-space-xs);
-    color: var(--fc-color-text-secondary);
+    margin-bottom: var(--fc-space-sm);
+    color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
     font-weight: var(--fc-font-weight-normal, 400);
 }
@@ -218,17 +218,17 @@
 
 .help-main--floating .help-doc__toc-item {
     display: block;
-    padding: 0;
+    padding: var(--fc-space-xs) 0;
     border-radius: 0;
     background: transparent;
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-md);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
     line-height: var(--fc-line-height-normal);
 }
 
 .help-main--floating .help-doc__toc-item:hover {
     background: transparent;
-    color: var(--fc-color-primary-hover, var(--fc-color-primary));
+    color: var(--fc-color-primary);
 }
 
 .help-main--floating .help-doc__toc-item span {
