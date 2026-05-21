@@ -1,6 +1,5 @@
 .pe-dashboard-signal-list,
-.pe-dashboard-action-list,
-.pe-dashboard-issue-grid {
+.pe-dashboard-action-list {
     display: grid;
     gap: var(--fc-space-sm);
     margin: 0;
@@ -14,12 +13,6 @@
     grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
 }
 
-.pe-dashboard-issue-grid {
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-}
-
-.pe-dashboard-issue,
-.pe-dashboard-issue-row,
 .pe-dashboard-action,
 .pe-dashboard-signal-row {
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 80%, transparent);
@@ -27,49 +20,65 @@
     background: var(--fc-color-bg);
 }
 
+/* 质量监控行式列表：单列、无独立边框，靠分隔线提高密度 */
+.pe-dashboard-issue-list {
+    display: flex;
+    flex-direction: column;
+}
+
 .pe-dashboard-issue-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--fc-space-xs) var(--fc-space-sm);
+    grid-template-rows: auto auto;
+    column-gap: var(--fc-space-sm);
     align-items: center;
-    padding: var(--fc-space-sm);
+    padding: var(--fc-space-sm) 0;
+    border-top: 1px dashed color-mix(in srgb, var(--fc-color-border) 48%, transparent);
 }
 
-.pe-dashboard-issue {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--fc-space-xs);
-    min-width: 0;
-    padding: var(--fc-space-sm);
+.pe-dashboard-issue-row:first-child {
+    padding-top: 0;
+    border-top: 0;
 }
 
-.pe-dashboard-issue--ok {
-    border-color: var(--fc-color-success-border);
+.pe-dashboard-issue-row:last-child {
+    padding-bottom: 0;
 }
 
-.pe-dashboard-issue--warn {
-    border-color: var(--fc-color-warning-border);
+.pe-dashboard-issue-row__label {
+    grid-column: 1;
+    grid-row: 1;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    font-weight: var(--fc-font-weight-medium);
 }
 
-.pe-dashboard-issue--danger {
-    border-color: var(--fc-color-danger-border);
+.pe-dashboard-issue-row__hint {
+    grid-column: 1;
+    grid-row: 2;
 }
 
-.pe-dashboard-issue-row--ok {
-    border-color: var(--fc-color-success-border);
+.pe-dashboard-issue-row strong {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    font-size: var(--fc-font-size-lg);
+    font-weight: var(--fc-font-weight-bold);
+    line-height: 1.1;
 }
 
-.pe-dashboard-issue-row--warn {
-    border-color: var(--fc-color-warning-border);
+.pe-dashboard-issue-row--ok strong {
+    color: var(--fc-color-text-tertiary);
 }
 
-.pe-dashboard-issue-row--danger {
-    border-color: var(--fc-color-danger-border);
+.pe-dashboard-issue-row--warn strong {
+    color: var(--fc-color-warning);
 }
 
-.pe-dashboard-issue__label,
-.pe-dashboard-issue__hint,
-.pe-dashboard-issue-row__label,
+.pe-dashboard-issue-row--danger strong {
+    color: var(--fc-color-danger);
+}
+
 .pe-dashboard-issue-row__hint,
 .pe-dashboard-action__desc,
 .pe-dashboard-signal-row dt,
@@ -79,16 +88,6 @@
     line-height: 1.35;
 }
 
-.pe-dashboard-issue__hint {
-    grid-column: 1 / -1;
-}
-
-.pe-dashboard-issue-row__hint {
-    grid-column: 1 / -1;
-}
-
-.pe-dashboard-issue strong,
-.pe-dashboard-issue-row strong,
 .pe-dashboard-signal-row strong {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);

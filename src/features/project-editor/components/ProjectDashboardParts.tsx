@@ -118,23 +118,6 @@ export function DashboardIssueList({items}: { items: DashboardIssueItem[] }) {
     )
 }
 
-export function DashboardIssueGrid({items}: { items: DashboardIssueItem[] }) {
-    return (
-        <div className="pe-dashboard-issue-grid">
-            {items.map(item => (
-                <article
-                    key={item.key}
-                    className={`pe-dashboard-issue pe-dashboard-issue--${item.severity}`}
-                >
-                    <span className="pe-dashboard-issue__label">{item.label}</span>
-                    <strong>{formatDashboardNumber(item.value)}</strong>
-                    <span className="pe-dashboard-issue__hint">{item.hint}</span>
-                </article>
-            ))}
-        </div>
-    )
-}
-
 export function DashboardActionList({items}: { items: DashboardActionItem[] }) {
     return (
         <div className="pe-dashboard-action-list">
