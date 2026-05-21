@@ -10,11 +10,12 @@ import './HelpSidebar.css'
 
 interface HelpSidebarProps {
     groups: HelpTopicGroup[]
-    activeTopicKey: HelpTopicKey
+    activeModuleKey: HelpModuleKey
+    activeTopicKey: HelpTopicKey | null
     searchText: string
     showCollapseButton: boolean
     onSearchTextChange: (value: string) => void
-    onSelectModule: (topicKey: HelpTopicKey) => void
+    onSelectModule: (moduleKey: HelpModuleKey) => void
     onSelectTopic: (topicKey: HelpTopicKey) => void
     onCollapse: () => void
 }
@@ -63,6 +64,7 @@ function HelpModuleIcon({moduleKey}: { moduleKey: HelpModuleKey }) {
 
 export default function HelpSidebar({
     groups,
+    activeModuleKey,
     activeTopicKey,
     searchText,
     showCollapseButton,
@@ -99,15 +101,14 @@ export default function HelpSidebar({
             </div>
             <div className="help-side__list" aria-label="帮助主题">
                 {groups.length > 0 ? groups.map(group => {
-                    const activeInModule = group.topics.some(topic => topic.key === activeTopicKey)
-                    const firstTopic = group.topics[0]
+                    const activeInModule = group.module.key === activeModuleKey
 
                     return (
                         <section className={`help-side__module${activeInModule ? ' is-active' : ''}`} key={group.module.key}>
                             <button
                                 type="button"
                                 className="help-side__module-button"
-                                onClick={() => firstTopic ? onSelectModule(firstTopic.key) : undefined}
+                                onClick={() => onSelectModule(group.module.key)}
                             >
                                 <span className="help-side__module-icon">
                                     <HelpModuleIcon moduleKey={group.module.key}/>

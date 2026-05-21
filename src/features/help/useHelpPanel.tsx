@@ -9,13 +9,16 @@ import {
 import '../../shared/ui/layout/DockPanelScaffold.css'
 import {
     filterHelpTopics,
+    getHelpModule,
     getHelpSectionDomId,
     groupHelpTopicsByModule,
     HELP_TOPICS,
+    type HelpModuleKey,
     type HelpTopicKey,
     normalizeHelpTopicKey,
 } from '../../shared/help/helpCatalog'
 import HelpArticle from './components/HelpArticle'
+import HelpModuleHome from './components/HelpModuleHome'
 import HelpSidebar from './components/HelpSidebar'
 import './components/HelpPanel.css'
 
@@ -54,7 +57,8 @@ export function useHelpPanel({
     onTogglePanelMode,
     onToggleCollapsed,
 }: UseHelpPanelOptions = {}): HelpPanelSlots {
-    const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey>('getting-started')
+    const [activeModuleKey, setActiveModuleKey] = useState<HelpModuleKey>('basics')
+    const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey | null>(null)
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
@@ -65,7 +69,10 @@ export function useHelpPanel({
 
     useEffect(() => {
         if (requestId === undefined) return
-        setActiveTopicKey(normalizeHelpTopicKey(requestTopicKey))
+        const nextTopicKey = normalizeHelpTopicKey(requestTopicKey)
+        const nextTopic = HELP_TOPICS.find(topic => topic.key === nextTopicKey) ?? HELP_TOPICS[0]
+        setActiveModuleKey(nextTopic.moduleKey)
+        setActiveTopicKey(nextTopic.key)
         setActiveSectionId(requestSectionId ?? null)
     }, [requestId, requestSectionId, requestTopicKey])
 
@@ -81,14 +88,28 @@ export function useHelpPanel({
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
+            if (!activeTopicKey) {
+                articleBodyRef.current?.scrollTo({top: 0, behavior: 'smooth'})
+                return
+            }
             scrollToSection(activeTopicKey, activeSectionId, articleBodyRef.current)
         })
         return () => window.cancelAnimationFrame(frame)
-    }, [activeSectionId, activeTopicKey])
+    }, [activeModuleKey, activeSectionId, activeTopicKey])
 
     const activeTopic = useMemo(
-        () => HELP_TOPICS.find(topic => topic.key === activeTopicKey) ?? HELP_TOPICS[0],
+        () => activeTopicKey ? HELP_TOPICS.find(topic => topic.key === activeTopicKey) ?? HELP_TOPICS[0] : null,
         [activeTopicKey],
+    )
+
+    const activeModule = useMemo(
+        () => getHelpModule(activeModuleKey),
+        [activeModuleKey],
+    )
+
+    const activeModuleTopics = useMemo(
+        () => HELP_TOPICS.filter(topic => topic.moduleKey === activeModuleKey),
+        [activeModuleKey],
     )
 
     const topicGroups = useMemo(
@@ -96,20 +117,24 @@ export function useHelpPanel({
         [searchText],
     )
 
-    const handleSelectTopic = (topicKey: HelpTopicKey) => {
-        setActiveTopicKey(topicKey)
-        setActiveSectionId(null)
+    const handleSelectTopic = (topicKey: HelpTopicKey, sectionId: string | null = null) => {
+        const nextTopic = HELP_TOPICS.find(topic => topic.key === topicKey) ?? HELP_TOPICS[0]
+        setActiveModuleKey(nextTopic.moduleKey)
+        setActiveTopicKey(nextTopic.key)
+        setActiveSectionId(sectionId)
         if (panelMode !== 'fullscreen') {
             setSidebarCollapsed(true)
         }
     }
 
-    const handleSelectModule = (topicKey: HelpTopicKey) => {
-        setActiveTopicKey(topicKey)
+    const handleSelectModule = (moduleKey: HelpModuleKey) => {
+        setActiveModuleKey(moduleKey)
+        setActiveTopicKey(null)
         setActiveSectionId(null)
     }
 
     const handleSelectSection = (sectionId: string) => {
+        if (!activeTopicKey) return
         setActiveSectionId(sectionId)
         window.requestAnimationFrame(() => {
             scrollToSection(activeTopicKey, sectionId, articleBodyRef.current)
@@ -119,7 +144,8 @@ export function useHelpPanel({
     const sideContent = (
         <HelpSidebar
             groups={topicGroups}
-            activeTopicKey={activeTopic.key}
+            activeModuleKey={activeModuleKey}
+            activeTopicKey={activeTopic?.key ?? null}
             searchText={searchText}
             showCollapseButton={panelMode !== 'fullscreen'}
             onSearchTextChange={setSearchText}
@@ -176,12 +202,21 @@ export function useHelpPanel({
                     </DockPanelIconButton>
                 </div>
             </DockPanelTopbar>
-            <HelpArticle
-                topic={activeTopic}
-                activeSectionId={activeSectionId}
-                bodyRef={articleBodyRef}
-                onSelectSection={handleSelectSection}
-            />
+            {activeTopic ? (
+                <HelpArticle
+                    topic={activeTopic}
+                    activeSectionId={activeSectionId}
+                    bodyRef={articleBodyRef}
+                    onSelectSection={handleSelectSection}
+                />
+            ) : (
+                <HelpModuleHome
+                    module={activeModule}
+                    topics={activeModuleTopics}
+                    bodyRef={articleBodyRef}
+                    onSelectTopic={handleSelectTopic}
+                />
+            )}
         </DockPanelMain>
     )
 
