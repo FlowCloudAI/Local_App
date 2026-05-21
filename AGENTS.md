@@ -56,11 +56,11 @@ app_main/
 │   │   ├── desktop/          # 桌面端布局组件
 │   │   ├── index/            # 应用入口与根组件（AppRoot）
 │   │   └── mobile/           # 移动端布局组件
-│   ├── contexts/             # 前端上下文（当前为空目录，规划用途）
 │   ├── features/             # 按功能域组织的 React 组件
 │   │   ├── about/            # 关于页面
 │   │   ├── ai-chat/          # AI 对话助手
 │   │   ├── entries/          # 词条系统
+│   │   ├── help/             # 右侧 Dock 帮助中心
 │   │   ├── home/             # 首页概览
 │   │   ├── maps/             # 地图与形状编辑器
 │   │   ├── onboarding/       # 首次使用引导
@@ -69,10 +69,9 @@ app_main/
 │   │   ├── projects/         # 项目列表与创建
 │   │   ├── relation-graph/   # 词条关系图
 │   │   └── snapshots/        # 快照面板
-│   ├── hooks/                # 全局自定义 Hooks（当前为空目录，规划用途）
 │   ├── i18n/                 # 国际化配置与语言包
 │   ├── pages/                # 页面级组件
-│   ├── shared/               # 共享组件与工具
+│   ├── shared/               # 共享组件、Hooks 与工具
 │   ├── App.css               # 根组件样式
 │   └── main.tsx              # 应用入口（主题预加载后挂载 React）
 ├── src-tauri/                # Tauri / Rust 后端
@@ -272,7 +271,7 @@ cargo test
     - 在 `src-tauri/src/apis/xxx.rs` 中添加 `#[tauri::command]` 函数。
     - 在 `src-tauri/src/lib.rs` 的 `invoke_handler` 列表中注册。
     - 在 `src/api/xxx.ts` 中添加对应的前端封装函数。
-3. **AI 插件热插拔限制**：当前 `install` / `uninstall` 接口因 Rust 所有权限制尚未完全实现运行时热插拔，修改插件后可能需要重启应用生效。
+3. **AI 插件安装/卸载限制**：`plugin_install_from_file`、`plugin_market_install` 和 `plugin_uninstall` 会先要求关闭所有活跃 AI 会话，再操作运行时插件注册表和磁盘 `.fcplug` 文件；不要绕过该检查。
 4. **数据库初始化顺序**：`lib.rs` 的 `setup` 中会异步初始化 SQLite，完成后才注入 `AppState` 并初始化 `AiState`。前端应在收到
    `backend-ready` 事件后再执行依赖后端的操作。
 5. **窗口显示时机**：`main.tsx` 中会在解析主题后通过 `requestAnimationFrame` 调用 `showWindow()`，以确保首屏不出现白闪。
