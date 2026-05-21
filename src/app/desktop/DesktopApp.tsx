@@ -7,7 +7,7 @@ import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import type {AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import {useAiController} from '../../features/ai-chat/hooks/useAiController'
 import {useAIChatPanel} from '../../features/ai-chat/useAIChatPanel'
-import {useHelpPanel} from '../../features/help/useHelpPanel'
+import {type HelpPanelRequest, useHelpPanel} from '../../features/help/useHelpPanel'
 import {useSnapshotPanel} from '../../features/snapshots/useSnapshotPanel'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {listen} from '@tauri-apps/api/event'
@@ -25,6 +25,7 @@ import {
     saveHomeLastSession,
     type HomeActivityTarget,
 } from '../../features/home/homeActivity'
+import {parseHelpTarget} from '../../shared/help/helpCatalog'
 
 type EntryTabMeta = {
     projectId: string
@@ -78,8 +79,7 @@ export default function DesktopApp() {
     const [mainContentKey, setMainContentKey] = useState<MainContentKey>('home')
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
-    const [helpTopicKey, setHelpTopicKey] = useState<string | null>(null)
-    const [helpTopicSignal, setHelpTopicSignal] = useState(0)
+    const [helpRequest, setHelpRequest] = useState<HelpPanelRequest | null>(null)
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
@@ -674,8 +674,10 @@ export default function DesktopApp() {
                 return
             case 'help':
                 recordHomeActivity(target)
-                setHelpTopicKey(target.id)
-                setHelpTopicSignal(prev => prev + 1)
+                setHelpRequest(prev => ({
+                    ...parseHelpTarget(target.id),
+                    requestId: (prev?.requestId ?? 0) + 1,
+                }))
                 handleSideBarSelect('help', {forceOpen: true})
                 return
         }
@@ -767,8 +769,7 @@ export default function DesktopApp() {
     })
     const helpSlots = useHelpPanel({
         panelMode: aiPanelMode,
-        topicKey: helpTopicKey,
-        topicSignal: helpTopicSignal,
+        request: helpRequest,
         onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
     })

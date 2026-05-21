@@ -1,3 +1,5 @@
+import {buildHelpTargetId, HELP_HOME_LINKS} from '../../shared/help/helpCatalog'
+
 const HOME_ACTIVITY_STORAGE_KEY = 'flowcloudai.home.activity.v1'
 const HOME_SESSION_STORAGE_KEY = 'flowcloudai.home.last-session.v1'
 const MAX_ACTIVITY_RECORDS = 80
@@ -57,38 +59,17 @@ export interface HomeDashboardData {
     updatedAt: string
 }
 
-const HOME_HELP_LINKS: HomeHelpLink[] = [
-    {
-        key: 'getting-started',
-        title: '新手指南',
-        description: '了解世界观、词条、关系和 AI 助手的基础流程。',
-        target: {
-            type: 'help',
-            id: 'getting-started',
-            title: '新手指南',
-        },
+const HOME_HELP_LINKS: HomeHelpLink[] = HELP_HOME_LINKS.map(link => ({
+    key: link.key,
+    title: link.title,
+    description: link.description,
+    target: {
+        type: 'help',
+        id: buildHelpTargetId(link.topicKey, link.sectionId),
+        title: link.title,
+        description: link.description,
     },
-    {
-        key: 'ai-guide',
-        title: 'AI 功能说明',
-        description: '查看对话、总结、矛盾检测和工具调用的使用方式。',
-        target: {
-            type: 'help',
-            id: 'ai-guide',
-            title: 'AI 功能说明',
-        },
-    },
-    {
-        key: 'plugins',
-        title: '插件说明',
-        description: '了解模型插件、API Key 和本地插件安装。',
-        target: {
-            type: 'help',
-            id: 'plugins',
-            title: '插件说明',
-        },
-    },
-]
+}))
 
 function canUseStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
