@@ -1,9 +1,12 @@
 import type {RefObject} from 'react'
+import MarkdownPreview, {type MarkdownPreviewProps} from '@uiw/react-markdown-preview'
+import {useTheme} from 'flowcloudai-ui'
 import {
     getHelpModule,
     getHelpSectionDomId,
     type HelpTopic,
 } from '../../../shared/help/helpCatalog'
+import {getHelpSectionMarkdown} from '../../../shared/help/helpMarkdown'
 import './HelpArticle.css'
 
 interface HelpArticleProps {
@@ -13,6 +16,19 @@ interface HelpArticleProps {
     onSelectSection: (sectionId: string) => void
 }
 
+const markdownComponents: MarkdownPreviewProps['components'] = {
+    img: ({node, ...props}) => {
+        void node
+        return <img {...props} loading="lazy" decoding="async"/>
+    },
+}
+
+function resolveMarkdownColorMode(theme: string): 'light' | 'dark' {
+    if (theme === 'dark') return 'dark'
+    if (theme === 'light') return 'light'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
 export default function HelpArticle({
     topic,
     bodyRef,
@@ -20,6 +36,8 @@ export default function HelpArticle({
     onSelectSection,
 }: HelpArticleProps) {
     const module = getHelpModule(topic.moduleKey)
+    const {theme} = useTheme()
+    const colorMode = resolveMarkdownColorMode(theme)
 
     return (
         <div className="help-main__body" ref={bodyRef}>
@@ -67,16 +85,12 @@ export default function HelpArticle({
                             <div className="help-doc__section-number">{String(index + 1).padStart(2, '0')}</div>
                             <div className="help-doc__section-content">
                                 <h3>{section.title}</h3>
-                                <p>{section.lead}</p>
-                                {section.figure ? (
-                                    <figure className="help-doc__figure">
-                                        <img src={section.figure.src} alt={section.figure.alt} loading="lazy"/>
-                                        <figcaption>{section.figure.caption}</figcaption>
-                                    </figure>
-                                ) : null}
-                                <ul className="help-doc__step-list">
-                                    {section.items.map(item => <li key={item}>{item}</li>)}
-                                </ul>
+                                <MarkdownPreview
+                                    source={getHelpSectionMarkdown(topic.key, section.id)}
+                                    className="help-doc__markdown"
+                                    components={markdownComponents}
+                                    wrapperElement={{'data-color-mode': colorMode}}
+                                />
                             </div>
                         </section>
                     ))}

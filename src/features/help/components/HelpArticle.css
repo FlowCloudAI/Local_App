@@ -137,13 +137,37 @@
     line-height: var(--fc-line-height-tight);
 }
 
-.help-doc__section p {
+.help-doc__markdown.wmde-markdown {
+    margin-top: var(--fc-space-sm);
+    background: transparent;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    line-height: var(--fc-line-height-normal);
+}
+
+.help-doc__markdown.wmde-markdown p {
     margin: var(--fc-space-sm) 0 0;
     color: var(--fc-color-text-secondary);
     line-height: var(--fc-line-height-normal);
 }
 
-.help-doc__figure {
+.help-doc__markdown.wmde-markdown ul,
+.help-doc__markdown.wmde-markdown ol {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-sm);
+    margin: var(--fc-space-md) 0 0;
+    padding-left: var(--fc-space-lg);
+    color: var(--fc-color-text);
+    line-height: var(--fc-line-height-normal);
+}
+
+.help-doc__markdown.wmde-markdown img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 14rem;
+    object-fit: cover;
     margin: var(--fc-space-md) 0 0;
     overflow: hidden;
     border: 1px solid var(--fc-color-border);
@@ -151,24 +175,30 @@
     background: var(--fc-color-bg);
 }
 
-.help-doc__figure img {
-    display: block;
-    width: 100%;
-    height: auto;
-    max-height: 14rem;
-    object-fit: cover;
+.help-doc__markdown.wmde-markdown p:has(> img) {
+    margin: var(--fc-space-md) 0 0;
 }
 
-.help-doc__figure figcaption {
-    margin: 0;
+.help-doc__markdown.wmde-markdown p:has(> img) + p em {
+    display: block;
+    margin-top: calc(-1 * var(--fc-space-sm));
     padding: var(--fc-space-sm) var(--fc-space-md);
-    border-top: 1px solid var(--fc-color-border);
+    border: 1px solid var(--fc-color-border);
+    border-top: 0;
+    border-radius: 0 0 var(--fc-radius-md) var(--fc-radius-md);
+    background: var(--fc-color-bg);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
+    font-style: normal;
     line-height: var(--fc-line-height-normal);
 }
 
-.help-doc__step-list,
+.help-doc__section p {
+    margin: var(--fc-space-sm) 0 0;
+    color: var(--fc-color-text-secondary);
+    line-height: var(--fc-line-height-normal);
+}
+
 .help-doc__tips ul {
     display: flex;
     flex-direction: column;

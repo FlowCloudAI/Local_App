@@ -1,6 +1,7 @@
 import helpAiFigure from './assets/help-ai.svg'
 import helpBasicsFigure from './assets/help-basics.svg'
 import helpMapFigure from './assets/help-map.svg'
+import {getHelpSectionMarkdown} from './helpMarkdown'
 
 export type HelpModuleKey = 'basics' | 'knowledge' | 'ai' | 'visualization' | 'safety'
 
@@ -449,6 +450,7 @@ export function filterHelpTopics(topics: HelpTopic[], query: string) {
             ...topic.sections.flatMap(section => [
                 section.title,
                 section.lead,
+                getHelpSectionMarkdown(topic.key, section.id),
                 section.figure?.caption ?? '',
                 ...section.items,
             ]),
