@@ -1,6 +1,4 @@
 .help-panel {
-    container-type: inline-size;
-    container-name: help-panel;
     position: relative;
     display: block;
     width: 100%;
@@ -17,8 +15,8 @@
     left: 0;
     bottom: 0;
     z-index: 20;
-    width: min(var(--dock-panel-sidebar-width), 100%);
-    min-width: 0;
+    width: var(--dock-panel-sidebar-width);
+    max-width: 100%;
     box-shadow: var(--fc-shadow-lg);
     transition: transform var(--fc-transition), opacity var(--fc-transition);
 }
@@ -35,7 +33,7 @@
     z-index: 19;
     border: 0;
     padding: 0;
-    background: var(--fc-color-bg-overlay);
+    background: rgba(0, 0, 0, 0.3);
     cursor: pointer;
 }
 
@@ -180,28 +178,3 @@
     background: var(--dock-panel-hover-bg);
 }
 
-.dockable-side-panel--fullscreen .help-panel {
-    background: transparent;
-}
-
-@container help-panel (max-width: 720px) {
-    .help-panel .help-side {
-        width: 100%;
-        min-width: 0;
-        border-right: 0;
-    }
-
-    .help-main__body {
-        padding: var(--fc-space-md);
-    }
-
-    .help-main__section-grid {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-@container help-panel (max-width: 480px) {
-    .help-main__header h2 {
-        font-size: 1.1rem;
-    }
-}

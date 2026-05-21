@@ -809,15 +809,9 @@ export default function DesktopApp() {
     // 侧边栏相关状态
     const IdeaIcon = (
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-            <defs>
-                <linearGradient id="ideaGrad" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
-                    <stop offset="0" stopColor="#0DBDED"/>
-                    <stop offset="1" stopColor="#9C1FED"/>
-                </linearGradient>
-            </defs>
             <path
                 d="M12 3C14 8 16 10 21 12C16 14 14 16 12 21C10 16 8 14 3 12C8 10 10 8 12 3Z"
-                stroke="url(#ideaGrad)"
+                stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -874,20 +868,18 @@ export default function DesktopApp() {
     const HelpIcon = (
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
             <path
-                d="M4.5 5.5h5A3.5 3.5 0 0 1 13 9v10.5a3.5 3.5 0 0 0-3.5-3.5h-5V5.5Z"
+                d="M4 6.5c2.5-1 5.5-1 8 .5 2.5-1.5 5.5-1.5 8-.5v12c-2.5-1-5.5-1-8 .5-2.5-1.5-5.5-1.5-8-.5v-12Z"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
             <path
-                d="M19.5 5.5h-5A3.5 3.5 0 0 0 11 9v10.5a3.5 3.5 0 0 1 3.5-3.5h5V5.5Z"
+                d="M12 7v12"
                 stroke="currentColor"
                 strokeWidth="1.5"
                 strokeLinecap="round"
-                strokeLinejoin="round"
             />
-            <path d="M8 8.5h1.8M15 8.5h1.8M8 11h1.8M15 11h1.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>)
 
     const menuItems: SideBarItem[] = [

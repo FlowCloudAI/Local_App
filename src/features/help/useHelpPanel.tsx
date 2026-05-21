@@ -139,7 +139,7 @@ export function useHelpPanel({
                         type="button"
                         className="help-side__toggle"
                         onClick={() => setSidebarCollapsed(true)}
-                        title="收起侧边栏"
+                        title="收起目录"
                     >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <path d="M10 3 5 8l5 5"/>
@@ -172,19 +172,15 @@ export function useHelpPanel({
         <DockPanelMain className="help-main">
             <DockPanelTopbar className="help-main__topbar">
                 <div className="help-main__topbar-left">
-                    {panelMode !== 'fullscreen' ? (
+                    {panelMode !== 'fullscreen' && sidebarCollapsed ? (
                         <DockPanelIconButton
                             type="button"
                             className="help-main__sidebar-toggle"
-                            onClick={() => setSidebarCollapsed(prev => !prev)}
-                            title={sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'}
+                            onClick={() => setSidebarCollapsed(false)}
+                            title="展开目录"
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                {sidebarCollapsed ? (
-                                    <path d="M6 3 11 8l-5 5"/>
-                                ) : (
-                                    <path d="M10 3 5 8l5 5"/>
-                                )}
+                                <path d="M6 3 11 8l-5 5"/>
                             </svg>
                         </DockPanelIconButton>
                     ) : null}

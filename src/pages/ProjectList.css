@@ -189,7 +189,10 @@
 
 .project-home-action-item {
   display: grid;
-  gap: 0.32rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.18rem;
+  align-items: center;
   padding: 0.78rem 0.85rem;
   border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
   background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
@@ -201,11 +204,30 @@
   background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg));
 }
 
-.project-home-action-item span {
+.project-home-action-item__icon {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: var(--fc-radius-md);
+  background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+  color: var(--fc-color-primary);
+}
+
+.project-home-action-item__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.project-home-action-item__title {
+  align-self: end;
   font-weight: var(--fc-font-weight-semibold, 600);
 }
 
-.project-home-action-item small {
+.project-home-action-item__desc {
+  align-self: start;
   color: var(--fc-color-text-secondary);
   font-size: 0.78rem;
   line-height: 1.55;

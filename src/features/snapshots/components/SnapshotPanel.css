@@ -144,6 +144,29 @@
     width: 100%;
     min-height: 100%;
     margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fc-space-xs);
+    padding: var(--fc-space-xl);
+    text-align: center;
+}
+
+.snapshot-main__empty-title {
+    margin: 0;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    font-weight: var(--fc-font-weight-medium);
+    line-height: 1.5;
+}
+
+.snapshot-main__empty-copy {
+    margin: 0;
+    max-width: 22rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.6;
 }
 
 .snapshot-main__graph {

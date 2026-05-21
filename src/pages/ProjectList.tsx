@@ -1,4 +1,4 @@
-import {type CSSProperties, memo, useCallback, useEffect, useMemo, useState} from 'react'
+import {type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
@@ -306,6 +306,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         key: string
         title: string
         description: string
+        icon: ReactNode
         target?: HomeActivityTarget
         onClick?: () => void
     }>>(() => [
@@ -313,12 +314,30 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'new-world',
             title: '开始一个新世界',
             description: '创建新的世界观项目。',
+            icon: (
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+                    <circle cx="11" cy="13" r="7.5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path
+                        d="M3.5 13h15M11 5.5c1.8 2.1 2.8 4.6 2.8 7.5s-1 5.4-2.8 7.5M11 5.5c-1.8 2.1-2.8 4.6-2.8 7.5s1 5.4 2.8 7.5"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                    <path d="M19 3.5v4M17 5.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+            ),
             onClick: () => setCreatorOpen(true),
         },
         {
             key: 'idea',
             title: '记录灵感',
             description: '先把想法放进灵感收件箱。',
+            icon: (
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+                    <path
+                        d="M12 3C14 8 16 10 21 12C16 14 14 16 12 21C10 16 8 14 3 12C8 10 10 8 12 3Z"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                </svg>
+            ),
             target: {
                 type: 'idea',
                 id: 'idea-panel',
@@ -330,6 +349,19 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'ai-chat',
             title: '打开 AI 助手',
             description: '让 AI 帮你整理设定、扩写片段或检查问题。',
+            icon: (
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+                    <path
+                        d="M5 9.5A3.5 3.5 0 0 1 8.5 6h7A3.5 3.5 0 0 1 19 9.5v4A3.5 3.5 0 0 1 15.5 17H10l-4 3v-3.6A3.48 3.48 0 0 1 5 13.5v-4Z"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                    <path d="M9 10h5M9 13h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path
+                        d="M17.5 4.5 18 6l1.5.5-1.5.5-.5 1.5-.5-1.5L15.5 6.5 17 6l.5-1.5Z"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                </svg>
+            ),
             target: {
                 type: 'conversation',
                 id: 'ai-chat-panel',
@@ -341,6 +373,17 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'snapshot',
             title: '查看快照',
             description: '回看最近保存的版本和分支。',
+            icon: (
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+                    <circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.5"/>
+                    <circle cx="8" cy="18" r="2" stroke="currentColor" strokeWidth="1.5"/>
+                    <circle cx="16" cy="12" r="2" stroke="currentColor" strokeWidth="1.5"/>
+                    <path
+                        d="M8 8v8m2-10h3.5A2.5 2.5 0 0 1 16 8.5v1.5M10 18h3.5A2.5 2.5 0 0 0 16 15.5V14"
+                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                </svg>
+            ),
             target: {
                 type: 'snapshot',
                 id: 'snapshot-panel',
@@ -593,8 +636,11 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         }
                                     }}
                                 >
-                                    <span>{action.title}</span>
-                                    <small>{action.description}</small>
+                                    <span className="project-home-action-item__icon" aria-hidden="true">
+                                        {action.icon}
+                                    </span>
+                                    <span className="project-home-action-item__title">{action.title}</span>
+                                    <small className="project-home-action-item__desc">{action.description}</small>
                                 </button>
                             ))}
                         </div>

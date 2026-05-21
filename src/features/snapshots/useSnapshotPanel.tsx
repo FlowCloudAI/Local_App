@@ -413,16 +413,17 @@ export function useSnapshotPanel({
     const mainViewport = (
         <div className="snapshot-main__viewport">
                 {loading && graphRows.length === 0 ? (
-                    <div className="snapshot-main__empty fc-empty-state-card">
-                        <span className="fc-empty-state-mark">Snapshot</span>
-                        <p className="fc-empty-state-title">正在加载版本历史</p>
-                        <p className="fc-empty-state-copy">正在读取快照图与分支信息。</p>
+                    <div className="snapshot-main__empty">
+                        <p className="snapshot-main__empty-title">正在加载版本历史…</p>
                     </div>
                 ) : graphRows.length === 0 ? (
-                    <div className="snapshot-main__empty fc-empty-state-card">
-                        <span className="fc-empty-state-mark">Snapshot</span>
-                        <p className="fc-empty-state-title">{activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}</p>
-                        <p className="fc-empty-state-copy">创建一次手动保存，或先切换到已有分支查看历史记录。</p>
+                    <div className="snapshot-main__empty">
+                        <p className="snapshot-main__empty-title">
+                            {activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}
+                        </p>
+                        <p className="snapshot-main__empty-copy">
+                            创建一次手动保存，或先切换到已有分支查看历史记录。
+                        </p>
                     </div>
                 ) : (
                     <div className="snapshot-main__graph"
