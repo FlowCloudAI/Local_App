@@ -8,6 +8,8 @@ import {
 import {
     DashboardBarList,
     type DashboardBarItem,
+    type DashboardIssueItem,
+    DashboardIssueGrid,
     DashboardMetric,
     HealthMeter,
 } from './ProjectDashboardParts'
@@ -116,10 +118,6 @@ function ProjectDashboard({
         }))
         : fallbackCategoryItems
     const tagTypeItems = getTagTypeItems(tagSchemas)
-    const customTypeNames = entryTypes
-        .filter(entryType => entryType.kind === 'custom')
-        .slice(0, 4)
-        .map(entryType => entryType.name)
     const structureChecks = [
         {label: '分类体系', passed: categories.length > 0},
         {label: '词条类型', passed: entryTypes.length > 0},
@@ -143,6 +141,43 @@ function ProjectDashboard({
     const relationCount = projectStats?.relationCount ?? 0
     const internalLinkCount = projectStats?.internalLinkCount ?? 0
     const updatedLast7Days = projectStats?.updatedLast7Days ?? 0
+    const qualityItems: DashboardIssueItem[] = [
+        {
+            key: 'uncategorized',
+            label: '未分类',
+            value: projectStats?.uncategorizedEntryCount,
+            hint: '缺少管理归属',
+            severity: projectStats?.uncategorizedEntryCount ? 'warn' : 'ok',
+        },
+        {
+            key: 'empty',
+            label: '空正文',
+            value: projectStats?.emptyContentEntryCount,
+            hint: '设定内容为空',
+            severity: projectStats?.emptyContentEntryCount ? 'danger' : 'ok',
+        },
+        {
+            key: 'summary',
+            label: '缺摘要',
+            value: projectStats?.missingSummaryEntryCount,
+            hint: '不利于快速检索',
+            severity: projectStats?.missingSummaryEntryCount ? 'warn' : 'ok',
+        },
+        {
+            key: 'isolated',
+            label: '孤立词条',
+            value: projectStats?.isolatedEntryCount,
+            hint: '没有关系或内链',
+            severity: projectStats?.isolatedEntryCount ? 'warn' : 'ok',
+        },
+        {
+            key: 'short',
+            label: '短正文',
+            value: projectStats?.shortContentEntryCount,
+            hint: '正文少于 100 字',
+            severity: projectStats?.shortContentEntryCount ? 'warn' : 'ok',
+        },
+    ]
 
     return (
         <section className="pe-dashboard-section">
@@ -207,11 +242,6 @@ function ProjectDashboard({
                         value={`${categoryStats.maxDepth || 0} 层`}
                         hint="观察资料结构的组织深度"
                     />
-                    <DashboardMetric
-                        label="自定义类型"
-                        value={formatDashboardNumber(customTypeCount)}
-                        hint={customTypeNames.length > 0 ? customTypeNames.join('、') : '尚未扩展'}
-                    />
                 </div>
 
                 <article className="pe-dashboard-panel">
@@ -236,6 +266,14 @@ function ProjectDashboard({
                         <span>{formatDashboardNumber(tagSchemas.length)} 项</span>
                     </div>
                     <DashboardBarList items={tagTypeItems}/>
+                </article>
+
+                <article className="pe-dashboard-panel pe-dashboard-panel--quality">
+                    <div className="pe-dashboard-panel__header">
+                        <h3>质量监控</h3>
+                        <span>异常指标</span>
+                    </div>
+                    <DashboardIssueGrid items={qualityItems}/>
                 </article>
 
                 <article className="pe-dashboard-panel pe-dashboard-panel--signals">

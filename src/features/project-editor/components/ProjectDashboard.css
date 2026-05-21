@@ -55,6 +55,10 @@
     background: color-mix(in srgb, var(--fc-color-primary) 5%, var(--fc-color-bg-secondary));
 }
 
+.pe-dashboard-panel--quality {
+    background: color-mix(in srgb, var(--fc-color-warning) 4%, var(--fc-color-bg-secondary));
+}
+
 .pe-dashboard-panel__header {
     display: flex;
     align-items: center;
@@ -214,6 +218,47 @@
     margin: 0;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
+}
+
+.pe-dashboard-issue-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.4rem, 1fr));
+    gap: var(--fc-space-sm);
+}
+
+.pe-dashboard-issue {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-height: 5.2rem;
+    padding: var(--fc-space-sm);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg);
+}
+
+.pe-dashboard-issue--ok {
+    border: 1px solid var(--fc-color-success-border);
+}
+
+.pe-dashboard-issue--warn {
+    border: 1px solid var(--fc-color-warning-border);
+}
+
+.pe-dashboard-issue--danger {
+    border: 1px solid var(--fc-color-danger-border);
+}
+
+.pe-dashboard-issue__label,
+.pe-dashboard-issue__hint {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.35;
+}
+
+.pe-dashboard-issue strong {
+    color: var(--fc-color-text);
+    font-size: 1.18rem;
+    line-height: 1.1;
 }
 
 .pe-dashboard-signals {

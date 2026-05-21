@@ -7,6 +7,14 @@ export interface DashboardBarItem {
     value: number
 }
 
+export interface DashboardIssueItem {
+    key: string
+    label: string
+    value?: number | null
+    hint: string
+    severity: 'ok' | 'warn' | 'danger'
+}
+
 function getBarStyle(value: number, total: number): CSSProperties {
     const percent = total > 0 ? Math.max(4, Math.round((value / total) * 100)) : 0
     return {'--pe-dashboard-bar-width': `${percent}%`} as CSSProperties
@@ -41,6 +49,23 @@ export function DashboardBarList({items}: { items: DashboardBarItem[] }) {
                         <span className="pe-dashboard-bar-fill" style={getBarStyle(item.value, total)}/>
                     </div>
                 </div>
+            ))}
+        </div>
+    )
+}
+
+export function DashboardIssueGrid({items}: { items: DashboardIssueItem[] }) {
+    return (
+        <div className="pe-dashboard-issue-grid">
+            {items.map(item => (
+                <article
+                    key={item.key}
+                    className={`pe-dashboard-issue pe-dashboard-issue--${item.severity}`}
+                >
+                    <span className="pe-dashboard-issue__label">{item.label}</span>
+                    <strong>{formatDashboardNumber(item.value)}</strong>
+                    <span className="pe-dashboard-issue__hint">{item.hint}</span>
+                </article>
             ))}
         </div>
     )
