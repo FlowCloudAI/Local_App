@@ -27,6 +27,7 @@
     margin-bottom: var(--fc-space-sm);
 }
 
+.help-side__home-button,
 .help-side__module-button {
     display: flex;
     align-items: center;
@@ -45,10 +46,16 @@
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
+.help-side__home-button {
+    margin-bottom: var(--fc-space-sm);
+}
+
+.help-side__home-button:hover,
 .help-side__module-button:hover {
     background: var(--dock-panel-hover-bg);
 }
 
+.help-side__home-button.is-active,
 .help-side__module.is-active .help-side__module-button {
     border-left-color: var(--fc-color-primary);
     background: var(--dock-panel-active-bg);

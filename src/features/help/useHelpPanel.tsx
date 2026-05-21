@@ -18,6 +18,7 @@ import {
     normalizeHelpTopicKey,
 } from '../../shared/help/helpCatalog'
 import HelpArticle from './components/HelpArticle'
+import HelpHome from './components/HelpHome'
 import HelpModuleHome from './components/HelpModuleHome'
 import HelpSidebar from './components/HelpSidebar'
 import './components/HelpPanel.css'
@@ -57,7 +58,7 @@ export function useHelpPanel({
     onTogglePanelMode,
     onToggleCollapsed,
 }: UseHelpPanelOptions = {}): HelpPanelSlots {
-    const [activeModuleKey, setActiveModuleKey] = useState<HelpModuleKey>('basics')
+    const [activeModuleKey, setActiveModuleKey] = useState<HelpModuleKey | null>(null)
     const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey | null>(null)
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
@@ -103,13 +104,18 @@ export function useHelpPanel({
     )
 
     const activeModule = useMemo(
-        () => getHelpModule(activeModuleKey),
+        () => activeModuleKey ? getHelpModule(activeModuleKey) : null,
         [activeModuleKey],
     )
 
     const activeModuleTopics = useMemo(
-        () => HELP_TOPICS.filter(topic => topic.moduleKey === activeModuleKey),
+        () => activeModuleKey ? HELP_TOPICS.filter(topic => topic.moduleKey === activeModuleKey) : [],
         [activeModuleKey],
+    )
+
+    const allTopicGroups = useMemo(
+        () => groupHelpTopicsByModule(HELP_TOPICS),
+        [],
     )
 
     const topicGroups = useMemo(
@@ -125,6 +131,12 @@ export function useHelpPanel({
         if (panelMode !== 'fullscreen') {
             setSidebarCollapsed(true)
         }
+    }
+
+    const handleSelectHome = () => {
+        setActiveModuleKey(null)
+        setActiveTopicKey(null)
+        setActiveSectionId(null)
     }
 
     const handleSelectModule = (moduleKey: HelpModuleKey) => {
@@ -144,11 +156,13 @@ export function useHelpPanel({
     const sideContent = (
         <HelpSidebar
             groups={topicGroups}
+            activeHome={!activeModuleKey && !activeTopicKey}
             activeModuleKey={activeModuleKey}
             activeTopicKey={activeTopic?.key ?? null}
             searchText={searchText}
             showCollapseButton={panelMode !== 'fullscreen'}
             onSearchTextChange={setSearchText}
+            onSelectHome={handleSelectHome}
             onSelectModule={handleSelectModule}
             onSelectTopic={handleSelectTopic}
             onCollapse={() => setSidebarCollapsed(true)}
@@ -207,13 +221,22 @@ export function useHelpPanel({
                     topic={activeTopic}
                     activeSectionId={activeSectionId}
                     bodyRef={articleBodyRef}
+                    onSelectHome={handleSelectHome}
                     onSelectSection={handleSelectSection}
                 />
-            ) : (
+            ) : activeModule ? (
                 <HelpModuleHome
                     module={activeModule}
                     topics={activeModuleTopics}
                     bodyRef={articleBodyRef}
+                    onSelectHome={handleSelectHome}
+                    onSelectTopic={handleSelectTopic}
+                />
+            ) : (
+                <HelpHome
+                    groups={allTopicGroups}
+                    bodyRef={articleBodyRef}
+                    onSelectModule={handleSelectModule}
                     onSelectTopic={handleSelectTopic}
                 />
             )}

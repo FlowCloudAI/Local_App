@@ -10,14 +10,25 @@ import './HelpSidebar.css'
 
 interface HelpSidebarProps {
     groups: HelpTopicGroup[]
-    activeModuleKey: HelpModuleKey
+    activeHome: boolean
+    activeModuleKey: HelpModuleKey | null
     activeTopicKey: HelpTopicKey | null
     searchText: string
     showCollapseButton: boolean
     onSearchTextChange: (value: string) => void
+    onSelectHome: () => void
     onSelectModule: (moduleKey: HelpModuleKey) => void
     onSelectTopic: (topicKey: HelpTopicKey) => void
     onCollapse: () => void
+}
+
+function HelpHomeIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 10.5 12 4l8 6.5V20H5.5a1.5 1.5 0 0 1-1.5-1.5v-8Z"/>
+            <path d="M9 20v-6h6v6"/>
+        </svg>
+    )
 }
 
 function HelpModuleIcon({moduleKey}: { moduleKey: HelpModuleKey }) {
@@ -64,11 +75,13 @@ function HelpModuleIcon({moduleKey}: { moduleKey: HelpModuleKey }) {
 
 export default function HelpSidebar({
     groups,
+    activeHome,
     activeModuleKey,
     activeTopicKey,
     searchText,
     showCollapseButton,
     onSearchTextChange,
+    onSelectHome,
     onSelectModule,
     onSelectTopic,
     onCollapse,
@@ -100,6 +113,17 @@ export default function HelpSidebar({
                 />
             </div>
             <div className="help-side__list" aria-label="帮助主题">
+                <button
+                    type="button"
+                    className={`help-side__home-button${activeHome ? ' is-active' : ''}`}
+                    aria-current={activeHome ? 'page' : undefined}
+                    onClick={onSelectHome}
+                >
+                    <span className="help-side__module-icon">
+                        <HelpHomeIcon/>
+                    </span>
+                    <span className="help-side__module-title">首页</span>
+                </button>
                 {groups.length > 0 ? groups.map(group => {
                     const activeInModule = group.module.key === activeModuleKey
 

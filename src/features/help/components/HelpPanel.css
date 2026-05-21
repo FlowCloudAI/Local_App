@@ -41,6 +41,43 @@
     background: var(--fc-color-bg);
 }
 
+.help-content-home-button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    margin: 0 0 var(--fc-space-sm);
+    padding: var(--fc-space-xs) var(--fc-space-sm);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    font-size: var(--fc-font-size-sm);
+    line-height: var(--fc-line-height-normal);
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.help-content-home-button:hover {
+    border-color: var(--fc-color-primary);
+    background: var(--dock-panel-hover-bg);
+    color: var(--fc-color-primary);
+}
+
+.help-content-home-button svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.6;
+}
+
+.help-content-home-button + .help-doc__header,
+.help-content-home-button + .help-home__header {
+    padding-top: var(--fc-space-md);
+}
+
 .help-main__topbar-left {
     display: flex;
     align-items: center;

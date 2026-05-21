@@ -10,6 +10,7 @@ interface HelpArticleProps {
     topic: HelpTopic
     activeSectionId: string | null
     bodyRef: RefObject<HTMLDivElement | null>
+    onSelectHome: () => void
     onSelectSection: (sectionId: string) => void
 }
 
@@ -17,6 +18,7 @@ export default function HelpArticle({
     topic,
     activeSectionId,
     bodyRef,
+    onSelectHome,
     onSelectSection,
 }: HelpArticleProps) {
     const module = getHelpModule(topic.moduleKey)
@@ -24,6 +26,12 @@ export default function HelpArticle({
     return (
         <div className="help-main__body" ref={bodyRef}>
             <article className="help-doc">
+                <button type="button" className="help-content-home-button" onClick={onSelectHome}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M9.5 3.5 5 8l4.5 4.5"/>
+                    </svg>
+                    返回首页
+                </button>
                 <header className="help-doc__header">
                     <div className="help-doc__crumb">帮助中心 / {module.label} / {topic.category}</div>
                     <h2>{topic.label}</h2>

@@ -6,6 +6,7 @@ interface HelpModuleHomeProps {
     module: HelpModule
     topics: HelpTopic[]
     bodyRef: RefObject<HTMLDivElement | null>
+    onSelectHome: () => void
     onSelectTopic: (topicKey: HelpTopicKey, sectionId?: string) => void
 }
 
@@ -21,6 +22,7 @@ export default function HelpModuleHome({
     module,
     topics,
     bodyRef,
+    onSelectHome,
     onSelectTopic,
 }: HelpModuleHomeProps) {
     const leadFigure = findLeadFigure(topics)
@@ -29,6 +31,12 @@ export default function HelpModuleHome({
     return (
         <div className="help-main__body" ref={bodyRef}>
             <article className="help-home">
+                <button type="button" className="help-content-home-button" onClick={onSelectHome}>
+                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M9.5 3.5 5 8l4.5 4.5"/>
+                    </svg>
+                    返回首页
+                </button>
                 <header className={`help-home__header${leadFigure ? ' has-figure' : ''}`}>
                     <div className="help-home__intro">
                         <div className="help-home__crumb">帮助中心 / {module.label}</div>
