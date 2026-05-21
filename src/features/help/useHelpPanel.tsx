@@ -115,12 +115,10 @@ export function useHelpPanel({
         <HelpSidebar
             groups={topicGroups}
             activeTopicKey={activeTopic.key}
-            activeSectionId={activeSectionId}
             searchText={searchText}
             showCollapseButton={panelMode !== 'fullscreen'}
             onSearchTextChange={setSearchText}
             onSelectTopic={handleSelectTopic}
-            onSelectSection={handleSelectSection}
             onCollapse={() => setSidebarCollapsed(true)}
         />
     )
