@@ -1,7 +1,8 @@
 use super::common::*;
 use super::images::{copy_entry_images, prepare_entry_cover_path};
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,6 +48,43 @@ fn normalize_entry_compare_text(value: &str) -> String {
 
 fn normalize_entry_lookup_title(value: &str) -> String {
     value.trim().to_lowercase()
+}
+
+fn normalize_stats_entry_type(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn parse_entry_timestamp(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|date_time| date_time.with_timezone(&Utc))
+        .ok()
+        .or_else(|| {
+            NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S%.f")
+                .or_else(|_| NaiveDateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S"))
+                .ok()
+                .map(|date_time| DateTime::<Utc>::from_naive_utc_and_offset(date_time, Utc))
+        })
+}
+
+fn sort_type_stats(stats: &mut [ProjectEntryTypeStat]) {
+    stats.sort_by(|left, right| {
+        right
+            .count
+            .cmp(&left.count)
+            .then_with(|| left.entry_type.cmp(&right.entry_type))
+    });
+}
+
+fn sort_category_stats(stats: &mut [ProjectCategoryStat]) {
+    stats.sort_by(|left, right| {
+        right
+            .count
+            .cmp(&left.count)
+            .then_with(|| left.category_id.cmp(&right.category_id))
+    });
 }
 
 fn parse_entry_uri(raw: &str) -> Option<Uuid> {
@@ -437,8 +475,31 @@ pub async fn db_get_project_stats(
 
     let mut image_count = 0usize;
     let mut word_count = 0usize;
+    let mut entry_count = 0usize;
+    let mut internal_link_count = 0usize;
+    let mut uncategorized_entry_count = 0usize;
+    let mut empty_content_entry_count = 0usize;
+    let mut short_content_entry_count = 0usize;
+    let mut missing_summary_entry_count = 0usize;
+    let mut created_last_7_days = 0usize;
+    let mut updated_last_7_days = 0usize;
+    let mut entries_by_type = HashMap::<Option<String>, (usize, usize)>::new();
+    let mut entries_by_category = HashMap::<Option<Uuid>, (usize, usize)>::new();
+    let mut entry_ids = HashSet::<Uuid>::new();
+    let mut connected_entry_ids = HashSet::<Uuid>::new();
     let mut offset = 0usize;
     const PAGE_SIZE: usize = 500;
+    const SHORT_CONTENT_CHAR_THRESHOLD: usize = 100;
+    let recent_threshold = Utc::now() - Duration::days(7);
+
+    let relations = db
+        .list_relations_for_project(&project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    for relation in &relations {
+        connected_entry_ids.insert(relation.a_id);
+        connected_entry_ids.insert(relation.b_id);
+    }
 
     loop {
         let batch = db
@@ -461,8 +522,60 @@ pub async fn db_get_project_stats(
 
         for brief in &batch {
             let entry = db.get_entry(&brief.id).await.map_err(|e| e.to_string())?;
+            let entry_word_count = entry.content.chars().count();
+            let entry_type = normalize_stats_entry_type(entry.r#type.as_deref());
+            let category_id = entry.category_id;
+
+            entry_count += 1;
+            entry_ids.insert(entry.id);
             image_count += entry.images.0.len();
-            word_count += entry.content.chars().count();
+            word_count += entry_word_count;
+
+            if category_id.is_none() {
+                uncategorized_entry_count += 1;
+            }
+            if entry.content.trim().is_empty() {
+                empty_content_entry_count += 1;
+            }
+            if entry_word_count < SHORT_CONTENT_CHAR_THRESHOLD {
+                short_content_entry_count += 1;
+            }
+            if entry.summary.as_deref().map(str::trim).unwrap_or_default().is_empty() {
+                missing_summary_entry_count += 1;
+            }
+            if parse_entry_timestamp(&entry.created_at)
+                .map(|created_at| created_at >= recent_threshold)
+                .unwrap_or(false)
+            {
+                created_last_7_days += 1;
+            }
+            if parse_entry_timestamp(&entry.updated_at)
+                .map(|updated_at| updated_at >= recent_threshold)
+                .unwrap_or(false)
+            {
+                updated_last_7_days += 1;
+            }
+
+            let type_entry = entries_by_type.entry(entry_type).or_insert((0, 0));
+            type_entry.0 += 1;
+            type_entry.1 += entry_word_count;
+
+            let category_entry = entries_by_category.entry(category_id).or_insert((0, 0));
+            category_entry.0 += 1;
+            category_entry.1 += entry_word_count;
+
+            let outgoing_links = db
+                .list_outgoing_links(&entry.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let incoming_links = db
+                .list_incoming_links(&entry.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            internal_link_count += outgoing_links.len();
+            if !outgoing_links.is_empty() || !incoming_links.is_empty() {
+                connected_entry_ids.insert(entry.id);
+            }
         }
 
         offset += batch_len;
@@ -471,9 +584,44 @@ pub async fn db_get_project_stats(
         }
     }
 
+    let isolated_entry_count = entry_ids
+        .iter()
+        .filter(|entry_id| !connected_entry_ids.contains(entry_id))
+        .count();
+    let mut entries_by_type = entries_by_type
+        .into_iter()
+        .map(|(entry_type, (count, word_count))| ProjectEntryTypeStat {
+            entry_type,
+            count,
+            word_count,
+        })
+        .collect::<Vec<_>>();
+    let mut entries_by_category = entries_by_category
+        .into_iter()
+        .map(|(category_id, (count, word_count))| ProjectCategoryStat {
+            category_id: category_id.map(|id| id.to_string()),
+            count,
+            word_count,
+        })
+        .collect::<Vec<_>>();
+    sort_type_stats(&mut entries_by_type);
+    sort_category_stats(&mut entries_by_category);
+
     Ok(ProjectStats {
+        entry_count,
         image_count,
         word_count,
+        relation_count: relations.len(),
+        internal_link_count,
+        entries_by_type,
+        entries_by_category,
+        uncategorized_entry_count,
+        empty_content_entry_count,
+        short_content_entry_count,
+        missing_summary_entry_count,
+        isolated_entry_count,
+        created_last_7_days,
+        updated_last_7_days,
     })
 }
 

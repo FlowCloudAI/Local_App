@@ -78,9 +78,33 @@ export interface ProjectTimelineEvent {
 
 }
 
+export interface ProjectEntryTypeStat {
+    entryType?: string | null
+    count: number
+    wordCount: number
+}
+
+export interface ProjectCategoryStat {
+    categoryId?: string | null
+    count: number
+    wordCount: number
+}
+
 export interface ProjectStats {
+    entryCount: number
     imageCount: number
     wordCount: number
+    relationCount: number
+    internalLinkCount: number
+    entriesByType: ProjectEntryTypeStat[]
+    entriesByCategory: ProjectCategoryStat[]
+    uncategorizedEntryCount: number
+    emptyContentEntryCount: number
+    shortContentEntryCount: number
+    missingSummaryEntryCount: number
+    isolatedEntryCount: number
+    createdLast7Days: number
+    updatedLast7Days: number
 }
 
 export interface CoverThumbnailMigrationSummary {

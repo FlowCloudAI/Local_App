@@ -4,6 +4,7 @@ import type {
     CustomEntryType,
     EntryTypeView,
     Project,
+    ProjectStats,
     TagSchema,
 } from '../../../api'
 
@@ -16,6 +17,9 @@ export interface ProjectOverviewProps {
     tagCount: number
     imageCount?: number | null
     wordCount?: number | null
+    projectStats?: ProjectStats | null
+    mapCount?: number | null
+    snapshotCount?: number | null
     onCreateTag?: () => void
     onCreateEntryType?: () => void
     onEditTag?: (tag: TagSchema) => void

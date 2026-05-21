@@ -1,9 +1,20 @@
-import type {CSSProperties} from 'react'
 import {
+    entryTypeKey,
     type Category,
     type EntryTypeView,
+    type ProjectStats,
     type TagSchema,
 } from '../../../api'
+import {
+    DashboardBarList,
+    type DashboardBarItem,
+    DashboardMetric,
+    HealthMeter,
+} from './ProjectDashboardParts'
+import {
+    formatDashboardNumber,
+    formatDashboardRatio,
+} from './ProjectDashboardFormat'
 import './ProjectDashboard.css'
 
 interface ProjectDashboardProps {
@@ -13,29 +24,9 @@ interface ProjectDashboardProps {
     entryCount: number
     imageCount?: number | null
     wordCount?: number | null
-}
-
-interface BarItem {
-    key: string
-    label: string
-    value: number
-}
-
-const numberFormatter = new Intl.NumberFormat('zh-CN')
-
-function formatNumber(value: number | null | undefined): string {
-    if (value == null || Number.isNaN(value)) return '--'
-    return numberFormatter.format(value)
-}
-
-function formatRatio(value: number): string {
-    if (!Number.isFinite(value)) return '--'
-    return `${Math.round(value * 100)}%`
-}
-
-function getBarStyle(value: number, total: number): CSSProperties {
-    const percent = total > 0 ? Math.max(4, Math.round((value / total) * 100)) : 0
-    return {'--pe-dashboard-bar-width': `${percent}%`} as CSSProperties
+    projectStats?: ProjectStats | null
+    mapCount?: number | null
+    snapshotCount?: number | null
 }
 
 function getCategoryDepthStats(categories: Category[]) {
@@ -62,7 +53,7 @@ function getCategoryDepthStats(categories: Category[]) {
     }
 }
 
-function getTagTypeItems(tagSchemas: TagSchema[]): BarItem[] {
+function getTagTypeItems(tagSchemas: TagSchema[]): DashboardBarItem[] {
     const counts = new Map<string, number>([
         ['文本', 0],
         ['数值', 0],
@@ -81,56 +72,6 @@ function getTagTypeItems(tagSchemas: TagSchema[]): BarItem[] {
         .filter(item => item.value > 0)
 }
 
-function DashboardMetric({label, value, hint}: { label: string; value: string; hint: string }) {
-    return (
-        <article className="pe-dashboard-metric">
-            <span className="pe-dashboard-metric__label">{label}</span>
-            <strong className="pe-dashboard-metric__value">{value}</strong>
-            <span className="pe-dashboard-metric__hint">{hint}</span>
-        </article>
-    )
-}
-
-function DashboardBarList({items}: { items: BarItem[] }) {
-    const total = items.reduce((sum, item) => sum + item.value, 0)
-
-    if (items.length === 0) {
-        return <p className="pe-dashboard-empty">暂无可统计数据</p>
-    }
-
-    return (
-        <div className="pe-dashboard-bars">
-            {items.map(item => (
-                <div className="pe-dashboard-bar-row" key={item.key}>
-                    <div className="pe-dashboard-bar-row__topline">
-                        <span>{item.label}</span>
-                        <span>{formatNumber(item.value)}</span>
-                    </div>
-                    <div className="pe-dashboard-bar-track">
-                        <span className="pe-dashboard-bar-fill" style={getBarStyle(item.value, total)}/>
-                    </div>
-                </div>
-            ))}
-        </div>
-    )
-}
-
-function HealthMeter({score}: { score: number }) {
-    const status = score >= 80 ? '结构稳定' : score >= 55 ? '仍需补强' : '基础偏弱'
-    return (
-        <div className="pe-dashboard-health">
-            <div className="pe-dashboard-health__ring" style={getBarStyle(score, 100)}>
-                <span>{score}</span>
-            </div>
-            <div className="pe-dashboard-health__body">
-                <span className="pe-dashboard-health__label">世界观结构化评分</span>
-                <strong>{status}</strong>
-                <span>基于分类、词条类型、标签体系、内容体量和平均字数估算。</span>
-            </div>
-        </div>
-    )
-}
-
 function ProjectDashboard({
                               categories,
                               entryTypes,
@@ -138,22 +79,42 @@ function ProjectDashboard({
                               entryCount,
                               imageCount,
                               wordCount,
+                              projectStats,
+                              mapCount,
+                              snapshotCount,
                           }: ProjectDashboardProps) {
-    const safeWordCount = wordCount ?? 0
-    const safeImageCount = imageCount ?? 0
-    const averageWords = entryCount > 0 ? Math.round(safeWordCount / entryCount) : 0
-    const assetRatio = entryCount > 0 ? safeImageCount / entryCount : 0
+    const effectiveEntryCount = projectStats?.entryCount ?? entryCount
+    const safeWordCount = projectStats?.wordCount ?? wordCount ?? 0
+    const safeImageCount = projectStats?.imageCount ?? imageCount ?? 0
+    const averageWords = effectiveEntryCount > 0 ? Math.round(safeWordCount / effectiveEntryCount) : 0
+    const assetRatio = effectiveEntryCount > 0 ? safeImageCount / effectiveEntryCount : 0
     const categoryStats = getCategoryDepthStats(categories)
+    const entryTypeNameMap = new Map(entryTypes.map(entryType => [entryTypeKey(entryType), entryType.name]))
+    const categoryNameMap = new Map(categories.map(category => [category.id, category.name]))
     const builtinTypeCount = entryTypes.filter(entryType => entryType.kind === 'builtin').length
     const customTypeCount = entryTypes.length - builtinTypeCount
-    const typeItems = [
+    const fallbackTypeItems = [
         {key: 'builtin', label: '内置类型', value: builtinTypeCount},
         {key: 'custom', label: '自定义类型', value: customTypeCount},
     ].filter(item => item.value > 0)
-    const categoryItems = [
+    const typeItems = projectStats?.entriesByType.length
+        ? projectStats.entriesByType.map(item => ({
+            key: item.entryType ?? 'unset',
+            label: item.entryType ? entryTypeNameMap.get(item.entryType) ?? item.entryType : '未设置类型',
+            value: item.count,
+        }))
+        : fallbackTypeItems
+    const fallbackCategoryItems = [
         {key: 'root', label: '一级分类', value: categoryStats.rootCount},
         {key: 'nested', label: '子分类', value: categoryStats.nestedCount},
     ].filter(item => item.value > 0)
+    const categoryItems = projectStats?.entriesByCategory.length
+        ? projectStats.entriesByCategory.slice(0, 6).map(item => ({
+            key: item.categoryId ?? 'uncategorized',
+            label: item.categoryId ? categoryNameMap.get(item.categoryId) ?? '未知分类' : '未分类',
+            value: item.count,
+        }))
+        : fallbackCategoryItems
     const tagTypeItems = getTagTypeItems(tagSchemas)
     const customTypeNames = entryTypes
         .filter(entryType => entryType.kind === 'custom')
@@ -163,12 +124,25 @@ function ProjectDashboard({
         {label: '分类体系', passed: categories.length > 0},
         {label: '词条类型', passed: entryTypes.length > 0},
         {label: '标签字段', passed: tagSchemas.length > 0},
-        {label: '内容资产', passed: entryCount > 0},
+        {label: '内容资产', passed: effectiveEntryCount > 0},
         {label: '平均字数', passed: averageWords >= 100},
     ]
-    const structureScore = Math.round(
+    const baseScore = Math.round(
         (structureChecks.filter(item => item.passed).length / structureChecks.length) * 100,
     )
+    const healthIssueCount = projectStats
+        ? projectStats.uncategorizedEntryCount
+        + projectStats.emptyContentEntryCount
+        + projectStats.missingSummaryEntryCount
+        + projectStats.isolatedEntryCount
+        : 0
+    const healthPenalty = projectStats && effectiveEntryCount > 0
+        ? Math.min(40, Math.round((healthIssueCount / (effectiveEntryCount * 4)) * 100))
+        : 0
+    const structureScore = Math.max(0, baseScore - healthPenalty)
+    const relationCount = projectStats?.relationCount ?? 0
+    const internalLinkCount = projectStats?.internalLinkCount ?? 0
+    const updatedLast7Days = projectStats?.updatedLast7Days ?? 0
 
     return (
         <section className="pe-dashboard-section">
@@ -200,13 +174,33 @@ function ProjectDashboard({
                 <div className="pe-dashboard-metric-grid">
                     <DashboardMetric
                         label="平均词条字数"
-                        value={formatNumber(averageWords)}
+                        value={formatDashboardNumber(averageWords)}
                         hint="衡量设定资料的填充厚度"
                     />
                     <DashboardMetric
                         label="图文资源比"
-                        value={formatRatio(assetRatio)}
+                        value={formatDashboardRatio(assetRatio)}
                         hint="平均每个词条关联图片资源"
+                    />
+                    <DashboardMetric
+                        label="关系总数"
+                        value={formatDashboardNumber(relationCount)}
+                        hint="词条之间的显式关系"
+                    />
+                    <DashboardMetric
+                        label="内链总数"
+                        value={formatDashboardNumber(internalLinkCount)}
+                        hint="正文中维护的词条链接"
+                    />
+                    <DashboardMetric
+                        label="地图数量"
+                        value={formatDashboardNumber(mapCount)}
+                        hint="项目空间资料资产"
+                    />
+                    <DashboardMetric
+                        label="版本快照"
+                        value={formatDashboardNumber(snapshotCount)}
+                        hint="当前资料库版本沉淀"
                     />
                     <DashboardMetric
                         label="分类层级深度"
@@ -215,23 +209,23 @@ function ProjectDashboard({
                     />
                     <DashboardMetric
                         label="自定义类型"
-                        value={formatNumber(customTypeCount)}
+                        value={formatDashboardNumber(customTypeCount)}
                         hint={customTypeNames.length > 0 ? customTypeNames.join('、') : '尚未扩展'}
                     />
                 </div>
 
                 <article className="pe-dashboard-panel">
                     <div className="pe-dashboard-panel__header">
-                        <h3>词条类型配置</h3>
-                        <span>{formatNumber(entryTypes.length)} 项</span>
+                        <h3>{projectStats ? '词条类型分布' : '词条类型配置'}</h3>
+                        <span>{formatDashboardNumber(projectStats?.entriesByType.length ?? entryTypes.length)} 项</span>
                     </div>
                     <DashboardBarList items={typeItems}/>
                 </article>
 
                 <article className="pe-dashboard-panel">
                     <div className="pe-dashboard-panel__header">
-                        <h3>分类结构</h3>
-                        <span>{formatNumber(categories.length)} 项</span>
+                        <h3>{projectStats ? '分类词条分布' : '分类结构'}</h3>
+                        <span>{formatDashboardNumber(projectStats?.entriesByCategory.length ?? categories.length)} 项</span>
                     </div>
                     <DashboardBarList items={categoryItems}/>
                 </article>
@@ -239,7 +233,7 @@ function ProjectDashboard({
                 <article className="pe-dashboard-panel">
                     <div className="pe-dashboard-panel__header">
                         <h3>标签字段类型</h3>
-                        <span>{formatNumber(tagSchemas.length)} 项</span>
+                        <span>{formatDashboardNumber(tagSchemas.length)} 项</span>
                     </div>
                     <DashboardBarList items={tagTypeItems}/>
                 </article>
@@ -250,9 +244,10 @@ function ProjectDashboard({
                         <span>基础版</span>
                     </div>
                     <ul className="pe-dashboard-signals">
-                        <li>当前已有 {formatNumber(entryCount)} 个词条进入项目资料库。</li>
-                        <li>结构配置项共 {formatNumber(categories.length + entryTypes.length + tagSchemas.length)} 个。</li>
-                        <li>下一阶段将接入类型词条数、孤立词条、短正文词条等健康指标。</li>
+                        <li>当前已有 {formatDashboardNumber(effectiveEntryCount)} 个词条进入项目资料库。</li>
+                        <li>最近 7 天更新 {formatDashboardNumber(updatedLast7Days)} 个词条。</li>
+                        <li>未分类 {formatDashboardNumber(projectStats?.uncategorizedEntryCount)} 个，孤立词条 {formatDashboardNumber(projectStats?.isolatedEntryCount)} 个。</li>
+                        <li>空正文 {formatDashboardNumber(projectStats?.emptyContentEntryCount)} 个，缺摘要 {formatDashboardNumber(projectStats?.missingSummaryEntryCount)} 个。</li>
                     </ul>
                 </article>
             </div>

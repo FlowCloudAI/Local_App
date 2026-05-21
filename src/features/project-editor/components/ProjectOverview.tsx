@@ -22,6 +22,9 @@ function ProjectOverview({
                              tagCount,
                              imageCount,
                              wordCount,
+                             projectStats,
+                             mapCount,
+                             snapshotCount,
                              onCreateTag,
                              onCreateEntryType,
                              onEditTag,
@@ -74,6 +77,9 @@ function ProjectOverview({
                 entryCount={entryCount}
                 imageCount={imageCount}
                 wordCount={wordCount}
+                projectStats={projectStats}
+                mapCount={mapCount}
+                snapshotCount={snapshotCount}
             />
 
             <ProjectFeatureLinks

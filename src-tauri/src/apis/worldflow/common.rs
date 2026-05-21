@@ -49,9 +49,37 @@ pub struct ProjectTimelineData {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectEntryTypeStat {
+    pub entry_type: Option<String>,
+    pub count: usize,
+    pub word_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCategoryStat {
+    pub category_id: Option<String>,
+    pub count: usize,
+    pub word_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectStats {
+    pub entry_count: usize,
     pub image_count: usize,
     pub word_count: usize,
+    pub relation_count: usize,
+    pub internal_link_count: usize,
+    pub entries_by_type: Vec<ProjectEntryTypeStat>,
+    pub entries_by_category: Vec<ProjectCategoryStat>,
+    pub uncategorized_entry_count: usize,
+    pub empty_content_entry_count: usize,
+    pub short_content_entry_count: usize,
+    pub missing_summary_entry_count: usize,
+    pub isolated_entry_count: usize,
+    pub created_last_7_days: usize,
+    pub updated_last_7_days: usize,
 }
 
 struct DefaultTimelineTagDefinition {

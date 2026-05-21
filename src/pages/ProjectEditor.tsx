@@ -18,6 +18,7 @@ import {
     type CategoryCreatedEvent,
     type CategoryDeletedEvent,
     type CustomEntryType,
+    dbListSnapshots,
     db_count_entries,
     db_create_category,
     db_create_entry,
@@ -43,7 +44,9 @@ import {
     type EntryDeletedEvent,
     type EntryTypeView,
     type EntryUpdatedEvent,
+    map_list_project_maps,
     type Project,
+    type ProjectStats,
     type TagSchema,
 } from '../api'
 import EntryEditor from '../features/entries/components/EntryEditor'
@@ -180,8 +183,9 @@ function ProjectEditorInner({
     const [categories, setCategories] = useState<Category[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [entryCount, setEntryCount] = useState(0)
-    const [imageCount, setImageCount] = useState<number | null>(null)
-    const [wordCount, setWordCount] = useState<number | null>(null)
+    const [projectStats, setProjectStats] = useState<ProjectStats | null>(null)
+    const [mapCount, setMapCount] = useState<number | null>(null)
+    const [snapshotCount, setSnapshotCount] = useState<number | null>(null)
     const [categoryEntryRefreshToken, setCategoryEntryRefreshToken] = useState(0)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
@@ -282,21 +286,48 @@ function ProjectEditorInner({
             }
         })()
 
+        return () => {
+            cancelled = true
+        }
+    }, [fetchAll, projectId])
+
+    useEffect(() => {
+        let cancelled = false
+
         void (async () => {
-            try {
-                const stats = await db_get_project_stats(projectId)
-                if (cancelled) return
-                setImageCount(stats.imageCount)
-                setWordCount(stats.wordCount)
-            } catch (e) {
-                if (!cancelled) logger.error('ProjectEditor stats load failed', e)
+            const [statsResult, mapsResult, snapshotsResult] = await Promise.allSettled([
+                db_get_project_stats(projectId),
+                map_list_project_maps(projectId),
+                dbListSnapshots(),
+            ])
+            if (cancelled) return
+
+            if (statsResult.status === 'fulfilled') {
+                setProjectStats(statsResult.value)
+            } else {
+                logger.error('ProjectEditor stats load failed', statsResult.reason)
+                setProjectStats(null)
+            }
+
+            if (mapsResult.status === 'fulfilled') {
+                setMapCount(mapsResult.value.length)
+            } else {
+                logger.warn('ProjectEditor map count load failed', mapsResult.reason)
+                setMapCount(null)
+            }
+
+            if (snapshotsResult.status === 'fulfilled') {
+                setSnapshotCount(snapshotsResult.value.length)
+            } else {
+                logger.warn('ProjectEditor snapshot count load failed', snapshotsResult.reason)
+                setSnapshotCount(null)
             }
         })()
 
         return () => {
             cancelled = true
         }
-    }, [fetchAll, projectId])
+    }, [categoryEntryRefreshToken, projectId])
 
     // 监听 AI 工具调用产生的事件，刷新编辑页
     useEffect(() => {
@@ -989,8 +1020,11 @@ function ProjectEditorInner({
                             tagSchemas={tagSchemas}
                             entryCount={entryCount}
                             tagCount={tagSchemas.length}
-                            imageCount={imageCount}
-                            wordCount={wordCount}
+                            imageCount={projectStats?.imageCount ?? null}
+                            wordCount={projectStats?.wordCount ?? null}
+                            projectStats={projectStats}
+                            mapCount={mapCount}
+                            snapshotCount={snapshotCount}
                             onCreateTag={() => {
                                 setEditingTag(null)
                                 setTagCreatorOpen(true)
