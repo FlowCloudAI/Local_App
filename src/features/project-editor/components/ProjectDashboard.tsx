@@ -99,6 +99,14 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                             />
                         </div>
                     </article>
+
+                    <article className="pe-dashboard-panel pe-dashboard-panel--signals">
+                        <div className="pe-dashboard-panel__header">
+                            <h3>管理信号</h3>
+                            <span>资料治理</span>
+                        </div>
+                        <DashboardSignalList items={dashboard.signalItems}/>
+                    </article>
                 </div>
 
                 <aside className="pe-dashboard-sidebar">
@@ -110,14 +118,6 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                             <span>核心视图</span>
                         </div>
                         <DashboardActionList items={dashboard.actionItems}/>
-                    </article>
-
-                    <article className="pe-dashboard-panel pe-dashboard-panel--signals">
-                        <div className="pe-dashboard-panel__header">
-                            <h3>管理信号</h3>
-                            <span>资料治理</span>
-                        </div>
-                        <DashboardSignalList items={dashboard.signalItems}/>
                     </article>
                 </aside>
             </div>

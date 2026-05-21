@@ -40,6 +40,7 @@
 
 .pe-dashboard-status-strip {
     grid-template-columns: minmax(16rem, 0.9fr) minmax(0, 2.1fr);
+    align-items: start;
 }
 
 .pe-dashboard-layout {
@@ -69,7 +70,7 @@
 .pe-dashboard-status-card {
     display: flex;
     flex-direction: column;
-    gap: var(--fc-space-md);
+    gap: var(--fc-space-sm);
     min-width: 0;
     padding: var(--fc-space-md);
 }
@@ -123,6 +124,7 @@
 
 .pe-dashboard-kpi-strip {
     grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr));
+    align-self: start;
 }
 
 .pe-dashboard-kpi,
@@ -131,11 +133,11 @@
     flex-direction: column;
     gap: var(--fc-space-xs);
     min-width: 0;
-    padding: var(--fc-space-md);
+    padding: var(--fc-space-sm) var(--fc-space-md);
 }
 
 .pe-dashboard-kpi {
-    min-height: 5.1rem;
+    min-height: 4.25rem;
 }
 
 .pe-dashboard-kpi--ok {
@@ -163,7 +165,7 @@
 .pe-dashboard-metric__value {
     overflow-wrap: anywhere;
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-xl);
+    font-size: var(--fc-font-size-lg);
     line-height: 1.1;
 }
 
@@ -177,9 +179,9 @@
     --pe-dashboard-bar-width: 0%;
     display: grid;
     place-items: center;
-    flex: 0 0 5.2rem;
-    width: 5.2rem;
-    height: 5.2rem;
+    flex: 0 0 4.4rem;
+    width: 4.4rem;
+    height: 4.4rem;
     border-radius: 50%;
     background:
         radial-gradient(circle, var(--fc-color-bg-secondary) 58%, transparent 60%),
@@ -205,13 +207,13 @@
 
 .pe-dashboard-health__body strong {
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-lg);
+    font-size: var(--fc-font-size-md);
 }
 
 .pe-dashboard-health__body span,
 .pe-dashboard-empty {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--fc-font-size-xs);
     line-height: 1.45;
 }
 
