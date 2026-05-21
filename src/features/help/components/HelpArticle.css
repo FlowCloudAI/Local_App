@@ -91,8 +91,7 @@
     transition: background 0.15s ease, color 0.15s ease;
 }
 
-.help-doc__toc-item:hover,
-.help-doc__toc-item.is-active {
+.help-doc__toc-item:hover {
     background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text);
 }
@@ -119,10 +118,6 @@
 
 .help-doc__section:first-child {
     border-top: 0;
-}
-
-.help-doc__section.is-highlighted {
-    background: color-mix(in srgb, var(--fc-color-primary) 7%, transparent);
 }
 
 .help-doc__section-number {
@@ -228,8 +223,7 @@
     line-height: var(--fc-line-height-normal);
 }
 
-.help-main--floating .help-doc__toc-item:hover,
-.help-main--floating .help-doc__toc-item.is-active {
+.help-main--floating .help-doc__toc-item:hover {
     background: transparent;
     color: var(--fc-color-primary-hover, var(--fc-color-primary));
 }
@@ -292,20 +286,9 @@
     line-height: var(--fc-line-height-normal);
 }
 
-.help-main--fullscreen .help-doc__toc-item:hover,
-.help-main--fullscreen .help-doc__toc-item.is-active {
+.help-main--fullscreen .help-doc__toc-item:hover {
     background: transparent;
     color: var(--fc-color-primary);
-}
-
-.help-main--fullscreen .help-doc__toc-item.is-active::before {
-    position: absolute;
-    top: var(--fc-space-xs);
-    bottom: var(--fc-space-xs);
-    left: calc(-1 * var(--fc-space-md) - 2px);
-    width: 2px;
-    background: var(--fc-color-primary);
-    content: '';
 }
 
 .help-main--fullscreen .help-doc__toc-item span {

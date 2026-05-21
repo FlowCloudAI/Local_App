@@ -220,7 +220,6 @@ export function useHelpPanel({
             {activeTopic ? (
                 <HelpArticle
                     topic={activeTopic}
-                    activeSectionId={activeSectionId}
                     bodyRef={articleBodyRef}
                     onSelectHome={handleSelectHome}
                     onSelectSection={handleSelectSection}

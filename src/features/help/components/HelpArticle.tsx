@@ -8,7 +8,6 @@ import './HelpArticle.css'
 
 interface HelpArticleProps {
     topic: HelpTopic
-    activeSectionId: string | null
     bodyRef: RefObject<HTMLDivElement | null>
     onSelectHome: () => void
     onSelectSection: (sectionId: string) => void
@@ -16,7 +15,6 @@ interface HelpArticleProps {
 
 export default function HelpArticle({
     topic,
-    activeSectionId,
     bodyRef,
     onSelectHome,
     onSelectSection,
@@ -49,7 +47,7 @@ export default function HelpArticle({
                             <button
                                 key={section.id}
                                 type="button"
-                                className={`help-doc__toc-item${section.id === activeSectionId ? ' is-active' : ''}`}
+                                className="help-doc__toc-item"
                                 onClick={() => onSelectSection(section.id)}
                             >
                                 <span>{String(index + 1).padStart(2, '0')}</span>
@@ -62,7 +60,7 @@ export default function HelpArticle({
                 <div className="help-doc__sections">
                     {topic.sections.map((section, index) => (
                         <section
-                            className={`help-doc__section${section.id === activeSectionId ? ' is-highlighted' : ''}`}
+                            className="help-doc__section"
                             id={getHelpSectionDomId(topic.key, section.id)}
                             key={section.id}
                         >
