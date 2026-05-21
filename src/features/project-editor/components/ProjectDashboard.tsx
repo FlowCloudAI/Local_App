@@ -8,8 +8,6 @@ import {
 import {
     DashboardBarList,
     type DashboardBarItem,
-    type DashboardIssueItem,
-    DashboardIssueGrid,
     DashboardMetric,
     HealthMeter,
 } from './ProjectDashboardParts'
@@ -17,6 +15,8 @@ import {
     formatDashboardNumber,
     formatDashboardRatio,
 } from './ProjectDashboardFormat'
+import ProjectDashboardRiskPanel from './ProjectDashboardRiskPanel'
+import type {ProjectRiskSummary} from './ProjectOverview.types'
 import './ProjectDashboard.css'
 
 interface ProjectDashboardProps {
@@ -29,6 +29,7 @@ interface ProjectDashboardProps {
     projectStats?: ProjectStats | null
     mapCount?: number | null
     snapshotCount?: number | null
+    riskSummary?: ProjectRiskSummary | null
 }
 
 function getCategoryDepthStats(categories: Category[]) {
@@ -84,6 +85,7 @@ function ProjectDashboard({
                               projectStats,
                               mapCount,
                               snapshotCount,
+                              riskSummary,
                           }: ProjectDashboardProps) {
     const effectiveEntryCount = projectStats?.entryCount ?? entryCount
     const safeWordCount = projectStats?.wordCount ?? wordCount ?? 0
@@ -141,43 +143,6 @@ function ProjectDashboard({
     const relationCount = projectStats?.relationCount ?? 0
     const internalLinkCount = projectStats?.internalLinkCount ?? 0
     const updatedLast7Days = projectStats?.updatedLast7Days ?? 0
-    const qualityItems: DashboardIssueItem[] = [
-        {
-            key: 'uncategorized',
-            label: '未分类',
-            value: projectStats?.uncategorizedEntryCount,
-            hint: '缺少管理归属',
-            severity: projectStats?.uncategorizedEntryCount ? 'warn' : 'ok',
-        },
-        {
-            key: 'empty',
-            label: '空正文',
-            value: projectStats?.emptyContentEntryCount,
-            hint: '设定内容为空',
-            severity: projectStats?.emptyContentEntryCount ? 'danger' : 'ok',
-        },
-        {
-            key: 'summary',
-            label: '缺摘要',
-            value: projectStats?.missingSummaryEntryCount,
-            hint: '不利于快速检索',
-            severity: projectStats?.missingSummaryEntryCount ? 'warn' : 'ok',
-        },
-        {
-            key: 'isolated',
-            label: '孤立词条',
-            value: projectStats?.isolatedEntryCount,
-            hint: '没有关系或内链',
-            severity: projectStats?.isolatedEntryCount ? 'warn' : 'ok',
-        },
-        {
-            key: 'short',
-            label: '短正文',
-            value: projectStats?.shortContentEntryCount,
-            hint: '正文少于 100 字',
-            severity: projectStats?.shortContentEntryCount ? 'warn' : 'ok',
-        },
-    ]
 
     return (
         <section className="pe-dashboard-section">
@@ -268,13 +233,7 @@ function ProjectDashboard({
                     <DashboardBarList items={tagTypeItems}/>
                 </article>
 
-                <article className="pe-dashboard-panel pe-dashboard-panel--quality">
-                    <div className="pe-dashboard-panel__header">
-                        <h3>质量监控</h3>
-                        <span>异常指标</span>
-                    </div>
-                    <DashboardIssueGrid items={qualityItems}/>
-                </article>
+                <ProjectDashboardRiskPanel projectStats={projectStats} riskSummary={riskSummary}/>
 
                 <article className="pe-dashboard-panel pe-dashboard-panel--signals">
                     <div className="pe-dashboard-panel__header">

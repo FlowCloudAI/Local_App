@@ -20,6 +20,7 @@ export interface ProjectOverviewProps {
     projectStats?: ProjectStats | null
     mapCount?: number | null
     snapshotCount?: number | null
+    riskSummary?: ProjectRiskSummary | null
     onCreateTag?: () => void
     onCreateEntryType?: () => void
     onEditTag?: (tag: TagSchema) => void
@@ -40,4 +41,11 @@ export interface ProjectOverviewProps {
 
 export interface ProjectOverviewVirtualChildProps {
     virtualScrollElement?: HTMLElement | null
+}
+
+export interface ProjectRiskSummary {
+    reportCount: number
+    issueCount: number
+    unresolvedCount: number
+    latestOverview?: string | null
 }

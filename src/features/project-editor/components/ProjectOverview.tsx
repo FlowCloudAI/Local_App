@@ -25,6 +25,7 @@ function ProjectOverview({
                              projectStats,
                              mapCount,
                              snapshotCount,
+                             riskSummary,
                              onCreateTag,
                              onCreateEntryType,
                              onEditTag,
@@ -80,6 +81,7 @@ function ProjectOverview({
                 projectStats={projectStats}
                 mapCount={mapCount}
                 snapshotCount={snapshotCount}
+                riskSummary={riskSummary}
             />
 
             <ProjectFeatureLinks

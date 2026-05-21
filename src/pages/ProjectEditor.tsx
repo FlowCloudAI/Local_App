@@ -12,6 +12,7 @@ import {
 import {listen} from '@tauri-apps/api/event'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {
+    ai_list_contradiction_reports,
     type Category,
     CATEGORY_CREATED,
     CATEGORY_DELETED,
@@ -56,6 +57,7 @@ import ProjectContradictionPanel from '../features/project-editor/components/Pro
 import TagCreator from '../features/entries/components/TagCreator'
 import CategoryView from '../features/project-editor/components/CategoryView'
 import ProjectOverview from '../features/project-editor/components/ProjectOverview'
+import type {ProjectRiskSummary} from '../features/project-editor/components/ProjectOverview.types'
 import ProjectCoverPickerModal from '../features/project-editor/components/ProjectCoverPickerModal'
 import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
 import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
@@ -186,6 +188,7 @@ function ProjectEditorInner({
     const [projectStats, setProjectStats] = useState<ProjectStats | null>(null)
     const [mapCount, setMapCount] = useState<number | null>(null)
     const [snapshotCount, setSnapshotCount] = useState<number | null>(null)
+    const [riskSummary, setRiskSummary] = useState<ProjectRiskSummary | null>(null)
     const [categoryEntryRefreshToken, setCategoryEntryRefreshToken] = useState(0)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
@@ -295,10 +298,11 @@ function ProjectEditorInner({
         let cancelled = false
 
         void (async () => {
-            const [statsResult, mapsResult, snapshotsResult] = await Promise.allSettled([
+            const [statsResult, mapsResult, snapshotsResult, riskResult] = await Promise.allSettled([
                 db_get_project_stats(projectId),
                 map_list_project_maps(projectId),
                 dbListSnapshots(),
+                ai_list_contradiction_reports(projectId),
             ])
             if (cancelled) return
 
@@ -321,6 +325,19 @@ function ProjectEditorInner({
             } else {
                 logger.warn('ProjectEditor snapshot count load failed', snapshotsResult.reason)
                 setSnapshotCount(null)
+            }
+
+            if (riskResult.status === 'fulfilled') {
+                const reports = riskResult.value
+                setRiskSummary({
+                    reportCount: reports.length,
+                    issueCount: reports.reduce((sum, report) => sum + report.issueCount, 0),
+                    unresolvedCount: reports.reduce((sum, report) => sum + report.unresolvedCount, 0),
+                    latestOverview: reports[0]?.overview ?? null,
+                })
+            } else {
+                logger.warn('ProjectEditor contradiction summary load failed', riskResult.reason)
+                setRiskSummary(null)
             }
         })()
 
@@ -1025,6 +1042,7 @@ function ProjectEditorInner({
                             projectStats={projectStats}
                             mapCount={mapCount}
                             snapshotCount={snapshotCount}
+                            riskSummary={riskSummary}
                             onCreateTag={() => {
                                 setEditingTag(null)
                                 setTagCreatorOpen(true)
