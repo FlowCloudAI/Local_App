@@ -104,6 +104,11 @@ export function useHelpPanel({
         }
     }
 
+    const handleSelectModule = (topicKey: HelpTopicKey) => {
+        setActiveTopicKey(topicKey)
+        setActiveSectionId(null)
+    }
+
     const handleSelectSection = (sectionId: string) => {
         setActiveSectionId(sectionId)
         window.requestAnimationFrame(() => {
@@ -118,6 +123,7 @@ export function useHelpPanel({
             searchText={searchText}
             showCollapseButton={panelMode !== 'fullscreen'}
             onSearchTextChange={setSearchText}
+            onSelectModule={handleSelectModule}
             onSelectTopic={handleSelectTopic}
             onCollapse={() => setSidebarCollapsed(true)}
         />

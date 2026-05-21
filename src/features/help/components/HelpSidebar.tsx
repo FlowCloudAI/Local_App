@@ -14,6 +14,7 @@ interface HelpSidebarProps {
     searchText: string
     showCollapseButton: boolean
     onSearchTextChange: (value: string) => void
+    onSelectModule: (topicKey: HelpTopicKey) => void
     onSelectTopic: (topicKey: HelpTopicKey) => void
     onCollapse: () => void
 }
@@ -66,6 +67,7 @@ export default function HelpSidebar({
     searchText,
     showCollapseButton,
     onSearchTextChange,
+    onSelectModule,
     onSelectTopic,
     onCollapse,
 }: HelpSidebarProps) {
@@ -105,7 +107,7 @@ export default function HelpSidebar({
                             <button
                                 type="button"
                                 className="help-side__module-button"
-                                onClick={() => firstTopic ? onSelectTopic(firstTopic.key) : undefined}
+                                onClick={() => firstTopic ? onSelectModule(firstTopic.key) : undefined}
                             >
                                 <span className="help-side__module-icon">
                                     <HelpModuleIcon moduleKey={group.module.key}/>
