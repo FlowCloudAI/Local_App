@@ -81,21 +81,25 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                                 label="平均词条字数"
                                 value={formatDashboardNumber(dashboard.averageWords)}
                                 hint="衡量设定资料的填充厚度"
+                                muted={dashboard.averageWords === 0}
                             />
                             <DashboardMetric
                                 label="图文资源比"
                                 value={formatDashboardRatio(dashboard.assetRatio)}
                                 hint="平均每个词条关联图片资源"
+                                muted={dashboard.assetRatio === 0}
                             />
                             <DashboardMetric
                                 label="内链总数"
                                 value={formatDashboardNumber(dashboard.internalLinkCount)}
                                 hint="正文中维护的词条链接"
+                                muted={dashboard.internalLinkCount === 0}
                             />
                             <DashboardMetric
                                 label="分类层级深度"
                                 value={`${dashboard.categoryDepth || 0} 层`}
                                 hint="观察资料结构的组织深度"
+                                muted={!dashboard.categoryDepth}
                             />
                         </div>
                     </article>
@@ -126,8 +130,9 @@ function ProjectDashboard(props: ProjectDashboardProps) {
 }
 
 function DashboardDistributionBlock({title, items}: { title: string; items: DashboardBarItem[] }) {
+    const isEmpty = items.length === 0 || items.every(item => item.value === 0)
     return (
-        <div className="pe-dashboard-distribution-block">
+        <div className="pe-dashboard-distribution-block" data-empty={isEmpty ? 'true' : undefined}>
             <h4>{title}</h4>
             <DashboardBarList items={items}/>
         </div>

@@ -44,9 +44,14 @@ function getBarStyle(value: number, total: number): CSSProperties {
     return {'--pe-dashboard-bar-width': `${percent}%`} as CSSProperties
 }
 
-export function DashboardMetric({label, value, hint}: { label: string; value: string; hint: string }) {
+export function DashboardMetric({label, value, hint, muted}: {
+    label: string
+    value: string
+    hint: string
+    muted?: boolean
+}) {
     return (
-        <article className="pe-dashboard-metric">
+        <article className="pe-dashboard-metric" data-muted={muted ? 'true' : undefined}>
             <span className="pe-dashboard-metric__label">{label}</span>
             <strong className="pe-dashboard-metric__value">{value}</strong>
             <span className="pe-dashboard-metric__hint">{hint}</span>
