@@ -10,6 +10,7 @@ import '../../shared/ui/layout/DockPanelScaffold.css'
 import {
     filterHelpTopics,
     getHelpSectionDomId,
+    groupHelpTopicsByModule,
     HELP_TOPICS,
     type HelpTopicKey,
     normalizeHelpTopicKey,
@@ -90,8 +91,8 @@ export function useHelpPanel({
         [activeTopicKey],
     )
 
-    const filteredTopics = useMemo(
-        () => filterHelpTopics(HELP_TOPICS, searchText),
+    const topicGroups = useMemo(
+        () => groupHelpTopicsByModule(filterHelpTopics(HELP_TOPICS, searchText)),
         [searchText],
     )
 
@@ -112,12 +113,14 @@ export function useHelpPanel({
 
     const sideContent = (
         <HelpSidebar
-            topics={filteredTopics}
+            groups={topicGroups}
             activeTopicKey={activeTopic.key}
+            activeSectionId={activeSectionId}
             searchText={searchText}
             showCollapseButton={panelMode !== 'fullscreen'}
             onSearchTextChange={setSearchText}
             onSelectTopic={handleSelectTopic}
+            onSelectSection={handleSelectSection}
             onCollapse={() => setSidebarCollapsed(true)}
         />
     )

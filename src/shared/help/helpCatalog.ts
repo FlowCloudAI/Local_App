@@ -1,3 +1,9 @@
+import helpAiFigure from './assets/help-ai.svg'
+import helpBasicsFigure from './assets/help-basics.svg'
+import helpMapFigure from './assets/help-map.svg'
+
+export type HelpModuleKey = 'basics' | 'knowledge' | 'ai' | 'visualization' | 'safety'
+
 export type HelpTopicKey =
     | 'getting-started'
     | 'workspace'
@@ -9,15 +15,29 @@ export type HelpTopicKey =
     | 'snapshots'
     | 'troubleshooting'
 
+export interface HelpModule {
+    key: HelpModuleKey
+    label: string
+    description: string
+}
+
+export interface HelpFigure {
+    src: string
+    alt: string
+    caption: string
+}
+
 export interface HelpTopicSection {
     id: string
     title: string
     lead: string
     items: string[]
+    figure?: HelpFigure
 }
 
 export interface HelpTopic {
     key: HelpTopicKey
+    moduleKey: HelpModuleKey
     label: string
     summary: string
     category: string
@@ -39,9 +59,23 @@ export interface ParsedHelpTarget {
     sectionId: string | null
 }
 
+export interface HelpTopicGroup {
+    module: HelpModule
+    topics: HelpTopic[]
+}
+
+export const HELP_MODULES: HelpModule[] = [
+    {key: 'basics', label: '基础操作', description: '从界面结构到日常工作流。'},
+    {key: 'knowledge', label: '资料管理', description: '词条、分类、关系和时间线。'},
+    {key: 'ai', label: 'AI 与插件', description: '对话辅助、模型插件和密钥配置。'},
+    {key: 'visualization', label: '地图与可视化', description: '地图、形状和地理复核。'},
+    {key: 'safety', label: '版本与排查', description: '快照、恢复和常见问题。'},
+]
+
 export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'getting-started',
+        moduleKey: 'basics',
         label: '新手指南',
         summary: '从创建世界观到写下第一批词条，建立一个可持续扩展的创作起点。',
         category: '入门',
@@ -52,6 +86,11 @@ export const HELP_TOPICS: HelpTopic[] = [
                 title: '创建第一个世界',
                 lead: '先把作品范围和管理边界定下来，不急着补满所有细节。',
                 items: ['在首页创建世界观，名称建议使用作品名或企划名。', '项目简介写清题材、基调和当前阶段，后续 AI 辅助会更稳定。'],
+                figure: {
+                    src: helpBasicsFigure,
+                    alt: '帮助文档中的工作区结构示意图',
+                    caption: '先确定项目边界，再进入分类、词条和辅助工具的工作流。',
+                },
             },
             {
                 id: 'build-structure',
@@ -70,6 +109,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'workspace',
+        moduleKey: 'basics',
         label: '工作区结构',
         summary: '理解主工作区、右侧 Dock 工具和底部设置入口之间的关系。',
         category: '界面',
@@ -98,6 +138,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'entries',
+        moduleKey: 'knowledge',
         label: '词条与分类',
         summary: '用分类、标签、正文和链接管理角色、地点、组织与事件。',
         category: '资料',
@@ -108,6 +149,11 @@ export const HELP_TOPICS: HelpTopic[] = [
                 title: '写词条',
                 lead: '词条是世界观资料的最小稳定单位，应当围绕一个明确对象展开。',
                 items: ['标题使用读者或作者能快速识别的名称。', '正文先写核心设定，再补充历史、动机、限制和未解问题。'],
+                figure: {
+                    src: helpBasicsFigure,
+                    alt: '词条资料和侧边目录的示意图',
+                    caption: '词条正文保持稳定，临时想法先放在便签或待整理区域。',
+                },
             },
             {
                 id: 'classify-entry',
@@ -126,6 +172,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'relations-timeline',
+        moduleKey: 'knowledge',
         label: '关系图与时间线',
         summary: '通过关系图检查连接，通过时间线整理事件顺序。',
         category: '分析',
@@ -154,6 +201,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'maps',
+        moduleKey: 'visualization',
         label: '地图与形状编辑',
         summary: '维护世界地图、区域边界和地点语义，服务地理叙事。',
         category: '可视化',
@@ -164,6 +212,11 @@ export const HELP_TOPICS: HelpTopic[] = [
                 title: '地图用途',
                 lead: '地图不是单纯插图，它帮助你确认距离、边界、路线和冲突区域。',
                 items: ['先标注叙事中会反复出现的地点。', '对边境、海岸、山脉这类影响剧情的地理要素保持命名一致。'],
+                figure: {
+                    src: helpMapFigure,
+                    alt: '地图区域和地点连线的示意图',
+                    caption: '地图帮助你把地点、路线和势力范围放回同一个空间里检查。',
+                },
             },
             {
                 id: 'shape-editing',
@@ -182,6 +235,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'ai-guide',
+        moduleKey: 'ai',
         label: 'AI 功能',
         summary: '使用对话、角色聊天、总结和矛盾检测来辅助创作。',
         category: 'AI',
@@ -192,6 +246,11 @@ export const HELP_TOPICS: HelpTopic[] = [
                 title: '普通对话',
                 lead: '普通对话适合提纲、润色、设定追问和资料整理。',
                 items: ['先在设置中配置插件、模型和 API Key。', '提问时说明目标、范围和希望输出的格式。'],
+                figure: {
+                    src: helpAiFigure,
+                    alt: 'AI 对话和上下文整理的示意图',
+                    caption: '把目标、范围和输出格式说清楚，比单纯让 AI 自由发挥更可靠。',
+                },
             },
             {
                 id: 'character-chat',
@@ -210,6 +269,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'plugins',
+        moduleKey: 'ai',
         label: '插件与密钥',
         summary: '管理模型插件、API Key 和本地能力扩展。',
         category: '设置',
@@ -220,6 +280,11 @@ export const HELP_TOPICS: HelpTopic[] = [
                 title: '插件来源',
                 lead: 'FlowCloudAI 使用 .fcplug 插件接入模型、图像生成和语音能力。',
                 items: ['插件包通常包含 manifest、wasm 模块和图标。', '只安装来源明确、与你当前需求匹配的插件。'],
+                figure: {
+                    src: helpAiFigure,
+                    alt: '插件连接模型能力的示意图',
+                    caption: '插件负责把本地应用和具体模型能力连接起来。',
+                },
             },
             {
                 id: 'api-key',
@@ -238,6 +303,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'snapshots',
+        moduleKey: 'safety',
         label: '版本管理',
         summary: '用分支、快照、回退和恢复保护世界观数据。',
         category: '安全',
@@ -266,6 +332,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
     {
         key: 'troubleshooting',
+        moduleKey: 'safety',
         label: '常见问题',
         summary: '遇到插件、数据、界面和 AI 调用问题时的排查顺序。',
         category: '排查',
@@ -326,6 +393,7 @@ export const HELP_HOME_LINKS: HelpHomeLink[] = [
 ]
 
 const HELP_TOPIC_KEYS = new Set(HELP_TOPICS.map(topic => topic.key))
+const HELP_MODULE_MAP = new Map(HELP_MODULES.map(module => [module.key, module]))
 
 function normalizeSearchText(value: string) {
     return value.trim().toLocaleLowerCase()
@@ -353,16 +421,37 @@ export function getHelpSectionDomId(topicKey: HelpTopicKey, sectionId: string) {
     return `help-section-${topicKey}-${sectionId}`
 }
 
+export function getHelpModule(moduleKey: HelpModuleKey) {
+    return HELP_MODULE_MAP.get(moduleKey) ?? HELP_MODULES[0]
+}
+
+export function groupHelpTopicsByModule(topics: HelpTopic[]): HelpTopicGroup[] {
+    return HELP_MODULES
+        .map(module => ({
+            module,
+            topics: topics.filter(topic => topic.moduleKey === module.key),
+        }))
+        .filter(group => group.topics.length > 0)
+}
+
 export function filterHelpTopics(topics: HelpTopic[], query: string) {
     const keyword = normalizeSearchText(query)
     if (!keyword) return topics
 
     return topics.filter(topic => {
+        const module = getHelpModule(topic.moduleKey)
         const source = [
+            module.label,
+            module.description,
             topic.label,
             topic.summary,
             topic.category,
-            ...topic.sections.flatMap(section => [section.title, section.lead, ...section.items]),
+            ...topic.sections.flatMap(section => [
+                section.title,
+                section.lead,
+                section.figure?.caption ?? '',
+                ...section.items,
+            ]),
             ...topic.tips,
         ].join('\n').toLocaleLowerCase()
 

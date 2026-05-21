@@ -1,8 +1,10 @@
 import type {RefObject} from 'react'
 import {
+    getHelpModule,
     getHelpSectionDomId,
     type HelpTopic,
 } from '../../../shared/help/helpCatalog'
+import './HelpArticle.css'
 
 interface HelpArticleProps {
     topic: HelpTopic
@@ -17,11 +19,13 @@ export default function HelpArticle({
     bodyRef,
     onSelectSection,
 }: HelpArticleProps) {
+    const module = getHelpModule(topic.moduleKey)
+
     return (
         <div className="help-main__body" ref={bodyRef}>
             <article className="help-doc">
                 <header className="help-doc__header">
-                    <div className="help-doc__crumb">帮助中心 / {topic.category}</div>
+                    <div className="help-doc__crumb">帮助中心 / {module.label} / {topic.category}</div>
                     <h2>{topic.label}</h2>
                     <p>{topic.summary}</p>
                     <div className="help-doc__meta" aria-label="文档信息">
@@ -58,6 +62,12 @@ export default function HelpArticle({
                             <div className="help-doc__section-content">
                                 <h3>{section.title}</h3>
                                 <p>{section.lead}</p>
+                                {section.figure ? (
+                                    <figure className="help-doc__figure">
+                                        <img src={section.figure.src} alt={section.figure.alt} loading="lazy"/>
+                                        <figcaption>{section.figure.caption}</figcaption>
+                                    </figure>
+                                ) : null}
                                 <ul className="help-doc__step-list">
                                     {section.items.map(item => <li key={item}>{item}</li>)}
                                 </ul>
