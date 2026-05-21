@@ -1,4 +1,4 @@
-import type {HelpTopicGroup, HelpTopicKey} from '../../../shared/help/helpCatalog'
+import type {HelpModuleKey, HelpTopicGroup, HelpTopicKey} from '../../../shared/help/helpCatalog'
 import {DockPanelSearchInput} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {
     DockPanelIconButton,
@@ -11,30 +11,68 @@ import './HelpSidebar.css'
 interface HelpSidebarProps {
     groups: HelpTopicGroup[]
     activeTopicKey: HelpTopicKey
-    activeSectionId: string | null
     searchText: string
     showCollapseButton: boolean
     onSearchTextChange: (value: string) => void
     onSelectTopic: (topicKey: HelpTopicKey) => void
-    onSelectSection: (sectionId: string) => void
     onCollapse: () => void
+}
+
+function HelpModuleIcon({moduleKey}: { moduleKey: HelpModuleKey }) {
+    switch (moduleKey) {
+        case 'basics':
+            return (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 6.5 12 2l8 4.5v9L12 20l-8-4.5v-9Z"/>
+                    <path d="M12 20v-9M4.5 7 12 11l7.5-4"/>
+                </svg>
+            )
+        case 'knowledge':
+            return (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 6c0-2 14-2 14 0v12c0 2-14 2-14 0V6Z"/>
+                    <path d="M5 6c0 2 14 2 14 0M5 12c0 2 14 2 14 0"/>
+                    <path d="M16 15h4v4h-4z"/>
+                </svg>
+            )
+        case 'ai':
+            return (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 12a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"/>
+                    <path d="M4 12h4M16 12h4M12 4v4M12 16v4"/>
+                    <path d="M6 6l2.5 2.5M17.5 15.5 20 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>
+                </svg>
+            )
+        case 'visualization':
+            return (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 6l5-2 6 3 5-2v13l-5 2-6-3-5 2V6Z"/>
+                    <path d="M9 4v13M15 7v13"/>
+                </svg>
+            )
+        case 'safety':
+            return (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6l-7-3Z"/>
+                    <path d="m9 12 2 2 4-5"/>
+                </svg>
+            )
+    }
 }
 
 export default function HelpSidebar({
     groups,
     activeTopicKey,
-    activeSectionId,
     searchText,
     showCollapseButton,
     onSearchTextChange,
     onSelectTopic,
-    onSelectSection,
     onCollapse,
 }: HelpSidebarProps) {
     return (
         <DockPanelSide className="help-side">
             <DockPanelTopbar className="help-side__topbar" variant="side">
-                <DockPanelTitle>帮助目录</DockPanelTitle>
+                <DockPanelTitle>帮助分类</DockPanelTitle>
                 {showCollapseButton ? (
                     <DockPanelIconButton
                         type="button"
@@ -53,50 +91,45 @@ export default function HelpSidebar({
                 <DockPanelSearchInput
                     value={searchText}
                     onChange={onSearchTextChange}
-                    placeholder="搜索帮助内容"
-                    ariaLabel="搜索帮助内容"
+                    placeholder="在目录中搜索"
+                    ariaLabel="在目录中搜索"
                 />
             </div>
             <div className="help-side__list" aria-label="帮助主题">
-                {groups.length > 0 ? groups.map(group => (
-                    <section className="help-side__module" key={group.module.key}>
-                        <div className="help-side__module-header">
-                            <span className="help-side__module-title">{group.module.label}</span>
-                            <span className="help-side__module-count">{group.topics.length}</span>
-                        </div>
-                        <div className="help-side__module-desc">{group.module.description}</div>
-                        <div className="help-side__module-list">
-                            {group.topics.map(topic => (
-                                <div className="help-side__topic" key={topic.key}>
-                                    <button
-                                        type="button"
-                                        className={`help-side__item${topic.key === activeTopicKey ? ' is-active' : ''}`}
-                                        aria-current={topic.key === activeTopicKey ? 'page' : undefined}
-                                        onClick={() => onSelectTopic(topic.key)}
-                                    >
-                                        <span className="help-side__item-meta">{topic.category}</span>
-                                        <span className="help-side__item-title">{topic.label}</span>
-                                        <span className="help-side__item-summary">{topic.summary}</span>
-                                    </button>
-                                    {topic.key === activeTopicKey ? (
-                                        <div className="help-side__section-list" aria-label={`${topic.label} 小节`}>
-                                            {topic.sections.map(section => (
-                                                <button
-                                                    key={section.id}
-                                                    type="button"
-                                                    className={`help-side__section-item${section.id === activeSectionId ? ' is-active' : ''}`}
-                                                    onClick={() => onSelectSection(section.id)}
-                                                >
-                                                    {section.title}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ) : null}
+                {groups.length > 0 ? groups.map(group => {
+                    const activeInModule = group.topics.some(topic => topic.key === activeTopicKey)
+                    const firstTopic = group.topics[0]
+
+                    return (
+                        <section className={`help-side__module${activeInModule ? ' is-active' : ''}`} key={group.module.key}>
+                            <button
+                                type="button"
+                                className="help-side__module-button"
+                                onClick={() => firstTopic ? onSelectTopic(firstTopic.key) : undefined}
+                            >
+                                <span className="help-side__module-icon">
+                                    <HelpModuleIcon moduleKey={group.module.key}/>
+                                </span>
+                                <span className="help-side__module-title">{group.module.label}</span>
+                            </button>
+                            {activeInModule ? (
+                                <div className="help-side__topic-list" aria-label={`${group.module.label} 主题`}>
+                                    {group.topics.map(topic => (
+                                        <button
+                                            key={topic.key}
+                                            type="button"
+                                            className={`help-side__topic-item${topic.key === activeTopicKey ? ' is-active' : ''}`}
+                                            aria-current={topic.key === activeTopicKey ? 'page' : undefined}
+                                            onClick={() => onSelectTopic(topic.key)}
+                                        >
+                                            {topic.label}
+                                        </button>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                    </section>
-                )) : (
+                            ) : null}
+                        </section>
+                    )
+                }) : (
                     <div className="help-side__empty">
                         <strong>没有匹配内容</strong>
                         <span>换一个关键词试试。</span>
