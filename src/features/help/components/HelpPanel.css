@@ -33,7 +33,7 @@
     z-index: 19;
     border: 0;
     padding: 0;
-    background: color-mix(in srgb, var(--fc-color-text) 28%, transparent);
+    background: rgba(0, 0, 0, 0.3);
     cursor: pointer;
 }
 
