@@ -14,6 +14,16 @@ export type DockableSidePanelMode = 'fullscreen' | 'floating'
 const PANEL_COLLAPSE_THRESHOLD_RATIO = 1 / 5
 const FULLSCREEN_TRIGGER_DISTANCE = 150
 const FULLSCREEN_TRANSITION_MS = 180
+const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
+const FULLSCREEN_SIDE_MIN_WIDTH = 224
+const FULLSCREEN_SIDE_MAX_WIDTH_RATIO = 0.45
+const FULLSCREEN_SIDE_WIDTH_VAR = '--dockable-side-panel-fullscreen-side-width'
+const FLOATING_COLLAPSE_PREVIEW_CLASS = 'is-collapse-preview'
+const FLOATING_COLLAPSE_RESTORE_CLASS = 'is-collapse-restoring'
+const FULLSCREEN_SIDE_COLLAPSE_PREVIEW_CLASS = 'is-fullscreen-side-collapse-preview'
+const FULLSCREEN_SIDE_COLLAPSE_RESTORE_CLASS = 'is-fullscreen-side-collapse-restoring'
+
+type ResizeDragMode = 'floating-panel' | 'fullscreen-side' | null
 
 interface PanelRect {
     top: number
@@ -31,6 +41,12 @@ interface DockableSidePanelProps {
     onCollapsedChange?: (collapsed: boolean) => void
     onWidthChange: (width: number) => void
     onModeChange?: (mode: DockableSidePanelMode) => void
+    fullscreenSideWidth?: number
+    fullscreenSideMinWidth?: number
+    fullscreenSideMaxWidthRatio?: number
+    fullscreenSideCollapsed?: boolean
+    onFullscreenSideWidthChange?: (width: number) => void
+    onFullscreenSideCollapsedChange?: (collapsed: boolean) => void
     className?: string
     handleTitle?: string
     // 双 slot API：side 仅在 fullscreen 渲染，main 始终渲染；
@@ -49,6 +65,12 @@ export default function DockableSidePanel({
                                               onCollapsedChange,
                                               onWidthChange,
                                               onModeChange,
+                                              fullscreenSideWidth = FULLSCREEN_SIDE_DEFAULT_WIDTH,
+                                              fullscreenSideMinWidth = FULLSCREEN_SIDE_MIN_WIDTH,
+                                              fullscreenSideMaxWidthRatio = FULLSCREEN_SIDE_MAX_WIDTH_RATIO,
+                                              fullscreenSideCollapsed = false,
+                                              onFullscreenSideWidthChange,
+                                              onFullscreenSideCollapsedChange,
                                               className = '',
                                               handleTitle = '拖拽调整宽度',
                                               sides,
@@ -76,6 +98,8 @@ export default function DockableSidePanel({
     // mousedown 时已是 collapsed 状态，等待鼠标移动到展开后的手柄位置再激活拖拽
     const pendingExpandRef = useRef(false)
     const pendingExpandHandleXRef = useRef(0)
+    const resizeDragModeRef = useRef<ResizeDragMode>(null)
+    const dragCurrentWidthRef = useRef(0)
 
     const readPanelRect = useCallback((rect: DOMRect): PanelRect => ({
         top: rect.top,
@@ -89,6 +113,27 @@ export default function DockableSidePanel({
         if (!parent) return null
         return readPanelRect(parent.getBoundingClientRect())
     }, [readPanelRect])
+
+    const getFullscreenSideMaxWidth = useCallback(() => {
+        const containerWidth = fullscreenRect?.width
+            ?? readFullscreenTargetRect()?.width
+            ?? window.innerWidth
+        return Math.max(fullscreenSideMinWidth, containerWidth * fullscreenSideMaxWidthRatio)
+    }, [fullscreenRect?.width, fullscreenSideMaxWidthRatio, fullscreenSideMinWidth, readFullscreenTargetRect])
+
+    const clampFullscreenSideWidth = useCallback((nextWidth: number) => (
+        Math.min(
+            getFullscreenSideMaxWidth(),
+            Math.max(fullscreenSideMinWidth, nextWidth),
+        )
+    ), [fullscreenSideMinWidth, getFullscreenSideMaxWidth])
+
+    const writeFullscreenSideWidth = useCallback((nextWidth: number) => {
+        rootRef.current?.style.setProperty(
+            FULLSCREEN_SIDE_WIDTH_VAR,
+            `${clampFullscreenSideWidth(nextWidth)}px`,
+        )
+    }, [clampFullscreenSideWidth])
 
     const clearFullscreenAnimation = useCallback(() => {
         if (fullscreenAnimationRafRef.current !== null) {
@@ -112,7 +157,8 @@ export default function DockableSidePanel({
             window.clearTimeout(collapseRestoreTimerRef.current)
             collapseRestoreTimerRef.current = null
         }
-        rootRef.current?.classList.remove('is-collapse-restoring')
+        rootRef.current?.classList.remove(FLOATING_COLLAPSE_RESTORE_CLASS)
+        rootRef.current?.classList.remove(FULLSCREEN_SIDE_COLLAPSE_RESTORE_CLASS)
     }, [])
 
     const startFullscreenEnterAnimation = useCallback((targetRect: PanelRect) => {
@@ -189,6 +235,13 @@ export default function DockableSidePanel({
     }, [mode, collapsed, width])
 
     useLayoutEffect(() => {
+        if (mode !== 'fullscreen') return
+        if (isDraggingRef.current && resizeDragModeRef.current === 'fullscreen-side') return
+
+        writeFullscreenSideWidth(fullscreenSideWidth)
+    }, [fullscreenSideWidth, mode, writeFullscreenSideWidth])
+
+    useLayoutEffect(() => {
         const previousMode = previousModeRef.current
         previousModeRef.current = mode
 
@@ -239,6 +292,7 @@ export default function DockableSidePanel({
     const handleResizeStart = useCallback((event: ReactMouseEvent) => {
         if (mode !== 'floating') return
         event.preventDefault()
+        resizeDragModeRef.current = 'floating-panel'
         isDraggingRef.current = true
         isCollapsePreviewRef.current = false
         isFullscreenPreviewRef.current = false
@@ -261,12 +315,99 @@ export default function DockableSidePanel({
         document.body.style.userSelect = 'none'
     }, [collapsed, minWidth, mode, onCollapsedChange, width])
 
+    const handleFullscreenSideResizeStart = useCallback((event: ReactMouseEvent) => {
+        if (mode !== 'fullscreen') return
+        event.preventDefault()
+        resizeDragModeRef.current = 'fullscreen-side'
+        isDraggingRef.current = true
+        isCollapsePreviewRef.current = false
+        isFullscreenPreviewRef.current = false
+        setDragHint('调整侧栏宽度')
+
+        const startWidth = clampFullscreenSideWidth(
+            fullscreenSideCollapsed
+                ? fullscreenSideWidth || FULLSCREEN_SIDE_DEFAULT_WIDTH
+                : fullscreenSideWidth,
+        )
+        dragStartXRef.current = event.clientX
+        dragStartWidthRef.current = startWidth
+        dragCurrentWidthRef.current = startWidth
+
+        const el = rootRef.current
+        if (fullscreenSideCollapsed) {
+            // 收起状态下点击手柄：先展开到上次宽度，等鼠标追上新手柄位置后继续拖拽。
+            pendingExpandRef.current = true
+            pendingExpandHandleXRef.current = event.clientX + startWidth
+            onFullscreenSideCollapsedChange?.(false)
+            writeFullscreenSideWidth(startWidth)
+        } else {
+            pendingExpandRef.current = false
+            setIsDraggingClass(true)
+        }
+        el?.classList.remove(FULLSCREEN_SIDE_COLLAPSE_PREVIEW_CLASS)
+        clearCollapseRestore()
+        document.body.style.cursor = 'col-resize'
+        document.body.style.userSelect = 'none'
+    }, [
+        clampFullscreenSideWidth,
+        clearCollapseRestore,
+        fullscreenSideCollapsed,
+        fullscreenSideWidth,
+        mode,
+        onFullscreenSideCollapsedChange,
+        writeFullscreenSideWidth,
+    ])
+
     useEffect(() => {
         const handleMouseMove = (event: MouseEvent) => {
             if (!isDraggingRef.current) return
 
             const el = rootRef.current
             if (!el) return
+            const dragMode = resizeDragModeRef.current
+
+            if (dragMode === 'fullscreen-side') {
+                if (pendingExpandRef.current) {
+                    if (event.clientX < pendingExpandHandleXRef.current) {
+                        setDragHint('移到手柄位置后拖拽')
+                        return
+                    }
+                    pendingExpandRef.current = false
+                    dragStartXRef.current = pendingExpandHandleXRef.current
+                    setIsDraggingClass(true)
+                }
+
+                const rawWidth = dragStartWidthRef.current + event.clientX - dragStartXRef.current
+                const collapseThreshold = dragStartWidthRef.current * PANEL_COLLAPSE_THRESHOLD_RATIO
+                const nextWidth = clampFullscreenSideWidth(rawWidth)
+                const shouldCollapse = rawWidth <= collapseThreshold
+                const wasCollapsePreview = isCollapsePreviewRef.current
+                isCollapsePreviewRef.current = shouldCollapse
+                dragCurrentWidthRef.current = nextWidth
+
+                if (wasCollapsePreview && !shouldCollapse) {
+                    el.classList.add(FULLSCREEN_SIDE_COLLAPSE_RESTORE_CLASS)
+                    if (collapseRestoreTimerRef.current !== null) {
+                        window.clearTimeout(collapseRestoreTimerRef.current)
+                    }
+                    collapseRestoreTimerRef.current = window.setTimeout(() => {
+                        el.classList.remove(FULLSCREEN_SIDE_COLLAPSE_RESTORE_CLASS)
+                        collapseRestoreTimerRef.current = null
+                    }, 160)
+                } else if (shouldCollapse) {
+                    clearCollapseRestore()
+                }
+                if (shouldCollapse !== wasCollapsePreview) {
+                    el.classList.toggle(FULLSCREEN_SIDE_COLLAPSE_PREVIEW_CLASS, shouldCollapse)
+                }
+
+                setDragHint(shouldCollapse ? '释放后收起侧栏' : '调整侧栏宽度')
+                el.style.setProperty(
+                    FULLSCREEN_SIDE_WIDTH_VAR,
+                    shouldCollapse ? '0px' : `${nextWidth}px`,
+                )
+                return
+            }
 
             if (pendingExpandRef.current) {
                 if (event.clientX > pendingExpandHandleXRef.current) {
@@ -297,19 +438,19 @@ export default function DockableSidePanel({
             isCollapsePreviewRef.current = shouldCollapse
             isFullscreenPreviewRef.current = shouldFullscreen
             if (wasCollapsePreview && !shouldCollapse) {
-                el.classList.add('is-collapse-restoring')
+                el.classList.add(FLOATING_COLLAPSE_RESTORE_CLASS)
                 if (collapseRestoreTimerRef.current !== null) {
                     window.clearTimeout(collapseRestoreTimerRef.current)
                 }
                 collapseRestoreTimerRef.current = window.setTimeout(() => {
-                    el.classList.remove('is-collapse-restoring')
+                    el.classList.remove(FLOATING_COLLAPSE_RESTORE_CLASS)
                     collapseRestoreTimerRef.current = null
                 }, 160)
             } else if (shouldCollapse) {
                 clearCollapseRestore()
             }
             if (shouldCollapse !== wasCollapsePreview) {
-                el.classList.toggle('is-collapse-preview', shouldCollapse)
+                el.classList.toggle(FLOATING_COLLAPSE_PREVIEW_CLASS, shouldCollapse)
             }
             if (shouldFullscreen !== wasFullscreenPreview) {
                 el.classList.toggle('is-fullscreen-preview', shouldFullscreen)
@@ -335,9 +476,11 @@ export default function DockableSidePanel({
         const handleMouseUp = () => {
             if (!isDraggingRef.current) return
             const el = rootRef.current
+            const dragMode = resizeDragModeRef.current
 
             isDraggingRef.current = false
             pendingExpandRef.current = false
+            resizeDragModeRef.current = null
             document.body.style.cursor = ''
             document.body.style.userSelect = ''
 
@@ -348,8 +491,22 @@ export default function DockableSidePanel({
             setIsDraggingClass(false)
             setDragHint('')
             clearCollapseRestore()
-            el?.classList.remove('is-collapse-preview')
+            el?.classList.remove(FLOATING_COLLAPSE_PREVIEW_CLASS)
+            el?.classList.remove(FULLSCREEN_SIDE_COLLAPSE_PREVIEW_CLASS)
             el?.classList.remove('is-fullscreen-preview')
+
+            if (dragMode === 'fullscreen-side') {
+                if (shouldCollapse) {
+                    onFullscreenSideCollapsedChange?.(true)
+                    el?.style.setProperty(FULLSCREEN_SIDE_WIDTH_VAR, '0px')
+                } else {
+                    const finalWidth = clampFullscreenSideWidth(dragCurrentWidthRef.current || dragStartWidthRef.current)
+                    onFullscreenSideCollapsedChange?.(false)
+                    onFullscreenSideWidthChange?.(finalWidth)
+                    el?.style.setProperty(FULLSCREEN_SIDE_WIDTH_VAR, `${finalWidth}px`)
+                }
+                return
+            }
 
             if (shouldFullscreen) {
                 if (el) {
@@ -379,16 +536,31 @@ export default function DockableSidePanel({
             if (isDraggingRef.current) {
                 document.body.style.cursor = ''
                 document.body.style.userSelect = ''
+                resizeDragModeRef.current = null
             }
             clearCollapseRestore()
         }
-    }, [clearCollapseRestore, maxWidthRatio, minWidth, onCollapsedChange, onModeChange, onWidthChange, readPanelRect])
+    }, [
+        clampFullscreenSideWidth,
+        clearCollapseRestore,
+        maxWidthRatio,
+        minWidth,
+        onCollapsedChange,
+        onFullscreenSideCollapsedChange,
+        onFullscreenSideWidthChange,
+        onModeChange,
+        onWidthChange,
+        readPanelRect,
+    ])
+
+    const hasFullscreenSide = mode === 'fullscreen' && sides?.[activeKey] != null
 
     const rootClassName = [
         'dockable-side-panel',
         `dockable-side-panel--${mode}`,
-        mode === 'floating' && isDraggingClass ? 'is-dragging' : '',
+        isDraggingClass ? 'is-dragging' : '',
         mode === 'floating' && collapsed ? 'is-collapsed' : '',
+        hasFullscreenSide && fullscreenSideCollapsed ? 'is-fullscreen-side-collapsed' : '',
         mode === 'fullscreen' && fullscreenTransitionEnabled ? 'is-fullscreen-animating' : '',
         className,
     ].filter(Boolean).join(' ')
@@ -438,9 +610,9 @@ export default function DockableSidePanel({
             <div className="dockable-side-panel__body">
                 {/* side-stack 仅在 active layer 真实存在 side 节点时渲染，
                     避免非激活 layer 撑出宽度形成空白 */}
-                {sides && mode === 'fullscreen' && sides[activeKey] != null && (
+                {hasFullscreenSide && (
                     <div className="dockable-side-panel__side-stack">
-                        {Object.entries(sides).map(([key, node]) => (
+                        {Object.entries(sides ?? {}).map(([key, node]) => (
                             <div
                                 key={key}
                                 className={`dockable-side-panel__side-layer${key === activeKey ? ' active' : ''}`}
@@ -449,6 +621,24 @@ export default function DockableSidePanel({
                                 {node}
                             </div>
                         ))}
+                    </div>
+                )}
+                {hasFullscreenSide && (
+                    <div
+                        className={`dockable-side-panel__side-resize-handle${isDraggingClass ? ' is-dragging' : ''}`}
+                        onMouseDown={handleFullscreenSideResizeStart}
+                        title="拖拽调整侧栏宽度"
+                    >
+                        {dragHint && (
+                            <div className="dockable-side-panel__drag-hint">
+                                {dragHint}
+                            </div>
+                        )}
+                        <div className="dockable-side-panel__resize-grip" aria-hidden="true">
+                            <span className="dockable-side-panel__resize-dot"/>
+                            <span className="dockable-side-panel__resize-dot"/>
+                            <span className="dockable-side-panel__resize-dot"/>
+                        </div>
                     </div>
                 )}
                 <div className="dockable-side-panel__main-stack">

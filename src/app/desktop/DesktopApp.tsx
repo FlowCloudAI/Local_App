@@ -41,6 +41,7 @@ type ProjectToolTabMeta = {
 type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
 type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
 const AI_MIN_PANEL_WIDTH = 500
+const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
 
 export default function DesktopApp() {
     const win = getCurrentWindow()
@@ -82,6 +83,8 @@ export default function DesktopApp() {
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
+    const [fullscreenSideWidth, setFullscreenSideWidth] = useState(FULLSCREEN_SIDE_DEFAULT_WIDTH)
+    const [fullscreenSideCollapsed, setFullscreenSideCollapsed] = useState(false)
     const [backendReady, setBackendReady] = useState(false)
 
     useEffect(() => {
@@ -1117,6 +1120,10 @@ export default function DesktopApp() {
                         onCollapsedChange={handleAiPanelCollapsedChange}
                         onWidthChange={setAiPanelWidth}
                         onModeChange={setAiPanelMode}
+                        fullscreenSideWidth={fullscreenSideWidth}
+                        fullscreenSideCollapsed={fullscreenSideCollapsed}
+                        onFullscreenSideWidthChange={setFullscreenSideWidth}
+                        onFullscreenSideCollapsedChange={setFullscreenSideCollapsed}
                         handleTitle="拖拽调整宽度"
                         sides={sidePanelSides}
                         mains={sidePanelMains}
