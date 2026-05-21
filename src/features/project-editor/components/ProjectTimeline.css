@@ -115,7 +115,7 @@
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
     border-radius: var(--fc-radius-lg);
     background: color-mix(in srgb, var(--fc-color-bg) 92%, transparent);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--fc-color-shadow) 10%, transparent);
+    box-shadow: var(--fc-shadow-xs);
     scroll-snap-align: start;
 }
 

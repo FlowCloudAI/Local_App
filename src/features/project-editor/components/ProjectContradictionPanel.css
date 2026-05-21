@@ -405,7 +405,7 @@
 .pe-contradiction-issue-card__title,
 .pe-contradiction-evidence-card__title {
     margin: 0;
-    font-size: var(--fc-font-size-base);
+    font-size: var(--fc-font-size-md);
     font-weight: var(--fc-font-weight-bold);
     color: var(--fc-color-text);
 }
