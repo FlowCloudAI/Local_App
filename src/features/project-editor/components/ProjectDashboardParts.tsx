@@ -15,6 +15,30 @@ export interface DashboardIssueItem {
     severity: 'ok' | 'warn' | 'danger'
 }
 
+export interface DashboardKpiItem {
+    key: string
+    label: string
+    value: string
+    hint: string
+    tone?: 'default' | 'ok' | 'warn' | 'danger'
+}
+
+export interface DashboardActionItem {
+    key: string
+    title: string
+    description: string
+    badge?: string
+    disabled?: boolean
+    onClick?: () => void
+}
+
+export interface DashboardSignalItem {
+    key: string
+    label: string
+    value: string
+    description: string
+}
+
 function getBarStyle(value: number, total: number): CSSProperties {
     const percent = total > 0 ? Math.max(4, Math.round((value / total) * 100)) : 0
     return {'--pe-dashboard-bar-width': `${percent}%`} as CSSProperties
@@ -27,6 +51,23 @@ export function DashboardMetric({label, value, hint}: { label: string; value: st
             <strong className="pe-dashboard-metric__value">{value}</strong>
             <span className="pe-dashboard-metric__hint">{hint}</span>
         </article>
+    )
+}
+
+export function DashboardKpiStrip({items}: { items: DashboardKpiItem[] }) {
+    return (
+        <div className="pe-dashboard-kpi-strip">
+            {items.map(item => (
+                <article
+                    key={item.key}
+                    className={`pe-dashboard-kpi pe-dashboard-kpi--${item.tone ?? 'default'}`}
+                >
+                    <span className="pe-dashboard-kpi__label">{item.label}</span>
+                    <strong className="pe-dashboard-kpi__value">{item.value}</strong>
+                    <span className="pe-dashboard-kpi__hint">{item.hint}</span>
+                </article>
+            ))}
+        </div>
     )
 }
 
@@ -54,6 +95,23 @@ export function DashboardBarList({items}: { items: DashboardBarItem[] }) {
     )
 }
 
+export function DashboardIssueList({items}: { items: DashboardIssueItem[] }) {
+    return (
+        <div className="pe-dashboard-issue-list">
+            {items.map(item => (
+                <div
+                    key={item.key}
+                    className={`pe-dashboard-issue-row pe-dashboard-issue-row--${item.severity}`}
+                >
+                    <span className="pe-dashboard-issue-row__label">{item.label}</span>
+                    <strong>{formatDashboardNumber(item.value)}</strong>
+                    <span className="pe-dashboard-issue-row__hint">{item.hint}</span>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 export function DashboardIssueGrid({items}: { items: DashboardIssueItem[] }) {
     return (
         <div className="pe-dashboard-issue-grid">
@@ -68,6 +126,44 @@ export function DashboardIssueGrid({items}: { items: DashboardIssueItem[] }) {
                 </article>
             ))}
         </div>
+    )
+}
+
+export function DashboardActionList({items}: { items: DashboardActionItem[] }) {
+    return (
+        <div className="pe-dashboard-action-list">
+            {items.map(item => (
+                <button
+                    key={item.key}
+                    type="button"
+                    className="pe-dashboard-action"
+                    onClick={item.onClick}
+                    disabled={item.disabled}
+                >
+                    <span className="pe-dashboard-action__topline">
+                        <span className="pe-dashboard-action__title">{item.title}</span>
+                        {item.badge && <span className="pe-dashboard-action__badge">{item.badge}</span>}
+                    </span>
+                    <span className="pe-dashboard-action__desc">{item.description}</span>
+                </button>
+            ))}
+        </div>
+    )
+}
+
+export function DashboardSignalList({items}: { items: DashboardSignalItem[] }) {
+    return (
+        <dl className="pe-dashboard-signal-list">
+            {items.map(item => (
+                <div className="pe-dashboard-signal-row" key={item.key}>
+                    <dt>{item.label}</dt>
+                    <dd>
+                        <strong>{item.value}</strong>
+                        <span>{item.description}</span>
+                    </dd>
+                </div>
+            ))}
+        </dl>
     )
 }
 

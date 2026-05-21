@@ -9,7 +9,6 @@ import {
 import {RollingBox} from 'flowcloudai-ui'
 import ProjectConfigOverview from './ProjectConfigOverview'
 import ProjectDashboard from './ProjectDashboard'
-import ProjectFeatureLinks from './ProjectFeatureLinks'
 import ProjectOverviewHeader from './ProjectOverviewHeader'
 import type {ProjectOverviewProps, ProjectOverviewVirtualChildProps} from './ProjectOverview.types'
 
@@ -82,9 +81,6 @@ function ProjectOverview({
                 mapCount={mapCount}
                 snapshotCount={snapshotCount}
                 riskSummary={riskSummary}
-            />
-
-            <ProjectFeatureLinks
                 onOpenRelationGraph={onOpenRelationGraph}
                 onOpenTimeline={onOpenTimeline}
                 onOpenWorldMap={onOpenWorldMap}

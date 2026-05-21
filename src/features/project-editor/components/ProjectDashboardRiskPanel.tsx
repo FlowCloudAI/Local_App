@@ -1,6 +1,6 @@
 import type {ProjectStats} from '../../../api'
 import type {ProjectRiskSummary} from './ProjectOverview.types'
-import {DashboardIssueGrid, type DashboardIssueItem} from './ProjectDashboardParts'
+import {DashboardIssueList, type DashboardIssueItem} from './ProjectDashboardParts'
 
 interface ProjectDashboardRiskPanelProps {
     projectStats?: ProjectStats | null
@@ -64,14 +64,15 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary}: ProjectDashboard
             severity: severityOf(riskSummary?.unresolvedCount, 3),
         },
     ]
+    const issueTotal = qualityItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
 
     return (
         <article className="pe-dashboard-panel pe-dashboard-panel--quality">
             <div className="pe-dashboard-panel__header">
                 <h3>质量监控</h3>
-                <span>{riskSummary?.reportCount ? `${riskSummary.reportCount} 份报告` : '异常指标'}</span>
+                <span>{issueTotal > 0 ? `${issueTotal} 项待处理` : '状态正常'}</span>
             </div>
-            <DashboardIssueGrid items={qualityItems}/>
+            <DashboardIssueList items={qualityItems}/>
             {riskSummary?.latestOverview && (
                 <p className="pe-dashboard-empty">{riskSummary.latestOverview}</p>
             )}
