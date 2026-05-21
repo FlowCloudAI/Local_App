@@ -302,7 +302,7 @@ export default function ProjectCoverPickerModal({
                     </div>
                     <button
                         type="button"
-                        className="pe-cover-picker__close"
+                        className="pe-cover-picker__close app-dialog-close"
                         onClick={onClose}
                         disabled={applying}
                         aria-label="关闭"

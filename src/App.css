@@ -10,6 +10,32 @@ body {
     font-family: "Microsoft YaHei UI", var(--fc-font-family), sans-serif;
 }
 
+/* 通用弹窗关闭按钮 */
+.app-dialog-close {
+    display: grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+
+.app-dialog-close:hover:not(:disabled) {
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+}
+
+.app-dialog-close:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 /* 主容器 */
 .app-layout {
     --app-drag-handle-width: 8px;

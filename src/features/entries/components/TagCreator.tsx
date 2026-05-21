@@ -244,7 +244,7 @@ export default function TagCreator({
                 <div className="tag-creator-header">
                     <span className="tag-creator-title">{isEditMode ? '编辑标签' : '新建标签'}</span>
                     <button
-                        className="tag-creator-close"
+                        className="tag-creator-close app-dialog-close"
                         onClick={onClose}
                         disabled={submitting}
                         aria-label="关闭"

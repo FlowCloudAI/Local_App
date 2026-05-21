@@ -75,7 +75,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                 <div className="project-creator-header">
                     <span className="project-creator-title">新建世界观</span>
                     <button
-                        className="project-creator-close"
+                        className="project-creator-close app-dialog-close"
                         onClick={onClose}
                         disabled={submitting}
                         aria-label="关闭"

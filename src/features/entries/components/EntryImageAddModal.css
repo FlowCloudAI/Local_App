@@ -42,26 +42,6 @@
     letter-spacing: 0.01em;
 }
 
-.entry-image-add-close {
-    display: grid;
-    place-items: center;
-    width: 1.65rem;
-    height: 1.65rem;
-    padding: 0;
-    border: none;
-    border-radius: 0.45rem;
-    background: transparent;
-    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-}
-
-.entry-image-add-close:hover {
-    background: var(--fc-color-bg-secondary);
-    color: var(--fc-color-text);
-}
-
 /* ── 标签页 ──────────────────────────────────────────────────────────────────── */
 
 .entry-image-add-tabs {

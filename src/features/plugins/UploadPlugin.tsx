@@ -84,7 +84,7 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
                 <div className="upload-plugin-header">
                     <span className="upload-plugin-title">上传本地插件</span>
                     <button
-                        className="upload-plugin-close"
+                        className="upload-plugin-close app-dialog-close"
                         onClick={onClose}
                         disabled={submitting}
                         aria-label="关闭"

@@ -41,31 +41,6 @@
     letter-spacing: 0.01em;
 }
 
-.project-creator-close {
-    display: grid;
-    place-items: center;
-    width: 1.65rem;
-    height: 1.65rem;
-    padding: 0;
-    border: none;
-    border-radius: 0.45rem;
-    background: transparent;
-    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-}
-
-.project-creator-close:hover:not(:disabled) {
-    background: var(--fc-color-bg-secondary);
-    color: var(--fc-color-text);
-}
-
-.project-creator-close:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-}
-
 /* ── 内容区 ──────────────────────────────────────────────────────────────────── */
 
 .project-creator-body {
@@ -119,7 +94,7 @@
 }
 
 .project-creator-input::placeholder {
-    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
+    color: var(--fc-color-text-secondary);
     opacity: 0.7;
 }
 
@@ -153,7 +128,7 @@
 }
 
 .project-creator-textarea::placeholder {
-    color: var(--fc-color-text-muted, var(--fc-color-text-secondary));
+    color: var(--fc-color-text-secondary);
     opacity: 0.7;
 }
 

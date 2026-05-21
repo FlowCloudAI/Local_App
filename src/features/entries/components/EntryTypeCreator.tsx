@@ -143,7 +143,7 @@ export default function EntryTypeCreator({
                 <div className="entry-type-creator-header">
                     <span className="entry-type-creator-title">{isEditMode ? '编辑词条类型' : '新建词条类型'}</span>
                     <button
-                        className="entry-type-creator-close"
+                        className="entry-type-creator-close app-dialog-close"
                         onClick={onClose}
                         disabled={submitting}
                         aria-label="关闭"

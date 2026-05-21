@@ -187,7 +187,7 @@ export default function EntryImageAddModal({
                 <div className="entry-image-add-header">
                     <span className="entry-image-add-title">添加图片</span>
                     <button
-                        className="entry-image-add-close"
+                        className="entry-image-add-close app-dialog-close"
                         onClick={onClose}
                         aria-label="关闭"
                     >
