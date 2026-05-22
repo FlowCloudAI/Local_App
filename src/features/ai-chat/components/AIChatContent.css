@@ -97,7 +97,7 @@
     padding: 2rem 0.5rem;
     text-align: center;
     color: var(--fc-color-text-secondary);
-    font-size: 0.8rem;
+    font-size: var(--fc-font-size-sm);
 }
 
 .ai-conversation-row {
@@ -251,7 +251,7 @@
     align-items: center;
     justify-content: center;
     color: var(--fc-color-text);
-    font-size: 0.92rem;
+    font-size: var(--fc-font-size-md);
     font-weight: 700;
 }
 
@@ -283,7 +283,7 @@
 }
 
 .ai-conversation-title {
-    font-size: 0.85rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text);
     white-space: nowrap;
@@ -294,7 +294,7 @@
 .ai-conversation-subtitle {
     margin-top: 0.18rem;
     color: var(--fc-color-text-secondary);
-    font-size: 0.72rem;
+    font-size: var(--fc-font-size-xs);
     line-height: 1.2;
 }
 
@@ -381,7 +381,7 @@
     background: transparent;
     color: var(--fc-color-text);
     cursor: pointer;
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     padding: 5px 8px;
     text-align: left;
     white-space: nowrap;
@@ -408,7 +408,7 @@
 
 .ai-conversation-rename-input {
     width: 100%;
-    font-size: 0.85rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text);
     background: var(--dock-panel-bg);
@@ -639,7 +639,7 @@
     border: 1px solid var(--dock-panel-border-color);
     background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text-secondary);
-    font-size: 0.72rem;
+    font-size: var(--fc-font-size-xs);
     line-height: 1.25;
     overflow: hidden;
 }
@@ -711,7 +711,7 @@
 }
 
 .ai-empty-text {
-    font-size: 1.1rem;
+    font-size: var(--fc-font-size-lg);
     font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text);
 }
@@ -763,7 +763,7 @@
     gap: 0.75rem;
     padding: 0.7rem 0.8rem;
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    font-size: 0.74rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
 }
 
@@ -798,28 +798,28 @@
 
 .ai-messages-list .entry-editor-link-preview__content h3 {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
     color: var(--fc-color-text);
 }
 
 .ai-messages-list .entry-editor-link-preview__summary,
 .ai-messages-list .entry-editor-link-preview__empty {
     margin: 0.3rem 0 0;
-    font-size: 0.74rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.55;
     color: var(--fc-color-text-secondary);
 }
 
 .ai-messages-list .entry-editor-link-preview__empty {
     padding: 0.95rem 1rem 1.05rem;
-    font-size: 0.92rem;
+    font-size: var(--fc-font-size-md);
     line-height: 1.7;
     color: var(--fc-color-text);
 }
 
 .ai-messages-list .entry-editor-link-preview__hint {
     margin: 0.45rem 0 0;
-    font-size: 0.7rem;
+    font-size: var(--fc-font-size-xs);
     color: var(--fc-color-text-secondary);
 }
 
@@ -874,7 +874,7 @@
 .ai-report-context-scope {
     margin-top: 0.22rem;
     color: var(--fc-color-text-secondary);
-    font-size: 0.76rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.35;
 }
 
@@ -926,7 +926,7 @@
     gap: 0.75rem;
     margin-bottom: 0.45rem;
     padding: 0.32rem 0.5rem;
-    font-size: 0.76rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
     background: color-mix(in srgb, var(--fc-color-bg) 45%, transparent);
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
@@ -936,7 +936,7 @@
 .ai-edit-indicator button {
     flex-shrink: 0;
     padding: 0.14rem 0.45rem;
-    font-size: 0.74rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     border: 1px solid transparent;
     border-radius: 999px;
     background: transparent;
@@ -995,7 +995,7 @@
     border: none;
     background: transparent;
     color: var(--fc-color-text);
-    font-size: 0.95rem;
+    font-size: var(--fc-font-size-md);
     line-height: 1.6;
     resize: none;
     outline: none;
@@ -1024,7 +1024,7 @@
     gap: var(--fc-space-sm);
     padding-bottom: var(--fc-space-xs);
     color: var(--fc-color-text-secondary);
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
 }
 
 .ai-archived-input-hint button {
@@ -1033,7 +1033,7 @@
     background: transparent;
     color: var(--fc-color-primary);
     cursor: pointer;
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     padding: 0.2rem 0.5rem;
     white-space: nowrap;
 }
@@ -1045,7 +1045,7 @@
 .ai-input-limit-hint {
     margin-top: 0.2rem;
     color: var(--fc-color-warning, var(--fc-color-text-secondary));
-    font-size: 0.76rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.35;
 }
 
@@ -1069,7 +1069,7 @@
     gap: 0.75rem;
     padding: 0.7rem 0.8rem;
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    font-size: 0.74rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
 }
 
@@ -1102,13 +1102,13 @@
 }
 
 .ai-floating-input-inner .entry-editor-wikilink-option__title {
-    font-size: 0.86rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     color: var(--fc-color-text);
 }
 
 .ai-floating-input-inner .entry-editor-wikilink-option__meta,
 .ai-floating-input-inner .entry-editor-wikilink-empty {
-    font-size: 0.75rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.5;
     color: var(--fc-color-text-secondary);
 }
@@ -1209,7 +1209,7 @@
     width: 100%;
     text-align: left;
     padding: 6px 10px;
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     border: none;
     border-radius: var(--dock-panel-control-radius);
     background: transparent;
@@ -1240,7 +1240,7 @@
 }
 
 .ai-floating-char-count {
-    font-size: 0.75rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
     margin-right: 4px;
 }
