@@ -10,7 +10,7 @@
 .entry-relation-editor__label,
 .entry-relation-editor__field-note {
     margin: 0.22rem 0 0;
-    font-size: 0.75rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.5;
     color: var(--fc-color-text-secondary);
 }
@@ -33,7 +33,7 @@
     border-radius: 0.9rem;
     background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
     color: var(--fc-color-text-secondary);
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     line-height: 1.6;
 }
 
@@ -144,7 +144,7 @@
 
 .entry-relation-editor__viewer-sentence {
     display: block;
-    font-size: 0.86rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     color: var(--fc-color-text);
     white-space: nowrap;
     overflow: hidden;

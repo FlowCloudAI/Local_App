@@ -111,7 +111,7 @@
 }
 
 .fc-map-shape-editor__empty-hint {
-    font-size: 22px;
+    font-size: var(--fc-font-size-xl);
     fill: var(--fc-mse-muted);
     user-select: none;
     pointer-events: none;
@@ -497,7 +497,7 @@
 }
 
 .fc-map-shape-editor__key-location-label {
-    font-size: 14px;
+    font-size: var(--fc-font-size-control, 0.875rem);
     font-weight: 600;
     fill: var(--fc-color-text);
     user-select: none;

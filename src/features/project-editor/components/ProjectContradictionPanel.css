@@ -497,7 +497,7 @@ button.pe-contradiction-chip--entry:hover {
 
 .pe-contradiction-model-selectors .ai-toolbar-btn {
     padding: 4px 10px;
-    font-size: 0.8rem;
+    font-size: var(--fc-font-size-sm);
     border: 1px solid var(--fc-color-border);
     border-radius: 6px;
     background: var(--fc-color-bg);
@@ -541,7 +541,7 @@ button.pe-contradiction-chip--entry:hover {
     width: 100%;
     text-align: left;
     padding: 6px 10px;
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     border: none;
     border-radius: 6px;
     background: transparent;

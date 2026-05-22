@@ -44,7 +44,7 @@
 .about-section-title {
     margin: 0;
     color: var(--fc-color-text);
-    font-size: 1.35rem;
+    font-size: var(--fc-font-size-xl);
     font-weight: 700;
     line-height: 1.2;
 }
