@@ -118,15 +118,6 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         neutralChroma: 2,
         neutralVariantChroma: 6,
     },
-    {
-        id: 'nuanzhi',
-        label: '暖纸',
-        description: '偏稿纸的柔和暖底。',
-        primarySeed: '#9B7044',
-        neutralSeed: '#F4E8D2',
-        neutralChroma: 8,
-        neutralVariantChroma: 14,
-    },
 ]
 
 const FC_THEME_TOKEN_RULES: FcThemeTokenRule[] = [
