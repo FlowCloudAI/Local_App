@@ -170,6 +170,7 @@ export function createFcThemePreview(
     const neutralHct = Hct.fromInt(argbFromHex(neutralSeed))
     const neutralPalette = TonalPalette.fromHueAndChroma(neutralHct.hue, recipe.neutralChroma)
     const neutralVariantPalette = TonalPalette.fromHueAndChroma(neutralHct.hue, recipe.neutralVariantChroma)
+    const primaryPalette = primaryTheme.palettes.primary
     const primaryTones = createToneSwatches(primaryTheme.palettes.primary)
     const neutralTones = createToneSwatches(neutralPalette)
     const neutralVariantTones = createToneSwatches(neutralVariantPalette)
@@ -181,9 +182,9 @@ export function createFcThemePreview(
         neutralTones,
         neutralVariantTones,
         tokens: FC_THEME_TOKEN_RULES.map((rule) => createTokenPreview(rule, {
-            primary: primaryTones,
-            neutral: neutralTones,
-            neutralVariant: neutralVariantTones,
+            primary: primaryPalette,
+            neutral: neutralPalette,
+            neutralVariant: neutralVariantPalette,
         })),
     }
 }
@@ -202,7 +203,7 @@ export function createFcThemeOverrideCss(preview: FcThemePreview): string {
 
 function createTokenPreview(
     rule: FcThemeTokenRule,
-    palettes: Record<'primary' | 'neutral' | 'neutralVariant', MaterialToneSwatch[]>,
+    palettes: Record<'primary' | 'neutral' | 'neutralVariant', TonalPalette>,
 ): FcThemeTokenPreview {
     if (rule.kind === 'onPrimary') {
         const lightPrimary = getToneHex(palettes.primary, 50)
@@ -217,14 +218,16 @@ function createTokenPreview(
     }
 
     const palette = palettes[rule.palette ?? 'primary']
-    const lightHex = getToneHex(palette, rule.lightTone ?? 50)
-    const darkHex = getToneHex(palette, rule.darkTone ?? 70)
+    const lightTone = rule.lightTone ?? 50
+    const darkTone = rule.darkTone ?? 70
+    const lightHex = getToneHex(palette, lightTone)
+    const darkHex = getToneHex(palette, darkTone)
     return {
         token: rule.token,
         label: rule.label,
         group: rule.group,
-        light: createToneTokenValue(`Light T${rule.lightTone}`, lightHex, rule.lightAlpha),
-        dark: createToneTokenValue(`Dark T${rule.darkTone}`, darkHex, rule.darkAlpha),
+        light: createToneTokenValue(`Light T${lightTone}`, lightHex, rule.lightAlpha),
+        dark: createToneTokenValue(`Dark T${darkTone}`, darkHex, rule.darkAlpha),
     }
 }
 
@@ -256,8 +259,8 @@ function formatCssTokenValue(hex: string, alpha?: number): string {
     return `color-mix(in srgb, ${hex} ${alpha}%, transparent)`
 }
 
-function getToneHex(tones: MaterialToneSwatch[], tone: number): string {
-    return tones.find((item) => item.tone === tone)?.hex ?? '#000000'
+function getToneHex(palette: TonalPalette, tone: number): string {
+    return hexFromArgb(palette.tone(tone)).toUpperCase()
 }
 
 function pickReadableTextColor(backgroundHex: string): string {
