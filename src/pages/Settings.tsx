@@ -19,6 +19,7 @@ import {open} from '@tauri-apps/plugin-dialog'
 import {appConfigDir} from '@tauri-apps/api/path'
 import {listen} from '@tauri-apps/api/event'
 import AboutSection from '../features/about/AboutSection'
+import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
     ai_close_all_sessions,
     ai_get_usage_by_model,
@@ -1280,6 +1281,8 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                     )}
                                 </div>
                             </section>
+
+                            <ThemeColorPreview/>
 
                             {/* 操作按钮 */}
                             <div className="settings-footer">
