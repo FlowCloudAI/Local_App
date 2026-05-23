@@ -4,15 +4,16 @@ use crate::ai_services::context_builders::{build_contradiction_prompt, build_tas
 use crate::ai_services::contradiction_loader::{
     ContradictionLoadRequest, load_contradiction_corpus,
 };
+use crate::ai_services::world_check::world_check_definition;
 use crate::apis::ai_client::{
     CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
     EventTurnBegin, EventTurnEnd, cleanup_session_state, save_api_usage, turn_status_str,
 };
 use crate::reports::contradiction_report::ContradictionReport;
+use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
 use crate::senses::contradiction_sense::ContradictionSense;
 use crate::{AiSessionKind, AiState, ApiKeyStore, ContradictionSessionBinding};
 use flowcloudai_client::llm::config::SessionConfig;
-use flowcloudai_client::sense::Sense;
 use flowcloudai_client::{DefaultOrchestrator, SessionEvent, TurnStatus};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -86,6 +87,7 @@ pub struct ContradictionSessionResult {
     pub scope_summary: String,
     pub source_entry_ids: Vec<String>,
     pub truncated: bool,
+    pub world_check_report: WorldCheckReport,
 }
 
 #[derive(Debug, Serialize)]
@@ -175,6 +177,7 @@ pub async fn ai_start_contradiction_session(
         )
     })?;
 
+    let check_definition = world_check_definition(WorldCheckKind::Contradiction);
     let corpus = {
         let app_state = app_state.inner().lock().await;
         load_contradiction_corpus(&app_state, &request.load).await?
@@ -184,7 +187,7 @@ pub async fn ai_start_contradiction_session(
     let client = ai_state.client.lock().await;
     let registry = client.tool_registry().clone();
     let sense = ContradictionSense::new();
-    let whitelist = sense.tool_whitelist();
+    let whitelist = check_definition.tool_whitelist.clone();
     let config = Some(SessionConfig {
         max_tool_rounds: 50,
         ..Default::default()
@@ -196,7 +199,7 @@ pub async fn ai_start_contradiction_session(
 
     session.load_sense(sense).await.map_err(|e| e.to_string())?;
     session.set_orchestrator(Box::new(
-        DefaultOrchestrator::new(registry).with_whitelist(whitelist),
+        DefaultOrchestrator::new(registry).with_whitelist(Some(whitelist)),
     ));
     session
         .set_response_format(json!({ "type": "json_object" }))
@@ -207,6 +210,10 @@ pub async fn ai_start_contradiction_session(
     }
     if let Some(temperature) = request.temperature {
         session.set_temperature(temperature).await;
+    } else {
+        session
+            .set_temperature(check_definition.default_temperature)
+            .await;
     }
     if let Some(max_tokens) = request.max_tokens {
         session.set_max_tokens(max_tokens).await;
@@ -223,8 +230,20 @@ pub async fn ai_start_contradiction_session(
     handle
         .set_task_context(build_task_context(
             Some(corpus.project_id.clone()),
-            "contradiction_detection",
+            check_definition.task_type,
             HashMap::from([
+                (
+                    "checkKind".to_string(),
+                    check_definition.kind.as_str().to_string(),
+                ),
+                (
+                    "promptTemplate".to_string(),
+                    check_definition.prompt_template.to_string(),
+                ),
+                (
+                    "systemTemplate".to_string(),
+                    check_definition.system_template.to_string(),
+                ),
                 ("scope".to_string(), corpus.scope_summary.clone()),
                 (
                     "entryCount".to_string(),
@@ -315,6 +334,7 @@ pub async fn ai_start_contradiction_session(
 
     let report_id = Uuid::new_v4().to_string();
     let created_at = chrono::Utc::now().to_rfc3339();
+    let world_check_report = WorldCheckReport::from(&report);
     let stored_record = StoredContradictionReport {
         report_id: report_id.clone(),
         session_id: request.session_id.clone(),
@@ -349,6 +369,7 @@ pub async fn ai_start_contradiction_session(
         },
         report_id,
         report,
+        world_check_report,
         project_id: corpus.project_id,
         project_name: corpus.project_name,
         plugin_id: request.plugin_id,
