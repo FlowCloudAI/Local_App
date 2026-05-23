@@ -1,5 +1,6 @@
 import {useMemo, useState, type CSSProperties} from 'react'
 import {Button} from 'flowcloudai-ui'
+import FcPrimaryToneGuide from './FcPrimaryToneGuide'
 import {
     DEFAULT_MATERIAL_SEED_COLOR,
     generateMaterialThemePreview,
@@ -75,6 +76,11 @@ export default function ThemeColorPreview() {
                 <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>
             ) : (
                 <>
+                    {(() => {
+                        const primaryPalette = preview.palettes.find((palette) => palette.key === 'primary')
+                        return primaryPalette ? <FcPrimaryToneGuide tones={primaryPalette.tones}/> : null
+                    })()}
+
                     <div className="theme-color-preview__summary">
                         <span>HEX {preview.source.hex}</span>
                         <span>Hue {preview.source.hue}</span>
