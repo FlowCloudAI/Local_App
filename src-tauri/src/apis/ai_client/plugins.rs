@@ -1,11 +1,21 @@
 use super::common::*;
 
 #[derive(Clone, Serialize)]
+pub struct PluginModelInfo {
+    pub id: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub context_window_tokens: Option<u64>,
+    pub max_output_tokens: Option<u64>,
+}
+
+#[derive(Clone, Serialize)]
 pub struct PluginInfo {
     pub id: String,
     pub name: String,
     pub kind: String,
     pub models: Vec<String>,
+    pub model_infos: Vec<PluginModelInfo>,
     pub default_model: Option<String>,
     pub supported_sizes: Vec<String>,
     pub supported_voices: Vec<String>,
@@ -138,6 +148,21 @@ fn load_supported_voices_from_fcplug(fcplug_path: &Path) -> Vec<String> {
     )
 }
 
+fn plugin_model_infos(
+    meta: &flowcloudai_client::plugin::types::PluginMeta,
+) -> Vec<PluginModelInfo> {
+    meta.model_infos()
+        .iter()
+        .map(|model| PluginModelInfo {
+            id: model.id.clone(),
+            name: model.name.clone(),
+            description: model.description.clone(),
+            context_window_tokens: model.context_window_tokens,
+            max_output_tokens: model.max_output_tokens,
+        })
+        .collect()
+}
+
 pub(crate) async fn list_plugins_for_kind(
     ai_state: &AiState,
     kind: &str,
@@ -170,6 +195,7 @@ pub(crate) async fn list_plugins_for_kind(
                 name: meta.name.clone(),
                 kind: kind.to_string(),
                 models: meta.models().to_vec(),
+                model_infos: plugin_model_infos(&meta),
                 default_model: meta.default_model().map(str::to_string),
                 supported_sizes,
                 supported_voices,

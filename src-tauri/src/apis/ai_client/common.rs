@@ -55,6 +55,7 @@ pub(crate) struct EventTurnEnd {
     pub(crate) run_id: String,
     pub(crate) status: String, // "ok" | "cancelled" | "interrupted" | "error:<msg>"
     pub(crate) node_id: u64,
+    pub(crate) usage: Option<Usage>,
 }
 
 #[derive(Serialize, Clone)]
@@ -791,6 +792,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                                 run_id: rid.clone(),
                                 status: turn_status_str(&status),
                                 node_id,
+                                usage,
                             },
                         )
                         .ok();

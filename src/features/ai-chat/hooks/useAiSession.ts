@@ -21,6 +21,7 @@ import {
     type AiEventToolResult,
     type AiEventTurnBegin,
     type AiEventTurnEnd,
+    type AiUsage,
     type CharacterChatProjectSnapshot,
     type ConversationNode,
 } from '../../../api'
@@ -40,6 +41,8 @@ export interface SessionMessage {
     runId: string
     /** TurnEnd 事件携带的助手消息节点 ID，用于 checkout / 重说 */
     nodeId?: number
+    /** 本轮 API 用量。供应商未返回 usage 时为空。 */
+    usage?: AiUsage | null
 }
 
 export interface SessionIdentity {
@@ -413,13 +416,14 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         })
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
-            const {session_id: sid, run_id: rid, status, node_id} = event.payload
+            const {session_id: sid, run_id: rid, status, node_id, usage} = event.payload
             markRunEvent('ai:turn_end', rid)
             logger.log('[useAiSession][turn_end]', {
                 sessionId: sid,
                 runId: rid,
                 status,
                 nodeId: node_id,
+                usage,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
                 processingNodeId: processingNodeIdByRunRef.current[rid] ?? null,
@@ -461,6 +465,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         sessionId: sid,
                         runId: rid,
                         nodeId: node_id,
+                        usage,
                     })
                 }
 

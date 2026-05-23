@@ -465,6 +465,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     reasoning: message.reasoning,
                     blocks: message.blocks,
                     nodeId: message.nodeId,
+                    usage: message.usage,
                 }],
             }
         }))

@@ -553,6 +553,7 @@ fn spawn_contradiction_event_loop<S>(
                                 run_id: rid.clone(),
                                 status: turn_status_str(&status),
                                 node_id,
+                                usage,
                             },
                         )
                         .ok();

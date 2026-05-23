@@ -9,7 +9,7 @@ use super::common::*;
 /// - `"ai:delta"`        `{ session_id, run_id, text }`                —— AI 生成内容片段
 /// - `"ai:reasoning"`    `{ session_id, run_id, text }`                —— 思考过程片段
 /// - `"ai:tool_call"`    `{ session_id, run_id, index, name }`         —— AI 调用工具
-/// - `"ai:turn_end"`     `{ session_id, run_id, status }`              —— 对话结束
+/// - `"ai:turn_end"`     `{ session_id, run_id, status, usage }`       —— 对话结束
 /// - `"ai:error"`        `{ session_id, run_id, error }`               —— 发生错误
 #[tauri::command]
 pub async fn ai_create_llm_session(

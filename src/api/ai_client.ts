@@ -8,9 +8,18 @@ export interface PluginInfo {
   name: string
   kind: string
   models: string[]
+  model_infos: PluginModelInfo[]
   default_model: string | null
     supported_sizes: string[]
     supported_voices: string[]
+}
+
+export interface PluginModelInfo {
+  id: string
+  name?: string | null
+  description?: string | null
+  context_window_tokens?: number | null
+  max_output_tokens?: number | null
 }
 
 export interface AiCreateLlmSessionParams {
@@ -164,11 +173,18 @@ export interface AiEventToolCall {
   arguments?: string
 }
 
+export interface AiUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
 export interface AiEventTurnEnd {
   session_id: string
   run_id: string
   status: string
   node_id: number
+  usage?: AiUsage | null
 }
 
 export interface AiEventTurnBegin {
