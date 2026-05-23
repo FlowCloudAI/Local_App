@@ -15,6 +15,7 @@ import {
 } from '../../../api'
 import type {EntryImage} from '../../entries/lib/entryImage'
 import {normalizeEntryImages, toEntryImageSrc} from '../../entries/lib/entryImage'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 
 type Tab = 'existing' | 'local' | 'ai'
@@ -34,6 +35,7 @@ interface ProjectCoverPickerModalProps {
     currentCoverPath?: string | null
     onClose: () => void
     onSelectCover: (coverPath: string | null) => Promise<void> | void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
 function extractEntryImages(entry: Entry): CoverLibraryItem[] {
@@ -61,12 +63,14 @@ export default function ProjectCoverPickerModal({
                                                     currentCoverPath,
                                                     onClose,
                                                     onSelectCover,
+                                                    onOpenPluginManagement,
                                                 }: ProjectCoverPickerModalProps) {
     const [activeTab, setActiveTab] = useState<Tab>('existing')
     const [loadingLibrary, setLoadingLibrary] = useState(false)
     const [libraryItems, setLibraryItems] = useState<CoverLibraryItem[]>([])
     const [libraryQuery, setLibraryQuery] = useState('')
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const [pluginsLoaded, setPluginsLoaded] = useState(false)
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const [selectedSize, setSelectedSize] = useState('')
@@ -87,6 +91,7 @@ export default function ProjectCoverPickerModal({
         setLibraryItems([])
         setLibraryQuery('')
         setPlugins([])
+        setPluginsLoaded(false)
         setSelectedPlugin('')
         setSelectedModel('')
         setSelectedSize('')
@@ -106,6 +111,7 @@ export default function ProjectCoverPickerModal({
                 if (cancelled) return
 
                 setPlugins(imagePlugins)
+                setPluginsLoaded(true)
                 const defaultPlugin = imagePlugins[0]
                 setSelectedPlugin(defaultPlugin?.id ?? '')
                 setSelectedModel(defaultPlugin?.default_model ?? defaultPlugin?.models[0] ?? '')
@@ -128,6 +134,7 @@ export default function ProjectCoverPickerModal({
                 setLibraryItems(images)
             } catch (error) {
                 if (!cancelled) {
+                    setPluginsLoaded(true)
                     const message = error instanceof Error ? error.message : String(error)
                     setErrorMessage(message)
                     void showAlert(message, 'error', 'toast', 3000)
@@ -396,6 +403,14 @@ export default function ProjectCoverPickerModal({
 
                     {activeTab === 'ai' && (
                         <div className="pe-cover-picker__panel pe-cover-picker__panel--ai">
+                            {pluginsLoaded && plugins.length === 0 ? (
+                                <AiPluginMissingOverlay
+                                    kind="image"
+                                    variant="panel"
+                                    onOpenPluginManagement={onOpenPluginManagement}
+                                />
+                            ) : (
+                                <>
                             <div className="pe-cover-picker__field-row">
                                 <div className="pe-cover-picker__field">
                                     <label className="pe-cover-picker__label">插件</label>
@@ -502,6 +517,8 @@ export default function ProjectCoverPickerModal({
                                         </Button>
                                     </div>
                                 </div>
+                            )}
+                                </>
                             )}
                         </div>
                     )}

@@ -60,6 +60,7 @@ import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
 type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
+type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 type TemplateView = 'list' | 'detail'
 
@@ -155,12 +156,14 @@ function isRemoteVersionNewer(current: string, latest: string): boolean {
 
 interface SettingsProps {
     onBack?: () => void
+    initialTab?: SettingsTab
+    initialPluginKind?: PluginKindFilter
 }
 
-export default function Settings({onBack}: SettingsProps) {
+export default function Settings({onBack, initialTab = 'system', initialPluginKind = 'all'}: SettingsProps) {
     const {showAlert} = useAlert()
     const showAlertRef = useRef(showAlert)
-    const [activeTab, setActiveTab] = useState<SettingsTab>('system')
+    const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
 
     useEffect(() => {
         showAlertRef.current = showAlert
@@ -209,7 +212,7 @@ export default function Settings({onBack}: SettingsProps) {
     const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
     const [uninstallingId, setUninstallingId] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
-    const [kindFilter, setKindFilter] = useState<'all' | 'llm' | 'image' | 'tts'>('all')
+    const [kindFilter, setKindFilter] = useState<PluginKindFilter>(initialPluginKind)
     const [pluginDirectoryLoaded, setPluginDirectoryLoaded] = useState(false)
 
     const {setTheme} = useTheme();
@@ -236,6 +239,13 @@ export default function Settings({onBack}: SettingsProps) {
             setUsageLoading(false)
         }
     }, [])
+
+    useEffect(() => {
+        setActiveTab(initialTab)
+        if (initialTab === 'ai') {
+            setKindFilter(initialPluginKind)
+        }
+    }, [initialPluginKind, initialTab])
 
     // 切换到用量统计 tab 时自动加载
     useEffect(() => {

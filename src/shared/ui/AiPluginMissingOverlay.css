@@ -1,0 +1,95 @@
+.ai-plugin-missing {
+    pointer-events: auto;
+}
+
+.ai-plugin-missing--overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 460;
+    display: grid;
+    place-items: center;
+    padding: var(--fc-space-xl);
+    background: color-mix(in srgb, var(--fc-color-bg) 58%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.ai-plugin-missing--panel {
+    display: grid;
+    place-items: center;
+    min-height: 18rem;
+    padding: var(--fc-space-xl);
+}
+
+.ai-plugin-missing--inline {
+    display: block;
+    padding: 0;
+}
+
+.ai-plugin-missing__card {
+    width: min(100%, 24rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-xl);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    text-align: center;
+}
+
+.ai-plugin-missing--inline .ai-plugin-missing__card {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    border-radius: var(--fc-radius-md);
+    box-shadow: none;
+    text-align: left;
+}
+
+.ai-plugin-missing__icon {
+    width: 2.8rem;
+    height: 2.8rem;
+    display: grid;
+    place-items: center;
+    border-radius: var(--fc-radius-full);
+    color: var(--fc-color-primary);
+    background: var(--fc-color-primary-subtle);
+    flex: 0 0 auto;
+}
+
+.ai-plugin-missing--inline .ai-plugin-missing__icon {
+    width: 2rem;
+    height: 2rem;
+}
+
+.ai-plugin-missing__icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+}
+
+.ai-plugin-missing__content {
+    min-width: 0;
+}
+
+.ai-plugin-missing__title {
+    font-size: var(--fc-font-size-body);
+    font-weight: var(--fc-font-weight-semibold);
+    color: var(--fc-color-text);
+}
+
+.ai-plugin-missing__description {
+    margin: var(--fc-space-xs) 0 0;
+    font-size: var(--fc-font-size-control);
+    line-height: 1.6;
+    color: var(--fc-color-text-secondary);
+}
+
+.ai-plugin-missing--inline .ai-plugin-missing__description {
+    margin-top: 0.15rem;
+    line-height: 1.45;
+}

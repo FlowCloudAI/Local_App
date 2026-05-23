@@ -321,6 +321,7 @@ export interface AiFocus {
 
 export function useAiController(focus: AiFocus): AiContextValue {
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const [pluginsReady, setPluginsReady] = useState(false)
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const selectedPluginRef = useRef(selectedPlugin)
@@ -421,6 +422,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ])
 
         syncPluginSelection(pluginList, settings)
+        setPluginsReady(true)
 
         if (fetchedTools) {
             const enableOps = fetchedTools.map((tool) => ai_enable_tool(tool.name))
@@ -1422,6 +1424,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     return useMemo(() => ({
         plugins,
+        pluginsReady,
         selectedPlugin,
         selectedModel,
         setSelectedPlugin,
@@ -1466,7 +1469,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         getBranchInfo: session.getBranchInfo,
         switchBranch: session.switchBranch,
     }), [
-        plugins, selectedPlugin, selectedModel, conversations, activeConversationId,
+        plugins, pluginsReady, selectedPlugin, selectedModel, conversations, activeConversationId,
         messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,

@@ -11,6 +11,7 @@ import {
     type PluginInfo,
 } from '../../../api'
 import type {EntryImage} from '../lib/entryImage'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import './EntryImageAddModal.css'
 
 type Tab = 'local' | 'ai'
@@ -22,6 +23,7 @@ interface EntryImageAddModalProps {
     onClose: () => void
     onUploadLocal: () => void
     onAddAiImages: (images: EntryImage[]) => void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
 export default function EntryImageAddModal({
@@ -30,11 +32,13 @@ export default function EntryImageAddModal({
                                                onClose,
                                                onUploadLocal,
                                                onAddAiImages,
+                                               onOpenPluginManagement,
                                            }: EntryImageAddModalProps) {
     const [activeTab, setActiveTab] = useState<Tab>('local')
 
     // ── AI 生成相关状态 ──
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const [pluginsLoaded, setPluginsLoaded] = useState(false)
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const [selectedSize, setSelectedSize] = useState('')
@@ -52,14 +56,17 @@ export default function EntryImageAddModal({
             setGenerateState('idle')
             setResults([])
             setErrorMessage('')
+            setPlugins([])
             setSelectedPlugin('')
             setSelectedModel('')
             setSelectedSize('')
+            setPluginsLoaded(false)
         })
 
         ai_list_plugins('image')
             .then((data) => {
                 setPlugins(data)
+                setPluginsLoaded(true)
                 if (data.length > 0) {
                     queueMicrotask(() => {
                         setSelectedPlugin(data[0].id)
@@ -68,6 +75,7 @@ export default function EntryImageAddModal({
             })
             .catch((err) => {
                 logger.error('[EntryImageAddModal] 插件加载失败:', err)
+                setPluginsLoaded(true)
             })
     }, [open])
 
@@ -227,6 +235,14 @@ export default function EntryImageAddModal({
                         </div>
                     ) : (
                         <div className="entry-image-add-ai">
+                            {pluginsLoaded && plugins.length === 0 ? (
+                                <AiPluginMissingOverlay
+                                    kind="image"
+                                    variant="panel"
+                                    onOpenPluginManagement={onOpenPluginManagement}
+                                />
+                            ) : (
+                                <>
                             <div className="entry-image-add-ai__field-row">
                                 <div className="entry-image-add-ai__field">
                                     <label className="entry-image-add-ai__label">插件</label>
@@ -332,6 +348,8 @@ export default function EntryImageAddModal({
                                         </Button>
                                     </div>
                                 </div>
+                            )}
+                                </>
                             )}
                         </div>
                     )}

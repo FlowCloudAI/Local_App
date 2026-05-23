@@ -17,6 +17,7 @@ import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
 import Settings from '../../pages/Settings'
 import DockableSidePanel from '../../shared/ui/layout/DockableSidePanel'
+import type {AiMissingPluginKind} from '../../shared/ui/AiPluginMissingOverlay'
 import type {ReportConversationContext} from '../../features/ai-chat/model/AiControllerTypes'
 import {
     recordHomeActivity,
@@ -80,6 +81,8 @@ export default function DesktopApp() {
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
     const [helpRequest, setHelpRequest] = useState<HelpPanelRequest | null>(null)
+    const [settingsInitialTab, setSettingsInitialTab] = useState<'system' | 'ai'>('system')
+    const [settingsPluginKind, setSettingsPluginKind] = useState<AiMissingPluginKind | 'all'>('all')
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
@@ -559,12 +562,23 @@ export default function DesktopApp() {
             return
         }
         if (key === 'settings') {
+            setSettingsInitialTab('system')
+            setSettingsPluginKind('all')
             setSelectedKey('settings')
             setActiveKey('')
             setMainContentKey('settings')
             collapseAiPanel()
         }
     }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, sidePanelContentKey])
+
+    const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
+        setSettingsInitialTab('ai')
+        setSettingsPluginKind(kind)
+        setSelectedKey('settings')
+        setActiveKey('')
+        setMainContentKey('settings')
+        collapseAiPanel()
+    }, [collapseAiPanel])
 
     const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {
         setSelectedKey('ai-chat')
@@ -766,6 +780,7 @@ export default function DesktopApp() {
         onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
         onOpenEntry: handleOpenEntry,
+        onOpenPluginManagement: handleOpenPluginManagement,
     })
     const helpSlots = useHelpPanel({
         panelMode: aiPanelMode,
@@ -1096,6 +1111,7 @@ export default function DesktopApp() {
                                             onEntryDirtyChange={handleEntryDirtyChange}
                                             onStartCharacterChat={handleStartCharacterChat}
                                             onStartReportDiscussion={handleStartReportDiscussion}
+                                            onOpenPluginManagement={handleOpenPluginManagement}
                                             onDeleteProject={handleDeleteProject}
                                             onDeleteEntry={handleDeleteEntry}
                                         />
@@ -1105,7 +1121,10 @@ export default function DesktopApp() {
                         </div>
                         <div className={`page-wrapper ${mainContentKey === 'settings' ? 'active' : ''}`}>
                             {mainContentKey === 'settings' && (
-                                <Settings onBack={() => {
+                                <Settings
+                                    initialTab={settingsInitialTab}
+                                    initialPluginKind={settingsPluginKind}
+                                    onBack={() => {
                                     setMainContentKey('home')
                                     setSelectedKey('')
                                 }}/>

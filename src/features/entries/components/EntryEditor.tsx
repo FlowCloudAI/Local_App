@@ -55,6 +55,7 @@ import {type EntryImage, normalizeEntryImages, toEntryImageSrc,} from '../lib/en
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {areRelationDraftsEqual, buildRelationDraft, hasInvalidRelationDraft,} from '../lib/entryRelation'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
+import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import {
     buildTagValueMap,
     findCategoryDuplicatedEntry,
@@ -96,6 +97,7 @@ interface EntryEditorProps {
     onDelete?: () => void | Promise<void>
     onDirtyChange?: (dirty: boolean) => void
     onStartCharacterChat?: (entry: Entry) => void | Promise<void>
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
 interface EntryDraft {
@@ -155,6 +157,7 @@ export default function EntryEditor({
                                         onDelete,
                                         onDirtyChange,
                                         onStartCharacterChat,
+                                        onOpenPluginManagement,
                                     }: EntryEditorProps) {
     const [entry, setEntry] = useState<Entry | null>(null)
     const [draft, setDraft] = useState<EntryDraft>({
@@ -1303,6 +1306,7 @@ export default function EntryEditor({
                 projectId={projectId}
                 onClose={() => setImageAddModalOpen(false)}
                 onUploadLocal={handleUploadImages}
+                onOpenPluginManagement={onOpenPluginManagement}
                 onAddAiImages={(aiImages) => {
                     setDraft((current) => {
                         const nextImages = [...current.images]

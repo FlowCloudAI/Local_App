@@ -72,6 +72,7 @@ export interface AiFocusContext {
 
 export interface AiContextValue {
     plugins: PluginInfo[]
+    pluginsReady: boolean
     selectedPlugin: string
     selectedModel: string
     setSelectedPlugin: (v: string) => void

@@ -2,6 +2,7 @@ import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {listen} from '@tauri-apps/api/event'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_export_conversation,
@@ -21,6 +22,7 @@ import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSide
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import useLinkPreview from '../../entries/hooks/useLinkPreview'
 import useWikiLink from '../../entries/hooks/useWikiLink'
 import EntryEditorLinkPreview from '../../entries/components/EntryEditorLinkPreview'
@@ -149,6 +151,7 @@ interface AIChatContentProps {
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     /** fullscreen 双 slot 模式下，sidebar JSX 会 portal 到这个元素；为 null 时正常 inline 渲染 */
     sidePortalTarget?: HTMLElement | null
 }
@@ -159,6 +162,7 @@ export default function AIChatContent({
                                            onTogglePanelMode,
                                            onToggleCollapsed,
                                            onOpenEntry,
+                                           onOpenPluginManagement,
                                            sidePortalTarget,
                                        }: AIChatContentProps) {
     const ctx = controller
@@ -252,11 +256,14 @@ export default function AIChatContent({
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
+    const [ttsPluginsReady, setTtsPluginsReady] = useState(false)
+    const [hasTtsPlugin, setHasTtsPlugin] = useState(false)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
+    const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
     const filteredConversations = useMemo(() => {
         const keyword = conversationSearch.trim().toLocaleLowerCase()
 
@@ -269,6 +276,8 @@ export default function AIChatContent({
         }).sort(compareConversationsForList)
     }, [conversationFilter, conversationSearch, conversationStatusFilter, ctx.conversations])
     const hasConversationSearch = conversationSearch.trim().length > 0
+    const ttsUnavailable = ttsPluginsReady && !hasTtsPlugin
+    const roleplayTtsEnabled = isCharacterConversation && !ttsUnavailable
     const focusContextItems = useMemo(() => {
         const focusContext = ctx.focusContext
         return [
@@ -342,6 +351,29 @@ export default function AIChatContent({
         closeLinkPreview()
     }, [closeLinkPreview, linkPreviewProjectId])
 
+    const refreshTtsPluginAvailability = useCallback(async () => {
+        try {
+            const ttsPlugins = await ai_list_plugins('tts')
+            setHasTtsPlugin(ttsPlugins.length > 0)
+            setTtsPluginsReady(true)
+        } catch (error) {
+            logger.error('检查 TTS 插件状态失败', error)
+        }
+    }, [])
+
+    useEffect(() => {
+        void refreshTtsPluginAvailability()
+        const handler = () => {
+            void refreshTtsPluginAvailability()
+        }
+        const unlistenBackendReady = listen('backend-ready', handler)
+        window.addEventListener('fc:plugins-changed', handler)
+        return () => {
+            window.removeEventListener('fc:plugins-changed', handler)
+            unlistenBackendReady.then((fn) => fn())
+        }
+    }, [refreshTtsPluginAvailability])
+
     const inputWikiLink = useWikiLink({
         entryId: ctx.focusContext.entryId ?? '',
         entryCategoryId: null,
@@ -358,11 +390,13 @@ export default function AIChatContent({
     })
     const sendDisabledReason = isArchivedConversation
         ? '取消归档后继续对话'
-        : ctx.isStreaming
-            ? '正在生成中'
-            : !ctx.inputValue.trim()
-                ? '请输入消息'
-                : ''
+        : llmUnavailable
+            ? '请先安装 LLM 插件'
+            : ctx.isStreaming
+                ? '正在生成中'
+                : !ctx.inputValue.trim()
+                    ? '请输入消息'
+                    : ''
 
     useLayoutEffect(() => {
         if (!showFocusContext) {
@@ -718,6 +752,7 @@ export default function AIChatContent({
         let cancelled = false
 
         const run = async () => {
+            if (ttsUnavailable) return
             let shouldAutoPlay = activeConversation.characterAutoPlay
             if (shouldAutoPlay == null) {
                 try {
@@ -741,6 +776,7 @@ export default function AIChatContent({
         ctx.messages,
         handlePlayRoleMessage,
         isCharacterConversation,
+        ttsUnavailable,
     ])
 
     useEffect(() => {
@@ -1178,9 +1214,9 @@ export default function AIChatContent({
                                     markdown={message.role === 'assistant'}
                                     lineHeight={1.5}
                                     reasoning={message.reasoning || undefined}
-                                    rolePlaying={isCharacterConversation && message.role === 'assistant'}
+                                    rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
                                     onCopy={() => navigator.clipboard.writeText(message.content)}
-                                    onPlay={isCharacterConversation && message.role === 'assistant'
+                                    onPlay={roleplayTtsEnabled && message.role === 'assistant'
                                         ? () => void handlePlayRoleMessage(message.content, activeConversation?.characterVoiceId)
                                         : undefined}
                                     onEdit={message.role === 'user'
@@ -1204,9 +1240,9 @@ export default function AIChatContent({
                                     lineHeight={1.5}
                                     streaming
                                     markdown
-                                    rolePlaying={isCharacterConversation}
+                                    rolePlaying={roleplayTtsEnabled}
                                     toolCallDetail={'verbose'}
-                                    onPlay={isCharacterConversation
+                                    onPlay={roleplayTtsEnabled
                                         ? () => void handlePlayRoleMessage(
                                             ctx.streamingBlocks
                                                 .filter((block) => block.type === 'content')
@@ -1264,6 +1300,13 @@ export default function AIChatContent({
                                 </button>
                             </div>
                         )}
+                        {isCharacterConversation && ttsUnavailable && (
+                            <AiPluginMissingOverlay
+                                kind="tts"
+                                variant="inline"
+                                onOpenPluginManagement={onOpenPluginManagement}
+                            />
+                        )}
                         <textarea
                             ref={textareaRef}
                             className="ai-floating-textarea"
@@ -1275,8 +1318,12 @@ export default function AIChatContent({
                             onSelect={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
                             onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
                             onBlur={() => inputWikiLink.handleTextareaBlur()}
-                            disabled={isArchivedConversation}
-                            placeholder={isArchivedConversation ? '取消归档后继续对话' : '请输入消息...'}
+                            disabled={isArchivedConversation || llmUnavailable}
+                            placeholder={isArchivedConversation
+                                ? '取消归档后继续对话'
+                                : llmUnavailable
+                                    ? '安装 LLM 插件后继续对话'
+                                    : '请输入消息...'}
                         />
                         {inputLimitMessage && (
                             <div className="ai-input-limit-hint" role="status">
@@ -1308,7 +1355,7 @@ export default function AIChatContent({
                                 >
                                     深度思考
                                 </button>
-                                {isCharacterConversation && activeConversation && (
+                                {isCharacterConversation && activeConversation && !ttsUnavailable && (
                                     <button
                                         className={`ai-toolbar-btn ${effectiveRoleplayAutoPlay ? 'active' : ''}`}
                                         onClick={(event) => {

@@ -59,6 +59,7 @@ import CategoryView from '../features/project-editor/components/CategoryView'
 import ProjectOverview from '../features/project-editor/components/ProjectOverview'
 import type {ProjectRiskSummary} from '../features/project-editor/components/ProjectOverview.types'
 import ProjectCoverPickerModal from '../features/project-editor/components/ProjectCoverPickerModal'
+import type {AiMissingPluginKind} from '../shared/ui/AiPluginMissingOverlay'
 import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
 import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
@@ -93,6 +94,7 @@ interface Props {
         model: string
         reportContext: ReportConversationContext
     }) => void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     activeToolPanel?: ProjectPanel | null
     onOpenProjectPanel?: (panel: Exclude<ProjectPanel, 'overview'>, project: { id: string; name: string }) => void
     onProjectViewLabelChange?: (projectId: string, label: string) => void
@@ -167,6 +169,7 @@ function ProjectEditorInner({
                                 onEntryDirtyChange,
                                  onStartCharacterChat,
                                  onStartReportDiscussion,
+                                 onOpenPluginManagement,
                                  activeToolPanel = null,
                                  onOpenProjectPanel,
                                  onProjectViewLabelChange,
@@ -1199,6 +1202,7 @@ function ProjectEditorInner({
                                     id: entry.id,
                                     title: entry.title,
                                 })}
+                                onOpenPluginManagement={onOpenPluginManagement}
                             />
                         </div>
                     ))}
@@ -1270,6 +1274,7 @@ function ProjectEditorInner({
                 currentCoverPath={project?.cover_path ?? null}
                 onClose={() => setCoverPickerOpen(false)}
                 onSelectCover={handleUpdateProjectCover}
+                onOpenPluginManagement={onOpenPluginManagement}
             />
 
             <DeleteDialog
