@@ -36,8 +36,8 @@
 
 ### 关键外部依赖
 
-- **前端**：`@tauri-apps/api`、`@tauri-apps/plugin-*`、`@uiw/react-md-editor`、`@deck.gl/core`/`layers`/`react`/`widgets`、
-  `@luma.gl/shadertools`、`react-window`、`classnames`、`react-dropzone`、`i18next-browser-languagedetector`
+- **前端**：`@tauri-apps/api`、`@tauri-apps/plugin-*`、`@uiw/react-md-editor`、`@xyflow/react`、`@deck.gl/core`/`layers`/`react`/`widgets`、
+  `@luma.gl/shadertools`、`@pixi/react`、`pixi.js`、`react-window`、`classnames`、`react-dropzone`、`html-to-image`、`i18next-browser-languagedetector`
 - **后端**：`tauri`、`tokio`、`serde`、`serde_json`、`anyhow`、`reqwest`、`keyring`、`uuid`、`zip`、`scraper`、`futures`、`log`、
   `chrono`、`semver`、`moka`、`tera`、`ego-tree`、`htmd`、`base64`、`urlencoding`、`mime_guess`
 - **本地路径依赖**：

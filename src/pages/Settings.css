@@ -862,7 +862,7 @@
 }
 
 .usage-stat-card {
-    background: var(--fc-color-surface);
+    background: var(--fc-color-bg);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
     padding: 1rem;
@@ -906,10 +906,6 @@
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-}
-
-.usage-table tbody tr:hover {
-    background: var(--fc-color-surface-hover);
 }
 
 .usage-model-name {
