@@ -17,6 +17,13 @@
     font-size: var(--fc-font-size-sm);
 }
 
+.theme-color-preview__header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--fc-space-sm);
+}
+
 .theme-color-preview__controls {
     display: grid;
     grid-template-columns: minmax(16rem, 1fr) minmax(18rem, 1.5fr);
@@ -117,6 +124,15 @@
     border-radius: var(--fc-radius-md);
     background: var(--fc-color-danger-bg);
     color: var(--fc-color-danger);
+    font-size: var(--fc-font-size-sm);
+}
+
+.theme-color-preview__applied-notice {
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    border: 1px solid var(--fc-color-info-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-info-bg);
+    color: var(--fc-color-info);
     font-size: var(--fc-font-size-sm);
 }
 
