@@ -14,6 +14,7 @@ import {
 import {
     generateMaterialThemePreview,
     isValidHexColor,
+    normalizeHexColor,
     type MaterialRolePreview,
     type MaterialThemeMode,
     type MaterialToneSwatch,
@@ -33,23 +34,43 @@ export default function ThemeColorPreview() {
     const fcPreview = useMemo(() => createFcThemePreview(selectedRecipe, seedColor), [selectedRecipe, seedColor])
     const normalizedColor = fcPreview?.primarySeed ?? selectedRecipe.primarySeed
     const valid = isValidHexColor(seedColor)
+    const isDefaultTheme = recipeId === DEFAULT_FC_THEME_RECIPE_ID
+        && normalizedColor === normalizeHexColor(defaultRecipe.primarySeed)
+    const canApplyOverride = Boolean(fcPreview) && !isDefaultTheme
 
     useEffect(() => {
+        if (isDefaultTheme) {
+            if (overrideApplied) {
+                clearFcThemeTokenOverride()
+                setOverrideApplied(false)
+            }
+            return
+        }
         if (!overrideApplied || !fcPreview) return
         applyFcThemeTokenOverride(fcPreview)
-    }, [fcPreview, overrideApplied])
+    }, [fcPreview, isDefaultTheme, overrideApplied])
 
     const selectRecipe = (nextRecipeId: string) => {
         const nextRecipe = getFcThemeRecipe(nextRecipeId)
+        if (nextRecipe.id === DEFAULT_FC_THEME_RECIPE_ID) {
+            clearFcThemeTokenOverride()
+            setOverrideApplied(false)
+        }
         setRecipeId(nextRecipe.id)
         setSeedColor(nextRecipe.primarySeed)
     }
 
     const resetDefault = () => {
+        clearFcThemeTokenOverride()
+        setOverrideApplied(false)
         selectRecipe(DEFAULT_FC_THEME_RECIPE_ID)
     }
 
     const applyOverride = () => {
+        if (isDefaultTheme) {
+            clearOverride()
+            return
+        }
         if (!fcPreview) return
         setOverrideApplied(applyFcThemeTokenOverride(fcPreview))
     }
@@ -70,8 +91,8 @@ export default function ThemeColorPreview() {
                     <Button type="button" size="sm" variant="outline" onClick={resetDefault}>
                         恢复默认
                     </Button>
-                    <Button type="button" size="sm" disabled={!fcPreview} onClick={applyOverride}>
-                        {overrideApplied ? '更新覆盖' : '应用覆盖'}
+                    <Button type="button" size="sm" disabled={!canApplyOverride} onClick={applyOverride}>
+                        {isDefaultTheme ? '默认主题' : overrideApplied ? '更新覆盖' : '应用覆盖'}
                     </Button>
                     {overrideApplied && (
                         <Button type="button" size="sm" variant="ghost" onClick={clearOverride}>
@@ -134,6 +155,7 @@ export default function ThemeColorPreview() {
                     <div className="theme-color-preview__recipe-summary">
                         <strong>{fcPreview.recipe.label}</strong>
                         <span>{fcPreview.recipe.description}</span>
+                        {isDefaultTheme && <span>当前为内置默认主题，不注入覆盖。</span>}
                     </div>
 
                     <FcPrimaryToneGuide tokens={fcPreview.tokens}/>
