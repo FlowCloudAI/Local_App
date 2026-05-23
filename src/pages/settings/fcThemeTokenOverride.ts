@@ -1,21 +1,18 @@
 import {
-    createFcSemanticTokenOverrideCss,
-    type MaterialThemePreview,
-} from './materialThemePreview'
+    createFcThemeOverrideCss,
+    type FcThemePreview,
+} from './fcThemeRecipe'
 
 const FC_THEME_TOKEN_OVERRIDE_STYLE_ID = 'fc-theme-token-overrides'
 
-export function applyFcThemeTokenOverride(preview: MaterialThemePreview): boolean {
-    const css = createFcSemanticTokenOverrideCss(preview)
-    if (!css) return false
-
+export function applyFcThemeTokenOverride(preview: FcThemePreview): boolean {
     let style = document.getElementById(FC_THEME_TOKEN_OVERRIDE_STYLE_ID) as HTMLStyleElement | null
     if (!style) {
         style = document.createElement('style')
         style.id = FC_THEME_TOKEN_OVERRIDE_STYLE_ID
         document.head.appendChild(style)
     }
-    style.textContent = css
+    style.textContent = createFcThemeOverrideCss(preview)
     return true
 }
 

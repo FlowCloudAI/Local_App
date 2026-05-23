@@ -1,28 +1,22 @@
 import type {CSSProperties} from 'react'
-import {
-    createFcSemanticTokenPreviews,
-    type MaterialToneSwatch,
-    type FcSemanticTokenPreview,
-} from './materialThemePreview'
+import type {FcThemeTokenPreview} from './fcThemeRecipe'
 import './FcPrimaryToneGuide.css'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
 
 interface FcPrimaryToneGuideProps {
-    tones: MaterialToneSwatch[]
+    tokens: FcThemeTokenPreview[]
 }
 
-export default function FcPrimaryToneGuide({tones}: FcPrimaryToneGuideProps) {
-    const tokenPreviews = createFcSemanticTokenPreviews(tones)
-
+export default function FcPrimaryToneGuide({tokens}: FcPrimaryToneGuideProps) {
     return (
         <div className="fc-primary-tone-guide">
             <div className="fc-primary-tone-guide__header">
-                <strong>FC 主色建议映射</strong>
-                <span>深浅主题共用同一 Primary 色阶，只取不同 Tone。</span>
+                <strong>FC 主题令牌建议映射</strong>
+                <span>功能状态色保持不变，只覆盖主色、背景、边框和文字。</span>
             </div>
             <div className="fc-primary-tone-guide__token-list">
-                {tokenPreviews.map((item) => (
+                {tokens.map((item) => (
                     <FcPrimaryToken key={item.token} item={item}/>
                 ))}
             </div>
@@ -30,11 +24,12 @@ export default function FcPrimaryToneGuide({tones}: FcPrimaryToneGuideProps) {
     )
 }
 
-function FcPrimaryToken({item}: { item: FcSemanticTokenPreview }) {
+function FcPrimaryToken({item}: { item: FcThemeTokenPreview }) {
     return (
         <div className="fc-primary-tone-guide__token">
             <div className="fc-primary-tone-guide__token-name">
                 <strong>{item.label}</strong>
+                <span>{item.group}</span>
                 <code>{item.token}</code>
             </div>
             <ColorValue label={item.light.label} value={item.light.value} swatch={item.light.swatch}/>

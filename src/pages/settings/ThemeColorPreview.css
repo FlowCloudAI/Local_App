@@ -105,6 +105,8 @@
     background: var(--fc-color-bg-tertiary);
 }
 
+.theme-color-preview__preset--active { border-color: var(--fc-color-primary); background: var(--fc-color-primary-subtle); color: var(--fc-color-primary); }
+
 .theme-color-preview__preset-dot,
 .theme-color-preview__role-swatch,
 .theme-color-preview__tone-swatch {
@@ -135,6 +137,20 @@
     color: var(--fc-color-info);
     font-size: var(--fc-font-size-sm);
 }
+
+.theme-color-preview__recipe-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-sm);
+    align-items: baseline;
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg);
+}
+
+.theme-color-preview__recipe-summary strong { color: var(--fc-color-text); }
+
+.theme-color-preview__recipe-summary span { color: var(--fc-color-text-secondary); font-size: var(--fc-font-size-sm); }
 
 .theme-color-preview__summary {
     display: flex;

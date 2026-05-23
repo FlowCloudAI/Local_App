@@ -6,11 +6,14 @@ import {
     clearFcThemeTokenOverride,
 } from './fcThemeTokenOverride'
 import {
-    DEFAULT_MATERIAL_SEED_COLOR,
+    createFcThemePreview,
+    DEFAULT_FC_THEME_RECIPE_ID,
+    FC_THEME_RECIPES,
+    getFcThemeRecipe,
+} from './fcThemeRecipe'
+import {
     generateMaterialThemePreview,
-    getPrimaryToneSwatches,
     isValidHexColor,
-    MATERIAL_THEME_PRESETS,
     type MaterialRolePreview,
     type MaterialThemeMode,
     type MaterialToneSwatch,
@@ -20,22 +23,35 @@ import './ThemeColorPreview.css'
 type ColorVariableStyle = CSSProperties & Record<string, string>
 
 export default function ThemeColorPreview() {
-    const [seedColor, setSeedColor] = useState(DEFAULT_MATERIAL_SEED_COLOR)
+    const defaultRecipe = getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID)
+    const [recipeId, setRecipeId] = useState(defaultRecipe.id)
+    const [seedColor, setSeedColor] = useState(defaultRecipe.primarySeed)
     const [mode, setMode] = useState<MaterialThemeMode>('light')
     const [overrideApplied, setOverrideApplied] = useState(false)
-    const preview = useMemo(() => generateMaterialThemePreview(seedColor), [seedColor])
-    const normalizedColor = preview?.source.hex ?? DEFAULT_MATERIAL_SEED_COLOR
+    const selectedRecipe = getFcThemeRecipe(recipeId)
+    const materialPreview = useMemo(() => generateMaterialThemePreview(seedColor), [seedColor])
+    const fcPreview = useMemo(() => createFcThemePreview(selectedRecipe, seedColor), [selectedRecipe, seedColor])
+    const normalizedColor = fcPreview?.primarySeed ?? selectedRecipe.primarySeed
     const valid = isValidHexColor(seedColor)
-    const primaryTones = preview ? getPrimaryToneSwatches(preview) : []
 
     useEffect(() => {
-        if (!overrideApplied || !preview) return
-        applyFcThemeTokenOverride(preview)
-    }, [overrideApplied, preview])
+        if (!overrideApplied || !fcPreview) return
+        applyFcThemeTokenOverride(fcPreview)
+    }, [fcPreview, overrideApplied])
+
+    const selectRecipe = (nextRecipeId: string) => {
+        const nextRecipe = getFcThemeRecipe(nextRecipeId)
+        setRecipeId(nextRecipe.id)
+        setSeedColor(nextRecipe.primarySeed)
+    }
+
+    const resetDefault = () => {
+        selectRecipe(DEFAULT_FC_THEME_RECIPE_ID)
+    }
 
     const applyOverride = () => {
-        if (!preview) return
-        setOverrideApplied(applyFcThemeTokenOverride(preview))
+        if (!fcPreview) return
+        setOverrideApplied(applyFcThemeTokenOverride(fcPreview))
     }
 
     const clearOverride = () => {
@@ -47,14 +63,14 @@ export default function ThemeColorPreview() {
         <section className="settings-section fc-section-card theme-color-preview">
             <div className="theme-color-preview__header">
                 <div>
-                    <h2 className="settings-section-title fc-section-title">Material 主题色阶</h2>
-                    <p className="theme-color-preview__subtitle">可临时覆盖当前界面的 FC 主色语义令牌，不会保存。</p>
+                    <h2 className="settings-section-title fc-section-title">FC 主题配方</h2>
+                    <p className="theme-color-preview__subtitle">临时覆盖主色、背景、边框和文字层级；警告、危险、成功等功能色保持不变。</p>
                 </div>
                 <div className="theme-color-preview__header-actions">
-                    <Button type="button" size="sm" variant="outline" onClick={() => setSeedColor(DEFAULT_MATERIAL_SEED_COLOR)}>
+                    <Button type="button" size="sm" variant="outline" onClick={resetDefault}>
                         恢复默认
                     </Button>
-                    <Button type="button" size="sm" disabled={!preview} onClick={applyOverride}>
+                    <Button type="button" size="sm" disabled={!fcPreview} onClick={applyOverride}>
                         {overrideApplied ? '更新覆盖' : '应用覆盖'}
                     </Button>
                     {overrideApplied && (
@@ -67,7 +83,7 @@ export default function ThemeColorPreview() {
 
             <div className="theme-color-preview__controls">
                 <label className="theme-color-preview__field">
-                    <span>源颜色</span>
+                    <span>主题色微调</span>
                     <span className="theme-color-preview__color-control">
                         <input
                             className="theme-color-preview__color-input"
@@ -85,17 +101,18 @@ export default function ThemeColorPreview() {
                     </span>
                 </label>
 
-                <div className="theme-color-preview__preset-list" aria-label="色彩预设">
-                    {MATERIAL_THEME_PRESETS.map((preset) => (
+                <div className="theme-color-preview__preset-list" aria-label="主题配方预设">
+                    {FC_THEME_RECIPES.map((preset) => (
                         <button
-                            className="theme-color-preview__preset"
+                            className={`theme-color-preview__preset ${recipeId === preset.id ? 'theme-color-preview__preset--active' : ''}`}
                             type="button"
-                            key={preset.value}
-                            onClick={() => setSeedColor(preset.value)}
+                            key={preset.id}
+                            title={preset.description}
+                            onClick={() => selectRecipe(preset.id)}
                         >
                             <span
                                 className="theme-color-preview__preset-dot"
-                                style={colorStyle(preset.value)}
+                                style={colorStyle(preset.primarySeed)}
                                 aria-hidden="true"
                             />
                             {preset.label}
@@ -104,23 +121,28 @@ export default function ThemeColorPreview() {
                 </div>
             </div>
 
-            {!preview ? (
+            {!materialPreview || !fcPreview ? (
                 <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>
             ) : (
                 <>
                     {overrideApplied && (
                         <div className="theme-color-preview__applied-notice">
-                            已用运行时样式覆盖主色相关语义令牌。切换颜色后会自动更新覆盖。
+                            已用运行时样式覆盖 FC 主题令牌。切换配方或颜色后会自动更新覆盖。
                         </div>
                     )}
 
-                    {primaryTones.length > 0 && <FcPrimaryToneGuide tones={primaryTones}/>}
+                    <div className="theme-color-preview__recipe-summary">
+                        <strong>{fcPreview.recipe.label}</strong>
+                        <span>{fcPreview.recipe.description}</span>
+                    </div>
+
+                    <FcPrimaryToneGuide tokens={fcPreview.tokens}/>
 
                     <div className="theme-color-preview__summary">
-                        <span>HEX {preview.source.hex}</span>
-                        <span>Hue {preview.source.hue}</span>
-                        <span>Chroma {preview.source.chroma}</span>
-                        <span>Tone {preview.source.tone}</span>
+                        <span>HEX {materialPreview.source.hex}</span>
+                        <span>Hue {materialPreview.source.hue}</span>
+                        <span>Chroma {materialPreview.source.chroma}</span>
+                        <span>Tone {materialPreview.source.tone}</span>
                     </div>
 
                     <div className="theme-color-preview__mode-switch" role="group" aria-label="Material 角色模式">
@@ -137,13 +159,13 @@ export default function ThemeColorPreview() {
                     </div>
 
                     <div className="theme-color-preview__role-grid">
-                        {preview.schemes[mode].roles.map((role) => (
+                        {materialPreview.schemes[mode].roles.map((role) => (
                             <RoleCard key={`${mode}-${role.key}`} role={role}/>
                         ))}
                     </div>
 
                     <div className="theme-color-preview__palette-list">
-                        {preview.palettes.map((palette) => (
+                        {materialPreview.palettes.map((palette) => (
                             <div className="theme-color-preview__palette" key={palette.key}>
                                 <div className="theme-color-preview__palette-meta">
                                     <strong>{palette.label}</strong>
