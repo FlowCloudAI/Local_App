@@ -50,7 +50,7 @@
 
 .eem-diff {
     font-family: 'Consolas', 'Menlo', monospace;
-    font-size: 12.5px;
+    font-size: var(--fc-font-size-sm);
     line-height: var(--fc-line-height-normal);
 }
 

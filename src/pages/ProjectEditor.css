@@ -65,7 +65,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, var(--fc-color-bg-secondary));
     color: var(--fc-color-text);
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1;
     padding: 0.38rem 0.8rem;
     cursor: pointer;
@@ -97,7 +97,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, var(--fc-color-bg-secondary));
     color: var(--fc-color-text);
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1;
     padding: 0.38rem 0.8rem;
     cursor: pointer;
@@ -221,18 +221,18 @@
     --pe-font-delta-title: 5px;
     --pe-font-delta-body: 3px;
     --pe-font-size-overview-title: calc(1.75rem + var(--pe-font-delta-title));
-    --pe-font-size-overview-desc: calc(1rem + var(--pe-font-delta-body));
-    --pe-font-size-meta: calc(0.75rem + var(--pe-font-delta-body));
+    --pe-font-size-overview-desc: calc(var(--fc-font-size-body, 1rem) + var(--pe-font-delta-body));
+    --pe-font-size-meta: calc(var(--fc-font-size-caption, 0.75rem) + var(--pe-font-delta-body));
     --pe-font-size-stat-value: calc(1.5rem + var(--pe-font-delta-body));
-    --pe-font-size-stat-label: calc(0.7rem + var(--pe-font-delta-body));
-    --pe-font-size-control: calc(0.875rem + var(--pe-font-delta-body));
-    --pe-font-size-sort-tab: calc(0.75rem + var(--pe-font-delta-body));
-    --pe-font-size-type-chip: calc(0.72rem + var(--pe-font-delta-body));
-    --pe-font-size-status: calc(0.85rem + var(--pe-font-delta-body));
-    --pe-font-size-entry-badge: calc(0.68rem + var(--pe-font-delta-body));
-    --pe-font-size-entry-title: calc(0.9rem + var(--pe-font-delta-body));
-    --pe-font-size-entry-summary: calc(0.75rem + var(--pe-font-delta-body));
-    --pe-font-size-entry-date: calc(0.68rem + var(--pe-font-delta-body));
+    --pe-font-size-stat-label: calc(var(--fc-font-size-xs) + var(--pe-font-delta-body));
+    --pe-font-size-control: calc(var(--fc-font-size-control, 0.875rem) + var(--pe-font-delta-body));
+    --pe-font-size-sort-tab: calc(var(--fc-font-size-caption, 0.75rem) + var(--pe-font-delta-body));
+    --pe-font-size-type-chip: calc(var(--fc-font-size-xs) + var(--pe-font-delta-body));
+    --pe-font-size-status: calc(var(--fc-font-size-control, 0.875rem) + var(--pe-font-delta-body));
+    --pe-font-size-entry-badge: calc(var(--fc-font-size-xs) + var(--pe-font-delta-body));
+    --pe-font-size-entry-title: calc(var(--fc-font-size-reading, 0.9rem) + var(--pe-font-delta-body));
+    --pe-font-size-entry-summary: calc(var(--fc-font-size-caption, 0.75rem) + var(--pe-font-delta-body));
+    --pe-font-size-entry-date: calc(var(--fc-font-size-xs) + var(--pe-font-delta-body));
 }
 
 .pe-breadcrumb {
@@ -249,7 +249,7 @@
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, transparent);
     color: var(--fc-color-text-secondary);
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     user-select: none;
 }
 
@@ -394,7 +394,7 @@
 }
 
 .pe-overview-desc {
-    font-size: var(--pe-font-size-overview-desc);
+    font-size: var(--pe-font-size-overview-desc, var(--fc-font-size-body, 1rem));
     line-height: 1.65;
     margin: 0 0 var(--fc-space-md);
     max-width: 58rem;
@@ -433,7 +433,7 @@
     border-radius: var(--fc-radius-md);
     background: var(--fc-color-bg-secondary);
     color: var(--fc-color-text);
-    font-size: var(--pe-font-size-overview-desc, 0.9rem);
+    font-size: var(--pe-font-size-overview-desc, var(--fc-font-size-reading, 0.9rem));
     line-height: var(--fc-line-height-normal);
     resize: vertical;
     min-height: 4.5rem;
@@ -479,7 +479,7 @@
     display: flex;
     align-items: center;
     gap: var(--fc-space-xs);
-    font-size: var(--pe-font-size-meta);
+    font-size: var(--pe-font-size-meta, var(--fc-font-size-caption, 0.75rem));
     color: var(--fc-color-text-secondary);
     margin-bottom: var(--fc-space-lg);
     line-height: var(--fc-line-height-normal);
@@ -782,7 +782,7 @@
     justify-content: center;
     background: var(--fc-color-bg-tertiary, var(--fc-color-bg-secondary));
     color: var(--fc-color-text-secondary);
-    font-size: 0.8rem;
+    font-size: var(--fc-font-size-sm);
 }
 
 .pe-cover-picker__card-body {
@@ -812,7 +812,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
     color: var(--fc-color-primary);
-    font-size: 0.7rem;
+    font-size: var(--fc-font-size-xs);
 }
 
 .pe-cover-picker__empty,
@@ -847,13 +847,13 @@
 }
 
 .pe-cover-picker__results-title {
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
     font-weight: 600;
     color: var(--fc-color-text);
 }
 
 .pe-cover-picker__results-count {
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
 }
 
@@ -894,7 +894,7 @@
     height: 100%;
     display: grid;
     place-items: center;
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
 }
 
@@ -925,7 +925,7 @@
 }
 
 .pe-stat-label {
-    font-size: var(--pe-font-size-stat-label);
+    font-size: var(--pe-font-size-stat-label, var(--fc-font-size-xs));
     color: var(--fc-color-text-secondary);
     text-align: left;
     line-height: 1.2;
@@ -950,14 +950,14 @@
 
 .pe-feature-section__title {
     margin: 0;
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body, 1rem);
     font-weight: 700;
     color: var(--fc-color-text);
 }
 
 .pe-feature-section__desc {
     margin: 0;
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     line-height: 1.55;
     color: var(--fc-color-text-secondary);
 }
@@ -1033,7 +1033,7 @@
 }
 
 .pe-feature-entry__title {
-    font-size: 0.98rem;
+    font-size: var(--fc-font-size-body, 1rem);
     font-weight: 700;
     color: var(--fc-color-text);
 }
@@ -1043,12 +1043,12 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
     color: var(--fc-color-primary);
-    font-size: 0.7rem;
+    font-size: var(--fc-font-size-xs);
     line-height: 1.2;
 }
 
 .pe-feature-entry__desc {
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     line-height: 1.55;
     color: var(--fc-color-text-secondary);
 }
@@ -1059,7 +1059,7 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
-    font-size: var(--pe-font-size-control);
+    font-size: var(--pe-font-size-control, var(--fc-font-size-control, 0.875rem));
 }
 
 .pe-config-grid {
@@ -1169,13 +1169,13 @@
 }
 
 .pe-entry-type-item__icon--tag {
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
     font-weight: 700;
 }
 
 .pe-entry-type-item__desc {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.45;
     color: var(--fc-color-text-secondary);
     display: -webkit-box;
@@ -1242,7 +1242,7 @@
 }
 
 .pe-config-item__title {
-    font-size: 0.92rem;
+    font-size: var(--fc-font-size-md);
     font-weight: 700;
     color: var(--fc-color-text);
 }
@@ -1252,7 +1252,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     color: var(--fc-color-primary);
-    font-size: 0.7rem;
+    font-size: var(--fc-font-size-xs);
     line-height: 1.2;
 }
 
@@ -1264,7 +1264,7 @@
 .pe-config-item__desc,
 .pe-config-item__meta {
     margin: 0;
-    font-size: 0.8rem;
+    font-size: var(--fc-font-size-sm);
     line-height: 1.55;
     color: var(--fc-color-text-secondary);
 }
@@ -1288,7 +1288,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
     color: var(--fc-color-text-secondary);
-    font-size: 0.7rem;
+    font-size: var(--fc-font-size-xs);
     line-height: 1.2;
 }
 
@@ -1428,12 +1428,12 @@
     border-radius: var(--fc-radius-lg);
     background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     color: var(--fc-color-primary);
-    font-size: 1.1rem;
+    font-size: var(--fc-font-size-lg);
     flex-shrink: 0;
 }
 
 .pe-layout .fc-dialog__title {
-    font-size: 1.1rem;
+    font-size: var(--fc-font-size-lg);
     font-weight: 700;
     color: var(--fc-color-text);
     line-height: 1.3;
@@ -1447,7 +1447,7 @@
 .pe-layout .fc-dialog__desc {
     padding: 0 var(--fc-space-xl);
     margin: var(--fc-space-sm) 0 var(--fc-space-md);
-    font-size: 0.88rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     line-height: 1.55;
     color: var(--fc-color-text-secondary);
 }
@@ -1506,7 +1506,7 @@
     border-radius: var(--fc-radius-md);
     background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
     color: var(--fc-color-primary);
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body, 1rem);
     flex-shrink: 0;
 }
 
@@ -1523,7 +1523,7 @@
 }
 
 .pe-layout .fc-dialog__option-title {
-    font-size: 0.92rem;
+    font-size: var(--fc-font-size-md);
     font-weight: 600;
     color: var(--fc-color-text);
 }
@@ -1533,7 +1533,7 @@
 }
 
 .pe-layout .fc-dialog__option-desc {
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.5;
     color: var(--fc-color-text-secondary);
 }
@@ -1552,7 +1552,7 @@
     border-radius: var(--fc-radius-md);
     background: var(--fc-color-bg-secondary);
     color: var(--fc-color-text);
-    font-size: 0.88rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     font-weight: 500;
     cursor: pointer;
     transition:
@@ -1621,7 +1621,7 @@
     flex: 1;
     min-width: 8rem;
     max-width: 18rem;
-    font-size: var(--pe-font-size-control);
+    font-size: var(--pe-font-size-control, var(--fc-font-size-control, 0.875rem));
 }
 
 .pe-category-toolbar-actions {
@@ -1643,7 +1643,7 @@
     border: 1px solid var(--fc-color-border);
     background: transparent;
     color: var(--fc-color-text);
-    font-size: var(--pe-font-size-sort-tab);
+    font-size: var(--pe-font-size-sort-tab, var(--fc-font-size-caption, 0.75rem));
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -1679,7 +1679,7 @@
     border: 1px solid var(--fc-color-border);
     background: transparent;
     color: var(--fc-color-text);
-    font-size: var(--pe-font-size-type-chip);
+    font-size: var(--pe-font-size-type-chip, var(--fc-font-size-xs));
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -1720,7 +1720,7 @@
     flex: 1;
     color: var(--fc-color-text);
     opacity: 0.45;
-    font-size: var(--pe-font-size-status);
+    font-size: var(--pe-font-size-status, var(--fc-font-size-control, 0.875rem));
 }
 
 .pe-entries-region {
@@ -1765,7 +1765,7 @@
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, transparent);
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
     color: var(--fc-color-text-secondary);
-    font-size: var(--pe-font-size-status);
+    font-size: var(--pe-font-size-status, var(--fc-font-size-control, 0.875rem));
     box-shadow: var(--fc-shadow-xs);
 }
 
@@ -1824,7 +1824,7 @@
 }
 
 .pe-entry-create-card__label {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body, 1rem);
     font-weight: 600;
     text-align: center;
 }
@@ -1879,7 +1879,7 @@
 }
 
 .pe-entry-card .fc-card__title {
-    font-size: 1.2rem;
+    font-size: var(--fc-font-size-title-sm, 1.25rem);
 }
 
 .pe-entry-card .fc-card__description {
@@ -1889,7 +1889,7 @@
 
 .pe-entry-card .fc-card__extra-info {
     margin-top: 0;
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     color: rgba(255, 255, 255, 0.95);
 }
 
@@ -1898,7 +1898,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    font-size: var(--pe-font-size-entry-badge);
+    font-size: var(--pe-font-size-entry-badge, var(--fc-font-size-xs));
     font-weight: 500;
     padding: 0.1rem 0.45rem;
     border-radius: 999px;

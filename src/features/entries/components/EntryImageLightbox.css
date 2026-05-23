@@ -46,7 +46,7 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
     color: var(--fc-color-primary);
-    font-size: 0.75rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
 }
 
 .entry-editor-lightbox__main {
@@ -86,7 +86,7 @@
 
 .entry-editor-lightbox__empty {
     color: var(--fc-color-text-secondary);
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
 }
 
 .entry-editor-lightbox__gallery {
@@ -178,12 +178,12 @@
 }
 
 .entry-editor-lightbox__thumb-empty {
-    font-size: 1.1rem;
+    font-size: var(--fc-font-size-lg);
     color: var(--fc-color-text-secondary);
 }
 
 .entry-editor-lightbox__thumb-add-label {
-    font-size: 0.72rem;
+    font-size: var(--fc-font-size-xs);
     line-height: 1.2;
     color: var(--fc-color-text);
     text-align: center;

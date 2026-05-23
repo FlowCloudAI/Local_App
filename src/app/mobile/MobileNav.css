@@ -46,6 +46,6 @@
 }
 
 .mobile-nav__label {
-    font-size: 10px;
+    font-size: var(--fc-font-size-2xs, 0.625rem);
     line-height: 1;
 }

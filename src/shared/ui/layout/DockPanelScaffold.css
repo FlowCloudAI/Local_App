@@ -71,7 +71,7 @@
     border-bottom: 1px solid var(--dock-panel-border-color);
     background: var(--dock-panel-topbar-bg);
     backdrop-filter: blur(10px);
-    font-size: var(--dock-panel-title-size);
+    font-size: var(--dock-panel-title-size, var(--fc-font-size-sm));
     line-height: 1.2;
     flex-shrink: 0;
 }
@@ -84,7 +84,7 @@
 
 .dock-panel-title {
     min-width: 0;
-    font-size: var(--dock-panel-title-size);
+    font-size: var(--dock-panel-title-size, var(--fc-font-size-sm));
     font-weight: var(--dock-panel-title-weight);
     color: var(--fc-color-text);
 }

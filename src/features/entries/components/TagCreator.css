@@ -36,7 +36,7 @@
 }
 
 .tag-creator-title {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body, 1rem);
     font-weight: 600;
     color: var(--fc-color-text);
     letter-spacing: 0.01em;
@@ -66,7 +66,7 @@
 }
 
 .tag-creator-label {
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     font-weight: 500;
     color: var(--fc-color-text-secondary, var(--fc-color-text));
 }
@@ -84,7 +84,7 @@
     padding: 0;
     border: none;
     background: transparent;
-    font-size: 0.76rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-primary);
     cursor: pointer;
 }
@@ -105,7 +105,7 @@
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
     font-family: var(--fc-font-family), sans-serif;
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
     line-height: 1.5;
     outline: none;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -174,12 +174,12 @@
 }
 
 .tag-creator-option-title {
-    font-size: 0.88rem;
+    font-size: var(--fc-font-size-control, 0.875rem);
     font-weight: 600;
 }
 
 .tag-creator-option-description {
-    font-size: 0.76rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary, var(--fc-color-text));
     opacity: 0.82;
     line-height: 1.45;
@@ -203,7 +203,7 @@
     border: 1px solid var(--fc-color-border);
     background: transparent;
     color: var(--fc-color-text);
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -263,7 +263,7 @@
 }
 
 .tag-creator-range-sep {
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     color: var(--fc-color-text-secondary, var(--fc-color-text));
     opacity: 0.7;
 }
@@ -272,7 +272,7 @@
 
 .tag-creator-field-hint {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
 }
 
@@ -286,7 +286,7 @@
     border-radius: 0.5rem;
     border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e53e3e) 28%, transparent);
     background: color-mix(in srgb, var(--fc-color-danger, #e53e3e) 8%, transparent);
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     color: var(--fc-color-danger, #e53e3e);
 }
 

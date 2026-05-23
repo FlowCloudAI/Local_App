@@ -26,7 +26,7 @@
 }
 
 .project-import-conflict-title {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body, 1rem);
     font-weight: 600;
     color: var(--fc-color-text);
 }
@@ -40,7 +40,7 @@
 
 .project-import-conflict-message {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
     line-height: 1.6;
     color: var(--fc-color-text-secondary);
 }
@@ -49,7 +49,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    font-size: 0.82rem;
+    font-size: var(--fc-font-size-sm);
     font-weight: 500;
     color: var(--fc-color-text-secondary);
 }
@@ -62,7 +62,7 @@
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
     font-family: var(--fc-font-family), sans-serif;
-    font-size: 0.9rem;
+    font-size: var(--fc-font-size-reading, 0.9rem);
     line-height: 1.5;
     outline: none;
     box-sizing: border-box;
@@ -81,7 +81,7 @@
 
 .project-import-conflict-error {
     margin: 0;
-    font-size: 0.78rem;
+    font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-danger, #e53e3e);
 }
 

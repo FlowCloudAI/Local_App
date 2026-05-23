@@ -162,7 +162,7 @@
     border: none;
     cursor: pointer;
     color: var(--fc-color-danger);
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body, 1rem);
     line-height: 1;
     width: 1.5rem;
     height: 1.5rem;
