@@ -9,7 +9,7 @@ import {normalizeHexColor, type MaterialToneSwatch} from './materialThemePreview
 
 const MATERIAL_THEME_TONES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 97, 99, 100] as const
 
-type FcThemeLightProfile = 'default' | 'airy' | 'soft' | 'warm'
+type FcThemeLightProfile = 'default' | 'soft' | 'warm'
 type FcThemePaletteKey = 'primary' | 'neutral' | 'neutralVariant'
 type MaterialThemeTone = typeof MATERIAL_THEME_TONES[number]
 
@@ -77,16 +77,6 @@ export const DEFAULT_FC_THEME_RECIPE_ID = 'liuyun'
 
 const LIGHT_TONE_PROFILES: Record<FcThemeLightProfile, FcLightToneProfile> = {
     default: {
-        primarySubtle: 95,
-        bg: 99,
-        bgSecondary: 97,
-        bgTertiary: 95,
-        bgElevated: 100,
-        border: 90,
-        borderLight: 95,
-        borderHover: 60,
-    },
-    airy: {
         primarySubtle: 95,
         bg: 99,
         bgSecondary: 97,
@@ -178,16 +168,6 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         neutralChroma: 4,
         neutralVariantChroma: 9,
         lightProfile: 'soft',
-    },
-    {
-        id: 'yuebai',
-        label: '月白',
-        description: '近乎无色的轻冷背景。',
-        primarySeed: '#6A8FB8',
-        neutralSeed: '#F4F7FA',
-        neutralChroma: 2,
-        neutralVariantChroma: 6,
-        lightProfile: 'airy',
     },
 ]
 
