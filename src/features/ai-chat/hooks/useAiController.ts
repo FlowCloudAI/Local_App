@@ -33,6 +33,8 @@ import {
     type TaskContextPayload,
     type ToolStatus,
     type UpdateSessionParams,
+    formatApiError,
+    toApiError,
 } from '../../../api'
 import {type SessionMessage, useAiSession} from './useAiSession'
 import {estimateMessagesTokens} from '../lib/contextUsage'
@@ -1668,7 +1670,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     runId: preparedSession.runId,
                     error,
                 })
-                onError(`发送失败: ${error}`)
+                onError(`发送失败: ${formatApiError(toApiError(error))}`)
                 return
             }
 
@@ -1690,7 +1692,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     runId: recoveredSession.runId,
                     error: retryError,
                 })
-                onError(`发送失败: ${retryError}`)
+                onError(`发送失败: ${formatApiError(toApiError(retryError))}`)
             }
         }
     }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length, onError])

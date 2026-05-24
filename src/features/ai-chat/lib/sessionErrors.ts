@@ -1,4 +1,5 @@
+import {ErrorCode, toApiError} from '../../../api/error'
+
 export function isMissingBackendSessionError(error: unknown): boolean {
-    const message = String(error)
-    return message.includes('Session') && message.includes('不存在')
+    return toApiError(error).code === ErrorCode.LlmSessionNotFound
 }

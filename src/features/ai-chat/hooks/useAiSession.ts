@@ -756,7 +756,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             if (missingBackendSession) {
                 throw e
             }
-            onErrorRef.current(`发送失败: ${e}`)
+            onErrorRef.current(`发送失败: ${formatApiError(toApiError(e))}`)
         }
     }, [setRunStreaming])
 
