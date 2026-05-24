@@ -4,6 +4,7 @@ pub(super) use crate::ApiError;
 pub(super) use crate::ApiKeyStore;
 pub(super) use crate::PathsState;
 pub(super) use crate::PendingEditsState;
+pub(super) use crate::SettingsState;
 pub(super) use flowcloudai_client::llm::config::SessionConfig;
 pub(super) use flowcloudai_client::{
     AudioDecoder, AudioSource, ConversationNode, ConversationNodeSeed, DefaultOrchestrator,

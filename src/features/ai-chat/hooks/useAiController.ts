@@ -92,7 +92,24 @@ const buildSessionUpdateParams = (
     presencePenalty: settings.presencePenaltyEnabled ? settings.presencePenalty : 0,
 })
 
-const createDraftConversation = (pluginId: string, model: string): Conversation => ({
+const buildDefaultConversationSettings = (settings: AppSettings | null): ConversationSettings => {
+    const llm = settings?.llm
+    return normalizeConversationSettings({
+        temperature: llm?.temperature ?? DEFAULT_CONVERSATION_SETTINGS.temperature,
+        topP: llm?.top_p ?? DEFAULT_CONVERSATION_SETTINGS.topP,
+        frequencyPenaltyEnabled: Boolean(llm && llm.frequency_penalty !== 0),
+        frequencyPenalty: llm?.frequency_penalty ?? DEFAULT_CONVERSATION_SETTINGS.frequencyPenalty,
+        presencePenaltyEnabled: Boolean(llm && llm.presence_penalty !== 0),
+        presencePenalty: llm?.presence_penalty ?? DEFAULT_CONVERSATION_SETTINGS.presencePenalty,
+        systemPrompt: DEFAULT_CONVERSATION_SETTINGS.systemPrompt,
+    })
+}
+
+const createDraftConversation = (
+    pluginId: string,
+    model: string,
+    settings: ConversationSettings = DEFAULT_CONVERSATION_SETTINGS,
+): Conversation => ({
     id: `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     title: '新对话',
     messages: [],
@@ -111,7 +128,7 @@ const createDraftConversation = (pluginId: string, model: string): Conversation 
     characterAutoPlay: null,
     reportContext: null,
     reportSeeded: false,
-    settings: normalizeConversationSettings(),
+    settings: normalizeConversationSettings(settings),
 })
 
 const isEmptyDraftConversation = (conversation: Conversation) =>
@@ -994,7 +1011,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
             return
         }
 
-        const draft = createDraftConversation(selectedPlugin, selectedModel)
+        const draft = createDraftConversation(
+            selectedPlugin,
+            selectedModel,
+            buildDefaultConversationSettings(appSettingsRef.current),
+        )
         setConversations((prev) => [draft, ...prev])
         setActiveConversationId(draft.id)
         activeConversationIdRef.current = draft.id
@@ -1034,7 +1055,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
             return
         }
 
-        const draft = createDraftConversation(selectedPlugin, selectedModel)
+        const draft = createDraftConversation(
+            selectedPlugin,
+            selectedModel,
+            buildDefaultConversationSettings(appSettingsRef.current),
+        )
         session.activateSession(null, null)
         setConversations((prev) => [
             draft,
@@ -1362,7 +1387,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
         const draftConversation: Conversation | null = activeConv
             ? null
-            : createDraftConversation(selectedPlugin, selectedModel)
+            : createDraftConversation(
+                selectedPlugin,
+                selectedModel,
+                buildDefaultConversationSettings(appSettingsRef.current),
+            )
         const currentConv = activeConv ?? draftConversation
         if (!currentConv) return
         const currentConvId = currentConv.id

@@ -18,6 +18,7 @@ pub async fn ai_create_llm_session(
     app: AppHandle,
     ai_state: State<'_, AiState>,
     paths: State<'_, PathsState>,
+    settings_state: State<'_, SettingsState>,
     session_id: String,
     plugin_id: String,
     model: Option<String>,
@@ -29,6 +30,10 @@ pub async fn ai_create_llm_session(
     settings: Option<StoredConversationSettings>,
 ) -> Result<CreateLlmSessionResult, ApiError> {
     let trace_id = client_trace_id.as_deref().unwrap_or("none");
+    let global_llm_defaults = {
+        let settings = settings_state.settings.lock().await;
+        settings.llm.clone()
+    };
     log::info!(
         "[ai_create_llm_session][recv] trace_id={} session_id={} plugin_id={} model={:?} conversation_id={:?} temperature={:?} max_tokens={:?} max_tool_rounds={:?}",
         trace_id,
@@ -123,8 +128,13 @@ pub async fn ai_create_llm_session(
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
     }
-    session.load_sense(AppSense::new()).await?;
+    session
+        .load_sense(AppSense::new(Some(
+            global_llm_defaults.app_sense_custom_prompt.clone(),
+        )))
+        .await?;
     session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
+    let runtime_settings = settings.as_ref().or(restored_settings.as_ref());
 
     let model_to_apply = model
         .clone()
@@ -135,12 +145,42 @@ pub async fn ai_create_llm_session(
     if let Some(m) = model_to_apply {
         session.set_model(&m).await;
     }
-    if let Some(t) = temperature {
-        session.set_temperature(t).await;
-    }
-    if let Some(n) = max_tokens {
-        session.set_max_tokens(n).await;
-    }
+    let temperature_to_apply = temperature
+        .or_else(|| runtime_settings.map(|settings| settings.temperature))
+        .unwrap_or(global_llm_defaults.temperature)
+        .clamp(0.0, 2.0);
+    let top_p_to_apply = runtime_settings
+        .map(|settings| settings.top_p)
+        .unwrap_or(global_llm_defaults.top_p)
+        .clamp(0.0, 1.0);
+    let frequency_penalty_to_apply = runtime_settings
+        .map(|settings| {
+            if settings.frequency_penalty_enabled {
+                settings.frequency_penalty
+            } else {
+                0.0
+            }
+        })
+        .unwrap_or(global_llm_defaults.frequency_penalty)
+        .clamp(-2.0, 2.0);
+    let presence_penalty_to_apply = runtime_settings
+        .map(|settings| {
+            if settings.presence_penalty_enabled {
+                settings.presence_penalty
+            } else {
+                0.0
+            }
+        })
+        .unwrap_or(global_llm_defaults.presence_penalty)
+        .clamp(-2.0, 2.0);
+    let max_tokens_to_apply = max_tokens.unwrap_or(global_llm_defaults.max_tokens).max(1);
+    session.set_temperature(temperature_to_apply).await;
+    session.set_top_p(top_p_to_apply).await;
+    session
+        .set_frequency_penalty(frequency_penalty_to_apply)
+        .await;
+    session.set_presence_penalty(presence_penalty_to_apply).await;
+    session.set_max_tokens(max_tokens_to_apply).await;
     session.set_stream(true).await;
     log::info!(
         "[ai_create_llm_session][configured] trace_id={} session_id={} plugin_id={} model={}",
