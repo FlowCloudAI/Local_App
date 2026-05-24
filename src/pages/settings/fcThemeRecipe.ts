@@ -46,6 +46,7 @@ export interface FcThemeTokenPreview {
     token: string
     label: string
     group: '主色' | '背景' | '边框' | '文字'
+    modeInvariant: boolean
     light: FcThemeTokenValue
     dark: FcThemeTokenValue
 }
@@ -83,6 +84,7 @@ interface FcThemeTokenRule {
     darkTone?: number
     lightAlpha?: number
     darkAlpha?: number
+    modeInvariant?: boolean
     kind?: 'onPrimary'
 }
 
@@ -202,14 +204,14 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
 ]
 
 const FC_THEME_TOKEN_RULES: FcThemeTokenRule[] = [
-    {token: '--fc-color-primary', label: '主色', group: '主色', palette: 'primary', lightTone: 50, darkTone: 70},
-    {token: '--fc-color-primary-hover', label: '悬停', group: '主色', palette: 'primary', lightTone: 40, darkTone: 80},
-    {token: '--fc-color-primary-active', label: '按下', group: '主色', palette: 'primary', lightTone: 30, darkTone: 90},
+    {token: '--fc-color-primary', label: '主色', group: '主色', palette: 'primary', lightTone: 50, modeInvariant: true},
+    {token: '--fc-color-primary-hover', label: '悬停', group: '主色', palette: 'primary', lightTone: 40, modeInvariant: true},
+    {token: '--fc-color-primary-active', label: '按下', group: '主色', palette: 'primary', lightTone: 30, modeInvariant: true},
     {token: '--fc-color-primary-subtle', label: '弱背景', group: '主色', palette: 'primary', lightPalette: 'primarySurface', lightToneKey: 'primarySubtle', darkTone: 70, darkAlpha: 12},
-    {token: '--fc-color-border-focus', label: '焦点边框', group: '主色', palette: 'primary', lightTone: 50, darkTone: 60},
-    {token: '--fc-color-text-link', label: '链接', group: '主色', palette: 'primary', lightTone: 40, darkTone: 70},
-    {token: '--fc-color-text-link-hover', label: '链接悬停', group: '主色', palette: 'primary', lightTone: 30, darkTone: 80},
-    {token: '--fc-color-text-on-primary', label: '主色上文字', group: '主色', kind: 'onPrimary'},
+    {token: '--fc-color-border-focus', label: '焦点边框', group: '主色', palette: 'primary', lightTone: 50, modeInvariant: true},
+    {token: '--fc-color-text-link', label: '链接', group: '主色', palette: 'primary', lightTone: 40, modeInvariant: true},
+    {token: '--fc-color-text-link-hover', label: '链接悬停', group: '主色', palette: 'primary', lightTone: 30, modeInvariant: true},
+    {token: '--fc-color-text-on-primary', label: '主色上文字', group: '主色', modeInvariant: true, kind: 'onPrimary'},
 
     {token: '--fc-color-bg', label: '页面背景', group: '背景', palette: 'neutral', lightPalette: 'primarySurface', lightToneKey: 'bg', darkTone: 10},
     {token: '--fc-color-bg-secondary', label: '工作台背景', group: '背景', palette: 'neutral', lightPalette: 'primarySurface', lightToneKey: 'bgSecondary', darkTone: 20},
@@ -326,7 +328,11 @@ export function createFcThemeOverrideCss(
         '}',
         '',
         '[data-theme="dark"] {',
-        ...preview.tokens.map((item) => `  ${item.token}: ${tokenColors?.[item.token]?.dark.css ?? item.dark.css} !important;`),
+        ...preview.tokens.map((item) => {
+            const lightCss = tokenColors?.[item.token]?.light.css ?? item.light.css
+            const darkCss = item.modeInvariant ? lightCss : tokenColors?.[item.token]?.dark.css ?? item.dark.css
+            return `  ${item.token}: ${darkCss} !important;`
+        }),
         '}',
     ].join('\n')
 }
@@ -338,8 +344,8 @@ export function createFcThemeTokenColorValues(preview: FcThemePreview): FcThemeT
             css: item.light.css,
         },
         dark: {
-            hex: item.dark.hex,
-            css: item.dark.css,
+            hex: item.modeInvariant ? item.light.hex : item.dark.hex,
+            css: item.modeInvariant ? item.light.css : item.dark.css,
         },
     }]))
 }
@@ -351,11 +357,12 @@ function createTokenPreview(
 ): FcThemeTokenPreview {
     if (rule.kind === 'onPrimary') {
         const lightPrimary = getToneHex(palettes.primary, 50)
-        const darkPrimary = getToneHex(palettes.primary, 70)
+        const darkPrimary = rule.modeInvariant ? lightPrimary : getToneHex(palettes.primary, 70)
         return {
             token: rule.token,
             label: rule.label,
             group: rule.group,
+            modeInvariant: Boolean(rule.modeInvariant),
             light: createStaticTokenValue('自动对比', pickReadableTextColor(lightPrimary)),
             dark: createStaticTokenValue('自动对比', pickReadableTextColor(darkPrimary)),
         }
@@ -367,13 +374,14 @@ function createTokenPreview(
     const lightPalette = palettes[lightPaletteKey]
     const darkPalette = palettes[darkPaletteKey]
     const lightTone = normalizeThemeTone(resolveLightTone(rule, lightProfile))
-    const darkTone = normalizeThemeTone(rule.darkTone ?? 70)
+    const darkTone = normalizeThemeTone(rule.modeInvariant ? lightTone : rule.darkTone ?? 70)
     const lightHex = getToneHex(lightPalette, lightTone)
-    const darkHex = getToneHex(darkPalette, darkTone)
+    const darkHex = rule.modeInvariant ? lightHex : getToneHex(darkPalette, darkTone)
     return {
         token: rule.token,
         label: rule.label,
         group: rule.group,
+        modeInvariant: Boolean(rule.modeInvariant),
         light: createToneTokenValue(`Light ${formatPaletteLabel(lightPaletteKey)} T${lightTone}`, lightHex, rule.lightAlpha),
         dark: createToneTokenValue(`Dark T${darkTone}`, darkHex, rule.darkAlpha),
     }
