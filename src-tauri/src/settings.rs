@@ -109,7 +109,7 @@ pub struct LlmDefaults {
     pub stream: bool,
     /// 是否显示思考过程（ReasoningDelta）
     pub show_reasoning: bool,
-    /// 仅追加到 AppSense 默认系统提示词之后
+    /// 仅追加到通用 AI 对话默认系统提示词之后
     pub app_sense_custom_prompt: String,
     /// 是否在上下文接近模型窗口时自动压缩历史
     pub auto_compact_enabled: bool,

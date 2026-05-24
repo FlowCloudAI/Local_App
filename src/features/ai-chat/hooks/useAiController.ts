@@ -92,6 +92,9 @@ const buildSessionUpdateParams = (
     presencePenalty: settings.presencePenaltyEnabled ? settings.presencePenalty : 0,
 })
 
+const getGlobalDefaultPrompt = (settings: AppSettings | null): string =>
+    settings?.llm?.app_sense_custom_prompt.trim() ?? ''
+
 const buildDefaultConversationSettings = (settings: AppSettings | null): ConversationSettings => {
     const llm = settings?.llm
     return normalizeConversationSettings({
@@ -101,8 +104,21 @@ const buildDefaultConversationSettings = (settings: AppSettings | null): Convers
         frequencyPenalty: llm?.frequency_penalty ?? DEFAULT_CONVERSATION_SETTINGS.frequencyPenalty,
         presencePenaltyEnabled: Boolean(llm && llm.presence_penalty !== 0),
         presencePenalty: llm?.presence_penalty ?? DEFAULT_CONVERSATION_SETTINGS.presencePenalty,
-        systemPrompt: DEFAULT_CONVERSATION_SETTINGS.systemPrompt,
+        systemPrompt: getGlobalDefaultPrompt(settings),
     })
+}
+
+const normalizeConversationSettingsWithGlobalPrompt = (
+    settings: Partial<ConversationSettings> | null | undefined,
+    mode: Conversation['mode'] | undefined,
+    appSettings: AppSettings | null,
+): ConversationSettings => {
+    const normalized = normalizeConversationSettings(settings)
+    const globalPrompt = getGlobalDefaultPrompt(appSettings)
+    if ((mode == null || mode === 'default') && !normalized.systemPrompt.trim() && globalPrompt) {
+        return {...normalized, systemPrompt: globalPrompt}
+    }
+    return normalized
 }
 
 const createDraftConversation = (
@@ -763,7 +779,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     ? {
                         ...c,
                         messages: storedToMessages(stored.messages),
-                        settings: normalizeConversationSettings(stored.settings),
+                        settings: normalizeConversationSettingsWithGlobalPrompt(
+                            stored.settings,
+                            c.mode,
+                            appSettingsRef.current,
+                        ),
                     }
                     : c,
             ))
@@ -1002,7 +1022,16 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (existingDraft) {
             setConversations((prev) => prev.map((conversation) =>
                 conversation.id === existingDraft.id
-                    ? {...conversation, pluginId: selectedPlugin, model: selectedModel}
+                    ? {
+                        ...conversation,
+                        pluginId: selectedPlugin,
+                        model: selectedModel,
+                        settings: normalizeConversationSettingsWithGlobalPrompt(
+                            conversation.settings,
+                            conversation.mode,
+                            appSettingsRef.current,
+                        ),
+                    }
                     : conversation,
             ))
             setActiveConversationId(existingDraft.id)
@@ -1287,7 +1316,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
                             ? {
                                 ...conversation,
                                 messages: storedToMessages(stored.messages),
-                                settings: normalizeConversationSettings(stored.settings),
+                                settings: normalizeConversationSettingsWithGlobalPrompt(
+                                    stored.settings,
+                                    conversation.mode,
+                                    appSettingsRef.current,
+                                ),
                             }
                             : conversation,
                     ))

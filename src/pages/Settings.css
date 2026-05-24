@@ -205,6 +205,43 @@
   font-size: var(--fc-font-size-sm);
 }
 
+.settings-text-model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(18rem, 1fr));
+  gap: var(--fc-space-sm) var(--fc-space-lg);
+}
+
+.settings-text-model-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fc-space-md);
+  color: var(--fc-color-text);
+  font-size: var(--fc-font-size-control, 0.875rem);
+}
+
+.settings-text-model-field > span {
+  color: var(--fc-color-text);
+}
+
+.settings-text-model-field input[type='number'] {
+  width: 8.25rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 84%, transparent);
+  border-radius: var(--fc-radius-sm);
+  background: var(--fc-color-bg);
+  color: var(--fc-color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.settings-text-model-field input[type='number']:focus {
+  outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
+  outline-offset: 1px;
+}
+
 .settings-ai-model-grid {
   display: grid;
   grid-template-columns: 5rem minmax(16rem, 1fr) minmax(16rem, 1fr) minmax(16rem, 1fr);
@@ -839,6 +876,10 @@
 }
 
 @media (max-width: 720px) {
+  .settings-text-model-grid {
+    grid-template-columns: 1fr;
+  }
+
   .settings-ai-model-grid {
     grid-template-columns: 1fr;
     gap: var(--fc-space-sm);

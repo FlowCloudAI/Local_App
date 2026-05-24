@@ -80,6 +80,12 @@ function normalizeThemeSelectValue(value: SelectValue): Theme {
     return 'system'
 }
 
+function clampNumberValue(value: string, fallback: number, min: number, max: number): number {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed)) return fallback
+    return Math.min(max, Math.max(min, parsed))
+}
+
 interface ParsedPluginVersion {
     core: [number, number, number]
     prerelease: string[]
@@ -1517,80 +1523,72 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                             {/* 文本模型配置 */}
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">文本模型配置</h2>
-                                <div className="settings-row settings-row--compact">
-                                    <div className="settings-field">
-                                        <label className="settings-label-wide">温度</label>
-                                        <div className="settings-range-control">
-                                            <Slider
-                                                min={0}
-                                                max={2}
-                                                step={0.1}
-                                                value={settings.llm.temperature}
-                                                onChange={(value) => updateLlmDefaults({
-                                                    temperature: Array.isArray(value) ? value[0] : value,
-                                                })}
-                                            />
-                                        </div>
-                                        <span className="settings-span">{settings.llm.temperature.toFixed(1)}</span>
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label-wide">Top P</label>
-                                        <div className="settings-range-control">
-                                            <Slider
-                                                min={0}
-                                                max={1}
-                                                step={0.05}
-                                                value={settings.llm.top_p}
-                                                onChange={(value) => updateLlmDefaults({
-                                                    top_p: Array.isArray(value) ? value[0] : value,
-                                                })}
-                                            />
-                                        </div>
-                                        <span className="settings-span">{settings.llm.top_p.toFixed(2)}</span>
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label-wide">重复惩罚</label>
-                                        <div className="settings-range-control">
-                                            <Slider
-                                                min={-2}
-                                                max={2}
-                                                step={0.1}
-                                                value={settings.llm.frequency_penalty}
-                                                onChange={(value) => updateLlmDefaults({
-                                                    frequency_penalty: Array.isArray(value) ? value[0] : value,
-                                                })}
-                                            />
-                                        </div>
-                                        <span className="settings-span">{settings.llm.frequency_penalty.toFixed(1)}</span>
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label-wide">存在惩罚</label>
-                                        <div className="settings-range-control">
-                                            <Slider
-                                                min={-2}
-                                                max={2}
-                                                step={0.1}
-                                                value={settings.llm.presence_penalty}
-                                                onChange={(value) => updateLlmDefaults({
-                                                    presence_penalty: Array.isArray(value) ? value[0] : value,
-                                                })}
-                                            />
-                                        </div>
-                                        <span className="settings-span">{settings.llm.presence_penalty.toFixed(1)}</span>
-                                    </div>
+                                <div className="settings-text-model-grid">
+                                    <label className="settings-text-model-field">
+                                        <span>温度</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={2}
+                                            step={0.1}
+                                            value={settings.llm.temperature}
+                                            onChange={(event) => updateLlmDefaults({
+                                                temperature: clampNumberValue(event.currentTarget.value, settings.llm.temperature, 0, 2),
+                                            })}
+                                        />
+                                    </label>
+                                    <label className="settings-text-model-field">
+                                        <span>top_p</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={1}
+                                            step={0.05}
+                                            value={settings.llm.top_p}
+                                            onChange={(event) => updateLlmDefaults({
+                                                top_p: clampNumberValue(event.currentTarget.value, settings.llm.top_p, 0, 1),
+                                            })}
+                                        />
+                                    </label>
+                                    <label className="settings-text-model-field">
+                                        <span>重复惩罚</span>
+                                        <input
+                                            type="number"
+                                            min={-2}
+                                            max={2}
+                                            step={0.1}
+                                            value={settings.llm.frequency_penalty}
+                                            onChange={(event) => updateLlmDefaults({
+                                                frequency_penalty: clampNumberValue(event.currentTarget.value, settings.llm.frequency_penalty, -2, 2),
+                                            })}
+                                        />
+                                    </label>
+                                    <label className="settings-text-model-field">
+                                        <span>存在惩罚</span>
+                                        <input
+                                            type="number"
+                                            min={-2}
+                                            max={2}
+                                            step={0.1}
+                                            value={settings.llm.presence_penalty}
+                                            onChange={(event) => updateLlmDefaults({
+                                                presence_penalty: clampNumberValue(event.currentTarget.value, settings.llm.presence_penalty, -2, 2),
+                                            })}
+                                        />
+                                    </label>
                                 </div>
                                 <div className="settings-field-stack settings-field-stack--full settings-llm-prompt-field">
-                                    <label className="settings-label-wide">AppSense 自定义提示词</label>
+                                    <label className="settings-label-wide">全局默认提示词</label>
                                     <textarea
                                         className="settings-textarea"
                                         value={settings.llm.app_sense_custom_prompt}
                                         onChange={(event) => updateLlmDefaults({
                                             app_sense_custom_prompt: event.currentTarget.value,
                                         })}
-                                        placeholder="会追加在 AppSense 默认系统提示词之后，仅影响通用 AI 对话。"
+                                        placeholder="例如：保持回答简洁，优先延续当前世界观设定。"
                                     />
                                     <span className="settings-field-hint">
-                                        这段提示词只影响 AppSense，不会作用于角色对话、矛盾检查、摘要或图片提示词生成。
+                                        这段提示词会作为通用 AI 对话的默认提示词；当前对话没有独有提示词时会自动填充。
                                     </span>
                                 </div>
                                 <div className="settings-field settings-field-stack settings-field-stack--full">

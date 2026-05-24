@@ -19,7 +19,7 @@ impl AppSense {
     fn append_custom_prompt(&self, prompts: &mut Vec<String>) {
         if let Some(prompt) = &self.custom_prompt {
             prompts.push(format!(
-                "AppSense 全局自定义提示词如下。它只作用于通用 AI 对话，并追加在默认系统提示词之后。\n{}",
+                "全局默认提示词如下。它只作用于通用 AI 对话，并追加在默认系统提示词之后。\n{}",
                 prompt
             ));
         }
