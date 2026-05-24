@@ -473,6 +473,7 @@
 /* ========== 右侧主区域 ========== */
 .ai-main {
     --ai-chat-content-max-width: 840px;
+    --ai-chat-bottom-mask-bg: var(--dock-panel-bg);
     border-radius: var(--fc-radius-xl);
 }
 
@@ -966,6 +967,24 @@
     width: min(var(--ai-chat-content-max-width), calc(100% - 40px));
     z-index: 100;
     isolation: isolate;
+}
+
+.ai-floating-input-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    bottom: -24px;
+    left: 50%;
+    width: 100vw;
+    transform: translateX(-50%);
+    pointer-events: none;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 0%, transparent) 0%,
+        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 100%, transparent) calc(100% - 24px),
+        var(--ai-chat-bottom-mask-bg) 100%
+    );
+    z-index: 110;
 }
 
 .ai-floating-input-inner {
