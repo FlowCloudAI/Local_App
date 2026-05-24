@@ -35,6 +35,8 @@ import {
     type UpdateSessionParams,
 } from '../../../api'
 import {type SessionMessage, useAiSession} from './useAiSession'
+import {estimateMessagesTokens} from '../lib/contextUsage'
+import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import type {
     AiContextValue,
     AiFocusContext,
@@ -64,6 +66,8 @@ const buildAiLogPreview = (content: string) => {
 const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
 const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
+
+type PreparedAiSession = { sid: string; runId: string; conversationId: string }
 
 const toStoredConversationSettings = (settings: ConversationSettings): StoredConversationSettings => ({
     temperature: settings.temperature,
@@ -509,7 +513,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         conversationId: string,
         message: SessionMessage,
     ) => {
-        if (!message.usage || !message.nodeId) return
+        if (!message.nodeId) return
 
         const settings = await setting_get_settings().catch(() => appSettingsRef.current)
         if (settings) appSettingsRef.current = settings
@@ -524,7 +528,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const contextWindowTokens = modelInfo?.context_window_tokens ?? null
         if (!contextWindowTokens || contextWindowTokens <= 0) return
 
-        const usageRatio = message.usage.total_tokens / contextWindowTokens
+        const messagesForEstimate = conversation.messages.some((item) => item.id === message.id)
+            ? conversation.messages
+            : [...conversation.messages, {content: message.content}]
+        const estimatedTokens = estimateMessagesTokens(messagesForEstimate)
+        const usageTokens = message.usage?.total_tokens ?? 0
+        const usedTokens = Math.max(usageTokens, estimatedTokens)
+        const usageRatio = usedTokens / contextWindowTokens
         if (usageRatio < compactSettings.auto_compact_threshold_ratio) return
 
         const inFlightKey = `${conversationId}:${message.nodeId}`
@@ -546,6 +556,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 positionNodeId: result.positionNodeId ?? null,
                 summaryChars: result.summaryChars,
                 usageRatio,
+                usageTokens: message.usage?.total_tokens ?? null,
+                estimatedTokens,
             })
             if (!result.applied) return
 
@@ -1353,6 +1365,81 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (!currentConv) return
         const currentConvId = currentConv.id
         const currentSettings = normalizeConversationSettings(currentConv.settings)
+        const syncPreparedSessionContext = async (target: PreparedAiSession) => {
+            try {
+                await ai_update_session(
+                    target.sid,
+                    buildSessionUpdateParams(currentSettings, sessionParamsRef.current.thinking),
+                )
+                const ctx = await resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    currentSettings,
+                )
+                await ai_set_task_context(target.sid, ctx)
+            } catch (error) {
+                logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
+                    traceId,
+                    sessionId: target.sid,
+                    error,
+                })
+            }
+        }
+        const recreateMissingSession = async (failedSession: PreparedAiSession): Promise<PreparedAiSession | null> => {
+            logger.warn('[useAiController][发送链路] 后端会话不存在，准备重建后继续发送', {
+                traceId,
+                conversationId: failedSession.conversationId,
+                sessionId: failedSession.sid,
+                runId: failedSession.runId,
+            })
+
+            delete runtimeConversationRef.current[runtimeConversationKey(failedSession.sid, failedSession.runId)]
+            session.activateSession(null, null)
+            setConversations((prev) => prev.map((conversation) =>
+                conversation.id === failedSession.conversationId
+                    ? {...conversation, sessionId: null, runId: null}
+                    : conversation,
+            ))
+
+            const isPending = failedSession.conversationId.startsWith('conv_')
+            const created = await session.createSession(
+                currentConv.pluginId || selectedPlugin,
+                currentConv.model || selectedModel,
+                isPending ? undefined : failedSession.conversationId,
+                sessionParams.maxToolRounds,
+                traceId,
+                toStoredConversationSettings(currentSettings),
+            )
+            if (!created) return null
+
+            const nextConversationId = isPending ? created.conversationId : failedSession.conversationId
+            runtimeConversationRef.current[
+                runtimeConversationKey(created.sessionId, created.runId)
+            ] = nextConversationId
+            setConversations((prev) => prev.map((conversation) =>
+                conversation.id === failedSession.conversationId
+                    ? {
+                        ...conversation,
+                        id: nextConversationId,
+                        sessionId: created.sessionId,
+                        runId: created.runId,
+                    }
+                    : conversation,
+            ))
+            if (activeConversationIdRef.current === failedSession.conversationId) {
+                setActiveConversationId(nextConversationId)
+                activeConversationIdRef.current = nextConversationId
+            }
+
+            logger.log('[useAiController][发送链路] 后端会话重建完成', {
+                traceId,
+                previousSessionId: failedSession.sid,
+                sessionId: created.sessionId,
+                runId: created.runId,
+                conversationId: nextConversationId,
+            })
+            return {sid: created.sessionId, runId: created.runId, conversationId: nextConversationId}
+        }
 
         if (draftConversation) {
             logger.log('[useAiController][发送链路] 当前没有激活对话，创建前端草稿对话', {
@@ -1399,7 +1486,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
         const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
         const existingRunId = sessionClosedForEdit ? null : currentConv.runId
-        const preparedSession = await (async (): Promise<{ sid: string; runId: string; conversationId: string } | null> => {
+        const preparedSession = await (async (): Promise<PreparedAiSession | null> => {
             if (existingSid && existingRunId) {
                 logger.log('[useAiController][发送链路] 复用当前对话已有后端会话', {
                     traceId,
@@ -1534,24 +1621,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         })()
         if (!preparedSession) return
 
-        try {
-            await ai_update_session(
-                preparedSession.sid,
-                buildSessionUpdateParams(currentSettings, sessionParamsRef.current.thinking),
-            )
-            const ctx = await resolveContextPayload(
-                focusRef.current.projectId,
-                focusRef.current.entryId,
-                currentSettings,
-            )
-            await ai_set_task_context(preparedSession.sid, ctx)
-        } catch (error) {
-            logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
-                traceId,
-                sessionId: preparedSession.sid,
-                error,
-            })
-        }
+        await syncPreparedSessionContext(preparedSession)
 
         const actualPrompt = currentConv.mode === 'report'
         && !currentConv.reportSeeded
@@ -1588,8 +1658,42 @@ export function useAiController(focus: AiFocus): AiContextValue {
             actualPromptLength: actualPrompt.length,
             isReportBootstrap: actualPrompt !== trimmed,
         })
-        await session.sendMessage(actualPrompt, preparedSession.sid, preparedSession.runId, traceId)
-    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length])
+        try {
+            await session.sendMessage(actualPrompt, preparedSession.sid, preparedSession.runId, traceId)
+        } catch (error) {
+            if (!isMissingBackendSessionError(error)) {
+                logger.error('[useAiController][发送链路] 发送失败且无法自动恢复', {
+                    traceId,
+                    sessionId: preparedSession.sid,
+                    runId: preparedSession.runId,
+                    error,
+                })
+                onError(`发送失败: ${error}`)
+                return
+            }
+
+            const recoveredSession = await recreateMissingSession(preparedSession)
+            if (!recoveredSession) return
+            await syncPreparedSessionContext(recoveredSession)
+            logger.log('[useAiController][发送链路] 会话重建后重试发送', {
+                traceId,
+                conversationId: recoveredSession.conversationId,
+                sessionId: recoveredSession.sid,
+                runId: recoveredSession.runId,
+            })
+            try {
+                await session.sendMessage(actualPrompt, recoveredSession.sid, recoveredSession.runId, traceId)
+            } catch (retryError) {
+                logger.error('[useAiController][发送链路] 会话重建后重试仍失败', {
+                    traceId,
+                    sessionId: recoveredSession.sid,
+                    runId: recoveredSession.runId,
+                    error: retryError,
+                })
+                onError(`发送失败: ${retryError}`)
+            }
+        }
+    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length, onError])
 
     const stopStreaming = useCallback(() => {
         abortControllerRef.current?.abort()

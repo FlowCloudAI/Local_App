@@ -26,6 +26,7 @@ import {
     type ConversationNode,
     type StoredConversationSettings,
 } from '../../../api'
+import {isMissingBackendSessionError} from '../lib/sessionErrors'
 
 // ── 导出类型 ──────────────────────────────────────────────────
 
@@ -733,15 +734,24 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 runId: rid,
             })
         } catch (e) {
-            logger.error('[useAiSession][发送链路] 后端发送命令失败', {
+            const missingBackendSession = isMissingBackendSessionError(e)
+            const logPayload = {
                 traceId,
                 sessionId: sid,
                 runId: rid,
                 error: e,
-            })
-            onErrorRef.current(`发送失败: ${e}`)
+            }
+            if (missingBackendSession) {
+                logger.warn('[useAiSession][发送链路] 后端会话不存在，交由控制层重建', logPayload)
+            } else {
+                logger.error('[useAiSession][发送链路] 后端发送命令失败', logPayload)
+            }
             delete expectUserTurnByRunRef.current[rid]
             setRunStreaming(rid, false)
+            if (missingBackendSession) {
+                throw e
+            }
+            onErrorRef.current(`发送失败: ${e}`)
         }
     }, [setRunStreaming])
 

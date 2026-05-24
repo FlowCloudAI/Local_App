@@ -19,6 +19,7 @@ import {
 } from '../../../api'
 import type {AiContextValue, Conversation, ConversationSettings} from '../model/AiControllerTypes'
 import {normalizeConversationSettings} from '../model/AiControllerTypes'
+import {estimateMessagesTokens, estimateTextTokens, formatTokenCount} from '../lib/contextUsage'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
@@ -56,6 +57,10 @@ const CONVERSATION_SETTING_TOOLTIPS = {
 const formatConversationSettingNumber = (value: number) => {
     const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
     return fixed.replace(/\.?0+$/, '')
+}
+const formatContextUsagePercent = (percent: number, usedTokens: number) => {
+    if (usedTokens > 0 && percent > 0 && percent < 1) return '<1%'
+    return `${Math.min(100, Math.max(0, Math.round(percent)))}%`
 }
 const parseConversationNumber = (value: string, fallback: number) => {
     const parsed = Number(value)
@@ -326,17 +331,36 @@ export default function AIChatContent({
         }
         return null
     }, [ctx.messages])
-    const contextUsagePercent = useMemo(() => {
-        const currentInputTokenEstimate = Math.ceil(ctx.inputValue.trim().length / 2)
-        if (!contextWindowTokens || contextWindowTokens <= 0) return 0
-        const usedTokens = (latestUsage?.total_tokens ?? 0) + currentInputTokenEstimate
-        return Math.min(100, Math.max(0, Math.round((usedTokens / contextWindowTokens) * 100)))
-    }, [contextWindowTokens, ctx.inputValue, latestUsage])
+    const contextUsage = useMemo(() => {
+        const currentInputTokenEstimate = estimateTextTokens(ctx.inputValue)
+        const estimatedTokens =
+            estimateMessagesTokens(ctx.messages)
+            + estimateTextTokens(activeConversation?.settings.systemPrompt)
+            + currentInputTokenEstimate
+        const usageTokens = latestUsage?.total_tokens ?? 0
+        const usedTokens = Math.max(usageTokens, estimatedTokens)
+        const source = latestUsage && usageTokens >= estimatedTokens ? '供应商 usage' : '本地估算'
+        if (!contextWindowTokens || contextWindowTokens <= 0) {
+            return {
+                label: usedTokens > 0 ? '?' : '0%',
+                percent: 0,
+                ringPercent: 0,
+                title: usedTokens > 0
+                    ? `上下文窗口信息未返回，已估算当前上下文约 ${formatTokenCount(usedTokens)} tokens`
+                    : '上下文窗口信息未返回，暂以 0% 显示',
+            }
+        }
+        const percent = Math.min(100, Math.max(0, (usedTokens / contextWindowTokens) * 100))
+        const label = formatContextUsagePercent(percent, usedTokens)
+        return {
+            label,
+            percent,
+            ringPercent: percent > 0 && percent < 1 ? 1 : percent,
+            title: `上下文占用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)} tokens）`,
+        }
+    }, [activeConversation?.settings.systemPrompt, contextWindowTokens, ctx.inputValue, ctx.messages, latestUsage])
     const showContextUsageIndicator = Boolean(contextModelId)
-    const contextUsageTitle = contextWindowTokens && contextWindowTokens > 0
-        ? `上下文占用约 ${contextUsagePercent}%`
-        : '上下文窗口信息未返回，暂以 0% 显示'
-    const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsagePercent / 100)
+    const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsage.ringPercent / 100)
     const conversationSettings = normalizeConversationSettings(activeConversation?.settings)
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings,>(
         key: K,
@@ -1611,8 +1635,8 @@ export default function AIChatContent({
                             {showContextUsageIndicator && (
                                 <div
                                     className="ai-context-usage-indicator"
-                                    title={contextUsageTitle}
-                                    aria-label={contextUsageTitle}
+                                    title={contextUsage.title}
+                                    aria-label={contextUsage.title}
                                 >
                                     <svg className="ai-context-usage-ring" viewBox="0 0 28 28" aria-hidden="true">
                                         <circle
@@ -1630,7 +1654,7 @@ export default function AIChatContent({
                                             strokeDashoffset={contextUsageDashOffset}
                                         />
                                     </svg>
-                                    <span>{contextUsagePercent}%</span>
+                                    <span>{contextUsage.label}</span>
                                 </div>
                             )}
                         </div>
