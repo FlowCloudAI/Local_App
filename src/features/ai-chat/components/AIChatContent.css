@@ -1011,7 +1011,7 @@
     box-sizing: border-box;
     padding: var(--fc-space-md) var(--fc-space-lg) calc(var(--fc-space-md) + 0.35rem);
     border: 1px solid var(--dock-panel-border-color);
-    border-radius: var(--fc-radius-lg);
+    border-radius: var(--fc-radius-lg) var(--fc-radius-lg) 0 0;
     background: var(--fc-color-bg-elevated);
     box-shadow: 0 -0.35rem 1.2rem color-mix(in srgb, var(--fc-color-bg) 24%, transparent);
     transform-origin: center bottom;
