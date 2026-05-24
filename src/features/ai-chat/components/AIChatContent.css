@@ -1003,39 +1003,32 @@
     overflow-y: hidden;
 }
 
-.ai-floating-input-inner.has-context-usage .ai-floating-textarea {
-    padding-right: 4.5rem;
-}
-
 .ai-context-usage-indicator {
-    position: absolute;
-    top: var(--fc-space-sm);
-    right: var(--fc-space-md);
     display: inline-flex;
+    align-self: flex-end;
     align-items: center;
-    gap: 0.35rem;
-    height: 1.65rem;
-    padding: 0 0.35rem;
-    border-radius: var(--fc-radius-full, 999px);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, var(--fc-color-text) 12%);
+    gap: 0.25rem;
+    height: 1.05rem;
+    margin-bottom: -0.25rem;
+    padding: 0;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-caption, 0.75rem);
     font-weight: var(--fc-font-weight-semibold);
     line-height: 1;
-    pointer-events: none;
+    pointer-events: auto;
     font-variant-numeric: tabular-nums;
 }
 
 .ai-context-usage-ring {
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1rem;
+    height: 1rem;
     transform: rotate(-90deg);
 }
 
 .ai-context-usage-ring-track,
 .ai-context-usage-ring-value {
     fill: none;
-    stroke-width: 3.2;
+    stroke-width: 3;
 }
 
 .ai-context-usage-ring-track {

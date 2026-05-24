@@ -1302,10 +1302,7 @@ export default function AIChatContent({
                 )}
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
-                    <div
-                        className={`ai-floating-input-inner${showContextUsageIndicator ? ' has-context-usage' : ''}`}
-                        ref={inputWikiContainerRef}
-                    >
+                    <div className="ai-floating-input-inner" ref={inputWikiContainerRef}>
                         {ctx.editingMessageId && (
                             <div className="ai-edit-indicator">
                                 <span>正在编辑上一条消息</span>
