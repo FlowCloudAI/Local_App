@@ -277,6 +277,7 @@ pub async fn ai_start_contradiction_session(
             kind: AiSessionKind::Contradiction,
             model: resolved_model,
             plugin_id: request.plugin_id.clone(),
+            settings: None,
         },
     );
 

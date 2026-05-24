@@ -17,7 +17,8 @@ import {
     setting_get_settings,
     setting_has_api_key,
 } from '../../../api'
-import type {AiContextValue, Conversation} from '../model/AiControllerTypes'
+import type {AiContextValue, Conversation, ConversationSettings} from '../model/AiControllerTypes'
+import {normalizeConversationSettings} from '../model/AiControllerTypes'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
@@ -45,6 +46,14 @@ const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
 const ACTION_MENU_ESTIMATED_HEIGHT = 196
 const CONTEXT_USAGE_RING_RADIUS = 10
 const CONTEXT_USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_USAGE_RING_RADIUS
+const formatConversationSettingNumber = (value: number) => {
+    const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
+    return fixed.replace(/\.?0+$/, '')
+}
+const parseConversationNumber = (value: string, fallback: number) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+}
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
 type ActionMenuPlacement = 'up' | 'down'
@@ -218,6 +227,7 @@ export default function AIChatContent({
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
     const [inputLimitMessage, setInputLimitMessage] = useState('')
+    const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
 
     useEffect(() => {
         if (!isPluginMenuOpen) return
@@ -240,6 +250,10 @@ export default function AIChatContent({
         document.addEventListener('mousedown', handleClick)
         return () => document.removeEventListener('mousedown', handleClick)
     }, [isModelMenuOpen])
+
+    useEffect(() => {
+        setSettingsDrawerOpen(false)
+    }, [ctx.activeConversationId])
 
     const [autoScroll, setAutoScroll] = useState(true)
     const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
@@ -285,6 +299,14 @@ export default function AIChatContent({
         ? `上下文占用约 ${contextUsagePercent}%`
         : '上下文窗口信息未返回，暂以 0% 显示'
     const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsagePercent / 100)
+    const conversationSettings = normalizeConversationSettings(activeConversation?.settings)
+    const updateConversationSetting = useCallback(<K extends keyof ConversationSettings,>(
+        key: K,
+        value: ConversationSettings[K],
+    ) => {
+        if (!activeConversation) return
+        void ctx.updateConversationSettings(activeConversation.id, {[key]: value} as Partial<ConversationSettings>)
+    }, [activeConversation, ctx])
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
     const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
@@ -1302,6 +1324,107 @@ export default function AIChatContent({
                 )}
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
+                    {activeConversation && settingsDrawerOpen && (
+                        <div className="ai-conversation-settings-panel">
+                            <div className="ai-conversation-settings-grid">
+                                <label className="ai-conversation-settings-field">
+                                    <span>温度</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="2"
+                                        step="0.1"
+                                        value={formatConversationSettingNumber(conversationSettings.temperature)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'temperature',
+                                            parseConversationNumber(
+                                                event.currentTarget.value,
+                                                conversationSettings.temperature,
+                                            ),
+                                        )}
+                                    />
+                                </label>
+                                <label className="ai-conversation-settings-field">
+                                    <span>Top p</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="1"
+                                        step="0.05"
+                                        value={formatConversationSettingNumber(conversationSettings.topP)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'topP',
+                                            parseConversationNumber(event.currentTarget.value, conversationSettings.topP),
+                                        )}
+                                    />
+                                </label>
+                                <div className="ai-conversation-settings-field ai-conversation-settings-field--penalty">
+                                    <label>
+                                        <span>重复惩罚</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={conversationSettings.frequencyPenaltyEnabled}
+                                            onChange={(event) => updateConversationSetting(
+                                                'frequencyPenaltyEnabled',
+                                                event.currentTarget.checked,
+                                            )}
+                                        />
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="-2"
+                                        max="2"
+                                        step="0.1"
+                                        disabled={!conversationSettings.frequencyPenaltyEnabled}
+                                        value={formatConversationSettingNumber(conversationSettings.frequencyPenalty)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'frequencyPenalty',
+                                            parseConversationNumber(
+                                                event.currentTarget.value,
+                                                conversationSettings.frequencyPenalty,
+                                            ),
+                                        )}
+                                    />
+                                </div>
+                                <div className="ai-conversation-settings-field ai-conversation-settings-field--penalty">
+                                    <label>
+                                        <span>存在惩罚</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={conversationSettings.presencePenaltyEnabled}
+                                            onChange={(event) => updateConversationSetting(
+                                                'presencePenaltyEnabled',
+                                                event.currentTarget.checked,
+                                            )}
+                                        />
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="-2"
+                                        max="2"
+                                        step="0.1"
+                                        disabled={!conversationSettings.presencePenaltyEnabled}
+                                        value={formatConversationSettingNumber(conversationSettings.presencePenalty)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'presencePenalty',
+                                            parseConversationNumber(
+                                                event.currentTarget.value,
+                                                conversationSettings.presencePenalty,
+                                            ),
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                            <label className="ai-conversation-settings-prompt">
+                                <span>当前对话独有提示词</span>
+                                <textarea
+                                    value={conversationSettings.systemPrompt}
+                                    onChange={(event) => updateConversationSetting('systemPrompt', event.currentTarget.value)}
+                                    placeholder="例如：保持回答简洁，优先延续当前世界观设定。"
+                                />
+                            </label>
+                        </div>
+                    )}
                     <div className="ai-floating-input-inner" ref={inputWikiContainerRef}>
                         {ctx.editingMessageId && (
                             <div className="ai-edit-indicator">
@@ -1331,31 +1454,53 @@ export default function AIChatContent({
                                 onOpenPluginManagement={onOpenPluginManagement}
                             />
                         )}
-                        {showContextUsageIndicator && (
-                            <div
-                                className="ai-context-usage-indicator"
-                                title={contextUsageTitle}
-                                aria-label={contextUsageTitle}
-                            >
-                                <svg className="ai-context-usage-ring" viewBox="0 0 28 28" aria-hidden="true">
-                                    <circle
-                                        className="ai-context-usage-ring-track"
-                                        cx="14"
-                                        cy="14"
-                                        r={CONTEXT_USAGE_RING_RADIUS}
-                                    />
-                                    <circle
-                                        className="ai-context-usage-ring-value"
-                                        cx="14"
-                                        cy="14"
-                                        r={CONTEXT_USAGE_RING_RADIUS}
-                                        strokeDasharray={CONTEXT_USAGE_RING_CIRCUMFERENCE}
-                                        strokeDashoffset={contextUsageDashOffset}
-                                    />
-                                </svg>
-                                <span>{contextUsagePercent}%</span>
+                        <div className="ai-input-meta-row">
+                            <div className="ai-conversation-settings-summary">
+                                <button
+                                    type="button"
+                                    className="ai-conversation-settings-toggle"
+                                    disabled={!activeConversation}
+                                    aria-expanded={settingsDrawerOpen}
+                                    title={activeConversation ? '当前对话属性设置' : '发送消息后可设置当前对话属性'}
+                                    onClick={() => setSettingsDrawerOpen((open) => !open)}
+                                >
+                                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                                        {settingsDrawerOpen
+                                            ? <path d="M3.5 10.5 8 6l4.5 4.5"/>
+                                            : <path d="M6 3.5 10.5 8 6 12.5"/>}
+                                    </svg>
+                                </button>
+                                <span>温度 {formatConversationSettingNumber(conversationSettings.temperature)}</span>
+                                <span>Top p {formatConversationSettingNumber(conversationSettings.topP)}</span>
+                                <span>重复惩罚 {conversationSettings.frequencyPenaltyEnabled ? '开' : '关'}</span>
+                                <span>存在惩罚 {conversationSettings.presencePenaltyEnabled ? '开' : '关'}</span>
                             </div>
-                        )}
+                            {showContextUsageIndicator && (
+                                <div
+                                    className="ai-context-usage-indicator"
+                                    title={contextUsageTitle}
+                                    aria-label={contextUsageTitle}
+                                >
+                                    <svg className="ai-context-usage-ring" viewBox="0 0 28 28" aria-hidden="true">
+                                        <circle
+                                            className="ai-context-usage-ring-track"
+                                            cx="14"
+                                            cy="14"
+                                            r={CONTEXT_USAGE_RING_RADIUS}
+                                        />
+                                        <circle
+                                            className="ai-context-usage-ring-value"
+                                            cx="14"
+                                            cy="14"
+                                            r={CONTEXT_USAGE_RING_RADIUS}
+                                            strokeDasharray={CONTEXT_USAGE_RING_CIRCUMFERENCE}
+                                            strokeDashoffset={contextUsageDashOffset}
+                                        />
+                                    </svg>
+                                    <span>{contextUsagePercent}%</span>
+                                </div>
+                            )}
+                        </div>
                         <textarea
                             ref={textareaRef}
                             className="ai-floating-textarea"

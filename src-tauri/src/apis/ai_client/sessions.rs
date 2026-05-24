@@ -24,6 +24,7 @@ pub async fn ai_create_llm_session(
     max_tool_rounds: Option<i32>,
     conversation_id: Option<String>,
     client_trace_id: Option<String>,
+    settings: Option<StoredConversationSettings>,
 ) -> Result<CreateLlmSessionResult, String> {
     let trace_id = client_trace_id.as_deref().unwrap_or("none");
     log::info!(
@@ -61,12 +62,14 @@ pub async fn ai_create_llm_session(
     );
     let mut restored_head = None;
     let mut restored_model = None;
+    let mut restored_settings = None;
     let mut restored_history = None;
     let resolved_conversation_id = if let Some(conv_id) = conversation_id.as_deref() {
         let conversation = chat_store_get_conversation(paths.inner(), conv_id)?
             .ok_or_else(|| format!("未找到会话：{}", conv_id))?;
         restored_head = conversation.head;
         restored_model = Some(conversation.meta.model.clone());
+        restored_settings = Some(conversation.settings.clone());
         restored_history = Some(stored_conversation_to_runtime_seeds(&conversation));
         conversation.meta.id
     } else {
@@ -153,6 +156,7 @@ pub async fn ai_create_llm_session(
         e.to_string()
     })?;
     let run_id = Uuid::new_v4().to_string();
+    let conversation_settings = settings.clone().or(restored_settings);
     log::info!(
         "[ai_create_llm_session][run_started] trace_id={} conversation_id={} session_id={} run_id={} plugin_id={} model={}",
         trace_id,
@@ -177,6 +181,7 @@ pub async fn ai_create_llm_session(
                 kind: AiSessionKind::General,
                 model: resolved_model.clone(),
                 plugin_id: plugin_id.clone(),
+                settings: conversation_settings,
             },
         );
         log::info!(

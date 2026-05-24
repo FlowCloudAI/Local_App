@@ -24,6 +24,7 @@ import {
     type AiUsage,
     type CharacterChatProjectSnapshot,
     type ConversationNode,
+    type StoredConversationSettings,
 } from '../../../api'
 
 // ── 导出类型 ──────────────────────────────────────────────────
@@ -607,6 +608,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         conversationId?: string,
         maxToolRounds?: number | null,
         traceId?: string,
+        settings?: StoredConversationSettings | null,
     ): Promise<SessionIdentity | null> => {
         const newId = `session_${Date.now()}`
         try {
@@ -618,6 +620,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 // 续聊时告知后端回放历史，新对话不传
                 conversationId: conversationId ?? null,
                 clientTraceId: traceId ?? null,
+                settings: settings ?? null,
             })
             logger.log('[useAiSession][createSession]', {
                 traceId: traceId ?? null,

@@ -32,6 +32,7 @@ export interface AiCreateLlmSessionParams {
   /** 续聊已有对话时传入其 ID，App 后端将回放历史并覆写原文件 */
   conversationId?: string | null
     clientTraceId?: string | null
+    settings?: StoredConversationSettings | null
 }
 
 export interface AiCreateLlmSessionResult {
@@ -232,6 +233,7 @@ export const ai_create_llm_session = ({
                                            maxToolRounds,
                                            conversationId,
                                            clientTraceId,
+                                           settings,
 }: AiCreateLlmSessionParams) =>
     command<AiCreateLlmSessionResult>('ai_create_llm_session', {
     sessionId,
@@ -242,6 +244,7 @@ export const ai_create_llm_session = ({
         maxToolRounds,
         conversationId,
         clientTraceId,
+        settings,
   })
 
 export const ai_create_character_session = ({

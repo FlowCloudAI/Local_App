@@ -31,6 +31,57 @@ export interface Message {
     usage?: AiUsage | null
 }
 
+export interface ConversationSettings {
+    temperature: number
+    topP: number
+    frequencyPenaltyEnabled: boolean
+    frequencyPenalty: number
+    presencePenaltyEnabled: boolean
+    presencePenalty: number
+    systemPrompt: string
+}
+
+export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
+    temperature: 0.7,
+    topP: 1,
+    frequencyPenaltyEnabled: false,
+    frequencyPenalty: 1.1,
+    presencePenaltyEnabled: false,
+    presencePenalty: 0,
+    systemPrompt: '',
+}
+
+const clampNumber = (value: unknown, fallback: number, min: number, max: number) => {
+    const numberValue = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+    return Math.min(max, Math.max(min, numberValue))
+}
+
+export function normalizeConversationSettings(
+    settings?: Partial<ConversationSettings> | null,
+): ConversationSettings {
+    return {
+        ...DEFAULT_CONVERSATION_SETTINGS,
+        ...settings,
+        temperature: clampNumber(settings?.temperature, DEFAULT_CONVERSATION_SETTINGS.temperature, 0, 2),
+        topP: clampNumber(settings?.topP, DEFAULT_CONVERSATION_SETTINGS.topP, 0, 1),
+        frequencyPenalty: clampNumber(
+            settings?.frequencyPenalty,
+            DEFAULT_CONVERSATION_SETTINGS.frequencyPenalty,
+            -2,
+            2,
+        ),
+        presencePenalty: clampNumber(
+            settings?.presencePenalty,
+            DEFAULT_CONVERSATION_SETTINGS.presencePenalty,
+            -2,
+            2,
+        ),
+        frequencyPenaltyEnabled: Boolean(settings?.frequencyPenaltyEnabled),
+        presencePenaltyEnabled: Boolean(settings?.presencePenaltyEnabled),
+        systemPrompt: settings?.systemPrompt ?? DEFAULT_CONVERSATION_SETTINGS.systemPrompt,
+    }
+}
+
 export interface Conversation {
     id: string
     title: string
@@ -50,6 +101,7 @@ export interface Conversation {
     characterAutoPlay?: boolean | null
     reportContext?: ReportConversationContext | null
     reportSeeded?: boolean
+    settings: ConversationSettings
 }
 
 export interface ConversationRuntimeState {
@@ -124,6 +176,7 @@ export interface AiContextValue {
         entryId: string
     }) => Promise<void>
     updateConversationCharacterAutoPlay: (convId: string, autoPlay: boolean) => void
+    updateConversationSettings: (convId: string, patch: Partial<ConversationSettings>) => Promise<void>
     switchConversation: (convId: string) => Promise<void>
     deleteConversation: (convId: string, e?: React.MouseEvent) => Promise<void>
     renameConversation: (convId: string, title: string) => Promise<void>

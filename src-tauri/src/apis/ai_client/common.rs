@@ -556,6 +556,7 @@ fn chat_store_save_snapshot(
     conversation_id: &str,
     plugin_id: &str,
     model: &str,
+    requested_settings: Option<StoredConversationSettings>,
     nodes: Vec<ConversationNode>,
     head: Option<u64>,
 ) -> Result<(), String> {
@@ -578,7 +579,7 @@ fn chat_store_save_snapshot(
             auto_title(&messages),
             now.clone(),
             None,
-            StoredConversationSettings::default(),
+            requested_settings.unwrap_or_default(),
             messages,
         ),
     };
@@ -611,12 +612,13 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
                 entry.conversation_id.clone(),
                 entry.plugin_id.clone(),
                 entry.model.clone(),
+                entry.settings.clone(),
                 entry.handle.clone(),
             )
         })
     };
 
-    let Some((conversation_id, plugin_id, model, handle)) = snapshot_target else {
+    let Some((conversation_id, plugin_id, model, settings, handle)) = snapshot_target else {
         log::warn!("[chat_store] session '{}' 不存在，跳过快照保存", session_id);
         return;
     };
@@ -624,8 +626,15 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
     let nodes = handle.get_all_nodes().await;
     let head = handle.head().await;
     let paths = app.state::<PathsState>();
-    match chat_store_save_snapshot(paths.inner(), &conversation_id, &plugin_id, &model, nodes, head)
-    {
+    match chat_store_save_snapshot(
+        paths.inner(),
+        &conversation_id,
+        &plugin_id,
+        &model,
+        settings,
+        nodes,
+        head,
+    ) {
         Ok(()) => log::info!(
             "[chat_store] 已保存会话快照: session_id={} conversation_id={}",
             session_id,

@@ -417,6 +417,7 @@ pub async fn ai_create_character_session(
             kind: AiSessionKind::Character,
             model: resolved_model,
             plugin_id: input.plugin_id.clone(),
+            settings: None,
         },
     );
 

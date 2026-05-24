@@ -1,4 +1,5 @@
 use crate::reports::contradiction_report::ContradictionReport;
+use crate::apis::ai_client::StoredConversationSettings;
 use anyhow::Result;
 use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
 use std::collections::HashMap;
@@ -104,6 +105,7 @@ pub(crate) struct SessionEntry {
     pub(crate) kind: AiSessionKind,
     pub(crate) model: String,
     pub(crate) plugin_id: String,
+    pub(crate) settings: Option<StoredConversationSettings>,
 }
 
 /// AI 客户端全局状态（插件注册中心 + 活跃 LLM 会话）
