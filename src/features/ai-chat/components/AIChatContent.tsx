@@ -234,6 +234,8 @@ export default function AIChatContent({
 
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
+    const settingsDrawerRef = useRef<HTMLDivElement>(null)
+    const settingsToggleRef = useRef<HTMLButtonElement>(null)
     const [inputLimitMessage, setInputLimitMessage] = useState('')
     const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
     const [settingsDrawerMounted, setSettingsDrawerMounted] = useState(false)
@@ -273,6 +275,19 @@ export default function AIChatContent({
         if (settingsDrawerOpen) {
             setSettingsDrawerMounted(true)
         }
+    }, [settingsDrawerOpen])
+
+    useEffect(() => {
+        if (!settingsDrawerOpen) return
+        const handleClick = (event: MouseEvent) => {
+            const target = event.target
+            if (!(target instanceof Node)) return
+            if (settingsDrawerRef.current?.contains(target)) return
+            if (settingsToggleRef.current?.contains(target)) return
+            setSettingsDrawerOpen(false)
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
     }, [settingsDrawerOpen])
 
     const [autoScroll, setAutoScroll] = useState(true)
@@ -1422,6 +1437,7 @@ export default function AIChatContent({
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
                     {activeConversation && settingsDrawerMounted && (
                         <div
+                            ref={settingsDrawerRef}
                             className={`ai-conversation-settings-panel ${settingsDrawerOpen ? 'is-open' : 'is-closing'}`}
                             onAnimationEnd={handleSettingsDrawerAnimationEnd}
                         >
@@ -1575,6 +1591,7 @@ export default function AIChatContent({
                         <div className="ai-input-meta-row">
                             <div className="ai-conversation-settings-summary">
                                 <button
+                                    ref={settingsToggleRef}
                                     type="button"
                                     className="ai-conversation-settings-toggle"
                                     disabled={!activeConversation}
