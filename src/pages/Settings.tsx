@@ -28,6 +28,7 @@ import {
     type ApiUsageSummary,
     type AppSettings,
     type DefaultPaths,
+    type LlmCompactDetail,
     type LocalPluginInfo,
     open_in_file_manager,
     plugin_install_from_file,
@@ -64,6 +65,12 @@ type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 type TemplateView = 'list' | 'detail'
+
+const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string }> = [
+    {value: 'brief', label: '简略'},
+    {value: 'balanced', label: '适中'},
+    {value: 'detailed', label: '详细'},
+]
 
 interface ParsedPluginVersion {
     core: [number, number, number]
@@ -477,7 +484,11 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                 temperature: 0.7,
                 max_tokens: 2000,
                 stream: true,
-                show_reasoning: false
+                show_reasoning: false,
+                auto_compact_enabled: false,
+                auto_compact_threshold_ratio: 0.75,
+                auto_compact_recent_messages: 8,
+                auto_compact_detail: 'balanced'
             },
             image: {
                 plugin_id: null,
@@ -602,6 +613,33 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             return {...prev, [type]: aiConfig}
         })
     }
+
+    const updateLlmDefaults = useCallback((patch: Partial<AppSettings['llm']>) => {
+        setSettings(prev => prev ? {
+            ...prev,
+            llm: {
+                ...prev.llm,
+                ...patch,
+            },
+        } : null)
+    }, [])
+
+    const handleLlmCompactThresholdChange = useCallback((value: number | number[]) => {
+        const rawValue = Array.isArray(value) ? value[0] : value
+        const nextValue = Number.isFinite(rawValue) ? rawValue : 75
+        updateLlmDefaults({
+            auto_compact_threshold_ratio: Math.min(0.95, Math.max(0.5, nextValue / 100)),
+        })
+    }, [updateLlmDefaults])
+
+    const handleLlmCompactRecentMessagesChange = useCallback((value: string) => {
+        const parsed = Number(value)
+        updateLlmDefaults({
+            auto_compact_recent_messages: Number.isFinite(parsed)
+                ? Math.min(30, Math.max(2, Math.trunc(parsed)))
+                : 8,
+        })
+    }, [updateLlmDefaults])
 
     // API Key 管理
     const handleConfigureApiKey = (pluginId: string) => {
@@ -1465,6 +1503,65 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                         />
                                     </div>
                                 </div>
+                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                    <label className="settings-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.llm.auto_compact_enabled}
+                                            onChange={(event) => updateLlmDefaults({
+                                                auto_compact_enabled: event.target.checked,
+                                            })}
+                                        />
+                                        <span>自动压缩上下文</span>
+                                    </label>
+                                    <span className="settings-field-hint">
+                                        本轮回复结束后检测上下文占用，超过阈值时使用当前模型生成会话摘要。
+                                    </span>
+                                </div>
+                                {settings.llm.auto_compact_enabled && (
+                                    <div className="settings-row settings-row--compact settings-llm-compact-options">
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">压缩阈值</label>
+                                            <div className="settings-range-control">
+                                                <Slider
+                                                    min={50}
+                                                    max={95}
+                                                    step={5}
+                                                    value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
+                                                    onChange={handleLlmCompactThresholdChange}
+                                                />
+                                            </div>
+                                            <span className="settings-span">
+                                                {Math.round(settings.llm.auto_compact_threshold_ratio * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">保留近期消息</label>
+                                            <input
+                                                className="settings-number-input"
+                                                type="number"
+                                                min={2}
+                                                max={30}
+                                                step={1}
+                                                value={settings.llm.auto_compact_recent_messages}
+                                                onChange={(event) => handleLlmCompactRecentMessagesChange(event.target.value)}
+                                            />
+                                            <span className="settings-span">条</span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">摘要详细程度</label>
+                                            <div className="settings-select-control">
+                                                <Select
+                                                    options={LLM_COMPACT_DETAIL_OPTIONS}
+                                                    value={settings.llm.auto_compact_detail}
+                                                    onChange={(value) => updateLlmDefaults({
+                                                        auto_compact_detail: String(value) as LlmCompactDetail,
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
 
                             {/* 图片生成默认配置 */}

@@ -293,6 +293,21 @@
   min-width: 0;
 }
 
+.settings-field-stack--full {
+  grid-column: 1 / -1;
+  margin-top: var(--fc-space-md);
+}
+
+.settings-range-control,
+.settings-select-control {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.settings-llm-compact-options {
+  margin-top: var(--fc-space-md);
+}
+
 .settings-field-hint {
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);

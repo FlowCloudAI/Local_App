@@ -8,7 +8,13 @@ export interface LlmDefaults {
   max_tokens: number
   stream: boolean
   show_reasoning: boolean
+  auto_compact_enabled: boolean
+  auto_compact_threshold_ratio: number
+  auto_compact_recent_messages: number
+  auto_compact_detail: LlmCompactDetail
 }
+
+export type LlmCompactDetail = 'brief' | 'balanced' | 'detailed'
 
 export interface ImageDefaults {
   plugin_id: string | null
