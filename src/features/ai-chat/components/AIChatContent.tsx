@@ -46,6 +46,13 @@ const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
 const ACTION_MENU_ESTIMATED_HEIGHT = 196
 const CONTEXT_USAGE_RING_RADIUS = 10
 const CONTEXT_USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_USAGE_RING_RADIUS
+const CONVERSATION_SETTING_TOOLTIPS = {
+    temperature: '温度：控制回答的随机性，越高越发散，越低越稳定。',
+    topP: 'top_p：限制候选词累计概率，越低越集中，越高越开放。',
+    frequencyPenalty: '重复惩罚：启用后降低重复用词和句式，可设置具体强度。',
+    presencePenalty: '存在惩罚：启用后鼓励模型引入新内容，可设置具体强度。',
+    systemPrompt: '当前对话独有提示词：只作用于当前对话，会作为额外 system 提示发送。',
+} as const
 const formatConversationSettingNumber = (value: number) => {
     const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
     return fixed.replace(/\.?0+$/, '')
@@ -1351,7 +1358,7 @@ export default function AIChatContent({
                             onAnimationEnd={handleSettingsDrawerAnimationEnd}
                         >
                             <div className="ai-conversation-settings-grid">
-                                <label className="ai-conversation-settings-field">
+                                <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.temperature}>
                                     <span>温度</span>
                                     <input
                                         type="number"
@@ -1368,8 +1375,8 @@ export default function AIChatContent({
                                         )}
                                     />
                                 </label>
-                                <label className="ai-conversation-settings-field">
-                                    <span>Top p</span>
+                                <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.topP}>
+                                    <span>top_p</span>
                                     <input
                                         type="number"
                                         min="0"
@@ -1382,7 +1389,10 @@ export default function AIChatContent({
                                         )}
                                     />
                                 </label>
-                                <div className="ai-conversation-settings-field ai-conversation-settings-field--penalty">
+                                <div
+                                    className="ai-conversation-settings-field ai-conversation-settings-field--penalty"
+                                    title={CONVERSATION_SETTING_TOOLTIPS.frequencyPenalty}
+                                >
                                     <label>
                                         <span>重复惩罚</span>
                                         <input
@@ -1410,7 +1420,10 @@ export default function AIChatContent({
                                         )}
                                     />
                                 </div>
-                                <div className="ai-conversation-settings-field ai-conversation-settings-field--penalty">
+                                <div
+                                    className="ai-conversation-settings-field ai-conversation-settings-field--penalty"
+                                    title={CONVERSATION_SETTING_TOOLTIPS.presencePenalty}
+                                >
                                     <label>
                                         <span>存在惩罚</span>
                                         <input
@@ -1439,7 +1452,7 @@ export default function AIChatContent({
                                     />
                                 </div>
                             </div>
-                            <label className="ai-conversation-settings-prompt">
+                            <label className="ai-conversation-settings-prompt" title={CONVERSATION_SETTING_TOOLTIPS.systemPrompt}>
                                 <span>当前对话独有提示词</span>
                                 <textarea
                                     value={conversationSettings.systemPrompt}
@@ -1494,10 +1507,10 @@ export default function AIChatContent({
                                             : <path d="M6 3.5 10.5 8 6 12.5"/>}
                                     </svg>
                                 </button>
-                                <span>温度 {formatConversationSettingNumber(conversationSettings.temperature)}</span>
-                                <span>Top p {formatConversationSettingNumber(conversationSettings.topP)}</span>
-                                <span>重复惩罚 {conversationSettings.frequencyPenaltyEnabled ? '开' : '关'}</span>
-                                <span>存在惩罚 {conversationSettings.presencePenaltyEnabled ? '开' : '关'}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.temperature}>温度 {formatConversationSettingNumber(conversationSettings.temperature)}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.topP}>top_p {formatConversationSettingNumber(conversationSettings.topP)}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.frequencyPenalty}>重复惩罚 {conversationSettings.frequencyPenaltyEnabled ? '开' : '关'}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.presencePenalty}>存在惩罚 {conversationSettings.presencePenaltyEnabled ? '开' : '关'}</span>
                             </div>
                             {showContextUsageIndicator && (
                                 <div
