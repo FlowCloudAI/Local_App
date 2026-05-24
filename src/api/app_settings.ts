@@ -5,9 +5,13 @@ export interface LlmDefaults {
   plugin_id: string | null
   default_model: string | null
   temperature: number
+  top_p: number
+  frequency_penalty: number
+  presence_penalty: number
   max_tokens: number
   stream: boolean
   show_reasoning: boolean
+  app_sense_custom_prompt: string
   auto_compact_enabled: boolean
   auto_compact_threshold_ratio: number
   auto_compact_recent_messages: number

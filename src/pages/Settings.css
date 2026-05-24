@@ -179,6 +179,25 @@
   outline-offset: 1px;
 }
 
+.settings-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+  padding: var(--fc-space-sm) var(--fc-space-md);
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-md);
+  background: var(--fc-color-bg);
+  color: var(--fc-color-text);
+  font: inherit;
+  line-height: var(--fc-line-height-normal);
+}
+
+.settings-textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
+  outline-offset: 1px;
+}
+
 .settings-span {
   min-width: 2.5rem;
   font-variant-numeric: tabular-nums;
@@ -326,6 +345,10 @@
 
 .settings-llm-compact-options {
   margin-top: var(--fc-space-md);
+}
+
+.settings-llm-prompt-field {
+  margin-top: var(--fc-space-lg);
 }
 
 .settings-field-hint {

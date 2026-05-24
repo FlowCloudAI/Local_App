@@ -100,10 +100,17 @@ pub struct LlmDefaults {
     pub plugin_id: Option<String>,
     pub default_model: Option<String>,
     pub temperature: f64,
+    pub top_p: f64,
+    /// 重复惩罚，0 = 不惩罚
+    pub frequency_penalty: f64,
+    /// 存在惩罚，0 = 不惩罚
+    pub presence_penalty: f64,
     pub max_tokens: i64,
     pub stream: bool,
     /// 是否显示思考过程（ReasoningDelta）
     pub show_reasoning: bool,
+    /// 仅追加到 AppSense 默认系统提示词之后
+    pub app_sense_custom_prompt: String,
     /// 是否在上下文接近模型窗口时自动压缩历史
     pub auto_compact_enabled: bool,
     /// 自动压缩触发阈值，取值 0.0 - 1.0
@@ -120,9 +127,13 @@ impl Default for LlmDefaults {
             plugin_id: None,
             default_model: None,
             temperature: 0.7,
+            top_p: 0.9,
+            frequency_penalty: 0.0,
+            presence_penalty: 0.0,
             max_tokens: 2000,
             stream: true,
             show_reasoning: false,
+            app_sense_custom_prompt: String::new(),
             auto_compact_enabled: false,
             auto_compact_threshold_ratio: 0.75,
             auto_compact_recent_messages: 8,

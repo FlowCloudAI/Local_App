@@ -540,9 +540,13 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                 plugin_id: null,
                 default_model: null,
                 temperature: 0.7,
+                top_p: 0.9,
+                frequency_penalty: 0,
+                presence_penalty: 0,
                 max_tokens: 2000,
                 stream: true,
                 show_reasoning: false,
+                app_sense_custom_prompt: '',
                 auto_compact_enabled: false,
                 auto_compact_threshold_ratio: 0.75,
                 auto_compact_recent_messages: 8,
@@ -1513,6 +1517,82 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                             {/* 文本模型配置 */}
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">文本模型配置</h2>
+                                <div className="settings-row settings-row--compact">
+                                    <div className="settings-field">
+                                        <label className="settings-label-wide">温度</label>
+                                        <div className="settings-range-control">
+                                            <Slider
+                                                min={0}
+                                                max={2}
+                                                step={0.1}
+                                                value={settings.llm.temperature}
+                                                onChange={(value) => updateLlmDefaults({
+                                                    temperature: Array.isArray(value) ? value[0] : value,
+                                                })}
+                                            />
+                                        </div>
+                                        <span className="settings-span">{settings.llm.temperature.toFixed(1)}</span>
+                                    </div>
+                                    <div className="settings-field">
+                                        <label className="settings-label-wide">Top P</label>
+                                        <div className="settings-range-control">
+                                            <Slider
+                                                min={0}
+                                                max={1}
+                                                step={0.05}
+                                                value={settings.llm.top_p}
+                                                onChange={(value) => updateLlmDefaults({
+                                                    top_p: Array.isArray(value) ? value[0] : value,
+                                                })}
+                                            />
+                                        </div>
+                                        <span className="settings-span">{settings.llm.top_p.toFixed(2)}</span>
+                                    </div>
+                                    <div className="settings-field">
+                                        <label className="settings-label-wide">重复惩罚</label>
+                                        <div className="settings-range-control">
+                                            <Slider
+                                                min={-2}
+                                                max={2}
+                                                step={0.1}
+                                                value={settings.llm.frequency_penalty}
+                                                onChange={(value) => updateLlmDefaults({
+                                                    frequency_penalty: Array.isArray(value) ? value[0] : value,
+                                                })}
+                                            />
+                                        </div>
+                                        <span className="settings-span">{settings.llm.frequency_penalty.toFixed(1)}</span>
+                                    </div>
+                                    <div className="settings-field">
+                                        <label className="settings-label-wide">存在惩罚</label>
+                                        <div className="settings-range-control">
+                                            <Slider
+                                                min={-2}
+                                                max={2}
+                                                step={0.1}
+                                                value={settings.llm.presence_penalty}
+                                                onChange={(value) => updateLlmDefaults({
+                                                    presence_penalty: Array.isArray(value) ? value[0] : value,
+                                                })}
+                                            />
+                                        </div>
+                                        <span className="settings-span">{settings.llm.presence_penalty.toFixed(1)}</span>
+                                    </div>
+                                </div>
+                                <div className="settings-field-stack settings-field-stack--full settings-llm-prompt-field">
+                                    <label className="settings-label-wide">AppSense 自定义提示词</label>
+                                    <textarea
+                                        className="settings-textarea"
+                                        value={settings.llm.app_sense_custom_prompt}
+                                        onChange={(event) => updateLlmDefaults({
+                                            app_sense_custom_prompt: event.currentTarget.value,
+                                        })}
+                                        placeholder="会追加在 AppSense 默认系统提示词之后，仅影响通用 AI 对话。"
+                                    />
+                                    <span className="settings-field-hint">
+                                        这段提示词只影响 AppSense，不会作用于角色对话、矛盾检查、摘要或图片提示词生成。
+                                    </span>
+                                </div>
                                 <div className="settings-field settings-field-stack settings-field-stack--full">
                                     <label className="settings-checkbox-row">
                                         <input
