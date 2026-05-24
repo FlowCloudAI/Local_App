@@ -12,9 +12,9 @@ use crate::apis::ai_client::{
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
 use crate::senses::contradiction_sense::ContradictionSense;
-use crate::{AiSessionKind, AiState, ApiKeyStore, ContradictionSessionBinding};
+use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, ContradictionSessionBinding};
 use flowcloudai_client::llm::config::SessionConfig;
-use flowcloudai_client::{DefaultOrchestrator, SessionEvent, TurnStatus};
+use flowcloudai_client::{DefaultOrchestrator, ErrorCode, SessionEvent, TurnStatus};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -169,18 +169,21 @@ pub async fn ai_start_contradiction_session(
     ai_state: State<'_, AiState>,
     app_state: State<'_, Arc<Mutex<AppState>>>,
     request: ContradictionSessionRequest,
-) -> Result<ContradictionSessionResult, String> {
+) -> Result<ContradictionSessionResult, ApiError> {
     let api_key = ApiKeyStore::get(&request.plugin_id).ok_or_else(|| {
-        format!(
-            "插件 '{}' 未配置 API Key，请在设置中配置",
-            request.plugin_id
+        ApiError::new(
+            ErrorCode::AuthApiKeyMissing,
+            format!("插件 '{}' 未配置 API Key，请在设置中配置", request.plugin_id),
         )
+        .with_kv("plugin_id", request.plugin_id.clone())
     })?;
 
     let check_definition = world_check_definition(WorldCheckKind::Contradiction);
     let corpus = {
         let app_state = app_state.inner().lock().await;
-        load_contradiction_corpus(&app_state, &request.load).await?
+        load_contradiction_corpus(&app_state, &request.load)
+            .await
+            .map_err(ApiError::internal)?
     };
     let prompt = build_contradiction_prompt(&corpus);
 
@@ -192,12 +195,10 @@ pub async fn ai_start_contradiction_session(
         max_tool_rounds: 50,
         ..Default::default()
     });
-    let mut session = client
-        .create_llm_session(&request.plugin_id, &api_key, config)
-        .map_err(|e| e.to_string())?;
+    let mut session = client.create_llm_session(&request.plugin_id, &api_key, config)?;
     drop(client);
 
-    session.load_sense(sense).await.map_err(|e| e.to_string())?;
+    session.load_sense(sense).await?;
     session.set_orchestrator(Box::new(
         DefaultOrchestrator::new(registry).with_whitelist(Some(whitelist)),
     ));
@@ -223,7 +224,7 @@ pub async fn ai_start_contradiction_session(
     let conversation_id = request.session_id.clone();
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
+    let (event_stream, handle) = session.try_run(input_rx)?;
     let run_id = Uuid::new_v4().to_string();
     let handle_for_error = handle.clone();
 
@@ -252,7 +253,8 @@ pub async fn ai_start_contradiction_session(
             ]),
             HashMap::from([("read_only".to_string(), true)]),
         ))
-        .await?;
+        .await
+        .map_err(ApiError::internal)?;
 
     let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<ContradictionReport, String>>();
     spawn_contradiction_event_loop(
@@ -284,38 +286,40 @@ pub async fn ai_start_contradiction_session(
     input_tx
         .send(prompt)
         .await
-        .map_err(|_| "矛盾检测会话已关闭".to_string())?;
+        .map_err(|_| ApiError::new(ErrorCode::LlmSessionClosed, "矛盾检测会话已关闭"))?;
 
     let report = match first_turn_rx.await {
         Ok(Ok(report)) => report,
         Ok(Err(error)) => {
+            let api_err = ApiError::internal(error);
             // Cancel 前先发射详细错误事件，避免 Tauri IPC 吞掉原始错误信息
             app.emit(
                 "ai:error",
                 crate::apis::ai_client::EventError {
                     session_id: request.session_id.clone(),
                     run_id: run_id.clone(),
-                    error: crate::ApiError::internal(error.clone()),
+                    error: api_err.clone(),
                 },
             )
             .ok();
             ai_state.sessions.lock().await.remove(&request.session_id);
             handle_for_error.cancel();
-            return Err(error);
+            return Err(api_err);
         }
         Err(_) => {
+            let api_err = ApiError::internal("矛盾检测首轮未返回结果");
             app.emit(
                 "ai:error",
                 crate::apis::ai_client::EventError {
                     session_id: request.session_id.clone(),
                     run_id: run_id.clone(),
-                    error: crate::ApiError::internal("矛盾检测首轮未返回结果"),
+                    error: api_err.clone(),
                 },
             )
             .ok();
             ai_state.sessions.lock().await.remove(&request.session_id);
             handle_for_error.cancel();
-            return Err("矛盾检测首轮未返回结果".to_string());
+            return Err(api_err);
         }
     };
 
@@ -350,7 +354,7 @@ pub async fn ai_start_contradiction_session(
         truncated: corpus.truncated,
         report: report.clone(),
     };
-    save_report_record(&ai_state.contradiction_reports_dir, &stored_record)?;
+    save_report_record(&ai_state.contradiction_reports_dir, &stored_record).map_err(ApiError::internal)?;
 
     ai_state.contradiction_bindings.lock().await.insert(
         request.session_id.clone(),
@@ -385,7 +389,7 @@ pub async fn ai_start_contradiction_session(
 pub async fn ai_get_contradiction_report(
     ai_state: State<'_, AiState>,
     session_id: String,
-) -> Result<Option<ContradictionReportView>, String> {
+) -> Result<Option<ContradictionReportView>, ApiError> {
     let bindings = ai_state.contradiction_bindings.lock().await;
     Ok(bindings
         .get(&session_id)
@@ -401,8 +405,9 @@ pub async fn ai_get_contradiction_report(
 pub async fn ai_list_contradiction_reports(
     ai_state: State<'_, AiState>,
     project_id: String,
-) -> Result<Vec<ContradictionReportHistoryItem>, String> {
-    let records = list_report_records(&ai_state.contradiction_reports_dir, &project_id)?;
+) -> Result<Vec<ContradictionReportHistoryItem>, ApiError> {
+    let records = list_report_records(&ai_state.contradiction_reports_dir, &project_id)
+        .map_err(ApiError::internal)?;
     Ok(records.iter().map(history_item_from_record).collect())
 }
 
@@ -410,24 +415,24 @@ pub async fn ai_list_contradiction_reports(
 pub async fn ai_get_contradiction_report_entry(
     ai_state: State<'_, AiState>,
     report_id: String,
-) -> Result<Option<StoredContradictionReport>, String> {
+) -> Result<Option<StoredContradictionReport>, ApiError> {
     let file_path = contradiction_report_file_path(&ai_state.contradiction_reports_dir, &report_id);
     if !file_path.exists() {
         return Ok(None);
     }
-    Ok(Some(read_report_record(&file_path)?))
+    Ok(Some(read_report_record(&file_path).map_err(ApiError::internal)?))
 }
 
 #[tauri::command]
 pub async fn ai_delete_contradiction_report(
     ai_state: State<'_, AiState>,
     report_id: String,
-) -> Result<bool, String> {
+) -> Result<bool, ApiError> {
     let file_path = contradiction_report_file_path(&ai_state.contradiction_reports_dir, &report_id);
     if !file_path.exists() {
         return Ok(false);
     }
-    std::fs::remove_file(&file_path).map_err(|e| format!("删除矛盾报告失败: {}", e))?;
+    std::fs::remove_file(&file_path)?;
     Ok(true)
 }
 
