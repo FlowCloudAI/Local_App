@@ -1,4 +1,4 @@
-use crate::AppState;
+use crate::{ApiError, AppState};
 use std::sync::Arc;
 use tauri::State;
 use tokio::sync::Mutex;
@@ -8,22 +8,22 @@ use worldflow_core::{query_usage_by_model, query_usage_summary};
 #[tauri::command]
 pub async fn ai_get_usage_summary(
     state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<worldflow_core::models::ApiUsageSummary, String> {
+) -> Result<worldflow_core::models::ApiUsageSummary, ApiError> {
     let app = state.lock().await;
     let db = app.sqlite_db.lock().await;
     query_usage_summary(&db.pool)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| ApiError::internal(e.to_string()))
 }
 
 /// 按模型分组查询 API 用量
 #[tauri::command]
 pub async fn ai_get_usage_by_model(
     state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<Vec<worldflow_core::models::ApiUsageByModel>, String> {
+) -> Result<Vec<worldflow_core::models::ApiUsageByModel>, ApiError> {
     let app = state.lock().await;
     let db = app.sqlite_db.lock().await;
     query_usage_by_model(&db.pool)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| ApiError::internal(e.to_string()))
 }

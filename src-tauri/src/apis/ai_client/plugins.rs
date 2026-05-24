@@ -166,12 +166,18 @@ fn plugin_model_infos(
 pub(crate) async fn list_plugins_for_kind(
     ai_state: &AiState,
     kind: &str,
-) -> Result<Vec<PluginInfo>, String> {
+) -> Result<Vec<PluginInfo>, ApiError> {
     let plugin_kind = match kind.to_lowercase().as_str() {
         "llm" => PluginKind::LLM,
         "image" => PluginKind::Image,
         "tts" => PluginKind::TTS,
-        other => return Err(format!("未知插件类型: {}", other)),
+        other => {
+            return Err(ApiError::new(
+                flowcloudai_client::ErrorCode::ValidationFormatError,
+                format!("未知插件类型: {}", other),
+            )
+            .with_kv("kind", other.to_string()));
+        }
     };
 
     let client = ai_state.client.lock().await;
@@ -211,6 +217,6 @@ pub(crate) async fn list_plugins_for_kind(
 pub async fn ai_list_plugins(
     ai_state: State<'_, AiState>,
     kind: String,
-) -> Result<Vec<PluginInfo>, String> {
+) -> Result<Vec<PluginInfo>, ApiError> {
     list_plugins_for_kind(ai_state.inner(), &kind).await
 }

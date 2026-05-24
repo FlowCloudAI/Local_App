@@ -260,9 +260,15 @@ pub async fn setting_get_settings_bootstrap(
             .to_string()
     };
 
-    let llm_plugins = list_plugins_for_kind(ai_state.inner(), "llm").await?;
-    let image_plugins = list_plugins_for_kind(ai_state.inner(), "image").await?;
-    let tts_plugins = list_plugins_for_kind(ai_state.inner(), "tts").await?;
+    let llm_plugins = list_plugins_for_kind(ai_state.inner(), "llm")
+        .await
+        .map_err(|e| e.to_string())?;
+    let image_plugins = list_plugins_for_kind(ai_state.inner(), "image")
+        .await
+        .map_err(|e| e.to_string())?;
+    let tts_plugins = list_plugins_for_kind(ai_state.inner(), "tts")
+        .await
+        .map_err(|e| e.to_string())?;
     let api_key_status = llm_plugins
         .iter()
         .chain(image_plugins.iter())

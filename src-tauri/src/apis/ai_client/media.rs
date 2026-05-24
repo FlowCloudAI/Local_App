@@ -1,4 +1,13 @@
 use super::common::*;
+use flowcloudai_client::ErrorCode;
+
+fn api_key_missing(plugin_id: &str) -> ApiError {
+    ApiError::new(
+        ErrorCode::AuthApiKeyMissing,
+        format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id),
+    )
+    .with_kv("plugin_id", plugin_id.to_string())
+}
 
 #[derive(Serialize)]
 pub struct ImageData {
@@ -6,14 +15,13 @@ pub struct ImageData {
     pub size: Option<String>,
 }
 
-async fn make_image_session(ai_state: &AiState, plugin_id: &str) -> Result<ImageSession, String> {
-    let api_key = ApiKeyStore::get(plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
+async fn make_image_session(ai_state: &AiState, plugin_id: &str) -> Result<ImageSession, ApiError> {
+    let api_key = ApiKeyStore::get(plugin_id).ok_or_else(|| api_key_missing(plugin_id))?;
 
     let client = ai_state.client.lock().await;
     client
         .create_image_session(plugin_id, &api_key, None)
-        .map_err(|e| format!("创建图像会话失败: {}", e))
+        .map_err(ApiError::from)
 }
 
 /// 文生图
@@ -24,7 +32,7 @@ pub async fn ai_text_to_image(
     model: String,
     prompt: String,
     size: Option<String>,
-) -> Result<Vec<ImageData>, String> {
+) -> Result<Vec<ImageData>, ApiError> {
     let session = make_image_session(&ai_state, &plugin_id).await?;
     let mut request = ImageRequest::text_to_image(&model, &prompt);
     if let Some(size) = size
@@ -34,12 +42,10 @@ pub async fn ai_text_to_image(
     {
         request = request.size(size);
     }
-    let result = session.generate(&request).await.map_err(|e| {
-        format!(
-            "text_to_image 调用失败 [plugin={} model={}]: {}",
-            plugin_id, model, e
-        )
-    })?;
+    let result = session
+        .generate(&request)
+        .await
+        .map_err(|e| ApiError::from(e).with_kv("plugin_id", plugin_id.clone()).with_kv("model", model.clone()))?;
 
     Ok(result
         .images
@@ -59,17 +65,12 @@ pub async fn ai_edit_image(
     model: String,
     prompt: String,
     image_url: String,
-) -> Result<Vec<ImageData>, String> {
+) -> Result<Vec<ImageData>, ApiError> {
     let session = make_image_session(&ai_state, &plugin_id).await?;
     let result = session
         .edit_image(&model, &prompt, &image_url)
         .await
-        .map_err(|e| {
-            format!(
-                "edit_image 调用失败 [plugin={} model={}]: {}",
-                plugin_id, model, e
-            )
-        })?;
+        .map_err(|e| ApiError::from(e).with_kv("plugin_id", plugin_id.clone()).with_kv("model", model.clone()))?;
 
     Ok(result
         .images
@@ -89,17 +90,12 @@ pub async fn ai_merge_images(
     model: String,
     prompt: String,
     image_urls: Vec<String>,
-) -> Result<Vec<ImageData>, String> {
+) -> Result<Vec<ImageData>, ApiError> {
     let session = make_image_session(&ai_state, &plugin_id).await?;
     let result = session
         .merge_images(&model, &prompt, image_urls)
         .await
-        .map_err(|e| {
-            format!(
-                "merge_images 调用失败 [plugin={} model={}]: {}",
-                plugin_id, model, e
-            )
-        })?;
+        .map_err(|e| ApiError::from(e).with_kv("plugin_id", plugin_id.clone()).with_kv("model", model.clone()))?;
 
     Ok(result
         .images
@@ -129,19 +125,13 @@ pub async fn ai_speak(
     model: String,
     text: String,
     voice_id: String,
-) -> Result<TtsResult, String> {
-    let api_key = ApiKeyStore::get(&plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
+) -> Result<TtsResult, ApiError> {
+    let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| api_key_missing(&plugin_id))?;
     let client = ai_state.client.lock().await;
-    let session = client
-        .create_tts_session(&plugin_id, &api_key, None)
-        .map_err(|e| e.to_string())?;
+    let session = client.create_tts_session(&plugin_id, &api_key, None)?;
     drop(client);
 
-    let result = session
-        .speak(&model, &text, &voice_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = session.speak(&model, &text, &voice_id).await?;
 
     use base64::Engine;
     let audio_base64 = base64::engine::general_purpose::STANDARD.encode(&result.audio);
@@ -162,19 +152,13 @@ pub async fn ai_play_tts(
     model: String,
     text: String,
     voice_id: String,
-) -> Result<(), String> {
-    let api_key = ApiKeyStore::get(&plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
+) -> Result<(), ApiError> {
+    let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| api_key_missing(&plugin_id))?;
     let client = ai_state.client.lock().await;
-    let session = client
-        .create_tts_session(&plugin_id, &api_key, None)
-        .map_err(|e| e.to_string())?;
+    let session = client.create_tts_session(&plugin_id, &api_key, None)?;
     drop(client);
 
-    let result = session
-        .speak(&model, &text, &voice_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = session.speak(&model, &text, &voice_id).await?;
 
     tauri::async_runtime::spawn(async move {
         let source = if result.audio.is_empty() {
