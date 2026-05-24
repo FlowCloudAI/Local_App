@@ -11,7 +11,7 @@ pub(super) use flowcloudai_client::{
 };
 pub(super) use futures::StreamExt;
 pub(super) use serde::{Deserialize, Serialize};
-pub(super) use std::collections::HashMap;
+pub(super) use std::collections::{HashMap, HashSet};
 pub(super) use std::fs::File;
 pub(super) use std::io::{Read, Write};
 pub(super) use std::path::{Path, PathBuf};
@@ -331,6 +331,94 @@ pub(super) fn stored_messages_to_seeds(messages: Vec<StoredMessage>) -> Vec<Conv
         .collect()
 }
 
+fn compact_runtime_content(text: &str) -> String {
+    format!(
+        "以下是此前对话的压缩摘要，代表本摘要之前的完整聊天记录。继续对话时请把它当作历史上下文，但不要向用户主动提及压缩。\n\n{}",
+        text.trim()
+    )
+}
+
+pub(super) fn active_message_path(
+    messages: &[StoredMessage],
+    head: Option<u64>,
+) -> Vec<StoredMessage> {
+    let by_id = messages
+        .iter()
+        .filter_map(|message| message.node_id.map(|node_id| (node_id, message)))
+        .collect::<HashMap<_, _>>();
+    let mut current = head.or_else(|| messages.iter().rev().find_map(|message| message.node_id));
+    let mut path = Vec::new();
+    let mut visited = HashSet::new();
+
+    while let Some(node_id) = current {
+        if !visited.insert(node_id) {
+            log::warn!(
+                "[chat_store] active path detected parent cycle at node_id={}",
+                node_id
+            );
+            break;
+        }
+        let Some(message) = by_id.get(&node_id) else {
+            break;
+        };
+        path.push((*message).clone());
+        current = message.parent;
+    }
+
+    path.reverse();
+    path
+}
+
+pub(super) fn stored_conversation_to_runtime_seeds(
+    conversation: &StoredConversation,
+) -> Vec<ConversationNodeSeed> {
+    let Some(compact) = conversation.compact.as_ref() else {
+        return stored_messages_to_seeds(conversation.messages.clone());
+    };
+
+    let path = active_message_path(&conversation.messages, conversation.head);
+    let Some(boundary_index) = path
+        .iter()
+        .position(|message| message.node_id == Some(compact.position_node_id))
+    else {
+        return stored_messages_to_seeds(conversation.messages.clone());
+    };
+
+    let Some(boundary_message) = path.get(boundary_index) else {
+        return stored_messages_to_seeds(conversation.messages.clone());
+    };
+
+    let mut seeds = Vec::new();
+    seeds.push(ConversationNodeSeed {
+        node_id: Some(compact.position_node_id),
+        parent: None,
+        turn_id: boundary_message.turn_id,
+        timestamp: Some(boundary_message.timestamp.clone()),
+        message: Message::system(compact_runtime_content(&compact.text)),
+    });
+
+    let mut parent = Some(compact.position_node_id);
+    for message in path.into_iter().skip(boundary_index + 1) {
+        let node_id = message.node_id;
+        seeds.push(ConversationNodeSeed {
+            node_id,
+            parent,
+            turn_id: message.turn_id,
+            timestamp: Some(message.timestamp),
+            message: Message {
+                role: message.role,
+                content: message.content,
+                reasoning_content: message.reasoning,
+                tool_call_id: message.tool_call_id,
+                tool_calls: message.tool_calls,
+            },
+        });
+        parent = node_id;
+    }
+
+    seeds
+}
+
 fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<StoredMessage> {
     nodes
         .into_iter()
@@ -368,6 +456,42 @@ fn auto_title(messages: &[StoredMessage]) -> String {
         .unwrap_or_else(|| "新对话".to_string())
 }
 
+fn merge_compacted_runtime_snapshot(
+    existing: StoredConversation,
+    runtime_messages: Vec<StoredMessage>,
+) -> Vec<StoredMessage> {
+    let Some(compact) = existing.compact.as_ref() else {
+        return runtime_messages;
+    };
+
+    let runtime_compact_content = compact_runtime_content(&compact.text);
+    let mut seen_ids = existing
+        .messages
+        .iter()
+        .filter_map(|message| message.node_id)
+        .collect::<HashSet<_>>();
+    let mut merged = existing.messages;
+
+    for message in runtime_messages {
+        if message.node_id == Some(compact.position_node_id)
+            && message.role == "system"
+            && message.content.as_deref() == Some(runtime_compact_content.as_str())
+        {
+            continue;
+        }
+
+        if let Some(node_id) = message.node_id {
+            if !seen_ids.insert(node_id) {
+                continue;
+            }
+        }
+        merged.push(message);
+    }
+
+    merged.sort_by_key(|message| message.node_id.unwrap_or(u64::MAX));
+    merged
+}
+
 fn chat_store_save_snapshot(
     paths: &PathsState,
     conversation_id: &str,
@@ -383,13 +507,14 @@ fn chat_store_save_snapshot(
 
     let now = chrono::Utc::now().to_rfc3339();
     let existing = chat_store_get_conversation(paths, conversation_id)?;
-    let (title, created_at, compact) = match existing {
+    let (title, created_at, compact, messages) = match existing {
         Some(conversation) => (
-            conversation.meta.title,
-            conversation.meta.created_at,
-            conversation.compact,
+            conversation.meta.title.clone(),
+            conversation.meta.created_at.clone(),
+            conversation.compact.clone(),
+            merge_compacted_runtime_snapshot(conversation, messages),
         ),
-        None => (auto_title(&messages), now.clone(), None),
+        None => (auto_title(&messages), now.clone(), None, messages),
     };
 
     let conversation = StoredConversation {

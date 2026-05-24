@@ -67,7 +67,7 @@ pub async fn ai_create_llm_session(
             .ok_or_else(|| format!("未找到会话：{}", conv_id))?;
         restored_head = conversation.head;
         restored_model = Some(conversation.meta.model.clone());
-        restored_history = Some(stored_messages_to_seeds(conversation.messages));
+        restored_history = Some(stored_conversation_to_runtime_seeds(&conversation));
         conversation.meta.id
     } else {
         session_id.clone()

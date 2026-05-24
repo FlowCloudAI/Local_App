@@ -427,6 +427,7 @@ pub fn run() {
             ai_list_tools,
             ai_list_conversations,
             ai_get_conversation,
+            ai_compact_conversation,
             ai_export_conversation,
             ai_delete_conversation,
             ai_rename_conversation,

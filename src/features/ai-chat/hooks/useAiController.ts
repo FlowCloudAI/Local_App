@@ -3,6 +3,7 @@ import {type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from
 import {listen} from '@tauri-apps/api/event'
 import {
     ai_build_character_project_snapshot,
+    ai_compact_conversation,
     ai_delete_conversation,
     ai_disable_tool,
     ai_enable_tool,
@@ -324,6 +325,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const [pluginsReady, setPluginsReady] = useState(false)
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
+    const appSettingsRef = useRef<AppSettings | null>(null)
+    const pluginsRef = useRef<PluginInfo[]>([])
+    useEffect(() => {
+        pluginsRef.current = plugins
+    }, [plugins])
     const selectedPluginRef = useRef(selectedPlugin)
     const selectedModelRef = useRef(selectedModel)
     useEffect(() => {
@@ -421,6 +427,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             includeTools ? ai_list_tools() : Promise.resolve(null),
         ])
 
+        appSettingsRef.current = settings
         syncPluginSelection(pluginList, settings)
         setPluginsReady(true)
 
@@ -440,6 +447,67 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const runtimeConversationRef = useRef<Record<string, string>>({})
     const abortControllerRef = useRef<AbortController | null>(null)
+    const sessionApiRef = useRef<ReturnType<typeof useAiSession> | null>(null)
+    const autoCompactInFlightRef = useRef<Set<string>>(new Set())
+
+    const maybeAutoCompactAfterMessage = useCallback(async (
+        conversationId: string,
+        message: SessionMessage,
+    ) => {
+        if (!message.usage || !message.nodeId) return
+
+        const settings = await setting_get_settings().catch(() => appSettingsRef.current)
+        if (settings) appSettingsRef.current = settings
+        const compactSettings = settings?.llm
+        if (!compactSettings?.auto_compact_enabled) return
+
+        const conversation = conversationsRef.current.find((item) => item.id === conversationId)
+        if (!conversation || conversation.mode !== 'default') return
+
+        const plugin = pluginsRef.current.find((item) => item.id === conversation.pluginId)
+        const modelInfo = plugin?.model_infos.find((item) => item.id === conversation.model)
+        const contextWindowTokens = modelInfo?.context_window_tokens ?? null
+        if (!contextWindowTokens || contextWindowTokens <= 0) return
+
+        const usageRatio = message.usage.total_tokens / contextWindowTokens
+        if (usageRatio < compactSettings.auto_compact_threshold_ratio) return
+
+        const inFlightKey = `${conversationId}:${message.nodeId}`
+        if (autoCompactInFlightRef.current.has(inFlightKey)) return
+        autoCompactInFlightRef.current.add(inFlightKey)
+
+        try {
+            const result = await ai_compact_conversation({
+                conversationId,
+                pluginId: conversation.pluginId,
+                model: conversation.model,
+                headNodeId: message.nodeId,
+                recentMessages: compactSettings.auto_compact_recent_messages,
+                detail: compactSettings.auto_compact_detail,
+            })
+            logger.log('[useAiController][自动压缩] 压缩检查完成', {
+                conversationId,
+                applied: result.applied,
+                positionNodeId: result.positionNodeId ?? null,
+                summaryChars: result.summaryChars,
+                usageRatio,
+            })
+            if (!result.applied) return
+
+            await sessionApiRef.current?.closeSession(message.sessionId)
+            delete runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
+            setConversations((prev) => prev.map((item) =>
+                item.id === conversationId ? {...item, sessionId: null, runId: null} : item,
+            ))
+        } catch (error) {
+            logger.warn('[useAiController][自动压缩] 压缩失败', {
+                conversationId,
+                error,
+            })
+        } finally {
+            autoCompactInFlightRef.current.delete(inFlightKey)
+        }
+    }, [])
 
     const onMessage = useCallback((message: SessionMessage) => {
         const targetConversationId =
@@ -480,7 +548,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 return next
             })
         }
-    }, [])
+        if (resolvedConversationId) {
+            void maybeAutoCompactAfterMessage(resolvedConversationId, message)
+        }
+    }, [maybeAutoCompactAfterMessage])
 
     const onUserTurnBegin = useCallback((payload: { sessionId: string; runId: string; nodeId: number }) => {
         const targetConversationId =
@@ -521,6 +592,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [])
 
     const session = useAiSession({onMessage, onUserTurnBegin, onError})
+    useEffect(() => {
+        sessionApiRef.current = session
+    }, [session])
 
     const selectConversation = useCallback((convId: string | null) => {
         activeConversationIdRef.current = convId

@@ -427,6 +427,23 @@ export interface StoredConversation extends ConversationMeta {
   compact?: StoredCompact | null
 }
 
+export interface CompactConversationRequest {
+  conversationId: string
+  pluginId?: string | null
+  model?: string | null
+  headNodeId?: number | null
+  recentMessages?: number | null
+  detail?: 'brief' | 'balanced' | 'detailed' | null
+}
+
+export interface CompactConversationResult {
+  applied: boolean
+  positionNodeId?: number | null
+  retainedMessages: number
+  summaryChars: number
+  reason?: string | null
+}
+
 export interface SummaryResult {
     summaryMarkdown: string
     highlights: string[]
@@ -481,6 +498,9 @@ export const ai_list_conversations = () =>
 
 export const ai_get_conversation = (id: string) =>
     command<StoredConversation | null>('ai_get_conversation', {id})
+
+export const ai_compact_conversation = (request: CompactConversationRequest) =>
+    command<CompactConversationResult>('ai_compact_conversation', {request})
 
 export const ai_export_conversation = (id: string, path: string, format: ConversationExportFormat) =>
     command<void>('ai_export_conversation', {id, path, format})
