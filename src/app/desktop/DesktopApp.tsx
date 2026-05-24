@@ -1,7 +1,7 @@
 import {logger} from '../../shared/logger'
 import '../../App.css'
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
-import {db_get_entry, db_get_project, type Project, setting_is_backend_ready} from '../../api'
+import {db_get_entry, db_get_project, type PlatformInfo, type Project, setting_is_backend_ready, showWindow} from '../../api'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import type {AiFocus} from '../../features/ai-chat/hooks/useAiController'
@@ -28,6 +28,10 @@ import {
 } from '../../features/home/homeActivity'
 import {parseHelpTarget} from '../../shared/help/helpCatalog'
 
+interface DesktopAppProps {
+    platformInfo: PlatformInfo
+}
+
 type EntryTabMeta = {
     projectId: string
     entryId: string
@@ -44,8 +48,9 @@ type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
 type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
 const AI_MIN_PANEL_WIDTH = 500
 const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
+let desktopWindowShown = false
 
-export default function DesktopApp() {
+export default function DesktopApp({platformInfo}: DesktopAppProps) {
     const win = getCurrentWindow()
     const {showAlert} = useAlert()
     const windowClosingRef = useRef(false)
@@ -112,6 +117,17 @@ export default function DesktopApp() {
             p.then(fn => fn())
         }
     }, [])
+
+    useEffect(() => {
+        if (!backendReady || !platformInfo.windowControls || desktopWindowShown) return
+        desktopWindowShown = true
+        requestAnimationFrame(() => {
+            showWindow().catch((error) => {
+                desktopWindowShown = false
+                logger.error('显示桌面窗口失败', error)
+            })
+        })
+    }, [backendReady, platformInfo.windowControls])
 
     useEffect(() => {
         if (aiPanelCollapsed) return

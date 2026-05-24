@@ -13,7 +13,7 @@ export default function AppRoot({platformInfo}: AppRootProps) {
         <Suspense fallback={<div className="app-loading">加载中…</div>}>
             {platformInfo.formFactor === 'mobile'
                 ? <MobileApp platformInfo={platformInfo}/>
-                : <DesktopApp/>}
+                : <DesktopApp platformInfo={platformInfo}/>}
         </Suspense>
     )
 }

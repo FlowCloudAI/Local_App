@@ -28,6 +28,31 @@ export interface TtsDefaults {
   auto_play: boolean
 }
 
+export interface ThemeColorCustomValues {
+  primarySeed: string
+  primarySurfaceChroma: number
+  neutralSeed: string
+  neutralChroma: number
+  neutralVariantChroma: number
+}
+
+export interface ThemeColorTokenValue {
+  hex: string
+  css: string
+}
+
+export interface ThemeColorTokenPair {
+  light: ThemeColorTokenValue
+  dark: ThemeColorTokenValue
+}
+
+export interface ThemeColorConfig {
+  version: 3
+  recipeId: string
+  customValues: ThemeColorCustomValues
+  tokenColors: Record<string, ThemeColorTokenPair>
+}
+
 export interface AppSettings {
   media_dir: string | null
   db_path: string | null
@@ -35,6 +60,7 @@ export interface AppSettings {
   theme: string
   language: string
   editor_font_size: number
+  theme_color_config: ThemeColorConfig | null
   auto_save_secs: number
   auto_backup_secs: number
   backup_dir: string | null

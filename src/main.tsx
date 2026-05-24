@@ -3,7 +3,8 @@ import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
 import AppShell from './app/index/AppShell'
-import {get_platform_info, type PlatformInfo, setting_get_settings, showWindow} from './api'
+import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
+import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
 
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
@@ -50,6 +51,11 @@ const initApp = async () => {
     ])
     if (settingsResult.status === 'fulfilled' && settingsResult.value.theme) {
         initialTheme = settingsResult.value.theme
+        const colorThemeApplied = applyPersistedThemeColorConfig(settingsResult.value.theme_color_config)
+        logger.info('[Bootstrap] 启动时应用颜色主题配置', {
+            recipeId: settingsResult.value.theme_color_config?.recipeId ?? null,
+            applied: colorThemeApplied,
+        })
     } else if (settingsResult.status === 'rejected') {
         logger.warn('Failed to load settings, using default theme:', settingsResult.reason)
     }
@@ -69,13 +75,6 @@ const initApp = async () => {
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : initialTheme
     document.documentElement.setAttribute('data-theme', resolvedTheme)
-
-    // data-theme 已同步写入，下一帧再显示窗口，确保浏览器绘制的第一帧已带有正确主题
-    if (platformInfo.windowControls) {
-        requestAnimationFrame(() => {
-            showWindow().catch(logger.error)
-        })
-    }
 
     createRoot(document.getElementById('root')!).render(
         <StrictMode>

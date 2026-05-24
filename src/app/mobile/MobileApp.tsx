@@ -3,7 +3,7 @@ import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
-import {exit_app, setting_is_backend_ready, type PlatformInfo} from '../../api'
+import {exit_app, setting_is_backend_ready, showWindow, type PlatformInfo} from '../../api'
 import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
@@ -19,6 +19,8 @@ import {type MobilePage, usePageStack} from './usePageStack'
 interface MobileAppProps {
     platformInfo: PlatformInfo
 }
+
+let mobileWindowShown = false
 
 type PageProps = {
     push: (page: MobilePage) => void
@@ -74,6 +76,17 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         setting_is_backend_ready().then(ready => { if (ready) mark() }).catch(() => {})
         return () => { disposed = true; p.then(fn => fn()) }
     }, [])
+
+    useEffect(() => {
+        if (!backendReady || !platformInfo.windowControls || mobileWindowShown) return
+        mobileWindowShown = true
+        requestAnimationFrame(() => {
+            showWindow().catch((error) => {
+                mobileWindowShown = false
+                logger.error('显示移动端窗口失败', error)
+            })
+        })
+    }, [backendReady, platformInfo.windowControls])
 
     const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),

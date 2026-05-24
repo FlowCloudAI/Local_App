@@ -40,6 +40,7 @@ import {
     type RemotePluginInfo,
     setting_delete_api_key,
     setting_get_media_dir,
+    setting_get_settings,
     setting_get_settings_bootstrap,
     setting_open_backup_dir,
     setting_set_api_key,
@@ -65,12 +66,19 @@ type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 type TemplateView = 'list' | 'detail'
+type SelectValue = string | number | (string | number)[]
 
 const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string }> = [
     {value: 'brief', label: '简略'},
     {value: 'balanced', label: '适中'},
     {value: 'detailed', label: '详细'},
 ]
+
+function normalizeThemeSelectValue(value: SelectValue): Theme {
+    const theme = String(Array.isArray(value) ? value[0] ?? 'system' : value)
+    if (theme === 'light' || theme === 'dark' || theme === 'system') return theme
+    return 'system'
+}
 
 interface ParsedPluginVersion {
     core: [number, number, number]
@@ -289,7 +297,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
     }, [getPluginById])
 
     // 初始化加载
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (source = 'manual') => {
         try {
             setLoading(true)
             settingsSaveSuccessNoticeEnabledRef.current = false
@@ -301,6 +309,12 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                 appConfigDir(),
             ])
 
+            logger.info('[Settings] 加载设置完成', {
+                source,
+                theme: bootstrap.settings.theme,
+                themeColorRecipeId: bootstrap.settings.theme_color_config?.recipeId ?? null,
+                mediaDir: bootstrap.mediaDir,
+            })
             setSettings(bootstrap.settings)
             setLlmPlugins(bootstrap.llmPlugins)
             setImagePlugins(bootstrap.imagePlugins)
@@ -311,6 +325,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             setApiKeyStatus(bootstrap.apiKeyStatus)
         } catch (error) {
             const errStr = String(error)
+            logger.error('[Settings] 加载设置失败', {source, error})
             if (!errStr.includes('state not managed')) {
                 await showAlertRef.current('加载设置失败: ' + error, 'error')
             }
@@ -352,7 +367,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
     }, [])
 
     useEffect(() => {
-        loadData().catch(logger.error)
+        loadData('mount').catch(logger.error)
     }, [loadData])
 
     useEffect(() => {
@@ -362,7 +377,8 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
     // 后端异步初始化完成后重新加载（AiState 在 DB 就绪后才 manage）
     useEffect(() => {
         const unlisten = listen('backend-ready', () => {
-            loadData().catch(logger.error)
+            logger.info('[Settings] 收到 backend-ready，重新加载设置')
+            loadData('backend-ready').catch(logger.error)
         })
         return () => {
             unlisten.then(f => f())
@@ -433,13 +449,27 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
         }))
     }, [settings?.editor_font_size, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const persistSettings = useCallback(async (nextSettings: AppSettings) => {
+    const persistSettings = useCallback(async (nextSettings: AppSettings, showSuccessNotice = true) => {
         try {
+            logger.info('[Settings] 准备保存设置', {
+                theme: nextSettings.theme,
+                themeColorRecipeId: nextSettings.theme_color_config?.recipeId ?? null,
+                showSuccessNotice,
+            })
             // 新 API 返回迁移摘要字符串（路径变更时自动复制文件），非空则弹窗提示
             const migrationMsg = await setting_update_settings(nextSettings)
             const newMediaDir = await setting_get_media_dir()
+            const savedSettings = await setting_get_settings()
+            logger.info('[Settings] 设置保存完成', {
+                requestTheme: nextSettings.theme,
+                savedTheme: savedSettings.theme,
+                requestThemeColorRecipeId: nextSettings.theme_color_config?.recipeId ?? null,
+                savedThemeColorRecipeId: savedSettings.theme_color_config?.recipeId ?? null,
+                migrationMsg,
+                newMediaDir,
+            })
             setMediaDir(current => current === newMediaDir ? current : newMediaDir)
-            const shouldShowSuccessNotice = settingsSaveSuccessNoticeEnabledRef.current
+            const shouldShowSuccessNotice = showSuccessNotice && settingsSaveSuccessNoticeEnabledRef.current
             settingsSaveSuccessNoticeEnabledRef.current = true
             if (migrationMsg) {
                 await showAlertRef.current(migrationMsg, 'info', 'toast', 3500)
@@ -452,6 +482,33 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             void showAlertRef.current(`设置保存失败：${message}`, 'error')
         }
     }, [])
+
+    const handleThemeChange = useCallback((value: SelectValue) => {
+        if (!settings) return
+
+        const nextTheme = normalizeThemeSelectValue(value)
+        const nextSettings = {...settings, theme: nextTheme}
+        logger.info('[Settings] 主题切换', {
+            previousTheme: settings.theme,
+            nextTheme,
+            rawValue: value,
+        })
+        setSettings(nextSettings)
+        setTheme(nextTheme)
+        void persistSettings(nextSettings, false)
+    }, [persistSettings, setTheme, settings])
+
+    const handleThemeColorConfigChange = useCallback((themeColorConfig: AppSettings['theme_color_config']) => {
+        if (!settings) return
+
+        const nextSettings = {...settings, theme_color_config: themeColorConfig}
+        logger.info('[Settings] 颜色主题配置变更，立即保存', {
+            recipeId: themeColorConfig?.recipeId ?? null,
+            tokenCount: themeColorConfig ? Object.keys(themeColorConfig.tokenColors).length : 0,
+        })
+        setSettings(nextSettings)
+        void persistSettings(nextSettings, false)
+    }, [persistSettings, settings])
 
     // 自动保存设置
     useEffect(() => {
@@ -473,6 +530,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             theme: 'system',
             language: 'zh-CN',
             editor_font_size: 14,
+            theme_color_config: null,
             auto_save_secs: 0,
             auto_backup_secs: 300,
             backup_dir: null,
@@ -738,7 +796,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             })
             await refreshPluginConfigState()
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
-            void showAlert(`${info.name} 安装成功`, 'success')
+            void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
         } catch (e) {
             void showAlert('本地插件安装失败: ' + e, 'error')
         } finally {
@@ -1277,18 +1335,6 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">外观</h2>
                                 <div className="settings-field">
-                                    <label className="settings-label">主题</label>
-                                    <Select
-                                        options={themeOptions}
-                                        value={settings.theme}
-                                        onChange={(value) => {
-                                            setSettings(prev => prev ? {...prev, theme: String(value)} : null);
-                                            setTheme(value as Theme)
-                                        }}
-                                        style={{flex: 1}}
-                                    />
-                                </div>
-                                <div className="settings-field">
                                     <label className="settings-label">语言</label>
                                     <Select
                                         options={languageOptions}
@@ -1320,9 +1366,20 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                         }>恢复默认</Button>
                                     )}
                                 </div>
+                                <div className="settings-field">
+                                    <label className="settings-label">显示模式</label>
+                                    <Select
+                                        options={themeOptions}
+                                        value={settings.theme}
+                                        onChange={handleThemeChange}
+                                        style={{flex: 1}}
+                                    />
+                                </div>
+                                <ThemeColorPreview
+                                    value={settings.theme_color_config}
+                                    onChange={handleThemeColorConfigChange}
+                                />
                             </section>
-
-                            <ThemeColorPreview/>
 
                             {/* 操作按钮 */}
                             <div className="settings-footer">
@@ -1347,8 +1404,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">AI配置</h1>
-                                    <p className="fc-page-subtitle">管理插件市场、默认模型、搜索引擎和各插件的 API
-                                        Key。</p>
+                                    <p className="fc-page-subtitle">配置默认模型、API Key、插件管理和 AI 工具。</p>
                                 </div>
                             </div>
 
@@ -1360,151 +1416,103 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                 }}
                             />
 
-                            {/* 已安装插件 */}
+                            {/* 默认模型 */}
                             <section className="settings-section fc-section-card">
-                                <div className="plugins-section-header">
-                                    <h2 className="plugins-section-title fc-section-title">已安装</h2>
-                                    <Button type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={loadingLocal}
-                                        onClick={loadLocal}
-                                    >
-                                        {loadingLocal ? '刷新中…' : '刷新'}
-                                    </Button>
-                                </div>
-
-                                {localError && <div
-                                    className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>}
-
-                                <div className="plugins-list">
-                                    {localPlugins.length === 0 && !loadingLocal ? (
-                                        <div className="plugins-empty">暂无已安装插件</div>
-                                    ) : (
-                                        localPlugins.map(plugin => {
-                                            const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
-                                            const updateVersion = marketPlugin
-                                            && isRemoteVersionNewer(plugin.version, marketPlugin.version)
-                                                ? marketPlugin.version
-                                                : undefined
-                                            return (
-                                                <LocalPluginCard
-                                                    key={plugin.id}
-                                                    plugin={plugin}
-                                                    updateVersion={updateVersion}
-                                                    onUninstall={handleUninstall}
-                                                    uninstalling={uninstallingId === plugin.id}
-                                                />
-                                            )
-                                        })
-                                    )}
-                                </div>
-                            </section>
-
-                            {/* 插件市场 */}
-                            <section className="settings-section fc-section-card">
-                                <div className="plugins-section-header">
-                                    <h2 className="plugins-section-title fc-section-title">插件库</h2>
-                                    <div className="plugins-section-actions">
-                                        <Button type="button"
-                                            size="sm"
-                                            disabled={installingLocalFile}
-                                            onClick={handleInstallFromFile}
-                                        >
-                                            {installingLocalFile ? '安装中…' : '安装本地插件'}
-                                        </Button>
-                                        <Button type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleUploadLocalPlugin}
-                                        >
-                                            上传本地插件
-                                        </Button>
-                                        <Button type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={loadingMarket}
-                                            onClick={loadMarket}
-                                        >
-                                            {loadingMarket ? '加载中…' : '刷新'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div className="plugins-filter-bar">
-                                    <Input
-                                        placeholder="搜索名称或作者…"
-                                        value={searchText}
-                                        onValueChange={setSearchText}
-                                        className="plugins-search"
-                                    />
-                                    <div className="plugins-kind-tabs">
-                                        {(['all', 'llm', 'image', 'tts'] as const).map(k => (
-                                            <button
-                                                key={k}
-                                                className={`plugins-kind-tab${kindFilter === k ? ' active' : ''}`}
-                                                onClick={() => setKindFilter(k)}
-                                            >
-                                                {k === 'all' ? '全部' : k.toUpperCase()}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {marketError && <div
-                                    className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>}
-
-                                <div className="plugins-list">
-                                    {filteredMarket.length === 0 && !loadingMarket ? (
-                                        <div className="plugins-empty">
-                                            {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
-                                        </div>
-                                    ) : (
-                                        filteredMarket.map(plugin => {
-                                            const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
-                                            const hasUpdate = installedPlugin
-                                                ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
-                                                : false
-                                            return (
-                                                <MarketPluginCard
-                                                    key={plugin.id}
-                                                    plugin={plugin}
-                                                    installedIds={installedIds}
-                                                    installedVersion={installedPlugin?.version}
-                                                    hasUpdate={hasUpdate}
-                                                    onInstall={handleInstall}
-                                                    installing={installingIds.has(plugin.id)}
-                                                />
-                                            )
-                                        })
-                                    )}
-                                </div>
-                            </section>
-
-                            {/* LLM 默认配置 */}
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">LLM 默认配置</h2>
-                                <div className="settings-row">
-                                    <div className="settings-field">
+                                <h2 className="settings-section-title fc-section-title">默认模型</h2>
+                                <div className="settings-ai-model-grid">
+                                    <div className="settings-ai-model-kind">LLM</div>
+                                    <div className="settings-field settings-ai-model-field">
                                         <label className="settings-label">插件</label>
-                                        <Select
-                                            options={getPluginOptions('llm')}
-                                            value={settings.llm.plugin_id || ''}
-                                            onChange={(value) => handleAiConfigChange('llm', 'plugin_id', value ? String(value) : null)}
-                                            style={{flex: 1}}
-                                        />
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={getPluginOptions('llm')}
+                                                value={settings.llm.plugin_id || ''}
+                                                onChange={(value) => handleAiConfigChange('llm', 'plugin_id', value ? String(value) : null)}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="settings-field">
+                                    <div className="settings-field settings-ai-model-field">
                                         <label className="settings-label">模型</label>
-                                        <Select
-                                            options={getModelOptions('llm')}
-                                            value={settings.llm.default_model || ''}
-                                            onChange={(value) => handleAiConfigChange('llm', 'default_model', value ? String(value) : null)}
-                                            disabled={!settings.llm.plugin_id}
-                                            style={{flex: 1}}
-                                        />
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={getModelOptions('llm')}
+                                                value={settings.llm.default_model || ''}
+                                                onChange={(value) => handleAiConfigChange('llm', 'default_model', value ? String(value) : null)}
+                                                disabled={!settings.llm.plugin_id}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="settings-ai-model-extra"/>
+
+                                    <div className="settings-ai-model-kind">图片</div>
+                                    <div className="settings-field settings-ai-model-field">
+                                        <label className="settings-label">插件</label>
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={getPluginOptions('image')}
+                                                value={settings.image.plugin_id || ''}
+                                                onChange={(value) => handleAiConfigChange('image', 'plugin_id', value ? String(value) : null)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="settings-field settings-ai-model-field">
+                                        <label className="settings-label">模型</label>
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={getModelOptions('image')}
+                                                value={settings.image.default_model || ''}
+                                                onChange={(value) => handleAiConfigChange('image', 'default_model', value ? String(value) : null)}
+                                                disabled={!settings.image.plugin_id}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="settings-ai-model-extra"/>
+
+                                    <div className="settings-ai-model-kind">TTS</div>
+                                    <div className="settings-field settings-ai-model-field">
+                                        <label className="settings-label">插件</label>
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={getPluginOptions('tts')}
+                                                value={settings.tts.plugin_id || ''}
+                                                onChange={(value) => handleAiConfigChange('tts', 'plugin_id', value ? String(value) : null)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="settings-field settings-ai-model-field">
+                                        <label className="settings-label">模型</label>
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={getModelOptions('tts')}
+                                                value={settings.tts.default_model || ''}
+                                                onChange={(value) => handleAiConfigChange('tts', 'default_model', value ? String(value) : null)}
+                                                disabled={!settings.tts.plugin_id}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="settings-field settings-ai-model-field">
+                                        <label className="settings-label">默认音色</label>
+                                        <div className="settings-select-control">
+                                            <Select
+                                                options={ttsVoiceOptions}
+                                                value={settings.tts.voice_id || ''}
+                                                onChange={(value) => setSettings(prev => prev ? {
+                                                    ...prev,
+                                                    tts: {
+                                                        ...prev.tts,
+                                                        voice_id: value ? String(value) : null,
+                                                    }
+                                                } : null)}
+                                                disabled={!selectedTtsPlugin || selectedTtsPlugin.supported_voices.length === 0}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
+                            </section>
+
+                            {/* 文本模型配置 */}
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">文本模型配置</h2>
                                 <div className="settings-field settings-field-stack settings-field-stack--full">
                                     <label className="settings-checkbox-row">
                                         <input
@@ -1564,96 +1572,6 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                         </div>
                                     </div>
                                 )}
-                            </section>
-
-                            {/* 图片生成默认配置 */}
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">图片生成默认配置</h2>
-                                <div className="settings-row">
-                                    <div className="settings-field">
-                                        <label className="settings-label">插件</label>
-                                        <Select
-                                            options={getPluginOptions('image')}
-                                            value={settings.image.plugin_id || ''}
-                                            onChange={(value) => handleAiConfigChange('image', 'plugin_id', value ? String(value) : null)}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label">模型</label>
-                                        <Select
-                                            options={getModelOptions('image')}
-                                            value={settings.image.default_model || ''}
-                                            onChange={(value) => handleAiConfigChange('image', 'default_model', value ? String(value) : null)}
-                                            disabled={!settings.image.plugin_id}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* TTS 默认配置 */}
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">TTS 默认配置</h2>
-                                <div className="settings-row">
-                                    <div className="settings-field">
-                                        <label className="settings-label">插件</label>
-                                        <Select
-                                            options={getPluginOptions('tts')}
-                                            value={settings.tts.plugin_id || ''}
-                                            onChange={(value) => handleAiConfigChange('tts', 'plugin_id', value ? String(value) : null)}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label">模型</label>
-                                        <Select
-                                            options={getModelOptions('tts')}
-                                            value={settings.tts.default_model || ''}
-                                            onChange={(value) => handleAiConfigChange('tts', 'default_model', value ? String(value) : null)}
-                                            disabled={!settings.tts.plugin_id}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                    <div className="settings-field">
-                                        <label className="settings-label">默认音色 ID</label>
-                                        <Select
-                                            options={ttsVoiceOptions}
-                                            value={settings.tts.voice_id || ''}
-                                            onChange={(value) => setSettings(prev => prev ? {
-                                                ...prev,
-                                                tts: {
-                                                    ...prev.tts,
-                                                    voice_id: value ? String(value) : null,
-                                                }
-                                            } : null)}
-                                            disabled={!selectedTtsPlugin || selectedTtsPlugin.supported_voices.length === 0}
-                                        />
-                                    </div>
-                                </div>
-                            </section>
-
-                            {/* AI 工具配置 */}
-                            <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">AI 工具配置</h2>
-                                <div className="settings-row">
-                                    <div className="settings-field">
-                                        <label className="settings-label">搜索引擎</label>
-                                        <Select
-                                            options={[
-                                                {value: 'bing', label: '必应 (Bing)'},
-                                                {value: 'baidu', label: '百度 (Baidu)'},
-                                                {value: 'duckduckgo', label: 'DuckDuckGo'},
-                                            ]}
-                                            value={settings.search_engine}
-                                            onChange={(value) => setSettings(prev => prev ? {
-                                                ...prev,
-                                                search_engine: String(value)
-                                            } : null)}
-                                            style={{flex: 1}}
-                                        />
-                                    </div>
-                                </div>
                             </section>
 
                             {/* API Key 管理 */}
@@ -1758,6 +1676,150 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                             )
                                         })
                                     )}
+                                </div>
+                            </section>
+
+                            {/* 已安装插件 */}
+                            <section className="settings-section fc-section-card">
+                                <div className="plugins-section-header">
+                                    <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
+                                    <Button type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={loadingLocal}
+                                        onClick={loadLocal}
+                                    >
+                                        {loadingLocal ? '刷新中…' : '刷新'}
+                                    </Button>
+                                </div>
+
+                                {localError && <div
+                                    className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>}
+
+                                <div className="plugins-list">
+                                    {localPlugins.length === 0 && !loadingLocal ? (
+                                        <div className="plugins-empty">暂无已安装插件</div>
+                                    ) : (
+                                        localPlugins.map(plugin => {
+                                            const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
+                                            const updateVersion = marketPlugin
+                                            && isRemoteVersionNewer(plugin.version, marketPlugin.version)
+                                                ? marketPlugin.version
+                                                : undefined
+                                            return (
+                                                <LocalPluginCard
+                                                    key={plugin.id}
+                                                    plugin={plugin}
+                                                    updateVersion={updateVersion}
+                                                    onUninstall={handleUninstall}
+                                                    uninstalling={uninstallingId === plugin.id}
+                                                />
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </section>
+
+                            {/* 插件库 */}
+                            <section className="settings-section fc-section-card">
+                                <div className="plugins-section-header">
+                                    <h2 className="plugins-section-title fc-section-title">插件库</h2>
+                                    <div className="plugins-section-actions">
+                                        <Button type="button"
+                                            size="sm"
+                                            disabled={installingLocalFile}
+                                            onClick={handleInstallFromFile}
+                                        >
+                                            {installingLocalFile ? '安装中…' : '安装本地插件'}
+                                        </Button>
+                                        <Button type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleUploadLocalPlugin}
+                                        >
+                                            上传本地插件
+                                        </Button>
+                                        <Button type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={loadingMarket}
+                                            onClick={loadMarket}
+                                        >
+                                            {loadingMarket ? '加载中…' : '刷新'}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="plugins-filter-bar">
+                                    <Input
+                                        placeholder="搜索名称或作者…"
+                                        value={searchText}
+                                        onValueChange={setSearchText}
+                                        className="plugins-search"
+                                    />
+                                    <div className="plugins-kind-tabs">
+                                        {(['all', 'llm', 'image', 'tts'] as const).map(k => (
+                                            <button
+                                                key={k}
+                                                className={`plugins-kind-tab${kindFilter === k ? ' active' : ''}`}
+                                                onClick={() => setKindFilter(k)}
+                                            >
+                                                {k === 'all' ? '全部' : k.toUpperCase()}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {marketError && <div
+                                    className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>}
+
+                                <div className="plugins-list">
+                                    {filteredMarket.length === 0 && !loadingMarket ? (
+                                        <div className="plugins-empty">
+                                            {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
+                                        </div>
+                                    ) : (
+                                        filteredMarket.map(plugin => {
+                                            const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
+                                            const hasUpdate = installedPlugin
+                                                ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
+                                                : false
+                                            return (
+                                                <MarketPluginCard
+                                                    key={plugin.id}
+                                                    plugin={plugin}
+                                                    installedIds={installedIds}
+                                                    installedVersion={installedPlugin?.version}
+                                                    hasUpdate={hasUpdate}
+                                                    onInstall={handleInstall}
+                                                    installing={installingIds.has(plugin.id)}
+                                                />
+                                            )
+                                        })
+                                    )}
+                                </div>
+                            </section>
+
+                            {/* AI 工具配置 */}
+                            <section className="settings-section fc-section-card">
+                                <h2 className="settings-section-title fc-section-title">AI 工具配置</h2>
+                                <div className="settings-row">
+                                    <div className="settings-field">
+                                        <label className="settings-label">搜索引擎</label>
+                                        <Select
+                                            options={[
+                                                {value: 'bing', label: '必应 (Bing)'},
+                                                {value: 'baidu', label: '百度 (Baidu)'},
+                                                {value: 'duckduckgo', label: 'DuckDuckGo'},
+                                            ]}
+                                            value={settings.search_engine}
+                                            onChange={(value) => setSettings(prev => prev ? {
+                                                ...prev,
+                                                search_engine: String(value)
+                                            } : null)}
+                                            style={{flex: 1}}
+                                        />
+                                    </div>
                                 </div>
                             </section>
                         </div>

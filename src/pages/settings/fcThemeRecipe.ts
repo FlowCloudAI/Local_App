@@ -328,11 +328,11 @@ export function createFcThemeOverrideCss(
     tokenColors?: FcThemeTokenColorValues,
 ): string {
     return [
-        ':root {',
+        'html:root {',
         ...preview.tokens.map((item) => `  ${item.token}: ${tokenColors?.[item.token]?.light.css ?? item.light.css} !important;`),
         '}',
         '',
-        '[data-theme="dark"] {',
+        'html:root[data-theme="dark"] {',
         ...preview.tokens.map((item) => {
             const lightCss = tokenColors?.[item.token]?.light.css ?? item.light.css
             const darkCss = item.modeInvariant ? lightCss : tokenColors?.[item.token]?.dark.css ?? item.dark.css

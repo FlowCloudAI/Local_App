@@ -1,7 +1,8 @@
-import {useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties} from 'react'
 import {Button} from 'flowcloudai-ui'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
-import {setting_export_theme_config} from '../../api'
+import {setting_export_theme_config, type ThemeColorConfig} from '../../api'
+import {logger} from '../../shared/logger'
 import {
     applyFcThemeTokenOverride,
     clearFcThemeTokenOverride,
@@ -45,17 +46,31 @@ interface ThemeConfigFile {
     exportedAt: string
 }
 
+interface ThemeColorState {
+    recipeId: string
+    themeValues: FcThemeCustomValues
+    tokenColors: FcThemeTokenColorValues
+}
+
+interface ThemeColorPreviewProps {
+    value: ThemeColorConfig | null
+    onChange: (config: ThemeColorConfig | null) => void
+}
+
 const THEME_CONFIG_VERSION = 3
 const PRIMARY_TOKEN = '--fc-color-primary'
 
-export default function ThemeColorPreview() {
-    const defaultRecipe = getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID)
-    const defaultValues = getFcThemeCustomValues(defaultRecipe)
-    const [recipeId, setRecipeId] = useState(defaultRecipe.id)
-    const [themeValues, setThemeValues] = useState<FcThemeCustomValues>(() => defaultValues)
-    const [tokenColors, setTokenColors] = useState<FcThemeTokenColorValues>(() => (
-        createTokenColors(defaultRecipe, defaultValues)
-    ))
+export default function ThemeColorPreview({value, onChange}: ThemeColorPreviewProps) {
+    const defaultRecipe = useMemo(() => getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID), [])
+    const defaultValues = useMemo(() => getFcThemeCustomValues(defaultRecipe), [defaultRecipe])
+    const initialState = useMemo(() => resolveThemeColorState(value, defaultRecipe, defaultValues), [
+        defaultRecipe,
+        defaultValues,
+        value,
+    ])
+    const [recipeId, setRecipeId] = useState(initialState.recipeId)
+    const [themeValues, setThemeValues] = useState<FcThemeCustomValues>(() => initialState.themeValues)
+    const [tokenColors, setTokenColors] = useState<FcThemeTokenColorValues>(() => initialState.tokenColors)
     const [customOpen, setCustomOpen] = useState(false)
     const [configMessage, setConfigMessage] = useState<string | null>(null)
     const importInputRef = useRef<HTMLInputElement>(null)
@@ -65,59 +80,184 @@ export default function ThemeColorPreview() {
     ), [selectedRecipe, themeValues])
     const fcPreview = useMemo(() => createFcThemePreview(customRecipe), [customRecipe])
     const currentPrimaryColor = getPrimaryTokenColor(tokenColors, themeValues.primarySeed)
-    const defaultTokenColors = createTokenColors(defaultRecipe, defaultValues)
     const isDefaultTheme = recipeId === DEFAULT_FC_THEME_RECIPE_ID
-        && sameThemeValues(themeValues, defaultValues)
-        && sameTokenColors(tokenColors, defaultTokenColors)
+    const stateSnapshotRef = useRef({
+        recipeId,
+        primarySeed: currentPrimaryColor,
+        isDefaultTheme,
+    })
+
+    useEffect(() => {
+        stateSnapshotRef.current = {
+            recipeId,
+            primarySeed: currentPrimaryColor,
+            isDefaultTheme,
+        }
+    }, [currentPrimaryColor, isDefaultTheme, recipeId])
+
+    useEffect(() => {
+        const nextState = resolveThemeColorState(value, defaultRecipe, defaultValues)
+        logger.info('[ThemeColorPreview] 从设置恢复颜色主题', {
+            recipeId: nextState.recipeId,
+            primarySeed: nextState.themeValues.primarySeed,
+            persisted: Boolean(value),
+        })
+        setRecipeId(nextState.recipeId)
+        setThemeValues(nextState.themeValues)
+        setTokenColors(nextState.tokenColors)
+    }, [defaultRecipe, defaultValues, value])
+
+    useEffect(() => {
+        if (value?.recipeId !== DEFAULT_FC_THEME_RECIPE_ID) return
+
+        logger.info('[ThemeColorPreview] 归一化默认颜色主题为空配置', {
+            recipeId: value.recipeId,
+        })
+        onChange(null)
+    }, [onChange, value])
+
+    const commitThemeColorConfig = useCallback((
+        nextRecipeId: string,
+        nextValues: FcThemeCustomValues,
+        nextTokenColors: FcThemeTokenColorValues,
+    ) => {
+        const normalizedValues = normalizeThemeValues(nextValues)
+        const nextRecipe = getFcThemeRecipe(nextRecipeId)
+        const nextPreview = createPreviewForValues(nextRecipe, normalizedValues ?? nextValues)
+        if (!normalizedValues || !nextPreview) {
+            logger.warn('[ThemeColorPreview] 颜色主题配置无效，跳过持久化', {nextRecipeId})
+            return
+        }
+
+        const normalizedTokenColors = normalizeTokenColorsForPreview(nextTokenColors, nextPreview)
+        const isDefaultConfig = nextRecipe.id === DEFAULT_FC_THEME_RECIPE_ID
+        if (isDefaultConfig) {
+            logger.info('[ThemeColorPreview] 持久化默认颜色主题为空配置')
+            onChange(null)
+            return
+        }
+
+        logger.info('[ThemeColorPreview] 持久化颜色主题配置', {
+            recipeId: nextRecipe.id,
+            primarySeed: normalizedValues.primarySeed,
+            tokenCount: Object.keys(normalizedTokenColors).length,
+        })
+        onChange({
+            version: THEME_CONFIG_VERSION,
+            recipeId: nextRecipe.id,
+            customValues: normalizedValues,
+            tokenColors: normalizedTokenColors,
+        })
+    }, [onChange])
+
+    useEffect(() => {
+        logger.info('[ThemeColorPreview] 组件挂载，使用初始颜色主题', {
+            recipeId: defaultRecipe.id,
+            primarySeed: defaultValues.primarySeed,
+            tokenCount: Object.keys(createTokenColors(defaultRecipe, defaultValues)).length,
+        })
+        return () => {
+            const snapshot = stateSnapshotRef.current
+            logger.info('[ThemeColorPreview] 组件卸载，当前颜色主题状态已交由设置持久化', {
+                recipeId: snapshot.recipeId,
+                primarySeed: snapshot.primarySeed,
+                isDefaultTheme: snapshot.isDefaultTheme,
+            })
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (isDefaultTheme || !fcPreview) {
+            logger.info('[ThemeColorPreview] 清除颜色主题覆盖', {
+                recipeId,
+                isDefaultTheme,
+                hasPreview: Boolean(fcPreview),
+            })
             clearFcThemeTokenOverride()
             return
         }
+        logger.info('[ThemeColorPreview] 应用颜色主题覆盖', {
+            recipeId,
+            primarySeed: currentPrimaryColor,
+            tokenCount: Object.keys(tokenColors).length,
+        })
         applyFcThemeTokenOverride(fcPreview, tokenColors)
-    }, [fcPreview, isDefaultTheme, tokenColors])
+    }, [currentPrimaryColor, fcPreview, isDefaultTheme, recipeId, tokenColors])
 
     const selectRecipe = (nextRecipeId: string) => {
         const nextRecipe = getFcThemeRecipe(nextRecipeId)
         const nextValues = getFcThemeCustomValues(nextRecipe)
+        logger.info('[ThemeColorPreview] 选择颜色主题预设', {
+            previousRecipeId: recipeId,
+            nextRecipeId: nextRecipe.id,
+            primarySeed: nextValues.primarySeed,
+        })
         setRecipeId(nextRecipe.id)
         setThemeValues(nextValues)
-        setTokenColors(createTokenColors(nextRecipe, nextValues))
+        const nextTokenColors = createTokenColors(nextRecipe, nextValues)
+        setTokenColors(nextTokenColors)
+        commitThemeColorConfig(nextRecipe.id, nextValues, nextTokenColors)
         setConfigMessage(null)
     }
 
     const resetDefault = () => {
+        logger.info('[ThemeColorPreview] 恢复默认颜色主题', {
+            previousRecipeId: recipeId,
+            previousPrimary: currentPrimaryColor,
+        })
         setCustomOpen(false)
         selectRecipe(DEFAULT_FC_THEME_RECIPE_ID)
     }
 
     const updateTokenColor = (token: string, mode: TokenColorMode, color: string) => {
         const normalized = normalizeHexColor(color)
-        if (!normalized) return
-        setTokenColors((current) => ({
-            ...current,
-            [token]: {
-                ...current[token],
-                ...(mode === 'both'
-                    ? {
-                        light: {hex: normalized, css: normalized},
-                        dark: {hex: normalized, css: normalized},
-                    }
-                    : {[mode]: {hex: normalized, css: normalized}}),
-            },
-        }))
+        if (!normalized) {
+            logger.warn('[ThemeColorPreview] 忽略无效令牌颜色', {token, mode, color})
+            return
+        }
+        logger.info('[ThemeColorPreview] 更新令牌颜色', {
+            recipeId,
+            token,
+            mode,
+            color: normalized,
+        })
+        setTokenColors((current) => {
+            const nextTokenColors = {
+                ...current,
+                [token]: {
+                    ...current[token],
+                    ...(mode === 'both'
+                        ? {
+                            light: {hex: normalized, css: normalized},
+                            dark: {hex: normalized, css: normalized},
+                        }
+                        : {[mode]: {hex: normalized, css: normalized}}),
+                },
+            }
+            commitThemeColorConfig(recipeId, themeValues, nextTokenColors)
+            return nextTokenColors
+        })
         setConfigMessage(null)
     }
 
     const generateFromPrimary = () => {
         const generated = generateFcThemeCustomValues(currentPrimaryColor, selectedRecipe)
         if (!generated) {
+            logger.warn('[ThemeColorPreview] 根据主色生成失败', {
+                recipeId,
+                primarySeed: currentPrimaryColor,
+            })
             setConfigMessage('请先输入有效的主题色。')
             return
         }
+        logger.info('[ThemeColorPreview] 根据主色生成颜色主题', {
+            recipeId,
+            primarySeed: currentPrimaryColor,
+        })
         setThemeValues(generated)
-        setTokenColors(createTokenColors(selectedRecipe, generated))
+        const nextTokenColors = createTokenColors(selectedRecipe, generated)
+        setTokenColors(nextTokenColors)
+        commitThemeColorConfig(selectedRecipe.id, generated, nextTokenColors)
         setConfigMessage('已根据主题色生成全部令牌颜色，可继续逐项微调。')
     }
 
@@ -141,6 +281,11 @@ export default function ThemeColorPreview() {
             exportedAt: new Date().toISOString(),
         }
         try {
+            logger.info('[ThemeColorPreview] 准备导出颜色主题配置', {
+                recipeId: selectedRecipe.id,
+                primarySeed: customValues.primarySeed,
+                tokenCount: Object.keys(normalizedTokenColors).length,
+            })
             const selectedPath = await saveFileDialog({
                 defaultPath: buildThemeConfigFileName(selectedRecipe.id),
                 filters: [{
@@ -148,10 +293,18 @@ export default function ThemeColorPreview() {
                     extensions: ['json'],
                 }],
             })
-            if (!selectedPath) return
+            if (!selectedPath) {
+                logger.info('[ThemeColorPreview] 取消导出颜色主题配置')
+                return
+            }
             await setting_export_theme_config(selectedPath, JSON.stringify(config, null, 2))
+            logger.info('[ThemeColorPreview] 颜色主题配置已导出', {
+                recipeId: selectedRecipe.id,
+                path: selectedPath,
+            })
             setConfigMessage('主题配置已导出。')
         } catch (error) {
+            logger.error('[ThemeColorPreview] 颜色主题配置导出失败', error)
             setConfigMessage(`主题配置导出失败：${formatErrorMessage(error)}`)
         }
     }
@@ -159,15 +312,27 @@ export default function ThemeColorPreview() {
     const importThemeConfig = async (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
         event.target.value = ''
-        if (!file) return
+        if (!file) {
+            logger.info('[ThemeColorPreview] 未选择颜色主题配置文件')
+            return
+        }
         try {
+            logger.info('[ThemeColorPreview] 准备导入颜色主题配置', {
+                fileName: file.name,
+                fileSize: file.size,
+            })
             const config = parseThemeConfig(JSON.parse(await file.text()))
             if (!config) {
+                logger.warn('[ThemeColorPreview] 颜色主题配置无法识别', {fileName: file.name})
                 setConfigMessage('主题配置无法识别。')
                 return
             }
             const importedRecipe = FC_THEME_RECIPES.find((recipe) => recipe.id === config.recipeId)
             if (!importedRecipe) {
+                logger.warn('[ThemeColorPreview] 颜色主题配置引用了不存在的预设', {
+                    fileName: file.name,
+                    recipeId: config.recipeId,
+                })
                 setConfigMessage('主题配置引用了不存在的预设。')
                 return
             }
@@ -176,34 +341,42 @@ export default function ThemeColorPreview() {
                 primarySeed: config.primarySeed ?? importedRecipe.primarySeed,
             }
             const importedTokenColors = config.tokenColors ?? createTokenColors(importedRecipe, importedValues)
-            setRecipeId(importedRecipe.id)
-            setThemeValues(importedValues)
-            setTokenColors(normalizeTokenColorsForPreview(
+            const normalizedImportedTokenColors = normalizeTokenColorsForPreview(
                 importedTokenColors,
                 createPreviewForValues(importedRecipe, importedValues),
-            ))
+            )
+            setRecipeId(importedRecipe.id)
+            setThemeValues(importedValues)
+            setTokenColors(normalizedImportedTokenColors)
             setCustomOpen(true)
+            commitThemeColorConfig(importedRecipe.id, importedValues, normalizedImportedTokenColors)
+            logger.info('[ThemeColorPreview] 颜色主题配置已导入', {
+                recipeId: importedRecipe.id,
+                primarySeed: importedValues.primarySeed,
+                tokenCount: Object.keys(importedTokenColors).length,
+            })
             setConfigMessage('主题配置已导入。')
-        } catch {
+        } catch (error) {
+            logger.error('[ThemeColorPreview] 颜色主题配置无法读取', error)
             setConfigMessage('主题配置无法读取。')
         }
     }
 
     return (
-        <section className="settings-section fc-section-card theme-color-preview">
+        <div className="theme-color-preview">
             <div className="theme-color-preview__header">
                 <div>
-                    <h2 className="settings-section-title fc-section-title">主题</h2>
-                    <p className="theme-color-preview__subtitle">主色、背景、边框和文字层级；警告、危险、成功等功能色保持不变。</p>
+                    <h3 className="theme-color-preview__title">颜色主题</h3>
+                    <p className="theme-color-preview__subtitle">主色、背景、边框和文字层级；功能色保持不变。</p>
                 </div>
                 <div className="theme-color-preview__header-actions">
                     <Button type="button" size="sm" variant="outline" onClick={resetDefault}>
-                        恢复默认
+                        恢复流云默认
                     </Button>
                 </div>
             </div>
 
-            <div className="theme-color-preview__preset-grid" aria-label="主题预设">
+            <div className="theme-color-preview__preset-grid" aria-label="颜色主题预设">
                 {FC_THEME_RECIPES.map((preset) => (
                     <ThemePresetCard
                         key={preset.id}
@@ -266,7 +439,7 @@ export default function ThemeColorPreview() {
                     </div>
                 )}
             </div>
-        </section>
+        </div>
     )
 }
 
@@ -291,6 +464,9 @@ function ThemePresetCard({
             <span className="theme-color-preview__preset-card-header">
                 <span className="theme-color-preview__preset-dot" aria-hidden="true"/>
                 <strong>{preset.label}</strong>
+                {preset.id === DEFAULT_FC_THEME_RECIPE_ID && (
+                    <span className="theme-color-preview__preset-badge">默认</span>
+                )}
             </span>
             <span className="theme-color-preview__preset-card-swatches" aria-hidden="true">
                 <span className="theme-color-preview__preset-swatch theme-color-preview__preset-swatch--surface"/>
@@ -298,6 +474,50 @@ function ThemePresetCard({
             </span>
         </button>
     )
+}
+
+function resolveThemeColorState(
+    config: ThemeColorConfig | null,
+    defaultRecipe: FcThemeRecipe,
+    defaultValues: FcThemeCustomValues,
+): ThemeColorState {
+    const fallbackTokenColors = createTokenColors(defaultRecipe, defaultValues)
+    if (!config) {
+        return {
+            recipeId: defaultRecipe.id,
+            themeValues: defaultValues,
+            tokenColors: fallbackTokenColors,
+        }
+    }
+
+    const parsed = parseThemeConfig(config)
+    const recipe = parsed
+        ? FC_THEME_RECIPES.find((item) => item.id === parsed.recipeId)
+        : null
+    if (!parsed || !recipe) {
+        logger.warn('[ThemeColorPreview] 设置中的颜色主题配置无效，回退默认主题', {
+            recipeId: config.recipeId,
+        })
+        return {
+            recipeId: defaultRecipe.id,
+            themeValues: defaultValues,
+            tokenColors: fallbackTokenColors,
+        }
+    }
+
+    const themeValues = parsed.customValues ?? {
+        ...getFcThemeCustomValues(recipe),
+        primarySeed: parsed.primarySeed ?? recipe.primarySeed,
+    }
+    const tokenColors = normalizeTokenColorsForPreview(
+        parsed.tokenColors ?? createTokenColors(recipe, themeValues),
+        createPreviewForValues(recipe, themeValues),
+    )
+    return {
+        recipeId: recipe.id,
+        themeValues,
+        tokenColors,
+    }
 }
 
 function parseThemeConfig(value: unknown): ParsedThemeConfig | null {
@@ -374,24 +594,6 @@ function normalizeThemeValues(values: FcThemeCustomValues): FcThemeCustomValues 
         neutralChroma: normalizeChroma(values.neutralChroma, 5, 0, 16),
         neutralVariantChroma: normalizeChroma(values.neutralVariantChroma, 10, 0, 24),
     }
-}
-
-function sameThemeValues(first: FcThemeCustomValues, second: FcThemeCustomValues): boolean {
-    return normalizeHexColor(first.primarySeed) === normalizeHexColor(second.primarySeed)
-        && normalizeHexColor(first.neutralSeed) === normalizeHexColor(second.neutralSeed)
-        && first.primarySurfaceChroma === second.primarySurfaceChroma
-        && first.neutralChroma === second.neutralChroma
-        && first.neutralVariantChroma === second.neutralVariantChroma
-}
-
-function sameTokenColors(first: FcThemeTokenColorValues, second: FcThemeTokenColorValues): boolean {
-    const keys = new Set([...Object.keys(first), ...Object.keys(second)])
-    return [...keys].every((key) => (
-        first[key]?.light.hex === second[key]?.light.hex
-        && first[key]?.light.css === second[key]?.light.css
-        && first[key]?.dark.hex === second[key]?.dark.hex
-        && first[key]?.dark.css === second[key]?.dark.css
-    ))
 }
 
 function normalizeTokenColorsForPreview(
