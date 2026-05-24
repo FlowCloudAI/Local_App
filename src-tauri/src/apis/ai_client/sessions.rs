@@ -1,4 +1,5 @@
 use super::common::*;
+use crate::senses::app_sense::AppSense;
 
 /// 创建 LLM 会话并启动后台事件循环。
 ///
@@ -113,6 +114,10 @@ pub async fn ai_create_llm_session(
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
     }
+    session
+        .load_sense(AppSense::new())
+        .await
+        .map_err(|e| e.to_string())?;
     session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
 
     let model_to_apply = model
