@@ -135,13 +135,14 @@ export default function ThemeColorPreview() {
             setConfigMessage('请先修正颜色后再导出。')
             return
         }
+        const normalizedTokenColors = normalizeTokenColorsForPreview(tokenColors, fcPreview)
         const config: ThemeConfigFile = {
             app: 'flowcloudai',
             type: 'theme',
             version: THEME_CONFIG_VERSION,
             recipeId: selectedRecipe.id,
             customValues,
-            tokenColors,
+            tokenColors: normalizedTokenColors,
             exportedAt: new Date().toISOString(),
         }
         const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'})
@@ -175,9 +176,13 @@ export default function ThemeColorPreview() {
                 ...getFcThemeCustomValues(importedRecipe),
                 primarySeed: config.primarySeed ?? importedRecipe.primarySeed,
             }
+            const importedTokenColors = config.tokenColors ?? createTokenColors(importedRecipe, importedValues)
             setRecipeId(importedRecipe.id)
             setThemeValues(importedValues)
-            setTokenColors(config.tokenColors ?? createTokenColors(importedRecipe, importedValues))
+            setTokenColors(normalizeTokenColorsForPreview(
+                importedTokenColors,
+                createPreviewForValues(importedRecipe, importedValues),
+            ))
             setCustomOpen(true)
             setConfigMessage('主题配置已导入。')
         } catch {
@@ -484,6 +489,17 @@ function sameTokenColors(first: FcThemeTokenColorValues, second: FcThemeTokenCol
         && first[key]?.dark.hex === second[key]?.dark.hex
         && first[key]?.dark.css === second[key]?.dark.css
     ))
+}
+
+function normalizeTokenColorsForPreview(
+    tokenColors: FcThemeTokenColorValues,
+    preview: FcThemePreview | null,
+): FcThemeTokenColorValues {
+    if (!preview) return tokenColors
+    return Object.fromEntries(Object.entries(tokenColors).map(([token, pair]) => {
+        const tokenPreview = preview.tokens.find((item) => item.token === token)
+        return [token, tokenPreview?.modeInvariant ? {...pair, dark: pair.light} : pair]
+    }))
 }
 
 function createTokenColors(recipe: FcThemeRecipe, values: FcThemeCustomValues): FcThemeTokenColorValues {
