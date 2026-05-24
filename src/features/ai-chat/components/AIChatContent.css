@@ -960,6 +960,7 @@
 
 /* ========== 悬浮输入框 ========== */
 .ai-floating-input-wrapper {
+    --ai-conversation-settings-input-overlap: 1.1rem;
     position: absolute;
     bottom: 24px;
     left: 50%;
@@ -1006,10 +1007,10 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(100% - 0.35rem);
+    bottom: calc(100% - var(--ai-conversation-settings-input-overlap));
     width: 100%;
     box-sizing: border-box;
-    padding: var(--fc-space-md) var(--fc-space-lg) calc(var(--fc-space-md) + 0.35rem);
+    padding: var(--fc-space-md) var(--fc-space-lg) calc(var(--fc-space-md) + var(--ai-conversation-settings-input-overlap));
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--fc-radius-lg) var(--fc-radius-lg) 0 0;
     background: var(--fc-color-bg-elevated);
@@ -1030,7 +1031,7 @@
 
 @keyframes ai-conversation-settings-drawer-open {
     from {
-        transform: translateY(calc(100% - 0.35rem));
+        transform: translateY(calc(100% - var(--ai-conversation-settings-input-overlap)));
     }
 
     to {
@@ -1044,7 +1045,7 @@
     }
 
     to {
-        transform: translateY(calc(100% - 0.35rem));
+        transform: translateY(calc(100% - var(--ai-conversation-settings-input-overlap)));
     }
 }
 
@@ -1539,7 +1540,7 @@
     }
 
     .ai-conversation-settings-panel {
-        padding: var(--fc-space-sm);
+        padding: var(--fc-space-sm) var(--fc-space-sm) calc(var(--fc-space-sm) + var(--ai-conversation-settings-input-overlap));
     }
 
     .ai-conversation-settings-summary {
