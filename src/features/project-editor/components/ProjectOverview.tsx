@@ -10,6 +10,7 @@ import {RollingBox} from 'flowcloudai-ui'
 import ProjectConfigOverview from './ProjectConfigOverview'
 import ProjectDashboard from './ProjectDashboard'
 import ProjectOverviewHeader from './ProjectOverviewHeader'
+import ProjectQuickActions from './ProjectQuickActions'
 import type {ProjectOverviewProps, ProjectOverviewVirtualChildProps} from './ProjectOverview.types'
 
 function ProjectOverview({
@@ -68,6 +69,16 @@ function ProjectOverview({
                 exporting={exporting}
                 onDelete={onDelete}
                 onDescriptionChange={onDescriptionChange}
+            />
+
+            <ProjectQuickActions
+                mapCount={mapCount}
+                riskSummary={riskSummary}
+                projectStats={projectStats}
+                onOpenRelationGraph={onOpenRelationGraph}
+                onOpenTimeline={onOpenTimeline}
+                onOpenWorldMap={onOpenWorldMap}
+                onOpenContradiction={onOpenContradiction}
             />
 
             <ProjectDashboard

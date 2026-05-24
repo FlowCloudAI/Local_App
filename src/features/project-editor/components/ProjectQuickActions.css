@@ -1,0 +1,5 @@
+.pe-quick-actions {
+    margin-bottom: var(--fc-space-xl);
+    padding-bottom: var(--fc-space-xl);
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+}

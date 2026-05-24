@@ -1,5 +1,4 @@
 import {
-    DashboardActionList,
     DashboardBarList,
     type DashboardBarItem,
     DashboardKpiStrip,
@@ -117,14 +116,6 @@ function ProjectDashboard(props: ProjectDashboardProps) {
 
                 <aside className="pe-dashboard-sidebar">
                     <ProjectDashboardRiskPanel projectStats={props.projectStats} riskSummary={props.riskSummary}/>
-
-                    <article className="pe-dashboard-panel">
-                        <div className="pe-dashboard-panel__header">
-                            <h3>快捷管理</h3>
-                            <span>核心视图</span>
-                        </div>
-                        <DashboardActionList items={dashboard.actionItems}/>
-                    </article>
                 </aside>
             </div>
         </section>

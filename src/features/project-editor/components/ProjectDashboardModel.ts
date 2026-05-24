@@ -45,7 +45,6 @@ export interface ProjectDashboardModel {
     categoryItems: DashboardBarItem[]
     tagTypeItems: DashboardBarItem[]
     kpiItems: DashboardKpiItem[]
-    actionItems: DashboardActionItem[]
     signalItems: DashboardSignalItem[]
 }
 
@@ -198,7 +197,22 @@ function getKpiItems(input: ProjectDashboardModelInput, model: {
     ]
 }
 
-function getActionItems(input: ProjectDashboardModelInput, relationCount: number): DashboardActionItem[] {
+export interface ProjectQuickActionInput {
+    mapCount?: number | null
+    riskSummary?: ProjectRiskSummary | null
+    projectStats?: ProjectStats | null
+    onOpenRelationGraph?: () => void
+    onOpenTimeline?: () => void
+    onOpenWorldMap?: () => void
+    onOpenContradiction?: () => void
+}
+
+export function buildProjectQuickActionItems(input: ProjectQuickActionInput): DashboardActionItem[] {
+    const relationCount = input.projectStats?.relationCount ?? 0
+    return getActionItems(input, relationCount)
+}
+
+function getActionItems(input: ProjectQuickActionInput, relationCount: number): DashboardActionItem[] {
     return [
         {
             key: 'relation',
@@ -277,7 +291,6 @@ export function buildProjectDashboardModel(input: ProjectDashboardModelInput): P
             createdLast7Days,
             updatedLast7Days,
         }),
-        actionItems: getActionItems(input, relationCount),
         signalItems: [
             {key: 'coverage', label: '分类覆盖', value: formatDashboardNumber(input.projectStats?.uncategorizedEntryCount), description: '未分类词条'},
             {key: 'content', label: '内容完整', value: formatDashboardNumber(input.projectStats?.emptyContentEntryCount), description: '空正文词条'},
