@@ -996,7 +996,7 @@
     background: var(--fc-color-bg-elevated);
     box-shadow: 0 -0.35rem 1.2rem color-mix(in srgb, var(--fc-color-bg) 24%, transparent);
     transform-origin: center bottom;
-    will-change: transform, opacity, clip-path;
+    will-change: transform, clip-path;
     z-index: 90;
 }
 
@@ -1011,13 +1011,11 @@
 
 @keyframes ai-conversation-settings-drawer-open {
     from {
-        opacity: 0;
         clip-path: inset(100% 0 0 0 round var(--fc-radius-lg));
-        transform: translateY(1.4rem) scaleY(0.96);
+        transform: translateY(0.35rem);
     }
 
     to {
-        opacity: 1;
         clip-path: inset(0 0 0 0 round var(--fc-radius-lg));
         transform: translateY(0);
     }
@@ -1025,15 +1023,13 @@
 
 @keyframes ai-conversation-settings-drawer-close {
     from {
-        opacity: 1;
         clip-path: inset(0 0 0 0 round var(--fc-radius-lg));
         transform: translateY(0);
     }
 
     to {
-        opacity: 0;
         clip-path: inset(100% 0 0 0 round var(--fc-radius-lg));
-        transform: translateY(1.4rem) scaleY(0.96);
+        transform: translateY(0.35rem);
     }
 }
 
