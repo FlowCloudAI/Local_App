@@ -82,6 +82,8 @@
     flex: 1;
     overflow-y: auto;
     padding: var(--dock-panel-list-padding);
+    scrollbar-width: thin;
+    scrollbar-color: var(--fc-color-scrollbar-thumb) transparent;
 }
 
 .ai-conversations-list::-webkit-scrollbar {
@@ -89,8 +91,12 @@
 }
 
 .ai-conversations-list::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.3);
-    border-radius: 2px;
+    background: var(--fc-color-scrollbar-thumb);
+    border-radius: var(--fc-radius-full);
+}
+
+.ai-conversations-list::-webkit-scrollbar-thumb:hover {
+    background: var(--fc-color-scrollbar-thumb-hover);
 }
 
 .ai-empty-history {
@@ -583,6 +589,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fc-color-scrollbar-thumb) transparent;
 }
 
 .ai-plugin-menu::-webkit-scrollbar {
@@ -590,8 +598,12 @@
 }
 
 .ai-plugin-menu::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.3);
-    border-radius: 2px;
+    background: var(--fc-color-scrollbar-thumb);
+    border-radius: var(--fc-radius-full);
+}
+
+.ai-plugin-menu::-webkit-scrollbar-thumb:hover {
+    background: var(--fc-color-scrollbar-thumb-hover);
 }
 
 .ai-plugin-menu-item {
@@ -1453,6 +1465,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--fc-color-scrollbar-thumb) transparent;
 }
 
 .ai-model-menu::-webkit-scrollbar {
@@ -1460,8 +1474,12 @@
 }
 
 .ai-model-menu::-webkit-scrollbar-thumb {
-    background: rgba(128, 128, 128, 0.3);
-    border-radius: 2px;
+    background: var(--fc-color-scrollbar-thumb);
+    border-radius: var(--fc-radius-full);
+}
+
+.ai-model-menu::-webkit-scrollbar-thumb:hover {
+    background: var(--fc-color-scrollbar-thumb-hover);
 }
 
 .ai-model-menu-item {

@@ -80,8 +80,8 @@
 }
 
 .project-timeline__event-strip {
-    --roll-thumb-hover: var(--fc-color-text-tertiary);
-    --roll-thumb-active: var(--fc-color-text-secondary);
+    --roll-thumb-hover: var(--fc-color-scrollbar-thumb-hover);
+    --roll-thumb-active: var(--fc-color-scrollbar-thumb-active);
     --roll-track: transparent;
     --roll-size: 0.5rem;
     width: 100%;

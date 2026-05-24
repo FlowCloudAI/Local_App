@@ -257,7 +257,7 @@ body {
 
 .is-tauri .fc-roll {
     scrollbar-width: auto;
-    scrollbar-color: auto;
+    scrollbar-color: var(--roll-thumb) var(--roll-track);
 }
 
 .is-tauri .fc-roll.fc-roll--size-thin::-webkit-scrollbar {
@@ -271,11 +271,11 @@ body {
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--roll-track);
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-thumb {
-    background-color: var(--fc-color-text-tertiary);
+    background-color: var(--roll-thumb);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
@@ -283,7 +283,7 @@ body {
 
 .is-tauri .fc-roll:hover::-webkit-scrollbar-thumb,
 .is-tauri .fc-roll.fc-roll--scrolling::-webkit-scrollbar-thumb {
-    background-color: var(--fc-color-text-secondary);
+    background-color: var(--roll-thumb);
 }
 
 .side-bar {
