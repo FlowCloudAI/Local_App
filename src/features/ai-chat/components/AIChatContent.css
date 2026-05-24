@@ -996,7 +996,7 @@
     background: var(--fc-color-bg-elevated);
     box-shadow: 0 -0.35rem 1.2rem color-mix(in srgb, var(--fc-color-bg) 24%, transparent);
     transform-origin: center bottom;
-    will-change: transform, clip-path;
+    will-change: transform;
     z-index: 90;
 }
 
@@ -1011,25 +1011,21 @@
 
 @keyframes ai-conversation-settings-drawer-open {
     from {
-        clip-path: inset(100% 0 0 0 round var(--fc-radius-lg));
-        transform: translateY(0.35rem);
+        transform: translateY(calc(100% - 0.35rem));
     }
 
     to {
-        clip-path: inset(0 0 0 0 round var(--fc-radius-lg));
         transform: translateY(0);
     }
 }
 
 @keyframes ai-conversation-settings-drawer-close {
     from {
-        clip-path: inset(0 0 0 0 round var(--fc-radius-lg));
         transform: translateY(0);
     }
 
     to {
-        clip-path: inset(100% 0 0 0 round var(--fc-radius-lg));
-        transform: translateY(0.35rem);
+        transform: translateY(calc(100% - 0.35rem));
     }
 }
 
