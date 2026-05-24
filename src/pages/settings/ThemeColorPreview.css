@@ -147,8 +147,20 @@
 .theme-color-preview__drawer-panel {
     display: flex;
     flex-direction: column;
-    gap: var(--fc-space-sm);
+    gap: var(--fc-space-md);
     padding: 0 var(--fc-space-md) var(--fc-space-md);
+}
+
+.theme-color-preview__drawer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-sm);
+}
+
+.theme-color-preview__custom-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--fc-space-sm);
 }
 
 .theme-color-preview__field {
@@ -188,7 +200,19 @@
     font-family: var(--fc-font-family);
 }
 
-.theme-color-preview__hex-input:focus {
+.theme-color-preview__number-input {
+    height: 2.5rem;
+    padding: 0 var(--fc-space-md);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    font: inherit;
+    font-family: var(--fc-font-family);
+}
+
+.theme-color-preview__hex-input:focus,
+.theme-color-preview__number-input:focus {
     outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
     outline-offset: 1px;
 }
