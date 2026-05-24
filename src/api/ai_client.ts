@@ -1,4 +1,5 @@
 import {command} from './base'
+import type {ApiError} from './error'
 import type {Entry, FCImage} from './worldflow'
 
 export type AiPluginKind = 'llm' | 'image' | 'tts'
@@ -213,7 +214,13 @@ export interface AiEventToolResult {
 export interface AiEventError {
   session_id: string
   run_id: string
-  error: string
+  /**
+   * 结构化错误对象。
+   *
+   * 兼容性：早期版本可能仍是字符串文案；前端读取时建议经过
+   * `toApiError` 规范化，避免后续切版本破坏。
+   */
+  error: ApiError
 }
 
 export interface ToolStatus {

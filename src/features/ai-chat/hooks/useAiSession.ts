@@ -25,6 +25,8 @@ import {
     type CharacterChatProjectSnapshot,
     type ConversationNode,
     type StoredConversationSettings,
+    formatApiError,
+    toApiError,
 } from '../../../api'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
 
@@ -548,12 +550,15 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
 
         const unlistenError = listen<AiEventError>('ai:error', event => {
             markRunEvent('ai:error', event.payload.run_id)
+            const err = toApiError(event.payload.error)
             logger.error('[useAiSession] ai:error event', {
-                payload: event.payload,
+                code: err.code,
+                message: err.message,
+                detail: err.detail,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
             })
-            onErrorRef.current(`AI 错误: ${event.payload.error}`)
+            onErrorRef.current(`AI 错误: ${formatApiError(err)}`)
             queueMicrotask(() => {
                 delete blocksByRunRef.current[event.payload.run_id]
                 setRunStreaming(event.payload.run_id, false)

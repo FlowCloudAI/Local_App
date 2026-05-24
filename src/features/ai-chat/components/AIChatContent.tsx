@@ -14,8 +14,10 @@ import {
     type EntryBrief,
     type PluginInfo,
     type ConversationExportFormat,
+    formatApiError,
     setting_get_settings,
     setting_has_api_key,
+    toApiError,
 } from '../../../api'
 import type {AiContextValue, Conversation, ConversationSettings} from '../model/AiControllerTypes'
 import {normalizeConversationSettings} from '../model/AiControllerTypes'
@@ -837,7 +839,7 @@ export default function AIChatContent({
             await ai_export_conversation(conversation.id, selectedPath, format)
             await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'nonInvasive', 1000)
         } catch (error) {
-            await showAlert(`导出会话失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`导出会话失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
         }
     }, [showAlert])
 
@@ -864,7 +866,7 @@ export default function AIChatContent({
                 ai_list_plugins('tts'),
             ])
         } catch (error) {
-            await showAlert(`读取语音设置失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`读取语音设置失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
             return
         }
 
@@ -884,7 +886,7 @@ export default function AIChatContent({
         try {
             hasApiKey = await setting_has_api_key(selectedPlugin.id)
         } catch (error) {
-            await showAlert(`读取语音插件密钥状态失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`读取语音插件密钥状态失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
             return
         }
 
@@ -917,7 +919,7 @@ export default function AIChatContent({
                 voiceId,
             })
         } catch (error) {
-            await showAlert(`语音播放失败：${String(error)}`, 'error', 'toast', 2800)
+            await showAlert(`语音播放失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2800)
         }
     }, [showAlert])
 
