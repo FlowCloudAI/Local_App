@@ -86,6 +86,33 @@ const buildSessionUpdateParams = (
     presencePenalty: settings.presencePenaltyEnabled ? settings.presencePenalty : 0,
 })
 
+const createDraftConversation = (pluginId: string, model: string): Conversation => ({
+    id: `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title: '新对话',
+    messages: [],
+    pluginId,
+    model,
+    sessionId: null,
+    runId: null,
+    timestamp: Date.now(),
+    pinnedAt: null,
+    archivedAt: null,
+    mode: 'default',
+    characterEntryId: null,
+    characterName: null,
+    backgroundImageUrl: null,
+    characterVoiceId: null,
+    characterAutoPlay: null,
+    reportContext: null,
+    reportSeeded: false,
+    settings: normalizeConversationSettings(),
+})
+
+const isEmptyDraftConversation = (conversation: Conversation) =>
+    conversation.id.startsWith('conv_')
+    && conversation.messages.length === 0
+    && (!conversation.mode || conversation.mode === 'default')
+
 interface StoredCharacterConversationMeta {
     mode?: 'character' | 'report' | null
     characterEntryId: string | null
@@ -937,6 +964,43 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [selectedPlugin, plugins]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
+        if (!conversationMetaLoaded || !pluginsReady || !selectedPlugin || !selectedModel) return
+        if (activeConversationIdRef.current) return
+
+        const existingDraft = conversationsRef.current.find(isEmptyDraftConversation)
+        if (existingDraft) {
+            setConversations((prev) => prev.map((conversation) =>
+                conversation.id === existingDraft.id
+                    ? {...conversation, pluginId: selectedPlugin, model: selectedModel}
+                    : conversation,
+            ))
+            setActiveConversationId(existingDraft.id)
+            activeConversationIdRef.current = existingDraft.id
+            session.activateSession(null, null)
+            return
+        }
+
+        const draft = createDraftConversation(selectedPlugin, selectedModel)
+        setConversations((prev) => [draft, ...prev])
+        setActiveConversationId(draft.id)
+        activeConversationIdRef.current = draft.id
+        session.activateSession(null, null)
+    }, [conversationMetaLoaded, pluginsReady, selectedModel, selectedPlugin, session])
+
+    useEffect(() => {
+        if (!activeConversationId?.startsWith('conv_') || !selectedPlugin || !selectedModel) return
+        setConversations((prev) => prev.map((conversation) => {
+            if (conversation.id !== activeConversationId || !isEmptyDraftConversation(conversation)) {
+                return conversation
+            }
+            if (conversation.pluginId === selectedPlugin && conversation.model === selectedModel) {
+                return conversation
+            }
+            return {...conversation, pluginId: selectedPlugin, model: selectedModel}
+        }))
+    }, [activeConversationId, selectedModel, selectedPlugin])
+
+    useEffect(() => {
         if (!session.sessionId) return
         const settings = activeConversationRef.current?.settings ?? DEFAULT_CONVERSATION_SETTINGS
         void ai_update_session(
@@ -946,13 +1010,28 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [activeConversation?.settings, sessionParams, session.sessionId])
 
     const createNewConversation = useCallback(async () => {
+        if (!selectedPlugin || !selectedModel) {
+            session.activateSession(null, null)
+            setActiveConversationId(null)
+            activeConversationIdRef.current = null
+            setInputValue('')
+            setEditingMessageId(null)
+            setAutoScroll(true)
+            return
+        }
+
+        const draft = createDraftConversation(selectedPlugin, selectedModel)
         session.activateSession(null, null)
-        setActiveConversationId(null)
-        activeConversationIdRef.current = null
+        setConversations((prev) => [
+            draft,
+            ...prev.filter((conversation) => !isEmptyDraftConversation(conversation)),
+        ])
+        setActiveConversationId(draft.id)
+        activeConversationIdRef.current = draft.id
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
-    }, [session])
+    }, [selectedModel, selectedPlugin, session])
 
     const startReportDiscussion = useCallback(async ({
                                                          title,
@@ -1267,27 +1346,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
         })
         if (activeConv?.runId && session.isRunStreaming(activeConv.runId)) return
 
-        const draftConversation: Conversation | null = activeConv ? null : {
-            id: `conv_${Date.now()}`,
-            title: '新对话',
-            messages: [],
-            pluginId: selectedPlugin,
-            model: selectedModel,
-            sessionId: null,
-            runId: null,
-            timestamp: Date.now(),
-            pinnedAt: null,
-            archivedAt: null,
-            mode: 'default',
-            characterEntryId: null,
-            characterName: null,
-            backgroundImageUrl: null,
-            characterVoiceId: null,
-            characterAutoPlay: null,
-            reportContext: null,
-            reportSeeded: false,
-            settings: normalizeConversationSettings(),
-        }
+        const draftConversation: Conversation | null = activeConv
+            ? null
+            : createDraftConversation(selectedPlugin, selectedModel)
         const currentConv = activeConv ?? draftConversation
         if (!currentConv) return
         const currentConvId = currentConv.id
