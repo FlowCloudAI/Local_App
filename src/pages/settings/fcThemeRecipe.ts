@@ -10,7 +10,7 @@ import {normalizeHexColor, type MaterialToneSwatch} from './materialThemePreview
 const MATERIAL_THEME_TONES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 97, 99, 100] as const
 
 type FcThemeLightProfile = 'default' | 'soft' | 'warm'
-type FcThemePaletteKey = 'primary' | 'neutral' | 'neutralVariant'
+type FcThemePaletteKey = 'primary' | 'primarySurface' | 'neutral' | 'neutralVariant'
 type MaterialThemeTone = typeof MATERIAL_THEME_TONES[number]
 
 export interface FcThemeRecipe {
@@ -18,6 +18,7 @@ export interface FcThemeRecipe {
     label: string
     description: string
     primarySeed: string
+    primarySurfaceChroma: number
     neutralSeed: string
     neutralChroma: number
     neutralVariantChroma: number
@@ -114,6 +115,7 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         label: '流云',
         description: '干净微暖的默认蓝调。',
         primarySeed: '#378ADD',
+        primarySurfaceChroma: 8,
         neutralSeed: '#F7F4EE',
         neutralChroma: 3.5,
         neutralVariantChroma: 7,
@@ -124,6 +126,7 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         label: '紫藤',
         description: '冷灰紫背景，适合夜间整理设定。',
         primarySeed: '#7C5CE8',
+        primarySurfaceChroma: 8,
         neutralSeed: '#F1EDF7',
         neutralChroma: 5,
         neutralVariantChroma: 10,
@@ -134,6 +137,7 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         label: '青松',
         description: '低饱和青灰，稳定、安静。',
         primarySeed: '#2E7D63',
+        primarySurfaceChroma: 5,
         neutralSeed: '#EEF5F1',
         neutralChroma: 5,
         neutralVariantChroma: 11,
@@ -144,6 +148,7 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         label: '晚霞',
         description: '温暖橙红，适合轻松构思。',
         primarySeed: '#D86B47',
+        primarySurfaceChroma: 9,
         neutralSeed: '#F8EFE8',
         neutralChroma: 6,
         neutralVariantChroma: 12,
@@ -154,6 +159,7 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         label: '琥珀',
         description: '纸张感更强的暖黄棕。',
         primarySeed: '#B7791F',
+        primarySurfaceChroma: 8,
         neutralSeed: '#F5EBD6',
         neutralChroma: 7,
         neutralVariantChroma: 13,
@@ -164,6 +170,7 @@ export const FC_THEME_RECIPES: FcThemeRecipe[] = [
         label: '墨蓝',
         description: '更专注的深蓝灰底色。',
         primarySeed: '#35618F',
+        primarySurfaceChroma: 7,
         neutralSeed: '#EEF2F6',
         neutralChroma: 4,
         neutralVariantChroma: 9,
@@ -175,20 +182,20 @@ const FC_THEME_TOKEN_RULES: FcThemeTokenRule[] = [
     {token: '--fc-color-primary', label: '主色', group: '主色', palette: 'primary', lightTone: 50, darkTone: 70},
     {token: '--fc-color-primary-hover', label: '悬停', group: '主色', palette: 'primary', lightTone: 40, darkTone: 80},
     {token: '--fc-color-primary-active', label: '按下', group: '主色', palette: 'primary', lightTone: 30, darkTone: 90},
-    {token: '--fc-color-primary-subtle', label: '弱背景', group: '主色', palette: 'primary', lightToneKey: 'primarySubtle', darkTone: 70, darkAlpha: 12},
+    {token: '--fc-color-primary-subtle', label: '弱背景', group: '主色', palette: 'primary', lightPalette: 'primarySurface', lightToneKey: 'primarySubtle', darkTone: 70, darkAlpha: 12},
     {token: '--fc-color-border-focus', label: '焦点边框', group: '主色', palette: 'primary', lightTone: 50, darkTone: 60},
     {token: '--fc-color-text-link', label: '链接', group: '主色', palette: 'primary', lightTone: 40, darkTone: 70},
     {token: '--fc-color-text-link-hover', label: '链接悬停', group: '主色', palette: 'primary', lightTone: 30, darkTone: 80},
     {token: '--fc-color-text-on-primary', label: '主色上文字', group: '主色', kind: 'onPrimary'},
 
-    {token: '--fc-color-bg', label: '页面背景', group: '背景', palette: 'neutral', lightPalette: 'primary', lightToneKey: 'bg', darkTone: 10},
-    {token: '--fc-color-bg-secondary', label: '工作台背景', group: '背景', palette: 'neutral', lightPalette: 'primary', lightToneKey: 'bgSecondary', darkTone: 20},
-    {token: '--fc-color-bg-tertiary', label: '悬停背景', group: '背景', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'bgTertiary', darkTone: 20},
-    {token: '--fc-color-bg-elevated', label: '浮层背景', group: '背景', palette: 'neutral', lightPalette: 'primary', lightToneKey: 'bgElevated', darkTone: 30},
+    {token: '--fc-color-bg', label: '页面背景', group: '背景', palette: 'neutral', lightPalette: 'primarySurface', lightToneKey: 'bg', darkTone: 10},
+    {token: '--fc-color-bg-secondary', label: '工作台背景', group: '背景', palette: 'neutral', lightPalette: 'primarySurface', lightToneKey: 'bgSecondary', darkTone: 20},
+    {token: '--fc-color-bg-tertiary', label: '悬停背景', group: '背景', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'bgTertiary', darkTone: 20},
+    {token: '--fc-color-bg-elevated', label: '浮层背景', group: '背景', palette: 'neutral', lightPalette: 'primarySurface', lightToneKey: 'bgElevated', darkTone: 30},
 
-    {token: '--fc-color-border', label: '边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'border', darkTone: 30},
-    {token: '--fc-color-border-light', label: '浅边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'borderLight', darkTone: 20},
-    {token: '--fc-color-border-hover', label: '边框悬停', group: '边框', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'borderHover', darkTone: 50},
+    {token: '--fc-color-border', label: '边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'border', darkTone: 30},
+    {token: '--fc-color-border-light', label: '浅边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'borderLight', darkTone: 20},
+    {token: '--fc-color-border-hover', label: '边框悬停', group: '边框', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'borderHover', darkTone: 50},
 
     {token: '--fc-color-text', label: '正文', group: '文字', palette: 'neutral', lightTone: 10, darkTone: 90},
     {token: '--fc-color-text-secondary', label: '次级文字', group: '文字', palette: 'neutral', lightTone: 40, darkTone: 70},
@@ -209,7 +216,9 @@ export function createFcThemePreview(
     if (!primarySeed || !neutralSeed) return null
 
     const primaryTheme = themeFromSourceColor(argbFromHex(primarySeed))
+    const primaryHct = Hct.fromInt(argbFromHex(primarySeed))
     const neutralHct = Hct.fromInt(argbFromHex(neutralSeed))
+    const primarySurfacePalette = TonalPalette.fromHueAndChroma(primaryHct.hue, recipe.primarySurfaceChroma)
     const neutralPalette = TonalPalette.fromHueAndChroma(neutralHct.hue, recipe.neutralChroma)
     const neutralVariantPalette = TonalPalette.fromHueAndChroma(neutralHct.hue, recipe.neutralVariantChroma)
     const primaryPalette = primaryTheme.palettes.primary
@@ -225,6 +234,7 @@ export function createFcThemePreview(
         neutralVariantTones,
         tokens: FC_THEME_TOKEN_RULES.map((rule) => createTokenPreview(rule, recipe.lightProfile, {
             primary: primaryPalette,
+            primarySurface: primarySurfacePalette,
             neutral: neutralPalette,
             neutralVariant: neutralVariantPalette,
         })),
@@ -328,6 +338,7 @@ function isMaterialThemeTone(tone: number): tone is MaterialThemeTone {
 
 function formatPaletteLabel(palette: FcThemePaletteKey): string {
     if (palette === 'primary') return '主色'
+    if (palette === 'primarySurface') return '主色柔面'
     if (palette === 'neutralVariant') return '中性变体'
     return '中性'
 }
