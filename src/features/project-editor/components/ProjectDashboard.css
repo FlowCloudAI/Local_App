@@ -39,8 +39,21 @@
 }
 
 .pe-dashboard-status-strip {
-    grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
+}
+
+.pe-dashboard-status-strip__kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.6rem, 1fr));
+    gap: var(--fc-space-md);
+    min-width: 0;
+}
+
+@container (min-width: 640px) {
+    .pe-dashboard-status-strip {
+        grid-template-columns: minmax(15rem, 22rem) minmax(0, 1fr);
+    }
 }
 
 .pe-dashboard-layout {
@@ -134,7 +147,6 @@
 }
 
 .pe-dashboard-kpi--health {
-    grid-column: span 2;
     padding: var(--fc-space-md);
 }
 
