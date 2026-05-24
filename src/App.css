@@ -257,17 +257,7 @@ body {
 
 .is-tauri .fc-roll {
     scrollbar-width: auto;
-    scrollbar-color: var(--roll-thumb) var(--roll-track);
-}
-
-.is-tauri .fc-roll.fc-roll--size-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-.is-tauri .fc-roll.fc-roll--size-thick::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    scrollbar-color: auto;
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-track {
