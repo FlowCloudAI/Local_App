@@ -447,6 +447,7 @@ pub fn run() {
             setting_get_media_dir,
             setting_get_default_paths,
             setting_open_backup_dir,
+            setting_export_theme_config,
             setting_is_backend_ready,
             setting_set_api_key,
             setting_has_api_key,

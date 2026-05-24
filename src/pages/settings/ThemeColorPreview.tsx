@@ -1,5 +1,7 @@
 import {useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties} from 'react'
 import {Button} from 'flowcloudai-ui'
+import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {setting_export_theme_config} from '../../api'
 import {
     applyFcThemeTokenOverride,
     clearFcThemeTokenOverride,
@@ -20,7 +22,7 @@ import {
     type FcThemeTokenColorValue,
     type FcThemeTokenColorValues,
 } from './fcThemeRecipe'
-import {isValidHexColor, normalizeHexColor} from './materialThemePreview'
+import {normalizeHexColor} from './materialThemePreview'
 import ThemeTokenColorEditor, {type TokenColorMode} from './ThemeTokenColorEditor'
 import './ThemeColorPreview.css'
 
@@ -44,6 +46,7 @@ interface ThemeConfigFile {
 }
 
 const THEME_CONFIG_VERSION = 3
+const PRIMARY_TOKEN = '--fc-color-primary'
 
 export default function ThemeColorPreview() {
     const defaultRecipe = getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID)
@@ -61,10 +64,7 @@ export default function ThemeColorPreview() {
         createCustomFcThemeRecipe(selectedRecipe, themeValues)
     ), [selectedRecipe, themeValues])
     const fcPreview = useMemo(() => createFcThemePreview(customRecipe), [customRecipe])
-    const normalizedPrimary = normalizeHexColor(themeValues.primarySeed)
-    const normalizedNeutral = normalizeHexColor(themeValues.neutralSeed)
-    const primaryValid = isValidHexColor(themeValues.primarySeed)
-    const neutralValid = isValidHexColor(themeValues.neutralSeed)
+    const currentPrimaryColor = getPrimaryTokenColor(tokenColors, themeValues.primarySeed)
     const defaultTokenColors = createTokenColors(defaultRecipe, defaultValues)
     const isDefaultTheme = recipeId === DEFAULT_FC_THEME_RECIPE_ID
         && sameThemeValues(themeValues, defaultValues)
@@ -92,14 +92,6 @@ export default function ThemeColorPreview() {
         selectRecipe(DEFAULT_FC_THEME_RECIPE_ID)
     }
 
-    const updateThemeValue = <Key extends keyof FcThemeCustomValues>(
-        key: Key,
-        value: FcThemeCustomValues[Key],
-    ) => {
-        setThemeValues((current) => ({...current, [key]: value}))
-        setConfigMessage(null)
-    }
-
     const updateTokenColor = (token: string, mode: TokenColorMode, color: string) => {
         const normalized = normalizeHexColor(color)
         if (!normalized) return
@@ -119,7 +111,7 @@ export default function ThemeColorPreview() {
     }
 
     const generateFromPrimary = () => {
-        const generated = generateFcThemeCustomValues(themeValues.primarySeed, selectedRecipe)
+        const generated = generateFcThemeCustomValues(currentPrimaryColor, selectedRecipe)
         if (!generated) {
             setConfigMessage('请先输入有效的主题色。')
             return
@@ -129,8 +121,11 @@ export default function ThemeColorPreview() {
         setConfigMessage('已根据主题色生成全部令牌颜色，可继续逐项微调。')
     }
 
-    const exportThemeConfig = () => {
-        const customValues = normalizeThemeValues(themeValues)
+    const exportThemeConfig = async () => {
+        const customValues = normalizeThemeValues({
+            ...themeValues,
+            primarySeed: currentPrimaryColor,
+        })
         if (!customValues || !fcPreview) {
             setConfigMessage('请先修正颜色后再导出。')
             return
@@ -145,16 +140,20 @@ export default function ThemeColorPreview() {
             tokenColors: normalizedTokenColors,
             exportedAt: new Date().toISOString(),
         }
-        const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'})
-        const url = URL.createObjectURL(blob)
-        const anchor = document.createElement('a')
-        anchor.href = url
-        anchor.download = `flowcloudai-theme-${selectedRecipe.id}.json`
-        document.body.appendChild(anchor)
-        anchor.click()
-        anchor.remove()
-        window.setTimeout(() => URL.revokeObjectURL(url), 0)
-        setConfigMessage('主题配置已导出。')
+        try {
+            const selectedPath = await saveFileDialog({
+                defaultPath: buildThemeConfigFileName(selectedRecipe.id),
+                filters: [{
+                    name: 'FlowCloudAI 主题配置',
+                    extensions: ['json'],
+                }],
+            })
+            if (!selectedPath) return
+            await setting_export_theme_config(selectedPath, JSON.stringify(config, null, 2))
+            setConfigMessage('主题配置已导出。')
+        } catch (error) {
+            setConfigMessage(`主题配置导出失败：${formatErrorMessage(error)}`)
+        }
     }
 
     const importThemeConfig = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -224,7 +223,7 @@ export default function ThemeColorPreview() {
                 >
                     <span>
                         <strong>自定义颜色与配置</strong>
-                        <small>{selectedRecipe.label} / {normalizedPrimary ?? themeValues.primarySeed}</small>
+                        <small>{selectedRecipe.label} / {currentPrimaryColor}</small>
                     </span>
                     <span aria-hidden="true">{customOpen ? '收起' : '展开'}</span>
                 </button>
@@ -244,50 +243,18 @@ export default function ThemeColorPreview() {
                             <Button type="button" size="sm" variant="outline" onClick={() => importInputRef.current?.click()}>
                                 导入配置
                             </Button>
-                            <Button type="button" size="sm" variant="outline" disabled={!fcPreview} onClick={exportThemeConfig}>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={!fcPreview}
+                                onClick={() => {
+                                    void exportThemeConfig()
+                                }}
+                            >
                                 导出配置
                             </Button>
                         </div>
-                        <div className="theme-color-preview__custom-grid">
-                            <ThemeColorField
-                                label="主题色"
-                                value={themeValues.primarySeed}
-                                inputValue={normalizedPrimary ?? selectedRecipe.primarySeed}
-                                valid={primaryValid}
-                                onChange={(value) => updateThemeValue('primarySeed', value)}
-                            />
-                            <ThemeColorField
-                                label="背景基准色"
-                                value={themeValues.neutralSeed}
-                                inputValue={normalizedNeutral ?? selectedRecipe.neutralSeed}
-                                valid={neutralValid}
-                                onChange={(value) => updateThemeValue('neutralSeed', value)}
-                            />
-                            <ThemeNumberField
-                                label="色面浓度"
-                                value={themeValues.primarySurfaceChroma}
-                                min={0}
-                                max={24}
-                                onChange={(value) => updateThemeValue('primarySurfaceChroma', value)}
-                            />
-                            <ThemeNumberField
-                                label="背景浓度"
-                                value={themeValues.neutralChroma}
-                                min={0}
-                                max={16}
-                                onChange={(value) => updateThemeValue('neutralChroma', value)}
-                            />
-                            <ThemeNumberField
-                                label="边框浓度"
-                                value={themeValues.neutralVariantChroma}
-                                min={0}
-                                max={24}
-                                onChange={(value) => updateThemeValue('neutralVariantChroma', value)}
-                            />
-                        </div>
-                        {(!primaryValid || !neutralValid) && (
-                            <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>
-                        )}
                         {fcPreview && (
                             <ThemeTokenColorEditor
                                 tokens={fcPreview.tokens}
@@ -330,70 +297,6 @@ function ThemePresetCard({
                 <span className="theme-color-preview__preset-swatch theme-color-preview__preset-swatch--primary"/>
             </span>
         </button>
-    )
-}
-
-function ThemeColorField({
-    label,
-    value,
-    inputValue,
-    valid,
-    onChange,
-}: {
-    label: string
-    value: string
-    inputValue: string
-    valid: boolean
-    onChange: (value: string) => void
-}) {
-    return (
-        <label className="theme-color-preview__field">
-            <span>{label}</span>
-            <span className="theme-color-preview__color-control">
-                <input
-                    className="theme-color-preview__color-input"
-                    type="color"
-                    value={inputValue}
-                    onChange={(event) => onChange(event.target.value)}
-                />
-                <input
-                    className={`theme-color-preview__hex-input ${valid ? '' : 'theme-color-preview__hex-input--invalid'}`}
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    spellCheck={false}
-                    aria-invalid={!valid}
-                />
-            </span>
-        </label>
-    )
-}
-
-function ThemeNumberField({
-    label,
-    value,
-    min,
-    max,
-    onChange,
-}: {
-    label: string
-    value: number
-    min: number
-    max: number
-    onChange: (value: number) => void
-}) {
-    return (
-        <label className="theme-color-preview__field">
-            <span>{label}</span>
-            <input
-                className="theme-color-preview__number-input"
-                type="number"
-                min={min}
-                max={max}
-                step={1}
-                value={value}
-                onChange={(event) => onChange(clampNumber(Number(event.target.value), min, max))}
-            />
-        </label>
     )
 }
 
@@ -509,6 +412,20 @@ function createTokenColors(recipe: FcThemeRecipe, values: FcThemeCustomValues): 
 
 function createPreviewForValues(recipe: FcThemeRecipe, values: FcThemeCustomValues): FcThemePreview | null {
     return createFcThemePreview(createCustomFcThemeRecipe(recipe, values))
+}
+
+function getPrimaryTokenColor(tokenColors: FcThemeTokenColorValues, fallback: string): string {
+    return normalizeHexColor(tokenColors[PRIMARY_TOKEN]?.light.hex)
+        ?? normalizeHexColor(fallback)
+        ?? '#4B78FF'
+}
+
+function buildThemeConfigFileName(recipeId: string): string {
+    return `flowcloudai-theme-${recipeId}.json`
+}
+
+function formatErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
 }
 
 function normalizeChroma(value: unknown, fallback: number, min: number, max: number): number {

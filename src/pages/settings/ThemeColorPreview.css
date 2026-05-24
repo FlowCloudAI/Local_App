@@ -157,71 +157,6 @@
     gap: var(--fc-space-sm);
 }
 
-.theme-color-preview__custom-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    gap: var(--fc-space-sm);
-}
-
-.theme-color-preview__field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fc-space-xs);
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-}
-
-.theme-color-preview__color-control {
-    display: flex;
-    align-items: center;
-    gap: var(--fc-space-sm);
-}
-
-.theme-color-preview__color-input {
-    width: 2.5rem;
-    height: 2.5rem;
-    padding: 0.125rem;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg);
-    cursor: pointer;
-}
-
-.theme-color-preview__hex-input {
-    min-width: 0;
-    flex: 1;
-    height: 2.5rem;
-    padding: 0 var(--fc-space-md);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg);
-    color: var(--fc-color-text);
-    font: inherit;
-    font-family: var(--fc-font-family);
-}
-
-.theme-color-preview__number-input {
-    height: 2.5rem;
-    padding: 0 var(--fc-space-md);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg);
-    color: var(--fc-color-text);
-    font: inherit;
-    font-family: var(--fc-font-family);
-}
-
-.theme-color-preview__hex-input:focus,
-.theme-color-preview__number-input:focus {
-    outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
-    outline-offset: 1px;
-}
-
-.theme-color-preview__hex-input--invalid {
-    border-color: var(--fc-color-danger);
-    background: var(--fc-color-danger-bg);
-}
-
 .theme-color-preview__token-editor {
     display: flex;
     flex-direction: column;
@@ -317,17 +252,10 @@
     outline-offset: 1px;
 }
 
-.theme-color-preview__invalid,
 .theme-color-preview__config-message {
     padding: var(--fc-space-sm) var(--fc-space-md);
     border-radius: var(--fc-radius-md);
     font-size: var(--fc-font-size-sm);
-}
-
-.theme-color-preview__invalid {
-    border: 1px solid var(--fc-color-danger-border);
-    background: var(--fc-color-danger-bg);
-    color: var(--fc-color-danger);
 }
 
 .theme-color-preview__config-message {

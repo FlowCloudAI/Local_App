@@ -78,6 +78,9 @@ export const setting_get_default_paths = () =>
 export const setting_open_backup_dir = (path: string) =>
   command<void>('setting_open_backup_dir', { path })
 
+export const setting_export_theme_config = (path: string, content: string) =>
+  command<void>('setting_export_theme_config', { path, content })
+
 export const setting_is_backend_ready = () =>
     command<boolean>('setting_is_backend_ready')
 
