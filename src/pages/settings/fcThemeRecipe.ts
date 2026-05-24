@@ -25,6 +25,14 @@ export interface FcThemeRecipe {
     lightProfile: FcThemeLightProfile
 }
 
+export interface FcThemeCustomValues {
+    primarySeed: string
+    primarySurfaceChroma: number
+    neutralSeed: string
+    neutralChroma: number
+    neutralVariantChroma: number
+}
+
 export interface FcThemeTokenValue {
     label: string
     value: string
@@ -207,6 +215,58 @@ export function getFcThemeRecipe(id: string): FcThemeRecipe {
     return FC_THEME_RECIPES.find((recipe) => recipe.id === id) ?? FC_THEME_RECIPES[0]
 }
 
+export function getFcThemeCustomValues(recipe: FcThemeRecipe): FcThemeCustomValues {
+    return {
+        primarySeed: recipe.primarySeed,
+        primarySurfaceChroma: recipe.primarySurfaceChroma,
+        neutralSeed: recipe.neutralSeed,
+        neutralChroma: recipe.neutralChroma,
+        neutralVariantChroma: recipe.neutralVariantChroma,
+    }
+}
+
+export function createCustomFcThemeRecipe(
+    recipe: FcThemeRecipe,
+    values: FcThemeCustomValues,
+): FcThemeRecipe {
+    return {
+        ...recipe,
+        primarySeed: values.primarySeed,
+        primarySurfaceChroma: values.primarySurfaceChroma,
+        neutralSeed: values.neutralSeed,
+        neutralChroma: values.neutralChroma,
+        neutralVariantChroma: values.neutralVariantChroma,
+    }
+}
+
+export function generateFcThemeCustomValues(
+    primarySeed: string,
+    baseRecipe: FcThemeRecipe,
+): FcThemeCustomValues | null {
+    const normalizedPrimary = normalizeHexColor(primarySeed)
+    if (!normalizedPrimary) return null
+
+    const primaryHct = Hct.fromInt(argbFromHex(normalizedPrimary))
+    const neutralChroma = baseRecipe.lightProfile === 'warm'
+        ? clampNumber(Math.round(primaryHct.chroma * 0.12), 5, 8)
+        : clampNumber(Math.round(primaryHct.chroma * 0.1), 4, 7)
+    const primarySurfaceChroma = clampNumber(Math.round(primaryHct.chroma * 0.22), 8, 14)
+    const neutralVariantChroma = clampNumber(primarySurfaceChroma + 3, 9, 18)
+    const neutralTone = baseRecipe.lightProfile === 'warm' ? 96 : 97
+    const neutralSeed = getToneHex(
+        TonalPalette.fromHueAndChroma(primaryHct.hue, neutralChroma),
+        neutralTone,
+    )
+
+    return {
+        primarySeed: normalizedPrimary,
+        primarySurfaceChroma,
+        neutralSeed,
+        neutralChroma,
+        neutralVariantChroma,
+    }
+}
+
 export function createFcThemePreview(
     recipe: FcThemeRecipe,
     primarySeedOverride?: string,
@@ -334,6 +394,10 @@ function normalizeThemeTone(tone: number): MaterialThemeTone {
 
 function isMaterialThemeTone(tone: number): tone is MaterialThemeTone {
     return MATERIAL_THEME_TONES.some((item) => item === tone)
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value))
 }
 
 function formatPaletteLabel(palette: FcThemePaletteKey): string {
