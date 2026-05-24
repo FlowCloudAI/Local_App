@@ -1,6 +1,5 @@
 import {useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties} from 'react'
 import {Button} from 'flowcloudai-ui'
-import FcPrimaryToneGuide from './FcPrimaryToneGuide'
 import {
     applyFcThemeTokenOverride,
     clearFcThemeTokenOverride,
@@ -8,43 +7,53 @@ import {
 import {
     createCustomFcThemeRecipe,
     createFcThemePreview,
+    createFcThemeTokenColorValues,
     DEFAULT_FC_THEME_RECIPE_ID,
     FC_THEME_RECIPES,
     generateFcThemeCustomValues,
     getFcThemeCustomValues,
     getFcThemeRecipe,
     type FcThemeCustomValues,
+    type FcThemePreview,
     type FcThemeRecipe,
+    type FcThemeTokenColorPair,
+    type FcThemeTokenColorValue,
+    type FcThemeTokenColorValues,
 } from './fcThemeRecipe'
-import {
-    isValidHexColor,
-    normalizeHexColor,
-} from './materialThemePreview'
+import {isValidHexColor, normalizeHexColor} from './materialThemePreview'
+import ThemeTokenColorEditor from './ThemeTokenColorEditor'
 import './ThemeColorPreview.css'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
+type TokenColorMode = 'light' | 'dark'
 
 interface ParsedThemeConfig {
     recipeId: string
     customValues?: FcThemeCustomValues
     primarySeed?: string
+    tokenColors?: FcThemeTokenColorValues
 }
 
 interface ThemeConfigFile {
     app: 'flowcloudai'
     type: 'theme'
-    version: 2
+    version: 3
     recipeId: string
     customValues: FcThemeCustomValues
+    tokenColors: FcThemeTokenColorValues
     exportedAt: string
 }
 
-const THEME_CONFIG_VERSION = 2
+const THEME_CONFIG_VERSION = 3
 
 export default function ThemeColorPreview() {
     const defaultRecipe = getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID)
+    const defaultValues = getFcThemeCustomValues(defaultRecipe)
     const [recipeId, setRecipeId] = useState(defaultRecipe.id)
-    const [themeValues, setThemeValues] = useState<FcThemeCustomValues>(() => getFcThemeCustomValues(defaultRecipe))
+    const [themeValues, setThemeValues] = useState<FcThemeCustomValues>(() => defaultValues)
+    const [tokenColors, setTokenColors] = useState<FcThemeTokenColorValues>(() => (
+        createTokenColors(defaultRecipe, defaultValues)
+    ))
     const [customOpen, setCustomOpen] = useState(false)
     const [configMessage, setConfigMessage] = useState<string | null>(null)
     const importInputRef = useRef<HTMLInputElement>(null)
@@ -57,21 +66,25 @@ export default function ThemeColorPreview() {
     const normalizedNeutral = normalizeHexColor(themeValues.neutralSeed)
     const primaryValid = isValidHexColor(themeValues.primarySeed)
     const neutralValid = isValidHexColor(themeValues.neutralSeed)
-    const defaultValues = getFcThemeCustomValues(defaultRecipe)
-    const isDefaultTheme = recipeId === DEFAULT_FC_THEME_RECIPE_ID && sameThemeValues(themeValues, defaultValues)
+    const defaultTokenColors = createTokenColors(defaultRecipe, defaultValues)
+    const isDefaultTheme = recipeId === DEFAULT_FC_THEME_RECIPE_ID
+        && sameThemeValues(themeValues, defaultValues)
+        && sameTokenColors(tokenColors, defaultTokenColors)
 
     useEffect(() => {
         if (isDefaultTheme || !fcPreview) {
             clearFcThemeTokenOverride()
             return
         }
-        applyFcThemeTokenOverride(fcPreview)
-    }, [fcPreview, isDefaultTheme])
+        applyFcThemeTokenOverride(fcPreview, tokenColors)
+    }, [fcPreview, isDefaultTheme, tokenColors])
 
     const selectRecipe = (nextRecipeId: string) => {
         const nextRecipe = getFcThemeRecipe(nextRecipeId)
+        const nextValues = getFcThemeCustomValues(nextRecipe)
         setRecipeId(nextRecipe.id)
-        setThemeValues(getFcThemeCustomValues(nextRecipe))
+        setThemeValues(nextValues)
+        setTokenColors(createTokenColors(nextRecipe, nextValues))
         setConfigMessage(null)
     }
 
@@ -88,6 +101,22 @@ export default function ThemeColorPreview() {
         setConfigMessage(null)
     }
 
+    const updateTokenColor = (token: string, mode: TokenColorMode, color: string) => {
+        const normalized = normalizeHexColor(color)
+        if (!normalized) return
+        setTokenColors((current) => ({
+            ...current,
+            [token]: {
+                ...current[token],
+                [mode]: {
+                    hex: normalized,
+                    css: normalized,
+                },
+            },
+        }))
+        setConfigMessage(null)
+    }
+
     const generateFromPrimary = () => {
         const generated = generateFcThemeCustomValues(themeValues.primarySeed, selectedRecipe)
         if (!generated) {
@@ -95,7 +124,8 @@ export default function ThemeColorPreview() {
             return
         }
         setThemeValues(generated)
-        setConfigMessage('已根据主题色生成其它配色，可继续微调。')
+        setTokenColors(createTokenColors(selectedRecipe, generated))
+        setConfigMessage('已根据主题色生成全部令牌颜色，可继续逐项微调。')
     }
 
     const exportThemeConfig = () => {
@@ -110,6 +140,7 @@ export default function ThemeColorPreview() {
             version: THEME_CONFIG_VERSION,
             recipeId: selectedRecipe.id,
             customValues,
+            tokenColors,
             exportedAt: new Date().toISOString(),
         }
         const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'})
@@ -145,7 +176,8 @@ export default function ThemeColorPreview() {
             }
             setRecipeId(importedRecipe.id)
             setThemeValues(importedValues)
-            setCustomOpen(!sameThemeValues(importedValues, getFcThemeCustomValues(importedRecipe)))
+            setTokenColors(config.tokenColors ?? createTokenColors(importedRecipe, importedValues))
+            setCustomOpen(true)
             setConfigMessage('主题配置已导入。')
         } catch {
             setConfigMessage('主题配置无法读取。')
@@ -250,17 +282,17 @@ export default function ThemeColorPreview() {
                         {(!primaryValid || !neutralValid) && (
                             <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>
                         )}
+                        {fcPreview && (
+                            <ThemeTokenColorEditor
+                                tokens={fcPreview.tokens}
+                                values={tokenColors}
+                                onChange={updateTokenColor}
+                            />
+                        )}
                         {configMessage && <div className="theme-color-preview__config-message">{configMessage}</div>}
                     </div>
                 )}
             </div>
-
-            {fcPreview && (
-                <details className="theme-color-preview__debug">
-                    <summary>开发调试</summary>
-                    <FcPrimaryToneGuide tokens={fcPreview.tokens}/>
-                </details>
-            )}
         </section>
     )
 }
@@ -367,9 +399,15 @@ function parseThemeConfig(value: unknown): ParsedThemeConfig | null {
         return primarySeed ? {recipeId: value.recipeId, primarySeed} : null
     }
 
+    if (value.version === 2) {
+        const customValues = parseThemeValues(value.customValues)
+        return customValues ? {recipeId: value.recipeId, customValues} : null
+    }
+
     if (value.version !== THEME_CONFIG_VERSION) return null
     const customValues = parseThemeValues(value.customValues)
-    return customValues ? {recipeId: value.recipeId, customValues} : null
+    const tokenColors = parseTokenColors(value.tokenColors)
+    return customValues && tokenColors ? {recipeId: value.recipeId, customValues, tokenColors} : null
 }
 
 function parseThemeValues(value: unknown): FcThemeCustomValues | null {
@@ -384,6 +422,36 @@ function parseThemeValues(value: unknown): FcThemeCustomValues | null {
         neutralChroma: normalizeChroma(value.neutralChroma, 5, 0, 16),
         neutralVariantChroma: normalizeChroma(value.neutralVariantChroma, 10, 0, 24),
     }
+}
+
+function parseTokenColors(value: unknown): FcThemeTokenColorValues | null {
+    if (!isRecord(value)) return null
+    const entries = Object.entries(value).flatMap(([token, pair]) => {
+        const parsedPair = parseTokenColorPair(pair)
+        return parsedPair ? [[token, parsedPair] as const] : []
+    })
+    return entries.length > 0 ? Object.fromEntries(entries) : null
+}
+
+function parseTokenColorPair(value: unknown): FcThemeTokenColorPair | null {
+    if (!isRecord(value)) return null
+    const light = parseTokenColorValue(value.light)
+    const dark = parseTokenColorValue(value.dark)
+    return light && dark ? {light, dark} : null
+}
+
+function parseTokenColorValue(value: unknown): FcThemeTokenColorValue | null {
+    if (typeof value === 'string') {
+        const hex = normalizeHexColor(value)
+        return hex ? {hex, css: hex} : null
+    }
+    if (!isRecord(value) || typeof value.hex !== 'string') return null
+    const hex = normalizeHexColor(value.hex)
+    if (!hex) return null
+    const css = typeof value.css === 'string' && isSafeTokenCss(value.css, hex)
+        ? value.css
+        : hex
+    return {hex, css}
 }
 
 function normalizeThemeValues(values: FcThemeCustomValues): FcThemeCustomValues | null {
@@ -407,6 +475,25 @@ function sameThemeValues(first: FcThemeCustomValues, second: FcThemeCustomValues
         && first.neutralVariantChroma === second.neutralVariantChroma
 }
 
+function sameTokenColors(first: FcThemeTokenColorValues, second: FcThemeTokenColorValues): boolean {
+    const keys = new Set([...Object.keys(first), ...Object.keys(second)])
+    return [...keys].every((key) => (
+        first[key]?.light.hex === second[key]?.light.hex
+        && first[key]?.light.css === second[key]?.light.css
+        && first[key]?.dark.hex === second[key]?.dark.hex
+        && first[key]?.dark.css === second[key]?.dark.css
+    ))
+}
+
+function createTokenColors(recipe: FcThemeRecipe, values: FcThemeCustomValues): FcThemeTokenColorValues {
+    const preview = createPreviewForValues(recipe, values)
+    return preview ? createFcThemeTokenColorValues(preview) : {}
+}
+
+function createPreviewForValues(recipe: FcThemeRecipe, values: FcThemeCustomValues): FcThemePreview | null {
+    return createFcThemePreview(createCustomFcThemeRecipe(recipe, values))
+}
+
 function normalizeChroma(value: unknown, fallback: number, min: number, max: number): number {
     const numeric = typeof value === 'number' ? value : Number(value)
     return Number.isFinite(numeric) ? clampNumber(Math.round(numeric), min, max) : fallback
@@ -418,6 +505,10 @@ function clampNumber(value: number, min: number, max: number): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isSafeTokenCss(value: string, hex: string): boolean {
+    return value === hex || /^color-mix\(in srgb, #[0-9A-F]{6} \d{1,3}%, transparent\)$/u.test(value)
 }
 
 function themePresetStyle(preset: FcThemeRecipe): ColorVariableStyle {
