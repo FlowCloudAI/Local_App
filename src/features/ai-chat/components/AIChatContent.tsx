@@ -43,6 +43,8 @@ const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
 const ACTION_MENU_ESTIMATED_HEIGHT = 196
+const CONTEXT_USAGE_RING_RADIUS = 10
+const CONTEXT_USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_USAGE_RING_RADIUS
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
 type ActionMenuPlacement = 'up' | 'down'
@@ -261,6 +263,26 @@ export default function AIChatContent({
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
+    const contextPluginInfo = ctx.plugins.find((plugin) => plugin.id === (activeConversation?.pluginId ?? ctx.selectedPlugin))
+    const contextModelId = activeConversation?.model || ctx.selectedModel
+    const contextModelInfo = contextPluginInfo?.model_infos.find((modelInfo) => modelInfo.id === contextModelId)
+    const contextWindowTokens = contextModelInfo?.context_window_tokens ?? null
+    const latestUsage = useMemo(() => {
+        for (let index = ctx.messages.length - 1; index >= 0; index -= 1) {
+            const usage = ctx.messages[index].usage
+            if (usage) return usage
+        }
+        return null
+    }, [ctx.messages])
+    const contextUsagePercent = useMemo(() => {
+        if (!contextWindowTokens || contextWindowTokens <= 0) return null
+        const currentInputTokenEstimate = Math.ceil(ctx.inputValue.trim().length / 2)
+        const usedTokens = (latestUsage?.total_tokens ?? 0) + currentInputTokenEstimate
+        return Math.min(100, Math.max(0, Math.round((usedTokens / contextWindowTokens) * 100)))
+    }, [contextWindowTokens, ctx.inputValue, latestUsage])
+    const contextUsageDashOffset = contextUsagePercent == null
+        ? CONTEXT_USAGE_RING_CIRCUMFERENCE
+        : CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsagePercent / 100)
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
     const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
@@ -1278,7 +1300,10 @@ export default function AIChatContent({
                 )}
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
-                    <div className="ai-floating-input-inner" ref={inputWikiContainerRef}>
+                    <div
+                        className={`ai-floating-input-inner${contextUsagePercent == null ? '' : ' has-context-usage'}`}
+                        ref={inputWikiContainerRef}
+                    >
                         {ctx.editingMessageId && (
                             <div className="ai-edit-indicator">
                                 <span>正在编辑上一条消息</span>
@@ -1306,6 +1331,31 @@ export default function AIChatContent({
                                 variant="inline"
                                 onOpenPluginManagement={onOpenPluginManagement}
                             />
+                        )}
+                        {contextUsagePercent != null && (
+                            <div
+                                className="ai-context-usage-indicator"
+                                title={`上下文占用约 ${contextUsagePercent}%`}
+                                aria-label={`上下文占用约 ${contextUsagePercent}%`}
+                            >
+                                <svg className="ai-context-usage-ring" viewBox="0 0 28 28" aria-hidden="true">
+                                    <circle
+                                        className="ai-context-usage-ring-track"
+                                        cx="14"
+                                        cy="14"
+                                        r={CONTEXT_USAGE_RING_RADIUS}
+                                    />
+                                    <circle
+                                        className="ai-context-usage-ring-value"
+                                        cx="14"
+                                        cy="14"
+                                        r={CONTEXT_USAGE_RING_RADIUS}
+                                        strokeDasharray={CONTEXT_USAGE_RING_CIRCUMFERENCE}
+                                        strokeDashoffset={contextUsageDashOffset}
+                                    />
+                                </svg>
+                                <span>{contextUsagePercent}%</span>
+                            </div>
                         )}
                         <textarea
                             ref={textareaRef}
