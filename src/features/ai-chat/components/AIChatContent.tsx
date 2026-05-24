@@ -275,14 +275,16 @@ export default function AIChatContent({
         return null
     }, [ctx.messages])
     const contextUsagePercent = useMemo(() => {
-        if (!contextWindowTokens || contextWindowTokens <= 0) return null
         const currentInputTokenEstimate = Math.ceil(ctx.inputValue.trim().length / 2)
+        if (!contextWindowTokens || contextWindowTokens <= 0) return 0
         const usedTokens = (latestUsage?.total_tokens ?? 0) + currentInputTokenEstimate
         return Math.min(100, Math.max(0, Math.round((usedTokens / contextWindowTokens) * 100)))
     }, [contextWindowTokens, ctx.inputValue, latestUsage])
-    const contextUsageDashOffset = contextUsagePercent == null
-        ? CONTEXT_USAGE_RING_CIRCUMFERENCE
-        : CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsagePercent / 100)
+    const showContextUsageIndicator = Boolean(contextModelId)
+    const contextUsageTitle = contextWindowTokens && contextWindowTokens > 0
+        ? `上下文占用约 ${contextUsagePercent}%`
+        : '上下文窗口信息未返回，暂以 0% 显示'
+    const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsagePercent / 100)
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
     const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
@@ -1301,7 +1303,7 @@ export default function AIChatContent({
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
                     <div
-                        className={`ai-floating-input-inner${contextUsagePercent == null ? '' : ' has-context-usage'}`}
+                        className={`ai-floating-input-inner${showContextUsageIndicator ? ' has-context-usage' : ''}`}
                         ref={inputWikiContainerRef}
                     >
                         {ctx.editingMessageId && (
@@ -1332,11 +1334,11 @@ export default function AIChatContent({
                                 onOpenPluginManagement={onOpenPluginManagement}
                             />
                         )}
-                        {contextUsagePercent != null && (
+                        {showContextUsageIndicator && (
                             <div
                                 className="ai-context-usage-indicator"
-                                title={`上下文占用约 ${contextUsagePercent}%`}
-                                aria-label={`上下文占用约 ${contextUsagePercent}%`}
+                                title={contextUsageTitle}
+                                aria-label={contextUsageTitle}
                             >
                                 <svg className="ai-context-usage-ring" viewBox="0 0 28 28" aria-hidden="true">
                                     <circle
