@@ -39,6 +39,7 @@ export default function EntryImageAddModal({
     // ── AI 生成相关状态 ──
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
     const [pluginsLoaded, setPluginsLoaded] = useState(false)
+    const [pluginLoadError, setPluginLoadError] = useState('')
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const [selectedSize, setSelectedSize] = useState('')
@@ -57,6 +58,7 @@ export default function EntryImageAddModal({
             setResults([])
             setErrorMessage('')
             setPlugins([])
+            setPluginLoadError('')
             setSelectedPlugin('')
             setSelectedModel('')
             setSelectedSize('')
@@ -71,10 +73,15 @@ export default function EntryImageAddModal({
                     queueMicrotask(() => {
                         setSelectedPlugin(data[0].id)
                     })
+                } else {
+                    queueMicrotask(() => {
+                        setActiveTab('ai')
+                    })
                 }
             })
             .catch((err) => {
                 logger.error('[EntryImageAddModal] 插件加载失败:', err)
+                setPluginLoadError(err instanceof Error ? err.message : String(err))
                 setPluginsLoaded(true)
             })
     }, [open])
@@ -177,6 +184,11 @@ export default function EntryImageAddModal({
         onClose()
     }
 
+    const handleOpenPluginManagement = () => {
+        onClose()
+        onOpenPluginManagement?.('image')
+    }
+
     if (!open) return null
 
     return createPortal(
@@ -235,11 +247,15 @@ export default function EntryImageAddModal({
                         </div>
                     ) : (
                         <div className="entry-image-add-ai">
-                            {pluginsLoaded && plugins.length === 0 ? (
+                            {pluginLoadError ? (
+                                <div className="entry-image-add-ai__error">
+                                    读取 Image 插件失败：{pluginLoadError}
+                                </div>
+                            ) : pluginsLoaded && plugins.length === 0 ? (
                                 <AiPluginMissingOverlay
                                     kind="image"
                                     variant="panel"
-                                    onOpenPluginManagement={onOpenPluginManagement}
+                                    onOpenPluginManagement={handleOpenPluginManagement}
                                 />
                             ) : (
                                 <>

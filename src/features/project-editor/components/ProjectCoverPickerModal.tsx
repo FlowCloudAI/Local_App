@@ -71,6 +71,7 @@ export default function ProjectCoverPickerModal({
     const [libraryQuery, setLibraryQuery] = useState('')
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
     const [pluginsLoaded, setPluginsLoaded] = useState(false)
+    const [pluginLoadError, setPluginLoadError] = useState('')
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const [selectedSize, setSelectedSize] = useState('')
@@ -92,6 +93,7 @@ export default function ProjectCoverPickerModal({
         setLibraryQuery('')
         setPlugins([])
         setPluginsLoaded(false)
+        setPluginLoadError('')
         setSelectedPlugin('')
         setSelectedModel('')
         setSelectedSize('')
@@ -112,6 +114,9 @@ export default function ProjectCoverPickerModal({
 
                 setPlugins(imagePlugins)
                 setPluginsLoaded(true)
+                if (imagePlugins.length === 0) {
+                    setActiveTab('ai')
+                }
                 const defaultPlugin = imagePlugins[0]
                 setSelectedPlugin(defaultPlugin?.id ?? '')
                 setSelectedModel(defaultPlugin?.default_model ?? defaultPlugin?.models[0] ?? '')
@@ -136,6 +141,7 @@ export default function ProjectCoverPickerModal({
                 if (!cancelled) {
                     setPluginsLoaded(true)
                     const message = error instanceof Error ? error.message : String(error)
+                    setPluginLoadError(message)
                     setErrorMessage(message)
                     void showAlert(message, 'error', 'toast', 3000)
                 }
@@ -285,6 +291,11 @@ export default function ProjectCoverPickerModal({
         }
     }
 
+    const handleOpenPluginManagement = () => {
+        onClose()
+        onOpenPluginManagement?.('image')
+    }
+
     if (!open) return null
 
     return createPortal(
@@ -403,11 +414,13 @@ export default function ProjectCoverPickerModal({
 
                     {activeTab === 'ai' && (
                         <div className="pe-cover-picker__panel pe-cover-picker__panel--ai">
-                            {pluginsLoaded && plugins.length === 0 ? (
+                            {pluginLoadError ? (
+                                <div className="pe-cover-picker__error">读取生图所需数据失败：{pluginLoadError}</div>
+                            ) : pluginsLoaded && plugins.length === 0 ? (
                                 <AiPluginMissingOverlay
                                     kind="image"
                                     variant="panel"
-                                    onOpenPluginManagement={onOpenPluginManagement}
+                                    onOpenPluginManagement={handleOpenPluginManagement}
                                 />
                             ) : (
                                 <>
