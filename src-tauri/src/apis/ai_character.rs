@@ -1,8 +1,8 @@
 use crate::apis::ai_client::{CreateLlmSessionResult, spawn_session_event_loop};
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
-use crate::{AiSessionKind, AiState, ApiKeyStore, AppState};
+use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState};
 use flowcloudai_client::llm::config::SessionConfig;
-use flowcloudai_client::{DefaultOrchestrator, sense::Sense};
+use flowcloudai_client::{DefaultOrchestrator, ErrorCode, sense::Sense};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -245,24 +245,27 @@ pub async fn ai_build_character_project_snapshot(
     state: State<'_, Arc<Mutex<AppState>>>,
     project_id: String,
     entry_id: String,
-) -> Result<CharacterProjectSnapshotBundle, String> {
-    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
+) -> Result<CharacterProjectSnapshotBundle, ApiError> {
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| {
+        ApiError::new(
+            ErrorCode::ValidationFormatError,
+            format!("projectId 非法 UUID: {}", e),
+        )
+        .with_kv("field", "projectId")
+    })?;
+    let entry_id = Uuid::parse_str(&entry_id).map_err(|e| {
+        ApiError::new(
+            ErrorCode::ValidationFormatError,
+            format!("entryId 非法 UUID: {}", e),
+        )
+        .with_kv("field", "entryId")
+    })?;
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
 
-    let project = db
-        .get_project(&project_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    let categories = db
-        .list_categories(&project_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    let tag_schemas = db
-        .list_tag_schemas(&project_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let project = db.get_project(&project_id).await.map_err(ApiError::from_display)?;
+    let categories = db.list_categories(&project_id).await.map_err(ApiError::from_display)?;
+    let tag_schemas = db.list_tag_schemas(&project_id).await.map_err(ApiError::from_display)?;
     let entry_briefs: Vec<EntryBrief> = db
         .list_entries(
             &project_id,
@@ -271,12 +274,12 @@ pub async fn ai_build_character_project_snapshot(
             0,
         )
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(ApiError::from_display)?;
     let relations = db
         .list_relations_for_project(&project_id)
         .await
-        .map_err(|e| e.to_string())?;
-    let character_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
+        .map_err(ApiError::from_display)?;
+    let character_entry = db.get_entry(&entry_id).await.map_err(ApiError::from_display)?;
 
     let mut all_entries = Vec::with_capacity(entry_briefs.len());
     for brief in entry_briefs {
@@ -365,9 +368,14 @@ pub async fn ai_create_character_session(
     app: AppHandle,
     ai_state: State<'_, AiState>,
     input: CharacterSessionInput,
-) -> Result<CreateLlmSessionResult, String> {
-    let api_key = ApiKeyStore::get(&input.plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", input.plugin_id))?;
+) -> Result<CreateLlmSessionResult, ApiError> {
+    let api_key = ApiKeyStore::get(&input.plugin_id).ok_or_else(|| {
+        ApiError::new(
+            ErrorCode::AuthApiKeyMissing,
+            format!("插件 '{}' 未配置 API Key，请在设置中配置", input.plugin_id),
+        )
+        .with_kv("plugin_id", input.plugin_id.clone())
+    })?;
 
     let client = ai_state.client.lock().await;
     let registry = client.tool_registry().clone();
@@ -377,12 +385,10 @@ pub async fn ai_create_character_session(
         max_tool_rounds: rounds as usize,
         ..Default::default()
     });
-    let mut session = client
-        .create_llm_session(&input.plugin_id, &api_key, config)
-        .map_err(|e| e.to_string())?;
+    let mut session = client.create_llm_session(&input.plugin_id, &api_key, config)?;
     drop(client);
 
-    session.load_sense(sense).await.map_err(|e| e.to_string())?;
+    session.load_sense(sense).await?;
     session.set_orchestrator(Box::new(
         DefaultOrchestrator::new(registry).with_whitelist(whitelist),
     ));
@@ -401,7 +407,7 @@ pub async fn ai_create_character_session(
     let conversation_id = input.session_id.clone();
 
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.try_run(input_rx).map_err(|e| e.to_string())?;
+    let (event_stream, handle) = session.try_run(input_rx)?;
     let run_id = Uuid::new_v4().to_string();
 
     spawn_session_event_loop(app, input.session_id.clone(), run_id.clone(), event_stream);

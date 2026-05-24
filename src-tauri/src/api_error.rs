@@ -36,6 +36,12 @@ impl ApiError {
         Self::new(ErrorCode::CoreClientInternalError, message)
     }
 
+    /// 兜底构造（Display）：用于在 `.map_err(ApiError::from_display)` 处便捷转换
+    /// 任意实现 `Display` 但未实现 `Into<String>` 的错误（如 worldflow_core 错误）。
+    pub fn from_display<E: std::fmt::Display>(err: E) -> Self {
+        Self::internal(err.to_string())
+    }
+
     /// 附加键值（detail 非对象时自动重建）。
     pub fn with_kv(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
         if !self.detail.is_object() {
