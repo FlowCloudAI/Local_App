@@ -57,14 +57,8 @@
 }
 
 .pe-dashboard-layout {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
     align-items: start;
-}
-
-@container (min-width: 880px) {
-    .pe-dashboard-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
-    }
 }
 
 .pe-dashboard-main-column,
