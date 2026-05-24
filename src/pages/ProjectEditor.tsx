@@ -1271,7 +1271,10 @@ function ProjectEditorInner({
             <ProjectCoverPickerModal
                 open={coverPickerOpen}
                 projectId={projectId}
+                projectName={project.name}
                 currentCoverPath={project?.cover_path ?? null}
+                aiPluginId={aiPluginId}
+                aiModel={aiModel}
                 onClose={() => setCoverPickerOpen(false)}
                 onSelectCover={handleUpdateProjectCover}
                 onOpenPluginManagement={onOpenPluginManagement}

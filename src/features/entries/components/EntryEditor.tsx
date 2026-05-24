@@ -1304,6 +1304,12 @@ export default function EntryEditor({
             <EntryImageAddModal
                 open={imageAddModalOpen}
                 projectId={projectId}
+                projectName={projectName}
+                entryTitle={draft.title || entry?.title || null}
+                entrySummary={draft.summary || entry?.summary || null}
+                entryType={draft.type || entry?.type || null}
+                aiPluginId={aiPluginId}
+                aiModel={aiModel}
                 onClose={() => setImageAddModalOpen(false)}
                 onUploadLocal={handleUploadImages}
                 onOpenPluginManagement={onOpenPluginManagement}

@@ -484,6 +484,21 @@ export interface GenerateEntrySummaryParams {
     maxTokens?: number | null
 }
 
+export interface FillImagePromptParams {
+    pluginId: string
+    model?: string | null
+    currentPrompt?: string | null
+    usage?: 'entry_image' | 'project_cover' | null
+    projectName?: string | null
+    entryTitle?: string | null
+    entrySummary?: string | null
+    entryType?: string | null
+}
+
+export interface FillImagePromptResult {
+    prompt: string
+}
+
 export const ai_generate_entry_summary = ({
                                               pluginId,
                                               projectId,
@@ -504,6 +519,29 @@ export const ai_generate_entry_summary = ({
             draftEntry,
             model,
             maxTokens,
+        },
+    })
+
+export const ai_fill_image_prompt = ({
+                                          pluginId,
+                                          model,
+                                          currentPrompt,
+                                          usage,
+                                          projectName,
+                                          entryTitle,
+                                          entrySummary,
+                                          entryType,
+                                      }: FillImagePromptParams) =>
+    command<FillImagePromptResult>('ai_fill_image_prompt', {
+        request: {
+            pluginId,
+            model,
+            currentPrompt,
+            usage,
+            projectName,
+            entryTitle,
+            entrySummary,
+            entryType,
         },
     })
 

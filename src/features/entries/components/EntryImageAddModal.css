@@ -178,6 +178,7 @@
 
 .entry-image-add-ai__actions {
     display: flex;
+    gap: var(--fc-space-sm);
     justify-content: flex-end;
 }
 

@@ -3,6 +3,7 @@ import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from
 import {createPortal} from 'react-dom'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
+    ai_fill_image_prompt,
     ai_list_plugins,
     ai_text_to_image,
     type FCImage,
@@ -20,6 +21,12 @@ type GenerateState = 'idle' | 'generating' | 'success' | 'error'
 interface EntryImageAddModalProps {
     open: boolean
     projectId: string
+    projectName?: string | null
+    entryTitle?: string | null
+    entrySummary?: string | null
+    entryType?: string | null
+    aiPluginId?: string | null
+    aiModel?: string | null
     onClose: () => void
     onUploadLocal: () => void
     onAddAiImages: (images: EntryImage[]) => void
@@ -29,6 +36,12 @@ interface EntryImageAddModalProps {
 export default function EntryImageAddModal({
                                                open,
                                                projectId,
+                                               projectName = null,
+                                               entryTitle = null,
+                                               entrySummary = null,
+                                               entryType = null,
+                                               aiPluginId = null,
+                                               aiModel = null,
                                                onClose,
                                                onUploadLocal,
                                                onAddAiImages,
@@ -44,6 +57,7 @@ export default function EntryImageAddModal({
     const [selectedModel, setSelectedModel] = useState('')
     const [selectedSize, setSelectedSize] = useState('')
     const [prompt, setPrompt] = useState('')
+    const [fillingPrompt, setFillingPrompt] = useState(false)
     const [generateState, setGenerateState] = useState<GenerateState>('idle')
     const [results, setResults] = useState<ImageData[]>([])
     const [errorMessage, setErrorMessage] = useState('')
@@ -54,6 +68,7 @@ export default function EntryImageAddModal({
         queueMicrotask(() => {
             setActiveTab('local')
             setPrompt('')
+            setFillingPrompt(false)
             setGenerateState('idle')
             setResults([])
             setErrorMessage('')
@@ -120,6 +135,37 @@ export default function EntryImageAddModal({
     const canGenerate = useMemo(() => {
         return prompt.trim().length > 0 && selectedPlugin.length > 0 && selectedModel.length > 0
     }, [prompt, selectedPlugin, selectedModel])
+
+    const handleFillPrompt = async () => {
+        if (fillingPrompt || generateState === 'generating') return
+        if (!aiPluginId) {
+            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'toast', 2200)
+            return
+        }
+
+        setFillingPrompt(true)
+        setErrorMessage('')
+        try {
+            const result = await ai_fill_image_prompt({
+                pluginId: aiPluginId,
+                model: aiModel || null,
+                currentPrompt: prompt.trim() || null,
+                usage: 'entry_image',
+                projectName,
+                entryTitle,
+                entrySummary,
+                entryType,
+            })
+            setPrompt(result.prompt)
+            void showAlert('已填充绘图提示词', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error)
+            setErrorMessage(msg)
+            void showAlert(msg, 'error', 'toast', 3000)
+        } finally {
+            setFillingPrompt(false)
+        }
+    }
 
     const handleGenerate = async () => {
         if (!canGenerate) return
@@ -309,7 +355,7 @@ export default function EntryImageAddModal({
                                     onKeyDown={handleKeyDown}
                                     placeholder="描述你想要生成的图像内容…"
                                     rows={3}
-                                    disabled={generateState === 'generating'}
+                                    disabled={generateState === 'generating' || fillingPrompt}
                                 />
                                 <span className="entry-image-add-ai__hint">按 Cmd / Ctrl + Enter 快速生成</span>
                             </div>
@@ -317,7 +363,14 @@ export default function EntryImageAddModal({
                             <div className="entry-image-add-ai__actions">
                                 <Button type="button"
                                     size="sm"
-                                    disabled={!canGenerate || generateState === 'generating'}
+                                    disabled={fillingPrompt || generateState === 'generating'}
+                                    onClick={() => void handleFillPrompt()}
+                                >
+                                    {fillingPrompt ? '填充中…' : 'AI 填充提示词'}
+                                </Button>
+                                <Button type="button"
+                                    size="sm"
+                                    disabled={!canGenerate || generateState === 'generating' || fillingPrompt}
                                     onClick={() => void handleGenerate()}
                                 >
                                     {generateState === 'generating' ? '生成中…' : '开始生成'}

@@ -409,6 +409,7 @@ pub fn run() {
             ai_get_contradiction_report_entry,
             ai_delete_contradiction_report,
             ai_generate_entry_summary,
+            ai_fill_image_prompt,
             ai_send_message,
             ai_cancel_session,
             ai_close_session,
