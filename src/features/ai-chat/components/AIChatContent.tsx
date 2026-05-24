@@ -228,6 +228,7 @@ export default function AIChatContent({
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
     const [inputLimitMessage, setInputLimitMessage] = useState('')
     const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
+    const [settingsDrawerMounted, setSettingsDrawerMounted] = useState(false)
 
     useEffect(() => {
         if (!isPluginMenuOpen) return
@@ -253,7 +254,14 @@ export default function AIChatContent({
 
     useEffect(() => {
         setSettingsDrawerOpen(false)
+        setSettingsDrawerMounted(false)
     }, [ctx.activeConversationId])
+
+    useEffect(() => {
+        if (settingsDrawerOpen) {
+            setSettingsDrawerMounted(true)
+        }
+    }, [settingsDrawerOpen])
 
     const [autoScroll, setAutoScroll] = useState(true)
     const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
@@ -307,6 +315,19 @@ export default function AIChatContent({
         if (!activeConversation) return
         void ctx.updateConversationSettings(activeConversation.id, {[key]: value} as Partial<ConversationSettings>)
     }, [activeConversation, ctx])
+    const toggleSettingsDrawer = useCallback(() => {
+        if (!activeConversation) return
+        if (!settingsDrawerOpen) {
+            setSettingsDrawerMounted(true)
+        }
+        setSettingsDrawerOpen((open) => !open)
+    }, [activeConversation, settingsDrawerOpen])
+    const handleSettingsDrawerAnimationEnd = useCallback((event: React.AnimationEvent<HTMLDivElement>) => {
+        if (event.currentTarget !== event.target) return
+        if (!settingsDrawerOpen) {
+            setSettingsDrawerMounted(false)
+        }
+    }, [settingsDrawerOpen])
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
     const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
@@ -1324,8 +1345,11 @@ export default function AIChatContent({
                 )}
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
-                    {activeConversation && settingsDrawerOpen && (
-                        <div className="ai-conversation-settings-panel">
+                    {activeConversation && settingsDrawerMounted && (
+                        <div
+                            className={`ai-conversation-settings-panel ${settingsDrawerOpen ? 'is-open' : 'is-closing'}`}
+                            onAnimationEnd={handleSettingsDrawerAnimationEnd}
+                        >
                             <div className="ai-conversation-settings-grid">
                                 <label className="ai-conversation-settings-field">
                                     <span>温度</span>
@@ -1462,7 +1486,7 @@ export default function AIChatContent({
                                     disabled={!activeConversation}
                                     aria-expanded={settingsDrawerOpen}
                                     title={activeConversation ? '当前对话属性设置' : '发送消息后可设置当前对话属性'}
-                                    onClick={() => setSettingsDrawerOpen((open) => !open)}
+                                    onClick={toggleSettingsDrawer}
                                 >
                                     <svg viewBox="0 0 16 16" aria-hidden="true">
                                         {settingsDrawerOpen

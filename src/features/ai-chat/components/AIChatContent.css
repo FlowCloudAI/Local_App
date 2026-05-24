@@ -965,6 +965,7 @@
     transform: translateX(-50%);
     width: min(var(--ai-chat-content-max-width), calc(100% - 40px));
     z-index: 100;
+    isolation: isolate;
 }
 
 .ai-floating-input-inner {
@@ -979,33 +980,60 @@
     transition: border-color 0.16s ease, box-shadow 0.16s ease;
     width: 100%;
     box-sizing: border-box;
+    z-index: 120;
 }
 
 .ai-conversation-settings-panel {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: calc(100% + var(--fc-space-sm));
+    bottom: calc(100% - 0.35rem);
     width: 100%;
     box-sizing: border-box;
-    padding: var(--fc-space-md) var(--fc-space-lg);
+    padding: var(--fc-space-md) var(--fc-space-lg) calc(var(--fc-space-md) + 0.35rem);
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--fc-radius-lg);
     background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-md);
-    animation: ai-conversation-settings-panel-in 0.18s ease;
-    z-index: 110;
+    box-shadow: 0 -0.35rem 1.2rem color-mix(in srgb, var(--fc-color-bg) 24%, transparent);
+    transform-origin: center bottom;
+    will-change: transform, opacity, clip-path;
+    z-index: 90;
 }
 
-@keyframes ai-conversation-settings-panel-in {
+.ai-conversation-settings-panel.is-open {
+    animation: ai-conversation-settings-drawer-open 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.ai-conversation-settings-panel.is-closing {
+    pointer-events: none;
+    animation: ai-conversation-settings-drawer-close 0.18s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes ai-conversation-settings-drawer-open {
     from {
         opacity: 0;
-        transform: translateY(var(--fc-space-md));
+        clip-path: inset(100% 0 0 0 round var(--fc-radius-lg));
+        transform: translateY(1.4rem) scaleY(0.96);
     }
 
     to {
         opacity: 1;
+        clip-path: inset(0 0 0 0 round var(--fc-radius-lg));
         transform: translateY(0);
+    }
+}
+
+@keyframes ai-conversation-settings-drawer-close {
+    from {
+        opacity: 1;
+        clip-path: inset(0 0 0 0 round var(--fc-radius-lg));
+        transform: translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        clip-path: inset(100% 0 0 0 round var(--fc-radius-lg));
+        transform: translateY(1.4rem) scaleY(0.96);
     }
 }
 
