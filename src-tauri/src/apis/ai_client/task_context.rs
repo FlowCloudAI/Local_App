@@ -21,7 +21,7 @@ pub async fn ai_set_task_context(
     ai_state: State<'_, AiState>,
     session_id: String,
     ctx: TaskContextDto,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     let project_id = ctx.project_id;
     let task_type = ctx.task_type.unwrap_or_default();
     let attributes = ctx.attributes.unwrap_or_default();
@@ -39,7 +39,13 @@ pub async fn ai_set_task_context(
         sessions
             .get(&session_id)
             .map(|entry| entry.handle.clone())
-            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+            .ok_or_else(|| {
+                ApiError::new(
+                    flowcloudai_client::ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
     };
 
     let result = handle
@@ -59,5 +65,5 @@ pub async fn ai_set_task_context(
             error
         ),
     }
-    result
+    result.map_err(ApiError::internal)
 }

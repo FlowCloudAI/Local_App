@@ -8,7 +8,13 @@ export interface LlmDefaults {
   max_tokens: number
   stream: boolean
   show_reasoning: boolean
+  auto_compact_enabled: boolean
+  auto_compact_threshold_ratio: number
+  auto_compact_recent_messages: number
+  auto_compact_detail: LlmCompactDetail
 }
+
+export type LlmCompactDetail = 'brief' | 'balanced' | 'detailed'
 
 export interface ImageDefaults {
   plugin_id: string | null
@@ -71,6 +77,9 @@ export const setting_get_default_paths = () =>
 
 export const setting_open_backup_dir = (path: string) =>
   command<void>('setting_open_backup_dir', { path })
+
+export const setting_export_theme_config = (path: string, content: string) =>
+  command<void>('setting_export_theme_config', { path, content })
 
 export const setting_is_backend_ready = () =>
     command<boolean>('setting_is_backend_ready')

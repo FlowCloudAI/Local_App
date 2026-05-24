@@ -260,22 +260,24 @@ body {
     scrollbar-color: auto;
 }
 
-.is-tauri .fc-roll.fc-roll--size-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+.is-tauri .fc-roll.fc-roll--thumb-auto {
+    --roll-thumb: var(--fc-color-scrollbar-thumb);
 }
 
-.is-tauri .fc-roll.fc-roll--size-thick::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+.is-tauri .fc-roll.fc-roll--thumb-auto:hover {
+    --roll-thumb: var(--roll-thumb-hover);
+}
+
+.is-tauri .fc-roll.fc-roll--thumb-auto.fc-roll--scrolling {
+    --roll-thumb: var(--roll-thumb-active);
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--roll-track);
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-thumb {
-    background-color: var(--fc-color-text-tertiary);
+    background-color: var(--roll-thumb);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
@@ -283,20 +285,25 @@ body {
 
 .is-tauri .fc-roll:hover::-webkit-scrollbar-thumb,
 .is-tauri .fc-roll.fc-roll--scrolling::-webkit-scrollbar-thumb {
-    background-color: var(--fc-color-text-secondary);
+    background-color: var(--roll-thumb);
 }
 
 .side-bar {
     --sidebar-item-hover-bg: var(--sidebar-item-bg, transparent);
+    --app-sidebar-icon-size: 1.75rem;
     user-select: none;
     z-index: 1001;  /* 高于 AI 右侧面板的 1000 */
     position: relative;  /* 确保 z-index 生效 */
     border-left-color: var(--fc-color-bg-secondary) !important;
 }
 
-.fc-sidebar__icon svg {
-    width: 1.5rem !important;
-    height: 1.5rem !important;
+.side-bar .fc-sidebar__icon {
+    height: var(--app-sidebar-icon-size);
+}
+
+.side-bar .fc-sidebar__icon svg {
+    width: var(--app-sidebar-icon-size);
+    height: var(--app-sidebar-icon-size);
 }
 
 .fc-sidebar__footer {

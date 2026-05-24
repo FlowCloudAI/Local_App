@@ -215,6 +215,19 @@ pub fn setting_open_backup_dir(app: AppHandle, path: String) -> Result<(), Strin
         .map_err(|e| e.to_string())
 }
 
+/// 将主题配置导出到用户通过保存对话框选择的路径。
+#[tauri::command]
+pub fn setting_export_theme_config(path: String, content: String) -> Result<(), String> {
+    let export_path = PathBuf::from(path);
+    if let Some(parent) = export_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建导出目录失败：{}", e))?;
+    }
+    std::fs::write(&export_path, content).map_err(|e| format!("写入主题配置失败：{}", e))
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsBootstrap {
@@ -247,9 +260,15 @@ pub async fn setting_get_settings_bootstrap(
             .to_string()
     };
 
-    let llm_plugins = list_plugins_for_kind(ai_state.inner(), "llm").await?;
-    let image_plugins = list_plugins_for_kind(ai_state.inner(), "image").await?;
-    let tts_plugins = list_plugins_for_kind(ai_state.inner(), "tts").await?;
+    let llm_plugins = list_plugins_for_kind(ai_state.inner(), "llm")
+        .await
+        .map_err(|e| e.to_string())?;
+    let image_plugins = list_plugins_for_kind(ai_state.inner(), "image")
+        .await
+        .map_err(|e| e.to_string())?;
+    let tts_plugins = list_plugins_for_kind(ai_state.inner(), "tts")
+        .await
+        .map_err(|e| e.to_string())?;
     let api_key_status = llm_plugins
         .iter()
         .chain(image_plugins.iter())

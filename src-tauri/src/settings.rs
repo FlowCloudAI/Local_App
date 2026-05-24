@@ -101,6 +101,14 @@ pub struct LlmDefaults {
     pub stream: bool,
     /// 是否显示思考过程（ReasoningDelta）
     pub show_reasoning: bool,
+    /// 是否在上下文接近模型窗口时自动压缩历史
+    pub auto_compact_enabled: bool,
+    /// 自动压缩触发阈值，取值 0.0 - 1.0
+    pub auto_compact_threshold_ratio: f64,
+    /// 自动压缩后保留最近多少条可见消息
+    pub auto_compact_recent_messages: u32,
+    /// 压缩文本详细程度："brief" | "balanced" | "detailed"
+    pub auto_compact_detail: String,
 }
 
 impl Default for LlmDefaults {
@@ -112,6 +120,10 @@ impl Default for LlmDefaults {
             max_tokens: 2000,
             stream: true,
             show_reasoning: false,
+            auto_compact_enabled: false,
+            auto_compact_threshold_ratio: 0.75,
+            auto_compact_recent_messages: 8,
+            auto_compact_detail: "balanced".to_string(),
         }
     }
 }

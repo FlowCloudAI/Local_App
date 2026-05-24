@@ -1,4 +1,5 @@
 mod ai_services;
+mod api_error;
 mod apis;
 mod auto_backup;
 mod layout;
@@ -10,6 +11,7 @@ mod state;
 mod template;
 mod tools;
 
+pub use api_error::ApiError;
 pub use settings::*;
 pub use state::*;
 
@@ -409,6 +411,7 @@ pub fn run() {
             ai_get_contradiction_report_entry,
             ai_delete_contradiction_report,
             ai_generate_entry_summary,
+            ai_fill_image_prompt,
             ai_send_message,
             ai_cancel_session,
             ai_close_session,
@@ -427,6 +430,8 @@ pub fn run() {
             ai_list_tools,
             ai_list_conversations,
             ai_get_conversation,
+            ai_update_conversation_settings,
+            ai_compact_conversation,
             ai_export_conversation,
             ai_delete_conversation,
             ai_rename_conversation,
@@ -445,6 +450,7 @@ pub fn run() {
             setting_get_media_dir,
             setting_get_default_paths,
             setting_open_backup_dir,
+            setting_export_theme_config,
             setting_is_backend_ready,
             setting_set_api_key,
             setting_has_api_key,

@@ -1,0 +1,65 @@
+.fc-primary-tone-guide {
+    padding: var(--fc-space-md);
+    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 28%, var(--fc-color-border));
+    border-radius: var(--fc-radius-md);
+    background: color-mix(in srgb, var(--fc-color-primary-subtle) 54%, var(--fc-color-bg));
+}
+
+.fc-primary-tone-guide__header {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+    margin-bottom: var(--fc-space-sm);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.fc-primary-tone-guide__header strong {
+    color: var(--fc-color-text);
+}
+
+.fc-primary-tone-guide__token-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: var(--fc-space-sm);
+}
+
+.fc-primary-tone-guide__token {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 1fr) repeat(2, minmax(6.5rem, 0.8fr));
+    gap: var(--fc-space-sm);
+    align-items: center;
+    padding: var(--fc-space-sm);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg);
+}
+
+.fc-primary-tone-guide__token-name,
+.fc-primary-tone-guide__value {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+}
+
+.fc-primary-tone-guide__token-name code,
+.fc-primary-tone-guide__value code {
+    overflow: hidden;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-primary-tone-guide__value span:not(.fc-primary-tone-guide__swatch) {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.fc-primary-tone-guide__swatch {
+    width: 100%;
+    height: 1rem;
+    border-radius: var(--fc-radius-xs);
+    background: var(--fc-primary-tone-guide-swatch);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+}

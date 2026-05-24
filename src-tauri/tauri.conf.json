@@ -53,24 +53,28 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "resources/templates": "templates"
+      "resources/templates": "templates",
+      "icons/fcplug.ico": "icons/fcplug.ico",
+      "icons/fcworld.ico": "icons/fcworld.ico"
     },
     "licenseFile": "nsis/license.rtf",
     "fileAssociations": [
       {
-        "ext": [
-          "fcplug"
-        ],
+        "ext": ["fcplug"],
         "mimeType": "application/x-fcplugin",
         "description": "流云AI插件文件",
         "role": "Editor",
         "name": "FlowCloudAI Plugin"
+      },
+      {
+        "ext": ["fcworld"],
+        "mimeType": "application/x-fcworld",
+        "name": "FlowCloudAI 世界观包",
+        "description": "FlowCloudAI world export",
+        "role": "Editor"
       }
     ],
     "windows": {
-      "wix": {
-        "language": "SimpChinese"
-      },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
       "timestampUrl": "http://timestamp.digicert.com",

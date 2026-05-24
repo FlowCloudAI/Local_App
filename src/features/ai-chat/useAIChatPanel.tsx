@@ -2,6 +2,7 @@ import {type ReactNode, useState} from 'react'
 import AIChatContent from './components/AIChatContent'
 import type {DockableSidePanelMode} from '../../shared/ui/layout/DockableSidePanel'
 import type {AiContextValue} from './model/AiControllerTypes'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../shared/ui/AiPluginMissingOverlay'
 
 interface UseAIChatPanelOptions {
     controller: AiContextValue
@@ -9,6 +10,7 @@ interface UseAIChatPanelOptions {
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
 export interface AIChatPanelSlots {
@@ -34,10 +36,18 @@ export function useAIChatPanel({
     // 用 useState + ref callback 把 portal host 元素暴露给 AIChatContent；
     // el 挂载时触发 re-render，AIChatContent 拿到非空 target 后才能 portal
     const [sidePortalEl, setSidePortalEl] = useState<HTMLDivElement | null>(null)
+    const missingLlmPlugin = controller.pluginsReady && controller.plugins.length === 0
+    const renderMissingOverlay = () => missingLlmPlugin ? (
+        <AiPluginMissingOverlay kind="llm" onOpenPluginManagement={rest.onOpenPluginManagement}/>
+    ) : null
 
     if (panelMode === 'fullscreen') {
         return {
-            side: <div className="ai-side-portal-host" ref={setSidePortalEl}/>,
+            side: (
+                <div className="ai-side-portal-host" ref={setSidePortalEl}>
+                    {renderMissingOverlay()}
+                </div>
+            ),
             main: (
                 <div className="ai-chat-layout">
                     <AIChatContent
@@ -46,6 +56,7 @@ export function useAIChatPanel({
                         sidePortalTarget={sidePortalEl}
                         {...rest}
                     />
+                    {renderMissingOverlay()}
                 </div>
             ),
         }
@@ -60,6 +71,7 @@ export function useAIChatPanel({
                     panelMode={panelMode}
                     {...rest}
                 />
+                {renderMissingOverlay()}
             </div>
         ),
     }

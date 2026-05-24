@@ -3,6 +3,7 @@ import {type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from
 import {listen} from '@tauri-apps/api/event'
 import {
     ai_build_character_project_snapshot,
+    ai_compact_conversation,
     ai_delete_conversation,
     ai_disable_tool,
     ai_enable_tool,
@@ -16,6 +17,7 @@ import {
     ai_save_character_conversation_meta,
     ai_save_conversation_ui_state,
     ai_set_task_context,
+    ai_update_conversation_settings,
     ai_update_session,
     type AppSettings,
     type CharacterConversationMeta,
@@ -26,20 +28,28 @@ import {
     type EntryUpdatedEvent,
     type PluginInfo,
     setting_get_settings,
+    type StoredConversationSettings,
     type StoredMessage,
     type TaskContextPayload,
     type ToolStatus,
+    type UpdateSessionParams,
+    formatApiError,
+    toApiError,
 } from '../../../api'
 import {type SessionMessage, useAiSession} from './useAiSession'
+import {estimateMessagesTokens} from '../lib/contextUsage'
+import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import type {
     AiContextValue,
     AiFocusContext,
     Conversation,
+    ConversationSettings,
     ConversationRuntimeState,
     Message,
     ReportConversationContext,
     SessionParams,
 } from '../model/AiControllerTypes'
+import {DEFAULT_CONVERSATION_SETTINGS, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {toEntryImageSrc} from '../../entries/lib/entryImage'
 
 const generateTitleFromMessage = (content: string): string => {
@@ -57,6 +67,57 @@ const buildAiLogPreview = (content: string) => {
 
 const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
+const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
+
+type PreparedAiSession = { sid: string; runId: string; conversationId: string }
+
+const toStoredConversationSettings = (settings: ConversationSettings): StoredConversationSettings => ({
+    temperature: settings.temperature,
+    topP: settings.topP,
+    frequencyPenaltyEnabled: settings.frequencyPenaltyEnabled,
+    frequencyPenalty: settings.frequencyPenalty,
+    presencePenaltyEnabled: settings.presencePenaltyEnabled,
+    presencePenalty: settings.presencePenalty,
+    systemPrompt: settings.systemPrompt,
+})
+
+const buildSessionUpdateParams = (
+    settings: ConversationSettings,
+    thinking: boolean,
+): UpdateSessionParams => ({
+    thinking,
+    temperature: settings.temperature,
+    topP: settings.topP,
+    frequencyPenalty: settings.frequencyPenaltyEnabled ? settings.frequencyPenalty : 0,
+    presencePenalty: settings.presencePenaltyEnabled ? settings.presencePenalty : 0,
+})
+
+const createDraftConversation = (pluginId: string, model: string): Conversation => ({
+    id: `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title: '新对话',
+    messages: [],
+    pluginId,
+    model,
+    sessionId: null,
+    runId: null,
+    timestamp: Date.now(),
+    pinnedAt: null,
+    archivedAt: null,
+    mode: 'default',
+    characterEntryId: null,
+    characterName: null,
+    backgroundImageUrl: null,
+    characterVoiceId: null,
+    characterAutoPlay: null,
+    reportContext: null,
+    reportSeeded: false,
+    settings: normalizeConversationSettings(),
+})
+
+const isEmptyDraftConversation = (conversation: Conversation) =>
+    conversation.id.startsWith('conv_')
+    && conversation.messages.length === 0
+    && (!conversation.mode || conversation.mode === 'default')
 
 interface StoredCharacterConversationMeta {
     mode?: 'character' | 'report' | null
@@ -321,8 +382,14 @@ export interface AiFocus {
 
 export function useAiController(focus: AiFocus): AiContextValue {
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const [pluginsReady, setPluginsReady] = useState(false)
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
+    const appSettingsRef = useRef<AppSettings | null>(null)
+    const pluginsRef = useRef<PluginInfo[]>([])
+    useEffect(() => {
+        pluginsRef.current = plugins
+    }, [plugins])
     const selectedPluginRef = useRef(selectedPlugin)
     const selectedModelRef = useRef(selectedModel)
     useEffect(() => {
@@ -362,6 +429,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     // Map value: snippet string（含空字符串），undefined 表示未缓存
     const entrySnippetCacheRef = useRef<Map<string, string>>(new Map())
     const entryTitleCacheRef = useRef<Map<string, string>>(new Map())
+    const conversationSettingsSaveTimersRef = useRef<Record<string, ReturnType<typeof window.setTimeout>>>({})
     const [focusContext, setFocusContext] = useState<AiFocusContext>({
         projectId: focus.projectId,
         projectName: null,
@@ -420,7 +488,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
             includeTools ? ai_list_tools() : Promise.resolve(null),
         ])
 
+        appSettingsRef.current = settings
         syncPluginSelection(pluginList, settings)
+        setPluginsReady(true)
 
         if (fetchedTools) {
             const enableOps = fetchedTools.map((tool) => ai_enable_tool(tool.name))
@@ -438,6 +508,75 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const runtimeConversationRef = useRef<Record<string, string>>({})
     const abortControllerRef = useRef<AbortController | null>(null)
+    const sessionApiRef = useRef<ReturnType<typeof useAiSession> | null>(null)
+    const autoCompactInFlightRef = useRef<Set<string>>(new Set())
+
+    const maybeAutoCompactAfterMessage = useCallback(async (
+        conversationId: string,
+        message: SessionMessage,
+    ) => {
+        if (!message.nodeId) return
+
+        const settings = await setting_get_settings().catch(() => appSettingsRef.current)
+        if (settings) appSettingsRef.current = settings
+        const compactSettings = settings?.llm
+        if (!compactSettings?.auto_compact_enabled) return
+
+        const conversation = conversationsRef.current.find((item) => item.id === conversationId)
+        if (!conversation || conversation.mode !== 'default') return
+
+        const plugin = pluginsRef.current.find((item) => item.id === conversation.pluginId)
+        const modelInfo = plugin?.model_infos.find((item) => item.id === conversation.model)
+        const contextWindowTokens = modelInfo?.context_window_tokens ?? null
+        if (!contextWindowTokens || contextWindowTokens <= 0) return
+
+        const messagesForEstimate = conversation.messages.some((item) => item.id === message.id)
+            ? conversation.messages
+            : [...conversation.messages, {content: message.content}]
+        const estimatedTokens = estimateMessagesTokens(messagesForEstimate)
+        const usageTokens = message.usage?.total_tokens ?? 0
+        const usedTokens = Math.max(usageTokens, estimatedTokens)
+        const usageRatio = usedTokens / contextWindowTokens
+        if (usageRatio < compactSettings.auto_compact_threshold_ratio) return
+
+        const inFlightKey = `${conversationId}:${message.nodeId}`
+        if (autoCompactInFlightRef.current.has(inFlightKey)) return
+        autoCompactInFlightRef.current.add(inFlightKey)
+
+        try {
+            const result = await ai_compact_conversation({
+                conversationId,
+                pluginId: conversation.pluginId,
+                model: conversation.model,
+                headNodeId: message.nodeId,
+                recentMessages: compactSettings.auto_compact_recent_messages,
+                detail: compactSettings.auto_compact_detail,
+            })
+            logger.log('[useAiController][自动压缩] 压缩检查完成', {
+                conversationId,
+                applied: result.applied,
+                positionNodeId: result.positionNodeId ?? null,
+                summaryChars: result.summaryChars,
+                usageRatio,
+                usageTokens: message.usage?.total_tokens ?? null,
+                estimatedTokens,
+            })
+            if (!result.applied) return
+
+            await sessionApiRef.current?.closeSession(message.sessionId)
+            delete runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
+            setConversations((prev) => prev.map((item) =>
+                item.id === conversationId ? {...item, sessionId: null, runId: null} : item,
+            ))
+        } catch (error) {
+            logger.warn('[useAiController][自动压缩] 压缩失败', {
+                conversationId,
+                error,
+            })
+        } finally {
+            autoCompactInFlightRef.current.delete(inFlightKey)
+        }
+    }, [])
 
     const onMessage = useCallback((message: SessionMessage) => {
         const targetConversationId =
@@ -463,6 +602,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     reasoning: message.reasoning,
                     blocks: message.blocks,
                     nodeId: message.nodeId,
+                    usage: message.usage,
                 }],
             }
         }))
@@ -477,7 +617,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 return next
             })
         }
-    }, [])
+        if (resolvedConversationId) {
+            void maybeAutoCompactAfterMessage(resolvedConversationId, message)
+        }
+    }, [maybeAutoCompactAfterMessage])
 
     const onUserTurnBegin = useCallback((payload: { sessionId: string; runId: string; nodeId: number }) => {
         const targetConversationId =
@@ -518,6 +661,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [])
 
     const session = useAiSession({onMessage, onUserTurnBegin, onError})
+    useEffect(() => {
+        sessionApiRef.current = session
+    }, [session])
 
     const selectConversation = useCallback((convId: string | null) => {
         activeConversationIdRef.current = convId
@@ -596,7 +742,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ai_get_conversation(convId).then(stored => {
             if (!stored) return
             setConversations(prev => prev.map(c =>
-                c.id === convId ? {...c, messages: storedToMessages(stored.messages)} : c,
+                c.id === convId
+                    ? {
+                        ...c,
+                        messages: storedToMessages(stored.messages),
+                        settings: normalizeConversationSettings(stored.settings),
+                    }
+                    : c,
             ))
         }).catch(() => {})
     }, [session.branchSwitchVersion])
@@ -654,6 +806,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const resolveContextPayload = useCallback(async (
         projectId: string | null,
         entryId: string | null,
+        conversationSettings?: ConversationSettings | null,
     ): Promise<TaskContextPayload> => {
         const attributes: Record<string, string> = {}
         const [projResult, entryResult] = await Promise.allSettled([
@@ -687,6 +840,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 attributes.entry_snippet = entryResult.value
             }
         }
+        const systemPrompt = conversationSettings?.systemPrompt.trim()
+        if (systemPrompt) {
+            attributes[CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE] = [
+                '当前对话独有提示词如下。它只作用于当前对话，不代表全局设置。',
+                systemPrompt,
+            ].join('\n')
+        }
 
         const hints: string[] = []
         if (!webSearchEnabled) {
@@ -716,7 +876,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const sid = session.sessionId
         if (!sid) return
         let cancelled = false
-        resolveContextPayload(focus.projectId, focus.entryId).then((ctx) => {
+        const settings = activeConversationRef.current?.settings ?? DEFAULT_CONVERSATION_SETTINGS
+        resolveContextPayload(focus.projectId, focus.entryId, settings).then((ctx) => {
             if (cancelled) return
             ai_set_task_context(sid, ctx).catch(() => {
             })
@@ -725,7 +886,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         return () => {
             cancelled = true
         }
-    }, [focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
+    }, [activeConversation?.settings, focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
 
     useEffect(() => {
         let mounted = true
@@ -817,18 +978,74 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [selectedPlugin, plugins]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
+        if (!conversationMetaLoaded || !pluginsReady || !selectedPlugin || !selectedModel) return
+        if (activeConversationIdRef.current) return
+
+        const existingDraft = conversationsRef.current.find(isEmptyDraftConversation)
+        if (existingDraft) {
+            setConversations((prev) => prev.map((conversation) =>
+                conversation.id === existingDraft.id
+                    ? {...conversation, pluginId: selectedPlugin, model: selectedModel}
+                    : conversation,
+            ))
+            setActiveConversationId(existingDraft.id)
+            activeConversationIdRef.current = existingDraft.id
+            session.activateSession(null, null)
+            return
+        }
+
+        const draft = createDraftConversation(selectedPlugin, selectedModel)
+        setConversations((prev) => [draft, ...prev])
+        setActiveConversationId(draft.id)
+        activeConversationIdRef.current = draft.id
+        session.activateSession(null, null)
+    }, [conversationMetaLoaded, pluginsReady, selectedModel, selectedPlugin, session])
+
+    useEffect(() => {
+        if (!activeConversationId?.startsWith('conv_') || !selectedPlugin || !selectedModel) return
+        setConversations((prev) => prev.map((conversation) => {
+            if (conversation.id !== activeConversationId || !isEmptyDraftConversation(conversation)) {
+                return conversation
+            }
+            if (conversation.pluginId === selectedPlugin && conversation.model === selectedModel) {
+                return conversation
+            }
+            return {...conversation, pluginId: selectedPlugin, model: selectedModel}
+        }))
+    }, [activeConversationId, selectedModel, selectedPlugin])
+
+    useEffect(() => {
         if (!session.sessionId) return
-        void ai_update_session(session.sessionId, {thinking: sessionParams.thinking}).catch(logger.error)
-    }, [sessionParams, session.sessionId])
+        const settings = activeConversationRef.current?.settings ?? DEFAULT_CONVERSATION_SETTINGS
+        void ai_update_session(
+            session.sessionId,
+            buildSessionUpdateParams(settings, sessionParams.thinking),
+        ).catch(logger.error)
+    }, [activeConversation?.settings, sessionParams, session.sessionId])
 
     const createNewConversation = useCallback(async () => {
+        if (!selectedPlugin || !selectedModel) {
+            session.activateSession(null, null)
+            setActiveConversationId(null)
+            activeConversationIdRef.current = null
+            setInputValue('')
+            setEditingMessageId(null)
+            setAutoScroll(true)
+            return
+        }
+
+        const draft = createDraftConversation(selectedPlugin, selectedModel)
         session.activateSession(null, null)
-        setActiveConversationId(null)
-        activeConversationIdRef.current = null
+        setConversations((prev) => [
+            draft,
+            ...prev.filter((conversation) => !isEmptyDraftConversation(conversation)),
+        ])
+        setActiveConversationId(draft.id)
+        activeConversationIdRef.current = draft.id
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
-    }, [session])
+    }, [selectedModel, selectedPlugin, session])
 
     const startReportDiscussion = useCallback(async ({
                                                          title,
@@ -865,6 +1082,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             characterAutoPlay: null,
             reportContext,
             reportSeeded: false,
+            settings: normalizeConversationSettings(),
         }
 
         setSelectedPlugin(pluginId)
@@ -917,6 +1135,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             characterAutoPlay: built.characterAutoPlay,
             reportContext: null,
             reportSeeded: false,
+            settings: normalizeConversationSettings(),
         }
         runtimeConversationRef.current[
             runtimeConversationKey(created.sessionId, created.runId)
@@ -935,6 +1154,84 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 ? {...conversation, characterAutoPlay: autoPlay}
                 : conversation
         )))
+    }, [])
+
+    const persistConversationSettings = useCallback((
+        convId: string,
+        settings: ConversationSettings,
+        immediate = false,
+    ) => {
+        if (convId.startsWith('conv_')) return
+        const timers = conversationSettingsSaveTimersRef.current
+        if (timers[convId]) {
+            window.clearTimeout(timers[convId])
+            delete timers[convId]
+        }
+
+        const save = () => {
+            void ai_update_conversation_settings(convId, toStoredConversationSettings(settings))
+                .then((saved) => {
+                    setConversations((prev) => prev.map((conversation) =>
+                        conversation.id === convId
+                            ? {...conversation, settings: normalizeConversationSettings(saved)}
+                            : conversation,
+                    ))
+                })
+                .catch((error) => {
+                    logger.warn('写入对话独有设置失败', {convId, error})
+                })
+        }
+
+        if (immediate) {
+            save()
+            return
+        }
+        timers[convId] = window.setTimeout(() => {
+            delete timers[convId]
+            save()
+        }, 450)
+    }, [])
+
+    const updateConversationSettings = useCallback(async (
+        convId: string,
+        patch: Partial<ConversationSettings>,
+    ) => {
+        let nextSettings: ConversationSettings | null = null
+        setConversations((prev) => prev.map((conversation) => {
+            if (conversation.id !== convId) return conversation
+            nextSettings = normalizeConversationSettings({
+                ...conversation.settings,
+                ...patch,
+            })
+            return {
+                ...conversation,
+                settings: nextSettings,
+            }
+        }))
+        if (!nextSettings) return
+
+        const current = conversationsRef.current.find((conversation) => conversation.id === convId)
+        if (current?.sessionId) {
+            void ai_update_session(
+                current.sessionId,
+                buildSessionUpdateParams(nextSettings, sessionParamsRef.current.thinking),
+            ).catch(logger.error)
+            void resolveContextPayload(
+                focusRef.current.projectId,
+                focusRef.current.entryId,
+                nextSettings,
+            )
+                .then((ctx) => ai_set_task_context(current.sessionId!, ctx))
+                .catch(logger.error)
+        }
+        persistConversationSettings(convId, nextSettings)
+    }, [persistConversationSettings, resolveContextPayload])
+
+    useEffect(() => () => {
+        Object.values(conversationSettingsSaveTimersRef.current).forEach((timer) => {
+            window.clearTimeout(timer)
+        })
+        conversationSettingsSaveTimersRef.current = {}
     }, [])
 
     const switchConversation = useCallback(async (convId: string) => {
@@ -962,7 +1259,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 if (stored) {
                     setConversations((prev) => prev.map((conversation) =>
                         conversation.id === convId
-                            ? {...conversation, messages: storedToMessages(stored.messages)}
+                            ? {
+                                ...conversation,
+                                messages: storedToMessages(stored.messages),
+                                settings: normalizeConversationSettings(stored.settings),
+                            }
                             : conversation,
                     ))
                 }
@@ -1059,29 +1360,88 @@ export function useAiController(focus: AiFocus): AiContextValue {
         })
         if (activeConv?.runId && session.isRunStreaming(activeConv.runId)) return
 
-        const draftConversation: Conversation | null = activeConv ? null : {
-            id: `conv_${Date.now()}`,
-            title: '新对话',
-            messages: [],
-            pluginId: selectedPlugin,
-            model: selectedModel,
-            sessionId: null,
-            runId: null,
-            timestamp: Date.now(),
-            pinnedAt: null,
-            archivedAt: null,
-            mode: 'default',
-            characterEntryId: null,
-            characterName: null,
-            backgroundImageUrl: null,
-            characterVoiceId: null,
-            characterAutoPlay: null,
-            reportContext: null,
-            reportSeeded: false,
-        }
+        const draftConversation: Conversation | null = activeConv
+            ? null
+            : createDraftConversation(selectedPlugin, selectedModel)
         const currentConv = activeConv ?? draftConversation
         if (!currentConv) return
         const currentConvId = currentConv.id
+        const currentSettings = normalizeConversationSettings(currentConv.settings)
+        const syncPreparedSessionContext = async (target: PreparedAiSession) => {
+            try {
+                await ai_update_session(
+                    target.sid,
+                    buildSessionUpdateParams(currentSettings, sessionParamsRef.current.thinking),
+                )
+                const ctx = await resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    currentSettings,
+                )
+                await ai_set_task_context(target.sid, ctx)
+            } catch (error) {
+                logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
+                    traceId,
+                    sessionId: target.sid,
+                    error,
+                })
+            }
+        }
+        const recreateMissingSession = async (failedSession: PreparedAiSession): Promise<PreparedAiSession | null> => {
+            logger.warn('[useAiController][发送链路] 后端会话不存在，准备重建后继续发送', {
+                traceId,
+                conversationId: failedSession.conversationId,
+                sessionId: failedSession.sid,
+                runId: failedSession.runId,
+            })
+
+            delete runtimeConversationRef.current[runtimeConversationKey(failedSession.sid, failedSession.runId)]
+            session.activateSession(null, null)
+            setConversations((prev) => prev.map((conversation) =>
+                conversation.id === failedSession.conversationId
+                    ? {...conversation, sessionId: null, runId: null}
+                    : conversation,
+            ))
+
+            const isPending = failedSession.conversationId.startsWith('conv_')
+            const created = await session.createSession(
+                currentConv.pluginId || selectedPlugin,
+                currentConv.model || selectedModel,
+                isPending ? undefined : failedSession.conversationId,
+                sessionParams.maxToolRounds,
+                traceId,
+                toStoredConversationSettings(currentSettings),
+            )
+            if (!created) return null
+
+            const nextConversationId = isPending ? created.conversationId : failedSession.conversationId
+            runtimeConversationRef.current[
+                runtimeConversationKey(created.sessionId, created.runId)
+            ] = nextConversationId
+            setConversations((prev) => prev.map((conversation) =>
+                conversation.id === failedSession.conversationId
+                    ? {
+                        ...conversation,
+                        id: nextConversationId,
+                        sessionId: created.sessionId,
+                        runId: created.runId,
+                    }
+                    : conversation,
+            ))
+            if (activeConversationIdRef.current === failedSession.conversationId) {
+                setActiveConversationId(nextConversationId)
+                activeConversationIdRef.current = nextConversationId
+            }
+
+            logger.log('[useAiController][发送链路] 后端会话重建完成', {
+                traceId,
+                previousSessionId: failedSession.sid,
+                sessionId: created.sessionId,
+                runId: created.runId,
+                conversationId: nextConversationId,
+            })
+            return {sid: created.sessionId, runId: created.runId, conversationId: nextConversationId}
+        }
 
         if (draftConversation) {
             logger.log('[useAiController][发送链路] 当前没有激活对话，创建前端草稿对话', {
@@ -1128,7 +1488,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
         const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
         const existingRunId = sessionClosedForEdit ? null : currentConv.runId
-        const preparedSession = await (async (): Promise<{ sid: string; runId: string; conversationId: string } | null> => {
+        const preparedSession = await (async (): Promise<PreparedAiSession | null> => {
             if (existingSid && existingRunId) {
                 logger.log('[useAiController][发送链路] 复用当前对话已有后端会话', {
                     traceId,
@@ -1182,6 +1542,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 desiredSessionId,
                 sessionParams.maxToolRounds,
                 traceId,
+                toStoredConversationSettings(currentSettings),
             )
             if (!created) return null
             logger.log('[useAiController][发送链路] 后端会话创建完成', {
@@ -1192,8 +1553,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 runId: created.runId,
             })
 
-            // 立即同步 sessionParams，避免首轮对话使用旧默认值
-            ai_update_session(created.sessionId, {thinking: sessionParamsRef.current.thinking}).then(() => {
+            // 立即同步本对话参数，避免首轮对话使用旧默认值
+            await ai_update_session(
+                created.sessionId,
+                buildSessionUpdateParams(currentSettings, sessionParamsRef.current.thinking),
+            ).then(() => {
                 logger.log('[useAiController][发送链路] 会话参数同步完成', {
                     traceId,
                     sessionId: created.sessionId,
@@ -1209,7 +1573,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             // 兜底推送：session 刚建立时 effect 可能尚未触发，确保首轮 assemble 有上下文
             try {
-                const ctx = await resolveContextPayload(focusRef.current.projectId, focusRef.current.entryId)
+                const ctx = await resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    currentSettings,
+                )
                 logger.log('[useAiController][发送链路] 准备推送任务上下文', {
                     traceId,
                     sessionId: created.sessionId,
@@ -1255,6 +1623,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         })()
         if (!preparedSession) return
 
+        await syncPreparedSessionContext(preparedSession)
+
         const actualPrompt = currentConv.mode === 'report'
         && !currentConv.reportSeeded
         && currentConv.reportContext
@@ -1290,8 +1660,42 @@ export function useAiController(focus: AiFocus): AiContextValue {
             actualPromptLength: actualPrompt.length,
             isReportBootstrap: actualPrompt !== trimmed,
         })
-        await session.sendMessage(actualPrompt, preparedSession.sid, preparedSession.runId, traceId)
-    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length])
+        try {
+            await session.sendMessage(actualPrompt, preparedSession.sid, preparedSession.runId, traceId)
+        } catch (error) {
+            if (!isMissingBackendSessionError(error)) {
+                logger.error('[useAiController][发送链路] 发送失败且无法自动恢复', {
+                    traceId,
+                    sessionId: preparedSession.sid,
+                    runId: preparedSession.runId,
+                    error,
+                })
+                onError(`发送失败: ${formatApiError(toApiError(error))}`)
+                return
+            }
+
+            const recoveredSession = await recreateMissingSession(preparedSession)
+            if (!recoveredSession) return
+            await syncPreparedSessionContext(recoveredSession)
+            logger.log('[useAiController][发送链路] 会话重建后重试发送', {
+                traceId,
+                conversationId: recoveredSession.conversationId,
+                sessionId: recoveredSession.sid,
+                runId: recoveredSession.runId,
+            })
+            try {
+                await session.sendMessage(actualPrompt, recoveredSession.sid, recoveredSession.runId, traceId)
+            } catch (retryError) {
+                logger.error('[useAiController][发送链路] 会话重建后重试仍失败', {
+                    traceId,
+                    sessionId: recoveredSession.sid,
+                    runId: recoveredSession.runId,
+                    error: retryError,
+                })
+                onError(`发送失败: ${formatApiError(toApiError(retryError))}`)
+            }
+        }
+    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length, onError])
 
     const stopStreaming = useCallback(() => {
         abortControllerRef.current?.abort()
@@ -1350,6 +1754,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             return
         }
 
+        const convSettings = normalizeConversationSettings(conv.settings)
         let currentSid = conv.sessionId
         let currentRunId = conv.runId
         if (currentSid && currentRunId) {
@@ -1358,7 +1763,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         if (!currentSid || !currentRunId) {
-            const created = await session.createSession(conv.pluginId, conv.model, conv.id, sessionParams.maxToolRounds)
+            const created = await session.createSession(
+                conv.pluginId,
+                conv.model,
+                conv.id,
+                sessionParams.maxToolRounds,
+                undefined,
+                toStoredConversationSettings(convSettings),
+            )
             if (!created) {
                 logger.error('[useAiController] 重说失败：无法创建会话')
                 return
@@ -1374,8 +1786,31 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             // 兜底推送上下文，确保 checkout 触发的首轮 assemble 有上下文
             try {
-                const ctx = await resolveContextPayload(focusRef.current.projectId, focusRef.current.entryId)
+                await ai_update_session(
+                    currentSid!,
+                    buildSessionUpdateParams(convSettings, sessionParamsRef.current.thinking),
+                )
+                const ctx = await resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    convSettings,
+                )
                 await ai_set_task_context(currentSid!, ctx)
+            } catch {
+                // 上下文推送失败不阻塞 checkout
+            }
+        } else {
+            try {
+                await ai_update_session(
+                    currentSid,
+                    buildSessionUpdateParams(convSettings, sessionParamsRef.current.thinking),
+                )
+                const ctx = await resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    convSettings,
+                )
+                await ai_set_task_context(currentSid, ctx)
             } catch {
                 // 上下文推送失败不阻塞 checkout
             }
@@ -1422,6 +1857,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     return useMemo(() => ({
         plugins,
+        pluginsReady,
         selectedPlugin,
         selectedModel,
         setSelectedPlugin,
@@ -1457,6 +1893,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         startReportDiscussion,
         startCharacterConversation,
         updateConversationCharacterAutoPlay,
+        updateConversationSettings,
         switchConversation,
         deleteConversation,
         renameConversation,
@@ -1466,13 +1903,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         getBranchInfo: session.getBranchInfo,
         switchBranch: session.switchBranch,
     }), [
-        plugins, selectedPlugin, selectedModel, conversations, activeConversationId,
+        plugins, pluginsReady, selectedPlugin, selectedModel, conversations, activeConversationId,
         messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
+        updateConversationSettings,
         selectConversation, session.getBranchInfo, session.switchBranch,
     ])
 }
@@ -1507,5 +1945,6 @@ function buildConversationFromMeta(
         characterAutoPlay: characterMeta?.characterAutoPlay ?? null,
         reportContext: isReport ? (storedMeta?.reportContext ?? null) : null,
         reportSeeded: isReport ? (storedMeta?.reportSeeded ?? false) : false,
+        settings: normalizeConversationSettings(),
     }
 }

@@ -1,5 +1,6 @@
 pub(super) use crate::AiSessionKind;
 pub(super) use crate::AiState;
+pub(super) use crate::ApiError;
 pub(super) use crate::ApiKeyStore;
 pub(super) use crate::PathsState;
 pub(super) use crate::PendingEditsState;
@@ -11,7 +12,7 @@ pub(super) use flowcloudai_client::{
 };
 pub(super) use futures::StreamExt;
 pub(super) use serde::{Deserialize, Serialize};
-pub(super) use std::collections::HashMap;
+pub(super) use std::collections::{HashMap, HashSet};
 pub(super) use std::fs::File;
 pub(super) use std::io::{Read, Write};
 pub(super) use std::path::{Path, PathBuf};
@@ -55,6 +56,7 @@ pub(crate) struct EventTurnEnd {
     pub(crate) run_id: String,
     pub(crate) status: String, // "ok" | "cancelled" | "interrupted" | "error:<msg>"
     pub(crate) node_id: u64,
+    pub(crate) usage: Option<Usage>,
 }
 
 #[derive(Serialize, Clone)]
@@ -151,6 +153,39 @@ pub struct StoredCompact {
     pub created_at: String,
 }
 
+/// 当前对话独有的大模型参数与系统提示词。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct StoredConversationSettings {
+    pub temperature: f64,
+    pub top_p: f64,
+    pub frequency_penalty_enabled: bool,
+    pub frequency_penalty: f64,
+    pub presence_penalty_enabled: bool,
+    pub presence_penalty: f64,
+    pub system_prompt: String,
+}
+
+impl Default for StoredConversationSettings {
+    fn default() -> Self {
+        Self {
+            temperature: 0.7,
+            top_p: 1.0,
+            frequency_penalty_enabled: false,
+            frequency_penalty: 1.1,
+            presence_penalty_enabled: false,
+            presence_penalty: 0.0,
+            system_prompt: String::new(),
+        }
+    }
+}
+
+impl StoredConversationSettings {
+    pub fn is_default(value: &Self) -> bool {
+        value == &Self::default()
+    }
+}
+
 /// App 侧对话文件结构，兼容旧 core v3 JSON。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredConversation {
@@ -158,6 +193,8 @@ pub struct StoredConversation {
     pub schema_version: u32,
     #[serde(flatten)]
     pub meta: ConversationMeta,
+    #[serde(default, skip_serializing_if = "StoredConversationSettings::is_default")]
+    pub settings: StoredConversationSettings,
     pub messages: Vec<StoredMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head: Option<u64>,
@@ -330,6 +367,118 @@ pub(super) fn stored_messages_to_seeds(messages: Vec<StoredMessage>) -> Vec<Conv
         .collect()
 }
 
+fn compact_runtime_content(text: &str) -> String {
+    format!(
+        "以下是此前对话的压缩摘要，代表本摘要之前的完整聊天记录。继续对话时请把它当作历史上下文，但不要向用户主动提及压缩。\n\n{}",
+        text.trim()
+    )
+}
+
+pub(super) fn active_message_path(
+    messages: &[StoredMessage],
+    head: Option<u64>,
+) -> Vec<StoredMessage> {
+    let by_id = messages
+        .iter()
+        .filter_map(|message| message.node_id.map(|node_id| (node_id, message)))
+        .collect::<HashMap<_, _>>();
+    let mut current = head.or_else(|| messages.iter().rev().find_map(|message| message.node_id));
+    let mut path = Vec::new();
+    let mut visited = HashSet::new();
+
+    while let Some(node_id) = current {
+        if !visited.insert(node_id) {
+            log::warn!(
+                "[chat_store] active path detected parent cycle at node_id={}",
+                node_id
+            );
+            break;
+        }
+        let Some(message) = by_id.get(&node_id) else {
+            break;
+        };
+        path.push((*message).clone());
+        current = message.parent;
+    }
+
+    path.reverse();
+    path
+}
+
+pub(super) fn stored_conversation_to_runtime_seeds(
+    conversation: &StoredConversation,
+) -> Vec<ConversationNodeSeed> {
+    let Some(compact) = conversation.compact.as_ref() else {
+        return stored_messages_to_seeds(conversation.messages.clone());
+    };
+
+    let path = active_message_path(&conversation.messages, conversation.head);
+    let Some(boundary_index) = path
+        .iter()
+        .position(|message| message.node_id == Some(compact.position_node_id))
+    else {
+        return stored_messages_to_seeds(conversation.messages.clone());
+    };
+
+    let Some(boundary_message) = path.get(boundary_index) else {
+        return stored_messages_to_seeds(conversation.messages.clone());
+    };
+
+    let mut seeds = Vec::new();
+    let mut parent = None;
+    for message in path[..=boundary_index]
+        .iter()
+        .filter(|message| message.role == "system")
+    {
+        let node_id = message.node_id;
+        seeds.push(ConversationNodeSeed {
+            node_id,
+            parent,
+            turn_id: message.turn_id,
+            timestamp: Some(message.timestamp.clone()),
+            message: Message {
+                role: message.role.clone(),
+                content: message.content.clone(),
+                reasoning_content: message.reasoning.clone(),
+                tool_call_id: message.tool_call_id.clone(),
+                tool_calls: message.tool_calls.clone(),
+            },
+        });
+        if node_id.is_some() {
+            parent = node_id;
+        }
+    }
+
+    seeds.push(ConversationNodeSeed {
+        node_id: Some(compact.position_node_id),
+        parent,
+        turn_id: boundary_message.turn_id,
+        timestamp: Some(boundary_message.timestamp.clone()),
+        message: Message::system(compact_runtime_content(&compact.text)),
+    });
+
+    parent = Some(compact.position_node_id);
+    for message in path.into_iter().skip(boundary_index + 1) {
+        let node_id = message.node_id;
+        seeds.push(ConversationNodeSeed {
+            node_id,
+            parent,
+            turn_id: message.turn_id,
+            timestamp: Some(message.timestamp),
+            message: Message {
+                role: message.role,
+                content: message.content,
+                reasoning_content: message.reasoning,
+                tool_call_id: message.tool_call_id,
+                tool_calls: message.tool_calls,
+            },
+        });
+        parent = node_id;
+    }
+
+    seeds
+}
+
 fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<StoredMessage> {
     nodes
         .into_iter()
@@ -367,11 +516,48 @@ fn auto_title(messages: &[StoredMessage]) -> String {
         .unwrap_or_else(|| "新对话".to_string())
 }
 
+fn merge_compacted_runtime_snapshot(
+    existing: StoredConversation,
+    runtime_messages: Vec<StoredMessage>,
+) -> Vec<StoredMessage> {
+    let Some(compact) = existing.compact.as_ref() else {
+        return runtime_messages;
+    };
+
+    let runtime_compact_content = compact_runtime_content(&compact.text);
+    let mut seen_ids = existing
+        .messages
+        .iter()
+        .filter_map(|message| message.node_id)
+        .collect::<HashSet<_>>();
+    let mut merged = existing.messages;
+
+    for message in runtime_messages {
+        if message.node_id == Some(compact.position_node_id)
+            && message.role == "system"
+            && message.content.as_deref() == Some(runtime_compact_content.as_str())
+        {
+            continue;
+        }
+
+        if let Some(node_id) = message.node_id {
+            if !seen_ids.insert(node_id) {
+                continue;
+            }
+        }
+        merged.push(message);
+    }
+
+    merged.sort_by_key(|message| message.node_id.unwrap_or(u64::MAX));
+    merged
+}
+
 fn chat_store_save_snapshot(
     paths: &PathsState,
     conversation_id: &str,
     plugin_id: &str,
     model: &str,
+    requested_settings: Option<StoredConversationSettings>,
     nodes: Vec<ConversationNode>,
     head: Option<u64>,
 ) -> Result<(), String> {
@@ -382,13 +568,21 @@ fn chat_store_save_snapshot(
 
     let now = chrono::Utc::now().to_rfc3339();
     let existing = chat_store_get_conversation(paths, conversation_id)?;
-    let (title, created_at, compact) = match existing {
+    let (title, created_at, compact, settings, messages) = match existing {
         Some(conversation) => (
-            conversation.meta.title,
-            conversation.meta.created_at,
-            conversation.compact,
+            conversation.meta.title.clone(),
+            conversation.meta.created_at.clone(),
+            conversation.compact.clone(),
+            conversation.settings.clone(),
+            merge_compacted_runtime_snapshot(conversation, messages),
         ),
-        None => (auto_title(&messages), now.clone(), None),
+        None => (
+            auto_title(&messages),
+            now.clone(),
+            None,
+            requested_settings.unwrap_or_default(),
+            messages,
+        ),
     };
 
     let conversation = StoredConversation {
@@ -401,6 +595,7 @@ fn chat_store_save_snapshot(
             created_at,
             updated_at: now,
         },
+        settings,
         messages,
         head,
         compact,
@@ -418,12 +613,13 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
                 entry.conversation_id.clone(),
                 entry.plugin_id.clone(),
                 entry.model.clone(),
+                entry.settings.clone(),
                 entry.handle.clone(),
             )
         })
     };
 
-    let Some((conversation_id, plugin_id, model, handle)) = snapshot_target else {
+    let Some((conversation_id, plugin_id, model, settings, handle)) = snapshot_target else {
         log::warn!("[chat_store] session '{}' 不存在，跳过快照保存", session_id);
         return;
     };
@@ -431,8 +627,15 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
     let nodes = handle.get_all_nodes().await;
     let head = handle.head().await;
     let paths = app.state::<PathsState>();
-    match chat_store_save_snapshot(paths.inner(), &conversation_id, &plugin_id, &model, nodes, head)
-    {
+    match chat_store_save_snapshot(
+        paths.inner(),
+        &conversation_id,
+        &plugin_id,
+        &model,
+        settings,
+        nodes,
+        head,
+    ) {
         Ok(()) => log::info!(
             "[chat_store] 已保存会话快照: session_id={} conversation_id={}",
             session_id,
@@ -451,7 +654,7 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
 pub(crate) struct EventError {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
-    pub(crate) error: String,
+    pub(crate) error: ApiError,
 }
 
 pub(crate) fn turn_status_str(s: &TurnStatus) -> String {
@@ -791,6 +994,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                                 run_id: rid.clone(),
                                 status: turn_status_str(&status),
                                 node_id,
+                                usage,
                             },
                         )
                         .ok();
@@ -803,7 +1007,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                             EventError {
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
-                                error: e,
+                                error: e.into(),
                             },
                         )
                         .ok();

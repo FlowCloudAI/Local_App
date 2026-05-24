@@ -1,4 +1,5 @@
 import {command} from './base'
+import type {ApiError} from './error'
 import type {Entry, FCImage} from './worldflow'
 
 export type AiPluginKind = 'llm' | 'image' | 'tts'
@@ -8,9 +9,18 @@ export interface PluginInfo {
   name: string
   kind: string
   models: string[]
+  model_infos: PluginModelInfo[]
   default_model: string | null
     supported_sizes: string[]
     supported_voices: string[]
+}
+
+export interface PluginModelInfo {
+  id: string
+  name?: string | null
+  description?: string | null
+  context_window_tokens?: number | null
+  max_output_tokens?: number | null
 }
 
 export interface AiCreateLlmSessionParams {
@@ -23,6 +33,7 @@ export interface AiCreateLlmSessionParams {
   /** 续聊已有对话时传入其 ID，App 后端将回放历史并覆写原文件 */
   conversationId?: string | null
     clientTraceId?: string | null
+    settings?: StoredConversationSettings | null
 }
 
 export interface AiCreateLlmSessionResult {
@@ -164,11 +175,18 @@ export interface AiEventToolCall {
   arguments?: string
 }
 
+export interface AiUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
 export interface AiEventTurnEnd {
   session_id: string
   run_id: string
   status: string
   node_id: number
+  usage?: AiUsage | null
 }
 
 export interface AiEventTurnBegin {
@@ -196,7 +214,13 @@ export interface AiEventToolResult {
 export interface AiEventError {
   session_id: string
   run_id: string
-  error: string
+  /**
+   * 结构化错误对象。
+   *
+   * 兼容性：早期版本可能仍是字符串文案；前端读取时建议经过
+   * `toApiError` 规范化，避免后续切版本破坏。
+   */
+  error: ApiError
 }
 
 export interface ToolStatus {
@@ -216,6 +240,7 @@ export const ai_create_llm_session = ({
                                            maxToolRounds,
                                            conversationId,
                                            clientTraceId,
+                                           settings,
 }: AiCreateLlmSessionParams) =>
     command<AiCreateLlmSessionResult>('ai_create_llm_session', {
     sessionId,
@@ -226,6 +251,7 @@ export const ai_create_llm_session = ({
         maxToolRounds,
         conversationId,
         clientTraceId,
+        settings,
   })
 
 export const ai_create_character_session = ({
@@ -404,11 +430,39 @@ export interface StoredCompact {
   created_at: string
 }
 
+export interface StoredConversationSettings {
+  temperature: number
+  topP: number
+  frequencyPenaltyEnabled: boolean
+  frequencyPenalty: number
+  presencePenaltyEnabled: boolean
+  presencePenalty: number
+  systemPrompt: string
+}
+
 export interface StoredConversation extends ConversationMeta {
   schema_version?: number
+  settings?: StoredConversationSettings
   messages: StoredMessage[]
   head?: number | null
   compact?: StoredCompact | null
+}
+
+export interface CompactConversationRequest {
+  conversationId: string
+  pluginId?: string | null
+  model?: string | null
+  headNodeId?: number | null
+  recentMessages?: number | null
+  detail?: 'brief' | 'balanced' | 'detailed' | null
+}
+
+export interface CompactConversationResult {
+  applied: boolean
+  positionNodeId?: number | null
+  retainedMessages: number
+  summaryChars: number
+  reason?: string | null
 }
 
 export interface SummaryResult {
@@ -437,6 +491,21 @@ export interface GenerateEntrySummaryParams {
     maxTokens?: number | null
 }
 
+export interface FillImagePromptParams {
+    pluginId: string
+    model?: string | null
+    currentPrompt?: string | null
+    usage?: 'entry_image' | 'project_cover' | null
+    projectName?: string | null
+    entryTitle?: string | null
+    entrySummary?: string | null
+    entryType?: string | null
+}
+
+export interface FillImagePromptResult {
+    prompt: string
+}
+
 export const ai_generate_entry_summary = ({
                                               pluginId,
                                               projectId,
@@ -460,11 +529,40 @@ export const ai_generate_entry_summary = ({
         },
     })
 
+export const ai_fill_image_prompt = ({
+                                          pluginId,
+                                          model,
+                                          currentPrompt,
+                                          usage,
+                                          projectName,
+                                          entryTitle,
+                                          entrySummary,
+                                          entryType,
+                                      }: FillImagePromptParams) =>
+    command<FillImagePromptResult>('ai_fill_image_prompt', {
+        request: {
+            pluginId,
+            model,
+            currentPrompt,
+            usage,
+            projectName,
+            entryTitle,
+            entrySummary,
+            entryType,
+        },
+    })
+
 export const ai_list_conversations = () =>
     command<ConversationMeta[]>('ai_list_conversations')
 
 export const ai_get_conversation = (id: string) =>
     command<StoredConversation | null>('ai_get_conversation', {id})
+
+export const ai_update_conversation_settings = (id: string, settings: StoredConversationSettings) =>
+    command<StoredConversationSettings>('ai_update_conversation_settings', {id, settings})
+
+export const ai_compact_conversation = (request: CompactConversationRequest) =>
+    command<CompactConversationResult>('ai_compact_conversation', {request})
 
 export const ai_export_conversation = (id: string, path: string, format: ConversationExportFormat) =>
     command<void>('ai_export_conversation', {id, path, format})

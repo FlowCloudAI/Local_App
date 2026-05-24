@@ -21,9 +21,14 @@ import {
     type AiEventToolResult,
     type AiEventTurnBegin,
     type AiEventTurnEnd,
+    type AiUsage,
     type CharacterChatProjectSnapshot,
     type ConversationNode,
+    type StoredConversationSettings,
+    formatApiError,
+    toApiError,
 } from '../../../api'
+import {isMissingBackendSessionError} from '../lib/sessionErrors'
 
 // ── 导出类型 ──────────────────────────────────────────────────
 
@@ -40,6 +45,8 @@ export interface SessionMessage {
     runId: string
     /** TurnEnd 事件携带的助手消息节点 ID，用于 checkout / 重说 */
     nodeId?: number
+    /** 本轮 API 用量。供应商未返回 usage 时为空。 */
+    usage?: AiUsage | null
 }
 
 export interface SessionIdentity {
@@ -413,13 +420,14 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         })
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
-            const {session_id: sid, run_id: rid, status, node_id} = event.payload
+            const {session_id: sid, run_id: rid, status, node_id, usage} = event.payload
             markRunEvent('ai:turn_end', rid)
             logger.log('[useAiSession][turn_end]', {
                 sessionId: sid,
                 runId: rid,
                 status,
                 nodeId: node_id,
+                usage,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
                 processingNodeId: processingNodeIdByRunRef.current[rid] ?? null,
@@ -461,6 +469,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         sessionId: sid,
                         runId: rid,
                         nodeId: node_id,
+                        usage,
                     })
                 }
 
@@ -541,12 +550,15 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
 
         const unlistenError = listen<AiEventError>('ai:error', event => {
             markRunEvent('ai:error', event.payload.run_id)
+            const err = toApiError(event.payload.error)
             logger.error('[useAiSession] ai:error event', {
-                payload: event.payload,
+                code: err.code,
+                message: err.message,
+                detail: err.detail,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
             })
-            onErrorRef.current(`AI 错误: ${event.payload.error}`)
+            onErrorRef.current(`AI 错误: ${formatApiError(err)}`)
             queueMicrotask(() => {
                 delete blocksByRunRef.current[event.payload.run_id]
                 setRunStreaming(event.payload.run_id, false)
@@ -602,6 +614,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         conversationId?: string,
         maxToolRounds?: number | null,
         traceId?: string,
+        settings?: StoredConversationSettings | null,
     ): Promise<SessionIdentity | null> => {
         const newId = `session_${Date.now()}`
         try {
@@ -613,6 +626,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 // 续聊时告知后端回放历史，新对话不传
                 conversationId: conversationId ?? null,
                 clientTraceId: traceId ?? null,
+                settings: settings ?? null,
             })
             logger.log('[useAiSession][createSession]', {
                 traceId: traceId ?? null,
@@ -725,15 +739,24 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 runId: rid,
             })
         } catch (e) {
-            logger.error('[useAiSession][发送链路] 后端发送命令失败', {
+            const missingBackendSession = isMissingBackendSessionError(e)
+            const logPayload = {
                 traceId,
                 sessionId: sid,
                 runId: rid,
                 error: e,
-            })
-            onErrorRef.current(`发送失败: ${e}`)
+            }
+            if (missingBackendSession) {
+                logger.warn('[useAiSession][发送链路] 后端会话不存在，交由控制层重建', logPayload)
+            } else {
+                logger.error('[useAiSession][发送链路] 后端发送命令失败', logPayload)
+            }
             delete expectUserTurnByRunRef.current[rid]
             setRunStreaming(rid, false)
+            if (missingBackendSession) {
+                throw e
+            }
+            onErrorRef.current(`发送失败: ${formatApiError(toApiError(e))}`)
         }
     }, [setRunStreaming])
 

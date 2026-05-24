@@ -21,6 +21,7 @@
     "@deck.gl/widgets": "9.2.11",
     "@luma.gl/core": "9.2.6",
     "@luma.gl/shadertools": "9.2.6",
+    "@material/material-color-utilities": "^0.4.0",
     "@pixi/react": "^8.0.5",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",

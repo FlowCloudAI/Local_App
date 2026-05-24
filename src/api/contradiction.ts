@@ -1,4 +1,5 @@
 import {command} from './base'
+import type {WorldCheckReport} from './world_check'
 
 export interface ContradictionEvidence {
     entryId: string
@@ -58,6 +59,7 @@ export interface ContradictionSessionResult {
     scopeSummary: string
     sourceEntryIds: string[]
     truncated: boolean
+    worldCheckReport: WorldCheckReport
 }
 
 export interface StoredContradictionReport {

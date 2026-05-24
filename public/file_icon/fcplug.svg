@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512" role="img" aria-label=".fcplug FlowCloudAI 插件包">
+  <defs>
+    
+    <filter id="shadow" x="-20%" y="-15%" width="140%" height="135%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.6"/>
+      <feOffset dx="0" dy="1.5" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.26"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    
+    <clipPath id="docClip">
+      <path d="M 30 8 H 81 Q 84 8 86 10 L 106 30 Q 108 32 108 35 V 110 Q 108 120 98 120 H 30 Q 20 120 20 110 V 18 Q 20 8 30 8 Z"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#shadow)">
+    
+    <path d="M 30 8 H 81 Q 84 8 86 10 L 106 30 Q 108 32 108 35 V 110 Q 108 120 98 120 H 30 Q 20 120 20 110 V 18 Q 20 8 30 8 Z" fill="#1D72F3" stroke="rgba(0,0,0,0.10)" stroke-width="0.75"/>
+
+    
+    <g transform="translate(31,19) scale(0.6875)" fill="rgba(255,255,255,0.92)">
+      <path d="M9 19&#xA;               H27 C27 8 32 0 39 0 C46 0 51 8 51 19&#xA;               H68 C73 19 77 23 77 28&#xA;               V46 H86 C92 46 96 51 96 58 C96 65 92 70 86 70&#xA;               H77 V87 C77 92 73 96 68 96&#xA;               H51 V88 C51 82 46 78 39 78 C32 78 27 82 27 88&#xA;               V96 H9 C4 96 0 92 0 87&#xA;               V70 H9 C15 70 19 65 19 58 C19 51 15 46 9 46&#xA;               H0 V28 C0 23 4 19 9 19 Z"/>
+    </g>
+
+    
+    <path d="M 86 10 L 106 30 L 88 30 Q 86 30 86 28 Z" fill="rgba(255,255,255,0.18)"/>
+    <path d="M 86 10 L 86 28 Q 86 30 88 30 L 106 30" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="0.65" stroke-linejoin="round"/>
+    <path d="M 86 10 L 106 30" stroke="rgba(255,255,255,0.40)" stroke-width="0.70" stroke-linecap="round"/>
+
+    
+    <g clip-path="url(#docClip)">
+      <rect x="20" y="93" width="88" height="0.75" fill="rgba(255,255,255,0.15)"/>
+    </g>
+
+    
+    <text x="64" y="112" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, sans-serif" font-weight="700" font-size="14" letter-spacing="0.5" fill="rgba(255,255,255,0.92)">fcplug</text>
+  </g>
+</svg>

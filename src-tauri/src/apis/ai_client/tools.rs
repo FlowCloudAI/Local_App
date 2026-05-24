@@ -2,21 +2,21 @@ use super::common::*;
 
 /// 启用指定工具
 #[tauri::command]
-pub async fn ai_enable_tool(ai_state: State<'_, AiState>, name: String) -> Result<bool, String> {
+pub async fn ai_enable_tool(ai_state: State<'_, AiState>, name: String) -> Result<bool, ApiError> {
     let client = ai_state.client.lock().await;
     Ok(client.tool_registry().enable_tool(&name))
 }
 
 /// 禁用指定工具
 #[tauri::command]
-pub async fn ai_disable_tool(ai_state: State<'_, AiState>, name: String) -> Result<bool, String> {
+pub async fn ai_disable_tool(ai_state: State<'_, AiState>, name: String) -> Result<bool, ApiError> {
     let client = ai_state.client.lock().await;
     Ok(client.tool_registry().disable_tool(&name))
 }
 
 /// 查询工具是否启用
 #[tauri::command]
-pub async fn ai_is_enabled(ai_state: State<'_, AiState>, name: String) -> Result<bool, String> {
+pub async fn ai_is_enabled(ai_state: State<'_, AiState>, name: String) -> Result<bool, ApiError> {
     let client = ai_state.client.lock().await;
     Ok(client.tool_registry().is_enabled(&name))
 }
@@ -29,7 +29,7 @@ pub struct ToolStatus {
 }
 
 #[tauri::command]
-pub async fn ai_list_tools(ai_state: State<'_, AiState>) -> Result<Vec<ToolStatus>, String> {
+pub async fn ai_list_tools(ai_state: State<'_, AiState>) -> Result<Vec<ToolStatus>, ApiError> {
     let client = ai_state.client.lock().await;
     let registry = client.tool_registry();
     let list = registry

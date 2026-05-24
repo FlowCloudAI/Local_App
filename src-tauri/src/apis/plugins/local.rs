@@ -7,7 +7,7 @@ use super::common::*;
 pub async fn plugin_list_local(
     paths: State<'_, PathsState>,
     ai_state: State<'_, AiState>,
-) -> Result<Vec<LocalPluginInfo>, String> {
+) -> Result<Vec<LocalPluginInfo>, ApiError> {
     let images_dir = paths
         .db_path
         .parent()
@@ -31,7 +31,7 @@ pub async fn plugin_install_from_file(
     paths: State<'_, PathsState>,
     ai_state: State<'_, AiState>,
     file_path: String,
-) -> Result<LocalPluginInfo, String> {
+) -> Result<LocalPluginInfo, ApiError> {
     require_no_active_sessions(&ai_state).await?;
     let images_dir = paths
         .db_path
@@ -40,9 +40,7 @@ pub async fn plugin_install_from_file(
         .unwrap_or_else(|| std::env::temp_dir().join("flowcloudai_images"));
     let path = PathBuf::from(&file_path);
     let client = ai_state.client.lock().await;
-    let meta = client
-        .install_plugin_from_path(&path)
-        .map_err(|e| e.to_string())?;
+    let meta = client.install_plugin_from_path(&path)?;
     let rc = client.get_plugin_ref_count(&meta.id);
     Ok(plugin_meta_to_local_info(&meta, rc, &images_dir))
 }
@@ -52,10 +50,8 @@ pub async fn plugin_install_from_file(
 pub async fn plugin_uninstall(
     ai_state: State<'_, AiState>,
     plugin_id: String,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     require_no_active_sessions(&ai_state).await?;
     let client = ai_state.client.lock().await;
-    client
-        .uninstall_plugin(&plugin_id)
-        .map_err(|e| e.to_string())
+    client.uninstall_plugin(&plugin_id).map_err(ApiError::from)
 }

@@ -2,6 +2,7 @@ import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {listen} from '@tauri-apps/api/event'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_export_conversation,
@@ -13,14 +14,19 @@ import {
     type EntryBrief,
     type PluginInfo,
     type ConversationExportFormat,
+    formatApiError,
     setting_get_settings,
     setting_has_api_key,
+    toApiError,
 } from '../../../api'
-import type {AiContextValue, Conversation} from '../model/AiControllerTypes'
+import type {AiContextValue, Conversation, ConversationSettings} from '../model/AiControllerTypes'
+import {normalizeConversationSettings} from '../model/AiControllerTypes'
+import {estimateMessagesTokens, estimateTextTokens, formatTokenCount} from '../lib/contextUsage'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
 import {resolvePreferredTtsPlugin, resolveVoiceIdWithPlugin} from '../../plugins/ttsVoice'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import useLinkPreview from '../../entries/hooks/useLinkPreview'
 import useWikiLink from '../../entries/hooks/useWikiLink'
 import EntryEditorLinkPreview from '../../entries/components/EntryEditorLinkPreview'
@@ -41,9 +47,31 @@ const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
 const ACTION_MENU_ESTIMATED_HEIGHT = 196
+const CONTEXT_USAGE_RING_RADIUS = 10
+const CONTEXT_USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_USAGE_RING_RADIUS
+const CONVERSATION_SETTING_TOOLTIPS = {
+    temperature: '温度：控制回答的随机性，越高越发散，越低越稳定。',
+    topP: 'top_p：限制候选词累计概率，越低越集中，越高越开放。',
+    frequencyPenalty: '重复惩罚：启用后降低重复用词和句式，可设置具体强度。',
+    presencePenalty: '存在惩罚：启用后鼓励模型引入新内容，可设置具体强度。',
+    systemPrompt: '当前对话独有提示词：只作用于当前对话，会作为额外 system 提示发送。',
+} as const
+const formatConversationSettingNumber = (value: number) => {
+    const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
+    return fixed.replace(/\.?0+$/, '')
+}
+const formatContextUsagePercent = (percent: number, usedTokens: number) => {
+    if (usedTokens > 0 && percent > 0 && percent < 1) return '<1%'
+    return `${Math.min(100, Math.max(0, Math.round(percent)))}%`
+}
+const parseConversationNumber = (value: string, fallback: number) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+}
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
 type ActionMenuPlacement = 'up' | 'down'
+type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
 
 const AI_CONVERSATION_FILTER_OPTIONS: Array<{ key: AiConversationFilter; label: string }> = [
     {key: 'all', label: '全部'},
@@ -149,6 +177,7 @@ interface AIChatContentProps {
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     /** fullscreen 双 slot 模式下，sidebar JSX 会 portal 到这个元素；为 null 时正常 inline 渲染 */
     sidePortalTarget?: HTMLElement | null
 }
@@ -159,6 +188,7 @@ export default function AIChatContent({
                                            onTogglePanelMode,
                                            onToggleCollapsed,
                                            onOpenEntry,
+                                           onOpenPluginManagement,
                                            sidePortalTarget,
                                        }: AIChatContentProps) {
     const ctx = controller
@@ -211,7 +241,15 @@ export default function AIChatContent({
 
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
+    const settingsDrawerRef = useRef<HTMLDivElement>(null)
+    const settingsToggleRef = useRef<HTMLButtonElement>(null)
     const [inputLimitMessage, setInputLimitMessage] = useState('')
+    const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
+    const [settingsDrawerMounted, setSettingsDrawerMounted] = useState(false)
+    const [llmApiKeyState, setLlmApiKeyState] = useState<{
+        availability: ApiKeyAvailability
+        refreshTick: number
+    }>({availability: 'unknown', refreshTick: 0})
 
     useEffect(() => {
         if (!isPluginMenuOpen) return
@@ -235,6 +273,30 @@ export default function AIChatContent({
         return () => document.removeEventListener('mousedown', handleClick)
     }, [isModelMenuOpen])
 
+    useEffect(() => {
+        setSettingsDrawerOpen(false)
+        setSettingsDrawerMounted(false)
+    }, [ctx.activeConversationId])
+
+    useEffect(() => {
+        if (settingsDrawerOpen) {
+            setSettingsDrawerMounted(true)
+        }
+    }, [settingsDrawerOpen])
+
+    useEffect(() => {
+        if (!settingsDrawerOpen) return
+        const handleClick = (event: MouseEvent) => {
+            const target = event.target
+            if (!(target instanceof Node)) return
+            if (settingsDrawerRef.current?.contains(target)) return
+            if (settingsToggleRef.current?.contains(target)) return
+            setSettingsDrawerOpen(false)
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [settingsDrawerOpen])
+
     const [autoScroll, setAutoScroll] = useState(true)
     const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -252,11 +314,83 @@ export default function AIChatContent({
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
+    const [ttsPluginsReady, setTtsPluginsReady] = useState(false)
+    const [hasTtsPlugin, setHasTtsPlugin] = useState(false)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
+    const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
+    const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
+    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 LLM 插件'
+    const contextPluginInfo = ctx.plugins.find((plugin) => plugin.id === (activeConversation?.pluginId ?? ctx.selectedPlugin))
+    const contextModelId = activeConversation?.model || ctx.selectedModel
+    const contextModelInfo = contextPluginInfo?.model_infos.find((modelInfo) => modelInfo.id === contextModelId)
+    const contextWindowTokens = contextModelInfo?.context_window_tokens ?? null
+    const latestUsage = useMemo(() => {
+        for (let index = ctx.messages.length - 1; index >= 0; index -= 1) {
+            const usage = ctx.messages[index].usage
+            if (usage) return usage
+        }
+        return null
+    }, [ctx.messages])
+    const contextUsage = useMemo(() => {
+        const currentInputTokenEstimate = estimateTextTokens(ctx.inputValue)
+        const estimatedTokens =
+            estimateMessagesTokens(ctx.messages)
+            + estimateTextTokens(activeConversation?.settings.systemPrompt)
+            + currentInputTokenEstimate
+        const usageTokens = latestUsage?.total_tokens ?? 0
+        const usedTokens = Math.max(usageTokens, estimatedTokens)
+        const source = latestUsage && usageTokens >= estimatedTokens ? '供应商 usage' : '本地估算'
+        if (!contextWindowTokens || contextWindowTokens <= 0) {
+            return {
+                label: usedTokens > 0 ? '?' : '0%',
+                percent: 0,
+                ringPercent: 0,
+                title: usedTokens > 0
+                    ? `上下文窗口信息未返回，已估算当前上下文约 ${formatTokenCount(usedTokens)} tokens`
+                    : '上下文窗口信息未返回，暂以 0% 显示',
+            }
+        }
+        const percent = Math.min(100, Math.max(0, (usedTokens / contextWindowTokens) * 100))
+        const label = formatContextUsagePercent(percent, usedTokens)
+        return {
+            label,
+            percent,
+            ringPercent: percent > 0 && percent < 1 ? 1 : percent,
+            title: `上下文占用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)} tokens）`,
+        }
+    }, [activeConversation?.settings.systemPrompt, contextWindowTokens, ctx.inputValue, ctx.messages, latestUsage])
+    const showContextUsageIndicator = Boolean(contextModelId)
+    const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsage.ringPercent / 100)
+    const conversationSettings = normalizeConversationSettings(activeConversation?.settings)
+    const updateConversationSetting = useCallback(<K extends keyof ConversationSettings,>(
+        key: K,
+        value: ConversationSettings[K],
+    ) => {
+        if (!activeConversation) return
+        void ctx.updateConversationSettings(activeConversation.id, {[key]: value} as Partial<ConversationSettings>)
+    }, [activeConversation, ctx])
+    const toggleSettingsDrawer = useCallback(() => {
+        if (!activeConversation) return
+        if (!settingsDrawerOpen) {
+            setSettingsDrawerMounted(true)
+        }
+        setSettingsDrawerOpen((open) => !open)
+    }, [activeConversation, settingsDrawerOpen])
+    const handleSettingsDrawerAnimationEnd = useCallback((event: React.AnimationEvent<HTMLDivElement>) => {
+        if (event.currentTarget !== event.target) return
+        if (!settingsDrawerOpen) {
+            setSettingsDrawerMounted(false)
+        }
+    }, [settingsDrawerOpen])
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
+    const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
+    const llmApiKeyMissing = ctx.pluginsReady
+        && !llmUnavailable
+        && Boolean(activeLlmPluginId)
+        && llmApiKeyState.availability === 'missing'
     const filteredConversations = useMemo(() => {
         const keyword = conversationSearch.trim().toLocaleLowerCase()
 
@@ -269,6 +403,8 @@ export default function AIChatContent({
         }).sort(compareConversationsForList)
     }, [conversationFilter, conversationSearch, conversationStatusFilter, ctx.conversations])
     const hasConversationSearch = conversationSearch.trim().length > 0
+    const ttsUnavailable = ttsPluginsReady && !hasTtsPlugin
+    const roleplayTtsEnabled = isCharacterConversation && !ttsUnavailable
     const focusContextItems = useMemo(() => {
         const focusContext = ctx.focusContext
         return [
@@ -342,6 +478,71 @@ export default function AIChatContent({
         closeLinkPreview()
     }, [closeLinkPreview, linkPreviewProjectId])
 
+    const refreshTtsPluginAvailability = useCallback(async () => {
+        try {
+            const ttsPlugins = await ai_list_plugins('tts')
+            setHasTtsPlugin(ttsPlugins.length > 0)
+            setTtsPluginsReady(true)
+        } catch (error) {
+            logger.error('检查 TTS 插件状态失败', error)
+        }
+    }, [])
+
+    useEffect(() => {
+        void refreshTtsPluginAvailability()
+        const handler = () => {
+            void refreshTtsPluginAvailability()
+        }
+        const unlistenBackendReady = listen('backend-ready', handler)
+        window.addEventListener('fc:plugins-changed', handler)
+        return () => {
+            window.removeEventListener('fc:plugins-changed', handler)
+            unlistenBackendReady.then((fn) => fn())
+        }
+    }, [refreshTtsPluginAvailability])
+
+    useEffect(() => {
+        const handler = () => setLlmApiKeyState((state) => ({
+            ...state,
+            refreshTick: state.refreshTick + 1,
+        }))
+        const unlistenBackendReady = listen('backend-ready', handler)
+        window.addEventListener('fc:api-key-changed', handler)
+        window.addEventListener('fc:plugins-changed', handler)
+        return () => {
+            window.removeEventListener('fc:api-key-changed', handler)
+            window.removeEventListener('fc:plugins-changed', handler)
+            unlistenBackendReady.then((fn) => fn())
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!ctx.pluginsReady || llmUnavailable || !activeLlmPluginId) {
+            setLlmApiKeyState((state) => ({...state, availability: 'unknown'}))
+            return
+        }
+
+        let cancelled = false
+        setLlmApiKeyState((state) => ({...state, availability: 'checking'}))
+        setting_has_api_key(activeLlmPluginId)
+            .then((hasApiKey) => {
+                if (cancelled) return
+                setLlmApiKeyState((state) => ({
+                    ...state,
+                    availability: hasApiKey ? 'configured' : 'missing',
+                }))
+            })
+            .catch((error) => {
+                if (cancelled) return
+                logger.warn('检查 LLM 插件 API Key 状态失败', {pluginId: activeLlmPluginId, error})
+                setLlmApiKeyState((state) => ({...state, availability: 'error'}))
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [activeLlmPluginId, ctx.pluginsReady, llmApiKeyState.refreshTick, llmUnavailable])
+
     const inputWikiLink = useWikiLink({
         entryId: ctx.focusContext.entryId ?? '',
         entryCategoryId: null,
@@ -358,11 +559,15 @@ export default function AIChatContent({
     })
     const sendDisabledReason = isArchivedConversation
         ? '取消归档后继续对话'
-        : ctx.isStreaming
-            ? '正在生成中'
-            : !ctx.inputValue.trim()
-                ? '请输入消息'
-                : ''
+        : llmUnavailable
+            ? '请先安装 LLM 插件'
+            : llmApiKeyMissing
+                ? `请先配置 ${activeLlmPluginName} 的 API Key`
+                : ctx.isStreaming
+                    ? '正在生成中'
+                    : !ctx.inputValue.trim()
+                        ? '请输入消息'
+                        : ''
 
     useLayoutEffect(() => {
         if (!showFocusContext) {
@@ -548,10 +753,22 @@ export default function AIChatContent({
 
     const handleSendCurrentInput = useCallback(async () => {
         const rawInput = ctx.inputValue
-        if (isArchivedConversation || !rawInput.trim() || ctx.isStreaming) return
+        if (llmApiKeyMissing) {
+            await showAlert(`LLM 插件「${activeLlmPluginName}」尚未配置 API Key。`, 'warning', 'toast', 2600)
+            return
+        }
+        if (isArchivedConversation || llmUnavailable || !rawInput.trim() || ctx.isStreaming) return
         const nextInput = await standardizeInputWikiLinks(rawInput)
         await ctx.sendMessage(nextInput)
-    }, [ctx, isArchivedConversation, standardizeInputWikiLinks])
+    }, [
+        activeLlmPluginName,
+        ctx,
+        isArchivedConversation,
+        llmApiKeyMissing,
+        llmUnavailable,
+        showAlert,
+        standardizeInputWikiLinks,
+    ])
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         inputWikiLink.handleWikiKeyDown(event)
@@ -622,7 +839,7 @@ export default function AIChatContent({
             await ai_export_conversation(conversation.id, selectedPath, format)
             await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'nonInvasive', 1000)
         } catch (error) {
-            await showAlert(`导出会话失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`导出会话失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
         }
     }, [showAlert])
 
@@ -649,7 +866,7 @@ export default function AIChatContent({
                 ai_list_plugins('tts'),
             ])
         } catch (error) {
-            await showAlert(`读取语音设置失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`读取语音设置失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
             return
         }
 
@@ -669,7 +886,7 @@ export default function AIChatContent({
         try {
             hasApiKey = await setting_has_api_key(selectedPlugin.id)
         } catch (error) {
-            await showAlert(`读取语音插件密钥状态失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`读取语音插件密钥状态失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
             return
         }
 
@@ -702,7 +919,7 @@ export default function AIChatContent({
                 voiceId,
             })
         } catch (error) {
-            await showAlert(`语音播放失败：${String(error)}`, 'error', 'toast', 2800)
+            await showAlert(`语音播放失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2800)
         }
     }, [showAlert])
 
@@ -718,6 +935,7 @@ export default function AIChatContent({
         let cancelled = false
 
         const run = async () => {
+            if (ttsUnavailable) return
             let shouldAutoPlay = activeConversation.characterAutoPlay
             if (shouldAutoPlay == null) {
                 try {
@@ -741,6 +959,7 @@ export default function AIChatContent({
         ctx.messages,
         handlePlayRoleMessage,
         isCharacterConversation,
+        ttsUnavailable,
     ])
 
     useEffect(() => {
@@ -1178,9 +1397,9 @@ export default function AIChatContent({
                                     markdown={message.role === 'assistant'}
                                     lineHeight={1.5}
                                     reasoning={message.reasoning || undefined}
-                                    rolePlaying={isCharacterConversation && message.role === 'assistant'}
+                                    rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
                                     onCopy={() => navigator.clipboard.writeText(message.content)}
-                                    onPlay={isCharacterConversation && message.role === 'assistant'
+                                    onPlay={roleplayTtsEnabled && message.role === 'assistant'
                                         ? () => void handlePlayRoleMessage(message.content, activeConversation?.characterVoiceId)
                                         : undefined}
                                     onEdit={message.role === 'user'
@@ -1204,9 +1423,9 @@ export default function AIChatContent({
                                     lineHeight={1.5}
                                     streaming
                                     markdown
-                                    rolePlaying={isCharacterConversation}
+                                    rolePlaying={roleplayTtsEnabled}
                                     toolCallDetail={'verbose'}
-                                    onPlay={isCharacterConversation
+                                    onPlay={roleplayTtsEnabled
                                         ? () => void handlePlayRoleMessage(
                                             ctx.streamingBlocks
                                                 .filter((block) => block.type === 'content')
@@ -1242,6 +1461,117 @@ export default function AIChatContent({
                 )}
 
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
+                    {activeConversation && settingsDrawerMounted && (
+                        <div
+                            ref={settingsDrawerRef}
+                            className={`ai-conversation-settings-panel ${settingsDrawerOpen ? 'is-open' : 'is-closing'}`}
+                            onAnimationEnd={handleSettingsDrawerAnimationEnd}
+                        >
+                            <div className="ai-conversation-settings-grid">
+                                <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.temperature}>
+                                    <span>温度</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="2"
+                                        step="0.1"
+                                        value={formatConversationSettingNumber(conversationSettings.temperature)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'temperature',
+                                            parseConversationNumber(
+                                                event.currentTarget.value,
+                                                conversationSettings.temperature,
+                                            ),
+                                        )}
+                                    />
+                                </label>
+                                <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.topP}>
+                                    <span>top_p</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="1"
+                                        step="0.05"
+                                        value={formatConversationSettingNumber(conversationSettings.topP)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'topP',
+                                            parseConversationNumber(event.currentTarget.value, conversationSettings.topP),
+                                        )}
+                                    />
+                                </label>
+                                <div
+                                    className="ai-conversation-settings-field ai-conversation-settings-field--penalty"
+                                    title={CONVERSATION_SETTING_TOOLTIPS.frequencyPenalty}
+                                >
+                                    <label>
+                                        <span>重复惩罚</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={conversationSettings.frequencyPenaltyEnabled}
+                                            onChange={(event) => updateConversationSetting(
+                                                'frequencyPenaltyEnabled',
+                                                event.currentTarget.checked,
+                                            )}
+                                        />
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="-2"
+                                        max="2"
+                                        step="0.1"
+                                        disabled={!conversationSettings.frequencyPenaltyEnabled}
+                                        value={formatConversationSettingNumber(conversationSettings.frequencyPenalty)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'frequencyPenalty',
+                                            parseConversationNumber(
+                                                event.currentTarget.value,
+                                                conversationSettings.frequencyPenalty,
+                                            ),
+                                        )}
+                                    />
+                                </div>
+                                <div
+                                    className="ai-conversation-settings-field ai-conversation-settings-field--penalty"
+                                    title={CONVERSATION_SETTING_TOOLTIPS.presencePenalty}
+                                >
+                                    <label>
+                                        <span>存在惩罚</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={conversationSettings.presencePenaltyEnabled}
+                                            onChange={(event) => updateConversationSetting(
+                                                'presencePenaltyEnabled',
+                                                event.currentTarget.checked,
+                                            )}
+                                        />
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="-2"
+                                        max="2"
+                                        step="0.1"
+                                        disabled={!conversationSettings.presencePenaltyEnabled}
+                                        value={formatConversationSettingNumber(conversationSettings.presencePenalty)}
+                                        onChange={(event) => updateConversationSetting(
+                                            'presencePenalty',
+                                            parseConversationNumber(
+                                                event.currentTarget.value,
+                                                conversationSettings.presencePenalty,
+                                            ),
+                                        )}
+                                    />
+                                </div>
+                            </div>
+                            <label className="ai-conversation-settings-prompt" title={CONVERSATION_SETTING_TOOLTIPS.systemPrompt}>
+                                <span>当前对话独有提示词</span>
+                                <textarea
+                                    value={conversationSettings.systemPrompt}
+                                    onChange={(event) => updateConversationSetting('systemPrompt', event.currentTarget.value)}
+                                    placeholder="例如：保持回答简洁，优先延续当前世界观设定。"
+                                />
+                            </label>
+                        </div>
+                    )}
                     <div className="ai-floating-input-inner" ref={inputWikiContainerRef}>
                         {ctx.editingMessageId && (
                             <div className="ai-edit-indicator">
@@ -1264,6 +1594,72 @@ export default function AIChatContent({
                                 </button>
                             </div>
                         )}
+                        {!isArchivedConversation && llmApiKeyMissing && (
+                            <div className="ai-api-key-input-hint" role="status" aria-live="polite">
+                                <span>LLM 插件「{activeLlmPluginName}」尚未配置 API Key。</span>
+                                {onOpenPluginManagement && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenPluginManagement('llm')}
+                                    >
+                                        去配置
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {isCharacterConversation && ttsUnavailable && (
+                            <AiPluginMissingOverlay
+                                kind="tts"
+                                variant="inline"
+                                onOpenPluginManagement={onOpenPluginManagement}
+                            />
+                        )}
+                        <div className="ai-input-meta-row">
+                            <div className="ai-conversation-settings-summary">
+                                <button
+                                    ref={settingsToggleRef}
+                                    type="button"
+                                    className="ai-conversation-settings-toggle"
+                                    disabled={!activeConversation}
+                                    aria-expanded={settingsDrawerOpen}
+                                    title={activeConversation ? '当前对话属性设置' : '发送消息后可设置当前对话属性'}
+                                    onClick={toggleSettingsDrawer}
+                                >
+                                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M6 3.5 10.5 8 6 12.5"/>
+                                    </svg>
+                                </button>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.temperature}>温度 {formatConversationSettingNumber(conversationSettings.temperature)}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.topP}>top_p {formatConversationSettingNumber(conversationSettings.topP)}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.frequencyPenalty}>重复惩罚 {conversationSettings.frequencyPenaltyEnabled ? '开' : '关'}</span>
+                                <span title={CONVERSATION_SETTING_TOOLTIPS.presencePenalty}>存在惩罚 {conversationSettings.presencePenaltyEnabled ? '开' : '关'}</span>
+                            </div>
+                            {showContextUsageIndicator && (
+                                <div
+                                    className="ai-context-usage-indicator"
+                                    title={contextUsage.title}
+                                    aria-label={contextUsage.title}
+                                >
+                                    <svg className="ai-context-usage-ring" viewBox="0 0 28 28" aria-hidden="true">
+                                        <circle
+                                            className="ai-context-usage-ring-track"
+                                            cx="14"
+                                            cy="14"
+                                            r={CONTEXT_USAGE_RING_RADIUS}
+                                        />
+                                        <circle
+                                            className="ai-context-usage-ring-value"
+                                            cx="14"
+                                            cy="14"
+                                            r={CONTEXT_USAGE_RING_RADIUS}
+                                            strokeDasharray={CONTEXT_USAGE_RING_CIRCUMFERENCE}
+                                            strokeDashoffset={contextUsageDashOffset}
+                                        />
+                                    </svg>
+                                    <span>{contextUsage.label}</span>
+                                </div>
+                            )}
+                        </div>
                         <textarea
                             ref={textareaRef}
                             className="ai-floating-textarea"
@@ -1275,8 +1671,14 @@ export default function AIChatContent({
                             onSelect={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
                             onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
                             onBlur={() => inputWikiLink.handleTextareaBlur()}
-                            disabled={isArchivedConversation}
-                            placeholder={isArchivedConversation ? '取消归档后继续对话' : '请输入消息...'}
+                            disabled={isArchivedConversation || llmUnavailable || llmApiKeyMissing}
+                            placeholder={isArchivedConversation
+                                ? '取消归档后继续对话'
+                                : llmUnavailable
+                                    ? '安装 LLM 插件后继续对话'
+                                    : llmApiKeyMissing
+                                        ? '配置 API Key 后继续对话'
+                                        : '请输入消息...'}
                         />
                         {inputLimitMessage && (
                             <div className="ai-input-limit-hint" role="status">
@@ -1308,7 +1710,7 @@ export default function AIChatContent({
                                 >
                                     深度思考
                                 </button>
-                                {isCharacterConversation && activeConversation && (
+                                {isCharacterConversation && activeConversation && !ttsUnavailable && (
                                     <button
                                         className={`ai-toolbar-btn ${effectiveRoleplayAutoPlay ? 'active' : ''}`}
                                         onClick={(event) => {

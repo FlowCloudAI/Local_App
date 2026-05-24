@@ -5,8 +5,8 @@ use super::market_client::*;
 
 /// 获取官方市场插件列表
 #[tauri::command]
-pub async fn plugin_market_list(net: State<'_, NetworkState>) -> Result<serde_json::Value, String> {
-    market_list(&net.client).await.map_err(|e| e.to_string())
+pub async fn plugin_market_list(net: State<'_, NetworkState>) -> Result<serde_json::Value, ApiError> {
+    market_list(&net.client).await.map_err(ApiError::from_display)
 }
 
 /// 从官方市场下载并安装插件
@@ -16,7 +16,7 @@ pub async fn plugin_market_install(
     ai_state: State<'_, AiState>,
     net: State<'_, NetworkState>,
     plugin_id: String,
-) -> Result<LocalPluginInfo, String> {
+) -> Result<LocalPluginInfo, ApiError> {
     require_no_active_sessions(&ai_state).await?;
 
     let images_dir = paths
@@ -30,12 +30,10 @@ pub async fn plugin_market_install(
     let tmp = std::env::temp_dir().join(format!("{}.fcplug", plugin_id));
     market_download(&net.client, &plugin_id, &tmp)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(ApiError::from_display)?;
 
     let client = ai_state.client.lock().await;
-    let meta = client
-        .install_plugin_from_path(&tmp)
-        .map_err(|e| e.to_string())?;
+    let meta = client.install_plugin_from_path(&tmp)?;
 
     // 清理临时文件（忽略失败）
     let _ = std::fs::remove_file(&tmp);
@@ -50,11 +48,11 @@ pub async fn plugin_market_upload(
     net: State<'_, NetworkState>,
     file_path: String,
     password: String,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, ApiError> {
     let path = PathBuf::from(&file_path);
     market_upload(&net.client, &path, &password)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(ApiError::from_display)
 }
 
 /// 更新官方市场上的插件（开发者用）
@@ -63,11 +61,11 @@ pub async fn plugin_market_update(
     net: State<'_, NetworkState>,
     plugin_id: String,
     file_path: String,
-) -> Result<serde_json::Value, String> {
+) -> Result<serde_json::Value, ApiError> {
     let path = PathBuf::from(&file_path);
     market_update(&net.client, &plugin_id, &path)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(ApiError::from_display)
 }
 
 /// 从官方市场删除插件（开发者用）
@@ -75,8 +73,8 @@ pub async fn plugin_market_update(
 pub async fn plugin_market_delete(
     net: State<'_, NetworkState>,
     plugin_id: String,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     market_delete(&net.client, &plugin_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(ApiError::from_display)
 }

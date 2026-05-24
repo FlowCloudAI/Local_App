@@ -7,7 +7,7 @@ pub async fn confirm_entry_edit(
     pending_edits: State<'_, PendingEditsState>,
     request_id: String,
     confirmed: bool,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     let mut map = pending_edits.pending.lock().await;
     match map.remove(&request_id) {
         Some(tx) => {
@@ -15,6 +15,10 @@ pub async fn confirm_entry_edit(
             let _ = tx.send(confirmed);
             Ok(())
         }
-        None => Err(format!("编辑请求 '{}' 不存在或已超时", request_id)),
+        None => Err(ApiError::new(
+            flowcloudai_client::ErrorCode::ValidationFormatError,
+            format!("编辑请求 '{}' 不存在或已超时", request_id),
+        )
+        .with_kv("request_id", request_id.clone())),
     }
 }

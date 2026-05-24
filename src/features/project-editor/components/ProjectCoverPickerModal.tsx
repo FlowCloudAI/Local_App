@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom'
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
+    ai_fill_image_prompt,
     ai_list_plugins,
     ai_text_to_image,
     db_get_entry,
@@ -15,6 +16,7 @@ import {
 } from '../../../api'
 import type {EntryImage} from '../../entries/lib/entryImage'
 import {normalizeEntryImages, toEntryImageSrc} from '../../entries/lib/entryImage'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 
 type Tab = 'existing' | 'local' | 'ai'
@@ -31,9 +33,13 @@ interface CoverLibraryItem {
 interface ProjectCoverPickerModalProps {
     open: boolean
     projectId: string
+    projectName?: string | null
     currentCoverPath?: string | null
+    aiPluginId?: string | null
+    aiModel?: string | null
     onClose: () => void
     onSelectCover: (coverPath: string | null) => Promise<void> | void
+    onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
 function extractEntryImages(entry: Entry): CoverLibraryItem[] {
@@ -58,19 +64,26 @@ function extractEntryImages(entry: Entry): CoverLibraryItem[] {
 export default function ProjectCoverPickerModal({
                                                     open,
                                                     projectId,
+                                                    projectName = null,
                                                     currentCoverPath,
+                                                    aiPluginId = null,
+                                                    aiModel = null,
                                                     onClose,
                                                     onSelectCover,
+                                                    onOpenPluginManagement,
                                                 }: ProjectCoverPickerModalProps) {
     const [activeTab, setActiveTab] = useState<Tab>('existing')
     const [loadingLibrary, setLoadingLibrary] = useState(false)
     const [libraryItems, setLibraryItems] = useState<CoverLibraryItem[]>([])
     const [libraryQuery, setLibraryQuery] = useState('')
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const [pluginsLoaded, setPluginsLoaded] = useState(false)
+    const [pluginLoadError, setPluginLoadError] = useState('')
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const [selectedSize, setSelectedSize] = useState('')
     const [prompt, setPrompt] = useState('')
+    const [fillingPrompt, setFillingPrompt] = useState(false)
     const [generateState, setGenerateState] = useState<GenerateState>('idle')
     const [results, setResults] = useState<ImageData[]>([])
     const [selectedResultIndex, setSelectedResultIndex] = useState(0)
@@ -87,10 +100,13 @@ export default function ProjectCoverPickerModal({
         setLibraryItems([])
         setLibraryQuery('')
         setPlugins([])
+        setPluginsLoaded(false)
+        setPluginLoadError('')
         setSelectedPlugin('')
         setSelectedModel('')
         setSelectedSize('')
         setPrompt('')
+        setFillingPrompt(false)
         setGenerateState('idle')
         setResults([])
         setSelectedResultIndex(0)
@@ -106,6 +122,10 @@ export default function ProjectCoverPickerModal({
                 if (cancelled) return
 
                 setPlugins(imagePlugins)
+                setPluginsLoaded(true)
+                if (imagePlugins.length === 0) {
+                    setActiveTab('ai')
+                }
                 const defaultPlugin = imagePlugins[0]
                 setSelectedPlugin(defaultPlugin?.id ?? '')
                 setSelectedModel(defaultPlugin?.default_model ?? defaultPlugin?.models[0] ?? '')
@@ -128,7 +148,9 @@ export default function ProjectCoverPickerModal({
                 setLibraryItems(images)
             } catch (error) {
                 if (!cancelled) {
+                    setPluginsLoaded(true)
                     const message = error instanceof Error ? error.message : String(error)
+                    setPluginLoadError(message)
                     setErrorMessage(message)
                     void showAlert(message, 'error', 'toast', 3000)
                 }
@@ -252,6 +274,34 @@ export default function ProjectCoverPickerModal({
         }
     }
 
+    const handleFillPrompt = async () => {
+        if (fillingPrompt || generateState === 'generating' || applying) return
+        if (!aiPluginId) {
+            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'toast', 2200)
+            return
+        }
+
+        setFillingPrompt(true)
+        setErrorMessage('')
+        try {
+            const result = await ai_fill_image_prompt({
+                pluginId: aiPluginId,
+                model: aiModel || null,
+                currentPrompt: prompt.trim() || null,
+                usage: 'project_cover',
+                projectName,
+            })
+            setPrompt(result.prompt)
+            void showAlert('已填充绘图提示词', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            setErrorMessage(message)
+            void showAlert(message, 'error', 'toast', 3000)
+        } finally {
+            setFillingPrompt(false)
+        }
+    }
+
     const handleAddAiCover = async () => {
         const target = results[selectedResultIndex]
         if (!target?.url) return
@@ -276,6 +326,11 @@ export default function ProjectCoverPickerModal({
             event.preventDefault()
             void handleGenerate()
         }
+    }
+
+    const handleOpenPluginManagement = () => {
+        onClose()
+        onOpenPluginManagement?.('image')
     }
 
     if (!open) return null
@@ -396,6 +451,16 @@ export default function ProjectCoverPickerModal({
 
                     {activeTab === 'ai' && (
                         <div className="pe-cover-picker__panel pe-cover-picker__panel--ai">
+                            {pluginLoadError ? (
+                                <div className="pe-cover-picker__error">读取生图所需数据失败：{pluginLoadError}</div>
+                            ) : pluginsLoaded && plugins.length === 0 ? (
+                                <AiPluginMissingOverlay
+                                    kind="image"
+                                    variant="panel"
+                                    onOpenPluginManagement={handleOpenPluginManagement}
+                                />
+                            ) : (
+                                <>
                             <div className="pe-cover-picker__field-row">
                                 <div className="pe-cover-picker__field">
                                     <label className="pe-cover-picker__label">插件</label>
@@ -445,7 +510,7 @@ export default function ProjectCoverPickerModal({
                                     onKeyDown={handlePromptKeyDown}
                                     placeholder="描述你想要生成的图像内容…"
                                     rows={3}
-                                    disabled={generateState === 'generating' || applying}
+                                    disabled={generateState === 'generating' || fillingPrompt || applying}
                                 />
                                 <span className="pe-cover-picker__hint">按 Ctrl / Cmd + Enter 可直接生成。</span>
                             </div>
@@ -453,8 +518,15 @@ export default function ProjectCoverPickerModal({
                             <div className="pe-cover-picker__actions">
                                 <Button type="button"
                                     size="sm"
+                                    onClick={() => void handleFillPrompt()}
+                                    disabled={fillingPrompt || generateState === 'generating' || applying}
+                                >
+                                    {fillingPrompt ? '填充中…' : 'AI 填充提示词'}
+                                </Button>
+                                <Button type="button"
+                                    size="sm"
                                     onClick={() => void handleGenerate()}
-                                    disabled={!canGenerate || generateState === 'generating' || applying}
+                                    disabled={!canGenerate || generateState === 'generating' || fillingPrompt || applying}
                                 >
                                     {generateState === 'generating' ? '生成中…' : '开始生成'}
                                 </Button>
@@ -502,6 +574,8 @@ export default function ProjectCoverPickerModal({
                                         </Button>
                                     </div>
                                 </div>
+                            )}
+                                </>
                             )}
                         </div>
                     )}

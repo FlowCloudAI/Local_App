@@ -19,6 +19,7 @@ import {open} from '@tauri-apps/plugin-dialog'
 import {appConfigDir} from '@tauri-apps/api/path'
 import {listen} from '@tauri-apps/api/event'
 import AboutSection from '../features/about/AboutSection'
+import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
     ai_close_all_sessions,
     ai_get_usage_by_model,
@@ -27,6 +28,7 @@ import {
     type ApiUsageSummary,
     type AppSettings,
     type DefaultPaths,
+    type LlmCompactDetail,
     type LocalPluginInfo,
     open_in_file_manager,
     plugin_install_from_file,
@@ -60,8 +62,15 @@ import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
 type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
+type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 type TemplateView = 'list' | 'detail'
+
+const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string }> = [
+    {value: 'brief', label: '简略'},
+    {value: 'balanced', label: '适中'},
+    {value: 'detailed', label: '详细'},
+]
 
 interface ParsedPluginVersion {
     core: [number, number, number]
@@ -155,12 +164,14 @@ function isRemoteVersionNewer(current: string, latest: string): boolean {
 
 interface SettingsProps {
     onBack?: () => void
+    initialTab?: SettingsTab
+    initialPluginKind?: PluginKindFilter
 }
 
-export default function Settings({onBack}: SettingsProps) {
+export default function Settings({onBack, initialTab = 'system', initialPluginKind = 'all'}: SettingsProps) {
     const {showAlert} = useAlert()
     const showAlertRef = useRef(showAlert)
-    const [activeTab, setActiveTab] = useState<SettingsTab>('system')
+    const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
 
     useEffect(() => {
         showAlertRef.current = showAlert
@@ -209,7 +220,7 @@ export default function Settings({onBack}: SettingsProps) {
     const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
     const [uninstallingId, setUninstallingId] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
-    const [kindFilter, setKindFilter] = useState<'all' | 'llm' | 'image' | 'tts'>('all')
+    const [kindFilter, setKindFilter] = useState<PluginKindFilter>(initialPluginKind)
     const [pluginDirectoryLoaded, setPluginDirectoryLoaded] = useState(false)
 
     const {setTheme} = useTheme();
@@ -236,6 +247,13 @@ export default function Settings({onBack}: SettingsProps) {
             setUsageLoading(false)
         }
     }, [])
+
+    useEffect(() => {
+        setActiveTab(initialTab)
+        if (initialTab === 'ai') {
+            setKindFilter(initialPluginKind)
+        }
+    }, [initialPluginKind, initialTab])
 
     // 切换到用量统计 tab 时自动加载
     useEffect(() => {
@@ -466,7 +484,11 @@ export default function Settings({onBack}: SettingsProps) {
                 temperature: 0.7,
                 max_tokens: 2000,
                 stream: true,
-                show_reasoning: false
+                show_reasoning: false,
+                auto_compact_enabled: false,
+                auto_compact_threshold_ratio: 0.75,
+                auto_compact_recent_messages: 8,
+                auto_compact_detail: 'balanced'
             },
             image: {
                 plugin_id: null,
@@ -592,6 +614,33 @@ export default function Settings({onBack}: SettingsProps) {
         })
     }
 
+    const updateLlmDefaults = useCallback((patch: Partial<AppSettings['llm']>) => {
+        setSettings(prev => prev ? {
+            ...prev,
+            llm: {
+                ...prev.llm,
+                ...patch,
+            },
+        } : null)
+    }, [])
+
+    const handleLlmCompactThresholdChange = useCallback((value: number | number[]) => {
+        const rawValue = Array.isArray(value) ? value[0] : value
+        const nextValue = Number.isFinite(rawValue) ? rawValue : 75
+        updateLlmDefaults({
+            auto_compact_threshold_ratio: Math.min(0.95, Math.max(0.5, nextValue / 100)),
+        })
+    }, [updateLlmDefaults])
+
+    const handleLlmCompactRecentMessagesChange = useCallback((value: string) => {
+        const parsed = Number(value)
+        updateLlmDefaults({
+            auto_compact_recent_messages: Number.isFinite(parsed)
+                ? Math.min(30, Math.max(2, Math.trunc(parsed)))
+                : 8,
+        })
+    }, [updateLlmDefaults])
+
     // API Key 管理
     const handleConfigureApiKey = (pluginId: string) => {
         setExpandedApiKeyPluginId(current => current === pluginId ? null : pluginId)
@@ -609,6 +658,7 @@ export default function Settings({onBack}: SettingsProps) {
             setSavingApiKeyPluginId(pluginId)
             await setting_set_api_key(pluginId, nextApiKey)
             setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
+            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: true}}))
             setExpandedApiKeyPluginId(null)
             setApiKeyDraft('')
             void showAlert('API Key 已保存', 'success', 'nonInvasive', 2000)
@@ -623,6 +673,7 @@ export default function Settings({onBack}: SettingsProps) {
         try {
             await setting_delete_api_key(pluginId)
             setApiKeyStatus(prev => ({...prev, [pluginId]: false}))
+            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: false}}))
             if (expandedApiKeyPluginId === pluginId) {
                 setExpandedApiKeyPluginId(null)
                 setApiKeyDraft('')
@@ -1271,6 +1322,8 @@ export default function Settings({onBack}: SettingsProps) {
                                 </div>
                             </section>
 
+                            <ThemeColorPreview/>
+
                             {/* 操作按钮 */}
                             <div className="settings-footer">
                                 <Button type="button" variant="outline" onClick={handleReset}>重置为默认</Button>
@@ -1452,6 +1505,65 @@ export default function Settings({onBack}: SettingsProps) {
                                         />
                                     </div>
                                 </div>
+                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                    <label className="settings-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.llm.auto_compact_enabled}
+                                            onChange={(event) => updateLlmDefaults({
+                                                auto_compact_enabled: event.target.checked,
+                                            })}
+                                        />
+                                        <span>自动压缩上下文</span>
+                                    </label>
+                                    <span className="settings-field-hint">
+                                        本轮回复结束后检测上下文占用，超过阈值时使用当前模型生成会话摘要。
+                                    </span>
+                                </div>
+                                {settings.llm.auto_compact_enabled && (
+                                    <div className="settings-row settings-row--compact settings-llm-compact-options">
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">压缩阈值</label>
+                                            <div className="settings-range-control">
+                                                <Slider
+                                                    min={50}
+                                                    max={95}
+                                                    step={5}
+                                                    value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
+                                                    onChange={handleLlmCompactThresholdChange}
+                                                />
+                                            </div>
+                                            <span className="settings-span">
+                                                {Math.round(settings.llm.auto_compact_threshold_ratio * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">保留近期消息</label>
+                                            <input
+                                                className="settings-number-input"
+                                                type="number"
+                                                min={2}
+                                                max={30}
+                                                step={1}
+                                                value={settings.llm.auto_compact_recent_messages}
+                                                onChange={(event) => handleLlmCompactRecentMessagesChange(event.target.value)}
+                                            />
+                                            <span className="settings-span">条</span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">摘要详细程度</label>
+                                            <div className="settings-select-control">
+                                                <Select
+                                                    options={LLM_COMPACT_DETAIL_OPTIONS}
+                                                    value={settings.llm.auto_compact_detail}
+                                                    onChange={(value) => updateLlmDefaults({
+                                                        auto_compact_detail: String(value) as LlmCompactDetail,
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
 
                             {/* 图片生成默认配置 */}
