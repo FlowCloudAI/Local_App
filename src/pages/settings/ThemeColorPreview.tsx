@@ -28,7 +28,6 @@ export default function ThemeColorPreview() {
     const [recipeId, setRecipeId] = useState(defaultRecipe.id)
     const [seedColor, setSeedColor] = useState(defaultRecipe.primarySeed)
     const [mode, setMode] = useState<MaterialThemeMode>('light')
-    const [overrideApplied, setOverrideApplied] = useState(false)
     const selectedRecipe = getFcThemeRecipe(recipeId)
     const materialPreview = useMemo(() => generateMaterialThemePreview(seedColor), [seedColor])
     const fcPreview = useMemo(() => createFcThemePreview(selectedRecipe, seedColor), [selectedRecipe, seedColor])
@@ -36,48 +35,24 @@ export default function ThemeColorPreview() {
     const valid = isValidHexColor(seedColor)
     const isDefaultTheme = recipeId === DEFAULT_FC_THEME_RECIPE_ID
         && normalizedColor === normalizeHexColor(defaultRecipe.primarySeed)
-    const canApplyOverride = Boolean(fcPreview) && !isDefaultTheme
 
     useEffect(() => {
         if (isDefaultTheme) {
-            if (overrideApplied) {
-                clearFcThemeTokenOverride()
-                setOverrideApplied(false)
-            }
+            clearFcThemeTokenOverride()
             return
         }
-        if (!overrideApplied || !fcPreview) return
+        if (!fcPreview) return
         applyFcThemeTokenOverride(fcPreview)
-    }, [fcPreview, isDefaultTheme, overrideApplied])
+    }, [fcPreview, isDefaultTheme])
 
     const selectRecipe = (nextRecipeId: string) => {
         const nextRecipe = getFcThemeRecipe(nextRecipeId)
-        if (nextRecipe.id === DEFAULT_FC_THEME_RECIPE_ID) {
-            clearFcThemeTokenOverride()
-            setOverrideApplied(false)
-        }
         setRecipeId(nextRecipe.id)
         setSeedColor(nextRecipe.primarySeed)
     }
 
     const resetDefault = () => {
-        clearFcThemeTokenOverride()
-        setOverrideApplied(false)
         selectRecipe(DEFAULT_FC_THEME_RECIPE_ID)
-    }
-
-    const applyOverride = () => {
-        if (isDefaultTheme) {
-            clearOverride()
-            return
-        }
-        if (!fcPreview) return
-        setOverrideApplied(applyFcThemeTokenOverride(fcPreview))
-    }
-
-    const clearOverride = () => {
-        clearFcThemeTokenOverride()
-        setOverrideApplied(false)
     }
 
     return (
@@ -91,14 +66,6 @@ export default function ThemeColorPreview() {
                     <Button type="button" size="sm" variant="outline" onClick={resetDefault}>
                         恢复默认
                     </Button>
-                    <Button type="button" size="sm" disabled={!canApplyOverride} onClick={applyOverride}>
-                        {isDefaultTheme ? '默认主题' : overrideApplied ? '更新覆盖' : '应用覆盖'}
-                    </Button>
-                    {overrideApplied && (
-                        <Button type="button" size="sm" variant="ghost" onClick={clearOverride}>
-                            清除覆盖
-                        </Button>
-                    )}
                 </div>
             </div>
 
@@ -146,12 +113,6 @@ export default function ThemeColorPreview() {
                 <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>
             ) : (
                 <>
-                    {overrideApplied && (
-                        <div className="theme-color-preview__applied-notice">
-                            已用运行时样式覆盖 FC 主题令牌。切换配方或颜色后会自动更新覆盖。
-                        </div>
-                    )}
-
                     <div className="theme-color-preview__recipe-summary">
                         <strong>{fcPreview.recipe.label}</strong>
                         <span>{fcPreview.recipe.description}</span>
