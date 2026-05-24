@@ -152,6 +152,39 @@ pub struct StoredCompact {
     pub created_at: String,
 }
 
+/// 当前对话独有的大模型参数与系统提示词。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct StoredConversationSettings {
+    pub temperature: f64,
+    pub top_p: f64,
+    pub frequency_penalty_enabled: bool,
+    pub frequency_penalty: f64,
+    pub presence_penalty_enabled: bool,
+    pub presence_penalty: f64,
+    pub system_prompt: String,
+}
+
+impl Default for StoredConversationSettings {
+    fn default() -> Self {
+        Self {
+            temperature: 0.7,
+            top_p: 1.0,
+            frequency_penalty_enabled: false,
+            frequency_penalty: 1.1,
+            presence_penalty_enabled: false,
+            presence_penalty: 0.0,
+            system_prompt: String::new(),
+        }
+    }
+}
+
+impl StoredConversationSettings {
+    pub fn is_default(value: &Self) -> bool {
+        value == &Self::default()
+    }
+}
+
 /// App 侧对话文件结构，兼容旧 core v3 JSON。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredConversation {
@@ -159,6 +192,8 @@ pub struct StoredConversation {
     pub schema_version: u32,
     #[serde(flatten)]
     pub meta: ConversationMeta,
+    #[serde(default, skip_serializing_if = "StoredConversationSettings::is_default")]
+    pub settings: StoredConversationSettings,
     pub messages: Vec<StoredMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head: Option<u64>,
@@ -389,15 +424,39 @@ pub(super) fn stored_conversation_to_runtime_seeds(
     };
 
     let mut seeds = Vec::new();
+    let mut parent = None;
+    for message in path[..=boundary_index]
+        .iter()
+        .filter(|message| message.role == "system")
+    {
+        let node_id = message.node_id;
+        seeds.push(ConversationNodeSeed {
+            node_id,
+            parent,
+            turn_id: message.turn_id,
+            timestamp: Some(message.timestamp.clone()),
+            message: Message {
+                role: message.role.clone(),
+                content: message.content.clone(),
+                reasoning_content: message.reasoning.clone(),
+                tool_call_id: message.tool_call_id.clone(),
+                tool_calls: message.tool_calls.clone(),
+            },
+        });
+        if node_id.is_some() {
+            parent = node_id;
+        }
+    }
+
     seeds.push(ConversationNodeSeed {
         node_id: Some(compact.position_node_id),
-        parent: None,
+        parent,
         turn_id: boundary_message.turn_id,
         timestamp: Some(boundary_message.timestamp.clone()),
         message: Message::system(compact_runtime_content(&compact.text)),
     });
 
-    let mut parent = Some(compact.position_node_id);
+    parent = Some(compact.position_node_id);
     for message in path.into_iter().skip(boundary_index + 1) {
         let node_id = message.node_id;
         seeds.push(ConversationNodeSeed {
@@ -507,14 +566,21 @@ fn chat_store_save_snapshot(
 
     let now = chrono::Utc::now().to_rfc3339();
     let existing = chat_store_get_conversation(paths, conversation_id)?;
-    let (title, created_at, compact, messages) = match existing {
+    let (title, created_at, compact, settings, messages) = match existing {
         Some(conversation) => (
             conversation.meta.title.clone(),
             conversation.meta.created_at.clone(),
             conversation.compact.clone(),
+            conversation.settings.clone(),
             merge_compacted_runtime_snapshot(conversation, messages),
         ),
-        None => (auto_title(&messages), now.clone(), None, messages),
+        None => (
+            auto_title(&messages),
+            now.clone(),
+            None,
+            StoredConversationSettings::default(),
+            messages,
+        ),
     };
 
     let conversation = StoredConversation {
@@ -527,6 +593,7 @@ fn chat_store_save_snapshot(
             created_at,
             updated_at: now,
         },
+        settings,
         messages,
         head,
         compact,

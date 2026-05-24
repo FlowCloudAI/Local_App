@@ -420,8 +420,19 @@ export interface StoredCompact {
   created_at: string
 }
 
+export interface StoredConversationSettings {
+  temperature: number
+  topP: number
+  frequencyPenaltyEnabled: boolean
+  frequencyPenalty: number
+  presencePenaltyEnabled: boolean
+  presencePenalty: number
+  systemPrompt: string
+}
+
 export interface StoredConversation extends ConversationMeta {
   schema_version?: number
+  settings?: StoredConversationSettings
   messages: StoredMessage[]
   head?: number | null
   compact?: StoredCompact | null
@@ -498,6 +509,9 @@ export const ai_list_conversations = () =>
 
 export const ai_get_conversation = (id: string) =>
     command<StoredConversation | null>('ai_get_conversation', {id})
+
+export const ai_update_conversation_settings = (id: string, settings: StoredConversationSettings) =>
+    command<StoredConversationSettings>('ai_update_conversation_settings', {id, settings})
 
 export const ai_compact_conversation = (request: CompactConversationRequest) =>
     command<CompactConversationResult>('ai_compact_conversation', {request})

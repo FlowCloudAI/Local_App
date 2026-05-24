@@ -17,6 +17,22 @@ pub async fn ai_get_conversation(
     chat_store_get_conversation(paths.inner(), &id)
 }
 
+/// 更新当前对话独有的大模型参数与系统提示词。
+#[tauri::command]
+pub async fn ai_update_conversation_settings(
+    paths: State<'_, PathsState>,
+    id: String,
+    settings: StoredConversationSettings,
+) -> Result<StoredConversationSettings, String> {
+    let mut conversation =
+        chat_store_get_conversation(paths.inner(), &id)?.ok_or_else(|| format!("未找到会话：{}", id))?;
+    let settings = normalize_conversation_settings(settings);
+    conversation.settings = settings.clone();
+    conversation.meta.updated_at = chrono::Utc::now().to_rfc3339();
+    chat_store_save_conversation(paths.inner(), &conversation)?;
+    Ok(settings)
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompactConversationRequest {
@@ -291,13 +307,26 @@ fn select_compact_boundary(
     if keep_start_index == 0 {
         return None;
     }
-    let boundary_index = keep_start_index - 1;
+    let boundary_index = (0..keep_start_index)
+        .rev()
+        .find(|index| path[*index].role != "system")?;
     let boundary_node_id = path.get(boundary_index)?.node_id?;
     Some((boundary_index, boundary_node_id, visible_count))
 }
 
 fn is_visible_chat_message(message: &StoredMessage) -> bool {
     matches!(message.role.as_str(), "user" | "assistant")
+}
+
+fn normalize_conversation_settings(
+    mut settings: StoredConversationSettings,
+) -> StoredConversationSettings {
+    settings.temperature = settings.temperature.clamp(0.0, 2.0);
+    settings.top_p = settings.top_p.clamp(0.0, 1.0);
+    settings.frequency_penalty = settings.frequency_penalty.clamp(-2.0, 2.0);
+    settings.presence_penalty = settings.presence_penalty.clamp(-2.0, 2.0);
+    settings.system_prompt = settings.system_prompt.trim().to_string();
+    settings
 }
 
 fn render_compact_source_history(
@@ -320,6 +349,9 @@ fn render_compact_source_history(
     }
 
     for (index, message) in covered_messages.iter().enumerate().skip(start_index) {
+        if message.role == "system" {
+            continue;
+        }
         output.push_str(&format!(
             "## {}. {}",
             index + 1,
