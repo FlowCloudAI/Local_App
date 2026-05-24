@@ -658,6 +658,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             setSavingApiKeyPluginId(pluginId)
             await setting_set_api_key(pluginId, nextApiKey)
             setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
+            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: true}}))
             setExpandedApiKeyPluginId(null)
             setApiKeyDraft('')
             void showAlert('API Key 已保存', 'success', 'nonInvasive', 2000)
@@ -672,6 +673,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
         try {
             await setting_delete_api_key(pluginId)
             setApiKeyStatus(prev => ({...prev, [pluginId]: false}))
+            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: false}}))
             if (expandedApiKeyPluginId === pluginId) {
                 setExpandedApiKeyPluginId(null)
                 setApiKeyDraft('')

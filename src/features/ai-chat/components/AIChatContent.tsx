@@ -64,6 +64,7 @@ const parseConversationNumber = (value: string, fallback: number) => {
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
 type ActionMenuPlacement = 'up' | 'down'
+type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
 
 const AI_CONVERSATION_FILTER_OPTIONS: Array<{ key: AiConversationFilter; label: string }> = [
     {key: 'all', label: '全部'},
@@ -236,6 +237,10 @@ export default function AIChatContent({
     const [inputLimitMessage, setInputLimitMessage] = useState('')
     const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
     const [settingsDrawerMounted, setSettingsDrawerMounted] = useState(false)
+    const [llmApiKeyState, setLlmApiKeyState] = useState<{
+        availability: ApiKeyAvailability
+        refreshTick: number
+    }>({availability: 'unknown', refreshTick: 0})
 
     useEffect(() => {
         if (!isPluginMenuOpen) return
@@ -292,6 +297,9 @@ export default function AIChatContent({
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
+    const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
+    const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
+    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 LLM 插件'
     const contextPluginInfo = ctx.plugins.find((plugin) => plugin.id === (activeConversation?.pluginId ?? ctx.selectedPlugin))
     const contextModelId = activeConversation?.model || ctx.selectedModel
     const contextModelInfo = contextPluginInfo?.model_infos.find((modelInfo) => modelInfo.id === contextModelId)
@@ -338,6 +346,10 @@ export default function AIChatContent({
     const showFocusContext = !isCharacterConversation && !isReportConversation
     const linkPreviewProjectId = activeConversation?.reportContext?.projectId ?? ctx.focusContext.projectId
     const llmUnavailable = ctx.pluginsReady && ctx.plugins.length === 0
+    const llmApiKeyMissing = ctx.pluginsReady
+        && !llmUnavailable
+        && Boolean(activeLlmPluginId)
+        && llmApiKeyState.availability === 'missing'
     const filteredConversations = useMemo(() => {
         const keyword = conversationSearch.trim().toLocaleLowerCase()
 
@@ -448,6 +460,48 @@ export default function AIChatContent({
         }
     }, [refreshTtsPluginAvailability])
 
+    useEffect(() => {
+        const handler = () => setLlmApiKeyState((state) => ({
+            ...state,
+            refreshTick: state.refreshTick + 1,
+        }))
+        const unlistenBackendReady = listen('backend-ready', handler)
+        window.addEventListener('fc:api-key-changed', handler)
+        window.addEventListener('fc:plugins-changed', handler)
+        return () => {
+            window.removeEventListener('fc:api-key-changed', handler)
+            window.removeEventListener('fc:plugins-changed', handler)
+            unlistenBackendReady.then((fn) => fn())
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!ctx.pluginsReady || llmUnavailable || !activeLlmPluginId) {
+            setLlmApiKeyState((state) => ({...state, availability: 'unknown'}))
+            return
+        }
+
+        let cancelled = false
+        setLlmApiKeyState((state) => ({...state, availability: 'checking'}))
+        setting_has_api_key(activeLlmPluginId)
+            .then((hasApiKey) => {
+                if (cancelled) return
+                setLlmApiKeyState((state) => ({
+                    ...state,
+                    availability: hasApiKey ? 'configured' : 'missing',
+                }))
+            })
+            .catch((error) => {
+                if (cancelled) return
+                logger.warn('检查 LLM 插件 API Key 状态失败', {pluginId: activeLlmPluginId, error})
+                setLlmApiKeyState((state) => ({...state, availability: 'error'}))
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [activeLlmPluginId, ctx.pluginsReady, llmApiKeyState.refreshTick, llmUnavailable])
+
     const inputWikiLink = useWikiLink({
         entryId: ctx.focusContext.entryId ?? '',
         entryCategoryId: null,
@@ -466,11 +520,13 @@ export default function AIChatContent({
         ? '取消归档后继续对话'
         : llmUnavailable
             ? '请先安装 LLM 插件'
-            : ctx.isStreaming
-                ? '正在生成中'
-                : !ctx.inputValue.trim()
-                    ? '请输入消息'
-                    : ''
+            : llmApiKeyMissing
+                ? `请先配置 ${activeLlmPluginName} 的 API Key`
+                : ctx.isStreaming
+                    ? '正在生成中'
+                    : !ctx.inputValue.trim()
+                        ? '请输入消息'
+                        : ''
 
     useLayoutEffect(() => {
         if (!showFocusContext) {
@@ -656,10 +712,22 @@ export default function AIChatContent({
 
     const handleSendCurrentInput = useCallback(async () => {
         const rawInput = ctx.inputValue
-        if (isArchivedConversation || !rawInput.trim() || ctx.isStreaming) return
+        if (llmApiKeyMissing) {
+            await showAlert(`LLM 插件「${activeLlmPluginName}」尚未配置 API Key。`, 'warning', 'toast', 2600)
+            return
+        }
+        if (isArchivedConversation || llmUnavailable || !rawInput.trim() || ctx.isStreaming) return
         const nextInput = await standardizeInputWikiLinks(rawInput)
         await ctx.sendMessage(nextInput)
-    }, [ctx, isArchivedConversation, standardizeInputWikiLinks])
+    }, [
+        activeLlmPluginName,
+        ctx,
+        isArchivedConversation,
+        llmApiKeyMissing,
+        llmUnavailable,
+        showAlert,
+        standardizeInputWikiLinks,
+    ])
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         inputWikiLink.handleWikiKeyDown(event)
@@ -1484,6 +1552,19 @@ export default function AIChatContent({
                                 </button>
                             </div>
                         )}
+                        {!isArchivedConversation && llmApiKeyMissing && (
+                            <div className="ai-api-key-input-hint" role="status" aria-live="polite">
+                                <span>LLM 插件「{activeLlmPluginName}」尚未配置 API Key。</span>
+                                {onOpenPluginManagement && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onOpenPluginManagement('llm')}
+                                    >
+                                        去配置
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         {isCharacterConversation && ttsUnavailable && (
                             <AiPluginMissingOverlay
                                 kind="tts"
@@ -1547,12 +1628,14 @@ export default function AIChatContent({
                             onSelect={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
                             onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
                             onBlur={() => inputWikiLink.handleTextareaBlur()}
-                            disabled={isArchivedConversation || llmUnavailable}
+                            disabled={isArchivedConversation || llmUnavailable || llmApiKeyMissing}
                             placeholder={isArchivedConversation
                                 ? '取消归档后继续对话'
                                 : llmUnavailable
                                     ? '安装 LLM 插件后继续对话'
-                                    : '请输入消息...'}
+                                    : llmApiKeyMissing
+                                        ? '配置 API Key 后继续对话'
+                                        : '请输入消息...'}
                         />
                         {inputLimitMessage && (
                             <div className="ai-input-limit-hint" role="status">
