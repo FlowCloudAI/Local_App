@@ -1,11 +1,20 @@
 use super::common::*;
+use flowcloudai_client::ErrorCode;
+
+fn conversation_not_found(id: &str) -> ApiError {
+    ApiError::new(
+        ErrorCode::LlmSessionNotFound,
+        format!("未找到会话：{}", id),
+    )
+    .with_kv("conversation_id", id.to_string())
+}
 
 /// 列出所有已保存对话的元信息，按 updated_at 降序
 #[tauri::command]
 pub async fn ai_list_conversations(
     paths: State<'_, PathsState>,
-) -> Result<Vec<ConversationMeta>, String> {
-    chat_store_list_conversations(paths.inner())
+) -> Result<Vec<ConversationMeta>, ApiError> {
+    chat_store_list_conversations(paths.inner()).map_err(ApiError::internal)
 }
 
 /// 返回完整对话（元信息 + 消息列表）
@@ -13,8 +22,8 @@ pub async fn ai_list_conversations(
 pub async fn ai_get_conversation(
     paths: State<'_, PathsState>,
     id: String,
-) -> Result<Option<StoredConversation>, String> {
-    chat_store_get_conversation(paths.inner(), &id)
+) -> Result<Option<StoredConversation>, ApiError> {
+    chat_store_get_conversation(paths.inner(), &id).map_err(ApiError::internal)
 }
 
 /// 更新当前对话独有的大模型参数与系统提示词。
@@ -23,13 +32,14 @@ pub async fn ai_update_conversation_settings(
     paths: State<'_, PathsState>,
     id: String,
     settings: StoredConversationSettings,
-) -> Result<StoredConversationSettings, String> {
-    let mut conversation =
-        chat_store_get_conversation(paths.inner(), &id)?.ok_or_else(|| format!("未找到会话：{}", id))?;
+) -> Result<StoredConversationSettings, ApiError> {
+    let mut conversation = chat_store_get_conversation(paths.inner(), &id)
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| conversation_not_found(&id))?;
     let settings = normalize_conversation_settings(settings);
     conversation.settings = settings.clone();
     conversation.meta.updated_at = chrono::Utc::now().to_rfc3339();
-    chat_store_save_conversation(paths.inner(), &conversation)?;
+    chat_store_save_conversation(paths.inner(), &conversation).map_err(ApiError::internal)?;
     Ok(settings)
 }
 
@@ -63,9 +73,10 @@ pub async fn ai_compact_conversation(
     ai_state: State<'_, AiState>,
     paths: State<'_, PathsState>,
     request: CompactConversationRequest,
-) -> Result<CompactConversationResult, String> {
-    let mut conversation = chat_store_get_conversation(paths.inner(), &request.conversation_id)?
-        .ok_or_else(|| format!("未找到会话：{}", request.conversation_id))?;
+) -> Result<CompactConversationResult, ApiError> {
+    let mut conversation = chat_store_get_conversation(paths.inner(), &request.conversation_id)
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| conversation_not_found(&request.conversation_id))?;
     let recent_messages = request.recent_messages.unwrap_or(8).clamp(2, 30) as usize;
     let detail = normalize_compact_detail(request.detail.as_deref());
     let plugin_id = request
@@ -114,16 +125,25 @@ pub async fn ai_compact_conversation(
     let history_markdown =
         render_compact_source_history(&path[..=boundary_index], conversation.compact.as_ref());
     let prompt = build_compact_prompt(&conversation.meta.title, &history_markdown, detail);
-    let api_key = ApiKeyStore::get(&plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
-    let raw_output =
-        run_compact_once(ai_state.inner(), &plugin_id, &api_key, &model, detail, prompt).await?;
+    let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| {
+        ApiError::new(
+            ErrorCode::AuthApiKeyMissing,
+            format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id),
+        )
+        .with_kv("plugin_id", plugin_id.clone())
+    })?;
+    let raw_output = run_compact_once(ai_state.inner(), &plugin_id, &api_key, &model, detail, prompt)
+        .await
+        .map_err(ApiError::internal)?;
     let summary = extract_compact_summary(&raw_output)
         .unwrap_or_else(|| raw_output.trim().to_string())
         .trim()
         .to_string();
     if summary.is_empty() {
-        return Err("压缩模型返回了空摘要".to_string());
+        return Err(ApiError::new(
+            ErrorCode::LlmResponseEmpty,
+            "压缩模型返回了空摘要",
+        ));
     }
 
     conversation.compact = Some(StoredCompact {
@@ -132,7 +152,7 @@ pub async fn ai_compact_conversation(
         created_at: chrono::Utc::now().to_rfc3339(),
     });
     conversation.meta.updated_at = chrono::Utc::now().to_rfc3339();
-    chat_store_save_conversation(paths.inner(), &conversation)?;
+    chat_store_save_conversation(paths.inner(), &conversation).map_err(ApiError::internal)?;
 
     Ok(CompactConversationResult {
         applied: true,
@@ -150,19 +170,27 @@ pub async fn ai_export_conversation(
     id: String,
     path: String,
     format: String,
-) -> Result<(), String> {
-    let conversation =
-        chat_store_get_conversation(paths.inner(), &id)?.ok_or_else(|| format!("未找到会话：{}", id))?;
+) -> Result<(), ApiError> {
+    let conversation = chat_store_get_conversation(paths.inner(), &id)
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| conversation_not_found(&id))?;
 
     let content = match format.as_str() {
-        "json" => serde_json::to_string_pretty(&conversation)
-            .map_err(|e| format!("序列化会话 JSON 失败: {}", e))?,
-        "markdown" | "md" => render_conversation_markdown(&conversation)?,
-        other => return Err(format!("不支持的导出格式：{}", other)),
+        "json" => serde_json::to_string_pretty(&conversation)?,
+        "markdown" | "md" => render_conversation_markdown(&conversation).map_err(ApiError::internal)?,
+        other => {
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                format!("不支持的导出格式：{}", other),
+            )
+            .with_kv("format", other.to_string()));
+        }
     };
 
-    std::fs::write(&path, content)
-        .map_err(|e| format!("写入导出文件失败 {:?}: {}", path, e))
+    std::fs::write(&path, content).map_err(|e| {
+        ApiError::new(ErrorCode::FsWriteFailed, format!("写入导出文件失败 {:?}: {}", path, e))
+            .with_kv("path", path.clone())
+    })
 }
 
 /// 删除指定对话文件
@@ -170,8 +198,8 @@ pub async fn ai_export_conversation(
 pub async fn ai_delete_conversation(
     paths: State<'_, PathsState>,
     id: String,
-) -> Result<(), String> {
-    chat_store_delete_conversation(paths.inner(), &id)
+) -> Result<(), ApiError> {
+    chat_store_delete_conversation(paths.inner(), &id).map_err(ApiError::internal)
 }
 
 /// 修改对话标题
@@ -180,24 +208,22 @@ pub async fn ai_rename_conversation(
     paths: State<'_, PathsState>,
     id: String,
     title: String,
-) -> Result<(), String> {
-    chat_store_rename_conversation(paths.inner(), &id, title)
+) -> Result<(), ApiError> {
+    chat_store_rename_conversation(paths.inner(), &id, title).map_err(ApiError::internal)
 }
 
 /// 读取特殊对话附加元数据。通用对话存储结构暂不包含这些字段，因此由应用侧单独持久化。
 #[tauri::command]
 pub fn ai_get_character_conversation_meta(
     paths: State<'_, PathsState>,
-) -> Result<HashMap<String, CharacterConversationMeta>, String> {
-    let path = character_conversation_meta_path(paths.inner())?;
+) -> Result<HashMap<String, CharacterConversationMeta>, ApiError> {
+    let path = character_conversation_meta_path(paths.inner()).map_err(ApiError::internal)?;
     if !path.exists() {
         return Ok(HashMap::new());
     }
 
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("读取特殊对话元数据失败 {:?}: {}", path, e))?;
-    serde_json::from_str::<HashMap<String, CharacterConversationMeta>>(&content)
-        .map_err(|e| format!("解析特殊对话元数据失败 {:?}: {}", path, e))
+    let content = std::fs::read_to_string(&path)?;
+    Ok(serde_json::from_str::<HashMap<String, CharacterConversationMeta>>(&content)?)
 }
 
 /// 覆盖写入特殊对话附加元数据。
@@ -205,46 +231,37 @@ pub fn ai_get_character_conversation_meta(
 pub fn ai_save_character_conversation_meta(
     paths: State<'_, PathsState>,
     metadata: HashMap<String, CharacterConversationMeta>,
-) -> Result<(), String> {
-    let path = character_conversation_meta_path(paths.inner())?;
+) -> Result<(), ApiError> {
+    let path = character_conversation_meta_path(paths.inner()).map_err(ApiError::internal)?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建特殊对话元数据目录失败 {:?}: {}", parent, e))?;
+        std::fs::create_dir_all(parent)?;
     }
 
-    let json = serde_json::to_string_pretty(&metadata)
-        .map_err(|e| format!("序列化特殊对话元数据失败: {}", e))?;
+    let json = serde_json::to_string_pretty(&metadata)?;
     let temp_path = path.with_extension("json.tmp");
     {
-        let mut file = std::fs::File::create(&temp_path)
-            .map_err(|e| format!("创建特殊对话元数据临时文件失败 {:?}: {}", temp_path, e))?;
-        file.write_all(json.as_bytes())
-            .map_err(|e| format!("写入特殊对话元数据失败 {:?}: {}", temp_path, e))?;
-        file.flush()
-            .map_err(|e| format!("刷新特殊对话元数据失败 {:?}: {}", temp_path, e))?;
+        let mut file = std::fs::File::create(&temp_path)?;
+        file.write_all(json.as_bytes())?;
+        file.flush()?;
     }
     if path.exists() {
-        std::fs::remove_file(&path)
-            .map_err(|e| format!("移除旧特殊对话元数据失败 {:?}: {}", path, e))?;
+        std::fs::remove_file(&path)?;
     }
-    std::fs::rename(&temp_path, &path)
-        .map_err(|e| format!("保存特殊对话元数据失败 {:?}: {}", path, e))
+    std::fs::rename(&temp_path, &path).map_err(ApiError::from)
 }
 
 /// 读取通用会话 UI 状态。顶置、归档等展示状态独立于对话历史文件保存。
 #[tauri::command]
 pub fn ai_get_conversation_ui_state(
     paths: State<'_, PathsState>,
-) -> Result<HashMap<String, ConversationUiState>, String> {
-    let path = conversation_ui_state_path(paths.inner())?;
+) -> Result<HashMap<String, ConversationUiState>, ApiError> {
+    let path = conversation_ui_state_path(paths.inner()).map_err(ApiError::internal)?;
     if !path.exists() {
         return Ok(HashMap::new());
     }
 
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("读取会话 UI 状态失败 {:?}: {}", path, e))?;
-    serde_json::from_str::<HashMap<String, ConversationUiState>>(&content)
-        .map_err(|e| format!("解析会话 UI 状态失败 {:?}: {}", path, e))
+    let content = std::fs::read_to_string(&path)?;
+    Ok(serde_json::from_str::<HashMap<String, ConversationUiState>>(&content)?)
 }
 
 /// 覆盖写入通用会话 UI 状态。
@@ -252,30 +269,23 @@ pub fn ai_get_conversation_ui_state(
 pub fn ai_save_conversation_ui_state(
     paths: State<'_, PathsState>,
     state: HashMap<String, ConversationUiState>,
-) -> Result<(), String> {
-    let path = conversation_ui_state_path(paths.inner())?;
+) -> Result<(), ApiError> {
+    let path = conversation_ui_state_path(paths.inner()).map_err(ApiError::internal)?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建会话 UI 状态目录失败 {:?}: {}", parent, e))?;
+        std::fs::create_dir_all(parent)?;
     }
 
-    let json = serde_json::to_string_pretty(&state)
-        .map_err(|e| format!("序列化会话 UI 状态失败: {}", e))?;
+    let json = serde_json::to_string_pretty(&state)?;
     let temp_path = path.with_extension("json.tmp");
     {
-        let mut file = std::fs::File::create(&temp_path)
-            .map_err(|e| format!("创建会话 UI 状态临时文件失败 {:?}: {}", temp_path, e))?;
-        file.write_all(json.as_bytes())
-            .map_err(|e| format!("写入会话 UI 状态失败 {:?}: {}", temp_path, e))?;
-        file.flush()
-            .map_err(|e| format!("刷新会话 UI 状态失败 {:?}: {}", temp_path, e))?;
+        let mut file = std::fs::File::create(&temp_path)?;
+        file.write_all(json.as_bytes())?;
+        file.flush()?;
     }
     if path.exists() {
-        std::fs::remove_file(&path)
-            .map_err(|e| format!("移除旧会话 UI 状态失败 {:?}: {}", path, e))?;
+        std::fs::remove_file(&path)?;
     }
-    std::fs::rename(&temp_path, &path)
-        .map_err(|e| format!("保存会话 UI 状态失败 {:?}: {}", path, e))
+    std::fs::rename(&temp_path, &path).map_err(ApiError::from)
 }
 
 fn normalize_compact_detail(detail: Option<&str>) -> &'static str {

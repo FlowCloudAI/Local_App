@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="512" height="512" role="img" aria-label=".fcworld FlowCloudAI 世界观包">
+  <defs>
+    
+    <filter id="shadow" x="-20%" y="-15%" width="140%" height="135%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.6"></feGaussianBlur>
+      <feOffset dx="0" dy="1.5" result="o"></feOffset>
+      <feComponentTransfer><feFuncA type="linear" slope="0.26"></feFuncA></feComponentTransfer>
+      <feMerge><feMergeNode></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+    </filter>
+    
+    <clipPath id="docClip">
+      <path d="M 30 8 H 81 Q 84 8 86 10 L 106 30 Q 108 32 108 35 V 110 Q 108 120 98 120 H 30 Q 20 120 20 110 V 18 Q 20 8 30 8 Z"></path>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#shadow)">
+    
+    <path d="M 30 8 H 81 Q 84 8 86 10 L 106 30 Q 108 32 108 35 V 110 Q 108 120 98 120 H 30 Q 20 120 20 110 V 18 Q 20 8 30 8 Z" fill="#7C35ED" stroke="rgba(0,0,0,0.10)" stroke-width="0.75"></path>
+
+    
+    <svg x="31" y="19" width="66" height="66" viewBox="0 0 96 96" overflow="visible">
+      <defs>
+        <mask id="globeMask">
+          
+          <rect width="96" height="96" fill="black"></rect>
+          
+          <circle cx="48" cy="48" r="48" fill="white"></circle>
+          
+          
+          <path fill="black" d="M14.8 28.9C20.4 19.7 27.9 13.5 35.6 11.5C32.0 17.5 29.6 23.5 28.7 28.9H14.8Z"></path>
+          <path fill="black" d="M39.0 28.9C41.3 20.4 44.8 13.5 48.0 9.7C51.2 13.5 54.7 20.4 57.0 28.9H39.0Z"></path>
+          <path fill="black" d="M60.4 11.5C68.1 13.5 75.6 19.7 81.2 28.9H67.3C66.4 23.5 64.0 17.5 60.4 11.5Z"></path>
+          
+          <path fill="black" d="M10.9 38.4H27.4C26.6 44.6 26.6 51.4 27.4 57.6H10.9C9.2 51.4 9.2 44.6 10.9 38.4Z"></path>
+          <path fill="black" d="M37.0 38.4H59.0C60.7 44.6 60.7 51.4 59.0 57.6H37.0C35.3 51.4 35.3 44.6 37.0 38.4Z"></path>
+          <path fill="black" d="M68.6 38.4H85.1C86.8 44.6 86.8 51.4 85.1 57.6H68.6C69.4 51.4 69.4 44.6 68.6 38.4Z"></path>
+          
+          <path fill="black" d="M14.8 67.1H28.7C29.6 72.5 32.0 78.5 35.6 84.5C27.9 82.5 20.4 76.3 14.8 67.1Z"></path>
+          <path fill="black" d="M39.0 67.1H57.0C54.7 75.6 51.2 82.5 48.0 86.3C44.8 82.5 41.3 75.6 39.0 67.1Z"></path>
+          <path fill="black" d="M67.3 67.1H81.2C75.6 76.3 68.1 82.5 60.4 84.5C64.0 78.5 66.4 72.5 67.3 67.1Z"></path>
+        </mask>
+      </defs>
+      
+      <circle cx="48" cy="48" r="48" fill="rgba(255,255,255,0.92)" mask="url(#globeMask)"></circle>
+    </svg>
+
+    
+    <path d="M 86 10 L 106 30 L 88 30 Q 86 30 86 28 Z" fill="rgba(255,255,255,0.18)"></path>
+    <path d="M 86 10 L 86 28 Q 86 30 88 30 L 106 30" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="0.65" stroke-linejoin="round"></path>
+    <path d="M 86 10 L 106 30" stroke="rgba(255,255,255,0.40)" stroke-width="0.70" stroke-linecap="round"></path>
+
+    
+    <g clip-path="url(#docClip)">
+      <rect x="20" y="93" width="88" height="0.75" fill="rgba(255,255,255,0.15)"></rect>
+    </g>
+
+    
+    <text x="64" y="112" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, &#39;Segoe UI&#39;, &#39;Helvetica Neue&#39;, sans-serif" font-weight="700" font-size="14" letter-spacing="0.5" fill="rgba(255,255,255,0.92)">fcworld</text>
+  </g>
+</svg>
