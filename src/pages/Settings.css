@@ -207,39 +207,63 @@
 
 .settings-text-model-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(18rem, 1fr));
-  gap: var(--fc-space-sm) var(--fc-space-lg);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fc-space-sm) var(--fc-space-md);
 }
 
 .settings-text-model-field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--fc-space-md);
+  gap: var(--fc-space-sm);
   color: var(--fc-color-text);
   font-size: var(--fc-font-size-control, 0.875rem);
 }
 
-.settings-text-model-field > span {
+.settings-text-model-field > span,
+.settings-text-model-field label span {
   color: var(--fc-color-text);
 }
 
 .settings-text-model-field input[type='number'] {
-  width: 8.25rem;
+  width: 5.5rem;
   min-width: 0;
   padding: 0.45rem 0.55rem;
   border: 1px solid color-mix(in srgb, var(--fc-color-border) 84%, transparent);
   border-radius: var(--fc-radius-sm);
-  background: var(--fc-color-bg);
+  background: color-mix(in srgb, var(--fc-color-bg) 84%, transparent);
   color: var(--fc-color-text);
   font: inherit;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
+.settings-text-model-field input[type='number']:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .settings-text-model-field input[type='number']:focus {
   outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
   outline-offset: 1px;
+}
+
+.settings-text-model-field--penalty {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.settings-text-model-field--penalty label {
+  display: flex;
+  align-items: center;
+  gap: var(--fc-space-xs);
+  min-width: 0;
+}
+
+.settings-text-model-field--penalty input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--fc-color-primary);
 }
 
 .settings-ai-model-grid {

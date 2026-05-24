@@ -71,14 +71,31 @@ const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
 
 type PreparedAiSession = { sid: string; runId: string; conversationId: string }
 
-const toStoredConversationSettings = (settings: ConversationSettings): StoredConversationSettings => ({
+const getGlobalDefaultPrompt = (settings: AppSettings | null): string =>
+    settings?.llm?.app_sense_custom_prompt.trim() ?? ''
+
+const getConversationSpecificPrompt = (
+    settings: ConversationSettings | null | undefined,
+    appSettings: AppSettings | null,
+): string => {
+    const prompt = settings?.systemPrompt.trim() ?? ''
+    if (!prompt) return ''
+
+    const globalPrompt = getGlobalDefaultPrompt(appSettings)
+    return globalPrompt && prompt === globalPrompt ? '' : prompt
+}
+
+const toStoredConversationSettings = (
+    settings: ConversationSettings,
+    appSettings: AppSettings | null = null,
+): StoredConversationSettings => ({
     temperature: settings.temperature,
     topP: settings.topP,
     frequencyPenaltyEnabled: settings.frequencyPenaltyEnabled,
     frequencyPenalty: settings.frequencyPenalty,
     presencePenaltyEnabled: settings.presencePenaltyEnabled,
     presencePenalty: settings.presencePenalty,
-    systemPrompt: settings.systemPrompt,
+    systemPrompt: getConversationSpecificPrompt(settings, appSettings),
 })
 
 const buildSessionUpdateParams = (
@@ -91,9 +108,6 @@ const buildSessionUpdateParams = (
     frequencyPenalty: settings.frequencyPenaltyEnabled ? settings.frequencyPenalty : 0,
     presencePenalty: settings.presencePenaltyEnabled ? settings.presencePenalty : 0,
 })
-
-const getGlobalDefaultPrompt = (settings: AppSettings | null): string =>
-    settings?.llm?.app_sense_custom_prompt.trim() ?? ''
 
 const buildDefaultConversationSettings = (settings: AppSettings | null): ConversationSettings => {
     const llm = settings?.llm
@@ -877,7 +891,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 attributes.entry_snippet = entryResult.value
             }
         }
-        const systemPrompt = conversationSettings?.systemPrompt.trim()
+        const systemPrompt = getConversationSpecificPrompt(
+            conversationSettings ?? null,
+            appSettingsRef.current,
+        )
         if (systemPrompt) {
             attributes[CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE] = [
                 '当前对话独有提示词如下。它只作用于当前对话，不代表全局设置。',
@@ -1223,7 +1240,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         const save = () => {
-            void ai_update_conversation_settings(convId, toStoredConversationSettings(settings))
+            void ai_update_conversation_settings(
+                convId,
+                toStoredConversationSettings(settings, appSettingsRef.current),
+            )
                 .then((saved) => {
                     setConversations((prev) => prev.map((conversation) =>
                         conversation.id === convId
@@ -1472,7 +1492,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 isPending ? undefined : failedSession.conversationId,
                 sessionParams.maxToolRounds,
                 traceId,
-                toStoredConversationSettings(currentSettings),
+                toStoredConversationSettings(currentSettings, appSettingsRef.current),
             )
             if (!created) return null
 
@@ -1604,7 +1624,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 desiredSessionId,
                 sessionParams.maxToolRounds,
                 traceId,
-                toStoredConversationSettings(currentSettings),
+                toStoredConversationSettings(currentSettings, appSettingsRef.current),
             )
             if (!created) return null
             logger.log('[useAiController][发送链路] 后端会话创建完成', {
@@ -1831,7 +1851,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 conv.id,
                 sessionParams.maxToolRounds,
                 undefined,
-                toStoredConversationSettings(convSettings),
+                toStoredConversationSettings(convSettings, appSettingsRef.current),
             )
             if (!created) {
                 logger.error('[useAiController] 重说失败：无法创建会话')

@@ -73,6 +73,8 @@ const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string
     {value: 'balanced', label: '适中'},
     {value: 'detailed', label: '详细'},
 ]
+const DEFAULT_ENABLED_FREQUENCY_PENALTY = 1.1
+const DEFAULT_ENABLED_PRESENCE_PENALTY = 0.5
 
 function normalizeThemeSelectValue(value: SelectValue): Theme {
     const theme = String(Array.isArray(value) ? value[0] ?? 'system' : value)
@@ -1550,32 +1552,56 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                             })}
                                         />
                                     </label>
-                                    <label className="settings-text-model-field">
-                                        <span>重复惩罚</span>
+                                    <div className="settings-text-model-field settings-text-model-field--penalty">
+                                        <label>
+                                            <span>重复惩罚</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.llm.frequency_penalty !== 0}
+                                                onChange={(event) => updateLlmDefaults({
+                                                    frequency_penalty: event.currentTarget.checked
+                                                        ? (settings.llm.frequency_penalty || DEFAULT_ENABLED_FREQUENCY_PENALTY)
+                                                        : 0,
+                                                })}
+                                            />
+                                        </label>
                                         <input
                                             type="number"
                                             min={-2}
                                             max={2}
                                             step={0.1}
+                                            disabled={settings.llm.frequency_penalty === 0}
                                             value={settings.llm.frequency_penalty}
                                             onChange={(event) => updateLlmDefaults({
                                                 frequency_penalty: clampNumberValue(event.currentTarget.value, settings.llm.frequency_penalty, -2, 2),
                                             })}
                                         />
-                                    </label>
-                                    <label className="settings-text-model-field">
-                                        <span>存在惩罚</span>
+                                    </div>
+                                    <div className="settings-text-model-field settings-text-model-field--penalty">
+                                        <label>
+                                            <span>存在惩罚</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={settings.llm.presence_penalty !== 0}
+                                                onChange={(event) => updateLlmDefaults({
+                                                    presence_penalty: event.currentTarget.checked
+                                                        ? (settings.llm.presence_penalty || DEFAULT_ENABLED_PRESENCE_PENALTY)
+                                                        : 0,
+                                                })}
+                                            />
+                                        </label>
                                         <input
                                             type="number"
                                             min={-2}
                                             max={2}
                                             step={0.1}
+                                            disabled={settings.llm.presence_penalty === 0}
                                             value={settings.llm.presence_penalty}
                                             onChange={(event) => updateLlmDefaults({
                                                 presence_penalty: clampNumberValue(event.currentTarget.value, settings.llm.presence_penalty, -2, 2),
                                             })}
                                         />
-                                    </label>
+                                    </div>
                                 </div>
                                 <div className="settings-field-stack settings-field-stack--full settings-llm-prompt-field">
                                     <label className="settings-label-wide">全局默认提示词</label>
