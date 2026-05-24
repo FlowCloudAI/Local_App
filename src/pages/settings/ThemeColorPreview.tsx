@@ -89,8 +89,10 @@ export default function ThemeColorPreview() {
         const anchor = document.createElement('a')
         anchor.href = url
         anchor.download = `flowcloudai-theme-${selectedRecipe.id}.json`
+        document.body.appendChild(anchor)
         anchor.click()
-        URL.revokeObjectURL(url)
+        anchor.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 0)
         setConfigMessage('主题配置已导出。')
     }
 
