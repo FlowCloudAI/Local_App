@@ -1,6 +1,7 @@
 /* ── 布局 ───────────────────────────────────────────────────────────────── */
 
 .pe-layout {
+    --pe-content-min-width: 40rem;
     --pe-divider-width: 8px;
     --pe-divider-handle-gap-height: 48px;
     --pe-divider-handle-gap-half: 24px;
@@ -232,6 +233,16 @@
     --pe-font-size-entry-title: calc(var(--fc-font-size-reading, 0.9rem) + var(--pe-font-delta-body));
     --pe-font-size-entry-summary: calc(var(--fc-font-size-caption, 0.75rem) + var(--pe-font-delta-body));
     --pe-font-size-entry-date: calc(var(--fc-font-size-xs) + var(--pe-font-delta-body));
+}
+
+.pe-content__rail {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    min-width: var(--pe-content-min-width);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .pe-breadcrumb {
