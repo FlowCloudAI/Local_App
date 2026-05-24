@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState, type CSSProperties} from 'react'
+import {useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties} from 'react'
 import {Button} from 'flowcloudai-ui'
 import FcPrimaryToneGuide from './FcPrimaryToneGuide'
 import {
@@ -10,26 +10,38 @@ import {
     DEFAULT_FC_THEME_RECIPE_ID,
     FC_THEME_RECIPES,
     getFcThemeRecipe,
+    type FcThemeRecipe,
 } from './fcThemeRecipe'
 import {
-    generateMaterialThemePreview,
     isValidHexColor,
     normalizeHexColor,
-    type MaterialRolePreview,
-    type MaterialThemeMode,
-    type MaterialToneSwatch,
 } from './materialThemePreview'
 import './ThemeColorPreview.css'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
 
+interface ImportedThemeConfig {
+    recipeId: string
+    seedColor: string
+}
+
+interface ThemeConfigFile extends ImportedThemeConfig {
+    app: 'flowcloudai'
+    type: 'theme'
+    version: 1
+    exportedAt: string
+}
+
+const THEME_CONFIG_VERSION = 1
+
 export default function ThemeColorPreview() {
     const defaultRecipe = getFcThemeRecipe(DEFAULT_FC_THEME_RECIPE_ID)
     const [recipeId, setRecipeId] = useState(defaultRecipe.id)
     const [seedColor, setSeedColor] = useState(defaultRecipe.primarySeed)
-    const [mode, setMode] = useState<MaterialThemeMode>('light')
+    const [customOpen, setCustomOpen] = useState(false)
+    const [configMessage, setConfigMessage] = useState<string | null>(null)
+    const importInputRef = useRef<HTMLInputElement>(null)
     const selectedRecipe = getFcThemeRecipe(recipeId)
-    const materialPreview = useMemo(() => generateMaterialThemePreview(seedColor), [seedColor])
     const fcPreview = useMemo(() => createFcThemePreview(selectedRecipe, seedColor), [selectedRecipe, seedColor])
     const normalizedColor = fcPreview?.primarySeed ?? selectedRecipe.primarySeed
     const valid = isValidHexColor(seedColor)
@@ -49,144 +61,207 @@ export default function ThemeColorPreview() {
         const nextRecipe = getFcThemeRecipe(nextRecipeId)
         setRecipeId(nextRecipe.id)
         setSeedColor(nextRecipe.primarySeed)
+        setConfigMessage(null)
     }
 
     const resetDefault = () => {
+        setCustomOpen(false)
         selectRecipe(DEFAULT_FC_THEME_RECIPE_ID)
+    }
+
+    const updateSeedColor = (value: string) => {
+        setSeedColor(value)
+        setConfigMessage(null)
+    }
+
+    const exportThemeConfig = () => {
+        if (!fcPreview) return
+        const config: ThemeConfigFile = {
+            app: 'flowcloudai',
+            type: 'theme',
+            version: THEME_CONFIG_VERSION,
+            recipeId: selectedRecipe.id,
+            seedColor: normalizedColor,
+            exportedAt: new Date().toISOString(),
+        }
+        const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'})
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement('a')
+        anchor.href = url
+        anchor.download = `flowcloudai-theme-${selectedRecipe.id}.json`
+        anchor.click()
+        URL.revokeObjectURL(url)
+        setConfigMessage('主题配置已导出。')
+    }
+
+    const importThemeConfig = async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        event.target.value = ''
+        if (!file) return
+        try {
+            const config = parseThemeConfig(JSON.parse(await file.text()))
+            if (!config) {
+                setConfigMessage('主题配置无法识别。')
+                return
+            }
+            const importedRecipe = FC_THEME_RECIPES.find((recipe) => recipe.id === config.recipeId)
+            if (!importedRecipe) {
+                setConfigMessage('主题配置引用了不存在的预设。')
+                return
+            }
+            setRecipeId(importedRecipe.id)
+            setSeedColor(config.seedColor)
+            setCustomOpen(config.seedColor !== normalizeHexColor(importedRecipe.primarySeed))
+            setConfigMessage('主题配置已导入。')
+        } catch {
+            setConfigMessage('主题配置无法读取。')
+        }
     }
 
     return (
         <section className="settings-section fc-section-card theme-color-preview">
             <div className="theme-color-preview__header">
                 <div>
-                    <h2 className="settings-section-title fc-section-title">FC 主题配方</h2>
-                    <p className="theme-color-preview__subtitle">临时覆盖主色、背景、边框和文字层级；警告、危险、成功等功能色保持不变。</p>
+                    <h2 className="settings-section-title fc-section-title">主题</h2>
+                    <p className="theme-color-preview__subtitle">主色、背景、边框和文字层级；警告、危险、成功等功能色保持不变。</p>
                 </div>
                 <div className="theme-color-preview__header-actions">
+                    <input
+                        ref={importInputRef}
+                        className="theme-color-preview__file-input"
+                        type="file"
+                        accept="application/json,.json"
+                        onChange={importThemeConfig}
+                    />
+                    <Button type="button" size="sm" variant="outline" onClick={() => importInputRef.current?.click()}>
+                        导入配置
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={!fcPreview} onClick={exportThemeConfig}>
+                        导出配置
+                    </Button>
                     <Button type="button" size="sm" variant="outline" onClick={resetDefault}>
                         恢复默认
                     </Button>
                 </div>
             </div>
 
-            <div className="theme-color-preview__controls">
-                <label className="theme-color-preview__field">
-                    <span>主题色微调</span>
-                    <span className="theme-color-preview__color-control">
-                        <input
-                            className="theme-color-preview__color-input"
-                            type="color"
-                            value={normalizedColor}
-                            onChange={(event) => setSeedColor(event.target.value)}
-                        />
-                        <input
-                            className={`theme-color-preview__hex-input ${valid ? '' : 'theme-color-preview__hex-input--invalid'}`}
-                            value={seedColor}
-                            onChange={(event) => setSeedColor(event.target.value)}
-                            spellCheck={false}
-                            aria-invalid={!valid}
-                        />
-                    </span>
-                </label>
-
-                <div className="theme-color-preview__preset-list" aria-label="主题配方预设">
-                    {FC_THEME_RECIPES.map((preset) => (
-                        <button
-                            className={`theme-color-preview__preset ${recipeId === preset.id ? 'theme-color-preview__preset--active' : ''}`}
-                            type="button"
-                            key={preset.id}
-                            title={preset.description}
-                            onClick={() => selectRecipe(preset.id)}
-                        >
-                            <span
-                                className="theme-color-preview__preset-dot"
-                                style={colorStyle(preset.primarySeed)}
-                                aria-hidden="true"
-                            />
-                            {preset.label}
-                        </button>
-                    ))}
-                </div>
+            <div className="theme-color-preview__preset-grid" aria-label="主题预设">
+                {FC_THEME_RECIPES.map((preset) => (
+                    <ThemePresetCard
+                        key={preset.id}
+                        preset={preset}
+                        active={recipeId === preset.id}
+                        onSelect={() => selectRecipe(preset.id)}
+                    />
+                ))}
             </div>
 
-            {!materialPreview || !fcPreview ? (
-                <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>
-            ) : (
-                <>
-                    <div className="theme-color-preview__recipe-summary">
-                        <strong>{fcPreview.recipe.label}</strong>
-                        <span>{fcPreview.recipe.description}</span>
-                        {isDefaultTheme && <span>当前为内置默认主题，不注入覆盖。</span>}
-                    </div>
+            <div className="theme-color-preview__current">
+                <strong>{selectedRecipe.label}</strong>
+                <span>{selectedRecipe.description}</span>
+                {isDefaultTheme && <span>内置默认主题</span>}
+            </div>
 
+            <div className="theme-color-preview__drawer">
+                <button
+                    className="theme-color-preview__drawer-toggle"
+                    type="button"
+                    aria-expanded={customOpen}
+                    onClick={() => setCustomOpen((open) => !open)}
+                >
+                    <span>
+                        <strong>自定义颜色</strong>
+                        <small>{normalizedColor}</small>
+                    </span>
+                    <span aria-hidden="true">{customOpen ? '收起' : '展开'}</span>
+                </button>
+                {customOpen && (
+                    <div className="theme-color-preview__drawer-panel">
+                        <label className="theme-color-preview__field">
+                            <span>主题色</span>
+                            <span className="theme-color-preview__color-control">
+                                <input
+                                    className="theme-color-preview__color-input"
+                                    type="color"
+                                    value={normalizedColor}
+                                    onChange={(event) => updateSeedColor(event.target.value)}
+                                />
+                                <input
+                                    className={`theme-color-preview__hex-input ${valid ? '' : 'theme-color-preview__hex-input--invalid'}`}
+                                    value={seedColor}
+                                    onChange={(event) => updateSeedColor(event.target.value)}
+                                    spellCheck={false}
+                                    aria-invalid={!valid}
+                                />
+                            </span>
+                        </label>
+                        {!valid && <div className="theme-color-preview__invalid">请输入 3 位或 6 位十六进制颜色。</div>}
+                    </div>
+                )}
+            </div>
+
+            {configMessage && <div className="theme-color-preview__config-message">{configMessage}</div>}
+
+            {fcPreview && (
+                <details className="theme-color-preview__debug">
+                    <summary>开发调试</summary>
                     <FcPrimaryToneGuide tokens={fcPreview.tokens}/>
-
-                    <div className="theme-color-preview__summary">
-                        <span>HEX {materialPreview.source.hex}</span>
-                        <span>Hue {materialPreview.source.hue}</span>
-                        <span>Chroma {materialPreview.source.chroma}</span>
-                        <span>Tone {materialPreview.source.tone}</span>
-                    </div>
-
-                    <div className="theme-color-preview__mode-switch" role="group" aria-label="Material 角色模式">
-                        {(['light', 'dark'] as const).map((item) => (
-                            <button
-                                className={`theme-color-preview__mode ${mode === item ? 'theme-color-preview__mode--active' : ''}`}
-                                type="button"
-                                key={item}
-                                onClick={() => setMode(item)}
-                            >
-                                {item === 'light' ? '浅色角色' : '深色角色'}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="theme-color-preview__role-grid">
-                        {materialPreview.schemes[mode].roles.map((role) => (
-                            <RoleCard key={`${mode}-${role.key}`} role={role}/>
-                        ))}
-                    </div>
-
-                    <div className="theme-color-preview__palette-list">
-                        {materialPreview.palettes.map((palette) => (
-                            <div className="theme-color-preview__palette" key={palette.key}>
-                                <div className="theme-color-preview__palette-meta">
-                                    <strong>{palette.label}</strong>
-                                    <span>H {palette.hue} / C {palette.chroma}</span>
-                                </div>
-                                <div className="theme-color-preview__tone-row">
-                                    {palette.tones.map((tone) => (
-                                        <ToneSwatch key={`${palette.key}-${tone.tone}`} tone={tone}/>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </>
+                </details>
             )}
         </section>
     )
 }
 
-function RoleCard({role}: { role: MaterialRolePreview }) {
+function ThemePresetCard({
+    preset,
+    active,
+    onSelect,
+}: {
+    preset: FcThemeRecipe
+    active: boolean
+    onSelect: () => void
+}) {
     return (
-        <div className="theme-color-preview__role-card">
-            <span className="theme-color-preview__role-swatch" style={colorStyle(role.hex)} aria-hidden="true"/>
-            <span className="theme-color-preview__role-name">{role.label}</span>
-            <code>{role.hex}</code>
-        </div>
+        <button
+            className={`theme-color-preview__preset-card ${active ? 'theme-color-preview__preset-card--active' : ''}`}
+            type="button"
+            style={themePresetStyle(preset)}
+            aria-pressed={active}
+            title={preset.description}
+            onClick={onSelect}
+        >
+            <span className="theme-color-preview__preset-card-header">
+                <span className="theme-color-preview__preset-dot" aria-hidden="true"/>
+                <strong>{preset.label}</strong>
+            </span>
+            <span className="theme-color-preview__preset-card-description">{preset.description}</span>
+            <span className="theme-color-preview__preset-card-swatches" aria-hidden="true">
+                <span className="theme-color-preview__preset-swatch theme-color-preview__preset-swatch--surface"/>
+                <span className="theme-color-preview__preset-swatch theme-color-preview__preset-swatch--primary"/>
+            </span>
+        </button>
     )
 }
 
-function ToneSwatch({tone}: { tone: MaterialToneSwatch }) {
-    return (
-        <div className="theme-color-preview__tone">
-            <span className="theme-color-preview__tone-swatch" style={colorStyle(tone.hex)} aria-hidden="true"/>
-            <span>{tone.tone}</span>
-        </div>
-    )
+function parseThemeConfig(value: unknown): ImportedThemeConfig | null {
+    if (!isRecord(value)) return null
+    if (value.version !== THEME_CONFIG_VERSION) return null
+    if (typeof value.recipeId !== 'string' || typeof value.seedColor !== 'string') return null
+    const seedColor = normalizeHexColor(value.seedColor)
+    if (!seedColor) return null
+    return {
+        recipeId: value.recipeId,
+        seedColor,
+    }
 }
 
-function colorStyle(color: string): ColorVariableStyle {
-    return {'--theme-color-preview-swatch': color}
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function themePresetStyle(preset: FcThemeRecipe): ColorVariableStyle {
+    return {
+        '--theme-color-preview-primary': preset.primarySeed,
+        '--theme-color-preview-surface': preset.neutralSeed,
+    }
 }
