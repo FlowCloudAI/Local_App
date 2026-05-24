@@ -21,11 +21,10 @@ import {
     type FcThemeTokenColorValues,
 } from './fcThemeRecipe'
 import {isValidHexColor, normalizeHexColor} from './materialThemePreview'
-import ThemeTokenColorEditor from './ThemeTokenColorEditor'
+import ThemeTokenColorEditor, {type TokenColorMode} from './ThemeTokenColorEditor'
 import './ThemeColorPreview.css'
 
 type ColorVariableStyle = CSSProperties & Record<string, string>
-type TokenColorMode = 'light' | 'dark'
 
 interface ParsedThemeConfig {
     recipeId: string
@@ -108,10 +107,12 @@ export default function ThemeColorPreview() {
             ...current,
             [token]: {
                 ...current[token],
-                [mode]: {
-                    hex: normalized,
-                    css: normalized,
-                },
+                ...(mode === 'both'
+                    ? {
+                        light: {hex: normalized, css: normalized},
+                        dark: {hex: normalized, css: normalized},
+                    }
+                    : {[mode]: {hex: normalized, css: normalized}}),
             },
         }))
         setConfigMessage(null)

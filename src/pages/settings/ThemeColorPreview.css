@@ -262,6 +262,8 @@
     background: var(--fc-color-bg-secondary);
 }
 
+.theme-color-preview__token-row--single { grid-template-columns: minmax(10rem, 1fr) minmax(9rem, 0.8fr); }
+
 .theme-color-preview__token-meta {
     display: flex;
     flex-direction: column;
