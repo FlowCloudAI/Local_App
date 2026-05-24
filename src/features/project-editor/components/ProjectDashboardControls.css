@@ -10,7 +10,7 @@
 }
 
 .pe-dashboard-action-list {
-    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 }
 
 .pe-dashboard-action,
@@ -96,12 +96,44 @@
 
 .pe-dashboard-action {
     display: flex;
-    flex-direction: column;
-    gap: var(--fc-space-xs);
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--fc-space-sm);
     padding: var(--fc-space-sm);
     color: inherit;
     text-align: left;
     cursor: pointer;
+}
+
+.pe-dashboard-action__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--fc-radius-md);
+    background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
+    color: var(--fc-color-primary);
+}
+
+.pe-dashboard-action__icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+    overflow: visible;
+}
+
+.pe-dashboard-action__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-xs);
+    min-width: 0;
+    flex: 1;
+}
+
+.pe-dashboard-action:disabled .pe-dashboard-action__icon {
+    background: color-mix(in srgb, var(--fc-color-text-disabled) 14%, transparent);
+    color: var(--fc-color-text-disabled);
 }
 
 .pe-dashboard-action:hover:not(:disabled) {

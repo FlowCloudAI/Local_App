@@ -1,4 +1,4 @@
-import type {CSSProperties} from 'react'
+import type {CSSProperties, ReactNode} from 'react'
 import {formatDashboardNumber} from './ProjectDashboardFormat'
 
 export interface DashboardBarItem {
@@ -29,6 +29,7 @@ export interface DashboardActionItem {
     description: string
     badge?: string
     disabled?: boolean
+    icon?: ReactNode
     onClick?: () => void
 }
 
@@ -129,11 +130,18 @@ export function DashboardActionList({items}: { items: DashboardActionItem[] }) {
                     onClick={item.onClick}
                     disabled={item.disabled}
                 >
-                    <span className="pe-dashboard-action__topline">
-                        <span className="pe-dashboard-action__title">{item.title}</span>
-                        {item.badge && <span className="pe-dashboard-action__badge">{item.badge}</span>}
+                    {item.icon && (
+                        <span className="pe-dashboard-action__icon" aria-hidden="true">
+                            {item.icon}
+                        </span>
+                    )}
+                    <span className="pe-dashboard-action__body">
+                        <span className="pe-dashboard-action__topline">
+                            <span className="pe-dashboard-action__title">{item.title}</span>
+                            {item.badge && <span className="pe-dashboard-action__badge">{item.badge}</span>}
+                        </span>
+                        <span className="pe-dashboard-action__desc">{item.description}</span>
                     </span>
-                    <span className="pe-dashboard-action__desc">{item.description}</span>
                 </button>
             ))}
         </div>
