@@ -10,6 +10,7 @@ import {normalizeHexColor, type MaterialToneSwatch} from './materialThemePreview
 const MATERIAL_THEME_TONES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 97, 99, 100] as const
 
 type FcThemeLightProfile = 'default' | 'airy' | 'soft' | 'warm'
+type FcThemePaletteKey = 'primary' | 'neutral' | 'neutralVariant'
 type MaterialThemeTone = typeof MATERIAL_THEME_TONES[number]
 
 export interface FcThemeRecipe {
@@ -50,7 +51,9 @@ interface FcThemeTokenRule {
     token: string
     label: string
     group: FcThemeTokenPreview['group']
-    palette?: 'primary' | 'neutral' | 'neutralVariant'
+    palette?: FcThemePaletteKey
+    lightPalette?: FcThemePaletteKey
+    darkPalette?: FcThemePaletteKey
     lightTone?: number
     lightToneKey?: keyof FcLightToneProfile
     darkTone?: number
@@ -198,14 +201,14 @@ const FC_THEME_TOKEN_RULES: FcThemeTokenRule[] = [
     {token: '--fc-color-text-link-hover', label: '链接悬停', group: '主色', palette: 'primary', lightTone: 30, darkTone: 80},
     {token: '--fc-color-text-on-primary', label: '主色上文字', group: '主色', kind: 'onPrimary'},
 
-    {token: '--fc-color-bg', label: '页面背景', group: '背景', palette: 'neutral', lightToneKey: 'bg', darkTone: 10},
-    {token: '--fc-color-bg-secondary', label: '工作台背景', group: '背景', palette: 'neutral', lightToneKey: 'bgSecondary', darkTone: 20},
-    {token: '--fc-color-bg-tertiary', label: '悬停背景', group: '背景', palette: 'neutralVariant', lightToneKey: 'bgTertiary', darkTone: 20},
-    {token: '--fc-color-bg-elevated', label: '浮层背景', group: '背景', palette: 'neutral', lightToneKey: 'bgElevated', darkTone: 30},
+    {token: '--fc-color-bg', label: '页面背景', group: '背景', palette: 'neutral', lightPalette: 'primary', lightToneKey: 'bg', darkTone: 10},
+    {token: '--fc-color-bg-secondary', label: '工作台背景', group: '背景', palette: 'neutral', lightPalette: 'primary', lightToneKey: 'bgSecondary', darkTone: 20},
+    {token: '--fc-color-bg-tertiary', label: '悬停背景', group: '背景', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'bgTertiary', darkTone: 20},
+    {token: '--fc-color-bg-elevated', label: '浮层背景', group: '背景', palette: 'neutral', lightPalette: 'primary', lightToneKey: 'bgElevated', darkTone: 30},
 
-    {token: '--fc-color-border', label: '边框', group: '边框', palette: 'neutralVariant', lightToneKey: 'border', darkTone: 30},
-    {token: '--fc-color-border-light', label: '浅边框', group: '边框', palette: 'neutralVariant', lightToneKey: 'borderLight', darkTone: 20},
-    {token: '--fc-color-border-hover', label: '边框悬停', group: '边框', palette: 'neutralVariant', lightToneKey: 'borderHover', darkTone: 50},
+    {token: '--fc-color-border', label: '边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'border', darkTone: 30},
+    {token: '--fc-color-border-light', label: '浅边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'borderLight', darkTone: 20},
+    {token: '--fc-color-border-hover', label: '边框悬停', group: '边框', palette: 'neutralVariant', lightPalette: 'primary', lightToneKey: 'borderHover', darkTone: 50},
 
     {token: '--fc-color-text', label: '正文', group: '文字', palette: 'neutral', lightTone: 10, darkTone: 90},
     {token: '--fc-color-text-secondary', label: '次级文字', group: '文字', palette: 'neutral', lightTone: 40, darkTone: 70},
@@ -263,7 +266,7 @@ export function createFcThemeOverrideCss(preview: FcThemePreview): string {
 function createTokenPreview(
     rule: FcThemeTokenRule,
     lightProfile: FcThemeLightProfile,
-    palettes: Record<'primary' | 'neutral' | 'neutralVariant', TonalPalette>,
+    palettes: Record<FcThemePaletteKey, TonalPalette>,
 ): FcThemeTokenPreview {
     if (rule.kind === 'onPrimary') {
         const lightPrimary = getToneHex(palettes.primary, 50)
@@ -277,16 +280,20 @@ function createTokenPreview(
         }
     }
 
-    const palette = palettes[rule.palette ?? 'primary']
+    const defaultPaletteKey = rule.palette ?? 'primary'
+    const lightPaletteKey = rule.lightPalette ?? defaultPaletteKey
+    const darkPaletteKey = rule.darkPalette ?? defaultPaletteKey
+    const lightPalette = palettes[lightPaletteKey]
+    const darkPalette = palettes[darkPaletteKey]
     const lightTone = normalizeThemeTone(resolveLightTone(rule, lightProfile))
     const darkTone = normalizeThemeTone(rule.darkTone ?? 70)
-    const lightHex = getToneHex(palette, lightTone)
-    const darkHex = getToneHex(palette, darkTone)
+    const lightHex = getToneHex(lightPalette, lightTone)
+    const darkHex = getToneHex(darkPalette, darkTone)
     return {
         token: rule.token,
         label: rule.label,
         group: rule.group,
-        light: createToneTokenValue(`Light T${lightTone}`, lightHex, rule.lightAlpha),
+        light: createToneTokenValue(`Light ${formatPaletteLabel(lightPaletteKey)} T${lightTone}`, lightHex, rule.lightAlpha),
         dark: createToneTokenValue(`Dark T${darkTone}`, darkHex, rule.darkAlpha),
     }
 }
@@ -337,6 +344,12 @@ function normalizeThemeTone(tone: number): MaterialThemeTone {
 
 function isMaterialThemeTone(tone: number): tone is MaterialThemeTone {
     return MATERIAL_THEME_TONES.some((item) => item === tone)
+}
+
+function formatPaletteLabel(palette: FcThemePaletteKey): string {
+    if (palette === 'primary') return '主色'
+    if (palette === 'neutralVariant') return '中性变体'
+    return '中性'
 }
 
 function pickReadableTextColor(backgroundHex: string): string {
