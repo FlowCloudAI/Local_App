@@ -37,6 +37,9 @@ export interface FcThemeTokenValue {
     label: string
     value: string
     swatch: string
+    hex: string
+    css: string
+    alpha?: number
 }
 
 export interface FcThemeTokenPreview {
@@ -55,6 +58,18 @@ export interface FcThemePreview {
     neutralVariantTones: MaterialToneSwatch[]
     tokens: FcThemeTokenPreview[]
 }
+
+export interface FcThemeTokenColorValue {
+    hex: string
+    css: string
+}
+
+export interface FcThemeTokenColorPair {
+    light: FcThemeTokenColorValue
+    dark: FcThemeTokenColorValue
+}
+
+export type FcThemeTokenColorValues = Record<string, FcThemeTokenColorPair>
 
 interface FcThemeTokenRule {
     token: string
@@ -301,16 +316,32 @@ export function createFcThemePreview(
     }
 }
 
-export function createFcThemeOverrideCss(preview: FcThemePreview): string {
+export function createFcThemeOverrideCss(
+    preview: FcThemePreview,
+    tokenColors?: FcThemeTokenColorValues,
+): string {
     return [
         ':root {',
-        ...preview.tokens.map((item) => `  ${item.token}: ${item.light.swatch} !important;`),
+        ...preview.tokens.map((item) => `  ${item.token}: ${tokenColors?.[item.token]?.light.css ?? item.light.css} !important;`),
         '}',
         '',
         '[data-theme="dark"] {',
-        ...preview.tokens.map((item) => `  ${item.token}: ${item.dark.swatch} !important;`),
+        ...preview.tokens.map((item) => `  ${item.token}: ${tokenColors?.[item.token]?.dark.css ?? item.dark.css} !important;`),
         '}',
     ].join('\n')
+}
+
+export function createFcThemeTokenColorValues(preview: FcThemePreview): FcThemeTokenColorValues {
+    return Object.fromEntries(preview.tokens.map((item) => [item.token, {
+        light: {
+            hex: item.light.hex,
+            css: item.light.css,
+        },
+        dark: {
+            hex: item.dark.hex,
+            css: item.dark.css,
+        },
+    }]))
 }
 
 function createTokenPreview(
@@ -356,10 +387,14 @@ function createToneSwatches(palette: TonalPalette): MaterialToneSwatch[] {
 }
 
 function createToneTokenValue(label: string, hex: string, alpha?: number): FcThemeTokenValue {
+    const css = formatCssTokenValue(hex, alpha)
     return {
         label,
         value: alpha ? `${hex} / ${alpha}%` : hex,
-        swatch: formatCssTokenValue(hex, alpha),
+        swatch: css,
+        hex,
+        css,
+        alpha,
     }
 }
 
@@ -368,6 +403,8 @@ function createStaticTokenValue(label: string, hex: string): FcThemeTokenValue {
         label,
         value: hex,
         swatch: hex,
+        hex,
+        css: hex,
     }
 }
 
