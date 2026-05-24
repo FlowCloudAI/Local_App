@@ -1,5 +1,6 @@
 pub(super) use crate::AiSessionKind;
 pub(super) use crate::AiState;
+pub(super) use crate::ApiError;
 pub(super) use crate::ApiKeyStore;
 pub(super) use crate::PathsState;
 pub(super) use crate::PendingEditsState;
@@ -653,7 +654,7 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
 pub(crate) struct EventError {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
-    pub(crate) error: String,
+    pub(crate) error: ApiError,
 }
 
 pub(crate) fn turn_status_str(s: &TurnStatus) -> String {
@@ -1006,7 +1007,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                             EventError {
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
-                                error: e,
+                                error: e.into(),
                             },
                         )
                         .ok();

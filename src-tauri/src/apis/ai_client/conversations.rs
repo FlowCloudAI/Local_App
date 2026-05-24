@@ -458,12 +458,12 @@ async fn run_compact_once(
     while let Some(event) = event_stream.next().await {
         match event {
             SessionEvent::ContentDelta(text) => output.push_str(&text),
-            SessionEvent::Error(error) => return Err(error),
+            SessionEvent::Error(error) => return Err(error.to_string()),
             SessionEvent::TurnEnd { status, .. } => match status {
                 TurnStatus::Ok => break,
                 TurnStatus::Cancelled => return Err("压缩任务已取消".to_string()),
                 TurnStatus::Interrupted => return Err("压缩任务被中断".to_string()),
-                TurnStatus::Error(error) => return Err(error),
+                TurnStatus::Error(error) => return Err(error.to_string()),
             },
             _ => {}
         }

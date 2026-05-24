@@ -295,7 +295,7 @@ pub async fn ai_start_contradiction_session(
                 crate::apis::ai_client::EventError {
                     session_id: request.session_id.clone(),
                     run_id: run_id.clone(),
-                    error: error.clone(),
+                    error: crate::ApiError::internal(error.clone()),
                 },
             )
             .ok();
@@ -309,7 +309,7 @@ pub async fn ai_start_contradiction_session(
                 crate::apis::ai_client::EventError {
                     session_id: request.session_id.clone(),
                     run_id: run_id.clone(),
-                    error: "矛盾检测首轮未返回结果".to_string(),
+                    error: crate::ApiError::internal("矛盾检测首轮未返回结果"),
                 },
             )
             .ok();
@@ -583,24 +583,25 @@ fn spawn_contradiction_event_loop<S>(
                             }
                             TurnStatus::Cancelled => Err("矛盾检测首轮已取消".to_string()),
                             TurnStatus::Interrupted => Err("矛盾检测首轮被中断".to_string()),
-                            TurnStatus::Error(error) => Err(error),
+                            TurnStatus::Error(error) => Err(error.to_string()),
                         };
                         let _ = sender.send(result);
                     }
                 }
                 SessionEvent::Error(error) => {
+                    let api_err: crate::ApiError = error.clone().into();
                     app_clone
                         .emit(
                             "ai:error",
                             EventError {
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
-                                error: error.clone(),
+                                error: api_err,
                             },
                         )
                         .ok();
                     if let Some(sender) = first_turn_sender.take() {
-                        let _ = sender.send(Err(error));
+                        let _ = sender.send(Err(error.to_string()));
                     }
                     break;
                 }

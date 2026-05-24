@@ -1,4 +1,5 @@
 mod ai_services;
+mod api_error;
 mod apis;
 mod auto_backup;
 mod layout;
@@ -10,6 +11,7 @@ mod state;
 mod template;
 mod tools;
 
+pub use api_error::ApiError;
 pub use settings::*;
 pub use state::*;
 

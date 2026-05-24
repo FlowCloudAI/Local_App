@@ -156,12 +156,12 @@ pub async fn ai_generate_entry_summary(
         while let Some(event) = event_stream.next().await {
             match event {
                 SessionEvent::ContentDelta(text) => output.push_str(&text),
-                SessionEvent::Error(error) => return Err(error),
+                SessionEvent::Error(error) => return Err(error.to_string()),
                 SessionEvent::TurnEnd { status, .. } => match status {
                     TurnStatus::Ok => break,
                     TurnStatus::Cancelled => return Err("总结任务已取消".to_string()),
                     TurnStatus::Interrupted => return Err("总结任务被中断".to_string()),
-                    TurnStatus::Error(error) => return Err(error),
+                    TurnStatus::Error(error) => return Err(error.to_string()),
                 },
                 _ => {}
             }
@@ -232,12 +232,12 @@ pub async fn ai_fill_image_prompt(
     while let Some(event) = event_stream.next().await {
         match event {
             SessionEvent::ContentDelta(text) => output.push_str(&text),
-            SessionEvent::Error(error) => return Err(error),
+            SessionEvent::Error(error) => return Err(error.to_string()),
             SessionEvent::TurnEnd { status, .. } => match status {
                 TurnStatus::Ok => break,
                 TurnStatus::Cancelled => return Err("绘图提示词任务已取消".to_string()),
                 TurnStatus::Interrupted => return Err("绘图提示词任务被中断".to_string()),
-                TurnStatus::Error(error) => return Err(error),
+                TurnStatus::Error(error) => return Err(error.to_string()),
             },
             _ => {}
         }
