@@ -4,8 +4,6 @@ import {
 } from './fcThemeRecipe'
 import {normalizeHexColor} from './materialThemePreview'
 
-type TokenColorMode = 'light' | 'dark'
-
 export type TokenColorMode = 'light' | 'dark' | 'both'
 
 interface ThemeTokenColorEditorProps {
