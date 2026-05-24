@@ -1,7 +1,6 @@
 /* ── 布局 ───────────────────────────────────────────────────────────────── */
 
 .pe-layout {
-    --pe-content-min-width: 40rem;
     --pe-divider-width: 8px;
     --pe-divider-handle-gap-height: 48px;
     --pe-divider-handle-gap-half: 24px;
@@ -209,8 +208,8 @@
 /* ── 右侧内容区 ───────────────────────────────────────────────────── */
 
 .pe-content {
-    flex: 1;
-    min-width: var(--pe-content-min-width);
+    flex: 1 1 0;
+    min-width: 0;
     height: 100%;
     overflow: hidden;
     display: flex;
