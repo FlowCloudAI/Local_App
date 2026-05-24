@@ -7,21 +7,26 @@ use super::common::*;
 pub async fn plugin_fetch_remote(
     net: State<'_, NetworkState>,
     registry_url: String,
-) -> Result<Vec<RemotePluginInfo>, String> {
+) -> Result<Vec<RemotePluginInfo>, ApiError> {
     let resp = net
         .client
         .get(&registry_url)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(ApiError::from_display)?;
 
     if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status()));
+        return Err(ApiError::new(
+            ErrorCode::HttpServerError,
+            format!("HTTP {}", resp.status()),
+        )
+        .with_kv("status_code", resp.status().as_u16())
+        .with_kv("url", registry_url.clone()));
     }
 
     resp.json::<Vec<RemotePluginInfo>>()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(ApiError::from_display)
 }
 
 /// 检查已安装插件是否有可用更新（对比自定义注册表）
@@ -30,7 +35,7 @@ pub async fn plugin_check_updates(
     ai_state: State<'_, AiState>,
     net: State<'_, NetworkState>,
     registry_url: String,
-) -> Result<Vec<PluginUpdateInfo>, String> {
+) -> Result<Vec<PluginUpdateInfo>, ApiError> {
     let remote = plugin_fetch_remote(net, registry_url).await?;
     let remote_map: std::collections::HashMap<_, _> =
         remote.into_iter().map(|p| (p.id, p.version)).collect();

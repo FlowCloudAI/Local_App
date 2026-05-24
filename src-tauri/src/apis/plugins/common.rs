@@ -1,5 +1,6 @@
 pub(super) use crate::state::PathsState;
-pub(super) use crate::{AiState, NetworkState};
+pub(super) use crate::{AiState, ApiError, NetworkState};
+pub(super) use flowcloudai_client::ErrorCode;
 pub(super) use flowcloudai_client::plugin::types::PluginMeta;
 pub(super) use reqwest::multipart;
 pub(super) use semver::Version;
@@ -150,13 +151,14 @@ pub(super) fn is_remote_version_newer(current: &str, latest: &str) -> bool {
 }
 
 /// 检查当前是否有活跃 AI 会话，有则返回错误（安装/卸载需要独占 plugin_registry）
-pub(super) async fn require_no_active_sessions(ai_state: &AiState) -> Result<(), String> {
+pub(super) async fn require_no_active_sessions(ai_state: &AiState) -> Result<(), ApiError> {
     let sessions = ai_state.sessions.lock().await;
     if !sessions.is_empty() {
-        return Err(format!(
-            "请先关闭所有 AI 会话（当前 {} 个）后再操作插件",
-            sessions.len()
-        ));
+        return Err(ApiError::new(
+            ErrorCode::PluginUnloadForbidden,
+            format!("请先关闭所有 AI 会话（当前 {} 个）后再操作插件", sessions.len()),
+        )
+        .with_kv("active_sessions", sessions.len() as u64));
     }
     Ok(())
 }
