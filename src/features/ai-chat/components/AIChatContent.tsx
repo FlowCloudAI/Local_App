@@ -1502,9 +1502,7 @@ export default function AIChatContent({
                                     onClick={toggleSettingsDrawer}
                                 >
                                     <svg viewBox="0 0 16 16" aria-hidden="true">
-                                        {settingsDrawerOpen
-                                            ? <path d="M3.5 10.5 8 6l4.5 4.5"/>
-                                            : <path d="M6 3.5 10.5 8 6 12.5"/>}
+                                        <path d="M6 3.5 10.5 8 6 12.5"/>
                                     </svg>
                                 </button>
                                 <span title={CONVERSATION_SETTING_TOOLTIPS.temperature}>温度 {formatConversationSettingNumber(conversationSettings.temperature)}</span>

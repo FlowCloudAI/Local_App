@@ -1209,6 +1209,12 @@
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+    transform-origin: center;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ai-conversation-settings-toggle[aria-expanded='true'] svg {
+    transform: rotate(-90deg);
 }
 
 .ai-context-usage-indicator {
