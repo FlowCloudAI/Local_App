@@ -1,5 +1,6 @@
 use super::common::*;
 use crate::senses::app_sense::AppSense;
+use flowcloudai_client::ErrorCode;
 
 /// 创建 LLM 会话并启动后台事件循环。
 ///
@@ -26,7 +27,7 @@ pub async fn ai_create_llm_session(
     conversation_id: Option<String>,
     client_trace_id: Option<String>,
     settings: Option<StoredConversationSettings>,
-) -> Result<CreateLlmSessionResult, String> {
+) -> Result<CreateLlmSessionResult, ApiError> {
     let trace_id = client_trace_id.as_deref().unwrap_or("none");
     log::info!(
         "[ai_create_llm_session][recv] trace_id={} session_id={} plugin_id={} model={:?} conversation_id={:?} temperature={:?} max_tokens={:?} max_tool_rounds={:?}",
@@ -48,10 +49,11 @@ pub async fn ai_create_llm_session(
                 session_id,
                 plugin_id
             );
-            return Err(format!(
-                "插件 '{}' 未配置 API Key，请在设置中配置",
-                plugin_id
-            ));
+            return Err(ApiError::new(
+                ErrorCode::AuthApiKeyMissing,
+                format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id),
+            )
+            .with_kv("plugin_id", plugin_id.clone()));
         }
     };
 
@@ -66,8 +68,15 @@ pub async fn ai_create_llm_session(
     let mut restored_settings = None;
     let mut restored_history = None;
     let resolved_conversation_id = if let Some(conv_id) = conversation_id.as_deref() {
-        let conversation = chat_store_get_conversation(paths.inner(), conv_id)?
-            .ok_or_else(|| format!("未找到会话：{}", conv_id))?;
+        let conversation = chat_store_get_conversation(paths.inner(), conv_id)
+            .map_err(ApiError::internal)?
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::LlmSessionNotFound,
+                    format!("未找到会话：{}", conv_id),
+                )
+                .with_kv("conversation_id", conv_id.to_string())
+            })?;
         restored_head = conversation.head;
         restored_model = Some(conversation.meta.model.clone());
         restored_settings = Some(conversation.settings.clone());
@@ -107,17 +116,14 @@ pub async fn ai_create_llm_session(
                 plugin_id,
                 e
             );
-            e.to_string()
+            ApiError::from(e)
         })?;
     drop(client);
 
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
     }
-    session
-        .load_sense(AppSense::new())
-        .await
-        .map_err(|e| e.to_string())?;
+    session.load_sense(AppSense::new()).await?;
     session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
 
     let model_to_apply = model
@@ -158,7 +164,7 @@ pub async fn ai_create_llm_session(
             resolved_conversation_id,
             e
         );
-        e.to_string()
+        ApiError::from(e)
     })?;
     let run_id = Uuid::new_v4().to_string();
     let conversation_settings = settings.clone().or(restored_settings);
@@ -216,16 +222,22 @@ pub async fn ai_checkout(
     ai_state: State<'_, AiState>,
     session_id: String,
     node_id: u64,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     let handle = {
         let sessions = ai_state.sessions.lock().await;
         sessions
             .get(&session_id)
             .map(|entry| entry.handle.clone())
-            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
     };
 
-    handle.checkout(node_id).await
+    handle.checkout(node_id).await.map_err(ApiError::internal)
 }
 
 /// 切换会话使用的插件（下一轮对话生效）
@@ -234,19 +246,33 @@ pub async fn ai_switch_plugin(
     ai_state: State<'_, AiState>,
     session_id: String,
     plugin_id: String,
-) -> Result<(), String> {
-    let api_key = ApiKeyStore::get(&plugin_id)
-        .ok_or_else(|| format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id))?;
+) -> Result<(), ApiError> {
+    let api_key = ApiKeyStore::get(&plugin_id).ok_or_else(|| {
+        ApiError::new(
+            ErrorCode::AuthApiKeyMissing,
+            format!("插件 '{}' 未配置 API Key，请在设置中配置", plugin_id),
+        )
+        .with_kv("plugin_id", plugin_id.clone())
+    })?;
 
     let handle = {
         let sessions = ai_state.sessions.lock().await;
         sessions
             .get(&session_id)
             .map(|entry| entry.handle.clone())
-            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
     };
 
-    handle.switch_plugin(&plugin_id, &api_key).await
+    handle
+        .switch_plugin(&plugin_id, &api_key)
+        .await
+        .map_err(ApiError::internal)
 }
 
 /// 运行时会话参数更新（所有字段可选，只更新传入的字段）
@@ -255,7 +281,7 @@ pub async fn ai_update_session(
     ai_state: State<'_, AiState>,
     session_id: String,
     params: serde_json::Value,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     use flowcloudai_client::ThinkingType;
     use serde::Deserialize;
 
@@ -286,18 +312,29 @@ pub async fn ai_update_session(
         top_logprobs: Option<Option<i64>>,
     }
 
-    fn validate_f64(value: f64, name: &str, min: f64, max: f64) -> Result<(), String> {
+    fn validate_f64(value: f64, name: &str, min: f64, max: f64) -> Result<(), ApiError> {
         if !value.is_finite() {
-            return Err(format!("参数 '{}' 不能是 NaN 或 Infinity", name));
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                format!("参数 '{}' 不能是 NaN 或 Infinity", name),
+            )
+            .with_kv("field", name.to_string()));
         }
         if value < min || value > max {
-            return Err(format!("参数 '{}' 必须在 {}-{} 之间", name, min, max));
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                format!("参数 '{}' 必须在 {}-{} 之间", name, min, max),
+            )
+            .with_kv("field", name.to_string())
+            .with_kv("min", min)
+            .with_kv("max", max));
         }
         Ok(())
     }
 
-    let params: SessionUpdateParams =
-        serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+    let params: SessionUpdateParams = serde_json::from_value(params).map_err(|e| {
+        ApiError::new(ErrorCode::ValidationFormatError, format!("参数解析失败: {}", e))
+    })?;
 
     if let Some(Some(t)) = params.temperature {
         validate_f64(t, "temperature", 0.0, 2.0)?;
@@ -313,17 +350,29 @@ pub async fn ai_update_session(
     }
     if let Some(Some(mt)) = params.max_tokens {
         if mt < 1 {
-            return Err("参数 'maxTokens' 必须大于 0".to_string());
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                "参数 'maxTokens' 必须大于 0",
+            )
+            .with_kv("field", "maxTokens"));
         }
     }
     if let Some(Some(n)) = params.n {
         if n < 1 {
-            return Err("参数 'n' 必须大于 0".to_string());
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                "参数 'n' 必须大于 0",
+            )
+            .with_kv("field", "n"));
         }
     }
     if let Some(Some(tl)) = params.top_logprobs {
         if tl < 0 {
-            return Err("参数 'topLogprobs' 不能为负数".to_string());
+            return Err(ApiError::new(
+                ErrorCode::ValidationFormatError,
+                "参数 'topLogprobs' 不能为负数",
+            )
+            .with_kv("field", "topLogprobs"));
         }
     }
     let changed_fields = [
@@ -362,7 +411,13 @@ pub async fn ai_update_session(
         sessions
             .get(&session_id)
             .map(|entry| entry.handle.clone())
-            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
     };
 
     handle
@@ -445,7 +500,7 @@ pub async fn ai_send_message(
     session_id: String,
     message: String,
     client_trace_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     let trace_id = client_trace_id.as_deref().unwrap_or("none");
     let message_bytes = message.len();
     let message_chars = message.chars().count();
@@ -471,7 +526,11 @@ pub async fn ai_send_message(
                 active_count,
                 active_session_ids
             );
-            return Err(format!("Session '{}' 不存在", session_id));
+            return Err(ApiError::new(
+                ErrorCode::LlmSessionNotFound,
+                format!("Session '{}' 不存在", session_id),
+            )
+            .with_kv("session_id", session_id.clone()));
         };
         log::info!(
             "[ai_send_message][session_found] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} active_count={} channel_capacity={} channel_max_capacity={}",
@@ -509,7 +568,11 @@ pub async fn ai_send_message(
                 plugin_id,
                 model
             );
-            format!("Session '{}' 已关闭", session_id)
+            ApiError::new(
+                ErrorCode::LlmSessionClosed,
+                format!("Session '{}' 已关闭", session_id),
+            )
+            .with_kv("session_id", session_id.clone())
         })?;
     log::info!(
         "[ai_send_message][queued] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} bytes={} chars={} previous_capacity={} previous_max_capacity={} current_capacity={}",
@@ -533,13 +596,19 @@ pub async fn ai_send_message(
 pub async fn ai_cancel_session(
     ai_state: State<'_, AiState>,
     session_id: String,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     let handle = {
         let sessions = ai_state.sessions.lock().await;
         sessions
             .get(&session_id)
             .map(|entry| entry.handle.clone())
-            .ok_or_else(|| format!("Session '{}' 不存在", session_id))?
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
     };
     handle.cancel();
     Ok(())
@@ -550,7 +619,7 @@ pub async fn ai_cancel_session(
 pub async fn ai_close_session(
     ai_state: State<'_, AiState>,
     session_id: String,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     // 先触发取消，再移除 entry，避免流式请求继续向前端发送事件。
     let removed = ai_state.sessions.lock().await.remove(&session_id);
     if let Some(ref entry) = removed {
@@ -566,7 +635,7 @@ pub async fn ai_close_session(
 
 /// 关闭并释放所有 LLM 会话
 #[tauri::command]
-pub async fn ai_close_all_sessions(ai_state: State<'_, AiState>) -> Result<usize, String> {
+pub async fn ai_close_all_sessions(ai_state: State<'_, AiState>) -> Result<usize, ApiError> {
     let removed = {
         let mut sessions = ai_state.sessions.lock().await;
         sessions.drain().map(|(_, entry)| entry).collect::<Vec<_>>()
