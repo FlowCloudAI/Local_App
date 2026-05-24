@@ -158,12 +158,6 @@ export default function ThemeColorPreview() {
                 ))}
             </div>
 
-            <div className="theme-color-preview__current">
-                <strong>{selectedRecipe.label}</strong>
-                <span>{selectedRecipe.description}</span>
-                {isDefaultTheme && <span>内置默认主题</span>}
-            </div>
-
             <div className="theme-color-preview__drawer">
                 <button
                     className="theme-color-preview__drawer-toggle"
@@ -236,7 +230,6 @@ function ThemePresetCard({
                 <span className="theme-color-preview__preset-dot" aria-hidden="true"/>
                 <strong>{preset.label}</strong>
             </span>
-            <span className="theme-color-preview__preset-card-description">{preset.description}</span>
             <span className="theme-color-preview__preset-card-swatches" aria-hidden="true">
                 <span className="theme-color-preview__preset-swatch theme-color-preview__preset-swatch--surface"/>
                 <span className="theme-color-preview__preset-swatch theme-color-preview__preset-swatch--primary"/>
