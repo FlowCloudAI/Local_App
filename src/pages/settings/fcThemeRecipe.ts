@@ -45,7 +45,7 @@ export interface FcThemeTokenValue {
 export interface FcThemeTokenPreview {
     token: string
     label: string
-    group: '主色' | '背景' | '边框' | '文字'
+    group: '主色' | '背景' | '边框' | '文字' | '滚动条'
     modeInvariant: boolean
     light: FcThemeTokenValue
     dark: FcThemeTokenValue
@@ -221,6 +221,11 @@ const FC_THEME_TOKEN_RULES: FcThemeTokenRule[] = [
     {token: '--fc-color-border', label: '边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'border', darkTone: 30},
     {token: '--fc-color-border-light', label: '浅边框', group: '边框', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'borderLight', darkTone: 20},
     {token: '--fc-color-border-hover', label: '边框悬停', group: '边框', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'borderHover', darkTone: 50},
+
+    {token: '--fc-color-scrollbar-track', label: '滚动轨道', group: '滚动条', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'bgTertiary', darkTone: 20},
+    {token: '--fc-color-scrollbar-thumb', label: '滚动滑块', group: '滚动条', palette: 'neutralVariant', lightPalette: 'primarySurface', lightToneKey: 'border', darkTone: 30},
+    {token: '--fc-color-scrollbar-thumb-hover', label: '滑块悬停', group: '滚动条', palette: 'neutral', lightTone: 60, darkTone: 50},
+    {token: '--fc-color-scrollbar-thumb-active', label: '滑块滚动', group: '滚动条', palette: 'neutral', lightTone: 40, darkTone: 70},
 
     {token: '--fc-color-text', label: '正文', group: '文字', palette: 'neutral', lightTone: 10, darkTone: 90},
     {token: '--fc-color-text-secondary', label: '次级文字', group: '文字', palette: 'neutral', lightTone: 40, darkTone: 70},

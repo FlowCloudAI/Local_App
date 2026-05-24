@@ -12,7 +12,7 @@ interface ThemeTokenColorEditorProps {
     onChange: (token: string, mode: TokenColorMode, color: string) => void
 }
 
-const TOKEN_GROUPS: Array<FcThemeTokenPreview['group']> = ['主色', '背景', '边框', '文字']
+const TOKEN_GROUPS: Array<FcThemeTokenPreview['group']> = ['主色', '背景', '边框', '滚动条', '文字']
 
 export default function ThemeTokenColorEditor({
     tokens,
@@ -23,7 +23,7 @@ export default function ThemeTokenColorEditor({
         <div className="theme-color-preview__token-editor">
             <div className="theme-color-preview__token-editor-header">
                 <strong>FC 主题令牌颜色</strong>
-                <span>主色令牌通用，背景、边框和文字可按浅色/深色分别覆盖。</span>
+                <span>主色令牌通用，背景、边框、滚动条和文字可按浅色/深色分别覆盖。</span>
             </div>
             {TOKEN_GROUPS.map((group) => {
                 const groupTokens = tokens.filter((item) => item.group === group)
