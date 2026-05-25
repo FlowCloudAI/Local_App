@@ -87,6 +87,165 @@ fn sort_category_stats(stats: &mut [ProjectCategoryStat]) {
     });
 }
 
+fn ratio_score(numerator: usize, denominator: usize) -> usize {
+    if denominator == 0 {
+        return 0;
+    }
+    ((numerator as f64 / denominator as f64) * 100.0).round() as usize
+}
+
+fn clamp_score(value: usize) -> usize {
+    value.min(100)
+}
+
+struct GovernanceScoreInput {
+    category_count: usize,
+    entry_type_count: usize,
+    tag_schema_count: usize,
+    entry_count: usize,
+    word_count: usize,
+    relation_count: usize,
+    internal_link_count: usize,
+    unset_type_count: usize,
+    uncategorized_entry_count: usize,
+    empty_content_entry_count: usize,
+    short_content_entry_count: usize,
+    missing_summary_entry_count: usize,
+    isolated_entry_count: usize,
+}
+
+fn build_governance_score(input: GovernanceScoreInput) -> ProjectGovernanceScore {
+    let average_words = if input.entry_count > 0 {
+        input.word_count / input.entry_count
+    } else {
+        0
+    };
+    let classified_count = input
+        .entry_count
+        .saturating_sub(input.uncategorized_entry_count);
+    let typed_count = input.entry_count.saturating_sub(input.unset_type_count);
+    let non_empty_count = input
+        .entry_count
+        .saturating_sub(input.empty_content_entry_count);
+    let summary_count = input
+        .entry_count
+        .saturating_sub(input.missing_summary_entry_count);
+    let long_content_count = input
+        .entry_count
+        .saturating_sub(input.short_content_entry_count);
+    let connected_count = input.entry_count.saturating_sub(input.isolated_entry_count);
+    let average_word_score = average_words.min(100);
+    let content_score = clamp_score(
+        (ratio_score(non_empty_count, input.entry_count) * 35
+            + ratio_score(summary_count, input.entry_count) * 25
+            + ratio_score(long_content_count, input.entry_count) * 25
+            + average_word_score * 15)
+            / 100,
+    );
+    let structure_score = [
+        input.category_count > 0,
+        input.entry_type_count > 0,
+        input.tag_schema_count > 0,
+        input.entry_count > 0,
+        input.relation_count > 0 || input.internal_link_count > 0,
+    ]
+    .iter()
+    .filter(|passed| **passed)
+    .count()
+        * 20;
+    let ownership_score = clamp_score(
+        (ratio_score(classified_count, input.entry_count) * 55
+            + ratio_score(typed_count, input.entry_count) * 45)
+            / 100,
+    );
+    let relation_density_score = if input.entry_count > 0 {
+        ((input.relation_count + input.internal_link_count) * 100 / input.entry_count).min(100)
+    } else {
+        0
+    };
+    let connectivity_score = clamp_score(
+        (ratio_score(connected_count, input.entry_count) * 70 + relation_density_score * 30) / 100,
+    );
+    let risk_issue_count = input.uncategorized_entry_count
+        + input.empty_content_entry_count
+        + input.short_content_entry_count
+        + input.missing_summary_entry_count
+        + input.isolated_entry_count;
+    let risk_score = if input.entry_count == 0 {
+        0
+    } else {
+        100usize.saturating_sub(((risk_issue_count * 100) / (input.entry_count * 5)).min(100))
+    };
+    let dimensions = vec![
+        ProjectGovernanceDimension {
+            key: "structure".to_string(),
+            label: "结构配置".to_string(),
+            score: structure_score,
+            weight: 20,
+        },
+        ProjectGovernanceDimension {
+            key: "content".to_string(),
+            label: "内容完整".to_string(),
+            score: content_score,
+            weight: 25,
+        },
+        ProjectGovernanceDimension {
+            key: "ownership".to_string(),
+            label: "组织归属".to_string(),
+            score: ownership_score,
+            weight: 20,
+        },
+        ProjectGovernanceDimension {
+            key: "connectivity".to_string(),
+            label: "关系连通".to_string(),
+            score: connectivity_score,
+            weight: 20,
+        },
+        ProjectGovernanceDimension {
+            key: "risk".to_string(),
+            label: "风险控制".to_string(),
+            score: risk_score,
+            weight: 15,
+        },
+    ];
+    let score = dimensions
+        .iter()
+        .map(|item| item.score * item.weight)
+        .sum::<usize>()
+        / dimensions
+            .iter()
+            .map(|item| item.weight)
+            .sum::<usize>()
+            .max(1);
+
+    ProjectGovernanceScore {
+        score,
+        dimensions,
+        checks: vec![
+            ProjectGovernanceCheck {
+                label: "分类体系".to_string(),
+                passed: input.category_count > 0,
+            },
+            ProjectGovernanceCheck {
+                label: "词条类型".to_string(),
+                passed: input.entry_type_count > 0,
+            },
+            ProjectGovernanceCheck {
+                label: "标签字段".to_string(),
+                passed: input.tag_schema_count > 0,
+            },
+            ProjectGovernanceCheck {
+                label: "内容资产".to_string(),
+                passed: input.entry_count > 0,
+            },
+            ProjectGovernanceCheck {
+                label: "平均字数".to_string(),
+                passed: average_words >= 100,
+            },
+        ],
+    }
+}
+
 fn parse_entry_uri(raw: &str) -> Option<Uuid> {
     let decoded = urlencoding::decode(raw).ok()?;
     Uuid::parse_str(decoded.trim()).ok()
@@ -477,6 +636,7 @@ pub async fn db_get_project_stats(
     let mut word_count = 0usize;
     let mut entry_count = 0usize;
     let mut internal_link_count = 0usize;
+    let mut unset_type_count = 0usize;
     let mut uncategorized_entry_count = 0usize;
     let mut empty_content_entry_count = 0usize;
     let mut short_content_entry_count = 0usize;
@@ -496,6 +656,21 @@ pub async fn db_get_project_stats(
         .list_relations_for_project(&project_id)
         .await
         .map_err(|e| e.to_string())?;
+    let category_count = db
+        .list_categories(&project_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .len();
+    let entry_type_count = db
+        .list_all_entry_types(&project_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .len();
+    let tag_schema_count = db
+        .list_tag_schemas(&project_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .len();
     for relation in &relations {
         connected_entry_ids.insert(relation.a_id);
         connected_entry_ids.insert(relation.b_id);
@@ -534,13 +709,22 @@ pub async fn db_get_project_stats(
             if category_id.is_none() {
                 uncategorized_entry_count += 1;
             }
+            if entry_type.is_none() {
+                unset_type_count += 1;
+            }
             if entry.content.trim().is_empty() {
                 empty_content_entry_count += 1;
             }
             if entry_word_count < SHORT_CONTENT_CHAR_THRESHOLD {
                 short_content_entry_count += 1;
             }
-            if entry.summary.as_deref().map(str::trim).unwrap_or_default().is_empty() {
+            if entry
+                .summary
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or_default()
+                .is_empty()
+            {
                 missing_summary_entry_count += 1;
             }
             if parse_entry_timestamp(&entry.created_at)
@@ -606,6 +790,21 @@ pub async fn db_get_project_stats(
         .collect::<Vec<_>>();
     sort_type_stats(&mut entries_by_type);
     sort_category_stats(&mut entries_by_category);
+    let governance_score = build_governance_score(GovernanceScoreInput {
+        category_count,
+        entry_type_count,
+        tag_schema_count,
+        entry_count,
+        word_count,
+        relation_count: relations.len(),
+        internal_link_count,
+        unset_type_count,
+        uncategorized_entry_count,
+        empty_content_entry_count,
+        short_content_entry_count,
+        missing_summary_entry_count,
+        isolated_entry_count,
+    });
 
     Ok(ProjectStats {
         entry_count,
@@ -622,6 +821,7 @@ pub async fn db_get_project_stats(
         isolated_entry_count,
         created_last_7_days,
         updated_last_7_days,
+        governance_score,
     })
 }
 

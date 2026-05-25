@@ -65,6 +65,30 @@ pub struct ProjectCategoryStat {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectGovernanceCheck {
+    pub label: String,
+    pub passed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectGovernanceDimension {
+    pub key: String,
+    pub label: String,
+    pub score: usize,
+    pub weight: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectGovernanceScore {
+    pub score: usize,
+    pub checks: Vec<ProjectGovernanceCheck>,
+    pub dimensions: Vec<ProjectGovernanceDimension>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectStats {
     pub entry_count: usize,
     pub image_count: usize,
@@ -80,6 +104,7 @@ pub struct ProjectStats {
     pub isolated_entry_count: usize,
     pub created_last_7_days: usize,
     pub updated_last_7_days: usize,
+    pub governance_score: ProjectGovernanceScore,
 }
 
 struct DefaultTimelineTagDefinition {

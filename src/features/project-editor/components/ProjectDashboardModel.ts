@@ -181,33 +181,6 @@ function getDistributionItems(input: ProjectDashboardModelInput, categoryStats: 
     }
 }
 
-function getStructureScore(input: ProjectDashboardModelInput, effectiveEntryCount: number, averageWords: number) {
-    const structureChecks = [
-        {label: '分类体系', passed: input.categories.length > 0},
-        {label: '词条类型', passed: input.entryTypes.length > 0},
-        {label: '标签字段', passed: input.tagSchemas.length > 0},
-        {label: '内容资产', passed: effectiveEntryCount > 0},
-        {label: '平均字数', passed: averageWords >= 100},
-    ]
-    const baseScore = Math.round(
-        (structureChecks.filter(item => item.passed).length / structureChecks.length) * 100,
-    )
-    const healthIssueCount = input.projectStats
-        ? input.projectStats.uncategorizedEntryCount
-        + input.projectStats.emptyContentEntryCount
-        + input.projectStats.missingSummaryEntryCount
-        + input.projectStats.isolatedEntryCount
-        : 0
-    const healthPenalty = input.projectStats && effectiveEntryCount > 0
-        ? Math.min(40, Math.round((healthIssueCount / (effectiveEntryCount * 4)) * 100))
-        : 0
-
-    return {
-        structureChecks,
-        structureScore: Math.max(0, baseScore - healthPenalty),
-    }
-}
-
 function getKpiItems(input: ProjectDashboardModelInput, model: {
     effectiveEntryCount: number
     safeWordCount: number
@@ -318,7 +291,6 @@ export function buildProjectDashboardModel(input: ProjectDashboardModelInput): P
     const assetRatio = effectiveEntryCount > 0 ? safeImageCount / effectiveEntryCount : 0
     const categoryStats = getCategoryDepthStats(input.categories)
     const distributions = getDistributionItems(input, categoryStats)
-    const structure = getStructureScore(input, effectiveEntryCount, averageWords)
     const relationCount = input.projectStats?.relationCount ?? 0
     const internalLinkCount = input.projectStats?.internalLinkCount ?? 0
     const createdLast7Days = input.projectStats?.createdLast7Days ?? 0
@@ -340,7 +312,8 @@ export function buildProjectDashboardModel(input: ProjectDashboardModelInput): P
         categoryDepth: categoryStats.maxDepth,
         relationCount,
         internalLinkCount,
-        ...structure,
+        structureScore: input.projectStats?.governanceScore.score ?? 0,
+        structureChecks: input.projectStats?.governanceScore.checks ?? [],
         ...distributions,
         kpiItems: getKpiItems(input, {
             effectiveEntryCount,

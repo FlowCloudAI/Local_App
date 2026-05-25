@@ -20,7 +20,6 @@ import {
     type CategoryDeletedEvent,
     type CustomEntryType,
     dbListSnapshots,
-    db_count_entries,
     db_create_category,
     db_create_entry,
     db_delete_category,
@@ -229,11 +228,11 @@ function ProjectEditorInner({
     }, [projectId])
 
     const fetchAll = useCallback(async () => {
-        const [proj, cats, types, count, tags] = await Promise.all([
+        const [proj, cats, types, stats, tags] = await Promise.all([
             db_get_project(projectId),
             db_list_categories(projectId),
             db_list_all_entry_types(projectId),
-            db_count_entries({projectId}),
+            db_get_project_stats(projectId),
             db_list_tag_schemas(projectId),
         ])
 
@@ -241,7 +240,8 @@ function ProjectEditorInner({
             project: proj,
             categories: cats,
             entryTypes: types,
-            entryCount: Number(count),
+            entryCount: stats.entryCount,
+            projectStats: stats,
             tagSchemas: tags,
         }
     }, [projectId])
@@ -253,6 +253,7 @@ function ProjectEditorInner({
             setCategories(data.categories)
             setEntryTypes(data.entryTypes)
             setEntryCount(data.entryCount)
+            setProjectStats(data.projectStats)
             setTagSchemas(data.tagSchemas)
         } catch (e) {
             logger.error('ProjectEditor load failed', e)
@@ -270,6 +271,7 @@ function ProjectEditorInner({
                 setCategories(data.categories)
                 setEntryTypes(data.entryTypes)
                 setEntryCount(data.entryCount)
+                setProjectStats(data.projectStats)
                 setTagSchemas(data.tagSchemas)
 
                 void (async () => {
@@ -282,6 +284,7 @@ function ProjectEditorInner({
                         setCategories(refreshed.categories)
                         setEntryTypes(refreshed.entryTypes)
                         setEntryCount(refreshed.entryCount)
+                        setProjectStats(refreshed.projectStats)
                         setTagSchemas(refreshed.tagSchemas)
                     } catch (error) {
                         if (!cancelled) logger.warn('project cover thumbnail migration failed', error)
@@ -303,20 +306,12 @@ function ProjectEditorInner({
         let cancelled = false
 
         void (async () => {
-            const [statsResult, mapsResult, snapshotsResult, riskResult] = await Promise.allSettled([
-                db_get_project_stats(projectId),
+            const [mapsResult, snapshotsResult, riskResult] = await Promise.allSettled([
                 map_list_project_maps(projectId),
                 dbListSnapshots(),
                 ai_list_contradiction_reports(projectId),
             ])
             if (cancelled) return
-
-            if (statsResult.status === 'fulfilled') {
-                setProjectStats(statsResult.value)
-            } else {
-                logger.error('ProjectEditor stats load failed', statsResult.reason)
-                setProjectStats(null)
-            }
 
             if (mapsResult.status === 'fulfilled') {
                 setMapCount(mapsResult.value.length)

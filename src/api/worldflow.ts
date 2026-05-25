@@ -90,6 +90,24 @@ export interface ProjectCategoryStat {
     wordCount: number
 }
 
+export interface ProjectGovernanceCheck {
+    label: string
+    passed: boolean
+}
+
+export interface ProjectGovernanceDimension {
+    key: string
+    label: string
+    score: number
+    weight: number
+}
+
+export interface ProjectGovernanceScore {
+    score: number
+    checks: ProjectGovernanceCheck[]
+    dimensions: ProjectGovernanceDimension[]
+}
+
 export interface ProjectStats {
     entryCount: number
     imageCount: number
@@ -105,6 +123,7 @@ export interface ProjectStats {
     isolatedEntryCount: number
     createdLast7Days: number
     updatedLast7Days: number
+    governanceScore: ProjectGovernanceScore
 }
 
 export interface CoverThumbnailMigrationSummary {
