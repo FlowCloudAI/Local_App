@@ -94,6 +94,7 @@ interface Props {
         model: string
         reportContext: ReportConversationContext
     }) => void
+    onOpenProjectAi?: () => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     activeToolPanel?: ProjectPanel | null
     onOpenProjectPanel?: (panel: Exclude<ProjectPanel, 'overview'>, project: { id: string; name: string }) => void
@@ -169,6 +170,7 @@ function ProjectEditorInner({
                                 onEntryDirtyChange,
                                  onStartCharacterChat,
                                  onStartReportDiscussion,
+                                 onOpenProjectAi,
                                  onOpenPluginManagement,
                                  activeToolPanel = null,
                                  onOpenProjectPanel,
@@ -1055,6 +1057,8 @@ function ProjectEditorInner({
                                     setEditingEntryType(null)
                                     setEntryTypeCreatorOpen(true)
                                 }}
+                                onCreateEntry={() => handleRequestCreateEntry(null)}
+                                onOpenProjectAi={onOpenProjectAi}
                                 onEditTag={(tag) => {
                                     setEditingTag(tag)
                                     setTagCreatorOpen(true)

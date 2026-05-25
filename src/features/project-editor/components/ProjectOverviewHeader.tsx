@@ -41,6 +41,8 @@ interface ProjectOverviewHeaderProps {
     onEditCover?: () => void
     onClearCover?: () => void
     coverUpdating?: boolean
+    onCreateEntry?: () => void | Promise<void>
+    onOpenProjectAi?: () => void
     onExport?: () => void | Promise<void>
     exporting?: boolean
     onDelete?: () => void | Promise<void>
@@ -58,6 +60,8 @@ function ProjectOverviewHeader({
                                    onEditCover,
                                    onClearCover,
                                    coverUpdating = false,
+                                   onCreateEntry,
+                                   onOpenProjectAi,
                                    onExport,
                                    exporting = false,
                                    onDelete,
@@ -180,6 +184,31 @@ function ProjectOverviewHeader({
                     <span className="pe-meta-sep">·</span>
                     <span>更新于 {formatDate(project.updated_at)}</span>
                 </div>
+                {(onCreateEntry || onOpenProjectAi || onExport) && (
+                    <div className="pe-overview-primary-actions">
+                        {onCreateEntry && (
+                            <Button type="button" size="lg" onClick={() => void onCreateEntry()}>
+                                新建词条
+                            </Button>
+                        )}
+                        {onOpenProjectAi && (
+                            <Button type="button" variant="outline" size="lg" onClick={onOpenProjectAi}>
+                                AI 讨论项目
+                            </Button>
+                        )}
+                        {onExport && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="lg"
+                                onClick={() => void onExport()}
+                                disabled={exporting}
+                            >
+                                {exporting ? '导出中…' : '导出世界'}
+                            </Button>
+                        )}
+                    </div>
+                )}
                 <ProjectOverviewStats
                     entryCount={entryCount}
                     categoryCount={categoryCount}
@@ -188,19 +217,6 @@ function ProjectOverviewHeader({
                     imageCount={imageCount}
                     wordCount={wordCount}
                 />
-                {onExport && (
-                    <div className="pe-overview-action-row">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void onExport()}
-                            disabled={exporting}
-                        >
-                            {exporting ? '导出中…' : '导出世界'}
-                        </Button>
-                    </div>
-                )}
                 {onDelete && (
                     <div className="pe-overview-danger-row">
                         <Button type="button" variant="ghost" size="sm" onClick={() => void handleDelete()}>

@@ -113,7 +113,7 @@
 }
 
 .pe-dashboard-panel__header h3 {
-    font-size: var(--fc-font-size-md);
+    font-size: var(--fc-font-size-lg);
 }
 
 .pe-dashboard-distribution-block h4 {
@@ -123,7 +123,7 @@
 .pe-dashboard-panel__header span {
     flex-shrink: 0;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
 }
 
 .pe-dashboard-distribution-grid,
@@ -167,7 +167,7 @@
 .pe-dashboard-metric__label,
 .pe-dashboard-metric__hint {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
     line-height: 1.45;
 }
 

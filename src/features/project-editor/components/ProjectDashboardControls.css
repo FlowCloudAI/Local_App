@@ -84,7 +84,7 @@
 .pe-dashboard-signal-row dt,
 .pe-dashboard-signal-row span {
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font-size: var(--fc-font-size-sm);
     line-height: 1.35;
 }
 
@@ -98,8 +98,8 @@
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: var(--fc-space-sm);
-    padding: var(--fc-space-sm);
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-md);
     color: inherit;
     text-align: left;
     cursor: pointer;
@@ -110,16 +110,16 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: var(--fc-space-3xl);
+    height: var(--fc-space-3xl);
     border-radius: var(--fc-radius-md);
     background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
     color: var(--fc-color-primary);
 }
 
 .pe-dashboard-action__icon svg {
-    width: 1.35rem;
-    height: 1.35rem;
+    width: var(--fc-font-size-xl);
+    height: var(--fc-font-size-xl);
     overflow: visible;
 }
 
@@ -148,7 +148,7 @@
 
 .pe-dashboard-action__title {
     color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--fc-font-size-lg);
     font-weight: var(--fc-font-weight-medium);
 }
 

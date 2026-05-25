@@ -23,8 +23,10 @@ export interface ProjectOverviewProps {
     riskSummary?: ProjectRiskSummary | null
     onCreateTag?: () => void
     onCreateEntryType?: () => void
+    onCreateEntry?: () => void | Promise<void>
     onEditTag?: (tag: TagSchema) => void
     onEditEntryType?: (entryType: CustomEntryType) => void
+    onOpenProjectAi?: () => void
     onOpenRelationGraph?: () => void
     onOpenTimeline?: () => void
     onOpenWorldMap?: () => void

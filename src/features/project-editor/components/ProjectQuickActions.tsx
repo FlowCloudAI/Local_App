@@ -134,8 +134,8 @@ function ProjectQuickActions(props: ProjectQuickActionInput) {
         <section className="pe-quick-actions">
             <article className="pe-dashboard-panel">
                 <div className="pe-dashboard-panel__header">
-                    <h3>核心视图</h3>
-                    <span>项目入口</span>
+                    <h3>高级工具</h3>
+                    <span>结构管理</span>
                 </div>
                 <DashboardActionList items={items}/>
             </article>

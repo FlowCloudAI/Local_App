@@ -1127,6 +1127,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
                                             onEntryDirtyChange={handleEntryDirtyChange}
                                             onStartCharacterChat={handleStartCharacterChat}
                                             onStartReportDiscussion={handleStartReportDiscussion}
+                                            onOpenProjectAi={() => handleSideBarSelect('ai-chat', {forceOpen: true})}
                                             onOpenPluginManagement={handleOpenPluginManagement}
                                             onDeleteProject={handleDeleteProject}
                                             onDeleteEntry={handleDeleteEntry}

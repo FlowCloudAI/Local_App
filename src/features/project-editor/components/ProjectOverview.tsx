@@ -26,10 +26,12 @@ function ProjectOverview({
                              mapCount,
                              snapshotCount,
                              riskSummary,
+                             onCreateEntry,
                              onCreateTag,
                              onCreateEntryType,
                              onEditTag,
                              onEditEntryType,
+                             onOpenProjectAi,
                              onOpenRelationGraph,
                              onOpenTimeline,
                              onOpenWorldMap,
@@ -65,10 +67,24 @@ function ProjectOverview({
                 onEditCover={onEditCover}
                 onClearCover={onClearCover}
                 coverUpdating={coverUpdating}
+                onCreateEntry={onCreateEntry}
+                onOpenProjectAi={onOpenProjectAi}
                 onExport={onExport}
                 exporting={exporting}
                 onDelete={onDelete}
                 onDescriptionChange={onDescriptionChange}
+            />
+
+            <ProjectNextSteps
+                entryCount={entryCount}
+                categoryCount={categories.length}
+                tagCount={tagCount}
+                hasDescription={Boolean(project.description?.trim())}
+                riskSummary={riskSummary}
+                onCreateEntry={onCreateEntry}
+                onOpenProjectAi={onOpenProjectAi}
+                onCreateTag={onCreateTag}
+                onOpenContradiction={onOpenContradiction}
             />
 
             <ProjectQuickActions
@@ -117,3 +133,94 @@ function ProjectOverview({
 }
 
 export default memo(ProjectOverview)
+
+interface ProjectNextStepsProps {
+    entryCount: number
+    categoryCount: number
+    tagCount: number
+    hasDescription: boolean
+    riskSummary?: ProjectOverviewProps['riskSummary']
+    onCreateEntry?: () => void | Promise<void>
+    onOpenProjectAi?: () => void
+    onCreateTag?: () => void
+    onOpenContradiction?: () => void
+}
+
+function ProjectNextSteps({
+                              entryCount,
+                              categoryCount,
+                              tagCount,
+                              hasDescription,
+                              riskSummary,
+                              onCreateEntry,
+                              onOpenProjectAi,
+                              onCreateTag,
+                              onOpenContradiction,
+                          }: ProjectNextStepsProps) {
+    const unresolvedCount = riskSummary?.unresolvedCount ?? 0
+    const items = [
+        {
+            key: 'entry',
+            title: entryCount > 0 ? '继续补充词条' : '创建第一条词条',
+            description: entryCount > 0
+                ? '把新的角色、地点、事件或物品写进当前世界。'
+                : '先用一条词条落下世界的第一个实体，再逐步扩展结构。',
+            actionLabel: entryCount > 0 ? '新建词条' : '写第一条词条',
+            onClick: onCreateEntry,
+            tone: 'primary',
+        },
+        {
+            key: 'ai',
+            title: hasDescription ? '让 AI 梳理下一步' : '让 AI 起草世界框架',
+            description: hasDescription
+                ? '基于当前项目，让 AI 帮你扩写设定、整理灵感或补全缺口。'
+                : '项目描述还很空，可以先让 AI 帮你生成世界方向和设定清单。',
+            actionLabel: 'AI 讨论项目',
+            onClick: onOpenProjectAi,
+            tone: 'default',
+        },
+        unresolvedCount > 0 ? {
+            key: 'risk',
+            title: '处理设定矛盾',
+            description: `还有 ${unresolvedCount} 个待处理问题，建议先复核影响创作连续性的冲突。`,
+            actionLabel: '查看矛盾',
+            onClick: onOpenContradiction,
+            tone: 'warning',
+        } : {
+            key: 'structure',
+            title: categoryCount > 0 && tagCount > 0 ? '完善资料结构' : '建立资料规则',
+            description: categoryCount > 0 && tagCount > 0
+                ? '继续补充标签和分类，让后续检索、筛选和 AI 上下文更稳定。'
+                : '先准备分类和标签规则，避免词条越写越散。',
+            actionLabel: '添加标签',
+            onClick: onCreateTag,
+            tone: 'default',
+        },
+    ]
+
+    return (
+        <section className="pe-next-steps">
+            <div className="pe-next-steps__header">
+                <div>
+                    <h2>下一步建议</h2>
+                    <p>按当前项目状态给出最直接的创作入口，先推进内容，再看管理数据。</p>
+                </div>
+            </div>
+            <div className="pe-next-steps__grid">
+                {items.map(item => (
+                    <button
+                        key={item.key}
+                        type="button"
+                        className={`pe-next-step-card pe-next-step-card--${item.tone}`}
+                        onClick={() => void item.onClick?.()}
+                        disabled={!item.onClick}
+                    >
+                        <span className="pe-next-step-card__title">{item.title}</span>
+                        <span className="pe-next-step-card__desc">{item.description}</span>
+                        <span className="pe-next-step-card__action">{item.actionLabel}</span>
+                    </button>
+                ))}
+            </div>
+        </section>
+    )
+}
