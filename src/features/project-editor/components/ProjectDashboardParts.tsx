@@ -5,6 +5,7 @@ export interface DashboardBarItem {
     key: string
     label: string
     value: number
+    tone?: 'warning' | 'muted'
 }
 
 export interface DashboardIssueItem {
@@ -60,11 +61,21 @@ function getPieStyle(items: DashboardBarItem[], total: number): CSSProperties {
     const segments = items.map((item, index) => {
         const start = current
         current += total > 0 ? (item.value / total) * 100 : 0
-        const color = PIE_SEGMENT_COLORS[index % PIE_SEGMENT_COLORS.length]
+        const color = getSegmentColor(index, item.tone)
         return `${color} ${start}% ${current}%`
     })
     const fallback = 'color-mix(in srgb, var(--fc-color-border) 54%, transparent)'
     return {background: `conic-gradient(${segments.length ? segments.join(', ') : `${fallback} 0 100%`})`}
+}
+
+function getSegmentColor(index: number, tone?: DashboardBarItem['tone']): string {
+    if (tone === 'warning') return 'var(--fc-color-warning)'
+    if (tone === 'muted') return 'var(--fc-color-text-tertiary)'
+    return PIE_SEGMENT_COLORS[index % PIE_SEGMENT_COLORS.length]
+}
+
+function getPercent(value: number, total: number): number {
+    return total > 0 ? Math.round((value / total) * 100) : 0
 }
 
 export function DashboardMetric({label, value, hint, muted}: {
@@ -109,17 +120,63 @@ export function DashboardBarList({items}: { items: DashboardBarItem[] }) {
 
     return (
         <div className="pe-dashboard-bars">
-            {items.map(item => (
-                <div className="pe-dashboard-bar-row" key={item.key}>
+            {items.map((item, index) => (
+                <div className="pe-dashboard-bar-row" key={item.key} data-tone={item.tone}>
                     <div className="pe-dashboard-bar-row__topline">
-                        <span>{item.label}</span>
+                        <span className="pe-dashboard-bar-row__rank">{index + 1}</span>
+                        <span className="pe-dashboard-bar-row__label">{item.label}</span>
                         <span>{formatDashboardNumber(item.value)}</span>
                     </div>
                     <div className="pe-dashboard-bar-track">
-                        <span className="pe-dashboard-bar-fill" style={getBarStyle(item.value, total)}/>
+                        <span
+                            className="pe-dashboard-bar-fill"
+                            style={{
+                                ...getBarStyle(item.value, total),
+                                background: getSegmentColor(index, item.tone),
+                            }}
+                        />
                     </div>
                 </div>
             ))}
+        </div>
+    )
+}
+
+export function DashboardStackedDistribution({items}: { items: DashboardBarItem[] }) {
+    const total = items.reduce((sum, item) => sum + item.value, 0)
+
+    if (items.length === 0 || total <= 0) {
+        return <p className="pe-dashboard-empty">暂无可统计数据</p>
+    }
+
+    return (
+        <div className="pe-dashboard-stacked">
+            <div className="pe-dashboard-stacked__bar" aria-hidden="true">
+                {items.map((item, index) => (
+                    <span
+                        key={item.key}
+                        className="pe-dashboard-stacked__segment"
+                        style={{
+                            flexBasis: `${(item.value / total) * 100}%`,
+                            background: getSegmentColor(index, item.tone),
+                        }}
+                    />
+                ))}
+            </div>
+            <div className="pe-dashboard-stacked__legend">
+                {items.map((item, index) => (
+                    <div className="pe-dashboard-stacked__legend-row" key={item.key}>
+                        <span
+                            className="pe-dashboard-pie-chart__swatch"
+                            style={{backgroundColor: getSegmentColor(index, item.tone)}}
+                            aria-hidden="true"
+                        />
+                        <span className="pe-dashboard-stacked__label">{item.label}</span>
+                        <strong>{formatDashboardNumber(item.value)}</strong>
+                        <span>{getPercent(item.value, total)}%</span>
+                    </div>
+                ))}
+            </div>
         </div>
     )
 }
@@ -136,17 +193,17 @@ export function DashboardPieChart({items}: { items: DashboardBarItem[] }) {
             <div className="pe-dashboard-pie-chart__shape" style={getPieStyle(items, total)} aria-hidden="true"/>
             <div className="pe-dashboard-pie-chart__legend">
                 {items.map((item, index) => {
-                    const percent = Math.round((item.value / total) * 100)
+                    const color = getSegmentColor(index, item.tone)
                     return (
                         <div className="pe-dashboard-pie-chart__legend-row" key={item.key}>
                             <span
                                 className="pe-dashboard-pie-chart__swatch"
-                                style={{backgroundColor: PIE_SEGMENT_COLORS[index % PIE_SEGMENT_COLORS.length]}}
+                                style={{backgroundColor: color}}
                                 aria-hidden="true"
                             />
                             <span className="pe-dashboard-pie-chart__label">{item.label}</span>
                             <strong>{formatDashboardNumber(item.value)}</strong>
-                            <span>{percent}%</span>
+                            <span>{getPercent(item.value, total)}%</span>
                         </div>
                     )
                 })}

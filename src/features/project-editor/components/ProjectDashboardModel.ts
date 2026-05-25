@@ -91,6 +91,36 @@ function getTagTypeItems(tagSchemas: TagSchema[]): DashboardBarItem[] {
         .filter(item => item.value > 0)
 }
 
+function getCategoryItems(
+    input: ProjectDashboardModelInput,
+    categoryNameMap: Map<string, string>,
+    fallbackCategoryItems: DashboardBarItem[],
+): DashboardBarItem[] {
+    if (!input.projectStats?.entriesByCategory.length) return fallbackCategoryItems
+
+    const items = input.projectStats.entriesByCategory
+        .map(item => ({
+            key: item.categoryId ?? 'uncategorized',
+            label: item.categoryId ? categoryNameMap.get(item.categoryId) ?? '未知分类' : '未分类',
+            value: item.count,
+            tone: item.categoryId ? undefined : 'warning' as const,
+        }))
+        .sort((first, second) => second.value - first.value)
+    const uncategorized = items.find(item => item.key === 'uncategorized' && item.value > 0)
+    const rankedItems = items.filter(item => item.key !== 'uncategorized')
+    const visibleItems = uncategorized
+        ? [uncategorized, ...rankedItems.slice(0, 4)]
+        : rankedItems.slice(0, 5)
+    const visibleKeys = new Set(visibleItems.map(item => item.key))
+    const otherTotal = items
+        .filter(item => !visibleKeys.has(item.key))
+        .reduce((sum, item) => sum + item.value, 0)
+
+    return otherTotal > 0
+        ? [...visibleItems, {key: 'other', label: '其他分类', value: otherTotal, tone: 'muted'}]
+        : visibleItems
+}
+
 function getDistributionItems(input: ProjectDashboardModelInput, categoryStats: ReturnType<typeof getCategoryDepthStats>) {
     const entryTypeNameMap = new Map(input.entryTypes.map(entryType => [entryTypeKey(entryType), entryType.name]))
     const categoryNameMap = new Map(input.categories.map(category => [category.id, category.name]))
@@ -111,15 +141,10 @@ function getDistributionItems(input: ProjectDashboardModelInput, categoryStats: 
                 key: item.entryType ?? 'unset',
                 label: item.entryType ? entryTypeNameMap.get(item.entryType) ?? item.entryType : '未设置类型',
                 value: item.count,
-            }))
+                tone: item.entryType ? undefined : 'warning' as const,
+            })).sort((first, second) => second.value - first.value)
             : fallbackTypeItems,
-        categoryItems: input.projectStats?.entriesByCategory.length
-            ? input.projectStats.entriesByCategory.slice(0, 6).map(item => ({
-                key: item.categoryId ?? 'uncategorized',
-                label: item.categoryId ? categoryNameMap.get(item.categoryId) ?? '未知分类' : '未分类',
-                value: item.count,
-            }))
-            : fallbackCategoryItems,
+        categoryItems: getCategoryItems(input, categoryNameMap, fallbackCategoryItems),
         tagTypeItems: getTagTypeItems(input.tagSchemas),
     }
 }

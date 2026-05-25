@@ -5,6 +5,7 @@ import {
     DashboardMetric,
     DashboardPieChart,
     DashboardSignalList,
+    DashboardStackedDistribution,
     HealthMeter,
 } from './ProjectDashboardParts'
 import {formatDashboardNumber, formatDashboardRatio} from './ProjectDashboardFormat'
@@ -64,6 +65,7 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                             <DashboardDistributionBlock
                                 title={props.projectStats ? '词条类型分布' : '词条类型配置'}
                                 items={dashboard.typeItems}
+                                variant="stacked"
                             />
                             <DashboardDistributionBlock
                                 title={props.projectStats ? '分类词条分布' : '分类结构'}
@@ -126,13 +128,18 @@ function ProjectDashboard(props: ProjectDashboardProps) {
 function DashboardDistributionBlock({title, items, variant = 'bar'}: {
     title: string
     items: DashboardBarItem[]
-    variant?: 'bar' | 'pie'
+    variant?: 'bar' | 'pie' | 'stacked'
 }) {
     const isEmpty = items.length === 0 || items.every(item => item.value === 0)
     return (
-        <div className="pe-dashboard-distribution-block" data-empty={isEmpty ? 'true' : undefined}>
+        <div
+            className={`pe-dashboard-distribution-block pe-dashboard-distribution-block--${variant}`}
+            data-empty={isEmpty ? 'true' : undefined}
+        >
             <h4>{title}</h4>
-            {variant === 'pie' ? <DashboardPieChart items={items}/> : <DashboardBarList items={items}/>}
+            {variant === 'pie' && <DashboardPieChart items={items}/>}
+            {variant === 'stacked' && <DashboardStackedDistribution items={items}/>}
+            {variant === 'bar' && <DashboardBarList items={items}/>}
         </div>
     )
 }
