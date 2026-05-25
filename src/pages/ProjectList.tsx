@@ -423,6 +423,8 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             .filter(item => !continueKey || getHomeActivityTargetKey(item) !== continueKey)
             .slice(0, 5)
     }, [continueItem, visibleRecentItems])
+    const aiAssistantAction = quickActions.find(action => action.key === 'ai-chat')
+    const ideaAction = quickActions.find(action => action.key === 'idea')
 
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
         const projectId = getDashboardProjectId(target)
@@ -580,28 +582,51 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             <div className="project-list-title-block fc-page-title-block">
                                 <h1 className="project-list-title fc-page-title">创作首页</h1>
                                 <p className="project-list-subtitle fc-page-subtitle">
-                                    回到正在构建的世界，继续整理角色、地点和灵感。
+                                    从一个世界开始创作，继续整理设定、记录灵感，或让 AI 帮你搭建世界框架。
                                 </p>
                             </div>
-                        </div>
-                    </section>
-
-                    <section className="project-home-panel project-home-panel--quick">
-                        <h2>快速开始</h2>
-                        <button
-                            type="button"
-                            className="project-home-continue-card"
-                            onClick={() => {
-                                if (continueItem) {
-                                    openDashboardTarget(continueItem)
-                                    return
-                                }
-                                setCreatorOpen(true)
-                            }}
-                        >
-                            {continueItem ? (
-                                <>
-                                    <span className="project-home-eyebrow">继续创作</span>
+                            <div className="project-home-hero__actions">
+                                <Button
+                                    type="button"
+                                    size="lg"
+                                    onClick={() => {
+                                        if (continueItem) {
+                                            openDashboardTarget(continueItem)
+                                            return
+                                        }
+                                        setCreatorOpen(true)
+                                    }}
+                                >
+                                    {continueItem ? `继续创作：${continueItem.title}` : '创建你的第一个世界'}
+                                </Button>
+                                {aiAssistantAction?.target && (
+                                    <Button
+                                        type="button"
+                                        size="lg"
+                                        variant="outline"
+                                        onClick={() => openDashboardTarget(aiAssistantAction.target!)}
+                                    >
+                                        打开 AI 助手
+                                    </Button>
+                                )}
+                                {ideaAction?.target && (
+                                    <Button
+                                        type="button"
+                                        size="lg"
+                                        variant="ghost"
+                                        onClick={() => openDashboardTarget(ideaAction.target!)}
+                                    >
+                                        记录灵感
+                                    </Button>
+                                )}
+                            </div>
+                            {continueItem && (
+                                <button
+                                    type="button"
+                                    className="project-home-continue-card"
+                                    onClick={() => openDashboardTarget(continueItem)}
+                                >
+                                    <span className="project-home-eyebrow">上次停在这里</span>
                                     <div className="project-home-continue-card__topline">
                                         <span className="project-home-continue-card__title">{continueItem.title}</span>
                                     </div>
@@ -609,17 +634,33 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
                                         {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
                                     </p>
-                                </>
-                            ) : (
-                                <>
-                                    <span className="project-home-eyebrow">开始创作</span>
-                                    <div className="project-home-continue-card__topline">
-                                        <span className="project-home-continue-card__title">给新的世界一个起点</span>
-                                    </div>
-                                    <p>创建世界观后，最近编辑、上次打开和常用内容会出现在这里。</p>
-                                </>
+                                </button>
                             )}
-                        </button>
+                        </div>
+                        <aside className="project-home-hero__guide" aria-label="推荐创作流程">
+                            <span className="project-home-eyebrow">推荐流程</span>
+                            <ol className="project-home-flow">
+                                <li>
+                                    <strong>建立世界</strong>
+                                    <span>先创建项目或导入已有世界观。</span>
+                                </li>
+                                <li>
+                                    <strong>补充设定</strong>
+                                    <span>用词条记录角色、地点、事件和物品。</span>
+                                </li>
+                                <li>
+                                    <strong>让 AI 协助</strong>
+                                    <span>整理灵感、扩写片段并检查设定矛盾。</span>
+                                </li>
+                            </ol>
+                        </aside>
+                    </section>
+
+                    <section className="project-home-panel project-home-panel--quick">
+                        <div className="project-home-panel__heading">
+                            <h2>重点功能</h2>
+                            <p>选择最贴近当前状态的入口，先把创作流跑起来。</p>
+                        </div>
                         <div className="project-home-action-list">
                             {quickActions.map(action => (
                                 <button
