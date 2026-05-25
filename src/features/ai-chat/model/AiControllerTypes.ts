@@ -45,11 +45,13 @@ export const DEFAULT_CONVERSATION_SETTINGS: ConversationSettings = {
     temperature: 0.7,
     topP: 1,
     frequencyPenaltyEnabled: false,
-    frequencyPenalty: 1.1,
+    frequencyPenalty: 0,
     presencePenaltyEnabled: false,
     presencePenalty: 0,
     systemPrompt: '',
 }
+
+export const CONVERSATION_TEMPERATURE_MAX = 1.9
 
 const clampNumber = (value: unknown, fallback: number, min: number, max: number) => {
     const numberValue = typeof value === 'number' && Number.isFinite(value) ? value : fallback
@@ -62,7 +64,12 @@ export function normalizeConversationSettings(
     return {
         ...DEFAULT_CONVERSATION_SETTINGS,
         ...settings,
-        temperature: clampNumber(settings?.temperature, DEFAULT_CONVERSATION_SETTINGS.temperature, 0, 2),
+        temperature: clampNumber(
+            settings?.temperature,
+            DEFAULT_CONVERSATION_SETTINGS.temperature,
+            0,
+            CONVERSATION_TEMPERATURE_MAX,
+        ),
         topP: clampNumber(settings?.topP, DEFAULT_CONVERSATION_SETTINGS.topP, 0, 1),
         frequencyPenalty: clampNumber(
             settings?.frequencyPenalty,

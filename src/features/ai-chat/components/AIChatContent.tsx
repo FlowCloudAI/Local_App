@@ -20,7 +20,7 @@ import {
     toApiError,
 } from '../../../api'
 import type {AiContextValue, Conversation, ConversationSettings} from '../model/AiControllerTypes'
-import {normalizeConversationSettings} from '../model/AiControllerTypes'
+import {CONVERSATION_TEMPERATURE_MAX, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {estimateMessagesTokens, estimateTextTokens, formatTokenCount} from '../lib/contextUsage'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
@@ -58,7 +58,8 @@ const CONVERSATION_SETTING_TOOLTIPS = {
 } as const
 const formatConversationSettingNumber = (value: number) => {
     const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
-    return fixed.replace(/\.?0+$/, '')
+    const trimmed = fixed.replace(/\.?0+$/, '')
+    return trimmed || '0'
 }
 const formatContextUsagePercent = (percent: number, usedTokens: number) => {
     if (usedTokens > 0 && percent > 0 && percent < 1) return '<1%'
@@ -67,6 +68,65 @@ const formatContextUsagePercent = (percent: number, usedTokens: number) => {
 const parseConversationNumber = (value: string, fallback: number) => {
     const parsed = Number(value)
     return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const isCompleteConversationNumberInput = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed || trimmed === '-' || trimmed === '+' || trimmed.endsWith('.')) return false
+    return Number.isFinite(Number(trimmed))
+}
+
+interface ConversationNumberInputProps {
+    value: number
+    min: number
+    max: number
+    step: number
+    disabled?: boolean
+    onCommit: (value: number) => void
+}
+
+function ConversationNumberInput({
+                                     value,
+                                     min,
+                                     max,
+                                     step,
+                                     disabled = false,
+                                     onCommit,
+                                 }: ConversationNumberInputProps) {
+    const formattedValue = formatConversationSettingNumber(value)
+    const [draft, setDraft] = useState(formattedValue)
+
+    useEffect(() => {
+        setDraft(formattedValue)
+    }, [formattedValue])
+
+    const commitDraft = useCallback((rawValue: string) => {
+        if (!isCompleteConversationNumberInput(rawValue)) return
+        onCommit(parseConversationNumber(rawValue, value))
+    }, [onCommit, value])
+
+    return (
+        <input
+            type="number"
+            min={formatConversationSettingNumber(min)}
+            max={formatConversationSettingNumber(max)}
+            step={formatConversationSettingNumber(step)}
+            disabled={disabled}
+            value={draft}
+            onChange={(event) => {
+                const nextDraft = event.currentTarget.value
+                setDraft(nextDraft)
+                commitDraft(nextDraft)
+            }}
+            onBlur={() => {
+                if (isCompleteConversationNumberInput(draft)) {
+                    onCommit(parseConversationNumber(draft, value))
+                } else {
+                    setDraft(formattedValue)
+                }
+            }}
+        />
+    )
 }
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
@@ -1470,32 +1530,27 @@ export default function AIChatContent({
                             <div className="ai-conversation-settings-grid">
                                 <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.temperature}>
                                     <span>温度</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="2"
-                                        step="0.1"
-                                        value={formatConversationSettingNumber(conversationSettings.temperature)}
-                                        onChange={(event) => updateConversationSetting(
+                                    <ConversationNumberInput
+                                        value={conversationSettings.temperature}
+                                        min={0}
+                                        max={CONVERSATION_TEMPERATURE_MAX}
+                                        step={0.1}
+                                        onCommit={(value) => updateConversationSetting(
                                             'temperature',
-                                            parseConversationNumber(
-                                                event.currentTarget.value,
-                                                conversationSettings.temperature,
-                                            ),
+                                            value,
                                         )}
                                     />
                                 </label>
                                 <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.topP}>
                                     <span>top_p</span>
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="1"
-                                        step="0.05"
-                                        value={formatConversationSettingNumber(conversationSettings.topP)}
-                                        onChange={(event) => updateConversationSetting(
+                                    <ConversationNumberInput
+                                        value={conversationSettings.topP}
+                                        min={0}
+                                        max={1}
+                                        step={0.05}
+                                        onCommit={(value) => updateConversationSetting(
                                             'topP',
-                                            parseConversationNumber(event.currentTarget.value, conversationSettings.topP),
+                                            value,
                                         )}
                                     />
                                 </label>
@@ -1514,19 +1569,15 @@ export default function AIChatContent({
                                             )}
                                         />
                                     </label>
-                                    <input
-                                        type="number"
-                                        min="-2"
-                                        max="2"
-                                        step="0.1"
+                                    <ConversationNumberInput
+                                        value={conversationSettings.frequencyPenalty}
+                                        min={-2}
+                                        max={2}
+                                        step={0.1}
                                         disabled={!conversationSettings.frequencyPenaltyEnabled}
-                                        value={formatConversationSettingNumber(conversationSettings.frequencyPenalty)}
-                                        onChange={(event) => updateConversationSetting(
+                                        onCommit={(value) => updateConversationSetting(
                                             'frequencyPenalty',
-                                            parseConversationNumber(
-                                                event.currentTarget.value,
-                                                conversationSettings.frequencyPenalty,
-                                            ),
+                                            value,
                                         )}
                                     />
                                 </div>
@@ -1545,19 +1596,15 @@ export default function AIChatContent({
                                             )}
                                         />
                                     </label>
-                                    <input
-                                        type="number"
-                                        min="-2"
-                                        max="2"
-                                        step="0.1"
+                                    <ConversationNumberInput
+                                        value={conversationSettings.presencePenalty}
+                                        min={-2}
+                                        max={2}
+                                        step={0.1}
                                         disabled={!conversationSettings.presencePenaltyEnabled}
-                                        value={formatConversationSettingNumber(conversationSettings.presencePenalty)}
-                                        onChange={(event) => updateConversationSetting(
+                                        onCommit={(value) => updateConversationSetting(
                                             'presencePenalty',
-                                            parseConversationNumber(
-                                                event.currentTarget.value,
-                                                conversationSettings.presencePenalty,
-                                            ),
+                                            value,
                                         )}
                                     />
                                 </div>

@@ -59,6 +59,7 @@ import {
 import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
 import UploadPlugin from '../features/plugins/UploadPlugin'
+import {CONVERSATION_TEMPERATURE_MAX} from '../features/ai-chat/model/AiControllerTypes'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
@@ -1531,11 +1532,16 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                         <input
                                             type="number"
                                             min={0}
-                                            max={2}
+                                            max={CONVERSATION_TEMPERATURE_MAX}
                                             step={0.1}
                                             value={settings.llm.temperature}
                                             onChange={(event) => updateLlmDefaults({
-                                                temperature: clampNumberValue(event.currentTarget.value, settings.llm.temperature, 0, 2),
+                                                temperature: clampNumberValue(
+                                                    event.currentTarget.value,
+                                                    settings.llm.temperature,
+                                                    0,
+                                                    CONVERSATION_TEMPERATURE_MAX,
+                                                ),
                                             })}
                                         />
                                     </label>
