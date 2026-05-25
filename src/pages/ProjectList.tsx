@@ -620,6 +620,18 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     </Button>
                                 )}
                             </div>
+                            <div className="project-home-path-hint" aria-label="推荐创作流程">
+                                <span className="project-home-path-hint__label">建议路径</span>
+                                {hasLoadedProjects && projects.length === 0 ? (
+                                    <ol className="project-home-path-list">
+                                        <li>创建世界</li>
+                                        <li>写第一条词条</li>
+                                        <li>让 AI 梳理设定</li>
+                                    </ol>
+                                ) : (
+                                    <p>继续当前项目后，可以从词条、地图、时间线或 AI 讨论接着推进。</p>
+                                )}
+                            </div>
                             {continueItem && (
                                 <button
                                     type="button"
@@ -637,23 +649,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                 </button>
                             )}
                         </div>
-                        <aside className="project-home-hero__guide" aria-label="推荐创作流程">
-                            <span className="project-home-eyebrow">推荐流程</span>
-                            <ol className="project-home-flow">
-                                <li>
-                                    <strong>建立世界</strong>
-                                    <span>先创建项目或导入已有世界观，让角色、地点和事件有统一归属。</span>
-                                </li>
-                                <li>
-                                    <strong>补充设定</strong>
-                                    <span>用词条沉淀角色、地点、事件和物品，再逐步补充关系与细节。</span>
-                                </li>
-                                <li>
-                                    <strong>让 AI 协助</strong>
-                                    <span>把零散想法交给 AI 讨论，快速扩写片段并提前发现设定矛盾。</span>
-                                </li>
-                            </ol>
-                        </aside>
                     </section>
 
                     <section className="project-home-panel project-home-panel--quick">
