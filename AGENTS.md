@@ -1,96 +1,91 @@
 # app_main — AGENTS.md
 
-> 本文档面向 AI 编码助手。`README.md` 面向使用者。
+> 面向 AI 编码助手的开发约定；README 面向用户。
 
 ## 项目概览
 
-`app_main` 是 FlowCloudAI 的桌面端主应用（Tauri 2 + React + Rust），覆盖词条/关系图/地图编辑、快照、AI 对话、插件管理与反馈。
-应用前端与 `src-tauri` 后端通过 `invoke` 封装分层交互，不允许业务代码直接在前端直接调用 `@tauri-apps/api`。
+`app_main` 是 FlowCloudAI 桌面主应用（Tauri 2 + React + Rust），负责项目/词条/关系图/地图/快照、AI 会话、插件市场与帮助中心的主业务。
+前端通过 `src/api` 与 Rust 命令交互，不直接在 React 层调用 Tauri invoke。
 
 ## 构建 / 运行 / 测试 / lint
 
 ```bash
 cd app_main
 npm install
-
-# 运行
-npm run dev
-npm run tauri -- dev
-
-# 构建
+npm run lint
 npm run build
+npm run tauri -- dev
 npm run tauri -- build
 
-# 可选：平台构建与 Android
-npm run tauri:build:windows
-npm run tauri:build:linux
-npm run android:dev
-npm run android:build:apk
-
-# 检查
-npm run lint
 cd src-tauri
 cargo test
 ```
 
-`app_main/src-tauri/tauri.conf.json` 的 `devUrl` 为 `http://localhost:5175`，与 `vite.config.ts` 的 dev 端口一致。
+`app_main/src-tauri/tauri.conf.json` 的 `devUrl` 目前是 `http://localhost:5175`，配套 `vite.config.ts` 也应保持一致。
 
 ## 代码风格与命名
 
-- React + TypeScript：严格模式（`tsconfig.app.json`），ES Modules，组件与 hooks 命名可读，避免 `any` 扩散。
-- Rust：Edition 2024；类型 PascalCase、函数 `snake_case`，公共函数优先返回 `Result`。
-- CSS：优先使用 `flowcloudai-ui` 的 CSS token，不以像素级硬编码为主。
-- `docs/前端风格指南.md` 的前端红线优先级高于仓库局部规范。
+- TypeScript/React 严格模式，ES Modules，避免引入 Redux / Zustand。
+- Rust Edition 2024，类型 PascalCase，函数变量 snake_case。
+- CSS 优先使用 `flowcloudai-ui` 设计 token，减少硬编码值。
+- 前端改动优先检查 `docs/前端风格指南.md`。
 
 ## 目录结构与职责
 
 ```text
 app_main/
 ├── src/
-│   ├── api/                  # API 封装：只允许这里访问 Tauri 命令
-│   ├── app/                  # 应用外壳（desktop / index / mobile）
-│   ├── features/             # 业务域模块
-│   ├── i18n/                 # 国际化资源与初始化
+│   ├── api/                  # 前端 API 封装（唯一对接层）
+│   ├── app/                  # 桌面端与移动端外壳
+│   ├── features/             # 业务域（词条、图谱、地图、插件等）
+│   ├── i18n/                 # 国际化
 │   ├── pages/                # 页面级组件
-│   ├── shared/               # 公共 UI / 工具 / hooks
-│   ├── main.tsx
-│   └── App.css
+│   ├── shared/               # 公共组件与工具
+│   ├── App.css
+│   └── main.tsx
 ├── src-tauri/
-│   ├── src/apis/             # Tauri Command 分组
-│   ├── src/ai_services        # AI 上下文、Artifact 与矛盾检测
-│   ├── src/layout/           # 关系图布局服务
-│   ├── src/map/              # 地图生成与持久化
-│   ├── src/tools/            # AI 工具注册
-│   └── tauri.conf.json
-├── docs/                     # 设计文档
+│   ├── src/
+│   │   ├── apis/             # Tauri Command 分组
+│   │   ├── ai_services/      # AI 上下文、事件与会话桥接
+│   │   ├── layout/           # 布局与坐标服务
+│   │   ├── map/              # 地图生成与持久化逻辑
+│   │   ├── tools/            # 工具执行与注册
+│   │   ├── reports/          # 报表相关逻辑
+│   │   ├── senses/           # 感知相关模块
+│   │   ├── state.rs
+│   │   ├── settings.rs
+│   │   ├── template.rs
+│   │   ├── auto_backup.rs
+│   │   ├── api_error.rs
+│   │   ├── lib.rs
+│   │   └── main.rs
+│   ├── tauri.conf.json
+│   ├── icons
+│   └── resources
+├── docs/                    # 设计文档
 └── package.json
 ```
 
-## 前后端约定
+## 前后端与事件约定
 
-- 前端仅通过 `src/api` 与后端交互；新增后端命令必须：
-  - 在 `src-tauri/src/apis/*` 中实现命令；
-  - 在 `src-tauri/src/lib.rs` 注册；
-  - 在 `src/api/*` 添加对应封装。
-- AI 会话事件建议保留订阅：`ai:ready`、`ai:delta`、`ai:reasoning`、`ai:tool_call`、`ai:tool_result`、`ai:turn_begin`、`ai:turn_end`、`ai:error`、`backend-ready`。
+- 命令新增时同步 `src-tauri/src/apis/*`、`src-tauri/src/lib.rs`、`src/api/*`。
+- AI 会话建议订阅：`ai:ready`、`ai:delta`、`ai:reasoning`、`ai:tool_call`、`ai:tool_result`、`ai:turn_begin`、`ai:turn_end`、
+  `ai:error`、`backend-ready`。
 
 ## 安全 / 禁止事项
 
-- 不提交真实 API Key；`settings.json` 不应存储密钥。
-- `fcimg://` 访问协议要保留路径白名单与归一化校验。
-- 后端发布默认禁用 WebView 右键菜单，不得在仓库层面解除。
-- 不提交 `target/`、`dist/`、`node_modules/`、本地 `data.db` 等运行产物。
+- 不提交 API Key、对话历史明文、`settings.json` 中敏感配置。
+- `fcimg://` 文件协议保持路径归一化与白名单校验。
+- 不能放宽 WebView 安全策略或在仓库层取消发布端右键限制。
+- 不提交 `dist/`、`target/`、`node_modules/`、本地测试数据库文件。
 
 ## 项目特有坑点
 
-- `tauri.conf.json` 中窗口透明 + 无边框设置与启动时 `showWindow` 时序相关，改 UI 显示顺序前先确认 `main.tsx` 初始化链路。
-- 修改 `app/src-tauri/` 中插件安装/卸载逻辑时，须确认关闭活跃 AI 会话后再执行。
-- `main.tsx` 与 `src-tauri/capabilities` 组合决定安全行为，新增能力需同步后端配置。
+- 窗口是无边框透明窗口，`main.tsx` 与 `showWindow` 的顺序直接影响启动白屏体验。
+- 触发插件卸载时需确认会话与插件引用状态已释放。
+- 修改 `src-tauri` 时建议在 `backend-ready` 后再执行依赖 AI 状态的前端行为验证。
 
 ## 贡献方式
 
-- 提交前至少执行：
-  - `npm run lint`
-  - `npm run build` 或 `npm run tauri -- build`
-  - `cd src-tauri && cargo test`
-- PR 说明需写明受影响页面、命令、测试与未覆盖风险。
+- 提交前优先执行：`npm run lint`、`npm run build`、`cd src-tauri && cargo test`。
+- PR 说明写明：影响页面、命令、初始化链路、未覆盖风险。
