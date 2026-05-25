@@ -299,16 +299,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--fc-space-3xl);
-  height: var(--fc-space-3xl);
-  border-radius: var(--fc-radius-md);
+  width: calc(var(--fc-space-3xl) + var(--fc-space-lg));
+  height: calc(var(--fc-space-3xl) + var(--fc-space-lg));
+  border-radius: var(--fc-radius-lg);
   background: color-mix(in srgb, var(--project-home-action-bg) 82%, transparent);
   color: var(--project-home-action-accent);
 }
 
 .project-home-action-item__icon svg {
-  width: var(--fc-font-size-xl);
-  height: var(--fc-font-size-xl);
+  width: calc(var(--fc-font-size-xl) + var(--fc-space-sm));
+  height: calc(var(--fc-font-size-xl) + var(--fc-space-sm));
 }
 
 .project-home-action-item__title {
