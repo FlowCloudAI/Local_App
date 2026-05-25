@@ -313,7 +313,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         {
             key: 'new-world',
             title: '开始一个新世界',
-            description: '创建新的世界观项目。',
+            description: '从项目名称、简介和封面开始，先搭好世界观的创作容器。',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <circle cx="11" cy="13" r="7.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -329,7 +329,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         {
             key: 'idea',
             title: '记录灵感',
-            description: '先把想法放进灵感收件箱。',
+            description: '把临时片段、角色点子和待整理设定先收进灵感箱，稍后再归档。',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <path
@@ -348,7 +348,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         {
             key: 'ai-chat',
             title: '打开 AI 助手',
-            description: '让 AI 帮你整理设定、扩写片段或检查问题。',
+            description: '让 AI 帮你拆解世界框架、扩写设定片段，或检查内容里的冲突。',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <path
@@ -372,7 +372,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         {
             key: 'snapshot',
             title: '查看快照',
-            description: '回看最近保存的版本和分支。',
+            description: '回看最近保存的版本，适合在大改设定前确认可回退节点。',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -582,7 +582,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             <div className="project-list-title-block fc-page-title-block">
                                 <h1 className="project-list-title fc-page-title">创作首页</h1>
                                 <p className="project-list-subtitle fc-page-subtitle">
-                                    从一个世界开始创作，继续整理设定、记录灵感，或让 AI 帮你搭建世界框架。
+                                    从世界项目开始组织创作：继续上次进度、记录突然出现的灵感，或让 AI 先帮你搭出设定骨架。
                                 </p>
                             </div>
                             <div className="project-home-hero__actions">
@@ -642,15 +642,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             <ol className="project-home-flow">
                                 <li>
                                     <strong>建立世界</strong>
-                                    <span>先创建项目或导入已有世界观。</span>
+                                    <span>先创建项目或导入已有世界观，让角色、地点和事件有统一归属。</span>
                                 </li>
                                 <li>
                                     <strong>补充设定</strong>
-                                    <span>用词条记录角色、地点、事件和物品。</span>
+                                    <span>用词条沉淀角色、地点、事件和物品，再逐步补充关系与细节。</span>
                                 </li>
                                 <li>
                                     <strong>让 AI 协助</strong>
-                                    <span>整理灵感、扩写片段并检查设定矛盾。</span>
+                                    <span>把零散想法交给 AI 讨论，快速扩写片段并提前发现设定矛盾。</span>
                                 </li>
                             </ol>
                         </aside>
@@ -659,7 +659,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                     <section className="project-home-panel project-home-panel--quick">
                         <div className="project-home-panel__heading">
                             <h2>重点功能</h2>
-                            <p>选择最贴近当前状态的入口，先把创作流跑起来。</p>
+                            <p>根据你现在的状态选择入口：新项目先建世界，零散想法先记灵感，已有材料可以直接交给 AI 梳理。</p>
                         </div>
                         <div className="project-home-action-list">
                             {quickActions.map(action => (
