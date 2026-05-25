@@ -147,45 +147,6 @@ export function DashboardBarList({items}: { items: DashboardBarItem[] }) {
     )
 }
 
-export function DashboardStackedDistribution({items}: { items: DashboardBarItem[] }) {
-    const total = items.reduce((sum, item) => sum + item.value, 0)
-
-    if (items.length === 0 || total <= 0) {
-        return <p className="pe-dashboard-empty">暂无可统计数据</p>
-    }
-
-    return (
-        <div className="pe-dashboard-stacked">
-            <div className="pe-dashboard-stacked__bar" aria-hidden="true">
-                {items.map((item, index) => (
-                    <span
-                        key={item.key}
-                        className="pe-dashboard-stacked__segment"
-                        style={{
-                            flexBasis: `${(item.value / total) * 100}%`,
-                            background: getSegmentColor(index, item.tone),
-                        }}
-                    />
-                ))}
-            </div>
-            <div className="pe-dashboard-stacked__legend">
-                {items.map((item, index) => (
-                    <div className="pe-dashboard-stacked__legend-row" key={item.key}>
-                        <span
-                            className="pe-dashboard-pie-chart__swatch"
-                            style={{backgroundColor: getSegmentColor(index, item.tone)}}
-                            aria-hidden="true"
-                        />
-                        <span className="pe-dashboard-stacked__label">{item.label}</span>
-                        <strong>{formatDashboardNumber(item.value)}</strong>
-                        <span>{getPercent(item.value, total)}%</span>
-                    </div>
-                ))}
-            </div>
-        </div>
-    )
-}
-
 export function DashboardPieChart({items}: { items: DashboardBarItem[] }) {
     const total = items.reduce((sum, item) => sum + item.value, 0)
 
