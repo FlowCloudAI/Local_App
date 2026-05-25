@@ -69,6 +69,17 @@
     min-width: 0;
 }
 
+@container (min-width: 1061px) {
+    .pe-dashboard-layout {
+        align-items: stretch;
+    }
+
+    .pe-dashboard-sidebar,
+    .pe-dashboard-sidebar > .pe-dashboard-panel--quality {
+        height: 100%;
+    }
+}
+
 .pe-dashboard-panel,
 .pe-dashboard-metric,
 .pe-dashboard-kpi,
