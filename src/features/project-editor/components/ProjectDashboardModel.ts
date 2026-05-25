@@ -91,6 +91,51 @@ function getTagTypeItems(tagSchemas: TagSchema[]): DashboardBarItem[] {
         .filter(item => item.value > 0)
 }
 
+function compactDistributionItems(
+    items: DashboardBarItem[],
+    options: { maxVisible: number; pinnedKey?: string; otherKey: string; otherLabel: string },
+): DashboardBarItem[] {
+    const pinned = options.pinnedKey
+        ? items.find(item => item.key === options.pinnedKey && item.value > 0)
+        : undefined
+    const rankedItems = items.filter(item => item.key !== options.pinnedKey)
+    const visibleItems = pinned
+        ? [pinned, ...rankedItems.slice(0, Math.max(0, options.maxVisible - 1))]
+        : rankedItems.slice(0, options.maxVisible)
+    const visibleKeys = new Set(visibleItems.map(item => item.key))
+    const otherTotal = items
+        .filter(item => !visibleKeys.has(item.key))
+        .reduce((sum, item) => sum + item.value, 0)
+
+    return otherTotal > 0
+        ? [...visibleItems, {key: options.otherKey, label: options.otherLabel, value: otherTotal, tone: 'muted'}]
+        : visibleItems
+}
+
+function getTypeItems(
+    input: ProjectDashboardModelInput,
+    entryTypeNameMap: Map<string, string>,
+    fallbackTypeItems: DashboardBarItem[],
+): DashboardBarItem[] {
+    if (!input.projectStats?.entriesByType.length) return fallbackTypeItems
+
+    const items = input.projectStats.entriesByType
+        .map(item => ({
+            key: item.entryType ?? 'unset',
+            label: item.entryType ? entryTypeNameMap.get(item.entryType) ?? item.entryType : '未设置类型',
+            value: item.count,
+            tone: item.entryType ? undefined : 'warning' as const,
+        }))
+        .sort((first, second) => second.value - first.value)
+
+    return compactDistributionItems(items, {
+        maxVisible: 3,
+        pinnedKey: 'unset',
+        otherKey: 'other-types',
+        otherLabel: '其他类型',
+    })
+}
+
 function getCategoryItems(
     input: ProjectDashboardModelInput,
     categoryNameMap: Map<string, string>,
@@ -106,19 +151,13 @@ function getCategoryItems(
             tone: item.categoryId ? undefined : 'warning' as const,
         }))
         .sort((first, second) => second.value - first.value)
-    const uncategorized = items.find(item => item.key === 'uncategorized' && item.value > 0)
-    const rankedItems = items.filter(item => item.key !== 'uncategorized')
-    const visibleItems = uncategorized
-        ? [uncategorized, ...rankedItems.slice(0, 4)]
-        : rankedItems.slice(0, 5)
-    const visibleKeys = new Set(visibleItems.map(item => item.key))
-    const otherTotal = items
-        .filter(item => !visibleKeys.has(item.key))
-        .reduce((sum, item) => sum + item.value, 0)
 
-    return otherTotal > 0
-        ? [...visibleItems, {key: 'other', label: '其他分类', value: otherTotal, tone: 'muted'}]
-        : visibleItems
+    return compactDistributionItems(items, {
+        maxVisible: 3,
+        pinnedKey: 'uncategorized',
+        otherKey: 'other',
+        otherLabel: '其他分类',
+    })
 }
 
 function getDistributionItems(input: ProjectDashboardModelInput, categoryStats: ReturnType<typeof getCategoryDepthStats>) {
@@ -136,13 +175,7 @@ function getDistributionItems(input: ProjectDashboardModelInput, categoryStats: 
     ].filter(item => item.value > 0)
 
     return {
-        typeItems: input.projectStats?.entriesByType.length
-            ? input.projectStats.entriesByType.map(item => ({
-                key: item.entryType ?? 'unset',
-                label: item.entryType ? entryTypeNameMap.get(item.entryType) ?? item.entryType : '未设置类型',
-                value: item.count,
-            })).sort((first, second) => second.value - first.value)
-            : fallbackTypeItems,
+        typeItems: getTypeItems(input, entryTypeNameMap, fallbackTypeItems),
         categoryItems: getCategoryItems(input, categoryNameMap, fallbackCategoryItems),
         tagTypeItems: getTagTypeItems(input.tagSchemas),
     }

@@ -64,6 +64,7 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                             <DashboardDistributionBlock
                                 title={props.projectStats ? '词条类型分布' : '词条类型配置'}
                                 items={dashboard.typeItems}
+                                variant="pie"
                             />
                             <DashboardDistributionBlock
                                 title={props.projectStats ? '分类词条分布' : '分类结构'}
