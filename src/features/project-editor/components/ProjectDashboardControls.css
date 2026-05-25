@@ -139,8 +139,8 @@
 }
 
 .pe-dashboard-action__icon svg {
-    width: calc(var(--fc-font-size-xl) + var(--fc-space-sm));
-    height: calc(var(--fc-font-size-xl) + var(--fc-space-sm));
+    width: calc(var(--fc-space-2xl) + var(--fc-space-sm));
+    height: calc(var(--fc-space-2xl) + var(--fc-space-sm));
     overflow: visible;
 }
 

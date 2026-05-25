@@ -331,7 +331,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         {
             key: 'idea',
             title: '记录灵感',
-            description: '把临时片段、角色点子和待整理设定先收进灵感箱，稍后再归档。',
+            description: '把片段、角色点子和待整理设定先收进灵感箱，稍后归档。',
             tone: 'idea',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
