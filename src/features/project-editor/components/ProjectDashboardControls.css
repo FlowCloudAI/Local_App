@@ -97,18 +97,29 @@
 .pe-dashboard-action {
     --pe-dashboard-action-accent: var(--fc-color-primary);
     --pe-dashboard-action-bg: var(--fc-color-primary-subtle);
+    --pe-dashboard-action-surface: var(--fc-color-bg);
+    --pe-dashboard-action-accent-soft: color-mix(in srgb, var(--pe-dashboard-action-accent) 12%, transparent);
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: row;
     align-items: flex-start;
     gap: var(--fc-space-md);
     padding: var(--fc-space-md);
-    border-color: color-mix(in srgb, var(--pe-dashboard-action-accent) 18%, var(--fc-color-border));
-    background:
-        linear-gradient(140deg, color-mix(in srgb, var(--pe-dashboard-action-bg) 46%, transparent), transparent 58%),
-        var(--fc-color-bg);
+    border-color: color-mix(in srgb, var(--pe-dashboard-action-accent) 14%, var(--fc-color-border));
+    background: var(--pe-dashboard-action-surface);
     color: inherit;
     text-align: left;
     cursor: pointer;
+}
+
+.pe-dashboard-action::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--fc-space-xs);
+    background: var(--pe-dashboard-action-accent);
+    opacity: 0.72;
 }
 
 .pe-dashboard-action--timeline {
@@ -134,7 +145,7 @@
     width: calc(var(--fc-space-3xl) + var(--fc-space-lg));
     height: calc(var(--fc-space-3xl) + var(--fc-space-lg));
     border-radius: var(--fc-radius-lg);
-    background: color-mix(in srgb, var(--pe-dashboard-action-bg) 84%, transparent);
+    background: var(--pe-dashboard-action-accent-soft);
     color: var(--pe-dashboard-action-accent);
 }
 
@@ -157,11 +168,14 @@
     color: var(--fc-color-text-disabled);
 }
 
+.pe-dashboard-action:disabled::before {
+    background: var(--fc-color-text-disabled);
+    opacity: 0.42;
+}
+
 .pe-dashboard-action:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--pe-dashboard-action-accent) 52%, var(--fc-color-border));
-    background:
-        linear-gradient(140deg, color-mix(in srgb, var(--pe-dashboard-action-bg) 72%, transparent), transparent 62%),
-        color-mix(in srgb, var(--pe-dashboard-action-accent) 6%, var(--fc-color-bg));
+    border-color: color-mix(in srgb, var(--pe-dashboard-action-accent) 36%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--pe-dashboard-action-accent) 5%, var(--pe-dashboard-action-surface));
 }
 
 .pe-dashboard-action:disabled {

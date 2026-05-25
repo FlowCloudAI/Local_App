@@ -253,32 +253,39 @@
 
 .project-home-action-item {
   --project-home-action-accent: var(--fc-color-primary);
-  --project-home-action-bg: var(--fc-color-primary-subtle);
+  --project-home-action-surface: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg));
+  --project-home-action-accent-soft: color-mix(in srgb, var(--project-home-action-accent) 12%, transparent);
+  position: relative;
+  overflow: hidden;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   column-gap: var(--fc-space-md);
   row-gap: var(--fc-space-xs);
   align-items: center;
   padding: var(--fc-space-lg);
-  border: 1px solid color-mix(in srgb, var(--project-home-action-accent) 18%, var(--fc-color-border));
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--project-home-action-bg) 50%, transparent), transparent 58%),
-    color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg));
+  border: 1px solid color-mix(in srgb, var(--project-home-action-accent) 14%, var(--fc-color-border));
+  background: var(--project-home-action-surface);
+}
+
+.project-home-action-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fc-space-xs);
+  background: var(--project-home-action-accent);
+  opacity: 0.72;
 }
 
 .project-home-action-item--idea {
   --project-home-action-accent: var(--fc-color-orange, var(--fc-color-warning));
-  --project-home-action-bg: var(--fc-color-orange-bg, var(--fc-color-warning-bg));
 }
 
 .project-home-action-item--ai {
   --project-home-action-accent: var(--fc-color-purple, var(--fc-color-info));
-  --project-home-action-bg: var(--fc-color-purple-bg, var(--fc-color-info-bg));
 }
 
 .project-home-action-item--snapshot {
   --project-home-action-accent: var(--fc-color-teal, var(--fc-color-info));
-  --project-home-action-bg: var(--fc-color-teal-bg, var(--fc-color-info-bg));
 }
 
 .project-home-action-item:hover,
@@ -288,10 +295,8 @@
 }
 
 .project-home-action-item:hover {
-  border-color: color-mix(in srgb, var(--project-home-action-accent) 44%, var(--fc-color-border));
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--project-home-action-bg) 78%, transparent), transparent 62%),
-    color-mix(in srgb, var(--project-home-action-accent) 6%, var(--fc-color-bg));
+  border-color: color-mix(in srgb, var(--project-home-action-accent) 36%, var(--fc-color-border));
+  background: color-mix(in srgb, var(--project-home-action-accent) 5%, var(--project-home-action-surface));
 }
 
 .project-home-action-item__icon {
@@ -302,7 +307,7 @@
   width: calc(var(--fc-space-3xl) + var(--fc-space-lg));
   height: calc(var(--fc-space-3xl) + var(--fc-space-lg));
   border-radius: var(--fc-radius-lg);
-  background: color-mix(in srgb, var(--project-home-action-bg) 82%, transparent);
+  background: var(--project-home-action-accent-soft);
   color: var(--project-home-action-accent);
 }
 
