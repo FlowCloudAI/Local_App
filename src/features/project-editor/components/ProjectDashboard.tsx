@@ -3,6 +3,7 @@ import {
     type DashboardBarItem,
     DashboardKpiStrip,
     DashboardMetric,
+    DashboardPieChart,
     DashboardSignalList,
     HealthMeter,
 } from './ProjectDashboardParts'
@@ -68,7 +69,7 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                                 title={props.projectStats ? '分类词条分布' : '分类结构'}
                                 items={dashboard.categoryItems}
                             />
-                            <DashboardDistributionBlock title="标签字段类型" items={dashboard.tagTypeItems}/>
+                            <DashboardDistributionBlock title="标签字段类型" items={dashboard.tagTypeItems} variant="pie"/>
                         </div>
                     </article>
 
@@ -122,12 +123,16 @@ function ProjectDashboard(props: ProjectDashboardProps) {
     )
 }
 
-function DashboardDistributionBlock({title, items}: { title: string; items: DashboardBarItem[] }) {
+function DashboardDistributionBlock({title, items, variant = 'bar'}: {
+    title: string
+    items: DashboardBarItem[]
+    variant?: 'bar' | 'pie'
+}) {
     const isEmpty = items.length === 0 || items.every(item => item.value === 0)
     return (
         <div className="pe-dashboard-distribution-block" data-empty={isEmpty ? 'true' : undefined}>
             <h4>{title}</h4>
-            <DashboardBarList items={items}/>
+            {variant === 'pie' ? <DashboardPieChart items={items}/> : <DashboardBarList items={items}/>}
         </div>
     )
 }

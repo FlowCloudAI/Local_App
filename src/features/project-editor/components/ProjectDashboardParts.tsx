@@ -46,6 +46,27 @@ function getBarStyle(value: number, total: number): CSSProperties {
     return {'--pe-dashboard-bar-width': `${percent}%`} as CSSProperties
 }
 
+const PIE_SEGMENT_COLORS = [
+    'var(--fc-color-primary)',
+    'var(--fc-color-success)',
+    'var(--fc-color-warning)',
+    'var(--fc-color-purple, var(--fc-color-info))',
+    'var(--fc-color-teal, var(--fc-color-info))',
+    'var(--fc-color-orange, var(--fc-color-warning))',
+]
+
+function getPieStyle(items: DashboardBarItem[], total: number): CSSProperties {
+    let current = 0
+    const segments = items.map((item, index) => {
+        const start = current
+        current += total > 0 ? (item.value / total) * 100 : 0
+        const color = PIE_SEGMENT_COLORS[index % PIE_SEGMENT_COLORS.length]
+        return `${color} ${start}% ${current}%`
+    })
+    const fallback = 'color-mix(in srgb, var(--fc-color-border) 54%, transparent)'
+    return {background: `conic-gradient(${segments.length ? segments.join(', ') : `${fallback} 0 100%`})`}
+}
+
 export function DashboardMetric({label, value, hint, muted}: {
     label: string
     value: string
@@ -99,6 +120,37 @@ export function DashboardBarList({items}: { items: DashboardBarItem[] }) {
                     </div>
                 </div>
             ))}
+        </div>
+    )
+}
+
+export function DashboardPieChart({items}: { items: DashboardBarItem[] }) {
+    const total = items.reduce((sum, item) => sum + item.value, 0)
+
+    if (items.length === 0 || total <= 0) {
+        return <p className="pe-dashboard-empty">暂无可统计数据</p>
+    }
+
+    return (
+        <div className="pe-dashboard-pie-chart">
+            <div className="pe-dashboard-pie-chart__shape" style={getPieStyle(items, total)} aria-hidden="true"/>
+            <div className="pe-dashboard-pie-chart__legend">
+                {items.map((item, index) => {
+                    const percent = Math.round((item.value / total) * 100)
+                    return (
+                        <div className="pe-dashboard-pie-chart__legend-row" key={item.key}>
+                            <span
+                                className="pe-dashboard-pie-chart__swatch"
+                                style={{backgroundColor: PIE_SEGMENT_COLORS[index % PIE_SEGMENT_COLORS.length]}}
+                                aria-hidden="true"
+                            />
+                            <span className="pe-dashboard-pie-chart__label">{item.label}</span>
+                            <strong>{formatDashboardNumber(item.value)}</strong>
+                            <span>{percent}%</span>
+                        </div>
+                    )
+                })}
+            </div>
         </div>
     )
 }
