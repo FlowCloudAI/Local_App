@@ -65,7 +65,12 @@ function getPieStyle(items: DashboardBarItem[], total: number): CSSProperties {
         return `${color} ${start}% ${current}%`
     })
     const fallback = 'color-mix(in srgb, var(--fc-color-border) 54%, transparent)'
-    return {background: `conic-gradient(${segments.length ? segments.join(', ') : `${fallback} 0 100%`})`}
+    return {
+        background: [
+            'radial-gradient(circle, var(--fc-color-bg) 48%, transparent 50%)',
+            `conic-gradient(${segments.length ? segments.join(', ') : `${fallback} 0 100%`})`,
+        ].join(', '),
+    }
 }
 
 function getSegmentColor(index: number, tone?: DashboardBarItem['tone']): string {

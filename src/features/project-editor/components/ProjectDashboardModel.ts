@@ -141,7 +141,6 @@ function getDistributionItems(input: ProjectDashboardModelInput, categoryStats: 
                 key: item.entryType ?? 'unset',
                 label: item.entryType ? entryTypeNameMap.get(item.entryType) ?? item.entryType : '未设置类型',
                 value: item.count,
-                tone: item.entryType ? undefined : 'warning' as const,
             })).sort((first, second) => second.value - first.value)
             : fallbackTypeItems,
         categoryItems: getCategoryItems(input, categoryNameMap, fallbackCategoryItems),

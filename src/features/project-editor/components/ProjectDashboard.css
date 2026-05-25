@@ -344,12 +344,10 @@
 .pe-dashboard-bar-row__rank {
     display: inline-grid;
     place-items: center;
-    width: var(--fc-space-lg);
+    min-width: var(--fc-space-lg);
     height: var(--fc-space-lg);
-    border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-border) 42%, transparent);
     color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-2xs);
+    font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-semibold);
 }
 
@@ -361,7 +359,6 @@
 }
 
 .pe-dashboard-bar-row[data-tone='warning'] .pe-dashboard-bar-row__rank {
-    background: var(--fc-color-warning-bg);
     color: var(--fc-color-warning);
 }
 
@@ -389,14 +386,14 @@
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    justify-content: space-between;
-    gap: var(--fc-space-md);
+    justify-content: flex-start;
+    gap: var(--fc-space-sm);
     min-width: 0;
 }
 
 .pe-dashboard-stacked__bar {
     display: flex;
-    min-height: var(--fc-space-xl);
+    min-height: var(--fc-space-sm);
     overflow: hidden;
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-border) 54%, transparent);
@@ -445,7 +442,7 @@
 }
 
 .pe-dashboard-pie-chart__shape {
-    width: calc(var(--fc-space-3xl) + var(--fc-space-xl));
+    width: calc(var(--fc-space-3xl) + var(--fc-space-sm));
     aspect-ratio: 1;
     border-radius: var(--fc-radius-full);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-color-border) 68%, transparent);
