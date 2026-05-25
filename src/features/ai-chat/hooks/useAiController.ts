@@ -122,6 +122,10 @@ const buildDefaultConversationSettings = (settings: AppSettings | null): Convers
     })
 }
 
+const conversationSettingsPatchAffectsContext = (patch: Partial<ConversationSettings>) => (
+    Object.prototype.hasOwnProperty.call(patch, 'systemPrompt')
+)
+
 const normalizeConversationSettingsWithGlobalPrompt = (
     settings: Partial<ConversationSettings> | null | undefined,
     mode: Conversation['mode'] | undefined,
@@ -925,7 +929,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
     }, [editModeEnabled, webSearchEnabled])
 
-    // tab 切换或 session 建立时推送最新焦点上下文
+    // tab 切换、session 建立或对话提示词变化时推送最新焦点上下文
     useEffect(() => {
         const sid = session.sessionId
         if (!sid) return
@@ -940,7 +944,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         return () => {
             cancelled = true
         }
-    }, [activeConversation?.settings, focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
+    }, [activeConversation?.settings.systemPrompt, focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
 
     useEffect(() => {
         let mounted = true
@@ -1290,13 +1294,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 current.sessionId,
                 buildSessionUpdateParams(nextSettings, sessionParamsRef.current.thinking),
             ).catch(logger.error)
-            void resolveContextPayload(
-                focusRef.current.projectId,
-                focusRef.current.entryId,
-                nextSettings,
-            )
-                .then((ctx) => ai_set_task_context(current.sessionId!, ctx))
-                .catch(logger.error)
+            if (conversationSettingsPatchAffectsContext(patch)) {
+                void resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    nextSettings,
+                )
+                    .then((ctx) => ai_set_task_context(current.sessionId!, ctx))
+                    .catch(logger.error)
+            }
         }
         persistConversationSettings(convId, nextSettings)
     }, [persistConversationSettings, resolveContextPayload])
