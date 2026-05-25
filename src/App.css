@@ -10,6 +10,34 @@ body {
     font-family: "Microsoft YaHei UI", var(--fc-font-family), sans-serif;
 }
 
+/* 默认滚动条对齐 RollingBox thin 模式 */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--fc-color-scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: transparent;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: var(--fc-radius-full);
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--fc-color-scrollbar-thumb);
+    border-radius: var(--fc-radius-full);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--fc-color-scrollbar-thumb-hover);
+}
+
 /* 通用弹窗关闭按钮 */
 .app-dialog-close {
     display: grid;
@@ -256,36 +284,30 @@ body {
 }
 
 .is-tauri .fc-roll {
-    scrollbar-width: auto;
-    scrollbar-color: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--roll-thumb) var(--roll-track);
 }
 
-.is-tauri .fc-roll.fc-roll--thumb-auto {
-    --roll-thumb: var(--fc-color-scrollbar-thumb);
+.is-tauri .fc-roll.fc-roll--size-normal {
+    --roll-size: 0.5rem;
 }
 
-.is-tauri .fc-roll.fc-roll--thumb-auto:hover {
-    --roll-thumb: var(--roll-thumb-hover);
-}
-
-.is-tauri .fc-roll.fc-roll--thumb-auto.fc-roll--scrolling {
-    --roll-thumb: var(--roll-thumb-active);
+.is-tauri .fc-roll::-webkit-scrollbar {
+    width: var(--roll-size);
+    height: var(--roll-size);
+    background: transparent;
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-track {
     background: var(--roll-track);
+    border-radius: var(--fc-radius-full);
 }
 
 .is-tauri .fc-roll::-webkit-scrollbar-thumb {
-    background-color: var(--roll-thumb);
-    border-radius: 999px;
+    background: var(--roll-thumb);
+    border-radius: var(--fc-radius-full);
     border: 2px solid transparent;
     background-clip: padding-box;
-}
-
-.is-tauri .fc-roll:hover::-webkit-scrollbar-thumb,
-.is-tauri .fc-roll.fc-roll--scrolling::-webkit-scrollbar-thumb {
-    background-color: var(--roll-thumb);
 }
 
 .side-bar {
