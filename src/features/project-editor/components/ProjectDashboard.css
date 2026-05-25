@@ -74,9 +74,24 @@
         align-items: stretch;
     }
 
-    .pe-dashboard-sidebar,
+    .pe-dashboard-main-column,
+    .pe-dashboard-sidebar {
+        align-self: stretch;
+        min-height: 0;
+    }
+
+    .pe-dashboard-main-column > .pe-dashboard-panel--signals {
+        flex: 1 1 auto;
+    }
+
+    .pe-dashboard-sidebar {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr);
+        gap: 0;
+    }
+
     .pe-dashboard-sidebar > .pe-dashboard-panel--quality {
-        height: 100%;
+        min-height: 100%;
     }
 }
 
