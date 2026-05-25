@@ -1146,18 +1146,18 @@
 
 .ai-floating-textarea {
     width: 100%;
-    min-height: 60px;
-    max-height: 200px;
-    padding: 8px 0;
+    min-height: calc(var(--fc-space-3xl) + var(--fc-space-md));
+    max-height: 12.5rem;
+    padding: var(--fc-space-sm) 0;
     border: none;
     background: transparent;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     resize: none;
     outline: none;
     font-family: inherit;
-    overflow-y: hidden;
+    overflow-y: auto;
 }
 
 .ai-input-meta-row {
