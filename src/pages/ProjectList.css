@@ -276,6 +276,10 @@
   opacity: 0.72;
 }
 
+.project-home-action-item--world {
+  --project-home-action-accent: var(--fc-color-info, var(--fc-color-primary));
+}
+
 .project-home-action-item--idea {
   --project-home-action-accent: var(--fc-color-orange, var(--fc-color-warning));
 }

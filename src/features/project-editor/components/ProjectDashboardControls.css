@@ -122,6 +122,11 @@
     opacity: 0.72;
 }
 
+.pe-dashboard-action--relation {
+    --pe-dashboard-action-accent: var(--fc-color-info, var(--fc-color-primary));
+    --pe-dashboard-action-bg: var(--fc-color-info-bg, var(--fc-color-primary-subtle));
+}
+
 .pe-dashboard-action--timeline {
     --pe-dashboard-action-accent: var(--fc-color-orange, var(--fc-color-warning));
     --pe-dashboard-action-bg: var(--fc-color-orange-bg, var(--fc-color-warning-bg));
