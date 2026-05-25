@@ -252,20 +252,46 @@
 }
 
 .project-home-action-item {
+  --project-home-action-accent: var(--fc-color-primary);
+  --project-home-action-bg: var(--fc-color-primary-subtle);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   column-gap: var(--fc-space-md);
   row-gap: var(--fc-space-xs);
   align-items: center;
   padding: var(--fc-space-lg);
-  border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-  background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
+  border: 1px solid color-mix(in srgb, var(--project-home-action-accent) 18%, var(--fc-color-border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--project-home-action-bg) 50%, transparent), transparent 58%),
+    color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg));
+}
+
+.project-home-action-item--idea {
+  --project-home-action-accent: var(--fc-color-orange, var(--fc-color-warning));
+  --project-home-action-bg: var(--fc-color-orange-bg, var(--fc-color-warning-bg));
+}
+
+.project-home-action-item--ai {
+  --project-home-action-accent: var(--fc-color-purple, var(--fc-color-info));
+  --project-home-action-bg: var(--fc-color-purple-bg, var(--fc-color-info-bg));
+}
+
+.project-home-action-item--snapshot {
+  --project-home-action-accent: var(--fc-color-teal, var(--fc-color-info));
+  --project-home-action-bg: var(--fc-color-teal-bg, var(--fc-color-info-bg));
 }
 
 .project-home-action-item:hover,
 .project-home-recent-item:hover,
 .project-home-help-item:hover {
   background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg));
+}
+
+.project-home-action-item:hover {
+  border-color: color-mix(in srgb, var(--project-home-action-accent) 44%, var(--fc-color-border));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--project-home-action-bg) 78%, transparent), transparent 62%),
+    color-mix(in srgb, var(--project-home-action-accent) 6%, var(--fc-color-bg));
 }
 
 .project-home-action-item__icon {
@@ -276,8 +302,8 @@
   width: var(--fc-space-3xl);
   height: var(--fc-space-3xl);
   border-radius: var(--fc-radius-md);
-  background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-  color: var(--fc-color-primary);
+  background: color-mix(in srgb, var(--project-home-action-bg) 82%, transparent);
+  color: var(--project-home-action-accent);
 }
 
 .project-home-action-item__icon svg {

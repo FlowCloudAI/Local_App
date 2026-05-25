@@ -177,7 +177,7 @@ function ProjectNextSteps({
                 : '项目描述还很空，可以先让 AI 帮你生成世界方向、核心冲突和第一批设定清单。',
             actionLabel: 'AI 讨论项目',
             onClick: onOpenProjectAi,
-            tone: 'default',
+            tone: 'ai',
         },
         unresolvedCount > 0 ? {
             key: 'risk',
@@ -194,7 +194,7 @@ function ProjectNextSteps({
                 : '先准备分类和标签规则，给人物、地点、势力等资料预留清晰的整理方式。',
             actionLabel: '添加标签',
             onClick: onCreateTag,
-            tone: 'default',
+            tone: 'structure',
         },
     ]
 

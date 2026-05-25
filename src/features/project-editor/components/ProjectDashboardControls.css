@@ -95,14 +95,35 @@
 }
 
 .pe-dashboard-action {
+    --pe-dashboard-action-accent: var(--fc-color-primary);
+    --pe-dashboard-action-bg: var(--fc-color-primary-subtle);
     display: flex;
     flex-direction: row;
     align-items: flex-start;
     gap: var(--fc-space-md);
     padding: var(--fc-space-md);
+    border-color: color-mix(in srgb, var(--pe-dashboard-action-accent) 18%, var(--fc-color-border));
+    background:
+        linear-gradient(140deg, color-mix(in srgb, var(--pe-dashboard-action-bg) 46%, transparent), transparent 58%),
+        var(--fc-color-bg);
     color: inherit;
     text-align: left;
     cursor: pointer;
+}
+
+.pe-dashboard-action--timeline {
+    --pe-dashboard-action-accent: var(--fc-color-orange, var(--fc-color-warning));
+    --pe-dashboard-action-bg: var(--fc-color-orange-bg, var(--fc-color-warning-bg));
+}
+
+.pe-dashboard-action--map {
+    --pe-dashboard-action-accent: var(--fc-color-teal, var(--fc-color-info));
+    --pe-dashboard-action-bg: var(--fc-color-teal-bg, var(--fc-color-info-bg));
+}
+
+.pe-dashboard-action--contradiction {
+    --pe-dashboard-action-accent: var(--fc-color-warning);
+    --pe-dashboard-action-bg: var(--fc-color-warning-bg);
 }
 
 .pe-dashboard-action__icon {
@@ -113,8 +134,8 @@
     width: var(--fc-space-3xl);
     height: var(--fc-space-3xl);
     border-radius: var(--fc-radius-md);
-    background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
-    color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--pe-dashboard-action-bg) 84%, transparent);
+    color: var(--pe-dashboard-action-accent);
 }
 
 .pe-dashboard-action__icon svg {
@@ -137,8 +158,10 @@
 }
 
 .pe-dashboard-action:hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 52%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-primary) 8%, var(--fc-color-bg));
+    border-color: color-mix(in srgb, var(--pe-dashboard-action-accent) 52%, var(--fc-color-border));
+    background:
+        linear-gradient(140deg, color-mix(in srgb, var(--pe-dashboard-action-bg) 72%, transparent), transparent 62%),
+        color-mix(in srgb, var(--pe-dashboard-action-accent) 6%, var(--fc-color-bg));
 }
 
 .pe-dashboard-action:disabled {
@@ -154,8 +177,8 @@
 
 .pe-dashboard-action__badge {
     padding: var(--fc-space-xs) var(--fc-space-sm);
-    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-    color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--pe-dashboard-action-bg) 78%, transparent);
+    color: var(--pe-dashboard-action-accent);
 }
 
 .pe-dashboard-signal-row {

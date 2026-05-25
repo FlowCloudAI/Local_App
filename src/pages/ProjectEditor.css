@@ -620,15 +620,19 @@
 }
 
 .pe-next-step-card {
+    --pe-next-step-accent: var(--fc-color-primary);
+    --pe-next-step-bg: var(--fc-color-primary-subtle);
     min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--fc-space-sm);
     padding: var(--fc-space-lg);
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 84%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pe-next-step-accent) 22%, var(--fc-color-border));
     border-radius: var(--fc-radius-lg);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg));
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--pe-next-step-bg) 54%, transparent), transparent 58%),
+        color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg));
     color: inherit;
     text-align: left;
     cursor: pointer;
@@ -640,8 +644,10 @@
 
 .pe-next-step-card:hover:not(:disabled) {
     transform: translateY(-1px);
-    border-color: color-mix(in srgb, var(--fc-color-primary) 52%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-primary) 8%, var(--fc-color-bg));
+    border-color: color-mix(in srgb, var(--pe-next-step-accent) 54%, var(--fc-color-border));
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--pe-next-step-bg) 78%, transparent), transparent 62%),
+        color-mix(in srgb, var(--pe-next-step-accent) 6%, var(--fc-color-bg));
 }
 
 .pe-next-step-card:disabled {
@@ -650,15 +656,23 @@
 }
 
 .pe-next-step-card--primary {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 48%, var(--fc-color-border));
-    background:
-        radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-primary) 13%, transparent), transparent 42%),
-        color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-secondary));
+    --pe-next-step-accent: var(--fc-color-primary);
+    --pe-next-step-bg: var(--fc-color-primary-subtle);
+}
+
+.pe-next-step-card--ai {
+    --pe-next-step-accent: var(--fc-color-purple, var(--fc-color-info));
+    --pe-next-step-bg: var(--fc-color-purple-bg, var(--fc-color-info-bg));
 }
 
 .pe-next-step-card--warning {
-    border-color: color-mix(in srgb, var(--fc-color-warning) 42%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-warning-bg) 48%, var(--fc-color-bg-secondary));
+    --pe-next-step-accent: var(--fc-color-warning);
+    --pe-next-step-bg: var(--fc-color-warning-bg);
+}
+
+.pe-next-step-card--structure {
+    --pe-next-step-accent: var(--fc-color-success);
+    --pe-next-step-bg: var(--fc-color-success-bg);
 }
 
 .pe-next-step-card__title {
@@ -676,7 +690,7 @@
 }
 
 .pe-next-step-card__action {
-    color: var(--fc-color-primary);
+    color: var(--pe-next-step-accent);
     font-size: var(--fc-font-size-md);
     font-weight: var(--fc-font-weight-semibold);
     line-height: var(--fc-line-height-tight);

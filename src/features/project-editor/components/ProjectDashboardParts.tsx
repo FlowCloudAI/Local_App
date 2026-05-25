@@ -27,6 +27,7 @@ export interface DashboardActionItem {
     key: string
     title: string
     description: string
+    tone?: 'relation' | 'timeline' | 'map' | 'contradiction'
     badge?: string
     disabled?: boolean
     icon?: ReactNode
@@ -126,7 +127,7 @@ export function DashboardActionList({items}: { items: DashboardActionItem[] }) {
                 <button
                     key={item.key}
                     type="button"
-                    className="pe-dashboard-action"
+                    className={`pe-dashboard-action pe-dashboard-action--${item.tone ?? item.key}`}
                     onClick={item.onClick}
                     disabled={item.disabled}
                 >

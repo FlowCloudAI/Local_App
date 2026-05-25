@@ -306,6 +306,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         key: string
         title: string
         description: string
+        tone: 'world' | 'idea' | 'ai' | 'snapshot'
         icon: ReactNode
         target?: HomeActivityTarget
         onClick?: () => void
@@ -314,6 +315,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'new-world',
             title: '开始一个新世界',
             description: '从项目名称、简介和封面开始，先搭好世界观的创作容器。',
+            tone: 'world',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <circle cx="11" cy="13" r="7.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -330,6 +332,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'idea',
             title: '记录灵感',
             description: '把临时片段、角色点子和待整理设定先收进灵感箱，稍后再归档。',
+            tone: 'idea',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <path
@@ -349,6 +352,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'ai-chat',
             title: '打开 AI 助手',
             description: '让 AI 帮你拆解世界框架、扩写设定片段，或检查内容里的冲突。',
+            tone: 'ai',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <path
@@ -373,6 +377,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             key: 'snapshot',
             title: '查看快照',
             description: '回看最近保存的版本，适合在大改设定前确认可回退节点。',
+            tone: 'snapshot',
             icon: (
                 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
                     <circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -661,7 +666,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                 <button
                                     key={action.key}
                                     type="button"
-                                    className="project-home-action-item"
+                                    className={`project-home-action-item project-home-action-item--${action.tone}`}
                                     onClick={() => {
                                         if (action.onClick) {
                                             action.onClick()
