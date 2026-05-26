@@ -977,6 +977,10 @@ function countLodVertices(shapes: CompiledPixiShape[], lodLevel: PixiLodLevel): 
     return shapes.reduce((total, shape) => total + shape.lod[lodLevel].length / 2, 0);
 }
 
+function getPixiShapeLodPolygon(shape: CompiledPixiShape, lodLevel: PixiLodLevel): number[] {
+    return shape.lod[lodLevel];
+}
+
 function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
     const flatPolygon = flattenPolygon(shape.polygon);
     const mediumPolygon = simplifyPolygonByDistance(shape.polygon, PIXI_POLYGON_LOD_MEDIUM_TOLERANCE);
@@ -1002,14 +1006,15 @@ function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
 function drawShapeFill(
     graphics: Graphics,
     shape: CompiledPixiShape,
+    polygon: number[],
 ) {
     graphics.clear();
-    if (shape.pointCount < 3) {
+    if (polygon.length < 6) {
         return;
     }
 
     graphics
-        .poly(shape.flatPolygon, true)
+        .poly(polygon, true)
         .fill({
             color: shape.fillColor,
             alpha: shape.fillAlpha,
@@ -1019,19 +1024,20 @@ function drawShapeFill(
 function drawShapeStroke(
     graphics: Graphics,
     shape: CompiledPixiShape,
+    polygon: number[],
     scale: number,
     polygonLineWidth: number,
     hovered: boolean,
 ) {
     graphics.clear();
-    if (shape.pointCount < 3) {
+    if (polygon.length < 6) {
         return;
     }
 
     const strokeWidth = (normalizePositiveNumber(polygonLineWidth, 2) + (hovered ? 1 : 0)) / Math.max(scale, 0.01);
 
     graphics
-        .poly(shape.flatPolygon, true)
+        .poly(polygon, true)
         .stroke({
             width: strokeWidth,
             color: shape.strokeColor,
@@ -1090,31 +1096,35 @@ function MapPixiBackground({
 
 function MapPixiShape({
                           shape,
+                          lodLevel,
                           transform,
                           polygonLineWidth,
                           hovered,
                           perfRecorder,
                       }: {
     shape: CompiledPixiShape;
+    lodLevel: PixiLodLevel;
     transform: PixiViewportTransform;
     polygonLineWidth: number;
     hovered: boolean;
     perfRecorder?: PixiPerfRecorder;
 }) {
+    const polygon = getPixiShapeLodPolygon(shape, lodLevel);
+    const polygonVertexCount = polygon.length / 2;
     const drawFill = useCallback((graphics: Graphics) => {
         const startedAt = perfRecorder ? getHighResolutionTime() : 0;
-        drawShapeFill(graphics, shape);
+        drawShapeFill(graphics, shape, polygon);
         if (perfRecorder) {
-            perfRecorder.recordShapeRedraw(shape.pointCount, getHighResolutionTime() - startedAt);
+            perfRecorder.recordShapeRedraw(polygonVertexCount, getHighResolutionTime() - startedAt);
         }
-    }, [perfRecorder, shape]);
+    }, [perfRecorder, polygon, polygonVertexCount, shape]);
     const drawStroke = useCallback((graphics: Graphics) => {
         const startedAt = perfRecorder ? getHighResolutionTime() : 0;
-        drawShapeStroke(graphics, shape, transform.scale, polygonLineWidth, hovered);
+        drawShapeStroke(graphics, shape, polygon, transform.scale, polygonLineWidth, hovered);
         if (perfRecorder) {
-            perfRecorder.recordShapeRedraw(shape.pointCount, getHighResolutionTime() - startedAt);
+            perfRecorder.recordShapeRedraw(polygonVertexCount, getHighResolutionTime() - startedAt);
         }
-    }, [hovered, perfRecorder, polygonLineWidth, shape, transform.scale]);
+    }, [hovered, perfRecorder, polygon, polygonLineWidth, polygonVertexCount, shape, transform.scale]);
 
     return (
         <>
@@ -1529,6 +1539,7 @@ function MapPixiScene({
                     <MapPixiShape
                         key={shape.source.id}
                         shape={shape}
+                        lodLevel={lodLevel}
                         transform={transform}
                         polygonLineWidth={polygonLineWidth}
                         hovered={hoveredDetail?.kind === 'shape' && hoveredDetail.object.id === shape.source.id}
