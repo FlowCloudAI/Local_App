@@ -117,6 +117,7 @@ interface PixiPerfRecorder {
     recordShapeRedraw: (pointCount: number, drawMs: number) => void;
     recordHitTest: (hitTestMs: number) => void;
     recordPointerMove: () => void;
+    setVisibleShapeCount: (count: number) => void;
 }
 
 interface PixiShapeBounds {
@@ -136,6 +137,8 @@ interface CompiledPixiShape {
     strokeColor: number;
     strokeAlpha: number;
 }
+
+const VIEWPORT_CULLING_PADDING_PIXELS = 64;
 
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
@@ -534,6 +537,12 @@ function usePixiPerfRecorder({
                 accumulatorRef.current.hitTestMs += hitTestMs;
                 scheduleFlush();
             },
+            setVisibleShapeCount: (count: number) => {
+                latestMetaRef.current = {
+                    ...latestMetaRef.current,
+                    visibleShapeCount: count,
+                };
+            },
         };
     }, [enabled, scheduleFlush]);
 }
@@ -753,6 +762,25 @@ function computePolygonBounds(polygon: [number, number][]): PixiShapeBounds {
 function isPointInBounds(point: [number, number], bounds: PixiShapeBounds): boolean {
     const [x, y] = point;
     return x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+}
+
+function doBoundsIntersect(a: PixiShapeBounds, b: PixiShapeBounds): boolean {
+    return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+
+function computeViewportWorldBounds(
+    transform: PixiViewportTransform,
+    size: ElementSize,
+): PixiShapeBounds {
+    const scale = Math.max(transform.scale, 0.01);
+    const padding = VIEWPORT_CULLING_PADDING_PIXELS / scale;
+
+    return {
+        minX: (-transform.x / scale) - padding,
+        minY: (-transform.y / scale) - padding,
+        maxX: ((size.width - transform.x) / scale) + padding,
+        maxY: ((size.height - transform.y) / scale) + padding,
+    };
 }
 
 function isPointInPolygon(point: [number, number], polygon: [number, number][]): boolean {
@@ -1255,6 +1283,17 @@ function MapPixiScene({
             : null
     ), [backgroundImage, naturalSize, scene.canvas]);
     const compiledShapes = useMemo(() => scene.shapes.map(compilePixiShape), [scene.shapes]);
+    const viewportWorldBounds = useMemo(() => (
+        computeViewportWorldBounds(transform, size)
+    ), [size, transform]);
+    const visibleShapes = useMemo(() => (
+        compiledShapes.filter(shape => doBoundsIntersect(shape.bbox, viewportWorldBounds))
+    ), [compiledShapes, viewportWorldBounds]);
+
+    useEffect(() => {
+        perfRecorder?.setVisibleShapeCount(visibleShapes.length);
+    }, [perfRecorder, visibleShapes.length]);
+
     const circleKeyLocationItems = useMemo(() => scene.keyLocations
         .map((location, index) => ({location, index}))
         .filter(({location}) => (
@@ -1295,7 +1334,7 @@ function MapPixiScene({
                 {backgroundImage && backgroundBounds && (
                     <MapPixiBackground backgroundImage={backgroundImage} bounds={backgroundBounds}/>
                 )}
-                {compiledShapes.map(shape => (
+                {visibleShapes.map(shape => (
                     <MapPixiShape
                         key={shape.source.id}
                         shape={shape}
@@ -1307,7 +1346,7 @@ function MapPixiScene({
                 ))}
                 <MapPixiShapeHitLayer
                     scene={scene}
-                    shapes={compiledShapes}
+                    shapes={visibleShapes}
                     transform={transform}
                     enablePicking={enablePicking}
                     onClick={onPickClick}
