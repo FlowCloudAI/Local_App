@@ -198,6 +198,7 @@ type MapPixiApplicationLike = {
     canvas?: HTMLCanvasElement | null;
     renderer?: {
         canvas?: HTMLCanvasElement | null;
+        resize?: (width: number, height: number) => void;
         resolution?: number;
         screen?: {
             width?: number;
@@ -1982,6 +1983,27 @@ function MapPixiApplicationGuard({
             canvas.removeEventListener('webglcontextrestored', handleContextRestored);
         };
     }, [app, onContextLost, onContextRestored]);
+
+    useLayoutEffect(() => {
+        if (!app?.renderer?.resize || size.width <= 0 || size.height <= 0) {
+            return;
+        }
+
+        app.renderer.resize(size.width, size.height);
+
+        const canvas = resolvePixiApplicationCanvas(app);
+        logPixiResizeDebug(debugPerf, 'resize-applied', {
+            expectedWidth: size.width,
+            expectedHeight: size.height,
+            canvasWidth: canvas?.width ?? null,
+            canvasHeight: canvas?.height ?? null,
+            canvasClientWidth: canvas?.clientWidth ?? null,
+            canvasClientHeight: canvas?.clientHeight ?? null,
+            rendererScreenWidth: app.renderer.screen?.width ?? null,
+            rendererScreenHeight: app.renderer.screen?.height ?? null,
+            rendererResolution: app.renderer.resolution ?? null,
+        });
+    }, [app, debugPerf, size.height, size.width]);
 
     useEffect(() => {
         const canvas = resolvePixiApplicationCanvas(app);
