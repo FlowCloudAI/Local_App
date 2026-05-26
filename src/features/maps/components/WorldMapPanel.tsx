@@ -741,6 +741,20 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         setSelectedLocationId(null)
     }, [draft.shapes])
 
+    const handleFinishDrawingShape = useCallback(() => {
+        if (!drawingShape || drawingShape.vertices.length < 3) {
+            return
+        }
+
+        updateDraft(current => ({
+            ...current,
+            shapes: [...current.shapes, drawingShape],
+        }))
+        setDrawingShape(null)
+        setSelectedShapeId(drawingShape.id)
+        setSelectedLocationId(null)
+    }, [drawingShape, updateDraft])
+
     const handleAddLocation = useCallback(() => {
         const relatedShape = draft.shapes.find(s => s.id === selectedShapeId) ?? draft.shapes[0] ?? null
         const cx = relatedShape
@@ -1155,7 +1169,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                         )}
                         <div className="wm-toolbar-sep"/>
                         <button type="button" className="wm-chip" onClick={handleQuickPreview}
-                                disabled={!activeMapId || draft.shapes.length === 0}>快速预览
+                                disabled={!activeMapId || draft.shapes.length === 0}>预览草图
                         </button>
                         <button type="button" className="wm-chip"
                                 onClick={() => void handleGenerate()}
@@ -1249,155 +1263,150 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                     <div className="wm-meta-row">
                                         <span>图形 / 地点</span><strong>{draft.shapes.length} / {draft.keyLocations.length}</strong>
                                     </div>
-                                    <div className="wm-sidebar-hints">
-                                        <div
-                                            className="wm-sidebar-hint">点击「绘制图形」在画布上逐点绘制区域，右键图形可选中/删除
+                                    {draft.shapes.length === 0 && draft.keyLocations.length === 0 && (
+                                        <div className="wm-sidebar-hints">
+                                            <div className="wm-sidebar-hint">切换到编辑模式后，可绘制区域、添加地点或上传底图。</div>
                                         </div>
-                                        <div className="wm-sidebar-hint">绘制完图形后点击「快速预览」可查看 deck
-                                            展示效果
+                                    )}
+                                    {!validation.isValid && (
+                                        <div className="wm-sidebar-hint wm-sidebar-hint--error">
+                                            当前草稿还没通过校验，完善图形或地点后才能生成海岸线。
                                         </div>
-                                        <div className="wm-sidebar-hint">「生成海岸线」对图形边缘做自然化处理</div>
-                                        <div className="wm-sidebar-hint">「上传底图」将图片显示在 deck 层，SVG
-                                            层叠加区域标记
+                                    )}
+                                    <details className="wm-details">
+                                        <summary>操作说明</summary>
+                                        <div className="wm-sidebar-hints">
+                                            <div className="wm-sidebar-hint">点击「绘制图形」在画布上逐点绘制区域。</div>
+                                            <div className="wm-sidebar-hint">双击画布或点击侧栏「完成图形」结束绘制。</div>
+                                            <div className="wm-sidebar-hint">「预览草图」显示当前草稿，「生成海岸线」会自然化图形边缘。</div>
+                                            <div className="wm-sidebar-hint">地图引擎和尺寸在创建时确定，创建后不在运行时切换。</div>
                                         </div>
-                                        <div className="wm-sidebar-hint">切换风格可改变海洋背景色和图形着色</div>
-                                        {!validation.isValid && (
-                                            <div className="wm-sidebar-hint wm-sidebar-hint--error">
-                                                当前草稿还没通过校验，完善图形或地点后才能生成海岸线。
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="wm-sidebar-sep"/>
-                                    <div className="wm-sidebar-subsection wm-sidebar-subsection--coastline">
-                                        <div className="wm-sidebar-subsection__header">
-                                            <span className="wm-sidebar-subsection__title">海岸线属性</span>
+                                    </details>
+                                    <details className="wm-details">
+                                        <summary>
+                                            <span>海岸线生成参数</span>
                                             <button
                                                 type="button"
                                                 className="wm-chip"
-                                                onClick={() => setCoastlineParams(DEFAULT_COASTLINE_PARAMS)}
+                                                onClick={event => {
+                                                    event.preventDefault()
+                                                    event.stopPropagation()
+                                                    setCoastlineParams(DEFAULT_COASTLINE_PARAMS)
+                                                }}
                                             >
                                                 恢复默认
                                             </button>
-                                        </div>
-                                        <div
-                                            className="wm-coastline-fields"
-                                            onWheel={(event) => {
-                                                event.stopPropagation()
-                                            }}
-                                        >
-                                        <div className="wm-field">
-                                            <label>最小段数</label>
-                                            <input
-                                                type="number"
-                                                step={1}
-                                                value={coastlineParams.minSegments ?? ''}
-                                                onChange={e => updateCoastlineParam('minSegments', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>最大段数</label>
-                                            <input
-                                                type="number"
-                                                step={1}
-                                                value={coastlineParams.maxSegments ?? ''}
-                                                onChange={e => updateCoastlineParam('maxSegments', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>细分基础</label>
-                                            <input
-                                                type="number"
-                                                step={1}
-                                                value={coastlineParams.segmentBase ?? ''}
-                                                onChange={e => updateCoastlineParam('segmentBase', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>长度因子</label>
-                                            <input
-                                                type="number"
-                                                step={1}
-                                                value={coastlineParams.segmentLengthFactor ?? ''}
-                                                onChange={e => updateCoastlineParam('segmentLengthFactor', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>振幅基础</label>
-                                            <input
-                                                type="number"
-                                                step={0.1}
-                                                value={coastlineParams.amplitudeBase ?? ''}
-                                                onChange={e => updateCoastlineParam('amplitudeBase', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>振幅最小</label>
-                                            <input
-                                                type="number"
-                                                step={0.5}
-                                                value={coastlineParams.amplitudeMin ?? ''}
-                                                onChange={e => updateCoastlineParam('amplitudeMin', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>平滑轮数</label>
-                                            <input
-                                                type="number"
-                                                step={1}
-                                                min={0}
-                                                value={coastlineParams.relaxPasses ?? ''}
-                                                onChange={e => updateCoastlineParam('relaxPasses', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>平滑权重</label>
-                                            <input
-                                                type="number"
-                                                step={0.01}
-                                                min={0}
-                                                max={0.5}
-                                                value={coastlineParams.relaxWeight ?? ''}
-                                                onChange={e => updateCoastlineParam('relaxWeight', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>Wave A 权重</label>
-                                            <input
-                                                type="number"
-                                                step={0.01}
-                                                value={coastlineParams.waveAWeight ?? ''}
-                                                onChange={e => updateCoastlineParam('waveAWeight', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>Wave B 权重</label>
-                                            <input
-                                                type="number"
-                                                step={0.01}
-                                                value={coastlineParams.waveBWeight ?? ''}
-                                                onChange={e => updateCoastlineParam('waveBWeight', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-field">
-                                            <label>Wave C 权重</label>
-                                            <input
-                                                type="number"
-                                                step={0.01}
-                                                value={coastlineParams.waveCWeight ?? ''}
-                                                onChange={e => updateCoastlineParam('waveCWeight', e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="wm-sidebar-hints">
-                                            <div className="wm-sidebar-hint">段数越高，海岸线细节越多，但计算量也会上升。
+                                        </summary>
+                                        <div className="wm-coastline-fields">
+                                            <div className="wm-field">
+                                                <label>最小段数</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    value={coastlineParams.minSegments ?? ''}
+                                                    onChange={e => updateCoastlineParam('minSegments', e.target.value)}
+                                                />
                                             </div>
-                                            <div className="wm-sidebar-hint">振幅和平滑决定轮廓起伏感，建议先小幅调整。
+                                            <div className="wm-field">
+                                                <label>最大段数</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    value={coastlineParams.maxSegments ?? ''}
+                                                    onChange={e => updateCoastlineParam('maxSegments', e.target.value)}
+                                                />
                                             </div>
-                                            <div className="wm-sidebar-hint">三组 Wave
-                                                权重控制大中小三个尺度的纹理占比。
+                                            <div className="wm-field">
+                                                <label>细分基础</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    value={coastlineParams.segmentBase ?? ''}
+                                                    onChange={e => updateCoastlineParam('segmentBase', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>长度因子</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    value={coastlineParams.segmentLengthFactor ?? ''}
+                                                    onChange={e => updateCoastlineParam('segmentLengthFactor', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>振幅基础</label>
+                                                <input
+                                                    type="number"
+                                                    step={0.1}
+                                                    value={coastlineParams.amplitudeBase ?? ''}
+                                                    onChange={e => updateCoastlineParam('amplitudeBase', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>振幅最小</label>
+                                                <input
+                                                    type="number"
+                                                    step={0.5}
+                                                    value={coastlineParams.amplitudeMin ?? ''}
+                                                    onChange={e => updateCoastlineParam('amplitudeMin', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>平滑轮数</label>
+                                                <input
+                                                    type="number"
+                                                    step={1}
+                                                    min={0}
+                                                    value={coastlineParams.relaxPasses ?? ''}
+                                                    onChange={e => updateCoastlineParam('relaxPasses', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>平滑权重</label>
+                                                <input
+                                                    type="number"
+                                                    step={0.01}
+                                                    min={0}
+                                                    max={0.5}
+                                                    value={coastlineParams.relaxWeight ?? ''}
+                                                    onChange={e => updateCoastlineParam('relaxWeight', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>Wave A 权重</label>
+                                                <input
+                                                    type="number"
+                                                    step={0.01}
+                                                    value={coastlineParams.waveAWeight ?? ''}
+                                                    onChange={e => updateCoastlineParam('waveAWeight', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>Wave B 权重</label>
+                                                <input
+                                                    type="number"
+                                                    step={0.01}
+                                                    value={coastlineParams.waveBWeight ?? ''}
+                                                    onChange={e => updateCoastlineParam('waveBWeight', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-field">
+                                                <label>Wave C 权重</label>
+                                                <input
+                                                    type="number"
+                                                    step={0.01}
+                                                    value={coastlineParams.waveCWeight ?? ''}
+                                                    onChange={e => updateCoastlineParam('waveCWeight', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="wm-sidebar-hints">
+                                                <div className="wm-sidebar-hint">段数越高，海岸线细节越多，但计算量也会上升。</div>
+                                                <div className="wm-sidebar-hint">振幅和平滑决定轮廓起伏感，建议先小幅调整。</div>
+                                                <div className="wm-sidebar-hint">三组 Wave 权重控制大中小三个尺度的纹理占比。</div>
                                             </div>
                                         </div>
-                                        </div>
-                                    </div>
+                                    </details>
                                 </>
                             )}
                             {!activeMapId && (
@@ -1436,6 +1445,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                         <span>已落点</span><strong>{drawingShape.vertices.length}</strong>
                                     </div>
                                     <div className="wm-sidebar-sep"/>
+                                    <button type="button" className="wm-chip is-active is-full"
+                                            onClick={handleFinishDrawingShape}
+                                            disabled={drawingShape.vertices.length < 3}>完成图形
+                                    </button>
                                     <button type="button" className="wm-chip is-full"
                                             onClick={() => setDrawingShape(null)}>取消绘制
                                     </button>
