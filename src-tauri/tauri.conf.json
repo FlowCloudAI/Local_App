@@ -25,8 +25,7 @@
         "transparent": true,
         "decorations": false,
         "center": true,
-        "additionalBrowserArgs": "--disable-extensions --disable-background-networking --disable-sync --metrics-recording-only --disable-features=Spellcheck,AutofillServerCommunication,Translate --disable-component-update --disable-default-apps --disable-domain-reliability --no-first-run --disable-features=AudioServiceOutOfProcess --js-flags=\"--max-old-space-size=128\" --disable-backgrounding-occluded-windows --proxy-bypass-list=*.localhost"
-      }
+        "additionalBrowserArgs": "--disable-extensions --disable-background-networking --disable-sync --metrics-recording-only --disable-component-update --disable-default-apps --disable-domain-reliability --no-first-run --disable-features=Spellcheck,AutofillServerCommunication,Translate,AudioServiceOutOfProcess --proxy-bypass-list=*.localhost"      }
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline'; img-src 'self' data: fcimg: http://fcimg.localhost https://www.flowcloudai.cn",
@@ -108,7 +107,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "__FLOWCLOUDAI_UPDATER_PUBLIC_KEY__",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZGOTc5QkIzRjkyNTA3OTEKUldTUkJ5WDVzNXVYL3lhTWU0U0ZHRHpaTGxJYXdBNXhxNUhsQ1oreHBxMUFReldrdy93Mkt0Q0sK",
       "endpoints": [
         "https://www.flowcloudai.cn/api/v1/app-updates/{{target}}/{{arch}}/{{current_version}}"
       ],
