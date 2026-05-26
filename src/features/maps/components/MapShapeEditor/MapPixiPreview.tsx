@@ -41,7 +41,7 @@ import type {
     MapRgbaColor,
     MapShapeEditorViewBox,
 } from './types';
-import {clamp, clampMapShapeEditorViewBox, createInitialMapShapeEditorViewBox,} from './mapShapeEditorSvgUtils';
+import {clamp, createInitialMapShapeEditorViewBox,} from './mapShapeEditorSvgUtils';
 import './MapShapeEditor.css';
 
 extend({
@@ -175,6 +175,8 @@ const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
 const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
 const PREVIEW_VIEWBOX_PADDING_RATIO = 0.35;
 const PREVIEW_VIEWBOX_MIN_PADDING = 80;
+const PREVIEW_MIN_VIEWBOX_SCALE = 0.18;
+const PREVIEW_MAX_VIEWBOX_SCALE = 2;
 const PIXI_POLYGON_LOD_LEVELS: PixiLodLevel[] = ['overview', 'low', 'medium', 'high', 'original'];
 const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { targetRatio: number; minPointCount: number }> = {
     overview: {targetRatio: 0.075, minPointCount: 80},
@@ -770,9 +772,39 @@ function toViewBoxPoint(
     rect: DOMRect,
     viewBox: MapShapeEditorViewBox,
 ): { x: number; y: number } {
+    const scale = Math.min(
+        rect.width / Math.max(viewBox.width, 1),
+        rect.height / Math.max(viewBox.height, 1),
+    );
+    const offsetX = (rect.width - viewBox.width * scale) / 2;
+    const offsetY = (rect.height - viewBox.height * scale) / 2;
+
     return {
-        x: viewBox.x + ((clientX - rect.left) / Math.max(rect.width, 1)) * viewBox.width,
-        y: viewBox.y + ((clientY - rect.top) / Math.max(rect.height, 1)) * viewBox.height,
+        x: viewBox.x + (clientX - rect.left - offsetX) / Math.max(scale, 0.01),
+        y: viewBox.y + (clientY - rect.top - offsetY) / Math.max(scale, 0.01),
+    };
+}
+
+function createInitialMapPreviewViewBox(
+    canvas: MapEditorCanvas,
+    size: ElementSize,
+): MapShapeEditorViewBox {
+    if (size.width <= 0 || size.height <= 0) {
+        return createInitialMapShapeEditorViewBox(canvas);
+    }
+
+    const scale = Math.min(
+        size.width / Math.max(canvas.width, 1),
+        size.height / Math.max(canvas.height, 1),
+    );
+    const width = size.width / Math.max(scale, 0.01);
+    const height = size.height / Math.max(scale, 0.01);
+
+    return {
+        x: (canvas.width - width) / 2,
+        y: (canvas.height - height) / 2,
+        width,
+        height,
     };
 }
 
@@ -781,12 +813,15 @@ function buildViewportTransform(
     size: ElementSize,
     syncViewBox?: MapShapeEditorViewBox,
 ): PixiViewportTransform {
-    const viewBox = syncViewBox ?? createInitialMapShapeEditorViewBox(canvas);
-    const scale = size.width / Math.max(viewBox.width, 1);
+    const viewBox = syncViewBox ?? createInitialMapPreviewViewBox(canvas, size);
+    const scale = Math.min(
+        size.width / Math.max(viewBox.width, 1),
+        size.height / Math.max(viewBox.height, 1),
+    );
 
     return {
-        x: -viewBox.x * scale,
-        y: -viewBox.y * scale,
+        x: (size.width - viewBox.width * scale) / 2 - viewBox.x * scale,
+        y: (size.height - viewBox.height * scale) / 2 - viewBox.y * scale,
         scale,
     };
 }
@@ -1059,14 +1094,28 @@ function computeSceneVisualBounds(scene: MapPreviewScene): PixiShapeBounds {
 function clampMapPreviewViewBox(
     viewBox: MapShapeEditorViewBox,
     scene: MapPreviewScene,
+    size: ElementSize,
 ): MapShapeEditorViewBox {
-    const sizeClampedViewBox = clampMapShapeEditorViewBox({
-        ...viewBox,
-        x: 0,
-        y: 0,
-    }, scene.canvas);
-    const width = sizeClampedViewBox.width;
-    const height = sizeClampedViewBox.height;
+    const viewportAspect = size.width > 0 && size.height > 0
+        ? size.height / size.width
+        : scene.canvas.height / Math.max(scene.canvas.width, 1);
+    let width = clamp(
+        viewBox.width,
+        scene.canvas.width * PREVIEW_MIN_VIEWBOX_SCALE,
+        scene.canvas.width * PREVIEW_MAX_VIEWBOX_SCALE,
+    );
+    let height = width * viewportAspect;
+    const minHeight = scene.canvas.height * PREVIEW_MIN_VIEWBOX_SCALE;
+    const maxHeight = scene.canvas.height * PREVIEW_MAX_VIEWBOX_SCALE;
+
+    if (height < minHeight) {
+        height = minHeight;
+        width = height / Math.max(viewportAspect, 0.01);
+    } else if (height > maxHeight) {
+        height = maxHeight;
+        width = height / Math.max(viewportAspect, 0.01);
+    }
+
     const padding = Math.max(
         Math.max(width, height) * PREVIEW_VIEWBOX_PADDING_RATIO,
         PREVIEW_VIEWBOX_MIN_PADDING,
@@ -1981,7 +2030,7 @@ export function MapPixiPreview({
     const resolvedLabelFontFamily = labelStyle?.fontFamily ?? labelFontFamily;
     const resolvedLabelFontWeight = labelStyle?.fontWeight ?? '600';
     const effectiveSyncViewBox = syncViewBox ?? (shouldUseInteractiveViewBox && scene
-        ? interactiveViewBox ?? createInitialMapShapeEditorViewBox(scene.canvas)
+        ? interactiveViewBox ?? createInitialMapPreviewViewBox(scene.canvas, size)
         : undefined);
     const transform = useMemo(() => (
         scene && hasRenderableSize
@@ -2076,10 +2125,10 @@ export function MapPixiPreview({
 
         setInteractiveViewBox(currentViewBox => (
             currentViewBox
-                ? clampMapPreviewViewBox(currentViewBox, scene)
-                : createInitialMapShapeEditorViewBox(scene.canvas)
+                ? clampMapPreviewViewBox(currentViewBox, scene, size)
+                : createInitialMapPreviewViewBox(scene.canvas, size)
         ));
-    }, [panZoomEnabled, scene, syncViewBox]);
+    }, [panZoomEnabled, scene, size, syncViewBox]);
 
     useEffect(() => {
         if (interactiveViewBox && onPreviewViewBoxChange) {
@@ -2112,7 +2161,7 @@ export function MapPixiPreview({
                 ...panState.originViewBox,
                 x: panState.originViewBox.x - (deltaClientX / rect.width) * panState.originViewBox.width,
                 y: panState.originViewBox.y - (deltaClientY / rect.height) * panState.originViewBox.height,
-            }, scene));
+            }, scene, size));
             setPanState(currentState => (currentState ? {
                 ...currentState,
                 hasMoved: currentState.hasMoved || moved,
@@ -2139,7 +2188,7 @@ export function MapPixiPreview({
             window.removeEventListener('pointerup', handlePointerUp);
             window.removeEventListener('pointercancel', handlePointerUp);
         };
-    }, [elementRef, interactiveViewBox, panState, scene]);
+    }, [elementRef, interactiveViewBox, panState, scene, size]);
 
     useEffect(() => {
         const node = elementRef.current;
@@ -2148,7 +2197,7 @@ export function MapPixiPreview({
         }
 
         const handleWheel = (event: WheelEvent) => {
-            const currentViewBox = interactiveViewBox ?? createInitialMapShapeEditorViewBox(scene.canvas);
+            const currentViewBox = interactiveViewBox ?? createInitialMapPreviewViewBox(scene.canvas, size);
             const rect = node.getBoundingClientRect();
             if (rect.width <= 0 || rect.height <= 0) return;
 
@@ -2167,14 +2216,14 @@ export function MapPixiPreview({
                 height: nextHeight,
                 x: pointer.x - (pointer.x - currentViewBox.x) * widthRatio,
                 y: pointer.y - (pointer.y - currentViewBox.y) * heightRatio,
-            }, scene));
+            }, scene, size));
         };
 
         node.addEventListener('wheel', handleWheel, {passive: false});
         return () => {
             node.removeEventListener('wheel', handleWheel);
         };
-    }, [elementRef, interactiveViewBox, scene, shouldUseInteractiveViewBox]);
+    }, [elementRef, interactiveViewBox, scene, shouldUseInteractiveViewBox, size]);
     const resolveTooltip = useCallback((detail: MapPreviewPickDetail) => {
         if (!getTooltip) {
             return getDefaultTooltip(detail);
@@ -2250,7 +2299,7 @@ export function MapPixiPreview({
             return;
         }
 
-        const currentViewBox = interactiveViewBox ?? createInitialMapShapeEditorViewBox(scene.canvas);
+        const currentViewBox = interactiveViewBox ?? createInitialMapPreviewViewBox(scene.canvas, size);
         event.preventDefault();
         setTooltipState(null);
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -2261,7 +2310,7 @@ export function MapPixiPreview({
             originViewBox: currentViewBox,
             hasMoved: false,
         });
-    }, [interactiveViewBox, scene, shouldUseInteractiveViewBox]);
+    }, [interactiveViewBox, scene, shouldUseInteractiveViewBox, size]);
     const handleContextLost = useCallback(() => {
         setContextLost(true);
         setTooltipState(null);

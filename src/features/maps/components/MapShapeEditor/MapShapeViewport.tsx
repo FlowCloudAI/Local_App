@@ -125,7 +125,8 @@ export function MapShapeViewport({
             style={{
                 position: 'relative',
                 width: '100%',
-                aspectRatio: `${canvas.width} / ${canvas.height}`,
+                height: '100%',
+                minHeight: 0,
                 overflow: 'hidden',
                 ...style,
             }}
