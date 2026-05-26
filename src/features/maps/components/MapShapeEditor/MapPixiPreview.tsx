@@ -2017,6 +2017,8 @@ export function MapPixiPreview({
     const pickingEnabled = enablePicking;
     const shouldUseInteractiveViewBox = Boolean(panZoomEnabled && !syncViewBox && scene);
     const pixiResolution = getPixiResolution();
+    const pixiRenderWidth = Math.max(1, size.width);
+    const pixiRenderHeight = Math.max(1, size.height);
     const resolvedPolygonLineWidth = shapeStyle?.lineWidth ?? polygonLineWidth;
     const resolvedKeyLocationRadius = keyLocationStyle?.radius ?? keyLocationRadius;
     const resolvedKeyLocationStrokeColor = keyLocationStyle?.showStroke === false
@@ -2350,6 +2352,8 @@ export function MapPixiPreview({
             {scene && shouldMountApplication && (
                 <Application
                     resizeTo={elementRef}
+                    width={pixiRenderWidth}
+                    height={pixiRenderHeight}
                     preference="webgl"
                     backgroundAlpha={0}
                     antialias
