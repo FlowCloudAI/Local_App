@@ -183,6 +183,13 @@ interface MapPixiApplicationGuardProps {
     onContextRestored: () => void;
 }
 
+type MapPixiApplicationLike = {
+    canvas?: HTMLCanvasElement | null;
+    renderer?: {
+        canvas?: HTMLCanvasElement | null;
+    };
+};
+
 /** @deprecated 使用 {@link MapKeyLocationRenderMode}。 */
 export type MapPixiKeyLocationRenderMode = MapKeyLocationRenderMode;
 
@@ -1580,17 +1587,13 @@ function MapPixiScene({
 }
 
 function MapPixiApplicationGuard({
-                                     onContextLost,
-                                     onContextRestored,
-                                 }: MapPixiApplicationGuardProps) {
-    const {app} = useApplication();
+                                      onContextLost,
+                                      onContextRestored,
+                                  }: MapPixiApplicationGuardProps) {
+    const {app} = useApplication() as { app?: MapPixiApplicationLike | null };
 
     useEffect(() => {
-        if (!app) {
-            return undefined;
-        }
-
-        const canvas = app.canvas as HTMLCanvasElement | null;
+        const canvas = app?.canvas ?? app?.renderer?.canvas ?? null;
         if (!canvas || typeof canvas.addEventListener !== 'function') {
             return undefined;
         }
