@@ -1082,12 +1082,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                                 恢复默认
                                             </button>
                                         </div>
-                                        <RollingBox axis="y"
+                                        <div
                                             className="wm-coastline-fields"
-                                            thumbSize="thin"
-                                            interceptWheel={(event) => {
+                                            onWheel={(event) => {
                                                 event.stopPropagation()
-                                                return false
                                             }}
                                         >
                                         <div className="wm-field">
@@ -1201,7 +1199,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                                 权重控制大中小三个尺度的纹理占比。
                                             </div>
                                         </div>
-                                        </RollingBox>
+                                        </div>
                                     </div>
                                 </>
                             )}
