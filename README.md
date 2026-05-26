@@ -1,17 +1,16 @@
-# 流云AI（FlowCloudAI）
+# 流云 AI 桌面端（app_main）
 
-流云AI 是面向创作工作流的本地优先桌面应用，整合了项目管理、词条体系、关系图、地图、快照和 AI 会话能力，目标是把文本创作到 AI
-辅助的关键步骤放在一个入口内完成。  
-应用基于本地 SQLite 与 Tauri 沙箱模型运行，插件化 AI 通过 `.fcplug` 扩展。
+`app_main` 是 FlowCloudAI 的 Tauri 桌面应用主入口，聚焦世界观创作与 AI 协作流程。  
+应用内整合项目管理、词条关系、时间线/地图、快照和插件生命周期。
 
 ## 项目简介（1-3 句）
 
-`app_main` 以 `projects -> entries -> relations -> timeline/map -> ai-chat -> snapshots` 的链路组织创作流程。  
-桌面端前端由 React 提供交互层，核心事件通过 Rust 后端封装为稳定命令与事件流。
+该应用将创作流程从“项目建立”到“词条编辑/关系维护/地图校验/AI 对话”统一到同一窗口。  
+后端 Rust 提供 `flowcloudai_client` 与 `core_world_data` 能力，前端通过 `src/api` 消费命令与事件。
 
 ## 快速开始
 
-### 安装与运行
+### 安装与启动
 
 ```bash
 cd app_main
@@ -19,65 +18,75 @@ npm install
 npm run tauri -- dev
 ```
 
-### 前端单独调试（仅资源验证）
+### 开发验证
+
+```bash
+cd app_main
+npm run lint
+npm run build
+cd src-tauri
+cargo test
+```
+
+### 前端资源单独调试（仅资源验证）
 
 ```bash
 cd app_main
 npm run dev
 ```
 
-### 仅构建
-
-```bash
-cd app_main
-npm run build
-```
-
-### 最小验证示例
-
-1. 启动应用后创建一个新项目；
-2. 在项目内新增一个词条并建立一条关系；
-3. 打开快照并确认可恢复回退。
-
 ## 主要功能 / 使用方式
 
-- 项目与词条：分类、标签、类型、关系与批量编辑。
-- 可视化：关系图、时间线、地图与快照回溯。
-- AI 协作：LLM 对话、工具调用、推理片段与会话分支。
-- 插件能力：本地 `.fcplug` 管理、安装卸载、引用计数保护。
-- 数据导出与恢复：本地会话与数据可回退。
+- 项目管理：创建/编辑项目、版本化词条与关系。  
+- 关系图与地图：图谱布局与地图编辑，支持导出与恢复。  
+- AI 会话：支持多模型会话、工具调用、流式事件与状态面板。  
+- 插件市场与安全策略：插件安装、更新、签名与引用校验。  
+- 反馈与快照：本地快照、恢复与导出回放。  
 
 ## 技术栈
 
-- 前端：TypeScript 5.9、React 19、Vite 6
-- 桌面：Tauri 2、Rust 2024、Tokio
-- 数据：SQLite（本地）
-- UI：`flowcloudai-ui`
-- AI 与插件：`flowcloudai_client`、`.fcplug`
+- 前端：TypeScript 5.9、React 19、Vite 6、React Router、`flowcloudai-ui`。  
+- 桌面：Tauri 2、Rust 2024。  
+- 数据与服务：本地 `SQLite`（Rust side）与 `core_world_data`、`core_ai_client`。
 
 ## 目录结构（顶层）
 
 ```text
 app_main/
 ├── src/
-│   ├── api/                 # API 封装
-│   ├── app/                 # 桌面与移动外壳
-│   ├── features/            # 业务域
-│   ├── i18n/                # 国际化资源
-│   ├── pages/               # 页面级组件
-│   ├── shared/              # 公共组件与 hooks
+│   ├── api/                  # Tauri API 封装
+│   ├── app/                  # 壳层与页面路由
+│   ├── features/             # 各业务模块
+│   ├── i18n/                 # 国际化
+│   ├── pages/                # 页面级组件
+│   ├── shared/               # 共享组件与工具
 │   ├── App.css
 │   └── main.tsx
-├── src-tauri/               # Rust 后端与命令
-└── package.json
+└── src-tauri/
+    ├── src/
+    │   ├── apis/
+    │   ├── ai_services/
+    │   ├── layout/
+    │   ├── map/
+    │   ├── senses/
+    │   ├── tools/
+    │   ├── reports/
+    │   ├── auto_backup.rs
+    │   ├── state.rs
+    │   ├── settings.rs
+    │   ├── template.rs
+    │   ├── lib.rs
+    │   ├── api_error.rs
+    │   └── main.rs
+    └── tauri.conf.json
 ```
 
 ## 许可证
 
-仓库未在根级给出独立 LICENSE，当前以子项目/仓库声明为准。
+本目录未单独声明完整 LICENSE，按仓库主策略执行。
 
 ## 贡献方式
 
-- 修改前阅读 `docs/前端风格指南.md`。
-- 常用检查：`npm run lint`、`npm run build`、`cd src-tauri && cargo test`。
-- PR 说明中写明影响页面、命令链路与未覆盖场景。
+- 修改前先阅读本仓库与模块 `AGENTS.md`。  
+- AI 功能或启动流程变更需补充重现步骤与 `backend-ready` 验证。  
+- 提交前执行至少一次 `npm run lint`、`npm run build`、`cd src-tauri && cargo test`。

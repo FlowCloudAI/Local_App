@@ -10,16 +10,16 @@
 !macro NSIS_HOOK_POSTINSTALL
   ; 为自定义文件类型设置资源管理器图标。
   ; Tauri 负责注册扩展名和打开方式，这里只补充 DefaultIcon。
-  WriteRegStr SHCTX "Software\Classes\.fcplug\DefaultIcon" "" "$INSTDIR\resources\icons\fcplug.ico,0"
+  WriteRegStr SHCTX "Software\Classes\.fcplug\DefaultIcon" "" "$INSTDIR\icons\fcplug.ico,0"
   ReadRegStr $0 SHCTX "Software\Classes\.fcplug" ""
   StrCmp $0 "" fcplug_icon_done 0
-  WriteRegStr SHCTX "Software\Classes\$0\DefaultIcon" "" "$INSTDIR\resources\icons\fcplug.ico,0"
+  WriteRegStr SHCTX "Software\Classes\$0\DefaultIcon" "" "$INSTDIR\icons\fcplug.ico,0"
 fcplug_icon_done:
 
-  WriteRegStr SHCTX "Software\Classes\.fcworld\DefaultIcon" "" "$INSTDIR\resources\icons\fcworld.ico,0"
+  WriteRegStr SHCTX "Software\Classes\.fcworld\DefaultIcon" "" "$INSTDIR\icons\fcworld.ico,0"
   ReadRegStr $0 SHCTX "Software\Classes\.fcworld" ""
   StrCmp $0 "" fcworld_icon_done 0
-  WriteRegStr SHCTX "Software\Classes\$0\DefaultIcon" "" "$INSTDIR\resources\icons\fcworld.ico,0"
+  WriteRegStr SHCTX "Software\Classes\$0\DefaultIcon" "" "$INSTDIR\icons\fcworld.ico,0"
 fcworld_icon_done:
 
   ; 通知资源管理器刷新文件类型图标缓存。
