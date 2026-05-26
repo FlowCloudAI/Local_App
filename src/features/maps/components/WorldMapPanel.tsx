@@ -9,6 +9,9 @@ import {
     createEmptyShapeDraft,
     createInitialMapShapeEditorViewBox,
     createMapShapeEditorLocalId,
+    type MapShapeSvgEditorLocationContextMenuDetail,
+    type MapShapeSvgEditorShapeContextMenuDetail,
+    type MapShapeSvgEditorVertexContextMenuDetail,
     type MapEditorCanvas,
     type MapKeyLocationDraft,
     type MapPreviewScene,
@@ -18,6 +21,7 @@ import {
     type MapShapeEditorDraft,
     MapShapeViewport,
     type MapShapeViewportRenderer,
+    moveShapeInOrder,
     validateMapEditorDraft,
 } from './MapShapeEditor'
 import * as deckStyleApi from '../styles/deck/presets'
@@ -230,7 +234,7 @@ function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
 
 export default function WorldMapPanel({projectId, projectName, onBack, onOpenEntry}: WorldMapPanelProps) {
     const {showAlert} = useAlert()
-    useContextMenu()
+    const {showContextMenu} = useContextMenu()
     const imageInputRef = useRef<HTMLInputElement>(null)
 
     // ── 地图列表状态 ────────────────────────────────────────────────────────
@@ -574,6 +578,15 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         setMaps(prev => prev.map(m => m.id === activeMapId ? {...m, name} : m))
     }, [activeMapId])
 
+    const deleteVertex = useCallback((shapeId: string, vertexId: string) => {
+        updateDraft(d => ({
+            ...d,
+            shapes: d.shapes.map(s =>
+                s.id === shapeId ? {...s, vertices: s.vertices.filter(v => v.id !== vertexId)} : s,
+            ),
+        }))
+    }, [updateDraft])
+
     const requestDeleteShape = useCallback(async (shapeId: string) => {
         const target = draft.shapes.find(shape => shape.id === shapeId)
         const confirmed = await showAlert(
@@ -603,6 +616,66 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         setSelectedLocationId(id => (id === locationId ? null : id))
     }, [draft.keyLocations, showAlert, updateDraft])
 
+    const moveShapeToIndex = useCallback((shapeId: string, targetIndex: number) => {
+        updateDraft(current => ({
+            ...current,
+            shapes: moveShapeInOrder(current.shapes, shapeId, targetIndex),
+        }))
+        setSelectedShapeId(shapeId)
+        setSelectedLocationId(null)
+    }, [updateDraft])
+
+    const handleShapeContextMenu = useCallback((detail: MapShapeSvgEditorShapeContextMenuDetail) => {
+        showContextMenu(detail.nativeEvent, [
+            {
+                label: '上移一层',
+                disabled: detail.isAtFront,
+                onClick: () => moveShapeToIndex(detail.shapeId, detail.shapeIndex + 1),
+            },
+            {
+                label: '下移一层',
+                disabled: detail.isAtBack,
+                onClick: () => moveShapeToIndex(detail.shapeId, detail.shapeIndex - 1),
+            },
+            {
+                label: '移到顶层',
+                disabled: detail.isAtFront,
+                onClick: () => moveShapeToIndex(detail.shapeId, detail.shapeCount - 1),
+            },
+            {
+                label: '移到底层',
+                disabled: detail.isAtBack,
+                onClick: () => moveShapeToIndex(detail.shapeId, 0),
+            },
+            {type: 'divider'},
+            {
+                label: '删除图形',
+                danger: true,
+                onClick: () => void requestDeleteShape(detail.shapeId),
+            },
+        ])
+    }, [moveShapeToIndex, requestDeleteShape, showContextMenu])
+
+    const handleVertexContextMenu = useCallback((detail: MapShapeSvgEditorVertexContextMenuDetail) => {
+        showContextMenu(detail.nativeEvent, [
+            {
+                label: '删除顶点',
+                danger: true,
+                onClick: () => deleteVertex(detail.shapeId, detail.vertexId),
+            },
+        ])
+    }, [deleteVertex, showContextMenu])
+
+    const handleLocationContextMenu = useCallback((detail: MapShapeSvgEditorLocationContextMenuDetail) => {
+        showContextMenu(detail.nativeEvent, [
+            {
+                label: '删除地点',
+                danger: true,
+                onClick: () => void requestDeleteLocation(detail.locationId),
+            },
+        ])
+    }, [requestDeleteLocation, showContextMenu])
+
     // ── 生成海岸线 ────────────────────────────────────────────────────
 
     const handleGenerate = useCallback(async () => {
@@ -624,6 +697,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             }, coastlineParams)
             setScene(response.scene)
             setSceneDirty(false)
+            setViewportMode('preview')
+            setSelectedShapeId(null)
+            setSelectedLocationId(null)
+            setDrawingShape(null)
         } catch (e) {
             setErrorMsg(`生成海岸线失败：${e instanceof Error ? e.message : String(e)}`)
         } finally {
@@ -640,6 +717,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         }
         setScene(buildPreviewSceneFromDraft({canvas: activeCanvas, shapes: draft.shapes, keyLocations: draft.keyLocations}))
         setSceneDirty(false)
+        setViewportMode('preview')
+        setSelectedShapeId(null)
+        setSelectedLocationId(null)
+        setDrawingShape(null)
     }, [activeCanvas, draft])
 
     // ── 底图上传 ───────────────────────────────────────────────────────────────
@@ -662,15 +743,6 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     }, [])
 
     // ── 图形编辑辅助 ─────────────────────────────────────────────────
-
-    const deleteVertex = useCallback((shapeId: string, vertexId: string) => {
-        updateDraft(d => ({
-            ...d,
-            shapes: d.shapes.map(s =>
-                s.id === shapeId ? {...s, vertices: s.vertices.filter(v => v.id !== vertexId)} : s,
-            ),
-        }))
-    }, [updateDraft])
 
     const updateSelectedShape = useCallback((field: 'name' | 'fill' | 'stroke', value: string) => {
         updateDraft(d => ({
@@ -944,7 +1016,10 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         onRequestShapeDelete: requestDeleteShape,
         onRequestVertexDelete: deleteVertex,
         onRequestLocationDelete: requestDeleteLocation,
-    }), [draft, selectedShapeId, selectedLocationId, drawingShape, requestDeleteShape, deleteVertex, requestDeleteLocation, updateDraft])
+        onShapeContextMenu: handleShapeContextMenu,
+        onVertexContextMenu: handleVertexContextMenu,
+        onLocationContextMenu: handleLocationContextMenu,
+    }), [draft, selectedShapeId, selectedLocationId, drawingShape, requestDeleteShape, deleteVertex, requestDeleteLocation, handleShapeContextMenu, handleVertexContextMenu, handleLocationContextMenu, updateDraft])
 
     // ── 派生数据 ───────────────────────────────────────────────────────────────
 

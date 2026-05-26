@@ -368,13 +368,17 @@ export function MapShapeSvgEditor({
         shape: MapShapeDraft,
     ) => {
         if (readOnly) return;
-        if (selectedShapeId !== shape.id) return;
-
         const svgElement = svgRef.current;
         if (!svgElement) return;
 
         event.preventDefault();
         event.stopPropagation();
+
+        if (selectedShapeId !== shape.id) {
+            onSelectedShapeChange(shape.id);
+            onSelectedLocationChange(null);
+            return;
+        }
 
         setPendingPointerState({
             kind: 'shape',
