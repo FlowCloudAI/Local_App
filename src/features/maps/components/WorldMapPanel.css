@@ -261,6 +261,27 @@
     gap: 10px;
 }
 
+.wm-utility-dialog {
+    width: min(420px, 100%);
+    max-height: min(720px, calc(100% - 48px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 8px;
+    border: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+}
+
+.wm-utility-dialog--wide {
+    width: min(560px, 100%);
+}
+
+.wm-utility-dialog .wm-coastline-fields {
+    max-height: min(520px, 58vh);
+}
+
 .wm-segmented {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -539,27 +560,6 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-}
-
-.wm-details {
-    border: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg);
-    padding: 8px;
-}
-
-.wm-details summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    cursor: pointer;
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: 600;
-}
-
-.wm-details[open] summary {
-    margin-bottom: 8px;
 }
 
 .wm-coastline-fields {
