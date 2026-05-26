@@ -174,12 +174,12 @@ const VIEWPORT_CULLING_PADDING_PIXELS = 128;
 const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
 const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
 const PIXI_POLYGON_LOD_LEVELS: PixiLodLevel[] = ['overview', 'low', 'medium', 'high', 'original'];
-const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { tolerance: number; minPointCount: number }> = {
-    overview: {tolerance: 6, minPointCount: 80},
-    low: {tolerance: 2.8, minPointCount: 1400},
-    medium: {tolerance: 1.6, minPointCount: 3000},
-    high: {tolerance: 0.95, minPointCount: 5600},
-    original: {tolerance: 0, minPointCount: 0},
+const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { targetRatio: number; minPointCount: number }> = {
+    overview: {targetRatio: 0.075, minPointCount: 80},
+    low: {targetRatio: 0.25, minPointCount: 240},
+    medium: {targetRatio: 0.5, minPointCount: 480},
+    high: {targetRatio: 0.82, minPointCount: 960},
+    original: {targetRatio: 1, minPointCount: 0},
 };
 
 interface MapPixiApplicationGuardProps {
@@ -912,7 +912,6 @@ function samplePolygonEvenly(polygon: [number, number][], targetPointCount: numb
 function simplifyPolygonDouglasPeucker(
     polygon: [number, number][],
     tolerance: number,
-    minPointCount: number,
 ): [number, number][] {
     if (polygon.length <= 3 || tolerance <= 0) {
         return polygon;
@@ -937,11 +936,58 @@ function simplifyPolygonDouglasPeucker(
         return polygon.slice(0, 3);
     }
 
-    if (minPointCount > 0 && simplified.length < Math.min(polygon.length, minPointCount)) {
-        return samplePolygonEvenly(polygon, minPointCount);
+    return simplified;
+}
+
+function getTargetLodPointCount(
+    polygon: [number, number][],
+    targetRatio: number,
+    minPointCount: number,
+): number {
+    const ratioTarget = Math.round(polygon.length * targetRatio);
+    return Math.min(polygon.length, Math.max(3, minPointCount, ratioTarget));
+}
+
+function simplifyPolygonToTargetPointCount(
+    polygon: [number, number][],
+    targetPointCount: number,
+): [number, number][] {
+    if (polygon.length <= targetPointCount) {
+        return polygon;
     }
 
-    return simplified;
+    let upperTolerance = 1;
+    let upperResult = simplifyPolygonDouglasPeucker(polygon, upperTolerance);
+    while (upperResult.length > targetPointCount && upperTolerance < 1024) {
+        upperTolerance *= 2;
+        upperResult = simplifyPolygonDouglasPeucker(polygon, upperTolerance);
+    }
+
+    let lowerTolerance = 0;
+    let bestResult = upperResult;
+    let bestDistance = Math.abs(upperResult.length - targetPointCount);
+
+    for (let iteration = 0; iteration < 10; iteration += 1) {
+        const tolerance = (lowerTolerance + upperTolerance) / 2;
+        const result = simplifyPolygonDouglasPeucker(polygon, tolerance);
+        const distance = Math.abs(result.length - targetPointCount);
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            bestResult = result;
+        }
+
+        if (result.length > targetPointCount) {
+            lowerTolerance = tolerance;
+        } else {
+            upperTolerance = tolerance;
+        }
+    }
+
+    if (bestResult.length < 3) {
+        return samplePolygonEvenly(polygon, targetPointCount);
+    }
+
+    return bestResult;
 }
 
 function computePolygonBounds(polygon: [number, number][]): PixiShapeBounds {
@@ -1077,7 +1123,10 @@ function buildPixiShapeLods(polygon: [number, number][], flatPolygon: number[]):
         const config = PIXI_POLYGON_LOD_CONFIG[lodLevel];
         lods[lodLevel] = lodLevel === 'original'
             ? flatPolygon
-            : flattenPolygon(simplifyPolygonDouglasPeucker(polygon, config.tolerance, config.minPointCount));
+            : flattenPolygon(simplifyPolygonToTargetPointCount(
+                polygon,
+                getTargetLodPointCount(polygon, config.targetRatio, config.minPointCount),
+            ));
     }
 
     return lods;
