@@ -664,6 +664,7 @@ export function MapShapeSvgEditor({
                     ref={svgRef}
                     className={`fc-map-shape-editor__canvas${panState ? ' fc-map-shape-editor__canvas--panning' : ''}`}
                     viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+                    preserveAspectRatio="xMidYMid meet"
                     role="img"
                     aria-label="地图轮廓 SVG 编辑器"
                     onClick={handleCanvasClick}
