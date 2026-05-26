@@ -149,7 +149,7 @@ export default function EntryEditorMetaPanel({
                 </div>
             </div>
 
-            <div className="entry-editor-meta-panel">
+            <div className="entry-editor-meta-panel entry-editor-meta-panel--primary">
                 <div className="entry-editor-meta-panel__section">
                     <label className="entry-editor-field-label">
                         标题
@@ -217,6 +217,9 @@ export default function EntryEditorMetaPanel({
                     )}
                 </div>
 
+            </div>
+
+            <div className="entry-editor-meta-panel entry-editor-meta-panel--secondary">
                 {isBrowseMode && isCharacterEntry && onStartCharacterChat && (
                     <div className="entry-editor-meta-panel__section">
                         <div className="entry-editor-field-label-row">
