@@ -11,6 +11,7 @@ import {
     createMapShapeEditorLocalId,
     type MapKeyLocationDraft,
     type MapPreviewScene,
+    type MapPixiPerfStats,
     type MapShapeDraft,
     type MapShapeEditorDraft,
     MapShapeViewport,
@@ -35,6 +36,39 @@ import {compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
 
 function mapLog(msg: string) {
     void log_message('info', `[WorldMap] ${msg}`)
+}
+
+function isPixiPerfDebugEnabled(): boolean {
+    if (typeof window === 'undefined') {
+        return import.meta.env.DEV
+    }
+
+    try {
+        const params = new URLSearchParams(window.location.search)
+        const queryValue = params.get('pixiPerf')
+        if (queryValue === '1' || queryValue === 'true') {
+            return true
+        }
+        if (queryValue === '0' || queryValue === 'false') {
+            return false
+        }
+
+        const storedValue = window.localStorage.getItem('fc:pixiPerf')
+        if (storedValue === '1' || storedValue === 'true') {
+            return true
+        }
+        if (storedValue === '0' || storedValue === 'false') {
+            return false
+        }
+    } catch {
+        return import.meta.env.DEV
+    }
+
+    return import.meta.env.DEV
+}
+
+function logPixiPerfStats(stats: MapPixiPerfStats) {
+    console.info('[WorldMap PixiPerf]', stats)
 }
 
 // ── 常量 ─────────────────────────────────────────────────────────────────
@@ -711,17 +745,30 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined
     const viewportKeyLocationStyle = previewRenderer === 'pixi' ? compiledPixiStyle.keyLocationStyle : undefined
     const viewportLabelStyle = previewRenderer === 'pixi' ? compiledPixiStyle.labelStyle : undefined
+    const pixiPerfDebugEnabled = useMemo(() => isPixiPerfDebugEnabled(), [])
 
     // DEBUG：包装 renderOverlay 以追踪 MapShapeViewport 是否实际调用了它
     const wrappedPixiProps = useMemo(() => {
-        if (!pixiProps.renderOverlay) {
+        const originalOnPerfStats = pixiProps.onPerfStats
+        const basePixiProps = pixiPerfDebugEnabled
+            ? {
+                ...pixiProps,
+                debugPerf: true,
+                onPerfStats: (stats: MapPixiPerfStats) => {
+                    originalOnPerfStats?.(stats)
+                    logPixiPerfStats(stats)
+                },
+            }
+            : pixiProps
+
+        if (!basePixiProps.renderOverlay) {
             mapLog('wrapRenderOverlay: no renderOverlay to wrap')
-            return pixiProps
+            return basePixiProps
         }
-        const original = pixiProps.renderOverlay
+        const original = basePixiProps.renderOverlay
         mapLog('wrapRenderOverlay: wrapping renderOverlay')
         return {
-            ...pixiProps,
+            ...basePixiProps,
             renderOverlay: (ctx: Parameters<typeof original>[0]) => {
                 mapLog('wrapRenderOverlay: CALLED')
                 const result = original(ctx)
@@ -729,7 +776,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                 return result
             }
         }
-    }, [pixiProps])
+    }, [pixiProps, pixiPerfDebugEnabled])
 
     const viewportRenderKey = `${previewRenderer}-${viewportMode}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
