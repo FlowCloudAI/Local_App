@@ -122,7 +122,7 @@ interface PixiPerfAccumulator {
     pointerMoveCount: number;
 }
 
-export type MapPixiLodLevel = 'low' | 'medium' | 'high';
+export type MapPixiLodLevel = 'overview' | 'low' | 'medium' | 'high' | 'original';
 export type MapPixiLodSetting = 'auto' | MapPixiLodLevel;
 type PixiLodLevel = MapPixiLodLevel;
 
@@ -154,11 +154,7 @@ interface PixiShapeBounds {
 interface CompiledPixiShape {
     source: MapPreviewShape;
     flatPolygon: number[];
-    lod: {
-        low: number[];
-        medium: number[];
-        high: number[];
-    };
+    lod: Record<PixiLodLevel, number[]>;
     bbox: PixiShapeBounds;
     pointCount: number;
     fillColor: number;
@@ -177,8 +173,14 @@ interface PixiViewportCullBucket {
 const VIEWPORT_CULLING_PADDING_PIXELS = 128;
 const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
 const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
-const PIXI_POLYGON_LOD_MEDIUM_TOLERANCE = 3;
-const PIXI_POLYGON_LOD_LOW_TOLERANCE = 8;
+const PIXI_POLYGON_LOD_LEVELS: PixiLodLevel[] = ['overview', 'low', 'medium', 'high', 'original'];
+const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { tolerance: number; minPointCount: number }> = {
+    overview: {tolerance: 18, minPointCount: 12},
+    low: {tolerance: 10, minPointCount: 24},
+    medium: {tolerance: 5, minPointCount: 48},
+    high: {tolerance: 2, minPointCount: 96},
+    original: {tolerance: 0, minPointCount: 0},
+};
 
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
@@ -520,7 +522,7 @@ function usePixiPerfRecorder({
         visibleShapeCount: scene?.shapes.length ?? 0,
         visibleVertexCount: vertexCount,
         lodVertexCount: vertexCount,
-        lodLevel: 'high',
+        lodLevel: 'original',
         scale,
     });
 
@@ -836,28 +838,107 @@ function getSquaredDistance(a: [number, number], b: [number, number]): number {
     return dx * dx + dy * dy;
 }
 
-function simplifyPolygonByDistance(
+function getSquaredDistanceToSegment(
+    point: [number, number],
+    start: [number, number],
+    end: [number, number],
+): number {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+
+    if (dx === 0 && dy === 0) {
+        return getSquaredDistance(point, start);
+    }
+
+    const t = Math.max(0, Math.min(1, ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (dx * dx + dy * dy)));
+    const projection: [number, number] = [start[0] + t * dx, start[1] + t * dy];
+    return getSquaredDistance(point, projection);
+}
+
+function simplifyPolylineDouglasPeucker(
+    points: [number, number][],
+    toleranceSquared: number,
+): [number, number][] {
+    if (points.length <= 2) {
+        return points;
+    }
+
+    const keep = new Array<boolean>(points.length).fill(false);
+    keep[0] = true;
+    keep[points.length - 1] = true;
+
+    const stack: Array<[number, number]> = [[0, points.length - 1]];
+    while (stack.length > 0) {
+        const [startIndex, endIndex] = stack.pop()!;
+        let maxDistance = 0;
+        let maxIndex = -1;
+
+        for (let index = startIndex + 1; index < endIndex; index += 1) {
+            const distance = getSquaredDistanceToSegment(points[index], points[startIndex], points[endIndex]);
+            if (distance > maxDistance) {
+                maxDistance = distance;
+                maxIndex = index;
+            }
+        }
+
+        if (maxIndex >= 0 && maxDistance > toleranceSquared) {
+            keep[maxIndex] = true;
+            stack.push([startIndex, maxIndex], [maxIndex, endIndex]);
+        }
+    }
+
+    return points.filter((_, index) => keep[index]);
+}
+
+function samplePolygonEvenly(polygon: [number, number][], targetPointCount: number): [number, number][] {
+    const count = Math.min(polygon.length, targetPointCount);
+    if (polygon.length <= count) {
+        return polygon;
+    }
+
+    const sampled: [number, number][] = [];
+    let lastIndex = -1;
+    for (let index = 0; index < count; index += 1) {
+        const sourceIndex = Math.floor((index * polygon.length) / count);
+        if (sourceIndex !== lastIndex) {
+            sampled.push(polygon[sourceIndex]);
+            lastIndex = sourceIndex;
+        }
+    }
+
+    return sampled.length >= 3 ? sampled : polygon.slice(0, 3);
+}
+
+function simplifyPolygonDouglasPeucker(
     polygon: [number, number][],
     tolerance: number,
+    minPointCount: number,
 ): [number, number][] {
     if (polygon.length <= 3 || tolerance <= 0) {
         return polygon;
     }
 
-    const toleranceSquared = tolerance * tolerance;
-    const simplified: [number, number][] = [polygon[0]];
-    let lastAccepted = polygon[0];
-
+    let splitIndex = 1;
+    let maxDistance = 0;
     for (let index = 1; index < polygon.length; index += 1) {
-        const point = polygon[index];
-        if (getSquaredDistance(point, lastAccepted) >= toleranceSquared) {
-            simplified.push(point);
-            lastAccepted = point;
+        const distance = getSquaredDistance(polygon[0], polygon[index]);
+        if (distance > maxDistance) {
+            maxDistance = distance;
+            splitIndex = index;
         }
     }
 
+    const toleranceSquared = tolerance * tolerance;
+    const firstPath = simplifyPolylineDouglasPeucker(polygon.slice(0, splitIndex + 1), toleranceSquared);
+    const secondPath = simplifyPolylineDouglasPeucker([...polygon.slice(splitIndex), polygon[0]], toleranceSquared);
+    const simplified = firstPath.concat(secondPath.slice(1, -1));
+
     if (simplified.length < 3) {
         return polygon.slice(0, 3);
+    }
+
+    if (minPointCount > 0 && simplified.length < Math.min(polygon.length, minPointCount)) {
+        return samplePolygonEvenly(polygon, minPointCount);
     }
 
     return simplified;
@@ -962,16 +1043,57 @@ function findCompiledShapeAtPoint(
     return null;
 }
 
-function selectPixiShapeLodLevel(scale: number): PixiLodLevel {
-    if (scale < 0.5) {
+function computePixiLodZoomRatio(
+    scene: MapPreviewScene,
+    transform: PixiViewportTransform,
+    size: ElementSize,
+): number {
+    return (transform.scale * scene.canvas.width) / Math.max(size.width, 1);
+}
+
+function selectPixiShapeLodLevel(zoomRatio: number): PixiLodLevel {
+    if (zoomRatio <= 1.05) {
+        return 'overview';
+    }
+
+    if (zoomRatio <= 1.75) {
         return 'low';
     }
 
-    if (scale < 1.5) {
+    if (zoomRatio <= 3) {
         return 'medium';
     }
 
-    return 'high';
+    if (zoomRatio <= 6) {
+        return 'high';
+    }
+
+    return 'original';
+}
+
+function buildPixiShapeLods(polygon: [number, number][], flatPolygon: number[]): Record<PixiLodLevel, number[]> {
+    const lods = {} as Record<PixiLodLevel, number[]>;
+    for (const lodLevel of PIXI_POLYGON_LOD_LEVELS) {
+        const config = PIXI_POLYGON_LOD_CONFIG[lodLevel];
+        lods[lodLevel] = lodLevel === 'original'
+            ? flatPolygon
+            : flattenPolygon(simplifyPolygonDouglasPeucker(polygon, config.tolerance, config.minPointCount));
+    }
+
+    return lods;
+}
+
+function resolvePixiLodLevel(
+    lodLevel: MapPixiLodSetting,
+    scene: MapPreviewScene,
+    transform: PixiViewportTransform,
+    size: ElementSize,
+): PixiLodLevel {
+    if (lodLevel !== 'auto') {
+        return lodLevel;
+    }
+
+    return selectPixiShapeLodLevel(computePixiLodZoomRatio(scene, transform, size));
 }
 
 function countLodVertices(shapes: CompiledPixiShape[], lodLevel: PixiLodLevel): number {
@@ -984,17 +1106,11 @@ function getPixiShapeLodPolygon(shape: CompiledPixiShape, lodLevel: PixiLodLevel
 
 function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
     const flatPolygon = flattenPolygon(shape.polygon);
-    const mediumPolygon = simplifyPolygonByDistance(shape.polygon, PIXI_POLYGON_LOD_MEDIUM_TOLERANCE);
-    const lowPolygon = simplifyPolygonByDistance(shape.polygon, PIXI_POLYGON_LOD_LOW_TOLERANCE);
 
     return {
         source: shape,
         flatPolygon,
-        lod: {
-            low: flattenPolygon(lowPolygon),
-            medium: flattenPolygon(mediumPolygon),
-            high: flatPolygon,
-        },
+        lod: buildPixiShapeLods(shape.polygon, flatPolygon),
         bbox: computePolygonBounds(shape.polygon),
         pointCount: shape.polygon.length,
         fillColor: colorToHex(shape.fillColor),
@@ -1485,9 +1601,7 @@ function MapPixiScene({
     const visibleVertexCount = useMemo(() => (
         visibleShapes.reduce((total, shape) => total + shape.pointCount, 0)
     ), [visibleShapes]);
-    const resolvedLodLevel = lodLevel === 'auto'
-        ? selectPixiShapeLodLevel(transform.scale)
-        : lodLevel;
+    const resolvedLodLevel = resolvePixiLodLevel(lodLevel, scene, transform, size);
     const lodVertexCount = useMemo(() => (
         countLodVertices(visibleShapes, resolvedLodLevel)
     ), [resolvedLodLevel, visibleShapes]);

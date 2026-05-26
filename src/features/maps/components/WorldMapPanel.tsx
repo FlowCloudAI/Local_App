@@ -86,9 +86,11 @@ const MAP_STYLE_LABELS: Record<MapStyle, string> = {
 }
 const PIXI_LOD_LABELS: Record<MapPixiLodSetting, string> = {
     auto: '自动',
+    overview: '概览',
     low: '低',
     medium: '中',
     high: '高',
+    original: '原始',
 }
 
 const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
