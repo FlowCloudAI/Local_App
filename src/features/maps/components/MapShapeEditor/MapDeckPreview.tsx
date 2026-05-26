@@ -625,6 +625,7 @@ function clampDeckViewState(
 interface BuildLayersOptions {
     scene: MapPreviewScene;
     showLabels: boolean;
+    pickingEnabled: boolean;
     shapeStyle?: MapPreviewShapeStyle;
     polygonLayerProps?: Omit<PolygonLayerProps<MapPreviewShape>, 'id' | 'data' | 'getPolygon'>;
     keyLocationStyle?: MapPreviewKeyLocationStyle;
@@ -650,6 +651,11 @@ function mergeExtensions(userProps: {
     ];
 }
 
+function resolvePixelLineWidth(...values: Array<number | undefined>): number {
+    const value = values.find(item => typeof item === 'number' && Number.isFinite(item));
+    return Math.max(0, value ?? 2);
+}
+
 function shouldRenderKeyLocationAsIcon(
     location: MapPreviewKeyLocation,
     renderMode: MapKeyLocationRenderMode,
@@ -664,6 +670,7 @@ function shouldRenderKeyLocationAsIcon(
 function buildLayers({
                          scene,
                          showLabels,
+                         pickingEnabled,
                          shapeStyle,
                          polygonLayerProps,
                          keyLocationStyle,
@@ -680,6 +687,14 @@ function buildLayers({
                          backgroundBounds,
                      }: BuildLayersOptions): Layer[] {
     const layers: Layer[] = [];
+    const polygonLineWidth = resolvePixelLineWidth(
+        shapeStyle?.lineWidth,
+        polygonLayerProps?.lineWidthMinPixels,
+    );
+    const keyLocationStrokeWidth = resolvePixelLineWidth(
+        keyLocationStyle?.strokeWidth,
+        scatterplotLayerProps?.lineWidthMinPixels,
+    );
     const circleKeyLocations = scene.keyLocations.filter(location => (
         keyLocationRenderMode === 'circle'
         || !shouldRenderKeyLocationAsIcon(location, keyLocationRenderMode)
@@ -700,14 +715,17 @@ function buildLayers({
 
     layers.push(
         new PolygonLayer<MapPreviewShape>({
-            pickable: true,
+            pickable: pickingEnabled,
             filled: true,
             stroked: true,
             wireframe: false,
-            lineWidthMinPixels: shapeStyle?.lineWidth ?? 2,
             getFillColor: item => item.fillColor,
             getLineColor: item => item.lineColor,
             ...polygonLayerProps,
+            getLineWidth: polygonLineWidth,
+            lineWidthUnits: 'pixels',
+            lineWidthMinPixels: polygonLineWidth,
+            lineWidthMaxPixels: polygonLineWidth,
             id: 'fc-map-preview-polygons',
             data: scene.shapes,
             getPolygon: item => item.polygon,
@@ -718,15 +736,17 @@ function buildLayers({
     if (circleKeyLocations.length > 0) {
         layers.push(
             new ScatterplotLayer<MapPreviewKeyLocation>({
-                pickable: true,
+                pickable: pickingEnabled,
                 radiusMinPixels: 6,
                 radiusMaxPixels: 14,
                 stroked: keyLocationStyle?.showStroke ?? true,
-                lineWidthMinPixels: keyLocationStyle?.strokeWidth ?? 2,
                 getRadius: keyLocationStyle?.radius ?? 8,
                 getFillColor: item => item.color,
                 getLineColor: () => keyLocationStyle?.strokeColor ?? DEFAULT_LOCATION_STROKE_COLOR,
                 ...scatterplotLayerProps,
+                lineWidthUnits: 'pixels',
+                lineWidthMinPixels: keyLocationStrokeWidth,
+                lineWidthMaxPixels: keyLocationStrokeWidth,
                 id: 'fc-map-preview-key-locations',
                 data: circleKeyLocations,
                 getPosition: item => item.position,
@@ -738,7 +758,7 @@ function buildLayers({
     if (iconKeyLocations.length > 0) {
         layers.push(
             new IconLayer<MapPreviewKeyLocation>({
-                pickable: true,
+                pickable: pickingEnabled,
                 sizeUnits: 'pixels',
                 sizeBasis: 'height',
                 getSize: item => item.iconSize ?? keyLocationStyle?.iconSize ?? 28,
@@ -1029,6 +1049,7 @@ export function MapDeckPreview({
                     layers={buildLayers({
                         scene,
                         showLabels,
+                        pickingEnabled,
                         shapeStyle,
                         polygonLayerProps,
                         keyLocationStyle,
