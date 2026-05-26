@@ -94,6 +94,31 @@ interface TooltipPosition {
     top: number;
 }
 
+export interface MapPixiPerfStats {
+    shapeCount: number;
+    vertexCount: number;
+    visibleShapeCount: number;
+    redrawShapeCount: number;
+    redrawVertexCount: number;
+    drawMs: number;
+    hitTestMs: number;
+    pointerMoveCount: number;
+    scale: number;
+}
+
+interface PixiPerfAccumulator {
+    redrawShapeCount: number;
+    redrawVertexCount: number;
+    drawMs: number;
+    hitTestMs: number;
+    pointerMoveCount: number;
+}
+
+interface PixiPerfRecorder {
+    recordShapeRedraw: (pointCount: number, drawMs: number) => void;
+    recordPointerMove: () => void;
+}
+
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
     onContextRestored: () => void;
@@ -174,6 +199,10 @@ export interface MapPixiPreviewProps {
      * 返回内容位于场景坐标系内，可直接使用 scene.canvas 坐标。
      */
     renderOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
+    /** 开发态性能统计开关。默认关闭，避免影响常规预览。 */
+    debugPerf?: boolean;
+    /** Pixi 性能统计回调。未提供时，开启 `debugPerf` 会输出到 console.debug。 */
+    onPerfStats?: (stats: MapPixiPerfStats) => void;
     onPixiClick?: (detail: MapPreviewPickDetail) => void;
     onPixiHover?: (detail: MapPreviewPickDetail | null) => void;
     onShapeClick?: (detail: MapPreviewShapePickDetail) => void;
@@ -357,6 +386,134 @@ function colorToAlpha(color: MapRgbaColor): number {
 
 function normalizePositiveNumber(value: number | undefined, fallback: number): number {
     return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : fallback;
+}
+
+function createEmptyPerfAccumulator(): PixiPerfAccumulator {
+    return {
+        redrawShapeCount: 0,
+        redrawVertexCount: 0,
+        drawMs: 0,
+        hitTestMs: 0,
+        pointerMoveCount: 0,
+    };
+}
+
+function getHighResolutionTime(): number {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+}
+
+function countSceneVertices(scene: MapPreviewScene | null): number {
+    return scene?.shapes.reduce((total, shape) => total + shape.polygon.length, 0) ?? 0;
+}
+
+function usePixiPerfRecorder({
+                                 enabled,
+                                 scene,
+                                 scale,
+                                 onStats,
+                             }: {
+    enabled: boolean;
+    scene: MapPreviewScene | null;
+    scale: number;
+    onStats?: (stats: MapPixiPerfStats) => void;
+}): PixiPerfRecorder | undefined {
+    const accumulatorRef = useRef<PixiPerfAccumulator>(createEmptyPerfAccumulator());
+    const flushTimerRef = useRef<number | null>(null);
+    const enabledRef = useRef(enabled);
+    const onStatsRef = useRef(onStats);
+    const vertexCount = useMemo(() => countSceneVertices(scene), [scene]);
+    const latestMetaRef = useRef({
+        shapeCount: scene?.shapes.length ?? 0,
+        vertexCount,
+        visibleShapeCount: scene?.shapes.length ?? 0,
+        scale,
+    });
+
+    useEffect(() => {
+        enabledRef.current = enabled;
+        onStatsRef.current = onStats;
+    }, [enabled, onStats]);
+
+    useEffect(() => {
+        latestMetaRef.current = {
+            shapeCount: scene?.shapes.length ?? 0,
+            vertexCount,
+            visibleShapeCount: scene?.shapes.length ?? 0,
+            scale,
+        };
+    }, [scale, scene?.shapes.length, vertexCount]);
+
+    const flushStats = useCallback(() => {
+        flushTimerRef.current = null;
+
+        if (!enabledRef.current) {
+            accumulatorRef.current = createEmptyPerfAccumulator();
+            return;
+        }
+
+        const accumulator = accumulatorRef.current;
+        const hasSamples = accumulator.redrawShapeCount > 0
+            || accumulator.pointerMoveCount > 0
+            || accumulator.hitTestMs > 0;
+
+        if (!hasSamples) {
+            return;
+        }
+
+        accumulatorRef.current = createEmptyPerfAccumulator();
+
+        const stats: MapPixiPerfStats = {
+            ...latestMetaRef.current,
+            redrawShapeCount: accumulator.redrawShapeCount,
+            redrawVertexCount: accumulator.redrawVertexCount,
+            drawMs: Number(accumulator.drawMs.toFixed(2)),
+            hitTestMs: Number(accumulator.hitTestMs.toFixed(2)),
+            pointerMoveCount: accumulator.pointerMoveCount,
+        };
+
+        if (onStatsRef.current) {
+            onStatsRef.current(stats);
+            return;
+        }
+
+        console.debug('[MapPixiPreview perf]', stats);
+    }, []);
+
+    const scheduleFlush = useCallback(() => {
+        if (!enabledRef.current || flushTimerRef.current !== null || typeof window === 'undefined') {
+            return;
+        }
+
+        flushTimerRef.current = window.setTimeout(flushStats, 250);
+    }, [flushStats]);
+
+    useEffect(() => () => {
+        if (flushTimerRef.current !== null && typeof window !== 'undefined') {
+            window.clearTimeout(flushTimerRef.current);
+        }
+    }, []);
+
+    return useMemo(() => {
+        if (!enabled) {
+            return undefined;
+        }
+
+        return {
+            recordShapeRedraw: (pointCount: number, drawMs: number) => {
+                const accumulator = accumulatorRef.current;
+                accumulator.redrawShapeCount += 1;
+                accumulator.redrawVertexCount += pointCount;
+                accumulator.drawMs += drawMs;
+                scheduleFlush();
+            },
+            recordPointerMove: () => {
+                accumulatorRef.current.pointerMoveCount += 1;
+                scheduleFlush();
+            },
+        };
+    }, [enabled, scheduleFlush]);
 }
 
 function shouldRenderKeyLocationAsIcon(
@@ -638,6 +795,7 @@ function MapPixiShape({
                           onHover,
                           onMove,
                           onOut,
+                          perfRecorder,
                       }: {
     shape: MapPreviewShape;
     index: number;
@@ -649,11 +807,16 @@ function MapPixiShape({
     onHover: (detail: MapPreviewShapePickDetail, event: FederatedPointerEvent) => void;
     onMove: (detail: MapPreviewShapePickDetail, event: FederatedPointerEvent) => void;
     onOut: () => void;
+    perfRecorder?: PixiPerfRecorder;
 }) {
     const hitArea = useMemo(() => new Polygon(flattenPolygon(shape.polygon)), [shape.polygon]);
     const draw = useCallback((graphics: Graphics) => {
+        const startedAt = perfRecorder ? getHighResolutionTime() : 0;
         drawShape(graphics, shape, transform.scale, polygonLineWidth, hovered);
-    }, [hovered, polygonLineWidth, shape, transform.scale]);
+        if (perfRecorder) {
+            perfRecorder.recordShapeRedraw(shape.polygon.length, getHighResolutionTime() - startedAt);
+        }
+    }, [hovered, perfRecorder, polygonLineWidth, shape, transform.scale]);
     const createDetail = useCallback((event: FederatedPointerEvent): MapPreviewShapePickDetail => {
         const point = getEventScreenPoint(event);
         return {
@@ -909,6 +1072,7 @@ function MapPixiScene({
                           onPickOut,
                           sceneFilters,
                           renderOverlay,
+                          perfRecorder,
                       }: {
     scene: MapPreviewScene;
     showLabels: boolean;
@@ -932,6 +1096,7 @@ function MapPixiScene({
     onPickOut: () => void;
     sceneFilters?: Filter[];
     renderOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
+    perfRecorder?: PixiPerfRecorder;
 }) {
     const backgroundImage = scene.backgroundImage;
     const naturalSize = useImageNaturalSize(
@@ -997,6 +1162,7 @@ function MapPixiScene({
                         onHover={onPickHover}
                         onMove={onPickMove}
                         onOut={onPickOut}
+                        perfRecorder={perfRecorder}
                     />
                 ))}
                 {circleKeyLocationItems.map(({location, index}) => (
@@ -1113,6 +1279,8 @@ export function MapPixiPreview({
                                    getTooltip,
                                    sceneFilters,
                                    renderOverlay,
+                                   debugPerf = false,
+                                   onPerfStats,
                                    onPixiClick,
                                    onPixiHover,
                                    onShapeClick,
@@ -1166,6 +1334,12 @@ export function MapPixiPreview({
             ? buildViewportTransform(scene.canvas, size, effectiveSyncViewBox)
             : null
     ), [effectiveSyncViewBox, hasRenderableSize, scene, size]);
+    const perfRecorder = usePixiPerfRecorder({
+        enabled: debugPerf,
+        scene,
+        scale: transform?.scale ?? 1,
+        onStats: onPerfStats,
+    });
 
     useEffect(() => {
         if (!hasScene) {
@@ -1391,8 +1565,9 @@ export function MapPixiPreview({
         }
     }, [onKeyLocationHover, onPixiHover, onShapeHover, updateTooltip]);
     const handlePickMove = useCallback((detail: MapPreviewPickDetail, event: FederatedPointerEvent) => {
+        perfRecorder?.recordPointerMove();
         updateTooltip(detail, event);
-    }, [updateTooltip]);
+    }, [perfRecorder, updateTooltip]);
     const handlePickOut = useCallback(() => {
         setHoveredDetail(null);
         setTooltipState(null);
@@ -1507,6 +1682,7 @@ export function MapPixiPreview({
                             onPickOut={handlePickOut}
                             sceneFilters={sceneFilters}
                             renderOverlay={renderOverlay}
+                            perfRecorder={perfRecorder}
                         />
                     )}
                 </Application>
