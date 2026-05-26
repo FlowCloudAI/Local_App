@@ -175,7 +175,6 @@ const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
 const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
 const PREVIEW_VIEWBOX_PADDING_RATIO = 0.35;
 const PREVIEW_VIEWBOX_MIN_PADDING = 80;
-const PREVIEW_VIEWBOX_MAX_PADDING_RATIO = 0.3;
 const PIXI_POLYGON_LOD_LEVELS: PixiLodLevel[] = ['overview', 'low', 'medium', 'high', 'original'];
 const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { targetRatio: number; minPointCount: number }> = {
     overview: {targetRatio: 0.075, minPointCount: 80},
@@ -1068,23 +1067,27 @@ function clampMapPreviewViewBox(
     }, scene.canvas);
     const width = sizeClampedViewBox.width;
     const height = sizeClampedViewBox.height;
-    const maxCanvasSide = Math.max(scene.canvas.width, scene.canvas.height);
-    const padding = clamp(
+    const padding = Math.max(
         Math.max(width, height) * PREVIEW_VIEWBOX_PADDING_RATIO,
         PREVIEW_VIEWBOX_MIN_PADDING,
-        maxCanvasSide * PREVIEW_VIEWBOX_MAX_PADDING_RATIO,
     );
-    const bounds = expandBounds(computeSceneVisualBounds(scene), padding);
-    const minX = Math.min(bounds.minX, bounds.maxX - width);
-    const maxX = Math.max(bounds.minX, bounds.maxX - width);
-    const minY = Math.min(bounds.minY, bounds.maxY - height);
-    const maxY = Math.max(bounds.minY, bounds.maxY - height);
+    const centerBounds = expandBounds(computeSceneVisualBounds(scene), padding);
+    const centerX = clamp(
+        viewBox.x + width / 2,
+        Math.min(centerBounds.minX, centerBounds.maxX),
+        Math.max(centerBounds.minX, centerBounds.maxX),
+    );
+    const centerY = clamp(
+        viewBox.y + height / 2,
+        Math.min(centerBounds.minY, centerBounds.maxY),
+        Math.max(centerBounds.minY, centerBounds.maxY),
+    );
 
     return {
         width,
         height,
-        x: clamp(viewBox.x, minX, maxX),
-        y: clamp(viewBox.y, minY, maxY),
+        x: centerX - width / 2,
+        y: centerY - height / 2,
     };
 }
 
