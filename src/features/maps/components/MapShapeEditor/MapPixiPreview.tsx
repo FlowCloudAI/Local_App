@@ -103,6 +103,10 @@ export interface MapPixiPerfStats {
     hitTestMs: number;
     cullMs: number;
     cullCount: number;
+    lodEstimateCount: number;
+    visibleVertexCount: number;
+    lodVertexCount: number;
+    lodLevel: PixiLodLevel;
     pointerMoveCount: number;
     scale: number;
 }
@@ -114,13 +118,27 @@ interface PixiPerfAccumulator {
     hitTestMs: number;
     cullMs: number;
     cullCount: number;
+    lodEstimateCount: number;
     pointerMoveCount: number;
+}
+
+type PixiLodLevel = 'low' | 'medium' | 'high';
+
+interface PixiPerfMeta {
+    shapeCount: number;
+    vertexCount: number;
+    visibleShapeCount: number;
+    visibleVertexCount: number;
+    lodVertexCount: number;
+    lodLevel: PixiLodLevel;
+    scale: number;
 }
 
 interface PixiPerfRecorder {
     recordShapeRedraw: (pointCount: number, drawMs: number) => void;
     recordHitTest: (hitTestMs: number) => void;
     recordCull: (visibleShapeCount: number, cullMs: number) => void;
+    recordLodEstimate: (visibleVertexCount: number, lodVertexCount: number, lodLevel: PixiLodLevel) => void;
     recordPointerMove: () => void;
 }
 
@@ -134,6 +152,11 @@ interface PixiShapeBounds {
 interface CompiledPixiShape {
     source: MapPreviewShape;
     flatPolygon: number[];
+    lod: {
+        low: number[];
+        medium: number[];
+        high: number[];
+    };
     bbox: PixiShapeBounds;
     pointCount: number;
     fillColor: number;
@@ -152,6 +175,8 @@ interface PixiViewportCullBucket {
 const VIEWPORT_CULLING_PADDING_PIXELS = 128;
 const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
 const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
+const PIXI_POLYGON_LOD_MEDIUM_TOLERANCE = 3;
+const PIXI_POLYGON_LOD_LOW_TOLERANCE = 8;
 
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
@@ -430,6 +455,7 @@ function createEmptyPerfAccumulator(): PixiPerfAccumulator {
         hitTestMs: 0,
         cullMs: 0,
         cullCount: 0,
+        lodEstimateCount: 0,
         pointerMoveCount: 0,
     };
 }
@@ -460,10 +486,13 @@ function usePixiPerfRecorder({
     const enabledRef = useRef(enabled);
     const onStatsRef = useRef(onStats);
     const vertexCount = useMemo(() => countSceneVertices(scene), [scene]);
-    const latestMetaRef = useRef({
+    const latestMetaRef = useRef<PixiPerfMeta>({
         shapeCount: scene?.shapes.length ?? 0,
         vertexCount,
         visibleShapeCount: scene?.shapes.length ?? 0,
+        visibleVertexCount: vertexCount,
+        lodVertexCount: vertexCount,
+        lodLevel: 'high',
         scale,
     });
 
@@ -477,6 +506,9 @@ function usePixiPerfRecorder({
             shapeCount: scene?.shapes.length ?? 0,
             vertexCount,
             visibleShapeCount: scene?.shapes.length ?? 0,
+            visibleVertexCount: vertexCount,
+            lodVertexCount: vertexCount,
+            lodLevel: 'high',
             scale,
         };
     }, [scale, scene?.shapes.length, vertexCount]);
@@ -493,7 +525,8 @@ function usePixiPerfRecorder({
         const hasSamples = accumulator.redrawShapeCount > 0
             || accumulator.pointerMoveCount > 0
             || accumulator.hitTestMs > 0
-            || accumulator.cullCount > 0;
+            || accumulator.cullCount > 0
+            || accumulator.lodEstimateCount > 0;
 
         if (!hasSamples) {
             return;
@@ -509,6 +542,7 @@ function usePixiPerfRecorder({
             hitTestMs: Number(accumulator.hitTestMs.toFixed(2)),
             cullMs: Number(accumulator.cullMs.toFixed(2)),
             cullCount: accumulator.cullCount,
+            lodEstimateCount: accumulator.lodEstimateCount,
             pointerMoveCount: accumulator.pointerMoveCount,
         };
 
@@ -562,6 +596,16 @@ function usePixiPerfRecorder({
                 latestMetaRef.current = {
                     ...latestMetaRef.current,
                     visibleShapeCount,
+                };
+                scheduleFlush();
+            },
+            recordLodEstimate: (visibleVertexCount, lodVertexCount, lodLevel) => {
+                accumulatorRef.current.lodEstimateCount += 1;
+                latestMetaRef.current = {
+                    ...latestMetaRef.current,
+                    visibleVertexCount,
+                    lodVertexCount,
+                    lodLevel,
                 };
                 scheduleFlush();
             },
@@ -761,6 +805,39 @@ function flattenPolygon(polygon: [number, number][]): number[] {
     return polygon.flatMap(([x, y]) => [x, y]);
 }
 
+function getSquaredDistance(a: [number, number], b: [number, number]): number {
+    const dx = a[0] - b[0];
+    const dy = a[1] - b[1];
+    return dx * dx + dy * dy;
+}
+
+function simplifyPolygonByDistance(
+    polygon: [number, number][],
+    tolerance: number,
+): [number, number][] {
+    if (polygon.length <= 3 || tolerance <= 0) {
+        return polygon;
+    }
+
+    const toleranceSquared = tolerance * tolerance;
+    const simplified: [number, number][] = [polygon[0]];
+    let lastAccepted = polygon[0];
+
+    for (let index = 1; index < polygon.length; index += 1) {
+        const point = polygon[index];
+        if (getSquaredDistance(point, lastAccepted) >= toleranceSquared) {
+            simplified.push(point);
+            lastAccepted = point;
+        }
+    }
+
+    if (simplified.length < 3) {
+        return polygon.slice(0, 3);
+    }
+
+    return simplified;
+}
+
 function computePolygonBounds(polygon: [number, number][]): PixiShapeBounds {
     if (polygon.length === 0) {
         return {minX: 0, minY: 0, maxX: 0, maxY: 0};
@@ -860,10 +937,35 @@ function findCompiledShapeAtPoint(
     return null;
 }
 
+function selectPixiShapeLodLevel(scale: number): PixiLodLevel {
+    if (scale < 0.5) {
+        return 'low';
+    }
+
+    if (scale < 1.5) {
+        return 'medium';
+    }
+
+    return 'high';
+}
+
+function countLodVertices(shapes: CompiledPixiShape[], lodLevel: PixiLodLevel): number {
+    return shapes.reduce((total, shape) => total + shape.lod[lodLevel].length / 2, 0);
+}
+
 function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
+    const flatPolygon = flattenPolygon(shape.polygon);
+    const mediumPolygon = simplifyPolygonByDistance(shape.polygon, PIXI_POLYGON_LOD_MEDIUM_TOLERANCE);
+    const lowPolygon = simplifyPolygonByDistance(shape.polygon, PIXI_POLYGON_LOD_LOW_TOLERANCE);
+
     return {
         source: shape,
-        flatPolygon: flattenPolygon(shape.polygon),
+        flatPolygon,
+        lod: {
+            low: flattenPolygon(lowPolygon),
+            medium: flattenPolygon(mediumPolygon),
+            high: flatPolygon,
+        },
         bbox: computePolygonBounds(shape.polygon),
         pointCount: shape.polygon.length,
         fillColor: colorToHex(shape.fillColor),
@@ -1343,10 +1445,21 @@ function MapPixiScene({
         };
     }, [compiledShapes, perfRecorder, viewportWorldBounds]);
     const visibleShapes = visibleShapeResult.shapes;
+    const visibleVertexCount = useMemo(() => (
+        visibleShapes.reduce((total, shape) => total + shape.pointCount, 0)
+    ), [visibleShapes]);
+    const lodLevel = selectPixiShapeLodLevel(transform.scale);
+    const lodVertexCount = useMemo(() => (
+        countLodVertices(visibleShapes, lodLevel)
+    ), [lodLevel, visibleShapes]);
 
     useEffect(() => {
         perfRecorder?.recordCull(visibleShapes.length, visibleShapeResult.cullMs);
     }, [perfRecorder, visibleShapeResult.cullMs, visibleShapes.length]);
+
+    useEffect(() => {
+        perfRecorder?.recordLodEstimate(visibleVertexCount, lodVertexCount, lodLevel);
+    }, [lodLevel, lodVertexCount, perfRecorder, visibleVertexCount]);
 
     const circleKeyLocationItems = useMemo(() => scene.keyLocations
         .map((location, index) => ({location, index}))
