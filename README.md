@@ -90,3 +90,8 @@ app_main/
 - 修改前先阅读本仓库与模块 `AGENTS.md`。  
 - AI 功能或启动流程变更需补充重现步骤与 `backend-ready` 验证。  
 - 提交前执行至少一次 `npm run lint`、`npm run build`、`cd src-tauri && cargo test`。
+
+## 文档同步依据（本次自动核对）
+
+- 同步时间：2026-05-26 17:02:35 +08:00
+- 依据文件：app_main/package.json, app_main/src-tauri/Cargo.toml, app_main/src-tauri/src
