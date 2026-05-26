@@ -208,7 +208,7 @@ type MapPixiApplicationLike = {
 
 function logPixiResizeDebug(enabled: boolean, label: string, payload: Record<string, unknown>) {
     if (!enabled) return;
-    console.debug('[MapPixiResize]', label, payload);
+    console.info('[MapPixiResize]', label, payload);
 }
 
 function resolvePixiApplicationCanvas(app: MapPixiApplicationLike | null | undefined): HTMLCanvasElement | null {
