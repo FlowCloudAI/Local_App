@@ -1175,7 +1175,7 @@
     gap: var(--fc-space-xs);
     flex: 1 1 auto;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-caption, 0.75rem);
     white-space: nowrap;
