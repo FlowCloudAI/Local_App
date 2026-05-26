@@ -140,6 +140,31 @@
     flex-shrink: 0;
 }
 
+.wm-toolbar-select {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fc-font-size-sm);
+    color: var(--fc-color-text-secondary);
+}
+
+.wm-toolbar-select select {
+    height: 28px;
+    min-width: 72px;
+    box-sizing: border-box;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    font: inherit;
+    padding: 3px 8px;
+}
+
+.wm-toolbar-select select:focus {
+    outline: none;
+    border-color: var(--fc-color-primary);
+}
+
 /* ── 错误横幅 ────────────────────────────────────────────────────────────── */
 
 .wm-error-banner {
@@ -411,6 +436,12 @@
     gap: 8px;
 }
 
+.wm-sidebar-subsection--coastline {
+    min-height: 180px;
+    max-height: min(46vh, 420px);
+    overflow: hidden;
+}
+
 .wm-sidebar-subsection__header {
     display: flex;
     align-items: center;
@@ -428,6 +459,16 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.wm-coastline-fields {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 2px;
+    overflow: hidden;
+    overscroll-behavior: contain;
 }
 
 .wm-sidebar-hints {

@@ -122,7 +122,9 @@ interface PixiPerfAccumulator {
     pointerMoveCount: number;
 }
 
-type PixiLodLevel = 'low' | 'medium' | 'high';
+export type MapPixiLodLevel = 'low' | 'medium' | 'high';
+export type MapPixiLodSetting = 'auto' | MapPixiLodLevel;
+type PixiLodLevel = MapPixiLodLevel;
 
 interface PixiPerfMeta {
     shapeCount: number;
@@ -282,6 +284,8 @@ export interface MapPixiPreviewProps {
      * 返回内容位于场景坐标系内，可直接使用 scene.canvas 坐标。
      */
     renderOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
+    /** 多边形 LOD 档位。`auto` 会按当前缩放自动选择，固定档位用于调试和性能对比。 */
+    lodLevel?: MapPixiLodSetting;
     /** 开发态性能统计开关。默认关闭，避免影响常规预览。 */
     debugPerf?: boolean;
     /** Pixi 性能统计回调。未提供时，开启 `debugPerf` 会输出到 console.debug。 */
@@ -1423,6 +1427,7 @@ function MapPixiScene({
                           onPickOut,
                           sceneFilters,
                           renderOverlay,
+                          lodLevel,
                           perfRecorder,
                       }: {
     scene: MapPreviewScene;
@@ -1447,6 +1452,7 @@ function MapPixiScene({
     onPickOut: () => void;
     sceneFilters?: Filter[];
     renderOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
+    lodLevel: MapPixiLodSetting;
     perfRecorder?: PixiPerfRecorder;
 }) {
     const backgroundImage = scene.backgroundImage;
@@ -1479,18 +1485,20 @@ function MapPixiScene({
     const visibleVertexCount = useMemo(() => (
         visibleShapes.reduce((total, shape) => total + shape.pointCount, 0)
     ), [visibleShapes]);
-    const lodLevel = selectPixiShapeLodLevel(transform.scale);
+    const resolvedLodLevel = lodLevel === 'auto'
+        ? selectPixiShapeLodLevel(transform.scale)
+        : lodLevel;
     const lodVertexCount = useMemo(() => (
-        countLodVertices(visibleShapes, lodLevel)
-    ), [lodLevel, visibleShapes]);
+        countLodVertices(visibleShapes, resolvedLodLevel)
+    ), [resolvedLodLevel, visibleShapes]);
 
     useEffect(() => {
         perfRecorder?.recordCull(visibleShapes.length, visibleShapeResult.cullMs);
     }, [perfRecorder, visibleShapeResult.cullMs, visibleShapes.length]);
 
     useEffect(() => {
-        perfRecorder?.recordLodEstimate(visibleVertexCount, lodVertexCount, lodLevel);
-    }, [lodLevel, lodVertexCount, perfRecorder, visibleVertexCount]);
+        perfRecorder?.recordLodEstimate(visibleVertexCount, lodVertexCount, resolvedLodLevel);
+    }, [lodVertexCount, perfRecorder, resolvedLodLevel, visibleVertexCount]);
 
     const circleKeyLocationItems = useMemo(() => scene.keyLocations
         .map((location, index) => ({location, index}))
@@ -1536,7 +1544,7 @@ function MapPixiScene({
                     <MapPixiShape
                         key={shape.source.id}
                         shape={shape}
-                        lodLevel={lodLevel}
+                        lodLevel={resolvedLodLevel}
                         transform={transform}
                         polygonLineWidth={polygonLineWidth}
                         hovered={hoveredDetail?.kind === 'shape' && hoveredDetail.object.id === shape.source.id}
@@ -1664,6 +1672,7 @@ export function MapPixiPreview({
                                    getTooltip,
                                    sceneFilters,
                                    renderOverlay,
+                                   lodLevel = 'auto',
                                    debugPerf = false,
                                    onPerfStats,
                                    onPixiClick,
@@ -2067,6 +2076,7 @@ export function MapPixiPreview({
                             onPickOut={handlePickOut}
                             sceneFilters={sceneFilters}
                             renderOverlay={renderOverlay}
+                            lodLevel={lodLevel}
                             perfRecorder={perfRecorder}
                         />
                     )}

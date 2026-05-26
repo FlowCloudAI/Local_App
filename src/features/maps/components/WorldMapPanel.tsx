@@ -11,6 +11,7 @@ import {
     createMapShapeEditorLocalId,
     type MapKeyLocationDraft,
     type MapPreviewScene,
+    type MapPixiLodSetting,
     type MapPixiPerfStats,
     type MapShapeDraft,
     type MapShapeEditorDraft,
@@ -82,6 +83,12 @@ const MAP_STYLE_LABELS: Record<MapStyle, string> = {
     flat: '扁平',
     tolkien: '托尔金',
     ink: '墨线',
+}
+const PIXI_LOD_LABELS: Record<MapPixiLodSetting, string> = {
+    auto: '自动',
+    low: '低',
+    medium: '中',
+    high: '高',
 }
 
 const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
@@ -200,6 +207,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const [viewBox, setViewBox] = useState(() => createInitialMapShapeEditorViewBox(CANVAS))
     const [viewportMode, setViewportMode] = useState<ViewportMode>('preview')
     const [previewRenderer, setPreviewRenderer] = useState<MapShapeViewportRenderer>('pixi')
+    const [pixiLodLevel, setPixiLodLevel] = useState<MapPixiLodSetting>('auto')
 
     // ── 操作状态 ─────────────────────────────────────────────────────────────
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -749,17 +757,21 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
     // DEBUG：包装 renderOverlay 以追踪 MapShapeViewport 是否实际调用了它
     const wrappedPixiProps = useMemo(() => {
-        const originalOnPerfStats = pixiProps.onPerfStats
+        const pixiPropsWithLod = {
+            ...pixiProps,
+            lodLevel: pixiLodLevel,
+        }
+        const originalOnPerfStats = pixiPropsWithLod.onPerfStats
         const basePixiProps = pixiPerfDebugEnabled
             ? {
-                ...pixiProps,
+                ...pixiPropsWithLod,
                 debugPerf: true,
                 onPerfStats: (stats: MapPixiPerfStats) => {
                     originalOnPerfStats?.(stats)
                     logPixiPerfStats(stats)
                 },
             }
-            : pixiProps
+            : pixiPropsWithLod
 
         if (!basePixiProps.renderOverlay) {
             mapLog('wrapRenderOverlay: no renderOverlay to wrap')
@@ -776,7 +788,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                 return result
             }
         }
-    }, [pixiProps, pixiPerfDebugEnabled])
+    }, [pixiLodLevel, pixiProps, pixiPerfDebugEnabled])
 
     const viewportRenderKey = `${previewRenderer}-${viewportMode}-${style}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
@@ -914,6 +926,21 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                         onClick={() => setPreviewRenderer('deck')}>
                     Deck 回退
                 </button>
+                {previewRenderer === 'pixi' && (
+                    <label className="wm-toolbar-select">
+                        <span>LOD</span>
+                        <select
+                            value={pixiLodLevel}
+                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                                setPixiLodLevel(event.target.value as MapPixiLodSetting)
+                            }}
+                        >
+                            {(Object.keys(PIXI_LOD_LABELS) as MapPixiLodSetting[]).map(level => (
+                                <option key={level} value={level}>{PIXI_LOD_LABELS[level]}</option>
+                            ))}
+                        </select>
+                    </label>
+                )}
                 {viewportMode === 'edit' && (
                     <>
                         <div className="wm-toolbar-sep"/>
@@ -1042,7 +1069,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                         )}
                                     </div>
                                     <div className="wm-sidebar-sep"/>
-                                    <div className="wm-sidebar-subsection">
+                                    <div className="wm-sidebar-subsection wm-sidebar-subsection--coastline">
                                         <div className="wm-sidebar-subsection__header">
                                             <span className="wm-sidebar-subsection__title">海岸线属性</span>
                                             <button
@@ -1053,6 +1080,14 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                                 恢复默认
                                             </button>
                                         </div>
+                                        <RollingBox axis="y"
+                                            className="wm-coastline-fields"
+                                            thumbSize="thin"
+                                            interceptWheel={(event) => {
+                                                event.stopPropagation()
+                                                return false
+                                            }}
+                                        >
                                         <div className="wm-field">
                                             <label>最小段数</label>
                                             <input
@@ -1164,6 +1199,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                                 权重控制大中小三个尺度的纹理占比。
                                             </div>
                                         </div>
+                                        </RollingBox>
                                     </div>
                                 </>
                             )}
