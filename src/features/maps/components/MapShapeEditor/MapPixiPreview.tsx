@@ -119,6 +119,24 @@ interface PixiPerfRecorder {
     recordPointerMove: () => void;
 }
 
+interface PixiShapeBounds {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+interface CompiledPixiShape {
+    source: MapPreviewShape;
+    flatPolygon: number[];
+    bbox: PixiShapeBounds;
+    pointCount: number;
+    fillColor: number;
+    fillAlpha: number;
+    strokeColor: number;
+    strokeAlpha: number;
+}
+
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
     onContextRestored: () => void;
@@ -708,30 +726,63 @@ function flattenPolygon(polygon: [number, number][]): number[] {
     return polygon.flatMap(([x, y]) => [x, y]);
 }
 
+function computePolygonBounds(polygon: [number, number][]): PixiShapeBounds {
+    if (polygon.length === 0) {
+        return {minX: 0, minY: 0, maxX: 0, maxY: 0};
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const [x, y] of polygon) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+    }
+
+    return {minX, minY, maxX, maxY};
+}
+
+function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
+    return {
+        source: shape,
+        flatPolygon: flattenPolygon(shape.polygon),
+        bbox: computePolygonBounds(shape.polygon),
+        pointCount: shape.polygon.length,
+        fillColor: colorToHex(shape.fillColor),
+        fillAlpha: colorToAlpha(shape.fillColor),
+        strokeColor: colorToHex(shape.lineColor),
+        strokeAlpha: colorToAlpha(shape.lineColor),
+    };
+}
+
 function drawShape(
     graphics: Graphics,
-    shape: MapPreviewShape,
+    shape: CompiledPixiShape,
     scale: number,
     polygonLineWidth: number,
     hovered: boolean,
 ) {
     graphics.clear();
-    if (shape.polygon.length < 3) {
+    if (shape.pointCount < 3) {
         return;
     }
 
     const strokeWidth = (normalizePositiveNumber(polygonLineWidth, 2) + (hovered ? 1 : 0)) / Math.max(scale, 0.01);
 
     graphics
-        .poly(flattenPolygon(shape.polygon), true)
+        .poly(shape.flatPolygon, true)
         .fill({
-            color: colorToHex(shape.fillColor),
-            alpha: colorToAlpha(shape.fillColor),
+            color: shape.fillColor,
+            alpha: shape.fillAlpha,
         })
         .stroke({
             width: strokeWidth,
-            color: colorToHex(shape.lineColor),
-            alpha: colorToAlpha(shape.lineColor),
+            color: shape.strokeColor,
+            alpha: shape.strokeAlpha,
         });
 }
 
@@ -797,7 +848,7 @@ function MapPixiShape({
                           onOut,
                           perfRecorder,
                       }: {
-    shape: MapPreviewShape;
+    shape: CompiledPixiShape;
     index: number;
     transform: PixiViewportTransform;
     polygonLineWidth: number;
@@ -809,19 +860,19 @@ function MapPixiShape({
     onOut: () => void;
     perfRecorder?: PixiPerfRecorder;
 }) {
-    const hitArea = useMemo(() => new Polygon(flattenPolygon(shape.polygon)), [shape.polygon]);
+    const hitArea = useMemo(() => new Polygon(shape.flatPolygon), [shape.flatPolygon]);
     const draw = useCallback((graphics: Graphics) => {
         const startedAt = perfRecorder ? getHighResolutionTime() : 0;
         drawShape(graphics, shape, transform.scale, polygonLineWidth, hovered);
         if (perfRecorder) {
-            perfRecorder.recordShapeRedraw(shape.polygon.length, getHighResolutionTime() - startedAt);
+            perfRecorder.recordShapeRedraw(shape.pointCount, getHighResolutionTime() - startedAt);
         }
     }, [hovered, perfRecorder, polygonLineWidth, shape, transform.scale]);
     const createDetail = useCallback((event: FederatedPointerEvent): MapPreviewShapePickDetail => {
         const point = getEventScreenPoint(event);
         return {
             kind: 'shape',
-            object: shape,
+            object: shape.source,
             index,
             layerId: 'fc-map-pixi-preview-polygons',
             x: point.x,
@@ -1109,6 +1160,7 @@ function MapPixiScene({
             ? computeBackgroundBounds(scene.canvas, backgroundImage, naturalSize)
             : null
     ), [backgroundImage, naturalSize, scene.canvas]);
+    const compiledShapes = useMemo(() => scene.shapes.map(compilePixiShape), [scene.shapes]);
     const circleKeyLocationItems = useMemo(() => scene.keyLocations
         .map((location, index) => ({location, index}))
         .filter(({location}) => (
@@ -1149,15 +1201,15 @@ function MapPixiScene({
                 {backgroundImage && backgroundBounds && (
                     <MapPixiBackground backgroundImage={backgroundImage} bounds={backgroundBounds}/>
                 )}
-                {scene.shapes.map((shape, index) => (
+                {compiledShapes.map((shape, index) => (
                     <MapPixiShape
-                        key={shape.id}
+                        key={shape.source.id}
                         shape={shape}
                         index={index}
                         transform={transform}
                         polygonLineWidth={polygonLineWidth}
                         enablePicking={enablePicking}
-                        hovered={hoveredDetail?.kind === 'shape' && hoveredDetail.object.id === shape.id}
+                        hovered={hoveredDetail?.kind === 'shape' && hoveredDetail.object.id === shape.source.id}
                         onClick={onPickClick}
                         onHover={onPickHover}
                         onMove={onPickMove}
