@@ -27,7 +27,7 @@ export interface MapShapeViewportProps {
     scene: MapPreviewScene | null;
     /**
      * 编辑图层的受控 viewBox。编辑模式下必需，以使
-     * SVG 编辑器与 deck 预览保持同步。预览模式下忽略。
+     * SVG 编辑器与预览层保持同步。预览模式下忽略。
      * 编辑模式下若省略，视口将在内部管理 viewBox。
      */
     viewBox?: MapShapeEditorViewBox;
@@ -74,7 +74,7 @@ export interface MapShapeViewportProps {
 
 export function MapShapeViewport({
                                      mode,
-                                     renderer = 'deck',
+                                     renderer = 'pixi',
                                      canvas,
                                      scene,
                                      viewBox: viewBoxProp,
