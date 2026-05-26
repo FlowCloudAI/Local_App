@@ -189,14 +189,27 @@ const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { targetRatio: number; minPo
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
     onContextRestored: () => void;
+    debugPerf: boolean;
+    size: ElementSize;
+    transform: PixiViewportTransform | null;
 }
 
 type MapPixiApplicationLike = {
     canvas?: HTMLCanvasElement | null;
     renderer?: {
         canvas?: HTMLCanvasElement | null;
+        resolution?: number;
+        screen?: {
+            width?: number;
+            height?: number;
+        };
     };
 };
+
+function logPixiResizeDebug(enabled: boolean, label: string, payload: Record<string, unknown>) {
+    if (!enabled) return;
+    console.debug('[MapPixiResize]', label, payload);
+}
 
 function resolvePixiApplicationCanvas(app: MapPixiApplicationLike | null | undefined): HTMLCanvasElement | null {
     if (!app) {
@@ -338,7 +351,7 @@ function getPixiResolution(): number {
     return Math.max(1, Math.min(window.devicePixelRatio || 1, MAX_PIXI_RESOLUTION));
 }
 
-function useElementSize<T extends HTMLElement>() {
+function useElementSize<T extends HTMLElement>(debugPerf: boolean) {
     const elementRef = useRef<T | null>(null);
     const [size, setSize] = useState<ElementSize>({width: 0, height: 0});
 
@@ -350,6 +363,12 @@ function useElementSize<T extends HTMLElement>() {
 
         const commitSize = (width: number, height: number) => {
             const nextSize = normalizeElementSize(width, height);
+            logPixiResizeDebug(debugPerf, 'commit-size', {
+                rawWidth: width,
+                rawHeight: height,
+                width: nextSize.width,
+                height: nextSize.height,
+            });
             setSize(currentSize => (
                 currentSize.width === nextSize.width && currentSize.height === nextSize.height
                     ? currentSize
@@ -377,6 +396,10 @@ function useElementSize<T extends HTMLElement>() {
             const entry = entries[0];
             if (!entry) return;
 
+            logPixiResizeDebug(debugPerf, 'resize-observer', {
+                width: entry.contentRect.width,
+                height: entry.contentRect.height,
+            });
             scheduleSizeUpdate(entry.contentRect.width, entry.contentRect.height);
         });
 
@@ -390,7 +413,7 @@ function useElementSize<T extends HTMLElement>() {
                 window.cancelAnimationFrame(frameId);
             }
         };
-    }, []);
+    }, [debugPerf]);
 
     return {elementRef, size};
 }
@@ -1931,6 +1954,9 @@ function MapPixiScene({
 function MapPixiApplicationGuard({
                                       onContextLost,
                                       onContextRestored,
+                                      debugPerf,
+                                      size,
+                                      transform,
                                   }: MapPixiApplicationGuardProps) {
     const {app} = useApplication() as { app?: MapPixiApplicationLike | null };
 
@@ -1956,6 +1982,22 @@ function MapPixiApplicationGuard({
             canvas.removeEventListener('webglcontextrestored', handleContextRestored);
         };
     }, [app, onContextLost, onContextRestored]);
+
+    useEffect(() => {
+        const canvas = resolvePixiApplicationCanvas(app);
+        logPixiResizeDebug(debugPerf, 'app-size', {
+            expectedWidth: size.width,
+            expectedHeight: size.height,
+            canvasWidth: canvas?.width ?? null,
+            canvasHeight: canvas?.height ?? null,
+            canvasClientWidth: canvas?.clientWidth ?? null,
+            canvasClientHeight: canvas?.clientHeight ?? null,
+            rendererScreenWidth: app?.renderer?.screen?.width ?? null,
+            rendererScreenHeight: app?.renderer?.screen?.height ?? null,
+            rendererResolution: app?.renderer?.resolution ?? null,
+            transform,
+        });
+    }, [app, debugPerf, size.height, size.width, transform]);
 
     return null;
 }
@@ -1996,7 +2038,7 @@ export function MapPixiPreview({
                                    syncViewBox,
                                    onPreviewViewBoxChange,
                                }: MapPixiPreviewProps) {
-    const {elementRef, size} = useElementSize<HTMLDivElement>();
+    const {elementRef, size} = useElementSize<HTMLDivElement>(debugPerf);
     const tooltipRef = useRef<HTMLDivElement | null>(null);
     const suppressPickClickRef = useRef(false);
     const [hoveredDetail, setHoveredDetail] = useState<MapPreviewPickDetail | null>(null);
@@ -2012,6 +2054,7 @@ export function MapPixiPreview({
     const [contextLost, setContextLost] = useState(false);
     const [contextRevision, setContextRevision] = useState(0);
     const hasScene = Boolean(scene);
+    const sceneCanvas = scene?.canvas ?? null;
     const hasRenderableSize = size.width >= MIN_RENDER_SIZE && size.height >= MIN_RENDER_SIZE;
     const panZoomEnabled = enablePanZoom ?? interactive;
     const pickingEnabled = enablePicking;
@@ -2045,6 +2088,33 @@ export function MapPixiPreview({
         scale: transform?.scale ?? 1,
         onStats: onPerfStats,
     });
+
+    useEffect(() => {
+        logPixiResizeDebug(debugPerf, 'preview-state', {
+            size,
+            pixiRenderWidth,
+            pixiRenderHeight,
+            sceneCanvas,
+            syncViewBox,
+            effectiveSyncViewBox,
+            transform,
+            hasRenderableSize,
+            shouldMountApplication,
+            shouldUseInteractiveViewBox,
+        });
+    }, [
+        debugPerf,
+        effectiveSyncViewBox,
+        hasRenderableSize,
+        pixiRenderHeight,
+        pixiRenderWidth,
+        sceneCanvas,
+        shouldMountApplication,
+        shouldUseInteractiveViewBox,
+        size,
+        syncViewBox,
+        transform,
+    ]);
 
     useEffect(() => {
         if (!hasScene) {
@@ -2363,6 +2433,9 @@ export function MapPixiPreview({
                     <MapPixiApplicationGuard
                         onContextLost={handleContextLost}
                         onContextRestored={handleContextRestored}
+                        debugPerf={debugPerf}
+                        size={size}
+                        transform={transform}
                     />
                     {shouldRenderScene && transform && (
                         <MapPixiScene
