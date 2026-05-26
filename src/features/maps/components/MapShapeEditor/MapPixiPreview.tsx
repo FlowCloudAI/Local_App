@@ -1836,7 +1836,7 @@ function MapPixiScene({
 
     return (
         <pixiContainer filters={sceneFilters}>
-            <pixiContainer x={transform.x} y={transform.y} scale={transform.scale}>
+            <pixiContainer x={transform.x} y={transform.y} scale={{x: transform.scale, y: transform.scale}}>
                 <MapPixiEmptyHitArea
                     scene={scene}
                     transform={transform}
