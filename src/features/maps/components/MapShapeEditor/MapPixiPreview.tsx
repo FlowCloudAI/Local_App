@@ -190,6 +190,23 @@ type MapPixiApplicationLike = {
     };
 };
 
+function resolvePixiApplicationCanvas(app: MapPixiApplicationLike | null | undefined): HTMLCanvasElement | null {
+    if (!app) {
+        return null;
+    }
+
+    const rendererCanvas = app.renderer?.canvas ?? null;
+    if (rendererCanvas) {
+        return rendererCanvas;
+    }
+
+    try {
+        return app.canvas ?? null;
+    } catch {
+        return null;
+    }
+}
+
 /** @deprecated 使用 {@link MapKeyLocationRenderMode}。 */
 export type MapPixiKeyLocationRenderMode = MapKeyLocationRenderMode;
 
@@ -1593,7 +1610,7 @@ function MapPixiApplicationGuard({
     const {app} = useApplication() as { app?: MapPixiApplicationLike | null };
 
     useEffect(() => {
-        const canvas = app?.canvas ?? app?.renderer?.canvas ?? null;
+        const canvas = resolvePixiApplicationCanvas(app);
         if (!canvas || typeof canvas.addEventListener !== 'function') {
             return undefined;
         }
