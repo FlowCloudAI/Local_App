@@ -1662,11 +1662,11 @@ export default function AIChatContent({
                             />
                         )}
                         <div className="ai-input-meta-row">
-                            <div className="ai-conversation-settings-summary">
+                            <div className="ai-input-meta-controls">
                                 <button
                                     ref={settingsToggleRef}
                                     type="button"
-                                    className="ai-conversation-settings-toggle"
+                                    className="ai-input-meta-btn ai-conversation-settings-toggle"
                                     disabled={!activeConversation}
                                     aria-expanded={settingsDrawerOpen}
                                     title={activeConversation ? '当前对话属性设置' : '发送消息后可设置当前对话属性'}
@@ -1675,11 +1675,41 @@ export default function AIChatContent({
                                     <svg viewBox="0 0 16 16" aria-hidden="true">
                                         <path d="M6 3.5 10.5 8 6 12.5"/>
                                     </svg>
+                                    <span>对话属性</span>
                                 </button>
-                                <span title={CONVERSATION_SETTING_TOOLTIPS.temperature}>温度 {formatConversationSettingNumber(conversationSettings.temperature)}</span>
-                                <span title={CONVERSATION_SETTING_TOOLTIPS.topP}>top_p {formatConversationSettingNumber(conversationSettings.topP)}</span>
-                                <span title={CONVERSATION_SETTING_TOOLTIPS.frequencyPenalty}>重复惩罚 {conversationSettings.frequencyPenaltyEnabled ? '开' : '关'}</span>
-                                <span title={CONVERSATION_SETTING_TOOLTIPS.presencePenalty}>存在惩罚 {conversationSettings.presencePenaltyEnabled ? '开' : '关'}</span>
+                                <div className="ai-model-switcher ai-model-switcher--meta" ref={modelSwitcherRef}>
+                                    {isModelMenuOpen && selectedPluginInfo && (
+                                        <div className="ai-model-menu">
+                                            {selectedPluginInfo.models.map((model) => (
+                                                <button
+                                                    key={model}
+                                                    className={`ai-model-menu-item ${model === ctx.selectedModel ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        ctx.setSelectedModel(model)
+                                                        setIsModelMenuOpen(false)
+                                                    }}
+                                                >
+                                                    {model}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className={`ai-input-meta-btn ai-model-switcher-btn ${isModelMenuOpen ? 'active' : ''}`}
+                                        aria-expanded={isModelMenuOpen}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            setIsModelMenuOpen((prev) => !prev)
+                                        }}
+                                        title="切换模型"
+                                    >
+                                        <svg viewBox="0 0 16 16" aria-hidden="true">
+                                            <path d="M6 3.5 10.5 8 6 12.5"/>
+                                        </svg>
+                                        <span>{ctx.selectedModel || '选择模型'}</span>
+                                    </button>
+                                </div>
                             </div>
                             {showContextUsageIndicator && (
                                 <div
@@ -1794,38 +1824,6 @@ export default function AIChatContent({
                                         </button>
                                     </>
                                 )}
-                                <div className="ai-model-switcher" ref={modelSwitcherRef}>
-                                    {isModelMenuOpen && selectedPluginInfo && (
-                                        <div className="ai-model-menu">
-                                            {selectedPluginInfo.models.map((model) => (
-                                                <button
-                                                    key={model}
-                                                    className={`ai-model-menu-item ${model === ctx.selectedModel ? 'active' : ''}`}
-                                                    onClick={() => {
-                                                        ctx.setSelectedModel(model)
-                                                        setIsModelMenuOpen(false)
-                                                    }}
-                                                >
-                                                    {model}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <button
-                                        className={`ai-toolbar-btn ${isModelMenuOpen ? 'active' : ''}`}
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            setIsModelMenuOpen((prev) => !prev)
-                                        }}
-                                        title="切换模型"
-                                    >
-                                        <span>{ctx.selectedModel || '选择模型'}</span>
-                                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
-                                             stroke="currentColor" strokeWidth="1.5">
-                                            <path d={isModelMenuOpen ? 'M1 7l4-4 4 4' : 'M1 3l4 4 4-4'}/>
-                                        </svg>
-                                    </button>
-                                </div>
                             </div>
                             <div className="ai-floating-actions">
                                 {showCharHint && (
