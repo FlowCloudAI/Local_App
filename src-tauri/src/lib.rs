@@ -146,7 +146,9 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
         log::info!("Single instance detected, quitting.");
         exit(0);
-    }));
+    }))
+    .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(tauri_plugin_process::init());
 
     builder
         .setup(|app| {

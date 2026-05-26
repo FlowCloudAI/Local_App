@@ -72,6 +72,8 @@ tera = "1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 worldflow_core = { path = "../../core_world_data" }
 git2 = { version = "0.20.4", default-features = false, features = ["vendored-libgit2"] }
 

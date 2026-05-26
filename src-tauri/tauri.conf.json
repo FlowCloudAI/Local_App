@@ -37,6 +37,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "android": {
       "minSdkVersion": 26
     },
@@ -102,6 +103,17 @@
           "libwebkit2gtk-4.1-0",
           "libssl3"
         ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "__FLOWCLOUDAI_UPDATER_PUBLIC_KEY__",
+      "endpoints": [
+        "https://www.flowcloudai.cn/api/v1/app-updates/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

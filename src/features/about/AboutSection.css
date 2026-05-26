@@ -143,6 +143,80 @@
     background: #fff;
 }
 
+.about-section-update {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.about-section-update-copy {
+    min-width: 0;
+}
+
+.about-section-update-desc,
+.about-section-update-status,
+.about-section-update-notes {
+    margin: 0.35rem 0 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    line-height: var(--fc-line-height-normal);
+}
+
+.about-section-update-status {
+    color: var(--fc-color-text);
+    font-weight: 600;
+}
+
+.about-section-update-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.8rem;
+    margin-top: 0.65rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.about-section-update-notes {
+    max-width: 42rem;
+    white-space: pre-wrap;
+}
+
+.about-section-update-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+}
+
+.about-section-update-progress {
+    position: relative;
+    overflow: hidden;
+    width: min(100%, 24rem);
+    height: 1.35rem;
+    margin-top: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--fc-color-bg) 70%, transparent);
+}
+
+.about-section-update-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--fc-color-primary) 62%, transparent);
+    transition: width 0.2s ease;
+}
+
+.about-section-update-progress strong {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    font-weight: 700;
+}
+
 .about-section-svg-icon {
     width: 1.65rem;
     height: 1.65rem;
@@ -337,6 +411,15 @@
     .about-section-meta {
         grid-template-columns: 1fr;
         min-width: 0;
+    }
+
+    .about-section-update {
+        flex-direction: column;
+    }
+
+    .about-section-update-actions {
+        width: 100%;
+        flex-wrap: wrap;
     }
 
     .about-section-action-row {
