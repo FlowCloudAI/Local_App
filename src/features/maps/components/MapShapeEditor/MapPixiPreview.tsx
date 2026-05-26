@@ -1097,24 +1097,39 @@ function computePixiLodZoomRatio(
     return (transform.scale * scene.canvas.width) / Math.max(size.width, 1);
 }
 
-function selectPixiShapeLodLevel(zoomRatio: number): PixiLodLevel {
-    if (zoomRatio <= 1.05) {
-        return 'overview';
+function selectPixiShapeLodLevel(zoomRatio: number, visibleVertexCount: number): PixiLodLevel {
+    if (visibleVertexCount <= 1200) {
+        return zoomRatio > 5 ? 'original' : 'high';
     }
 
-    if (zoomRatio <= 1.75) {
-        return 'low';
-    }
-
-    if (zoomRatio <= 3) {
+    if (zoomRatio <= 1.1) {
+        if (visibleVertexCount > 30000) {
+            return 'overview';
+        }
+        if (visibleVertexCount > 9000) {
+            return 'low';
+        }
         return 'medium';
     }
 
-    if (zoomRatio <= 6) {
+    if (zoomRatio <= 2.5) {
+        if (visibleVertexCount > 35000) {
+            return 'low';
+        }
+        if (visibleVertexCount > 14000) {
+            return 'medium';
+        }
         return 'high';
     }
 
-    return 'original';
+    if (zoomRatio <= 6) {
+        if (visibleVertexCount > 30000) {
+            return 'medium';
+        }
+        return 'high';
+    }
+
+    return visibleVertexCount > 25000 ? 'high' : 'original';
 }
 
 function buildPixiShapeLods(polygon: [number, number][], flatPolygon: number[]): Record<PixiLodLevel, number[]> {
@@ -1137,12 +1152,13 @@ function resolvePixiLodLevel(
     scene: MapPreviewScene,
     transform: PixiViewportTransform,
     size: ElementSize,
+    visibleVertexCount: number,
 ): PixiLodLevel {
     if (lodLevel !== 'auto') {
         return lodLevel;
     }
 
-    return selectPixiShapeLodLevel(computePixiLodZoomRatio(scene, transform, size));
+    return selectPixiShapeLodLevel(computePixiLodZoomRatio(scene, transform, size), visibleVertexCount);
 }
 
 function countLodVertices(shapes: CompiledPixiShape[], lodLevel: PixiLodLevel): number {
@@ -1650,7 +1666,7 @@ function MapPixiScene({
     const visibleVertexCount = useMemo(() => (
         visibleShapes.reduce((total, shape) => total + shape.pointCount, 0)
     ), [visibleShapes]);
-    const resolvedLodLevel = resolvePixiLodLevel(lodLevel, scene, transform, size);
+    const resolvedLodLevel = resolvePixiLodLevel(lodLevel, scene, transform, size, visibleVertexCount);
     const lodVertexCount = useMemo(() => (
         countLodVertices(visibleShapes, resolvedLodLevel)
     ), [resolvedLodLevel, visibleShapes]);
