@@ -41,7 +41,7 @@ import type {
     MapRgbaColor,
     MapShapeEditorViewBox,
 } from './types';
-import {clampMapShapeEditorViewBox, createInitialMapShapeEditorViewBox,} from './mapShapeEditorSvgUtils';
+import {clamp, clampMapShapeEditorViewBox, createInitialMapShapeEditorViewBox,} from './mapShapeEditorSvgUtils';
 import './MapShapeEditor.css';
 
 extend({
@@ -173,6 +173,9 @@ interface PixiViewportCullBucket {
 const VIEWPORT_CULLING_PADDING_PIXELS = 128;
 const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
 const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
+const PREVIEW_VIEWBOX_PADDING_RATIO = 0.35;
+const PREVIEW_VIEWBOX_MIN_PADDING = 80;
+const PREVIEW_VIEWBOX_MAX_PADDING_RATIO = 0.3;
 const PIXI_POLYGON_LOD_LEVELS: PixiLodLevel[] = ['overview', 'low', 'medium', 'high', 'original'];
 const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { targetRatio: number; minPointCount: number }> = {
     overview: {targetRatio: 0.075, minPointCount: 80},
@@ -1008,6 +1011,81 @@ function computePolygonBounds(polygon: [number, number][]): PixiShapeBounds {
     }
 
     return {minX, minY, maxX, maxY};
+}
+
+function mergeBounds(base: PixiShapeBounds, next: PixiShapeBounds): PixiShapeBounds {
+    return {
+        minX: Math.min(base.minX, next.minX),
+        minY: Math.min(base.minY, next.minY),
+        maxX: Math.max(base.maxX, next.maxX),
+        maxY: Math.max(base.maxY, next.maxY),
+    };
+}
+
+function expandBounds(bounds: PixiShapeBounds, padding: number): PixiShapeBounds {
+    return {
+        minX: bounds.minX - padding,
+        minY: bounds.minY - padding,
+        maxX: bounds.maxX + padding,
+        maxY: bounds.maxY + padding,
+    };
+}
+
+function computeSceneVisualBounds(scene: MapPreviewScene): PixiShapeBounds {
+    let bounds: PixiShapeBounds = {
+        minX: 0,
+        minY: 0,
+        maxX: scene.canvas.width,
+        maxY: scene.canvas.height,
+    };
+
+    for (const shape of scene.shapes) {
+        bounds = mergeBounds(bounds, computePolygonBounds(shape.polygon));
+    }
+
+    for (const location of scene.keyLocations) {
+        const markerPadding = normalizePositiveNumber(location.iconSize, DEFAULT_ICON_SIZE);
+        const [x, y] = location.position;
+        bounds = mergeBounds(bounds, {
+            minX: x - markerPadding,
+            minY: y - markerPadding,
+            maxX: x + markerPadding,
+            maxY: y + markerPadding,
+        });
+    }
+
+    return bounds;
+}
+
+function clampMapPreviewViewBox(
+    viewBox: MapShapeEditorViewBox,
+    scene: MapPreviewScene,
+): MapShapeEditorViewBox {
+    const sizeClampedViewBox = clampMapShapeEditorViewBox({
+        ...viewBox,
+        x: 0,
+        y: 0,
+    }, scene.canvas);
+    const width = sizeClampedViewBox.width;
+    const height = sizeClampedViewBox.height;
+    const maxCanvasSide = Math.max(scene.canvas.width, scene.canvas.height);
+    const padding = clamp(
+        Math.max(width, height) * PREVIEW_VIEWBOX_PADDING_RATIO,
+        PREVIEW_VIEWBOX_MIN_PADDING,
+        maxCanvasSide * PREVIEW_VIEWBOX_MAX_PADDING_RATIO,
+    );
+    const bounds = expandBounds(computeSceneVisualBounds(scene), padding);
+    const minX = Math.min(bounds.minX, bounds.maxX - width);
+    const maxX = Math.max(bounds.minX, bounds.maxX - width);
+    const minY = Math.min(bounds.minY, bounds.maxY - height);
+    const maxY = Math.max(bounds.minY, bounds.maxY - height);
+
+    return {
+        width,
+        height,
+        x: clamp(viewBox.x, minX, maxX),
+        y: clamp(viewBox.y, minY, maxY),
+    };
 }
 
 function isPointInBounds(point: [number, number], bounds: PixiShapeBounds): boolean {
@@ -1995,7 +2073,7 @@ export function MapPixiPreview({
 
         setInteractiveViewBox(currentViewBox => (
             currentViewBox
-                ? clampMapShapeEditorViewBox(currentViewBox, scene.canvas)
+                ? clampMapPreviewViewBox(currentViewBox, scene)
                 : createInitialMapShapeEditorViewBox(scene.canvas)
         ));
     }, [panZoomEnabled, scene, syncViewBox]);
@@ -2027,11 +2105,11 @@ export function MapPixiPreview({
             const moved = Math.hypot(deltaClientX, deltaClientY) >= PAN_DRAG_THRESHOLD;
 
             event.preventDefault();
-            setInteractiveViewBox(clampMapShapeEditorViewBox({
+            setInteractiveViewBox(clampMapPreviewViewBox({
                 ...panState.originViewBox,
                 x: panState.originViewBox.x - (deltaClientX / rect.width) * panState.originViewBox.width,
                 y: panState.originViewBox.y - (deltaClientY / rect.height) * panState.originViewBox.height,
-            }, scene.canvas));
+            }, scene));
             setPanState(currentState => (currentState ? {
                 ...currentState,
                 hasMoved: currentState.hasMoved || moved,
@@ -2081,12 +2159,12 @@ export function MapPixiPreview({
             const widthRatio = nextWidth / currentViewBox.width;
             const heightRatio = nextHeight / currentViewBox.height;
 
-            setInteractiveViewBox(clampMapShapeEditorViewBox({
+            setInteractiveViewBox(clampMapPreviewViewBox({
                 width: nextWidth,
                 height: nextHeight,
                 x: pointer.x - (pointer.x - currentViewBox.x) * widthRatio,
                 y: pointer.y - (pointer.y - currentViewBox.y) * heightRatio,
-            }, scene.canvas));
+            }, scene));
         };
 
         node.addEventListener('wheel', handleWheel, {passive: false});
