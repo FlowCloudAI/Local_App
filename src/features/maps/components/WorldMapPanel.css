@@ -1,4 +1,5 @@
 .wm-panel {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -140,6 +141,11 @@
     flex-shrink: 0;
 }
 
+.wm-toolbar-meta {
+    font-size: var(--fc-font-size-sm);
+    color: var(--fc-color-text-secondary);
+}
+
 .wm-toolbar-select {
     display: inline-flex;
     align-items: center;
@@ -203,6 +209,79 @@
 .wm-error-banner__close:hover {
     opacity: 1;
     background: color-mix(in srgb, var(--fc-color-danger) 10%, transparent);
+}
+
+/* ── 新建地图弹窗 ───────────────────────────────────────────────────────── */
+
+.wm-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.42);
+}
+
+.wm-create-map-dialog {
+    width: min(460px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 8px;
+    border: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+}
+
+.wm-create-map-dialog__header,
+.wm-create-map-dialog__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.wm-create-map-dialog__header h3 {
+    margin: 0;
+    font-size: var(--fc-font-size-lg);
+}
+
+.wm-create-map-dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.wm-create-map-dialog__size-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.wm-segmented {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg);
+}
+
+.wm-segmented__item {
+    border: 0;
+    padding: 8px 10px;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    font-size: var(--fc-font-size-sm);
+}
+
+.wm-segmented__item.is-active {
+    background: var(--fc-color-primary);
+    color: #fff;
 }
 
 /* ── 内容区 ────────────────────────────────────────────────────────────────────── */

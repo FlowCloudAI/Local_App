@@ -8,6 +8,13 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MapEntryCanvas {
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MapEntry {
     pub id: String,
     pub name: String,
@@ -15,6 +22,8 @@ pub struct MapEntry {
     pub scene_json: Option<String>,
     pub coastline_params_json: Option<String>,
     pub style: String,
+    pub canvas: Option<MapEntryCanvas>,
+    pub renderer: Option<String>,
     /// data: URL 或 null
     pub background_image_url: Option<String>,
     pub created_at: String,
@@ -81,6 +90,8 @@ fn load_store(app: &AppHandle, project_id: &str) -> Result<ProjectMapStore, Stri
                 scene_json: legacy["sceneJson"].as_str().map(|s| s.to_string()),
                 coastline_params_json: None,
                 style: legacy["style"].as_str().unwrap_or("flat").to_string(),
+                canvas: None,
+                renderer: None,
                 background_image_url: None,
                 created_at: legacy["savedAt"].as_str().unwrap_or_else(|| "").to_string(),
                 updated_at: legacy["savedAt"].as_str().unwrap_or_else(|| "").to_string(),

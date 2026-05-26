@@ -1,4 +1,5 @@
 import type {
+    MapEditorCanvas,
     MapPreviewBackgroundImage,
     MapShapeSaveRequest,
     MapShapeSaveResponse,
@@ -96,6 +97,8 @@ export interface MapEntry {
     sceneJson: string | null
     coastlineParamsJson: string | null
     style: string
+    canvas?: MapEditorCanvas | null
+    renderer?: string | null
     /** data: URL 或 null */
     backgroundImageUrl: string | null
     createdAt: string
