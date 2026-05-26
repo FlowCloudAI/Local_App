@@ -759,7 +759,24 @@ function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
     };
 }
 
-function drawShape(
+function drawShapeFill(
+    graphics: Graphics,
+    shape: CompiledPixiShape,
+) {
+    graphics.clear();
+    if (shape.pointCount < 3) {
+        return;
+    }
+
+    graphics
+        .poly(shape.flatPolygon, true)
+        .fill({
+            color: shape.fillColor,
+            alpha: shape.fillAlpha,
+        });
+}
+
+function drawShapeStroke(
     graphics: Graphics,
     shape: CompiledPixiShape,
     scale: number,
@@ -775,10 +792,6 @@ function drawShape(
 
     graphics
         .poly(shape.flatPolygon, true)
-        .fill({
-            color: shape.fillColor,
-            alpha: shape.fillAlpha,
-        })
         .stroke({
             width: strokeWidth,
             color: shape.strokeColor,
@@ -861,9 +874,16 @@ function MapPixiShape({
     perfRecorder?: PixiPerfRecorder;
 }) {
     const hitArea = useMemo(() => new Polygon(shape.flatPolygon), [shape.flatPolygon]);
-    const draw = useCallback((graphics: Graphics) => {
+    const drawFill = useCallback((graphics: Graphics) => {
         const startedAt = perfRecorder ? getHighResolutionTime() : 0;
-        drawShape(graphics, shape, transform.scale, polygonLineWidth, hovered);
+        drawShapeFill(graphics, shape);
+        if (perfRecorder) {
+            perfRecorder.recordShapeRedraw(shape.pointCount, getHighResolutionTime() - startedAt);
+        }
+    }, [perfRecorder, shape]);
+    const drawStroke = useCallback((graphics: Graphics) => {
+        const startedAt = perfRecorder ? getHighResolutionTime() : 0;
+        drawShapeStroke(graphics, shape, transform.scale, polygonLineWidth, hovered);
         if (perfRecorder) {
             perfRecorder.recordShapeRedraw(shape.pointCount, getHighResolutionTime() - startedAt);
         }
@@ -882,28 +902,31 @@ function MapPixiShape({
     }, [index, shape, transform]);
 
     return (
-        <pixiGraphics
-            draw={draw}
-            eventMode={enablePicking ? 'static' : 'none'}
-            cursor={enablePicking ? 'pointer' : undefined}
-            hitArea={hitArea}
-            onClick={(event: FederatedPointerEvent) => {
-                event.stopPropagation();
-                onClick(createDetail(event), event);
-            }}
-            onPointerOver={(event: FederatedPointerEvent) => {
-                event.stopPropagation();
-                onHover(createDetail(event), event);
-            }}
-            onPointerMove={(event: FederatedPointerEvent) => {
-                event.stopPropagation();
-                onMove(createDetail(event), event);
-            }}
-            onPointerOut={(event: FederatedPointerEvent) => {
-                event.stopPropagation();
-                onOut();
-            }}
-        />
+        <>
+            <pixiGraphics draw={drawFill}/>
+            <pixiGraphics
+                draw={drawStroke}
+                eventMode={enablePicking ? 'static' : 'none'}
+                cursor={enablePicking ? 'pointer' : undefined}
+                hitArea={hitArea}
+                onClick={(event: FederatedPointerEvent) => {
+                    event.stopPropagation();
+                    onClick(createDetail(event), event);
+                }}
+                onPointerOver={(event: FederatedPointerEvent) => {
+                    event.stopPropagation();
+                    onHover(createDetail(event), event);
+                }}
+                onPointerMove={(event: FederatedPointerEvent) => {
+                    event.stopPropagation();
+                    onMove(createDetail(event), event);
+                }}
+                onPointerOut={(event: FederatedPointerEvent) => {
+                    event.stopPropagation();
+                    onOut();
+                }}
+            />
+        </>
     );
 }
 
