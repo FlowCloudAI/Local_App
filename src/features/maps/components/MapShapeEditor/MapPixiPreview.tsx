@@ -101,6 +101,8 @@ export interface MapPixiPerfStats {
     redrawVertexCount: number;
     drawMs: number;
     hitTestMs: number;
+    cullMs: number;
+    cullCount: number;
     pointerMoveCount: number;
     scale: number;
 }
@@ -110,14 +112,16 @@ interface PixiPerfAccumulator {
     redrawVertexCount: number;
     drawMs: number;
     hitTestMs: number;
+    cullMs: number;
+    cullCount: number;
     pointerMoveCount: number;
 }
 
 interface PixiPerfRecorder {
     recordShapeRedraw: (pointCount: number, drawMs: number) => void;
     recordHitTest: (hitTestMs: number) => void;
+    recordCull: (visibleShapeCount: number, cullMs: number) => void;
     recordPointerMove: () => void;
-    setVisibleShapeCount: (count: number) => void;
 }
 
 interface PixiShapeBounds {
@@ -138,7 +142,16 @@ interface CompiledPixiShape {
     strokeAlpha: number;
 }
 
-const VIEWPORT_CULLING_PADDING_PIXELS = 64;
+interface PixiViewportCullBucket {
+    key: string;
+    x: number;
+    y: number;
+    scale: number;
+}
+
+const VIEWPORT_CULLING_PADDING_PIXELS = 128;
+const VIEWPORT_CULLING_BUCKET_PIXELS = 64;
+const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
 
 interface MapPixiApplicationGuardProps {
     onContextLost: () => void;
@@ -415,6 +428,8 @@ function createEmptyPerfAccumulator(): PixiPerfAccumulator {
         redrawVertexCount: 0,
         drawMs: 0,
         hitTestMs: 0,
+        cullMs: 0,
+        cullCount: 0,
         pointerMoveCount: 0,
     };
 }
@@ -477,7 +492,8 @@ function usePixiPerfRecorder({
         const accumulator = accumulatorRef.current;
         const hasSamples = accumulator.redrawShapeCount > 0
             || accumulator.pointerMoveCount > 0
-            || accumulator.hitTestMs > 0;
+            || accumulator.hitTestMs > 0
+            || accumulator.cullCount > 0;
 
         if (!hasSamples) {
             return;
@@ -491,6 +507,8 @@ function usePixiPerfRecorder({
             redrawVertexCount: accumulator.redrawVertexCount,
             drawMs: Number(accumulator.drawMs.toFixed(2)),
             hitTestMs: Number(accumulator.hitTestMs.toFixed(2)),
+            cullMs: Number(accumulator.cullMs.toFixed(2)),
+            cullCount: accumulator.cullCount,
             pointerMoveCount: accumulator.pointerMoveCount,
         };
 
@@ -537,11 +555,15 @@ function usePixiPerfRecorder({
                 accumulatorRef.current.hitTestMs += hitTestMs;
                 scheduleFlush();
             },
-            setVisibleShapeCount: (count: number) => {
+            recordCull: (visibleShapeCount: number, cullMs: number) => {
+                const accumulator = accumulatorRef.current;
+                accumulator.cullMs += cullMs;
+                accumulator.cullCount += 1;
                 latestMetaRef.current = {
                     ...latestMetaRef.current,
-                    visibleShapeCount: count,
+                    visibleShapeCount,
                 };
+                scheduleFlush();
             },
         };
     }, [enabled, scheduleFlush]);
@@ -769,7 +791,7 @@ function doBoundsIntersect(a: PixiShapeBounds, b: PixiShapeBounds): boolean {
 }
 
 function computeViewportWorldBounds(
-    transform: PixiViewportTransform,
+    transform: PixiViewportTransform | PixiViewportCullBucket,
     size: ElementSize,
 ): PixiShapeBounds {
     const scale = Math.max(transform.scale, 0.01);
@@ -780,6 +802,29 @@ function computeViewportWorldBounds(
         minY: (-transform.y / scale) - padding,
         maxX: ((size.width - transform.x) / scale) + padding,
         maxY: ((size.height - transform.y) / scale) + padding,
+    };
+}
+
+function computeViewportCullKey(transform: PixiViewportTransform): string {
+    const bucketX = Math.floor(transform.x / VIEWPORT_CULLING_BUCKET_PIXELS);
+    const bucketY = Math.floor(transform.y / VIEWPORT_CULLING_BUCKET_PIXELS);
+    const scaleBucket = Math.round(
+        Math.log2(Math.max(transform.scale, 0.01)) * VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE,
+    );
+
+    return `${bucketX}:${bucketY}:${scaleBucket}`;
+}
+
+function parseViewportCullKey(key: string): PixiViewportCullBucket {
+    const [bucketX = 0, bucketY = 0, scaleBucket = 0] = key
+        .split(':')
+        .map(value => Number.parseInt(value, 10));
+
+    return {
+        key,
+        x: bucketX * VIEWPORT_CULLING_BUCKET_PIXELS,
+        y: bucketY * VIEWPORT_CULLING_BUCKET_PIXELS,
+        scale: Math.pow(2, scaleBucket / VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE),
     };
 }
 
@@ -1283,16 +1328,25 @@ function MapPixiScene({
             : null
     ), [backgroundImage, naturalSize, scene.canvas]);
     const compiledShapes = useMemo(() => scene.shapes.map(compilePixiShape), [scene.shapes]);
+    const viewportCullKey = useMemo(() => computeViewportCullKey(transform), [transform]);
+    const viewportCullBucket = useMemo(() => parseViewportCullKey(viewportCullKey), [viewportCullKey]);
     const viewportWorldBounds = useMemo(() => (
-        computeViewportWorldBounds(transform, size)
-    ), [size, transform]);
-    const visibleShapes = useMemo(() => (
-        compiledShapes.filter(shape => doBoundsIntersect(shape.bbox, viewportWorldBounds))
-    ), [compiledShapes, viewportWorldBounds]);
+        computeViewportWorldBounds(viewportCullBucket, size)
+    ), [size, viewportCullBucket]);
+    const visibleShapeResult = useMemo(() => {
+        const startedAt = perfRecorder ? getHighResolutionTime() : 0;
+        const shapes = compiledShapes.filter(shape => doBoundsIntersect(shape.bbox, viewportWorldBounds));
+
+        return {
+            shapes,
+            cullMs: perfRecorder ? getHighResolutionTime() - startedAt : 0,
+        };
+    }, [compiledShapes, perfRecorder, viewportWorldBounds]);
+    const visibleShapes = visibleShapeResult.shapes;
 
     useEffect(() => {
-        perfRecorder?.setVisibleShapeCount(visibleShapes.length);
-    }, [perfRecorder, visibleShapes.length]);
+        perfRecorder?.recordCull(visibleShapes.length, visibleShapeResult.cullMs);
+    }, [perfRecorder, visibleShapeResult.cullMs, visibleShapes.length]);
 
     const circleKeyLocationItems = useMemo(() => scene.keyLocations
         .map((location, index) => ({location, index}))
