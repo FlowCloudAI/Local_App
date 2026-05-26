@@ -265,16 +265,22 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
     // ── 操作状态 ─────────────────────────────────────────────────────────────
     const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+    const markMapUnsaved = useCallback(() => {
+        setHasUnsavedChanges(true)
+        setSaveStatus('idle')
+    }, [])
 
     const updateDraft = useCallback((updater: MapShapeEditorDraft | ((draft: MapShapeEditorDraft) => MapShapeEditorDraft)) => {
         setDraft(current => typeof updater === 'function'
             ? (updater as (draft: MapShapeEditorDraft) => MapShapeEditorDraft)(current)
             : updater)
         setSceneDirty(true)
-        setSaveStatus('idle')
-    }, [])
+        markMapUnsaved()
+    }, [markMapUnsaved])
 
     const loadMapDataRef = useRef<(entry: MapEntry) => void>(() => {
     })
@@ -359,6 +365,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         setSelectedLocationId(null)
         setViewBox(createInitialMapShapeEditorViewBox(nextCanvas))
         setViewportMode('preview')
+        setHasUnsavedChanges(false)
         setSaveStatus('idle')
         setErrorMsg(null)
     }, [])
@@ -407,7 +414,6 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     ) => {
         const existing = maps.find(m => m.id === mapId)
         if (!existing) return
-        if (currentDraft.shapes.length === 0 && !currentBg) return // 无值得保存的内容
 
         const previewScene = buildPreviewSceneFromDraft({
             canvas: currentCanvas,
@@ -432,11 +438,11 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
     const handleSwitchMap = useCallback(async (entry: MapEntry) => {
         if (entry.id === activeMapId) return
-        if (activeMapId) {
+        if (activeMapId && hasUnsavedChanges) {
             await autoSave(activeMapId, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
         }
         loadMapData(entry)
-    }, [activeMapId, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams, autoSave, loadMapData])
+    }, [activeMapId, hasUnsavedChanges, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams, autoSave, loadMapData])
 
     // ── 新建地图 ────────────────────────────────────────────────────────
 
@@ -472,7 +478,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             return
         }
 
-        if (activeMapId) {
+        if (activeMapId && hasUnsavedChanges) {
             await autoSave(activeMapId, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
         }
 
@@ -486,7 +492,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         } catch (e) {
             setErrorMsg(`新建地图失败：${e instanceof Error ? e.message : String(e)}`)
         }
-    }, [activeCanvas, activeMapId, activeMapName, autoSave, backgroundImageUrl, coastlineParams, draft, loadMapData, maps.length, newMapForm, previewRenderer, projectId, scene, style])
+    }, [activeCanvas, activeMapId, activeMapName, autoSave, backgroundImageUrl, coastlineParams, draft, hasUnsavedChanges, loadMapData, maps.length, newMapForm, previewRenderer, projectId, scene, style])
 
     // ── 删除地图 ──────────────────────────────────────────────────────────
 
@@ -515,6 +521,9 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                     setPreviewRenderer('pixi')
                     setBackgroundImageUrl(null)
                     setActiveMapName('')
+                    setSceneDirty(false)
+                    setHasUnsavedChanges(false)
+                    setSaveStatus('idle')
                 }
             }
         } catch (e) {
@@ -532,10 +541,6 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const handleSave = useCallback(async () => {
         if (!activeMapId) {
             setErrorMsg('请先新建或选择一个地图。')
-            return
-        }
-        if (draft.shapes.length === 0 && !backgroundImageUrl) {
-            setErrorMsg('请先绘制图形或上传底图再保存。')
             return
         }
         if (draft.shapes.length > 0 && !validation.isValid) {
@@ -563,6 +568,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             setMaps(prev => prev.map(m => m.id === activeMapId ? saved : m))
             setScene(sceneToSave)
             setSceneDirty(false)
+            setHasUnsavedChanges(false)
             setSaveStatus('saved')
             setTimeout(() => setSaveStatus('idle'), 2500)
         } catch (e) {
@@ -576,7 +582,14 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
     const handleRename = useCallback((name: string) => {
         setActiveMapName(name)
         setMaps(prev => prev.map(m => m.id === activeMapId ? {...m, name} : m))
-    }, [activeMapId])
+        markMapUnsaved()
+    }, [activeMapId, markMapUnsaved])
+
+    const handleStyleChange = useCallback((nextStyle: MapStyle) => {
+        if (style === nextStyle) return
+        setStyle(nextStyle)
+        markMapUnsaved()
+    }, [markMapUnsaved, style])
 
     const deleteVertex = useCallback((shapeId: string, vertexId: string) => {
         updateDraft(d => ({
@@ -731,16 +744,16 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         const reader = new FileReader()
         reader.onload = () => {
             setBackgroundImageUrl(reader.result as string)
-            setSaveStatus('idle')
+            markMapUnsaved()
         }
         reader.readAsDataURL(file)
         if (imageInputRef.current) imageInputRef.current.value = ''
-    }, [])
+    }, [markMapUnsaved])
 
     const handleRemoveImage = useCallback(() => {
         setBackgroundImageUrl(null)
-        setSaveStatus('idle')
-    }, [])
+        markMapUnsaved()
+    }, [markMapUnsaved])
 
     // ── 图形编辑辅助 ─────────────────────────────────────────────────
 
@@ -802,7 +815,8 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             ...current,
             [field]: trimmed === '' ? undefined : Number(trimmed),
         }))
-    }, [])
+        markMapUnsaved()
+    }, [markMapUnsaved])
 
     // ── 添加图形/地点 ──────────────────────────────────────────────────
 
@@ -1032,6 +1046,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         if (saveStatus === 'saving') return '保存中…'
         if (saveStatus === 'saved') return '已保存'
         if (saveStatus === 'error') return '保存失败'
+        if (hasUnsavedChanges) return '未保存'
         const active = maps.find(m => m.id === activeMapId)
         if (active?.updatedAt) {
             const d = new Date(active.updatedAt)
@@ -1045,7 +1060,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             }
         }
         return '未保存'
-    }, [saveStatus, maps, activeMapId])
+    }, [saveStatus, hasUnsavedChanges, maps, activeMapId])
 
     if (isLoading) {
         return <div className="wm-panel">
@@ -1171,7 +1186,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                     {(['flat', 'tolkien', 'ink'] as MapStyle[]).map(s => (
                         <button key={s} type="button"
                                 className={`wm-style-btn${style === s ? ' is-active' : ''}`}
-                                onClick={() => setStyle(s)}>{MAP_STYLE_LABELS[s]}</button>
+                                onClick={() => handleStyleChange(s)}>{MAP_STYLE_LABELS[s]}</button>
                     ))}
                 </div>
                 <div className="wm-header-actions">
@@ -1367,6 +1382,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                                     event.preventDefault()
                                                     event.stopPropagation()
                                                     setCoastlineParams(DEFAULT_COASTLINE_PARAMS)
+                                                    markMapUnsaved()
                                                 }}
                                             >
                                                 恢复默认
