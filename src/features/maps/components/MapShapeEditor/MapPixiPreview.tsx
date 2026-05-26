@@ -5,7 +5,6 @@ import {
     type FederatedPointerEvent,
     type Filter,
     Graphics,
-    Polygon,
     Rectangle,
     Sprite,
     Text,
@@ -116,6 +115,7 @@ interface PixiPerfAccumulator {
 
 interface PixiPerfRecorder {
     recordShapeRedraw: (pointCount: number, drawMs: number) => void;
+    recordHitTest: (hitTestMs: number) => void;
     recordPointerMove: () => void;
 }
 
@@ -530,6 +530,10 @@ function usePixiPerfRecorder({
                 accumulatorRef.current.pointerMoveCount += 1;
                 scheduleFlush();
             },
+            recordHitTest: (hitTestMs: number) => {
+                accumulatorRef.current.hitTestMs += hitTestMs;
+                scheduleFlush();
+            },
         };
     }, [enabled, scheduleFlush]);
 }
@@ -746,6 +750,43 @@ function computePolygonBounds(polygon: [number, number][]): PixiShapeBounds {
     return {minX, minY, maxX, maxY};
 }
 
+function isPointInBounds(point: [number, number], bounds: PixiShapeBounds): boolean {
+    const [x, y] = point;
+    return x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+}
+
+function isPointInPolygon(point: [number, number], polygon: [number, number][]): boolean {
+    const [x, y] = point;
+    let inside = false;
+
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+        const [xi, yi] = polygon[i];
+        const [xj, yj] = polygon[j];
+        const intersects = ((yi > y) !== (yj > y))
+            && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+        if (intersects) {
+            inside = !inside;
+        }
+    }
+
+    return inside;
+}
+
+function findCompiledShapeAtPoint(
+    shapes: CompiledPixiShape[],
+    point: [number, number],
+): { shape: CompiledPixiShape; index: number } | null {
+    for (let index = shapes.length - 1; index >= 0; index -= 1) {
+        const shape = shapes[index];
+        if (isPointInBounds(point, shape.bbox) && isPointInPolygon(point, shape.source.polygon)) {
+            return {shape, index};
+        }
+    }
+
+    return null;
+}
+
 function compilePixiShape(shape: MapPreviewShape): CompiledPixiShape {
     return {
         source: shape,
@@ -850,30 +891,17 @@ function MapPixiBackground({
 
 function MapPixiShape({
                           shape,
-                          index,
                           transform,
                           polygonLineWidth,
-                          enablePicking,
                           hovered,
-                          onClick,
-                          onHover,
-                          onMove,
-                          onOut,
                           perfRecorder,
                       }: {
     shape: CompiledPixiShape;
-    index: number;
     transform: PixiViewportTransform;
     polygonLineWidth: number;
-    enablePicking: boolean;
     hovered: boolean;
-    onClick: (detail: MapPreviewShapePickDetail, event: FederatedPointerEvent) => void;
-    onHover: (detail: MapPreviewShapePickDetail, event: FederatedPointerEvent) => void;
-    onMove: (detail: MapPreviewShapePickDetail, event: FederatedPointerEvent) => void;
-    onOut: () => void;
     perfRecorder?: PixiPerfRecorder;
 }) {
-    const hitArea = useMemo(() => new Polygon(shape.flatPolygon), [shape.flatPolygon]);
     const drawFill = useCallback((graphics: Graphics) => {
         const startedAt = perfRecorder ? getHighResolutionTime() : 0;
         drawShapeFill(graphics, shape);
@@ -888,44 +916,11 @@ function MapPixiShape({
             perfRecorder.recordShapeRedraw(shape.pointCount, getHighResolutionTime() - startedAt);
         }
     }, [hovered, perfRecorder, polygonLineWidth, shape, transform.scale]);
-    const createDetail = useCallback((event: FederatedPointerEvent): MapPreviewShapePickDetail => {
-        const point = getEventScreenPoint(event);
-        return {
-            kind: 'shape',
-            object: shape.source,
-            index,
-            layerId: 'fc-map-pixi-preview-polygons',
-            x: point.x,
-            y: point.y,
-            coordinate: getEventCanvasCoordinate(event, transform),
-        };
-    }, [index, shape, transform]);
 
     return (
         <>
             <pixiGraphics draw={drawFill}/>
-            <pixiGraphics
-                draw={drawStroke}
-                eventMode={enablePicking ? 'static' : 'none'}
-                cursor={enablePicking ? 'pointer' : undefined}
-                hitArea={hitArea}
-                onClick={(event: FederatedPointerEvent) => {
-                    event.stopPropagation();
-                    onClick(createDetail(event), event);
-                }}
-                onPointerOver={(event: FederatedPointerEvent) => {
-                    event.stopPropagation();
-                    onHover(createDetail(event), event);
-                }}
-                onPointerMove={(event: FederatedPointerEvent) => {
-                    event.stopPropagation();
-                    onMove(createDetail(event), event);
-                }}
-                onPointerOut={(event: FederatedPointerEvent) => {
-                    event.stopPropagation();
-                    onOut();
-                }}
-            />
+            <pixiGraphics draw={drawStroke}/>
         </>
     );
 }
@@ -1123,6 +1118,82 @@ function MapPixiEmptyHitArea({
     );
 }
 
+function MapPixiShapeHitLayer({
+                                  scene,
+                                  shapes,
+                                  transform,
+                                  enablePicking,
+                                  onClick,
+                                  onHover,
+                                  onMove,
+                                  onOut,
+                                  perfRecorder,
+                              }: {
+    scene: MapPreviewScene;
+    shapes: CompiledPixiShape[];
+    transform: PixiViewportTransform;
+    enablePicking: boolean;
+    onClick: (detail: MapPreviewPickDetail, event: FederatedPointerEvent) => void;
+    onHover: (detail: MapPreviewPickDetail, event: FederatedPointerEvent) => void;
+    onMove: (detail: MapPreviewPickDetail, event: FederatedPointerEvent) => void;
+    onOut: () => void;
+    perfRecorder?: PixiPerfRecorder;
+}) {
+    const hoverKeyRef = useRef<string>('empty');
+    const hitArea = useMemo(() => new Rectangle(0, 0, scene.canvas.width, scene.canvas.height), [scene.canvas.height, scene.canvas.width]);
+    const createDetail = useCallback((event: FederatedPointerEvent): MapPreviewPickDetail => {
+        const startedAt = perfRecorder ? getHighResolutionTime() : 0;
+        const coordinate = getEventCanvasCoordinate(event, transform);
+        const hit = findCompiledShapeAtPoint(shapes, coordinate);
+        if (perfRecorder) {
+            perfRecorder.recordHitTest(getHighResolutionTime() - startedAt);
+        }
+
+        if (!hit) {
+            return createEmptyPickDetail(transform, event);
+        }
+
+        const point = getEventScreenPoint(event);
+        return {
+            kind: 'shape',
+            object: hit.shape.source,
+            index: hit.index,
+            layerId: 'fc-map-pixi-preview-polygons',
+            x: point.x,
+            y: point.y,
+            coordinate,
+        };
+    }, [perfRecorder, shapes, transform]);
+    const handleMove = useCallback((event: FederatedPointerEvent) => {
+        const detail = createDetail(event);
+        const nextHoverKey = detail.kind === 'shape' ? `shape:${detail.object.id}` : 'empty';
+
+        if (hoverKeyRef.current !== nextHoverKey) {
+            hoverKeyRef.current = nextHoverKey;
+            onHover(detail, event);
+        }
+
+        onMove(detail, event);
+    }, [createDetail, onHover, onMove]);
+    const handleOut = useCallback(() => {
+        hoverKeyRef.current = 'empty';
+        onOut();
+    }, [onOut]);
+
+    return (
+        <pixiContainer
+            eventMode={enablePicking ? 'static' : 'none'}
+            hitArea={hitArea}
+            onClick={(event: FederatedPointerEvent) => {
+                onClick(createDetail(event), event);
+            }}
+            onPointerOver={handleMove}
+            onPointerMove={handleMove}
+            onPointerOut={handleOut}
+        />
+    );
+}
+
 function MapPixiScene({
                           scene,
                           showLabels,
@@ -1224,22 +1295,27 @@ function MapPixiScene({
                 {backgroundImage && backgroundBounds && (
                     <MapPixiBackground backgroundImage={backgroundImage} bounds={backgroundBounds}/>
                 )}
-                {compiledShapes.map((shape, index) => (
+                {compiledShapes.map(shape => (
                     <MapPixiShape
                         key={shape.source.id}
                         shape={shape}
-                        index={index}
                         transform={transform}
                         polygonLineWidth={polygonLineWidth}
-                        enablePicking={enablePicking}
                         hovered={hoveredDetail?.kind === 'shape' && hoveredDetail.object.id === shape.source.id}
-                        onClick={onPickClick}
-                        onHover={onPickHover}
-                        onMove={onPickMove}
-                        onOut={onPickOut}
                         perfRecorder={perfRecorder}
                     />
                 ))}
+                <MapPixiShapeHitLayer
+                    scene={scene}
+                    shapes={compiledShapes}
+                    transform={transform}
+                    enablePicking={enablePicking}
+                    onClick={onPickClick}
+                    onHover={onPickHover}
+                    onMove={onPickMove}
+                    onOut={onPickOut}
+                    perfRecorder={perfRecorder}
+                />
                 {circleKeyLocationItems.map(({location, index}) => (
                     <MapPixiKeyLocationCircle
                         key={location.id}
