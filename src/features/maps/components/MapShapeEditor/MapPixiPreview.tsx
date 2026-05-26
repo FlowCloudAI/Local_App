@@ -176,9 +176,9 @@ const VIEWPORT_CULLING_ZOOM_BUCKETS_PER_OCTAVE = 4;
 const PIXI_POLYGON_LOD_LEVELS: PixiLodLevel[] = ['overview', 'low', 'medium', 'high', 'original'];
 const PIXI_POLYGON_LOD_CONFIG: Record<PixiLodLevel, { tolerance: number; minPointCount: number }> = {
     overview: {tolerance: 6, minPointCount: 80},
-    low: {tolerance: 1.2, minPointCount: 1200},
-    medium: {tolerance: 0.65, minPointCount: 2200},
-    high: {tolerance: 0.25, minPointCount: 4200},
+    low: {tolerance: 2.8, minPointCount: 1400},
+    medium: {tolerance: 1.6, minPointCount: 3000},
+    high: {tolerance: 0.95, minPointCount: 5600},
     original: {tolerance: 0, minPointCount: 0},
 };
 
