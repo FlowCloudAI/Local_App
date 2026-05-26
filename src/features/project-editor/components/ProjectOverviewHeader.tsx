@@ -141,7 +141,7 @@ function ProjectOverviewHeader({
                 </div>
             </div>
 
-            <div className="pe-overview-hero__content">
+            <div className="pe-overview-hero__content pe-overview-hero__primary">
                 <h1 className="pe-overview-title">{project.name}</h1>
                 {descEditing ? (
                     <div className="pe-overview-desc-editor">
@@ -179,6 +179,9 @@ function ProjectOverviewHeader({
                         )}
                     </div>
                 )}
+            </div>
+
+            <div className="pe-overview-hero__content pe-overview-hero__secondary">
                 <div className="pe-overview-meta">
                     <span>创建于 {formatDate(project.created_at)}</span>
                     <span className="pe-meta-sep">·</span>
