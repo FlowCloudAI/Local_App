@@ -527,12 +527,9 @@ function usePixiPerfRecorder({
 
     useEffect(() => {
         latestMetaRef.current = {
+            ...latestMetaRef.current,
             shapeCount: scene?.shapes.length ?? 0,
             vertexCount,
-            visibleShapeCount: scene?.shapes.length ?? 0,
-            visibleVertexCount: vertexCount,
-            lodVertexCount: vertexCount,
-            lodLevel: 'high',
             scale,
         };
     }, [scale, scene?.shapes.length, vertexCount]);
