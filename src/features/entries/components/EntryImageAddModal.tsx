@@ -11,12 +11,13 @@ import {
     import_remote_images,
     type PluginInfo,
 } from '../../../api'
-import type {EntryImage} from '../lib/entryImage'
+import {buildEntryImageMarkdownRef, type EntryImage, toEntryImageSrc} from '../lib/entryImage'
 import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import './EntryImageAddModal.css'
 
-type Tab = 'local' | 'ai'
+type Tab = 'existing' | 'local' | 'ai'
 type GenerateState = 'idle' | 'generating' | 'success' | 'error'
+type ModalMode = 'add' | 'insert'
 
 interface EntryImageAddModalProps {
     open: boolean
@@ -27,9 +28,12 @@ interface EntryImageAddModalProps {
     entryType?: string | null
     aiPluginId?: string | null
     aiModel?: string | null
+    mode?: ModalMode
+    existingImages?: EntryImage[]
     onClose: () => void
-    onUploadLocal: () => void
+    onUploadLocal: () => void | EntryImage[] | Promise<void | EntryImage[]>
     onAddAiImages: (images: EntryImage[]) => void
+    onInsertImage?: (image: EntryImage) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
@@ -42,12 +46,16 @@ export default function EntryImageAddModal({
                                                entryType = null,
                                                aiPluginId = null,
                                                aiModel = null,
+                                               mode = 'add',
+                                               existingImages = [],
                                                onClose,
                                                onUploadLocal,
                                                onAddAiImages,
+                                               onInsertImage,
                                                onOpenPluginManagement,
                                            }: EntryImageAddModalProps) {
-    const [activeTab, setActiveTab] = useState<Tab>('local')
+    const insertMode = mode === 'insert'
+    const [activeTab, setActiveTab] = useState<Tab>(insertMode ? 'existing' : 'local')
 
     // ── AI 生成相关状态 ──
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
@@ -66,7 +74,7 @@ export default function EntryImageAddModal({
     useEffect(() => {
         if (!open) return
         queueMicrotask(() => {
-            setActiveTab('local')
+            setActiveTab(insertMode ? 'existing' : 'local')
             setPrompt('')
             setFillingPrompt(false)
             setGenerateState('idle')
@@ -88,7 +96,7 @@ export default function EntryImageAddModal({
                     queueMicrotask(() => {
                         setSelectedPlugin(data[0].id)
                     })
-                } else {
+                } else if (!insertMode) {
                     queueMicrotask(() => {
                         setActiveTab('ai')
                     })
@@ -99,7 +107,7 @@ export default function EntryImageAddModal({
                 setPluginLoadError(err instanceof Error ? err.message : String(err))
                 setPluginsLoaded(true)
             })
-    }, [open])
+    }, [open, insertMode])
 
     useEffect(() => {
         const plugin = plugins.find((p) => p.id === selectedPlugin)
@@ -216,6 +224,9 @@ export default function EntryImageAddModal({
             }))
 
             onAddAiImages(entryImages)
+            if (insertMode && entryImages[0]) {
+                onInsertImage?.(entryImages[0])
+            }
             onClose()
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
@@ -225,8 +236,20 @@ export default function EntryImageAddModal({
         }
     }
 
-    const handleLocalUpload = () => {
-        onUploadLocal()
+    const handleLocalUpload = async () => {
+        const uploadedImages = await onUploadLocal()
+        if (insertMode && Array.isArray(uploadedImages) && uploadedImages[0]) {
+            onInsertImage?.(uploadedImages[0])
+        }
+        onClose()
+    }
+
+    const handleInsertExisting = (image: EntryImage) => {
+        if (!buildEntryImageMarkdownRef(image)) {
+            void showAlert('当前图片没有可插入的 uuid 引用。', 'warning', 'toast', 1800)
+            return
+        }
+        onInsertImage?.(image)
         onClose()
     }
 
@@ -251,7 +274,7 @@ export default function EntryImageAddModal({
                 aria-label="添加图片"
             >
                 <div className="entry-image-add-header">
-                    <span className="entry-image-add-title">添加图片</span>
+                    <span className="entry-image-add-title">{insertMode ? '插入图片' : '添加图片'}</span>
                     <button
                         className="entry-image-add-close app-dialog-close"
                         onClick={onClose}
@@ -265,6 +288,15 @@ export default function EntryImageAddModal({
                 </div>
 
                 <div className="entry-image-add-tabs">
+                    {insertMode && (
+                        <button
+                            type="button"
+                            className={`entry-image-add-tab${activeTab === 'existing' ? ' active' : ''}`}
+                            onClick={() => setActiveTab('existing')}
+                        >
+                            设定集
+                        </button>
+                    )}
                     <button
                         type="button"
                         className={`entry-image-add-tab${activeTab === 'local' ? ' active' : ''}`}
@@ -282,7 +314,43 @@ export default function EntryImageAddModal({
                 </div>
 
                 <div className="entry-image-add-body">
-                    {activeTab === 'local' ? (
+                    {activeTab === 'existing' ? (
+                        <div className="entry-image-add-existing">
+                            {existingImages.length > 0 ? (
+                                <div className="entry-image-add-existing__grid">
+                                    {existingImages.map((image, index) => {
+                                        const src = toEntryImageSrc(image)
+                                        const canInsert = Boolean(buildEntryImageMarkdownRef(image))
+                                        return (
+                                            <button
+                                                key={`${image.path ?? image.url ?? index}`}
+                                                type="button"
+                                                className="entry-image-add-existing__item"
+                                                onClick={() => handleInsertExisting(image)}
+                                                disabled={!canInsert}
+                                            >
+                                                <div className="entry-image-add-existing__media">
+                                                    {src ? (
+                                                        <img src={src} alt={image.alt || image.caption || `图片 ${index + 1}`}/>
+                                                    ) : (
+                                                        <span>无预览</span>
+                                                    )}
+                                                </div>
+                                                <div className="entry-image-add-existing__meta">
+                                                    <span>{image.alt || image.caption || `图片 ${index + 1}`}</span>
+                                                    {!canInsert && <small>缺少 uuid 引用</small>}
+                                                </div>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="entry-image-add-existing__empty">
+                                    当前设定集还没有图片，可上传本地图片或使用 AI 生成后插入。
+                                </div>
+                            )}
+                        </div>
+                    ) : activeTab === 'local' ? (
                         <div className="entry-image-add-local">
                             <p className="entry-image-add-local-desc">
                                 从本地文件系统选择图片文件，支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。
@@ -413,7 +481,7 @@ export default function EntryImageAddModal({
                                             variant="primary"
                                             onClick={handleAddToEntry}
                                         >
-                                            添加到词条
+                                            {insertMode ? '添加并插入' : '添加到词条'}
                                         </Button>
                                     </div>
                                 </div>

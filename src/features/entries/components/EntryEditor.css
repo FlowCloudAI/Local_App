@@ -585,6 +585,16 @@
     height: 100%;
 }
 
+.entry-editor-md-image-command {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1rem;
+    font-size: var(--fc-font-size-xs);
+    font-weight: 700;
+    line-height: 1;
+}
+
 .entry-editor-workspace.is-editing .entry-editor-markdown-anchor {
     height: auto;
 }

@@ -417,28 +417,21 @@ pub async fn import_remote_images(
     project_id: String,
     urls: Vec<String>,
 ) -> Result<Vec<FCImage>, String> {
-    let _project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-
-    let images_root = paths
-        .db_path
-        .parent()
-        .ok_or_else(|| "invalid db path".to_string())?
-        .join("images");
-    std::fs::create_dir_all(&images_root).map_err(|e| e.to_string())?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let target_dir = build_entry_images_dir(paths.inner(), &project_id)?;
+    std::fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
 
     let mut images = Vec::new();
-    for (i, url) in urls.into_iter().enumerate() {
+    for url in urls {
         // 清洗 URL：移除查询参数，提取纯净扩展名
         let clean_url = url.split('?').next().unwrap_or(&url);
-        let ext = clean_url.split('.').last().unwrap_or("png");
-
-        // 清洗文件名：移除 Windows 非法字符
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(0);
-        let filename = format!("remote_{}_{}.{}", timestamp, i, ext);
-        let local_path = images_root.join(&filename);
+        let ext = clean_url
+            .split('.')
+            .last()
+            .filter(|value| !value.is_empty() && value.len() <= 8)
+            .unwrap_or("png");
+        let filename = format!("{}.{}", Uuid::new_v4(), ext);
+        let local_path = target_dir.join(&filename);
 
         let bytes = network
             .client

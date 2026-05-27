@@ -2,6 +2,7 @@ import {logger} from '../../../shared/logger'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {listen} from '@tauri-apps/api/event'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import type {ICommand} from '@uiw/react-md-editor'
 import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_generate_entry_summary,
@@ -69,6 +70,7 @@ import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/tts
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
+type ImageAddModalMode = 'add' | 'insert'
 type EntryEditorCache = {
     entry: Entry
     draft: EntryDraft
@@ -139,7 +141,7 @@ function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
 }
 
 function escapeMarkdownImageAlt(value: string): string {
-    return value.replace(/[\[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+    return value.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export default function EntryEditor({
@@ -199,6 +201,7 @@ export default function EntryEditor({
     const [, setLinksLoading] = useState(false)
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
+    const [imageAddModalMode, setImageAddModalMode] = useState<ImageAddModalMode>('add')
     const entryCacheRef = useRef<Record<string, EntryEditorCache>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -955,7 +958,12 @@ export default function EntryEditor({
     }, [handleUndo, handleRedo])
 
 
-    async function handleUploadImages() {
+    function openImageAddModal(mode: ImageAddModalMode) {
+        setImageAddModalMode(mode)
+        setImageAddModalOpen(true)
+    }
+
+    async function handleUploadImages(): Promise<EntryImage[]> {
         try {
             const selected = await openFileDialog({
                 multiple: true,
@@ -965,14 +973,17 @@ export default function EntryEditor({
                 }],
             })
             const paths = Array.isArray(selected) ? selected : selected ? [selected] : []
-            if (!paths.length) return
+            if (!paths.length) return []
             const importedImages = await import_entry_images(projectId, paths)
+            const nextImportedImages = importedImages.map((image, index) => ({
+                ...image,
+                alt: image.alt || (image.path?.split(/[\\/]/).pop() ?? `图片 ${index + 1}`),
+            }))
             setDraft((current) => {
                 const nextImages = [...current.images]
-                importedImages.forEach((image, index) => {
+                nextImportedImages.forEach((image, index) => {
                     nextImages.push({
                         ...image,
-                        alt: image.alt || (image.path?.split(/[\\/]/).pop() ?? `图片 ${nextImages.length + 1}`),
                         is_cover: nextImages.length === 0 && index === 0,
                     })
                 })
@@ -981,9 +992,27 @@ export default function EntryEditor({
                     images: nextImages,
                 }
             })
+            return nextImportedImages
         } catch (e) {
             setError(String(e))
+            return []
         }
+    }
+
+    function handleAddAiImages(aiImages: EntryImage[]) {
+        setDraft((current) => {
+            const nextImages = [...current.images]
+            aiImages.forEach((image, index) => {
+                nextImages.push({
+                    ...image,
+                    is_cover: nextImages.length === 0 && index === 0,
+                })
+            })
+            return {
+                ...current,
+                images: nextImages,
+            }
+        })
     }
 
     function handleSetCover(targetIndex: number) {
@@ -1013,8 +1042,7 @@ export default function EntryEditor({
         setLightboxIndex((current) => Math.min(current, Math.max(0, draft.images.length - 2)))
     }
 
-    function handleInsertImageMarkdown(targetIndex: number) {
-        const image = draft.images[targetIndex]
+    function insertImageMarkdown(image: EntryImage | undefined, fallbackIndex = 0, closeLightbox = false) {
         const imageRef = buildEntryImageMarkdownRef(image)
         if (!image || !imageRef) {
             void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'toast', 1800)
@@ -1022,7 +1050,7 @@ export default function EntryEditor({
         }
 
         const textarea = editorRef.current?.getTextareaElement()
-        const fallbackAlt = image.alt || image.caption || draft.title || entry?.title || `图片 ${targetIndex + 1}`
+        const fallbackAlt = image.alt || image.caption || draft.title || entry?.title || `图片 ${fallbackIndex + 1}`
         const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
         let nextCursor = 0
 
@@ -1047,7 +1075,13 @@ export default function EntryEditor({
             nextTextarea?.focus()
             nextTextarea?.setSelectionRange(nextCursor, nextCursor)
         })
-        setLightboxOpen(false)
+        if (closeLightbox) {
+            setLightboxOpen(false)
+        }
+    }
+
+    function handleInsertImageMarkdown(targetIndex: number) {
+        insertImageMarkdown(draft.images[targetIndex], targetIndex, true)
     }
 
     function resolveEntryAnchor(target: EventTarget | null): HTMLAnchorElement | null {
@@ -1067,6 +1101,20 @@ export default function EntryEditor({
         await onTagSchemasChange?.(nextSchemas)
         setTagCreatorOpen(false)
     }
+
+    const imageInsertCommand = useMemo<ICommand>(() => ({
+        name: 'entry-image-insert',
+        keyCommand: 'entry-image-insert',
+        buttonProps: {
+            'aria-label': '插入图片',
+            title: '插入图片',
+        },
+        icon: <span className="entry-editor-md-image-command">图</span>,
+        execute: () => {
+            setImageAddModalMode('insert')
+            setImageAddModalOpen(true)
+        },
+    }), [])
 
     return (
         <div className="entry-editor-page">
@@ -1158,7 +1206,7 @@ export default function EntryEditor({
                                 ttsVoicePluginName={ttsVoicePluginName}
                                 ttsVoiceHint={ttsVoiceHint}
                                 onDraftChange={setDraft}
-                                onOpenImageAddModal={() => setImageAddModalOpen(true)}
+                                onOpenImageAddModal={() => openImageAddModal('add')}
                                 onViewImageSet={() => {
                                     setLightboxIndex(0)
                                     setLightboxOpen(true)
@@ -1185,6 +1233,7 @@ export default function EntryEditor({
                                             fontSizeScale={editorFontSize / 14}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
+                                            extraCommands={[imageInsertCommand]}
                                             onKeyDown={(event) => {
                                                 if (!(event.ctrlKey || event.metaKey) || event.repeat) return
                                                 const key = event.key.toLowerCase()
@@ -1332,7 +1381,7 @@ export default function EntryEditor({
                 onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
                 onAddImage={() => {
                     setLightboxOpen(false)
-                    setImageAddModalOpen(true)
+                    openImageAddModal('add')
                 }}
             />
 
@@ -1355,24 +1404,13 @@ export default function EntryEditor({
                 entryType={draft.type || entry?.type || null}
                 aiPluginId={aiPluginId}
                 aiModel={aiModel}
+                mode={imageAddModalMode}
+                existingImages={draft.images}
                 onClose={() => setImageAddModalOpen(false)}
                 onUploadLocal={handleUploadImages}
                 onOpenPluginManagement={onOpenPluginManagement}
-                onAddAiImages={(aiImages) => {
-                    setDraft((current) => {
-                        const nextImages = [...current.images]
-                        aiImages.forEach((image, index) => {
-                            nextImages.push({
-                                ...image,
-                                is_cover: nextImages.length === 0 && index === 0,
-                            })
-                        })
-                        return {
-                            ...current,
-                            images: nextImages,
-                        }
-                    })
-                }}
+                onAddAiImages={handleAddAiImages}
+                onInsertImage={(image) => insertImageMarkdown(image)}
             />
         </div>
     )

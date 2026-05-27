@@ -86,6 +86,89 @@
 
 /* ── 本地标签 ─────────────────────────────────────────────────────────────── */
 
+.entry-image-add-existing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.entry-image-add-existing__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+    gap: 0.75rem;
+}
+
+.entry-image-add-existing__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.5rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 0.5rem;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    cursor: pointer;
+    text-align: left;
+}
+
+.entry-image-add-existing__item:hover:not(:disabled) {
+    border-color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--fc-color-primary) 7%, var(--fc-color-bg));
+}
+
+.entry-image-add-existing__item:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.entry-image-add-existing__media {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: 0.4rem;
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+}
+
+.entry-image-add-existing__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.entry-image-add-existing__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    line-height: 1.4;
+}
+
+.entry-image-add-existing__meta span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.entry-image-add-existing__meta small,
+.entry-image-add-existing__empty {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+}
+
+.entry-image-add-existing__empty {
+    padding: 1.4rem;
+    border: 1px dashed var(--fc-color-border);
+    border-radius: 0.5rem;
+    text-align: center;
+    line-height: 1.6;
+}
+
 .entry-image-add-local {
     display: flex;
     flex-direction: column;
