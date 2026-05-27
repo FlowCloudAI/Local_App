@@ -738,6 +738,108 @@ fn is_entry_href_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '%'
 }
 
+fn file_name_from_path(path: &str) -> Option<String> {
+    let normalized = path.replace('\\', "/");
+    normalized
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .next_back()
+        .map(|value| value.to_string())
+}
+
+fn file_stem_from_name(file_name: &str) -> Option<String> {
+    let stem = Path::new(file_name).file_stem()?.to_str()?.trim();
+    if stem.is_empty() {
+        None
+    } else {
+        Some(stem.to_string())
+    }
+}
+
+fn insert_fcimg_ref_candidates(map: &mut HashMap<String, String>, path: &str, target_ref: &str) {
+    let Some(file_name) = file_name_from_path(path) else {
+        return;
+    };
+    if let Some(stem) = file_stem_from_name(&file_name) {
+        map.insert(stem.to_ascii_lowercase(), target_ref.to_string());
+    }
+    map.insert(file_name.to_ascii_lowercase(), target_ref.to_string());
+}
+
+fn is_fcimg_ref_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '%' || ch == '.' || ch == '/'
+}
+
+fn rewrite_fcimg_refs(
+    content: &str,
+    image_ref_map: &HashMap<String, String>,
+) -> Result<String, String> {
+    if image_ref_map.is_empty() || !content.contains("fcimg:") {
+        return Ok(content.to_string());
+    }
+
+    let mut output = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+    while let Some(offset) = content[cursor..].find("fcimg:") {
+        let prefix_start = cursor + offset;
+        let value_start = prefix_start + "fcimg:".len();
+        output.push_str(&content[cursor..value_start]);
+
+        let mut value_end = value_start;
+        for (relative, ch) in content[value_start..].char_indices() {
+            if is_fcimg_ref_char(ch) {
+                value_end = value_start + relative + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if value_end == value_start {
+            cursor = value_start;
+            continue;
+        }
+
+        let encoded = &content[value_start..value_end];
+        let decoded = urlencoding::decode(encoded)
+            .map_err(|e| format!("解析 fcimg 引用失败: {e}"))?
+            .trim_start_matches('/')
+            .to_string();
+        if let Some(mapped) = image_ref_map.get(&decoded.to_ascii_lowercase()) {
+            output.push_str(mapped);
+        } else {
+            output.push_str(encoded);
+        }
+        cursor = value_end;
+    }
+    output.push_str(&content[cursor..]);
+    Ok(output)
+}
+
+fn build_import_fcimg_ref_map(
+    package: &ValidatedFcworldPackage,
+    asset_targets: &HashMap<String, PathBuf>,
+) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for asset in &package.assets_index.assets {
+        let Some(target_path) = asset_targets.get(&asset.path) else {
+            continue;
+        };
+        let Some(target_ref) = target_path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .map(|value| value.to_string())
+        else {
+            continue;
+        };
+        map.insert(asset.id.to_ascii_lowercase(), target_ref.clone());
+        insert_fcimg_ref_candidates(&mut map, &asset.path, &target_ref);
+        if let Some(original_name) = &asset.original_name {
+            insert_fcimg_ref_candidates(&mut map, original_name, &target_ref);
+        }
+    }
+    map
+}
+
 fn rewrite_entry_hrefs(
     content: &str,
     entry_map: &HashMap<String, String>,
@@ -885,6 +987,7 @@ fn rewrite_entries_csv_for_import(
     content: &str,
     id_maps: &ImportIdMaps,
     asset_targets: &HashMap<String, PathBuf>,
+    fcimg_ref_map: &HashMap<String, String>,
 ) -> Result<String, String> {
     let Some((headers, mut rows)) = read_csv_rows(content, "entries.csv")? else {
         return Ok(content.to_string());
@@ -901,12 +1004,13 @@ fn rewrite_entries_csv_for_import(
         let old_project_id = row.get(project_index).cloned().unwrap_or_default();
         let old_category_id = row.get(category_index).cloned().unwrap_or_default();
         let new_id = required_mapped_id(&id_maps.entries, &old_id, "entries.id")?;
-        let rewritten_content = rewrite_entry_hrefs(
+        let rewritten_entry_content = rewrite_entry_hrefs(
             row.get(content_index)
                 .map(String::as_str)
                 .unwrap_or_default(),
             &id_maps.entries,
         )?;
+        let rewritten_content = rewrite_fcimg_refs(&rewritten_entry_content, fcimg_ref_map)?;
         let rewritten_tags = rewrite_entry_tags_json(
             row.get(tags_index).map(String::as_str).unwrap_or_default(),
             id_maps,
@@ -1080,6 +1184,7 @@ fn rewrite_csv_items_for_import(
 ) -> Result<(Vec<worldflow_core::CsvImportItem>, String), String> {
     let mut output = Vec::with_capacity(WorldflowCsvTable::ordered().len());
     let mut project_name = String::new();
+    let fcimg_ref_map = build_import_fcimg_ref_map(package, asset_targets);
 
     for table in WorldflowCsvTable::ordered().iter().copied() {
         let content = csv_item_content(&package.csv_items, table)?;
@@ -1098,7 +1203,7 @@ fn rewrite_csv_items_for_import(
                 rewrite_simple_project_table(content, table, &id_maps.entry_types, id_maps)?
             }
             WorldflowCsvTable::Entries => {
-                rewrite_entries_csv_for_import(content, id_maps, asset_targets)?
+                rewrite_entries_csv_for_import(content, id_maps, asset_targets, &fcimg_ref_map)?
             }
             WorldflowCsvTable::EntryRelations => rewrite_entry_relations_csv(content, id_maps)?,
             WorldflowCsvTable::EntryLinks => rewrite_entry_links_csv(content, id_maps)?,

@@ -4,6 +4,7 @@ use csv::StringRecord;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
 use std::sync::Mutex as StdMutex;
@@ -619,6 +620,83 @@ fn rebuild_csv_item(item: CsvExportItem, content: String, row_count: usize) -> C
     }
 }
 
+fn file_name_from_path(path: &str) -> Option<String> {
+    let normalized = path.replace('\\', "/");
+    normalized
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .next_back()
+        .map(|value| value.to_string())
+}
+
+fn file_stem_from_name(file_name: &str) -> Option<String> {
+    let stem = Path::new(file_name).file_stem()?.to_str()?.trim();
+    if stem.is_empty() {
+        None
+    } else {
+        Some(stem.to_string())
+    }
+}
+
+fn insert_fcimg_ref_candidates(map: &mut HashMap<String, String>, path: &str, target_ref: &str) {
+    let Some(file_name) = file_name_from_path(path) else {
+        return;
+    };
+    if let Some(stem) = file_stem_from_name(&file_name) {
+        map.insert(stem.to_ascii_lowercase(), target_ref.to_string());
+    }
+    map.insert(file_name.to_ascii_lowercase(), target_ref.to_string());
+}
+
+fn is_fcimg_ref_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '%' || ch == '.' || ch == '/'
+}
+
+fn rewrite_fcimg_refs(
+    content: &str,
+    image_ref_map: &HashMap<String, String>,
+) -> Result<String, String> {
+    if image_ref_map.is_empty() || !content.contains("fcimg:") {
+        return Ok(content.to_string());
+    }
+
+    let mut output = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+    while let Some(offset) = content[cursor..].find("fcimg:") {
+        let prefix_start = cursor + offset;
+        let value_start = prefix_start + "fcimg:".len();
+        output.push_str(&content[cursor..value_start]);
+
+        let mut value_end = value_start;
+        for (relative, ch) in content[value_start..].char_indices() {
+            if is_fcimg_ref_char(ch) {
+                value_end = value_start + relative + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if value_end == value_start {
+            cursor = value_start;
+            continue;
+        }
+
+        let encoded = &content[value_start..value_end];
+        let decoded = urlencoding::decode(encoded)
+            .map_err(|e| format!("解析 fcimg 引用失败: {e}"))?
+            .trim_start_matches('/')
+            .to_string();
+        if let Some(mapped) = image_ref_map.get(&decoded.to_ascii_lowercase()) {
+            output.push_str(mapped);
+        } else {
+            output.push_str(encoded);
+        }
+        cursor = value_end;
+    }
+    output.push_str(&content[cursor..]);
+    Ok(output)
+}
+
 fn decode_csv_opt_string(raw: &str) -> Result<Option<String>, String> {
     let trimmed = raw.trim();
     if trimmed == "null" || trimmed.starts_with('"') {
@@ -725,7 +803,7 @@ fn rewrite_entry_images_json<F>(
     entry_id: &str,
     collector: &mut AssetCollector,
     on_asset: &mut F,
-) -> Result<String, String>
+) -> Result<(String, HashMap<String, String>), String>
 where
     F: FnMut(&str),
 {
@@ -734,6 +812,7 @@ where
     let images = value
         .as_array_mut()
         .ok_or_else(|| format!("entries.images 不是数组 entry_id={entry_id}"))?;
+    let mut image_ref_map = HashMap::new();
 
     for image in images {
         let Some(object) = image.as_object_mut() else {
@@ -755,11 +834,13 @@ where
             "images",
         )?;
         on_asset(&asset.path);
+        insert_fcimg_ref_candidates(&mut image_ref_map, &path, &asset.id);
         object.insert("path".to_string(), Value::String(asset.path));
     }
 
-    serde_json::to_string(&value)
-        .map_err(|e| format!("序列化 entries.images JSON 失败 entry_id={entry_id}: {e}"))
+    let rewritten = serde_json::to_string(&value)
+        .map_err(|e| format!("序列化 entries.images JSON 失败 entry_id={entry_id}: {e}"))?;
+    Ok((rewritten, image_ref_map))
 }
 
 fn rewrite_entries_csv<F>(
@@ -783,6 +864,7 @@ where
         .map_err(|e| format!("读取 entries.csv 表头失败: {}", e))?
         .clone();
     let id_index = header_index(&headers, "id")?;
+    let content_index = header_index(&headers, "content")?;
     let images_index = header_index(&headers, "images")?;
     let cover_index = header_index(&headers, "cover_path")?;
     let mut rows = Vec::new();
@@ -794,10 +876,17 @@ where
             .map(|value| value.to_string())
             .collect::<Vec<_>>();
         let entry_id = fields.get(id_index).cloned().unwrap_or_default();
+        let mut image_ref_map = HashMap::new();
 
         if let Some(images) = fields.get(images_index).cloned() {
-            fields[images_index] =
+            let (rewritten_images, refs) =
                 rewrite_entry_images_json(&images, &entry_id, collector, on_asset)?;
+            fields[images_index] = rewritten_images;
+            image_ref_map = refs;
+        }
+
+        if let Some(content) = fields.get(content_index).cloned() {
+            fields[content_index] = rewrite_fcimg_refs(&content, &image_ref_map)?;
         }
 
         let cover_path = fields
@@ -1102,7 +1191,8 @@ fn count_entry_asset_candidates(item: &CsvExportItem) -> Result<usize, String> {
     for record in reader.records() {
         let record = record.map_err(|e| format!("读取 entries.csv 记录失败: {}", e))?;
         let entry_id = record.get(id_index).unwrap_or_default();
-        count += count_entry_images_candidates(record.get(images_index).unwrap_or_default(), entry_id)?;
+        count +=
+            count_entry_images_candidates(record.get(images_index).unwrap_or_default(), entry_id)?;
         let cover_path = record
             .get(cover_index)
             .map(decode_csv_opt_string)
@@ -1129,7 +1219,10 @@ fn count_scene_background_candidate(
     }
     let scene = serde_json::from_str::<Value>(scene_json)
         .map_err(|e| format!("解析地图 sceneJson 失败 map_id={map_id}: {e}"))?;
-    let Some(url) = scene.pointer("/backgroundImage/url").and_then(Value::as_str) else {
+    let Some(url) = scene
+        .pointer("/backgroundImage/url")
+        .and_then(Value::as_str)
+    else {
         return Ok(0);
     };
     if is_data_url(url) && reused_background != Some(url) {
@@ -1300,7 +1393,8 @@ where
 {
     let package_id = Uuid::new_v4().to_string();
     let mut collector = AssetCollector::default();
-    let (csv_items, cover_asset_id) = rewrite_csv_items(export.clone(), &mut collector, &mut on_asset)?;
+    let (csv_items, cover_asset_id) =
+        rewrite_csv_items(export.clone(), &mut collector, &mut on_asset)?;
     let (maps_json, map_count) =
         rewrite_maps_json(paths, &project.id, &mut collector, &mut on_asset)?;
     let (index_assets, package_assets) = collector.into_parts();
@@ -1821,10 +1915,7 @@ async fn import_fcworld_package_to_db(
                     );
                 }
                 CsvImportProgressPhase::TableFinished => {
-                    progress.note(
-                        "import_db",
-                        format!("完成写入 {}", event.table.file_name()),
-                    );
+                    progress.note("import_db", format!("完成写入 {}", event.table.file_name()));
                 }
             },
         )
@@ -1861,10 +1952,7 @@ async fn import_fcworld_package_to_db(
         &prepared.new_project_id,
         |current, total| {
             if total > 0 {
-                progress.step(
-                    "thumbnails",
-                    format!("生成主图缩略图：{current}/{total}"),
-                );
+                progress.step("thumbnails", format!("生成主图缩略图：{current}/{total}"));
             }
         },
     )
@@ -1975,9 +2063,10 @@ pub async fn db_export_project_fcworld(
         let asset_total = count_export_asset_candidates(paths.inner(), &project_id, &export.items)?;
         progress.add_total(asset_total, "export_assets", "处理导出图片资源");
         progress.add_total(1, "export_maps", "处理导出地图数据");
-        let package = prepare_fcworld_package_with_progress(paths.inner(), project, export, |path| {
-            progress.step("export_assets", format!("已处理资源：{path}"));
-        })?;
+        let package =
+            prepare_fcworld_package_with_progress(paths.inner(), project, export, |path| {
+                progress.step("export_assets", format!("已处理资源：{path}"));
+            })?;
         progress.step("export_maps", "已处理地图数据");
 
         let zip_total = 1 + package.csv_items.len() + 1 + package.assets.len() + 1;
@@ -2022,8 +2111,14 @@ pub async fn db_import_project_fcworld(
         let input_path_buf = PathBuf::from(&input_path);
         let state = state.inner().lock().await;
         let db = state.sqlite_db.lock().await;
-        import_fcworld_package_to_db(&db, paths.inner(), &input_path_buf, options, progress.clone())
-            .await
+        import_fcworld_package_to_db(
+            &db,
+            paths.inner(),
+            &input_path_buf,
+            options,
+            progress.clone(),
+        )
+        .await
     }
     .await;
 
@@ -2289,8 +2384,16 @@ mod tests {
         )
         .expect("导出包应通过导入校验");
         assert!(validation_steps.iter().any(|phase| phase == "validate_csv"));
-        assert!(validation_steps.iter().any(|phase| phase == "validate_assets"));
-        assert!(validation_steps.iter().any(|phase| phase == "validate_maps"));
+        assert!(
+            validation_steps
+                .iter()
+                .any(|phase| phase == "validate_assets")
+        );
+        assert!(
+            validation_steps
+                .iter()
+                .any(|phase| phase == "validate_maps")
+        );
         assert_eq!(
             validated.csv_items.len(),
             WorldflowCsvTable::ordered().len()
@@ -2580,8 +2683,8 @@ mod tests {
             None,
             disabled_import_progress(),
         )
-            .await
-            .expect("导入 fcworld 失败");
+        .await
+        .expect("导入 fcworld 失败");
         let new_project_id = Uuid::parse_str(&result.project_id).expect("新项目 ID 应合法");
         let imported_project = db.get_project(&new_project_id).await.expect("应写入新项目");
         assert_ne!(new_project_id, project.id);
