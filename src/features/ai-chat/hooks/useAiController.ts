@@ -372,6 +372,35 @@ const messageAttachmentsToStored = (attachments: Attachment[] | undefined): Stor
         .map(messageAttachmentToStored)
         .filter((attachment): attachment is StoredMessageAttachment => Boolean(attachment))
 
+const mergeDocumentAttachmentItemIds = (...groups: Array<string[] | undefined>): string[] => {
+    const merged: string[] = []
+    groups.forEach((group) => {
+        group?.forEach((itemId) => {
+            if (itemId && !merged.includes(itemId)) merged.push(itemId)
+        })
+    })
+    return merged
+}
+
+const collectDocumentAttachmentItemIds = (messages: Message[]): string[] =>
+    mergeDocumentAttachmentItemIds(messages.flatMap((message) =>
+        (message.attachments ?? [])
+            .map((attachment) => attachment.documentContextItemId)
+            .filter((itemId): itemId is string => Boolean(itemId)),
+    ))
+
+const collectDocumentAttachmentItemIdsUntilMessage = (
+    messages: Message[],
+    targetMessageId: string,
+): string[] => {
+    const collected: Message[] = []
+    for (const message of messages) {
+        collected.push(message)
+        if (message.id === targetMessageId) break
+    }
+    return collectDocumentAttachmentItemIds(collected)
+}
+
 const storedToMessages = (messages: StoredMessage[]): Message[] => {
     const result: Message[] = []
     let pendingAssistant: Message | null = null
@@ -1129,16 +1158,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const appendDocumentContext = useCallback(async (
         ctx: TaskContextPayload,
         conversationId: string,
+        itemIds: string[] = [],
     ): Promise<TaskContextPayload> => {
-        const readyItemIds = (documentContextItemsByConversationRef.current[conversationId] ?? [])
-            .filter((item) => item.status === 'ready')
-            .map((item) => item.id)
-        if (readyItemIds.length === 0) return ctx
+        const selectedItemIds = mergeDocumentAttachmentItemIds(itemIds)
+        if (selectedItemIds.length === 0) return ctx
 
         try {
             const result = await docctx_build_context({
                 conversationId,
-                itemIds: readyItemIds,
+                itemIds: selectedItemIds,
                 maxChars: DOCUMENT_CONTEXT_CHAR_BUDGET,
             })
             if (result.sources.length === 0 || !result.markdown.trim()) return ctx
@@ -1165,10 +1193,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
         let cancelled = false
         const conversationId = activeConversationRef.current?.id ?? null
         const settings = activeConversationRef.current?.settings ?? DEFAULT_CONVERSATION_SETTINGS
+        const documentAttachmentItemIds = activeConversationRef.current
+            ? collectDocumentAttachmentItemIds(activeConversationRef.current.messages)
+            : []
         resolveContextPayload(focus.projectId, focus.entryId, settings).then(async (ctx) => {
             if (cancelled) return
             const enrichedCtx = conversationId
-                ? await appendDocumentContext(ctx, conversationId)
+                ? await appendDocumentContext(ctx, conversationId, documentAttachmentItemIds)
                 : ctx
             if (cancelled) return
             ai_set_task_context(sid, enrichedCtx).catch(() => {
@@ -1749,7 +1780,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (!currentConv) return
         const currentConvId = currentConv.id
         const currentSettings = normalizeConversationSettings(currentConv.settings)
-        const syncPreparedSessionContext = async (target: PreparedAiSession) => {
+        const syncPreparedSessionContext = async (
+            target: PreparedAiSession,
+            documentAttachmentItemIds: string[] = [],
+        ) => {
             try {
                 await ai_update_session(
                     target.sid,
@@ -1760,7 +1794,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     currentSettings,
                 )
-                const enrichedCtx = await appendDocumentContext(ctx, target.conversationId)
+                const enrichedCtx = await appendDocumentContext(ctx, target.conversationId, documentAttachmentItemIds)
                 await ai_set_task_context(target.sid, enrichedCtx)
             } catch (error) {
                 logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
@@ -1846,10 +1880,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
         abortControllerRef.current = new AbortController()
 
         let sessionClosedForEdit = false
+        let messagesBeforeNewUser = currentConv.messages
 
         if (editingMessageId) {
             const editIdx = currentConv.messages.findIndex((message) => message.id === editingMessageId)
             if (editIdx !== -1) {
+                messagesBeforeNewUser = currentConv.messages.slice(0, editIdx)
                 setConversations((prev) => prev.map((conversation) =>
                     conversation.id === currentConvId
                         ? {...conversation, messages: conversation.messages.slice(0, editIdx)}
@@ -1872,6 +1908,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
             setEditingMessageId(null)
         }
 
+        const documentAttachmentItemIdsForSend = mergeDocumentAttachmentItemIds(
+            collectDocumentAttachmentItemIds(messagesBeforeNewUser),
+            pendingDocumentAttachmentIdsByConversationRef.current[currentConvId],
+        )
         const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
         const existingRunId = sessionClosedForEdit ? null : currentConv.runId
         const preparedSession = await (async (): Promise<PreparedAiSession | null> => {
@@ -1969,7 +2009,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     currentSettings,
                 )
-                const enrichedCtx = await appendDocumentContext(ctx, nextConversationId)
+                const enrichedCtx = await appendDocumentContext(
+                    ctx,
+                    nextConversationId,
+                    documentAttachmentItemIdsForSend,
+                )
                 logger.log('[useAiController][发送链路] 准备推送任务上下文', {
                     traceId,
                     sessionId: created.sessionId,
@@ -2029,7 +2073,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             .filter((item): item is DocumentContextItem => Boolean(item))
             .map(documentItemToAttachment)
 
-        await syncPreparedSessionContext(preparedSession)
+        await syncPreparedSessionContext(preparedSession, documentAttachmentItemIdsForSend)
 
         const actualPrompt = currentConv.mode === 'report'
         && !currentConv.reportSeeded
@@ -2091,7 +2135,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             const recoveredSession = await recreateMissingSession(preparedSession)
             if (!recoveredSession) return
-            await syncPreparedSessionContext(recoveredSession)
+            await syncPreparedSessionContext(recoveredSession, documentAttachmentItemIdsForSend)
             logger.log('[useAiController][发送链路] 会话重建后重试发送', {
                 traceId,
                 conversationId: recoveredSession.conversationId,
@@ -2179,6 +2223,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
             })
             return
         }
+        const documentAttachmentItemIds = collectDocumentAttachmentItemIdsUntilMessage(
+            conv.messages,
+            precedingUserMsg.id,
+        )
 
         const convSettings = normalizeConversationSettings(conv.settings)
         let currentSid = conv.sessionId
@@ -2221,7 +2269,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     convSettings,
                 )
-                const enrichedCtx = await appendDocumentContext(ctx, conv.id)
+                const enrichedCtx = await appendDocumentContext(ctx, conv.id, documentAttachmentItemIds)
                 await ai_set_task_context(currentSid!, enrichedCtx)
             } catch {
                 // 上下文推送失败不阻塞 checkout
@@ -2237,7 +2285,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     convSettings,
                 )
-                const enrichedCtx = await appendDocumentContext(ctx, conv.id)
+                const enrichedCtx = await appendDocumentContext(ctx, conv.id, documentAttachmentItemIds)
                 await ai_set_task_context(currentSid, enrichedCtx)
             } catch {
                 // 上下文推送失败不阻塞 checkout
