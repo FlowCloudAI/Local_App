@@ -244,8 +244,11 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         setActiveKey(newKey)
     }, [mainContentKey])
 
-    // 打开项目标签页
-    const handleOpenProject = useCallback((project: Project) => {
+    const ensureProjectTab = useCallback((project: Project, options?: {
+        activate?: boolean
+        recordActivity?: boolean
+        touchRecent?: boolean
+    }) => {
         const tabKey = `proj-${project.id}`
         setTabs((prev) => {
             const index = prev.findIndex((tab) => tab.key === tabKey)
@@ -253,21 +256,65 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             return prev.map((tab) => tab.key === tabKey ? {...tab, label: project.name, closable: true} : tab)
         })
         setProjectTabMap(prev => prev[tabKey] === project.id ? prev : {...prev, [tabKey]: project.id})
-        setActiveKey(tabKey)
-        recordHomeActivity({
-            type: 'project',
-            id: project.id,
-            projectId: project.id,
-            title: project.name,
-            subtitle: '项目',
-            description: project.description,
-            updatedAt: project.updated_at ?? project.created_at ?? null,
-        })
-        touchRecentPage(tabKey)
-        showHomeWorkspace()
+        if (options?.activate) {
+            setActiveKey(tabKey)
+            showHomeWorkspace()
+        }
+        if (options?.recordActivity) {
+            recordHomeActivity({
+                type: 'project',
+                id: project.id,
+                projectId: project.id,
+                title: project.name,
+                subtitle: '项目',
+                description: project.description,
+                updatedAt: project.updated_at ?? project.created_at ?? null,
+            })
+        }
+        if (options?.touchRecent) {
+            touchRecentPage(tabKey)
+        }
     }, [showHomeWorkspace, touchRecentPage])
 
+    // 打开项目标签页
+    const handleOpenProject = useCallback((project: Project) => {
+        ensureProjectTab(project, {
+            activate: true,
+            recordActivity: true,
+            touchRecent: true,
+        })
+    }, [ensureProjectTab])
+
+    const ensureProjectTabById = useCallback((projectId: string, options?: {
+        activate?: boolean
+        recordActivity?: boolean
+        touchRecent?: boolean
+    }) => {
+        const tabKey = `proj-${projectId}`
+        if (projectTabMap[tabKey]) {
+            if (options?.activate) {
+                setActiveKey(tabKey)
+                showHomeWorkspace()
+            }
+            if (options?.recordActivity) {
+                recordTabActivity(tabKey)
+            }
+            if (options?.touchRecent) {
+                touchRecentPage(tabKey)
+            }
+            return
+        }
+        db_get_project(projectId)
+            .then((project) => {
+                ensureProjectTab(project, options)
+            })
+            .catch((error) => {
+                logger.warn('补齐项目标签失败', error)
+            })
+    }, [ensureProjectTab, projectTabMap, recordTabActivity, showHomeWorkspace, touchRecentPage])
+
     const handleOpenEntry = useCallback((projectId: string, entry: { id: string; title: string }) => {
+        ensureProjectTabById(projectId)
         const tabKey = `entry-${projectId}-${entry.id}`
         setTabs((prev) => {
             const index = prev.findIndex((tab) => tab.key === tabKey)
@@ -292,7 +339,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         })
         touchRecentPage(tabKey)
         showHomeWorkspace()
-    }, [showHomeWorkspace, touchRecentPage])
+    }, [ensureProjectTabById, showHomeWorkspace, touchRecentPage])
 
     const handleOpenProjectTool = useCallback((panel: ProjectToolPanel, project: { id: string; name: string }) => {
         const tabKey = `tool-${project.id}-${panel}`
@@ -352,17 +399,13 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         })
     }, [])
 
-    const activateProjectTab = useCallback((projectId: string) => {
-        const tabKey = `proj-${projectId}`
-        setActiveKey(tabKey)
-        recordTabActivity(tabKey)
-        touchRecentPage(tabKey)
-        showHomeWorkspace()
-    }, [recordTabActivity, showHomeWorkspace, touchRecentPage])
-
     const handleBackToProject = useCallback((projectId: string) => {
-        activateProjectTab(projectId)
-    }, [activateProjectTab])
+        ensureProjectTabById(projectId, {
+            activate: true,
+            recordActivity: true,
+            touchRecent: true,
+        })
+    }, [ensureProjectTabById])
 
     const handleBackHome = useCallback(() => {
         setActiveKey('')
@@ -427,8 +470,12 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         const entryKey = `entry-${projectId}-${entryId}`
         closeTabsForKeys(new Set([entryKey]))
         removeHomeEntryActivity(projectId, entryId)
-        activateProjectTab(projectId)
-    }, [activateProjectTab, closeTabsForKeys])
+        ensureProjectTabById(projectId, {
+            activate: true,
+            recordActivity: true,
+            touchRecent: true,
+        })
+    }, [closeTabsForKeys, ensureProjectTabById])
 
     const handleTabChange = useCallback((key: string) => {
         const shouldShowHomeWorkspace = Boolean(projectTabMap[key] || toolTabMap[key] || entryTabMap[key])
