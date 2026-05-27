@@ -13,6 +13,12 @@ type MapProtocolVersion = 'map_shape_mvp_v1'
 type MapScenario = 'coastline_mvp'
 
 export interface CoastlineParamsPayload {
+    uiMode?: 'simple' | 'advanced'
+    qualityPreset?: 'preview' | 'rough' | 'balanced' | 'fine' | 'print'
+    scaleFactor?: number
+    macroNoise?: number
+    midNoise?: number
+    microNoise?: number
     minSegments?: number
     maxSegments?: number
     normalizedLengthMin?: number

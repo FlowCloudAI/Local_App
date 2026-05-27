@@ -275,7 +275,7 @@
 }
 
 .wm-utility-dialog--wide {
-    width: min(560px, 100%);
+    width: min(620px, 100%);
 }
 
 .wm-utility-dialog .wm-coastline-fields {
@@ -575,6 +575,46 @@
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
+}
+
+.wm-coastline-mode {
+    flex-shrink: 0;
+}
+
+.wm-coastline-quality-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.wm-coastline-quality-grid .wm-chip {
+    justify-content: center;
+    min-width: 0;
+}
+
+.wm-range-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.wm-range-field label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--fc-font-size-xs);
+    color: var(--fc-color-text-secondary);
+    font-weight: 500;
+}
+
+.wm-range-field label span {
+    color: var(--fc-color-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.wm-range-field input[type='range'] {
+    width: 100%;
 }
 
 .wm-sidebar-hints {

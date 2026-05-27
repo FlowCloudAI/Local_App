@@ -83,6 +83,30 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 type ViewportMode = 'edit' | 'preview'
 type MapStyle = 'flat' | 'tolkien' | 'ink'
 type MapUtilityPanel = 'help' | 'coastline' | null
+type CoastlineParamMode = NonNullable<CoastlineParamsPayload['uiMode']>
+type CoastlineQualityPreset = NonNullable<CoastlineParamsPayload['qualityPreset']>
+
+interface CoastlineQualityDefinition {
+    label: string
+    hint: string
+    params: Pick<CoastlineParamsPayload,
+        'minSegments' |
+        'maxSegments' |
+        'segmentBase' |
+        'segmentLengthFactor' |
+        'segmentEdgeRatioFactor' |
+        'relaxPasses' |
+        'relaxWeight'
+    >
+}
+
+interface CoastlineSimpleConfig {
+    qualityPreset: CoastlineQualityPreset
+    scaleFactor: number
+    macroNoise: number
+    midNoise: number
+    microNoise: number
+}
 
 const DEFAULT_CANVAS: MapEditorCanvas = {width: 1000, height: 1000}
 const MAP_SIZE_PRESETS = [
@@ -108,24 +132,185 @@ const MAP_RENDERER_LABELS: Record<MapShapeViewportRenderer, string> = {
     deck: 'Deck 精确制图',
 }
 
-const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = {
-    minSegments: 5,
-    maxSegments: 32,
-    segmentBase: 15,
-    segmentLengthFactor: 8,
+const COASTLINE_BASE_PARAMS: Required<Pick<CoastlineParamsPayload,
+    'amplitudeBase' |
+    'amplitudeMin' |
+    'amplitudeCanvasRatioMax' |
+    'waveAWeight' |
+    'waveBWeight' |
+    'waveCWeight'
+>> = {
     amplitudeBase: 1,
     amplitudeMin: 2,
-    relaxPasses: 2,
-    relaxWeight: 0.16,
+    amplitudeCanvasRatioMax: 0.025,
     waveAWeight: 0.50,
     waveBWeight: 0.29,
     waveCWeight: 0.30,
 }
 
+const COASTLINE_DEFAULT_SIMPLE_CONFIG: CoastlineSimpleConfig = {
+    qualityPreset: 'balanced',
+    scaleFactor: 1,
+    macroNoise: 1,
+    midNoise: 1,
+    microNoise: 1,
+}
+
+const COASTLINE_QUALITY_PRESETS: Record<CoastlineQualityPreset, CoastlineQualityDefinition> = {
+    preview: {
+        label: '预览',
+        hint: '最快生成，用于确认轮廓和地点关系。',
+        params: {
+            minSegments: 2,
+            maxSegments: 8,
+            segmentBase: 4,
+            segmentLengthFactor: 2,
+            segmentEdgeRatioFactor: 5,
+            relaxPasses: 1,
+            relaxWeight: 0.18,
+        },
+    },
+    rough: {
+        label: '粗糙',
+        hint: '较快生成，保留基本海岸线起伏。',
+        params: {
+            minSegments: 3,
+            maxSegments: 16,
+            segmentBase: 8,
+            segmentLengthFactor: 4,
+            segmentEdgeRatioFactor: 10,
+            relaxPasses: 1,
+            relaxWeight: 0.16,
+        },
+    },
+    balanced: {
+        label: '平衡',
+        hint: '默认档位，细节和速度比较均衡。',
+        params: {
+            minSegments: 5,
+            maxSegments: 32,
+            segmentBase: 15,
+            segmentLengthFactor: 8,
+            segmentEdgeRatioFactor: 18,
+            relaxPasses: 2,
+            relaxWeight: 0.16,
+        },
+    },
+    fine: {
+        label: '精细',
+        hint: '生成更多局部细节，适合定稿前预览。',
+        params: {
+            minSegments: 8,
+            maxSegments: 52,
+            segmentBase: 24,
+            segmentLengthFactor: 12,
+            segmentEdgeRatioFactor: 28,
+            relaxPasses: 2,
+            relaxWeight: 0.14,
+        },
+    },
+    print: {
+        label: '印刷',
+        hint: '最高细节，适合输出前使用，生成时间最长。',
+        params: {
+            minSegments: 10,
+            maxSegments: 80,
+            segmentBase: 34,
+            segmentLengthFactor: 18,
+            segmentEdgeRatioFactor: 42,
+            relaxPasses: 2,
+            relaxWeight: 0.12,
+        },
+    },
+}
+
+const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = buildSimpleCoastlineParams(COASTLINE_DEFAULT_SIMPLE_CONFIG)
+
 // ── 辅助函数 ───────────────────────────────────────────────────────────────────
 
 function emptyDraft(): MapShapeEditorDraft {
     return {shapes: [], keyLocations: []}
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) {
+        return min
+    }
+    return Math.min(max, Math.max(min, value))
+}
+
+function readNumber(value: unknown, fallback: number): number {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function readCoastlineSimpleConfig(params: CoastlineParamsPayload): CoastlineSimpleConfig {
+    const qualityPreset = params.qualityPreset && params.qualityPreset in COASTLINE_QUALITY_PRESETS
+        ? params.qualityPreset
+        : COASTLINE_DEFAULT_SIMPLE_CONFIG.qualityPreset
+
+    return {
+        qualityPreset,
+        scaleFactor: clampNumber(
+            readNumber(params.scaleFactor, COASTLINE_DEFAULT_SIMPLE_CONFIG.scaleFactor),
+            0.2,
+            3,
+        ),
+        macroNoise: clampNumber(
+            readNumber(params.macroNoise, COASTLINE_DEFAULT_SIMPLE_CONFIG.macroNoise),
+            0,
+            2,
+        ),
+        midNoise: clampNumber(
+            readNumber(params.midNoise, COASTLINE_DEFAULT_SIMPLE_CONFIG.midNoise),
+            0,
+            2,
+        ),
+        microNoise: clampNumber(
+            readNumber(params.microNoise, COASTLINE_DEFAULT_SIMPLE_CONFIG.microNoise),
+            0,
+            2,
+        ),
+    }
+}
+
+function buildSimpleCoastlineParams(config: CoastlineSimpleConfig): CoastlineParamsPayload {
+    const quality = COASTLINE_QUALITY_PRESETS[config.qualityPreset]
+    const scaleFactor = clampNumber(config.scaleFactor, 0.2, 3)
+    const macroNoise = clampNumber(config.macroNoise, 0, 2)
+    const midNoise = clampNumber(config.midNoise, 0, 2)
+    const microNoise = clampNumber(config.microNoise, 0, 2)
+
+    return {
+        uiMode: 'simple',
+        qualityPreset: config.qualityPreset,
+        scaleFactor,
+        macroNoise,
+        midNoise,
+        microNoise,
+        ...quality.params,
+        amplitudeBase: COASTLINE_BASE_PARAMS.amplitudeBase * scaleFactor,
+        amplitudeMin: COASTLINE_BASE_PARAMS.amplitudeMin * Math.sqrt(scaleFactor),
+        amplitudeCanvasRatioMax: COASTLINE_BASE_PARAMS.amplitudeCanvasRatioMax * scaleFactor,
+        waveAWeight: COASTLINE_BASE_PARAMS.waveAWeight * macroNoise,
+        waveBWeight: COASTLINE_BASE_PARAMS.waveBWeight * midNoise,
+        waveCWeight: COASTLINE_BASE_PARAMS.waveCWeight * microNoise,
+    }
+}
+
+function normalizeCoastlineParams(value: CoastlineParamsPayload | null | undefined): CoastlineParamsPayload {
+    if (!value) {
+        return DEFAULT_COASTLINE_PARAMS
+    }
+
+    if (value.uiMode === 'simple') {
+        return buildSimpleCoastlineParams(readCoastlineSimpleConfig(value))
+    }
+
+    return {
+        ...value,
+        uiMode: 'advanced',
+    }
 }
 
 interface NewMapFormState {
@@ -348,7 +533,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         try {
             setCoastlineParams(
                 entry.coastlineParamsJson
-                    ? JSON.parse(entry.coastlineParamsJson) as CoastlineParamsPayload
+                    ? normalizeCoastlineParams(JSON.parse(entry.coastlineParamsJson) as CoastlineParamsPayload)
                     : DEFAULT_COASTLINE_PARAMS,
             )
         } catch {
@@ -815,8 +1000,34 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         const trimmed = value.trim()
         setCoastlineParams(current => ({
             ...current,
+            uiMode: 'advanced',
             [field]: trimmed === '' ? undefined : Number(trimmed),
         }))
+        markMapUnsaved()
+    }, [markMapUnsaved])
+
+    const updateCoastlineMode = useCallback((mode: CoastlineParamMode) => {
+        setCoastlineParams(current => {
+            if (mode === 'simple') {
+                return buildSimpleCoastlineParams(readCoastlineSimpleConfig(current))
+            }
+
+            return {
+                ...current,
+                uiMode: 'advanced',
+            }
+        })
+        markMapUnsaved()
+    }, [markMapUnsaved])
+
+    const updateCoastlineSimpleConfig = useCallback((patch: Partial<CoastlineSimpleConfig>) => {
+        setCoastlineParams(current => {
+            const nextConfig = {
+                ...readCoastlineSimpleConfig(current),
+                ...patch,
+            }
+            return buildSimpleCoastlineParams(nextConfig)
+        })
         markMapUnsaved()
     }, [markMapUnsaved])
 
@@ -1064,114 +1275,216 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         return '未保存'
     }, [saveStatus, hasUnsavedChanges, maps, activeMapId])
 
+    const coastlineMode = coastlineParams.uiMode === 'advanced' ? 'advanced' : 'simple'
+    const coastlineSimpleConfig = readCoastlineSimpleConfig(coastlineParams)
+    const activeQuality = COASTLINE_QUALITY_PRESETS[coastlineSimpleConfig.qualityPreset]
     const coastlineParamFields = (
         <div className="wm-coastline-fields">
-            <div className="wm-field">
-                <label>最小段数</label>
-                <input
-                    type="number"
-                    step={1}
-                    value={coastlineParams.minSegments ?? ''}
-                    onChange={e => updateCoastlineParam('minSegments', e.target.value)}
-                />
+            <div className="wm-coastline-mode">
+                <div className="wm-segmented">
+                    {(['simple', 'advanced'] as CoastlineParamMode[]).map(mode => (
+                        <button
+                            key={mode}
+                            type="button"
+                            className={`wm-segmented__item${coastlineMode === mode ? ' is-active' : ''}`}
+                            onClick={() => updateCoastlineMode(mode)}
+                        >
+                            {mode === 'simple' ? '简单' : '高级'}
+                        </button>
+                    ))}
+                </div>
             </div>
-            <div className="wm-field">
-                <label>最大段数</label>
-                <input
-                    type="number"
-                    step={1}
-                    value={coastlineParams.maxSegments ?? ''}
-                    onChange={e => updateCoastlineParam('maxSegments', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>细分基础</label>
-                <input
-                    type="number"
-                    step={1}
-                    value={coastlineParams.segmentBase ?? ''}
-                    onChange={e => updateCoastlineParam('segmentBase', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>长度因子</label>
-                <input
-                    type="number"
-                    step={1}
-                    value={coastlineParams.segmentLengthFactor ?? ''}
-                    onChange={e => updateCoastlineParam('segmentLengthFactor', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>振幅基础</label>
-                <input
-                    type="number"
-                    step={0.1}
-                    value={coastlineParams.amplitudeBase ?? ''}
-                    onChange={e => updateCoastlineParam('amplitudeBase', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>振幅最小</label>
-                <input
-                    type="number"
-                    step={0.5}
-                    value={coastlineParams.amplitudeMin ?? ''}
-                    onChange={e => updateCoastlineParam('amplitudeMin', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>平滑轮数</label>
-                <input
-                    type="number"
-                    step={1}
-                    min={0}
-                    value={coastlineParams.relaxPasses ?? ''}
-                    onChange={e => updateCoastlineParam('relaxPasses', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>平滑权重</label>
-                <input
-                    type="number"
-                    step={0.01}
-                    min={0}
-                    max={0.5}
-                    value={coastlineParams.relaxWeight ?? ''}
-                    onChange={e => updateCoastlineParam('relaxWeight', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>Wave A 权重</label>
-                <input
-                    type="number"
-                    step={0.01}
-                    value={coastlineParams.waveAWeight ?? ''}
-                    onChange={e => updateCoastlineParam('waveAWeight', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>Wave B 权重</label>
-                <input
-                    type="number"
-                    step={0.01}
-                    value={coastlineParams.waveBWeight ?? ''}
-                    onChange={e => updateCoastlineParam('waveBWeight', e.target.value)}
-                />
-            </div>
-            <div className="wm-field">
-                <label>Wave C 权重</label>
-                <input
-                    type="number"
-                    step={0.01}
-                    value={coastlineParams.waveCWeight ?? ''}
-                    onChange={e => updateCoastlineParam('waveCWeight', e.target.value)}
-                />
-            </div>
+            {coastlineMode === 'simple' ? (
+                <>
+                    <div className="wm-field">
+                        <label>细化程度</label>
+                        <div className="wm-coastline-quality-grid">
+                            {(Object.keys(COASTLINE_QUALITY_PRESETS) as CoastlineQualityPreset[]).map(preset => (
+                                <button
+                                    key={preset}
+                                    type="button"
+                                    className={`wm-chip${coastlineSimpleConfig.qualityPreset === preset ? ' is-active' : ''}`}
+                                    onClick={() => updateCoastlineSimpleConfig({qualityPreset: preset})}
+                                >
+                                    {COASTLINE_QUALITY_PRESETS[preset].label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="wm-sidebar-hint">{activeQuality.hint}</div>
+                    </div>
+                    <div className="wm-range-field">
+                        <label>尺度系数 <span>{coastlineSimpleConfig.scaleFactor.toFixed(2)}</span></label>
+                        <input
+                            type="range"
+                            min={0.2}
+                            max={3}
+                            step={0.05}
+                            value={coastlineSimpleConfig.scaleFactor}
+                            onChange={event => updateCoastlineSimpleConfig({scaleFactor: Number(event.target.value)})}
+                        />
+                    </div>
+                    <div className="wm-range-field">
+                        <label>大尺度扰动 <span>{coastlineSimpleConfig.macroNoise.toFixed(2)}</span></label>
+                        <input
+                            type="range"
+                            min={0}
+                            max={2}
+                            step={0.05}
+                            value={coastlineSimpleConfig.macroNoise}
+                            onChange={event => updateCoastlineSimpleConfig({macroNoise: Number(event.target.value)})}
+                        />
+                    </div>
+                    <div className="wm-range-field">
+                        <label>中尺度扰动 <span>{coastlineSimpleConfig.midNoise.toFixed(2)}</span></label>
+                        <input
+                            type="range"
+                            min={0}
+                            max={2}
+                            step={0.05}
+                            value={coastlineSimpleConfig.midNoise}
+                            onChange={event => updateCoastlineSimpleConfig({midNoise: Number(event.target.value)})}
+                        />
+                    </div>
+                    <div className="wm-range-field">
+                        <label>细节扰动 <span>{coastlineSimpleConfig.microNoise.toFixed(2)}</span></label>
+                        <input
+                            type="range"
+                            min={0}
+                            max={2}
+                            step={0.05}
+                            value={coastlineSimpleConfig.microNoise}
+                            onChange={event => updateCoastlineSimpleConfig({microNoise: Number(event.target.value)})}
+                        />
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="wm-field">
+                        <label>最小段数</label>
+                        <input
+                            type="number"
+                            step={1}
+                            value={coastlineParams.minSegments ?? ''}
+                            onChange={e => updateCoastlineParam('minSegments', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>最大段数</label>
+                        <input
+                            type="number"
+                            step={1}
+                            value={coastlineParams.maxSegments ?? ''}
+                            onChange={e => updateCoastlineParam('maxSegments', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>细分基础</label>
+                        <input
+                            type="number"
+                            step={1}
+                            value={coastlineParams.segmentBase ?? ''}
+                            onChange={e => updateCoastlineParam('segmentBase', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>长度因子</label>
+                        <input
+                            type="number"
+                            step={1}
+                            value={coastlineParams.segmentLengthFactor ?? ''}
+                            onChange={e => updateCoastlineParam('segmentLengthFactor', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>长边因子</label>
+                        <input
+                            type="number"
+                            step={1}
+                            value={coastlineParams.segmentEdgeRatioFactor ?? ''}
+                            onChange={e => updateCoastlineParam('segmentEdgeRatioFactor', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>振幅基础</label>
+                        <input
+                            type="number"
+                            step={0.1}
+                            value={coastlineParams.amplitudeBase ?? ''}
+                            onChange={e => updateCoastlineParam('amplitudeBase', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>振幅最小</label>
+                        <input
+                            type="number"
+                            step={0.5}
+                            value={coastlineParams.amplitudeMin ?? ''}
+                            onChange={e => updateCoastlineParam('amplitudeMin', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>振幅上限比例</label>
+                        <input
+                            type="number"
+                            step={0.001}
+                            value={coastlineParams.amplitudeCanvasRatioMax ?? ''}
+                            onChange={e => updateCoastlineParam('amplitudeCanvasRatioMax', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>平滑轮数</label>
+                        <input
+                            type="number"
+                            step={1}
+                            min={0}
+                            value={coastlineParams.relaxPasses ?? ''}
+                            onChange={e => updateCoastlineParam('relaxPasses', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>平滑权重</label>
+                        <input
+                            type="number"
+                            step={0.01}
+                            min={0}
+                            max={0.5}
+                            value={coastlineParams.relaxWeight ?? ''}
+                            onChange={e => updateCoastlineParam('relaxWeight', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>Wave A 权重</label>
+                        <input
+                            type="number"
+                            step={0.01}
+                            value={coastlineParams.waveAWeight ?? ''}
+                            onChange={e => updateCoastlineParam('waveAWeight', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>Wave B 权重</label>
+                        <input
+                            type="number"
+                            step={0.01}
+                            value={coastlineParams.waveBWeight ?? ''}
+                            onChange={e => updateCoastlineParam('waveBWeight', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>Wave C 权重</label>
+                        <input
+                            type="number"
+                            step={0.01}
+                            value={coastlineParams.waveCWeight ?? ''}
+                            onChange={e => updateCoastlineParam('waveCWeight', e.target.value)}
+                        />
+                    </div>
+                </>
+            )}
             <div className="wm-sidebar-hints">
-                <div className="wm-sidebar-hint">段数越高，海岸线细节越多，但计算量也会上升。</div>
-                <div className="wm-sidebar-hint">振幅和平滑决定轮廓起伏感，建议先小幅调整。</div>
-                <div className="wm-sidebar-hint">三组 Wave 权重控制大中小三个尺度的纹理占比。</div>
+                <div className="wm-sidebar-hint">细化程度主要决定生成时间和最终点数。</div>
+                <div className="wm-sidebar-hint">尺度系数控制海岸线偏离原始边界的幅度。</div>
+                <div className="wm-sidebar-hint">当前三层扰动会映射到后端 Wave 权重，高级模式可直接编辑原始参数。</div>
             </div>
         </div>
     )
