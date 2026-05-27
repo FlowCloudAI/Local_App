@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "tauri:build:windows:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-windows-signed.ps1",
     "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
     "android:dev": "node ./scripts/android-dev.cjs",
     "android:build:apk": "tauri android build --apk",
