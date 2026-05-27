@@ -63,6 +63,7 @@ pdf-extract = { version = "0.10.0", optional = true }
 # ── 编码与压缩 ──
 base64 = "0.22.1"
 urlencoding = "2"
+encoding_rs = "0.8"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 csv = "1"
 sha2 = "0.10"

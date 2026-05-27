@@ -46,7 +46,12 @@ impl ParserRegistry {
     }
 
     pub fn supported_extensions(&self) -> Vec<&'static str> {
-        let candidates = ["doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf"];
+        let candidates = [
+            "txt", "md", "markdown", "csv", "tsv", "json", "jsonl", "xml", "yaml", "yml", "toml",
+            "ini", "log", "js", "ts", "jsx", "tsx", "py", "rs", "go", "java", "c", "cpp", "h",
+            "hpp", "cs", "php", "rb", "swift", "kt", "sql", "html", "htm", "css", "scss", "less",
+            "sh", "bat", "ps1", "env", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf",
+        ];
         candidates
             .into_iter()
             .filter(|extension| self.parsers.iter().any(|parser| parser.supports(extension)))
@@ -56,6 +61,8 @@ impl ParserRegistry {
 
 pub fn default_parser_registry() -> ParserRegistry {
     let mut registry = ParserRegistry::new();
+
+    registry.register(Box::new(super::providers::plain_text::PlainTextParser));
 
     #[cfg(feature = "document-office-oxide")]
     registry.register(Box::new(super::providers::office_oxide::OfficeOxideParser));

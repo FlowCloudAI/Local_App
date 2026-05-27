@@ -957,8 +957,13 @@ export default function AIChatContent({
             multiple: true,
             filters: [
                 {
-                    name: '文档',
-                    extensions: ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'],
+                    name: '文档与文本',
+                    extensions: [
+                        'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml',
+                        'ini', 'log', 'js', 'ts', 'jsx', 'tsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h',
+                        'hpp', 'cs', 'php', 'rb', 'swift', 'kt', 'sql', 'html', 'htm', 'css', 'scss', 'less',
+                        'sh', 'bat', 'ps1', 'env', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf',
+                    ],
                 },
             ],
         })
