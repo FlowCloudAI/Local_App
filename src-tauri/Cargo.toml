@@ -22,6 +22,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2.5.3", features = [] }
 
+[features]
+default = ["document-office-oxide"]
+document-office-oxide = ["dep:office_oxide"]
+
 [dependencies]
 # ── 核心框架 ──
 tauri = { version = "2", features = [] }
@@ -52,6 +56,7 @@ reqwest = { version = "0.13.2", features = ["json", "multipart"] }
 scraper = "0.26.0"
 ego-tree = "0.11.0"
 htmd = "0.5"
+office_oxide = { version = "0.1.2", optional = true }
 
 # ── 编码与压缩 ──
 base64 = "0.22.1"

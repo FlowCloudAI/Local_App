@@ -2,6 +2,7 @@ mod ai_services;
 mod api_error;
 mod apis;
 mod auto_backup;
+mod document_context;
 mod layout;
 mod map;
 mod reports;
