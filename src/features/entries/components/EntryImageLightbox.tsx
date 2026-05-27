@@ -21,6 +21,7 @@ interface EntryImageLightboxProps {
     onSetCover: (index: number) => void
     onRemove: (index: number) => void
     onAddImage?: () => void
+    onInsertMarkdown?: (index: number) => void
 }
 
 export default function EntryImageLightbox({
@@ -33,6 +34,7 @@ export default function EntryImageLightbox({
                                                onSetCover,
                                                onRemove,
                                                onAddImage,
+                                               onInsertMarkdown,
                                            }: EntryImageLightboxProps) {
     const MIN_SCALE = 1
     const MAX_SCALE = 5
@@ -253,6 +255,15 @@ export default function EntryImageLightbox({
                         >
                             设为主图
                         </Button>
+                        {onInsertMarkdown && (
+                            <Button type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onInsertMarkdown(currentIndex)}
+                            >
+                                插入正文
+                            </Button>
+                        )}
                         <Button type="button"
                             variant="outline"
                             size="sm"

@@ -51,7 +51,7 @@ import {
     parseInternalEntryHref,
     resolveMarkdownAnchor,
 } from '../lib/entryMarkdown'
-import {type EntryImage, normalizeEntryImages, toEntryImageSrc,} from '../lib/entryImage'
+import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages, toEntryImageSrc,} from '../lib/entryImage'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {areRelationDraftsEqual, buildRelationDraft, hasInvalidRelationDraft,} from '../lib/entryRelation'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
@@ -136,6 +136,10 @@ function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
             && image.alt === target.alt
             && Boolean(image.is_cover) === Boolean(target.is_cover)
     })
+}
+
+function escapeMarkdownImageAlt(value: string): string {
+    return value.replace(/[\[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export default function EntryEditor({
@@ -1009,6 +1013,43 @@ export default function EntryEditor({
         setLightboxIndex((current) => Math.min(current, Math.max(0, draft.images.length - 2)))
     }
 
+    function handleInsertImageMarkdown(targetIndex: number) {
+        const image = draft.images[targetIndex]
+        const imageRef = buildEntryImageMarkdownRef(image)
+        if (!image || !imageRef) {
+            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'toast', 1800)
+            return
+        }
+
+        const textarea = editorRef.current?.getTextareaElement()
+        const fallbackAlt = image.alt || image.caption || draft.title || entry?.title || `图片 ${targetIndex + 1}`
+        const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
+        let nextCursor = 0
+
+        setDraft((current) => {
+            const currentContent = current.content
+            const start = textarea?.selectionStart ?? currentContent.length
+            const end = textarea?.selectionEnd ?? start
+            const prefix = currentContent.slice(0, start)
+            const suffix = currentContent.slice(end)
+            const before = prefix && !prefix.endsWith('\n') ? '\n\n' : ''
+            const after = suffix && !suffix.startsWith('\n') ? '\n\n' : ''
+            nextCursor = prefix.length + before.length + markdown.length
+
+            return {
+                ...current,
+                content: `${prefix}${before}${markdown}${after}${suffix}`,
+            }
+        })
+
+        window.requestAnimationFrame(() => {
+            const nextTextarea = editorRef.current?.getTextareaElement()
+            nextTextarea?.focus()
+            nextTextarea?.setSelectionRange(nextCursor, nextCursor)
+        })
+        setLightboxOpen(false)
+    }
+
     function resolveEntryAnchor(target: EventTarget | null): HTMLAnchorElement | null {
         const anchor = resolveMarkdownAnchor(target)
         if (!anchor) return null
@@ -1288,6 +1329,7 @@ export default function EntryEditor({
                 onIndexChange={setLightboxIndex}
                 onSetCover={handleSetCover}
                 onRemove={handleRemoveImage}
+                onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
                 onAddImage={() => {
                     setLightboxOpen(false)
                     setImageAddModalOpen(true)
