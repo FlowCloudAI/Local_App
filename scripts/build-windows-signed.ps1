@@ -20,10 +20,19 @@ function Resolve-TauriSigningKeyPath {
 $signingKeyPath = Resolve-TauriSigningKeyPath
 $env:TAURI_SIGNING_PRIVATE_KEY_PATH = $signingKeyPath
 
+$hadPrivateKey = ![string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY)
 $hadPassword = ![string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)
 $passwordBuffer = [IntPtr]::Zero
 
 try {
+    if (!$hadPrivateKey) {
+        $privateKey = [System.IO.File]::ReadAllText($signingKeyPath).Trim()
+        if ([string]::IsNullOrWhiteSpace($privateKey)) {
+            throw "Tauri updater private key file is empty: $signingKeyPath"
+        }
+        $env:TAURI_SIGNING_PRIVATE_KEY = $privateKey
+    }
+
     if (!$hadPassword) {
         $securePassword = Read-Host "Enter Tauri updater private key password" -AsSecureString
         if ($securePassword.Length -eq 0) {
@@ -42,6 +51,9 @@ try {
 } finally {
     if (!$hadPassword) {
         Remove-Item Env:\TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
+    }
+    if (!$hadPrivateKey) {
+        Remove-Item Env:\TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
     }
     if ($passwordBuffer -ne [IntPtr]::Zero) {
         [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordBuffer)
