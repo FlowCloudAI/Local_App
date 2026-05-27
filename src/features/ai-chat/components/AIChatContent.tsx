@@ -394,7 +394,7 @@ export default function AIChatContent({
     const [hasTtsPlugin, setHasTtsPlugin] = useState(false)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
-    const visibleDocumentContextItems = ctx.documentContextItems.filter((item) => item.status !== 'ready')
+    const visibleDocumentContextItems = ctx.pendingDocumentAttachmentItems.filter((item) => item.status !== 'ready')
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
     const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)

@@ -1,5 +1,5 @@
 import {type MessageBoxBlock} from 'flowcloudai-ui'
-import {type AiUsage, type DocumentContextItem, type PluginInfo, type ToolStatus} from '../../../api'
+import {type AiUsage, type DocumentContextItem, type DocumentContextStatus, type PluginInfo, type ToolStatus} from '../../../api'
 
 export interface Attachment {
     id: string
@@ -7,6 +7,10 @@ export interface Attachment {
     type: 'image' | 'file'
     data: string
     preview?: string
+    documentContextItemId?: string
+    extension?: string
+    sha256?: string
+    status?: DocumentContextStatus | string
 }
 
 export interface ReportConversationContext {
@@ -144,6 +148,7 @@ export interface AiContextValue {
 
     messages: Message[]
     documentContextItems: DocumentContextItem[]
+    pendingDocumentAttachmentItems: DocumentContextItem[]
     addDocumentContextFiles: (filePaths: string[]) => Promise<void>
     removeDocumentContextItem: (itemId: string) => Promise<void>
     retryDocumentContextItem: (itemId: string) => Promise<void>

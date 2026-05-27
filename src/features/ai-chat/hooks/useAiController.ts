@@ -18,6 +18,7 @@ import {
     ai_save_conversation_ui_state,
     ai_set_task_context,
     ai_update_conversation_settings,
+    ai_update_message_attachments,
     ai_update_session,
     type AppSettings,
     type CharacterConversationMeta,
@@ -39,6 +40,7 @@ import {
     setting_get_settings,
     type StoredConversationSettings,
     type StoredMessage,
+    type StoredMessageAttachment,
     type TaskContextPayload,
     type ToolStatus,
     type UpdateSessionParams,
@@ -51,6 +53,7 @@ import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import type {
     AiContextValue,
     AiFocusContext,
+    Attachment,
     Conversation,
     ConversationSettings,
     ConversationRuntimeState,
@@ -330,6 +333,45 @@ function buildConversationUiStateMap(conversations: Conversation[]): Record<stri
     return state
 }
 
+const documentItemToAttachment = (item: DocumentContextItem): Attachment => ({
+    id: item.id,
+    name: item.fileName,
+    type: 'file',
+    data: item.id,
+    documentContextItemId: item.id,
+    extension: item.extension,
+    sha256: item.sha256,
+    status: item.status,
+})
+
+const storedAttachmentToMessageAttachment = (attachment: StoredMessageAttachment): Attachment => ({
+    id: attachment.attachmentId,
+    name: attachment.fileName,
+    type: 'file',
+    data: attachment.documentContextItemId,
+    documentContextItemId: attachment.documentContextItemId,
+    extension: attachment.extension,
+    sha256: attachment.sha256,
+    status: attachment.status,
+})
+
+const messageAttachmentToStored = (attachment: Attachment): StoredMessageAttachment | null => {
+    if (attachment.type !== 'file' || !attachment.documentContextItemId) return null
+    return {
+        attachmentId: attachment.id,
+        documentContextItemId: attachment.documentContextItemId,
+        fileName: attachment.name,
+        extension: attachment.extension ?? '',
+        sha256: attachment.sha256 ?? '',
+        status: attachment.status ?? 'ready',
+    }
+}
+
+const messageAttachmentsToStored = (attachments: Attachment[] | undefined): StoredMessageAttachment[] =>
+    (attachments ?? [])
+        .map(messageAttachmentToStored)
+        .filter((attachment): attachment is StoredMessageAttachment => Boolean(attachment))
+
 const storedToMessages = (messages: StoredMessage[]): Message[] => {
     const result: Message[] = []
     let pendingAssistant: Message | null = null
@@ -447,6 +489,7 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
             reasoning: message.reasoning || undefined,
             timestamp: new Date(message.timestamp).getTime(),
             nodeId: message.node_id ?? undefined,
+            attachments: message.attachments?.map(storedAttachmentToMessageAttachment),
         }
 
         if (message.content) {
@@ -535,10 +578,23 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         documentContextItemsByConversationRef.current = documentContextItemsByConversation
     }, [documentContextItemsByConversation])
+    const [pendingDocumentAttachmentIdsByConversation, setPendingDocumentAttachmentIdsByConversation] = useState<Record<string, string[]>>({})
+    const pendingDocumentAttachmentIdsByConversationRef = useRef(pendingDocumentAttachmentIdsByConversation)
+    useEffect(() => {
+        pendingDocumentAttachmentIdsByConversationRef.current = pendingDocumentAttachmentIdsByConversation
+    }, [pendingDocumentAttachmentIdsByConversation])
     const documentContextItems = useMemo(
         () => activeConversationId ? (documentContextItemsByConversation[activeConversationId] ?? []) : [],
         [activeConversationId, documentContextItemsByConversation],
     )
+    const pendingDocumentAttachmentItems = useMemo(() => {
+        if (!activeConversationId) return []
+        const items = documentContextItemsByConversation[activeConversationId] ?? []
+        const itemsById = new Map(items.map((item) => [item.id, item]))
+        return (pendingDocumentAttachmentIdsByConversation[activeConversationId] ?? [])
+            .map((itemId) => itemsById.get(itemId))
+            .filter((item): item is DocumentContextItem => Boolean(item))
+    }, [activeConversationId, documentContextItemsByConversation, pendingDocumentAttachmentIdsByConversation])
 
     const activeConversationRef = useRef(activeConversation)
     useEffect(() => {
@@ -627,6 +683,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
             }
             return next
         })
+        setPendingDocumentAttachmentIdsByConversation((current) => {
+            const pendingIds = current[fromConversationId]
+            if (!pendingIds?.length) return current
+            const next = {...current}
+            delete next[fromConversationId]
+            next[toConversationId] = pendingIds
+            return next
+        })
         return migrated
     }, [])
 
@@ -702,6 +766,23 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
     }, [])
 
+    const persistUserMessageAttachments = useCallback((
+        conversationId: string,
+        userMessage: Message | null | undefined,
+    ) => {
+        if (!userMessage?.nodeId || !userMessage.attachments?.length) return
+        const attachments = messageAttachmentsToStored(userMessage.attachments)
+        if (attachments.length === 0) return
+        ai_update_message_attachments(conversationId, userMessage.nodeId, attachments)
+            .catch((error) => {
+                logger.warn('[useAiController] 持久化消息附件失败', {
+                    conversationId,
+                    nodeId: userMessage.nodeId,
+                    error,
+                })
+            })
+    }, [])
+
     const onMessage = useCallback((message: SessionMessage) => {
         const targetConversationId =
             runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
@@ -711,11 +792,16 @@ export function useAiController(focus: AiFocus): AiContextValue {
             ))?.id
             ?? null
 
+        let latestUserMessageWithAttachments: Message | null = null
         setConversations((prev) => prev.map((conversation) => {
             const matchedByRuntime =
                 conversation.sessionId === message.sessionId && conversation.runId === message.runId
             const matchedByMap = targetConversationId != null && conversation.id === targetConversationId
             if (!matchedByRuntime && !matchedByMap) return conversation
+            latestUserMessageWithAttachments = [...conversation.messages]
+                .reverse()
+                .find((item) => item.role === 'user' && Boolean(item.nodeId) && Boolean(item.attachments?.length))
+                ?? null
             return {
                 ...conversation,
                 messages: [...conversation.messages, {
@@ -743,8 +829,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
         if (resolvedConversationId) {
             void maybeAutoCompactAfterMessage(resolvedConversationId, message)
+            persistUserMessageAttachments(resolvedConversationId, latestUserMessageWithAttachments)
         }
-    }, [maybeAutoCompactAfterMessage])
+    }, [maybeAutoCompactAfterMessage, persistUserMessageAttachments])
 
     const onUserTurnBegin = useCallback((payload: { sessionId: string; runId: string; nodeId: number }) => {
         const targetConversationId =
@@ -897,6 +984,24 @@ export function useAiController(focus: AiFocus): AiContextValue {
             setDocumentContextItemsByConversation((current) =>
                 mergeDocumentContextItems(current, [event.payload.item]),
             )
+            setConversations((current) => current.map((conversation) => ({
+                ...conversation,
+                messages: conversation.messages.map((message) => {
+                    if (!message.attachments?.some((attachment) =>
+                        attachment.documentContextItemId === event.payload.item.id,
+                    )) {
+                        return message
+                    }
+                    return {
+                        ...message,
+                        attachments: message.attachments.map((attachment) =>
+                            attachment.documentContextItemId === event.payload.item.id
+                                ? documentItemToAttachment(event.payload.item)
+                                : attachment,
+                        ),
+                    }
+                }),
+            })))
         })
         return () => {
             unlisten.then(fn => fn())
@@ -1559,6 +1664,18 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setDocumentContextItemsByConversation((current) =>
             mergeDocumentContextItems(current, items),
         )
+        setPendingDocumentAttachmentIdsByConversation((current) => {
+            const existing = current[conversationId] ?? []
+            const nextIds = items.map((item) => item.id)
+            const merged = [...existing]
+            nextIds.forEach((itemId) => {
+                if (!merged.includes(itemId)) merged.push(itemId)
+            })
+            return {
+                ...current,
+                [conversationId]: merged,
+            }
+        })
     }, [])
 
     const removeDocumentContextItem = useCallback(async (itemId: string) => {
@@ -1575,6 +1692,21 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 }
             })
             return next
+        })
+        setPendingDocumentAttachmentIdsByConversation((current) => {
+            let changed = false
+            const next = {...current}
+            Object.entries(next).forEach(([conversationId, itemIds]) => {
+                const filtered = itemIds.filter((id) => id !== itemId)
+                if (filtered.length === itemIds.length) return
+                changed = true
+                if (filtered.length === 0) {
+                    delete next[conversationId]
+                } else {
+                    next[conversationId] = filtered
+                }
+            })
+            return changed ? next : current
         })
     }, [])
 
@@ -1883,6 +2015,20 @@ export function useAiController(focus: AiFocus): AiContextValue {
         })()
         if (!preparedSession) return
 
+        const pendingAttachmentIds =
+            pendingDocumentAttachmentIdsByConversationRef.current[preparedSession.conversationId]
+            ?? pendingDocumentAttachmentIdsByConversationRef.current[currentConvId]
+            ?? []
+        const pendingItems =
+            documentContextItemsByConversationRef.current[preparedSession.conversationId]
+            ?? documentContextItemsByConversationRef.current[currentConvId]
+            ?? []
+        const pendingItemsById = new Map(pendingItems.map((item) => [item.id, item]))
+        const userAttachments = pendingAttachmentIds
+            .map((itemId) => pendingItemsById.get(itemId))
+            .filter((item): item is DocumentContextItem => Boolean(item))
+            .map(documentItemToAttachment)
+
         await syncPreparedSessionContext(preparedSession)
 
         const actualPrompt = currentConv.mode === 'report'
@@ -1896,6 +2042,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             role: 'user',
             content: trimmed,
             timestamp: Date.now(),
+            attachments: userAttachments.length > 0 ? userAttachments : undefined,
         }
 
         setConversations((prev) => prev.map((conversation) => {
@@ -1912,6 +2059,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }))
 
         setInputValue('')
+        if (pendingAttachmentIds.length > 0) {
+            setPendingDocumentAttachmentIdsByConversation((current) => {
+                const next = {...current}
+                delete next[currentConvId]
+                delete next[preparedSession.conversationId]
+                return next
+            })
+        }
         logger.log('[useAiController][发送链路] 用户消息已写入前端状态，准备进入 session 发送', {
             traceId,
             conversationId: preparedSession.conversationId,
@@ -2140,6 +2295,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setActiveConversationId: selectConversation,
         messages,
         documentContextItems,
+        pendingDocumentAttachmentItems,
         addDocumentContextFiles,
         removeDocumentContextItem,
         retryDocumentContextItem,
@@ -2181,7 +2337,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         switchBranch: session.switchBranch,
     }), [
         plugins, pluginsReady, selectedPlugin, selectedModel, conversations, activeConversationId,
-        documentContextItems,
+        documentContextItems, pendingDocumentAttachmentItems,
         messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
