@@ -77,7 +77,7 @@ const documentContextStatusLabel = (status: string) => {
         case 'parsing':
             return '解析中'
         case 'ready':
-            return '已载入'
+            return ''
         case 'failed':
             return '解析失败'
         default:
@@ -386,6 +386,7 @@ export default function AIChatContent({
     const projectEntriesRef = useRef<EntryBrief[]>([])
     const lastScrollTopRef = useRef(0)
     const roleplayAutoPlayRef = useRef<string | null>(null)
+    const notifiedFailedDocumentIdsRef = useRef<Set<string>>(new Set())
     const [overflowingFocusChips, setOverflowingFocusChips] = useState<Record<string, boolean>>({})
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
@@ -681,6 +682,27 @@ export default function AIChatContent({
     }, [focusContextItems, showFocusContext])
 
     useEffect(() => {
+        ctx.documentContextItems.forEach((item) => {
+            if (item.status !== 'failed') {
+                notifiedFailedDocumentIdsRef.current.delete(item.id)
+            }
+        })
+
+        const failedItem = ctx.documentContextItems.find((item) =>
+            item.status === 'failed' && !notifiedFailedDocumentIdsRef.current.has(item.id),
+        )
+        if (!failedItem) return
+
+        notifiedFailedDocumentIdsRef.current.add(failedItem.id)
+        void showAlert(
+            `文档「${failedItem.fileName}」解析失败${failedItem.error ? `：${failedItem.error}` : ''}`,
+            'error',
+            'toast',
+            3200,
+        )
+    }, [ctx.documentContextItems, showAlert])
+
+    useEffect(() => {
         if (!autoScroll) return
         requestAnimationFrame(() => {
             const container = messagesContainerRef.current
@@ -906,7 +928,6 @@ export default function AIChatContent({
 
         try {
             await ctx.addDocumentContextFiles(paths)
-            await showAlert('文档已加入上下文，后台正在解析。', 'success', 'toast', 1800)
         } catch (error) {
             logger.warn('[AIChatContent] 添加文档上下文失败', error)
             await showAlert('添加文档失败，请确认文件可读取且格式受支持。', 'error', 'toast', 2400)
@@ -1712,9 +1733,11 @@ export default function AIChatContent({
                                         title={item.error ?? item.sourcePath}
                                     >
                                         <span className="ai-document-context-name">{item.fileName}</span>
-                                        <span className="ai-document-context-status">
-                                            {documentContextStatusLabel(item.status)}
-                                        </span>
+                                        {documentContextStatusLabel(item.status) && (
+                                            <span className="ai-document-context-status">
+                                                {documentContextStatusLabel(item.status)}
+                                            </span>
+                                        )}
                                         {item.status === 'failed' && (
                                             <button
                                                 type="button"
