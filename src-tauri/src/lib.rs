@@ -28,6 +28,7 @@ use apis::ai_client::usage::*;
 use apis::ai_contradiction::*;
 use apis::ai_summary::*;
 use apis::app_settings::*;
+use apis::document_context::*;
 use apis::feedback::*;
 use apis::layout::*;
 use apis::map::*;
@@ -446,6 +447,12 @@ pub fn run() {
             ai_set_task_context,
             ai_get_usage_summary,
             ai_get_usage_by_model,
+            docctx_supported_extensions,
+            docctx_add_files,
+            docctx_list_items,
+            docctx_remove_item,
+            docctx_retry_item,
+            docctx_build_context,
             // 应用设置
             setting_get_settings,
             setting_get_settings_bootstrap,

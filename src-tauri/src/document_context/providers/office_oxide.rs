@@ -16,6 +16,7 @@ impl DocumentParser for OfficeOxideParser {
     }
 
     fn parse(&self, input: ParseInput) -> Result<ParsedDocument> {
+        let _ = input.max_chars_hint;
         let doc = office_oxide::Document::open(&input.source_path)?;
         let markdown = doc.to_markdown();
         let plain_text = doc.plain_text();
