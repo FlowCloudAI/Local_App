@@ -756,6 +756,96 @@
     padding-inline: 1.5rem;
 }
 
+.ai-message-frame {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    width: 100%;
+}
+
+.ai-message-frame--user {
+    align-items: flex-end;
+}
+
+.ai-message-frame--assistant {
+    align-items: stretch;
+}
+
+.ai-message-attachments {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.45rem;
+    width: min(100%, 30rem);
+}
+
+.ai-message-attachment-card {
+    display: grid;
+    grid-template-columns: 2.45rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7rem;
+    width: min(100%, 30rem);
+    min-height: 3.6rem;
+    padding: 0.5rem 0.75rem 0.5rem 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
+    color: var(--fc-color-text);
+}
+
+.ai-message-attachment-card--failed {
+    border-color: color-mix(in srgb, var(--fc-color-danger, #d64545) 42%, var(--fc-color-border));
+}
+
+.ai-message-attachment-icon {
+    width: 2.45rem;
+    height: 2.45rem;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--fc-color-primary);
+    color: var(--fc-color-text-on-primary);
+}
+
+.ai-message-attachment-card--pdf .ai-message-attachment-icon {
+    background: var(--fc-color-danger, #e5484d);
+}
+
+.ai-message-attachment-icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ai-message-attachment-meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+}
+
+.ai-message-attachment-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--fc-font-weight-semibold, 600);
+    line-height: 1.35;
+}
+
+.ai-message-attachment-type {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    line-height: 1.25;
+}
+
+.ai-message-attachment-card--failed .ai-message-attachment-type {
+    color: color-mix(in srgb, var(--fc-color-danger, #d64545) 86%, var(--fc-color-text));
+}
+
 .ai-messages-list .entry-editor-link-preview {
     position: fixed;
     z-index: 180;

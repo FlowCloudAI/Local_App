@@ -19,7 +19,7 @@ import {
     setting_has_api_key,
     toApiError,
 } from '../../../api'
-import type {AiContextValue, Conversation, ConversationSettings} from '../model/AiControllerTypes'
+import type {AiContextValue, Attachment, Conversation, ConversationSettings} from '../model/AiControllerTypes'
 import {CONVERSATION_TEMPERATURE_MAX, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {estimateMessagesTokens, estimateTextTokens, formatTokenCount} from '../lib/contextUsage'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
@@ -244,6 +244,48 @@ function buildRenderableAiChatBlocks(blocks?: MessageBoxBlock[]): MessageBoxBloc
             ? {...block, content: buildRenderableAiChatMarkdown(block.content)}
             : block
     ))
+}
+
+const attachmentFileTypeLabel = (attachment: Attachment) => {
+    const extension = attachment.extension?.replace(/^\./, '').trim()
+    if (extension) return extension.toUpperCase()
+    return '文件'
+}
+
+function AiMessageAttachments({attachments}: { attachments?: Attachment[] }) {
+    const fileAttachments = (attachments ?? []).filter((attachment) => attachment.type === 'file')
+    if (fileAttachments.length === 0) return null
+
+    return (
+        <div className="ai-message-attachments" aria-label="消息附件">
+            {fileAttachments.map((attachment) => {
+                const statusLabel = documentContextStatusLabel(attachment.status ?? 'ready')
+                const typeLabel = attachmentFileTypeLabel(attachment)
+                const isPdf = typeLabel === 'PDF'
+                return (
+                    <div
+                        key={attachment.id}
+                        className={`ai-message-attachment-card ai-message-attachment-card--${attachment.status ?? 'ready'} ${isPdf ? 'ai-message-attachment-card--pdf' : ''}`}
+                        title={attachment.name}
+                    >
+                        <span className="ai-message-attachment-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none">
+                                <path d="M7 3.75h6.2L18 8.55v11.7H7z"/>
+                                <path d="M13 3.75v5h5"/>
+                                <path d="M9.8 13h4.4M9.8 16h3.2"/>
+                            </svg>
+                        </span>
+                        <span className="ai-message-attachment-meta">
+                            <span className="ai-message-attachment-name">{attachment.name}</span>
+                            <span className="ai-message-attachment-type">
+                                {statusLabel || typeLabel}
+                            </span>
+                        </span>
+                    </div>
+                )
+            })}
+        </div>
+    )
 }
 
 interface AIChatContentProps {
@@ -1508,37 +1550,44 @@ export default function AIChatContent({
                             onMouseOut={handleEntryLinkMouseOut}
                         >
                             {ctx.messages.map((message) => (
-                                <MessageBox
+                                <div
                                     key={message.id}
-                                    role={message.role}
-                                    blocks={message.role === 'assistant'
-                                        ? buildRenderableAiChatBlocks(message.blocks)
-                                        : message.blocks}
-                                    content={message.role === 'assistant'
-                                        ? buildRenderableAiChatMarkdown(message.content)
-                                        : message.content}
-                                    toolCallDetail={'verbose'}
-                                    markdown={message.role === 'assistant'}
-                                    lineHeight={1.5}
-                                    reasoning={message.reasoning || undefined}
-                                    rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
-                                    onCopy={() => navigator.clipboard.writeText(message.content)}
-                                    onPlay={roleplayTtsEnabled && message.role === 'assistant'
-                                        ? () => void handlePlayRoleMessage(message.content, activeConversation?.characterVoiceId)
-                                        : undefined}
-                                    onEdit={message.role === 'user'
-                                        ? () => ctx.editMessage(message.id)
-                                        : undefined}
-                                    onRegenerate={message.role === 'assistant'
-                                        ? () => {
-                                            logger.log('[AIChatContent] 点击重说', {
-                                                messageId: message.id,
-                                                conversationId: ctx.activeConversationId,
-                                            })
-                                            void ctx.regenerateMessage(message.id)
-                                        }
-                                        : undefined}
-                                />
+                                    className={`ai-message-frame ai-message-frame--${message.role}`}
+                                >
+                                    {message.role === 'user' && (
+                                        <AiMessageAttachments attachments={message.attachments}/>
+                                    )}
+                                    <MessageBox
+                                        role={message.role}
+                                        blocks={message.role === 'assistant'
+                                            ? buildRenderableAiChatBlocks(message.blocks)
+                                            : message.blocks}
+                                        content={message.role === 'assistant'
+                                            ? buildRenderableAiChatMarkdown(message.content)
+                                            : message.content}
+                                        toolCallDetail={'verbose'}
+                                        markdown={message.role === 'assistant'}
+                                        lineHeight={1.5}
+                                        reasoning={message.reasoning || undefined}
+                                        rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
+                                        onCopy={() => navigator.clipboard.writeText(message.content)}
+                                        onPlay={roleplayTtsEnabled && message.role === 'assistant'
+                                            ? () => void handlePlayRoleMessage(message.content, activeConversation?.characterVoiceId)
+                                            : undefined}
+                                        onEdit={message.role === 'user'
+                                            ? () => ctx.editMessage(message.id)
+                                            : undefined}
+                                        onRegenerate={message.role === 'assistant'
+                                            ? () => {
+                                                logger.log('[AIChatContent] 点击重说', {
+                                                    messageId: message.id,
+                                                    conversationId: ctx.activeConversationId,
+                                                })
+                                                void ctx.regenerateMessage(message.id)
+                                            }
+                                            : undefined}
+                                    />
+                                </div>
                             ))}
                             {ctx.streamingBlocks.length > 0 && ctx.isStreaming && (
                                 <MessageBox
