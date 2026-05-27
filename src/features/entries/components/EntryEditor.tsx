@@ -1119,7 +1119,18 @@ export default function EntryEditor({
             'aria-label': '插入图片',
             title: '插入图片',
         },
-        icon: <span className="entry-editor-md-image-command">图</span>,
+        icon: (
+            <svg
+                className="entry-editor-md-image-command"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+            >
+                <rect x="3.5" y="5" width="17" height="14" rx="2"/>
+                <circle cx="8.5" cy="9.5" r="1.5"/>
+                <path d="M5.5 17l4.5-4.5 3 3 2-2 3.5 3.5"/>
+            </svg>
+        ),
         execute: () => {
             setImageAddModalMode('insert')
             setImageAddModalOpen(true)
