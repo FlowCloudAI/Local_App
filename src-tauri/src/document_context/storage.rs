@@ -70,6 +70,7 @@ pub fn create_pending_items(
             .to_ascii_lowercase();
         let sha256 = sha256_file(&source_path)?;
         let now = Utc::now().to_rfc3339();
+        let cached = read_cached_parse_output(&root, &sha256).ok();
         let item = DocumentContextItem {
             id: Uuid::new_v4().to_string(),
             conversation_id: conversation_id.clone(),
@@ -77,11 +78,21 @@ pub fn create_pending_items(
             source_path: raw_path,
             sha256,
             extension,
-            parser_id: None,
-            status: DocumentContextStatus::Pending,
-            markdown_path: None,
-            text_path: None,
-            chunks_path: None,
+            parser_id: cached.as_ref().map(|cache| cache.meta.parser_id.clone()),
+            status: if cached.is_some() {
+                DocumentContextStatus::Ready
+            } else {
+                DocumentContextStatus::Pending
+            },
+            markdown_path: cached
+                .as_ref()
+                .map(|cache| cache.markdown_path.to_string_lossy().to_string()),
+            text_path: cached
+                .as_ref()
+                .map(|cache| cache.text_path.to_string_lossy().to_string()),
+            chunks_path: cached
+                .as_ref()
+                .map(|cache| cache.chunks_path.to_string_lossy().to_string()),
             created_at: now.clone(),
             updated_at: now,
             error: None,
@@ -92,6 +103,38 @@ pub fn create_pending_items(
 
     write_index(&root, &index)?;
     Ok(created)
+}
+
+struct CachedParseOutput {
+    meta: ParseOutputMeta,
+    markdown_path: PathBuf,
+    text_path: PathBuf,
+    chunks_path: PathBuf,
+}
+
+fn read_cached_parse_output(root: &Path, sha256: &str) -> Result<CachedParseOutput> {
+    let item_dir = files_dir(root).join(sha256);
+    let markdown_path = item_dir.join("content.md");
+    let text_path = item_dir.join("text.txt");
+    let chunks_path = item_dir.join("chunks.json");
+    let meta_path = item_dir.join("meta.json");
+
+    if !markdown_path.is_file()
+        || !text_path.is_file()
+        || !chunks_path.is_file()
+        || !meta_path.is_file()
+    {
+        return Err(anyhow!("解析缓存不完整：{}", item_dir.display()));
+    }
+
+    let meta: ParseOutputMeta = read_json_file(&meta_path)?;
+    let _: Vec<DocumentChunk> = read_json_file(&chunks_path)?;
+    Ok(CachedParseOutput {
+        meta,
+        markdown_path,
+        text_path,
+        chunks_path,
+    })
 }
 
 pub fn list_items(

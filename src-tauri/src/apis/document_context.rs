@@ -43,6 +43,10 @@ pub fn docctx_add_files(
 ) -> Result<Vec<DocumentContextItem>, ApiError> {
     let items = create_pending_items(paths.inner(), conversation_id, file_paths)?;
     for item in items.clone() {
+        if item.status == crate::document_context::DocumentContextStatus::Ready {
+            emit_update(&app, item);
+            continue;
+        }
         spawn_parse_item(app.clone(), clone_paths(paths.inner()), item);
     }
     Ok(items)
