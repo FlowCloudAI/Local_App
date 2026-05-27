@@ -107,13 +107,25 @@ pub const COASTLINE_WAVE_C_SPAN: f64 = 5.1;
 /// 调大：大尺度起伏对最终形状影响更大；调小：大尺度形态被削弱。
 pub const COASTLINE_WAVE_A_WEIGHT: f64 = 0.50;
 
+/// 海岸线噪声第一层强度。
+/// 调大：大尺度起伏绝对幅度更强；调小：大尺度起伏绝对幅度减弱。
+pub const COASTLINE_WAVE_A_STRENGTH: f64 = 1.0;
+
 /// 海岸线噪声第二层权重。
 /// 调大：中尺度细节更突出；调小：整体更平滑。
 pub const COASTLINE_WAVE_B_WEIGHT: f64 = 0.29;
 
+/// 海岸线噪声第二层强度。
+/// 调大：中尺度起伏绝对幅度更强；调小：中尺度起伏绝对幅度减弱。
+pub const COASTLINE_WAVE_B_STRENGTH: f64 = 1.0;
+
 /// 海岸线噪声第三层权重。
 /// 调大：海岸线表面更粗糙、更有纹理感；调小：更光滑。
 pub const COASTLINE_WAVE_C_WEIGHT: f64 = 0.30;
+
+/// 海岸线噪声第三层强度。
+/// 调大：细碎纹理绝对幅度更强；调小：细碎纹理绝对幅度减弱。
+pub const COASTLINE_WAVE_C_STRENGTH: f64 = 1.0;
 
 /// 海岸线噪声第一组盐值。
 /// 修改：会改变该层大尺度噪声的随机模式，海岸线宏观形态变化但保持确定性。

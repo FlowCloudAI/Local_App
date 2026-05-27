@@ -41,8 +41,11 @@ export interface CoastlineParamsPayload {
     waveCBase?: number
     waveCSpan?: number
     waveAWeight?: number
+    waveAStrength?: number
     waveBWeight?: number
+    waveBStrength?: number
     waveCWeight?: number
+    waveCStrength?: number
     noiseSaltA?: string | number
     noiseSaltB?: string | number
     noiseSaltC?: string | number

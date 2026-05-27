@@ -94,9 +94,15 @@ pub struct CoastlineParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wave_a_weight: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wave_a_strength: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wave_b_weight: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wave_b_strength: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wave_c_weight: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wave_c_strength: Option<f64>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",

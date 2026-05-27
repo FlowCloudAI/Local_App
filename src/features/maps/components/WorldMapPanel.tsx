@@ -137,15 +137,21 @@ const COASTLINE_BASE_PARAMS: Required<Pick<CoastlineParamsPayload,
     'amplitudeMin' |
     'amplitudeCanvasRatioMax' |
     'waveAWeight' |
+    'waveAStrength' |
     'waveBWeight' |
-    'waveCWeight'
+    'waveBStrength' |
+    'waveCWeight' |
+    'waveCStrength'
 >> = {
     amplitudeBase: 1,
     amplitudeMin: 2,
     amplitudeCanvasRatioMax: 0.025,
     waveAWeight: 0.50,
+    waveAStrength: 1,
     waveBWeight: 0.29,
+    waveBStrength: 1,
     waveCWeight: 0.30,
+    waveCStrength: 1,
 }
 
 const COASTLINE_DEFAULT_SIMPLE_CONFIG: CoastlineSimpleConfig = {
@@ -292,9 +298,12 @@ function buildSimpleCoastlineParams(config: CoastlineSimpleConfig): CoastlinePar
         amplitudeBase: COASTLINE_BASE_PARAMS.amplitudeBase * scaleFactor,
         amplitudeMin: COASTLINE_BASE_PARAMS.amplitudeMin * Math.sqrt(scaleFactor),
         amplitudeCanvasRatioMax: COASTLINE_BASE_PARAMS.amplitudeCanvasRatioMax * scaleFactor,
-        waveAWeight: COASTLINE_BASE_PARAMS.waveAWeight * macroNoise,
-        waveBWeight: COASTLINE_BASE_PARAMS.waveBWeight * midNoise,
-        waveCWeight: COASTLINE_BASE_PARAMS.waveCWeight * microNoise,
+        waveAWeight: COASTLINE_BASE_PARAMS.waveAWeight,
+        waveAStrength: COASTLINE_BASE_PARAMS.waveAStrength * macroNoise,
+        waveBWeight: COASTLINE_BASE_PARAMS.waveBWeight,
+        waveBStrength: COASTLINE_BASE_PARAMS.waveBStrength * midNoise,
+        waveCWeight: COASTLINE_BASE_PARAMS.waveCWeight,
+        waveCStrength: COASTLINE_BASE_PARAMS.waveCStrength * microNoise,
     }
 }
 
@@ -1462,12 +1471,30 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                         />
                     </div>
                     <div className="wm-field">
+                        <label>Wave A 强度</label>
+                        <input
+                            type="number"
+                            step={0.05}
+                            value={coastlineParams.waveAStrength ?? ''}
+                            onChange={e => updateCoastlineParam('waveAStrength', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
                         <label>Wave B 权重</label>
                         <input
                             type="number"
                             step={0.01}
                             value={coastlineParams.waveBWeight ?? ''}
                             onChange={e => updateCoastlineParam('waveBWeight', e.target.value)}
+                        />
+                    </div>
+                    <div className="wm-field">
+                        <label>Wave B 强度</label>
+                        <input
+                            type="number"
+                            step={0.05}
+                            value={coastlineParams.waveBStrength ?? ''}
+                            onChange={e => updateCoastlineParam('waveBStrength', e.target.value)}
                         />
                     </div>
                     <div className="wm-field">
@@ -1479,12 +1506,21 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                             onChange={e => updateCoastlineParam('waveCWeight', e.target.value)}
                         />
                     </div>
+                    <div className="wm-field">
+                        <label>Wave C 强度</label>
+                        <input
+                            type="number"
+                            step={0.05}
+                            value={coastlineParams.waveCStrength ?? ''}
+                            onChange={e => updateCoastlineParam('waveCStrength', e.target.value)}
+                        />
+                    </div>
                 </>
             )}
             <div className="wm-sidebar-hints">
                 <div className="wm-sidebar-hint">细化程度主要决定生成时间和最终点数。</div>
                 <div className="wm-sidebar-hint">尺度系数控制海岸线偏离原始边界的幅度。</div>
-                <div className="wm-sidebar-hint">当前三层扰动会映射到后端 Wave 权重，高级模式可直接编辑原始参数。</div>
+                <div className="wm-sidebar-hint">三层扰动现在会映射到后端 Wave 强度；高级模式可直接编辑原始参数。</div>
             </div>
         </div>
     )

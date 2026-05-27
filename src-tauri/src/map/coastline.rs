@@ -6,9 +6,11 @@ use crate::map::constants::{
     COASTLINE_NORMALIZED_LENGTH_MAX, COASTLINE_NORMALIZED_LENGTH_MIN, COASTLINE_RELAX_PASSES,
     COASTLINE_RELAX_WEIGHT, COASTLINE_SEGMENT_BASE, COASTLINE_SEGMENT_EDGE_RATIO_FACTOR,
     COASTLINE_SEGMENT_LENGTH_FACTOR, COASTLINE_WAVE_A_BASE, COASTLINE_WAVE_A_SPAN,
-    COASTLINE_WAVE_A_WEIGHT, COASTLINE_WAVE_B_BASE, COASTLINE_WAVE_B_SPAN, COASTLINE_WAVE_B_WEIGHT,
-    COASTLINE_WAVE_C_BASE, COASTLINE_WAVE_C_SPAN, COASTLINE_WAVE_C_WEIGHT, HASH_TEXT_OFFSET_BASIS,
-    HASH_TEXT_PRIME, HASH_UNIT_INCREMENT, HASH_UNIT_MULTIPLIER, TAU,
+    COASTLINE_WAVE_A_STRENGTH, COASTLINE_WAVE_A_WEIGHT, COASTLINE_WAVE_B_BASE,
+    COASTLINE_WAVE_B_SPAN, COASTLINE_WAVE_B_STRENGTH, COASTLINE_WAVE_B_WEIGHT,
+    COASTLINE_WAVE_C_BASE, COASTLINE_WAVE_C_SPAN, COASTLINE_WAVE_C_STRENGTH,
+    COASTLINE_WAVE_C_WEIGHT, HASH_TEXT_OFFSET_BASIS, HASH_TEXT_PRIME, HASH_UNIT_INCREMENT,
+    HASH_UNIT_MULTIPLIER, TAU,
 };
 use crate::map::geometry::{find_polygon_self_intersections, is_point_in_polygon};
 use crate::map::types::{
@@ -391,8 +393,11 @@ fn layered_edge_noise(
     let w_a = param!(params, wave_a_weight, COASTLINE_WAVE_A_WEIGHT);
     let w_b = param!(params, wave_b_weight, COASTLINE_WAVE_B_WEIGHT);
     let w_c = param!(params, wave_c_weight, COASTLINE_WAVE_C_WEIGHT);
+    let s_a = param!(params, wave_a_strength, COASTLINE_WAVE_A_STRENGTH);
+    let s_b = param!(params, wave_b_strength, COASTLINE_WAVE_B_STRENGTH);
+    let s_c = param!(params, wave_c_strength, COASTLINE_WAVE_C_STRENGTH);
     let total = w_a + w_b + w_c;
-    (wave_a * w_a + wave_b * w_b + wave_c * w_c) / total.max(f64::EPSILON)
+    (wave_a * w_a * s_a + wave_b * w_b * s_b + wave_c * w_c * s_c) / total.max(f64::EPSILON)
 }
 
 fn dedupe_adjacent_vertices(
@@ -541,5 +546,19 @@ mod tests {
             },
             &vertices
         ));
+    }
+
+    #[test]
+    fn coastline_wave_strength_can_disable_all_noise() {
+        let params = CoastlineParams {
+            wave_a_strength: Some(0.0),
+            wave_b_strength: Some(0.0),
+            wave_c_strength: Some(0.0),
+            ..Default::default()
+        };
+
+        let noise = layered_edge_noise(42, 3, 0.37, Some(&params));
+
+        assert!(noise.abs() <= f64::EPSILON);
     }
 }
