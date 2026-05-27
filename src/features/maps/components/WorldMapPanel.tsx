@@ -407,6 +407,20 @@ function TrashIcon() {
     )
 }
 
+function CloseIcon({size = 18}: { size?: number }) {
+    return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: size, height: size}}>
+            <path
+                d="M4.25 4.25L11.75 11.75M11.75 4.25L4.25 11.75"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+            />
+        </svg>
+    )
+}
+
 function ImageIcon() {
     return (
         <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: 13, height: 13}}>
@@ -1555,8 +1569,13 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                     >
                         <div className="wm-create-map-dialog__header">
                             <h3>新建地图</h3>
-                            <button type="button" className="wm-icon-btn" onClick={() => setNewMapForm(null)}>
-                                ×
+                            <button
+                                type="button"
+                                className="wm-icon-btn wm-icon-btn--close"
+                                onClick={() => setNewMapForm(null)}
+                                aria-label="关闭"
+                            >
+                                <CloseIcon/>
                             </button>
                         </div>
                         <div className="wm-create-map-dialog__body">
@@ -1654,8 +1673,13 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                     >
                         <div className="wm-create-map-dialog__header">
                             <h3>{utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}</h3>
-                            <button type="button" className="wm-icon-btn" onClick={() => setUtilityPanel(null)}>
-                                ×
+                            <button
+                                type="button"
+                                className="wm-icon-btn wm-icon-btn--close"
+                                onClick={() => setUtilityPanel(null)}
+                                aria-label="关闭"
+                            >
+                                <CloseIcon/>
                             </button>
                         </div>
                         {utilityPanel === 'help' ? (
@@ -1795,7 +1819,13 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             {errorMsg && (
                 <div className="wm-error-banner fc-status-banner fc-status-banner--error">
                     {errorMsg}
-                    <button type="button" className="wm-error-banner__close" onClick={() => setErrorMsg(null)}>×
+                    <button
+                        type="button"
+                        className="wm-error-banner__close"
+                        onClick={() => setErrorMsg(null)}
+                        aria-label="关闭错误提示"
+                    >
+                        <CloseIcon size={16}/>
                     </button>
                 </div>
             )}

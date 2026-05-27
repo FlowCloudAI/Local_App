@@ -193,10 +193,8 @@
     border: none;
     cursor: pointer;
     color: var(--fc-color-danger);
-    font-size: var(--fc-font-size-body, 1rem);
-    line-height: 1;
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.75rem;
+    height: 1.75rem;
     padding: 0;
     border-radius: var(--fc-radius-sm);
     display: inline-flex;
@@ -462,9 +460,16 @@
     color: var(--fc-color-text-secondary);
     display: flex;
     align-items: center;
-    padding: 3px;
+    justify-content: center;
+    padding: var(--fc-space-xs);
     border-radius: var(--fc-radius-sm);
     transition: background var(--fc-transition), color var(--fc-transition);
+}
+
+.wm-icon-btn--close {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
 }
 
 .wm-icon-btn:hover {
