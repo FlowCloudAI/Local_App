@@ -11,7 +11,7 @@ function Resolve-TauriSigningKeyPath {
 
     $expandedPath = [Environment]::ExpandEnvironmentVariables($keyPath)
     if (!(Test-Path -LiteralPath $expandedPath)) {
-        throw "未找到 Tauri updater 私钥：$expandedPath。请先设置 TAURI_SIGNING_PRIVATE_KEY_PATH，或按 docs/publish.md 生成密钥。"
+        throw "Tauri updater private key not found: $expandedPath. Set TAURI_SIGNING_PRIVATE_KEY_PATH or generate the key first."
     }
 
     return (Resolve-Path -LiteralPath $expandedPath).Path
@@ -25,16 +25,16 @@ $passwordBuffer = [IntPtr]::Zero
 
 try {
     if (!$hadPassword) {
-        $securePassword = Read-Host "请输入 Tauri updater 私钥密码" -AsSecureString
+        $securePassword = Read-Host "Enter Tauri updater private key password" -AsSecureString
         if ($securePassword.Length -eq 0) {
-            throw "私钥密码不能为空。"
+            throw "Private key password cannot be empty."
         }
 
         $passwordBuffer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
         $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordBuffer)
     }
 
-    Write-Host "使用 Tauri updater 私钥：$signingKeyPath"
+    Write-Host "Using Tauri updater private key: $signingKeyPath"
     npm run tauri:build:windows
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
