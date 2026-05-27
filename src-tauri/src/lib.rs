@@ -145,12 +145,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init());
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
-        log::info!("Single instance detected, quitting.");
-        exit(0);
-    }))
-    .plugin(tauri_plugin_updater::Builder::new().build())
-    .plugin(tauri_plugin_process::init());
+    let builder = builder
+        .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {
+            log::info!("Single instance detected, quitting.");
+            exit(0);
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
 
     builder
         .setup(|app| {
@@ -451,6 +452,7 @@ pub fn run() {
             docctx_add_files,
             docctx_list_items,
             docctx_remove_item,
+            docctx_reassign_conversation,
             docctx_retry_item,
             docctx_build_context,
             // 应用设置

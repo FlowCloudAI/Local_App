@@ -12,8 +12,8 @@ use uuid::Uuid;
 use crate::PathsState;
 
 use super::model::{
-    DocumentContextBuildResult, DocumentContextItem, DocumentContextSource, DocumentContextStatus,
-    DocumentChunk, ParsedDocument,
+    DocumentChunk, DocumentContextBuildResult, DocumentContextItem, DocumentContextSource,
+    DocumentContextStatus, ParsedDocument,
 };
 
 const INDEX_FILE: &str = "index.json";
@@ -192,6 +192,33 @@ pub fn remove_item(paths: &PathsState, item_id: &str) -> Result<()> {
     write_index(&root, &index)
 }
 
+pub fn reassign_conversation(
+    paths: &PathsState,
+    from_conversation_id: &str,
+    to_conversation_id: &str,
+) -> Result<Vec<DocumentContextItem>> {
+    let root = context_root_dir(paths)?;
+    let mut index = read_index(&root)?;
+    let now = Utc::now().to_rfc3339();
+    let mut updated = Vec::new();
+
+    for item in &mut index.items {
+        if item.conversation_id.as_deref() != Some(from_conversation_id) {
+            continue;
+        }
+        item.conversation_id = Some(to_conversation_id.to_string());
+        item.updated_at = now.clone();
+        updated.push(item.clone());
+    }
+
+    if updated.is_empty() {
+        return Ok(updated);
+    }
+
+    write_index(&root, &index)?;
+    Ok(updated)
+}
+
 pub fn build_context_markdown(
     paths: &PathsState,
     conversation_id: &str,
@@ -350,9 +377,10 @@ fn sha256_file(path: &Path) -> Result<String> {
 }
 
 fn read_json_file<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
-    let content =
-        fs::read_to_string(path).with_context(|| format!("读取 JSON 文件失败：{}", path.display()))?;
-    serde_json::from_str(&content).with_context(|| format!("解析 JSON 文件失败：{}", path.display()))
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("读取 JSON 文件失败：{}", path.display()))?;
+    serde_json::from_str(&content)
+        .with_context(|| format!("解析 JSON 文件失败：{}", path.display()))
 }
 
 fn write_json_file<T: Serialize>(path: &Path, value: &T) -> Result<()> {

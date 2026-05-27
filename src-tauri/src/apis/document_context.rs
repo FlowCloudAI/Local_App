@@ -4,7 +4,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::document_context::{
     DocumentContextBuildResult, DocumentContextItem, ParseInput, build_context_markdown,
     create_pending_items, default_parser_registry, get_item, list_items, mark_item_parsing,
-    remove_item, save_parse_failure, save_parse_success,
+    reassign_conversation, remove_item, save_parse_failure, save_parse_success,
 };
 use crate::{ApiError, PathsState};
 
@@ -59,6 +59,16 @@ pub fn docctx_list_items(
 #[tauri::command]
 pub fn docctx_remove_item(paths: State<'_, PathsState>, item_id: String) -> Result<(), ApiError> {
     remove_item(paths.inner(), &item_id).map_err(ApiError::from)
+}
+
+#[tauri::command]
+pub fn docctx_reassign_conversation(
+    paths: State<'_, PathsState>,
+    from_conversation_id: String,
+    to_conversation_id: String,
+) -> Result<Vec<DocumentContextItem>, ApiError> {
+    reassign_conversation(paths.inner(), &from_conversation_id, &to_conversation_id)
+        .map_err(ApiError::from)
 }
 
 #[tauri::command]
@@ -122,16 +132,25 @@ fn spawn_parse_item(app: AppHandle, paths: PathsState, item: DocumentContextItem
         let updated = match parse_result {
             Ok(Ok(parsed)) => save_parse_success(&paths, &item_id, &parsed),
             Ok(Err(error)) => save_parse_failure(&paths, &item_id, error),
-            Err(error) => save_parse_failure(&paths, &item_id, format!("解析任务异常退出：{}", error)),
+            Err(error) => {
+                save_parse_failure(&paths, &item_id, format!("解析任务异常退出：{}", error))
+            }
         };
 
         match updated {
             Ok(item) => emit_update(&app, item),
-            Err(error) => log::warn!("[docctx] 写入解析结果失败 item_id={} error={}", item_id, error),
+            Err(error) => log::warn!(
+                "[docctx] 写入解析结果失败 item_id={} error={}",
+                item_id,
+                error
+            ),
         }
     });
 }
 
 fn emit_update(app: &AppHandle, item: DocumentContextItem) {
-    let _ = app.emit(DOCUMENT_CONTEXT_UPDATED, DocumentContextUpdatedEvent { item });
+    let _ = app.emit(
+        DOCUMENT_CONTEXT_UPDATED,
+        DocumentContextUpdatedEvent { item },
+    );
 }

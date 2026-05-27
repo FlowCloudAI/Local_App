@@ -58,6 +58,9 @@ export const docctx_list_items = (conversationId?: string | null) =>
 export const docctx_remove_item = (itemId: string) =>
     command<void>('docctx_remove_item', {itemId})
 
+export const docctx_reassign_conversation = (fromConversationId: string, toConversationId: string) =>
+    command<DocumentContextItem[]>('docctx_reassign_conversation', {fromConversationId, toConversationId})
+
 export const docctx_retry_item = (itemId: string) =>
     command<DocumentContextItem>('docctx_retry_item', {itemId})
 

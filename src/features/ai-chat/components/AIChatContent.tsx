@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {open as openFileDialog, save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {listen} from '@tauri-apps/api/event'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
@@ -68,6 +68,21 @@ const formatContextUsagePercent = (percent: number, usedTokens: number) => {
 const parseConversationNumber = (value: string, fallback: number) => {
     const parsed = Number(value)
     return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const documentContextStatusLabel = (status: string) => {
+    switch (status) {
+        case 'pending':
+            return '排队中'
+        case 'parsing':
+            return '解析中'
+        case 'ready':
+            return '已载入'
+        case 'failed':
+            return '解析失败'
+        default:
+            return status
+    }
 }
 
 const isCompleteConversationNumberInput = (value: string) => {
@@ -871,6 +886,33 @@ export default function AIChatContent({
         inputWikiLink.handleMarkdownCursorSync(event.currentTarget)
     }
 
+    const handleAttachDocuments = useCallback(async () => {
+        if (!activeConversation || isArchivedConversation) return
+        const selected = await openFileDialog({
+            multiple: true,
+            filters: [
+                {
+                    name: 'Office 文档',
+                    extensions: ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+                },
+            ],
+        })
+        const paths = Array.isArray(selected)
+            ? selected
+            : selected
+                ? [selected]
+                : []
+        if (paths.length === 0) return
+
+        try {
+            await ctx.addDocumentContextFiles(paths)
+            await showAlert('文档已加入上下文，后台正在解析。', 'success', 'toast', 1800)
+        } catch (error) {
+            logger.warn('[AIChatContent] 添加文档上下文失败', error)
+            await showAlert('添加文档失败，请确认文件可读取且格式受支持。', 'error', 'toast', 2400)
+        }
+    }, [activeConversation, ctx, isArchivedConversation, showAlert])
+
     const handleExportConversation = useCallback(async (
         event: React.MouseEvent,
         conversation: Conversation,
@@ -1661,8 +1703,63 @@ export default function AIChatContent({
                                 onOpenPluginManagement={onOpenPluginManagement}
                             />
                         )}
+                        {ctx.documentContextItems.length > 0 && (
+                            <div className="ai-document-context-list" aria-label="文档上下文">
+                                {ctx.documentContextItems.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className={`ai-document-context-chip ai-document-context-chip--${item.status}`}
+                                        title={item.error ?? item.sourcePath}
+                                    >
+                                        <span className="ai-document-context-name">{item.fileName}</span>
+                                        <span className="ai-document-context-status">
+                                            {documentContextStatusLabel(item.status)}
+                                        </span>
+                                        {item.status === 'failed' && (
+                                            <button
+                                                type="button"
+                                                className="ai-document-context-icon-btn"
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    void ctx.retryDocumentContextItem(item.id)
+                                                }}
+                                                title="重新解析"
+                                            >
+                                                ↻
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            className="ai-document-context-icon-btn"
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                void ctx.removeDocumentContextItem(item.id)
+                                            }}
+                                            title="移除文档"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="ai-input-meta-row">
                             <div className="ai-input-meta-controls">
+                                <button
+                                    type="button"
+                                    className="ai-input-meta-btn ai-document-context-add"
+                                    disabled={!activeConversation || isArchivedConversation}
+                                    title={activeConversation ? '添加文档上下文' : '创建对话后可添加文档上下文'}
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        void handleAttachDocuments()
+                                    }}
+                                >
+                                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="M5 8.5 9.8 3.7a2.1 2.1 0 0 1 3 3L7.2 12.3a3.2 3.2 0 1 1-4.5-4.5l5.7-5.7"/>
+                                    </svg>
+                                    <span>添加文档</span>
+                                </button>
                                 <button
                                     ref={settingsToggleRef}
                                     type="button"

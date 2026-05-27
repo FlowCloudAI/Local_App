@@ -34,7 +34,11 @@ impl ParserRegistry {
 
     pub fn parse(&self, input: ParseInput) -> Result<ParsedDocument> {
         let extension = input.extension.to_ascii_lowercase();
-        let Some(parser) = self.parsers.iter().find(|parser| parser.supports(&extension)) else {
+        let Some(parser) = self
+            .parsers
+            .iter()
+            .find(|parser| parser.supports(&extension))
+        else {
             return Err(anyhow!("当前不支持解析 .{} 文件", extension));
         };
 

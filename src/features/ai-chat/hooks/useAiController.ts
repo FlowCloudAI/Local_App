@@ -22,8 +22,17 @@ import {
     type AppSettings,
     type CharacterConversationMeta,
     type ConversationUiState,
+    DOCCTX_UPDATED,
     db_get_entry,
     db_get_project,
+    docctx_add_files,
+    docctx_build_context,
+    docctx_list_items,
+    docctx_reassign_conversation,
+    docctx_remove_item,
+    docctx_retry_item,
+    type DocumentContextItem,
+    type DocumentContextUpdatedEvent,
     ENTRY_UPDATED,
     type EntryUpdatedEvent,
     type PluginInfo,
@@ -68,8 +77,33 @@ const buildAiLogPreview = (content: string) => {
 const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
 const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
+const DOCUMENT_CONTEXT_ATTRIBUTE = 'attached_documents'
+const DOCUMENT_CONTEXT_CHAR_BUDGET = 24_000
 
 type PreparedAiSession = { sid: string; runId: string; conversationId: string }
+
+const mergeDocumentContextItems = (
+    current: Record<string, DocumentContextItem[]>,
+    items: DocumentContextItem[],
+) => {
+    if (items.length === 0) return current
+    const next = {...current}
+    let changed = false
+
+    items.forEach((item) => {
+        const conversationId = item.conversationId
+        if (!conversationId) return
+        const list = next[conversationId] ?? []
+        const existingIndex = list.findIndex((existing) => existing.id === item.id)
+        const nextList = existingIndex >= 0
+            ? list.map((existing, index) => index === existingIndex ? item : existing)
+            : [item, ...list]
+        next[conversationId] = nextList.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        changed = true
+    })
+
+    return changed ? next : current
+}
 
 const getGlobalDefaultPrompt = (settings: AppSettings | null): string =>
     settings?.llm?.app_sense_custom_prompt.trim() ?? ''
@@ -496,6 +530,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
     )
 
     const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation])
+    const [documentContextItemsByConversation, setDocumentContextItemsByConversation] = useState<Record<string, DocumentContextItem[]>>({})
+    const documentContextItemsByConversationRef = useRef(documentContextItemsByConversation)
+    useEffect(() => {
+        documentContextItemsByConversationRef.current = documentContextItemsByConversation
+    }, [documentContextItemsByConversation])
+    const documentContextItems = useMemo(
+        () => activeConversationId ? (documentContextItemsByConversation[activeConversationId] ?? []) : [],
+        [activeConversationId, documentContextItemsByConversation],
+    )
 
     const activeConversationRef = useRef(activeConversation)
     useEffect(() => {
@@ -556,6 +599,36 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         activeConversationIdRef.current = activeConversationId
     }, [activeConversationId])
+
+    const loadDocumentContextItems = useCallback(async (conversationId: string) => {
+        const items = await docctx_list_items(conversationId)
+        setDocumentContextItemsByConversation((current) => ({
+            ...current,
+            [conversationId]: items,
+        }))
+    }, [])
+
+    const migrateDocumentContextConversation = useCallback(async (
+        fromConversationId: string,
+        toConversationId: string,
+    ) => {
+        if (fromConversationId === toConversationId) return []
+        const migrated = await docctx_reassign_conversation(fromConversationId, toConversationId)
+        setDocumentContextItemsByConversation((current) => {
+            const next = {...current}
+            delete next[fromConversationId]
+            if (migrated.length > 0) {
+                next[toConversationId] = migrated
+            } else if (current[fromConversationId]?.length) {
+                next[toConversationId] = current[fromConversationId].map((item) => ({
+                    ...item,
+                    conversationId: toConversationId,
+                }))
+            }
+            return next
+        })
+        return migrated
+    }, [])
 
     const runtimeConversationRef = useRef<Record<string, string>>({})
     const abortControllerRef = useRef<AbortController | null>(null)
@@ -820,6 +893,25 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [])
 
     useEffect(() => {
+        const unlisten = listen<DocumentContextUpdatedEvent>(DOCCTX_UPDATED, (event) => {
+            setDocumentContextItemsByConversation((current) =>
+                mergeDocumentContextItems(current, [event.payload.item]),
+            )
+        })
+        return () => {
+            unlisten.then(fn => fn())
+        }
+    }, [])
+
+    useEffect(() => {
+        const conversationId = activeConversationId
+        if (!conversationId) return
+        loadDocumentContextItems(conversationId).catch((error) => {
+            logger.warn('[useAiController] 加载文档上下文列表失败', {conversationId, error})
+        })
+    }, [activeConversationId, loadDocumentContextItems])
+
+    useEffect(() => {
         let cancelled = false
 
         const loadFocusContext = async () => {
@@ -929,22 +1021,59 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
     }, [editModeEnabled, webSearchEnabled])
 
+    const appendDocumentContext = useCallback(async (
+        ctx: TaskContextPayload,
+        conversationId: string,
+    ): Promise<TaskContextPayload> => {
+        const readyItemIds = (documentContextItemsByConversationRef.current[conversationId] ?? [])
+            .filter((item) => item.status === 'ready')
+            .map((item) => item.id)
+        if (readyItemIds.length === 0) return ctx
+
+        try {
+            const result = await docctx_build_context({
+                conversationId,
+                itemIds: readyItemIds,
+                maxChars: DOCUMENT_CONTEXT_CHAR_BUDGET,
+            })
+            if (result.sources.length === 0 || !result.markdown.trim()) return ctx
+            return {
+                ...ctx,
+                attributes: {
+                    ...(ctx.attributes ?? {}),
+                    [DOCUMENT_CONTEXT_ATTRIBUTE]: result.markdown,
+                },
+            }
+        } catch (error) {
+            logger.warn('[useAiController] 构建文档上下文失败，继续使用基础上下文', {
+                conversationId,
+                error,
+            })
+            return ctx
+        }
+    }, [])
+
     // tab 切换、session 建立或对话提示词变化时推送最新焦点上下文
     useEffect(() => {
         const sid = session.sessionId
         if (!sid) return
         let cancelled = false
+        const conversationId = activeConversationRef.current?.id ?? null
         const settings = activeConversationRef.current?.settings ?? DEFAULT_CONVERSATION_SETTINGS
-        resolveContextPayload(focus.projectId, focus.entryId, settings).then((ctx) => {
+        resolveContextPayload(focus.projectId, focus.entryId, settings).then(async (ctx) => {
             if (cancelled) return
-            ai_set_task_context(sid, ctx).catch(() => {
+            const enrichedCtx = conversationId
+                ? await appendDocumentContext(ctx, conversationId)
+                : ctx
+            if (cancelled) return
+            ai_set_task_context(sid, enrichedCtx).catch(() => {
             })
         }).catch(() => {
         })
         return () => {
             cancelled = true
         }
-    }, [activeConversation?.settings.systemPrompt, focus.projectId, focus.entryId, session.sessionId, resolveContextPayload])
+    }, [activeConversation?.settings.systemPrompt, activeConversationId, focus.projectId, focus.entryId, session.sessionId, resolveContextPayload, appendDocumentContext])
 
     useEffect(() => {
         let mounted = true
@@ -1423,6 +1552,39 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
     }, [])
 
+    const addDocumentContextFiles = useCallback(async (filePaths: string[]) => {
+        const conversationId = activeConversationIdRef.current
+        if (!conversationId || filePaths.length === 0) return
+        const items = await docctx_add_files(conversationId, filePaths)
+        setDocumentContextItemsByConversation((current) =>
+            mergeDocumentContextItems(current, items),
+        )
+    }, [])
+
+    const removeDocumentContextItem = useCallback(async (itemId: string) => {
+        await docctx_remove_item(itemId)
+        setDocumentContextItemsByConversation((current) => {
+            const next = {...current}
+            Object.entries(next).forEach(([conversationId, items]) => {
+                const filtered = items.filter((item) => item.id !== itemId)
+                if (filtered.length === items.length) return
+                if (filtered.length === 0) {
+                    delete next[conversationId]
+                } else {
+                    next[conversationId] = filtered
+                }
+            })
+            return next
+        })
+    }, [])
+
+    const retryDocumentContextItem = useCallback(async (itemId: string) => {
+        const item = await docctx_retry_item(itemId)
+        setDocumentContextItemsByConversation((current) =>
+            mergeDocumentContextItems(current, [item]),
+        )
+    }, [])
+
     const sendMessage = useCallback(async (content: string) => {
         const trimmed = content.trim()
         if (!trimmed) return
@@ -1466,7 +1628,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     currentSettings,
                 )
-                await ai_set_task_context(target.sid, ctx)
+                const enrichedCtx = await appendDocumentContext(ctx, target.conversationId)
+                await ai_set_task_context(target.sid, enrichedCtx)
             } catch (error) {
                 logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
                     traceId,
@@ -1503,6 +1666,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
             if (!created) return null
 
             const nextConversationId = isPending ? created.conversationId : failedSession.conversationId
+            if (isPending && nextConversationId !== failedSession.conversationId) {
+                await migrateDocumentContextConversation(failedSession.conversationId, nextConversationId)
+            }
             runtimeConversationRef.current[
                 runtimeConversationKey(created.sessionId, created.runId)
             ] = nextConversationId
@@ -1659,6 +1825,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 })
             })
 
+            const nextConversationId = isPending ? created.conversationId : currentConvId
+            if (isPending && nextConversationId !== currentConvId) {
+                await migrateDocumentContextConversation(currentConvId, nextConversationId)
+            }
+
             // 兜底推送：session 刚建立时 effect 可能尚未触发，确保首轮 assemble 有上下文
             try {
                 const ctx = await resolveContextPayload(
@@ -1666,14 +1837,16 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     currentSettings,
                 )
+                const enrichedCtx = await appendDocumentContext(ctx, nextConversationId)
                 logger.log('[useAiController][发送链路] 准备推送任务上下文', {
                     traceId,
                     sessionId: created.sessionId,
-                    projectId: ctx.attributes?.project_id ?? null,
-                    entryId: ctx.attributes?.entry_id ?? null,
-                    readOnly: ctx.flags?.read_only ?? null,
+                    projectId: enrichedCtx.attributes?.project_id ?? null,
+                    entryId: enrichedCtx.attributes?.entry_id ?? null,
+                    hasDocumentContext: Boolean(enrichedCtx.attributes?.[DOCUMENT_CONTEXT_ATTRIBUTE]),
+                    readOnly: enrichedCtx.flags?.read_only ?? null,
                 })
-                await ai_set_task_context(created.sessionId, ctx)
+                await ai_set_task_context(created.sessionId, enrichedCtx)
                 logger.log('[useAiController][发送链路] 任务上下文推送完成', {
                     traceId,
                     sessionId: created.sessionId,
@@ -1686,7 +1859,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 })
             }
 
-            const nextConversationId = isPending ? created.conversationId : currentConvId
             runtimeConversationRef.current[
                 runtimeConversationKey(created.sessionId, created.runId)
                 ] = nextConversationId
@@ -1783,7 +1955,18 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 onError(`发送失败: ${formatApiError(toApiError(retryError))}`)
             }
         }
-    }, [editingMessageId, selectedModel, selectedPlugin, session, resolveContextPayload, sessionParams.maxToolRounds, tools.length, onError])
+    }, [
+        editingMessageId,
+        selectedModel,
+        selectedPlugin,
+        session,
+        resolveContextPayload,
+        appendDocumentContext,
+        migrateDocumentContextConversation,
+        sessionParams.maxToolRounds,
+        tools.length,
+        onError,
+    ])
 
     const stopStreaming = useCallback(() => {
         abortControllerRef.current?.abort()
@@ -1883,7 +2066,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     convSettings,
                 )
-                await ai_set_task_context(currentSid!, ctx)
+                const enrichedCtx = await appendDocumentContext(ctx, conv.id)
+                await ai_set_task_context(currentSid!, enrichedCtx)
             } catch {
                 // 上下文推送失败不阻塞 checkout
             }
@@ -1898,7 +2082,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     convSettings,
                 )
-                await ai_set_task_context(currentSid, ctx)
+                const enrichedCtx = await appendDocumentContext(ctx, conv.id)
+                await ai_set_task_context(currentSid, enrichedCtx)
             } catch {
                 // 上下文推送失败不阻塞 checkout
             }
@@ -1911,7 +2096,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ))
         setAutoScroll(true)
         await session.checkout(precedingUserMsg.nodeId, currentSid, currentRunId)
-    }, [session, sessionParams.maxToolRounds, resolveContextPayload])
+    }, [session, sessionParams.maxToolRounds, resolveContextPayload, appendDocumentContext])
 
     const editMessage = useCallback((messageId: string) => {
         const conv = conversations.find((conversation) => conversation.id === activeConversationIdRef.current)
@@ -1954,6 +2139,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
         activeConversationId,
         setActiveConversationId: selectConversation,
         messages,
+        documentContextItems,
+        addDocumentContextFiles,
+        removeDocumentContextItem,
+        retryDocumentContextItem,
         sendMessage,
         stopStreaming,
         regenerateMessage,
@@ -1992,9 +2181,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
         switchBranch: session.switchBranch,
     }), [
         plugins, pluginsReady, selectedPlugin, selectedModel, conversations, activeConversationId,
+        documentContextItems,
         messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
+        addDocumentContextFiles, removeDocumentContextItem, retryDocumentContextItem,
         toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,

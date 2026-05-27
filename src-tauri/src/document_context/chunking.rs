@@ -15,9 +15,9 @@ fn split_markdown_with_limit(markdown: &str, max_chars: usize) -> Vec<DocumentCh
         let line_with_break = format!("{}\n", line);
         let line_heading = parse_heading(line);
         let should_flush_for_heading = line_heading.is_some() && !current.trim().is_empty();
-        let should_flush_for_size =
-            current.chars().count() + line_with_break.chars().count() > max_chars
-                && !current.trim().is_empty();
+        let should_flush_for_size = current.chars().count() + line_with_break.chars().count()
+            > max_chars
+            && !current.trim().is_empty();
 
         if should_flush_for_heading || should_flush_for_size {
             push_chunk(&mut chunks, &mut current, current_heading.clone());
