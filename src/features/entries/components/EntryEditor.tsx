@@ -2,7 +2,7 @@ import {logger} from '../../../shared/logger'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {listen} from '@tauri-apps/api/event'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import type {ICommand} from '@uiw/react-md-editor'
+import {commands, type ICommand} from '@uiw/react-md-editor'
 import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_generate_entry_summary,
@@ -142,6 +142,16 @@ function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
 
 function escapeMarkdownImageAlt(value: string): string {
     return value.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function withToolbarTitle(command: ICommand, title: string): ICommand {
+    return {
+        ...command,
+        buttonProps: {
+            ...(command.buttonProps ?? {}),
+            title,
+        },
+    }
 }
 
 export default function EntryEditor({
@@ -1116,6 +1126,26 @@ export default function EntryEditor({
         },
     }), [])
 
+    const markdownToolbarCommands = useMemo<ICommand[]>(() => [
+        withToolbarTitle(commands.bold, '加粗'),
+        withToolbarTitle(commands.italic, '斜体'),
+        withToolbarTitle(commands.strikethrough, '删除线'),
+        commands.divider,
+        withToolbarTitle(commands.heading1, '一级标题'),
+        withToolbarTitle(commands.heading2, '二级标题'),
+        withToolbarTitle(commands.heading3, '三级标题'),
+        commands.divider,
+        withToolbarTitle(commands.quote, '引用'),
+        withToolbarTitle(commands.code, '行内代码'),
+        withToolbarTitle(commands.codeBlock, '代码块'),
+        commands.divider,
+        withToolbarTitle(commands.link, '链接'),
+        imageInsertCommand,
+        withToolbarTitle(commands.unorderedListCommand, '无序列表'),
+        withToolbarTitle(commands.orderedListCommand, '有序列表'),
+        withToolbarTitle(commands.hr, '分割线'),
+    ], [imageInsertCommand])
+
     return (
         <div className="entry-editor-page">
             <RollingBox axis="y" className="entry-editor-page__scroll" thumbSize="thin">
@@ -1233,7 +1263,7 @@ export default function EntryEditor({
                                             fontSizeScale={editorFontSize / 14}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
-                                            extraCommands={[imageInsertCommand]}
+                                            toolbarCommands={markdownToolbarCommands}
                                             onKeyDown={(event) => {
                                                 if (!(event.ctrlKey || event.metaKey) || event.repeat) return
                                                 const key = event.key.toLowerCase()
