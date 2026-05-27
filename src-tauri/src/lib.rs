@@ -436,6 +436,7 @@ pub fn run() {
             ai_list_conversations,
             ai_get_conversation,
             ai_update_conversation_settings,
+            ai_update_message_attachments,
             ai_compact_conversation,
             ai_export_conversation,
             ai_delete_conversation,

@@ -422,6 +422,16 @@ export interface StoredMessage {
       arguments?: string
     }
   }[]
+  attachments?: StoredMessageAttachment[]
+}
+
+export interface StoredMessageAttachment {
+    attachmentId: string
+    documentContextItemId: string
+    fileName: string
+    extension: string
+    sha256: string
+    status: string
 }
 
 export interface StoredCompact {
@@ -560,6 +570,19 @@ export const ai_get_conversation = (id: string) =>
 
 export const ai_update_conversation_settings = (id: string, settings: StoredConversationSettings) =>
     command<StoredConversationSettings>('ai_update_conversation_settings', {id, settings})
+
+export const ai_update_message_attachments = (
+    conversationId: string,
+    nodeId: number,
+    attachments: StoredMessageAttachment[],
+) =>
+    command<void>('ai_update_message_attachments', {
+        request: {
+            conversationId,
+            nodeId,
+            attachments,
+        },
+    })
 
 export const ai_compact_conversation = (request: CompactConversationRequest) =>
     command<CompactConversationResult>('ai_compact_conversation', {request})

@@ -144,6 +144,19 @@ pub struct StoredMessage {
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attachments: Vec<StoredMessageAttachment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredMessageAttachment {
+    pub attachment_id: String,
+    pub document_context_item_id: String,
+    pub file_name: String,
+    pub extension: String,
+    pub sha256: String,
+    pub status: String,
 }
 
 /// compact 文本的 App 侧元数据。
@@ -496,6 +509,7 @@ fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<St
                 timestamp: node.timestamp,
                 tool_call_id: message.tool_call_id,
                 tool_calls: message.tool_calls,
+                attachments: Vec::new(),
             }
         })
         .collect()
@@ -519,8 +533,9 @@ fn auto_title(messages: &[StoredMessage]) -> String {
 
 fn merge_compacted_runtime_snapshot(
     existing: StoredConversation,
-    runtime_messages: Vec<StoredMessage>,
+    mut runtime_messages: Vec<StoredMessage>,
 ) -> Vec<StoredMessage> {
+    apply_existing_message_attachments(&existing.messages, &mut runtime_messages);
     let Some(compact) = existing.compact.as_ref() else {
         return runtime_messages;
     };
@@ -551,6 +566,34 @@ fn merge_compacted_runtime_snapshot(
 
     merged.sort_by_key(|message| message.node_id.unwrap_or(u64::MAX));
     merged
+}
+
+fn apply_existing_message_attachments(
+    existing_messages: &[StoredMessage],
+    runtime_messages: &mut [StoredMessage],
+) {
+    let attachments_by_node = existing_messages
+        .iter()
+        .filter(|message| !message.attachments.is_empty())
+        .filter_map(|message| {
+            message
+                .node_id
+                .map(|node_id| (node_id, message.attachments.clone()))
+        })
+        .collect::<HashMap<_, _>>();
+
+    if attachments_by_node.is_empty() {
+        return;
+    }
+
+    for message in runtime_messages {
+        let Some(node_id) = message.node_id else {
+            continue;
+        };
+        if let Some(attachments) = attachments_by_node.get(&node_id) {
+            message.attachments = attachments.clone();
+        }
+    }
 }
 
 fn chat_store_save_snapshot(

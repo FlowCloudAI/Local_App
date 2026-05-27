@@ -45,6 +45,40 @@ pub async fn ai_update_conversation_settings(
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateMessageAttachmentsRequest {
+    pub conversation_id: String,
+    pub node_id: u64,
+    #[serde(default)]
+    pub attachments: Vec<StoredMessageAttachment>,
+}
+
+#[tauri::command]
+pub async fn ai_update_message_attachments(
+    paths: State<'_, PathsState>,
+    request: UpdateMessageAttachmentsRequest,
+) -> Result<(), ApiError> {
+    let mut conversation = chat_store_get_conversation(paths.inner(), &request.conversation_id)
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| conversation_not_found(&request.conversation_id))?;
+    let message = conversation
+        .messages
+        .iter_mut()
+        .find(|message| message.node_id == Some(request.node_id) && message.role == "user")
+        .ok_or_else(|| {
+            ApiError::new(
+                ErrorCode::LlmSessionNotFound,
+                format!("未找到用户消息节点：{}", request.node_id),
+            )
+            .with_kv("conversation_id", request.conversation_id.clone())
+            .with_kv("node_id", request.node_id.to_string())
+        })?;
+    message.attachments = request.attachments;
+    conversation.meta.updated_at = chrono::Utc::now().to_rfc3339();
+    chat_store_save_conversation(paths.inner(), &conversation).map_err(ApiError::internal)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CompactConversationRequest {
     pub conversation_id: String,
     pub plugin_id: Option<String>,
