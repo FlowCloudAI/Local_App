@@ -22,6 +22,8 @@ const COASTLINE_EDGE_SAFE_OFFSET_FACTOR: f64 = 0.35;
 const COASTLINE_NEAR_EDGE_SAFE_OFFSET_FACTOR: f64 = 0.38;
 const COASTLINE_CORNER_SAFE_OFFSET_FACTOR: f64 = 0.75;
 const COASTLINE_LOCATION_SAFE_OFFSET_FACTOR: f64 = 0.50;
+const COASTLINE_CONCAVE_CORNER_FACTOR: f64 = 0.45;
+const COASTLINE_SHARP_CORNER_FACTOR_MIN: f64 = 0.35;
 
 macro_rules! param {
     ($params:expr, $field:ident, $default:expr) => {
@@ -265,6 +267,7 @@ fn constrain_coastline_offset(
     let mut max_offset = edge_length * COASTLINE_EDGE_SAFE_OFFSET_FACTOR;
     let corner_distance = edge_length * t.min(1.0 - t);
     max_offset = max_offset.min(corner_distance * COASTLINE_CORNER_SAFE_OFFSET_FACTOR);
+    max_offset *= edge_corner_offset_factor(vertices, edge_index, t);
 
     if let Some(distance) = nearest_non_adjacent_edge_distance(vertices, edge_index, base_x, base_y)
     {
@@ -276,6 +279,50 @@ fn constrain_coastline_offset(
     }
 
     requested_offset.clamp(-max_offset.max(0.0), max_offset.max(0.0))
+}
+
+fn edge_corner_offset_factor(vertices: &[MapShapeVertex], edge_index: usize, t: f64) -> f64 {
+    let total = vertices.len();
+    if total < 3 {
+        return 1.0;
+    }
+
+    let start_factor = vertex_corner_offset_factor(vertices, edge_index);
+    let end_factor = vertex_corner_offset_factor(vertices, (edge_index + 1) % total);
+    (start_factor * (1.0 - t) + end_factor * t).clamp(0.0, 1.0)
+}
+
+fn vertex_corner_offset_factor(vertices: &[MapShapeVertex], vertex_index: usize) -> f64 {
+    let total = vertices.len();
+    if total < 3 {
+        return 1.0;
+    }
+
+    let previous = &vertices[(vertex_index + total - 1) % total];
+    let current = &vertices[vertex_index];
+    let next = &vertices[(vertex_index + 1) % total];
+    let in_x = previous.x - current.x;
+    let in_y = previous.y - current.y;
+    let out_x = next.x - current.x;
+    let out_y = next.y - current.y;
+    let in_length = (in_x * in_x + in_y * in_y).sqrt();
+    let out_length = (out_x * out_x + out_y * out_y).sqrt();
+    if in_length <= f64::EPSILON || out_length <= f64::EPSILON {
+        return COASTLINE_SHARP_CORNER_FACTOR_MIN;
+    }
+
+    let dot = ((in_x * out_x + in_y * out_y) / (in_length * out_length)).clamp(-1.0, 1.0);
+    let angle = dot.acos();
+    let sharp_factor = (angle / std::f64::consts::PI).clamp(COASTLINE_SHARP_CORNER_FACTOR_MIN, 1.0);
+
+    let turn_cross = (current.x - previous.x) * (next.y - current.y)
+        - (current.y - previous.y) * (next.x - current.x);
+    let is_concave = turn_cross.signum() != signed_area(vertices).signum();
+    if is_concave {
+        sharp_factor * COASTLINE_CONCAVE_CORNER_FACTOR
+    } else {
+        sharp_factor
+    }
 }
 
 fn nearest_non_adjacent_edge_distance(
@@ -714,6 +761,16 @@ mod tests {
             constrain_coastline_offset(&shape.vertices, &[], 3, 260.0, 240.0, 60.0, 0.5, 50.0);
 
         assert!(offset.abs() < 25.0);
+    }
+
+    #[test]
+    fn concave_corner_reduces_edge_offset_budget() {
+        let shape = build_narrow_shape();
+        let concave_factor = vertex_corner_offset_factor(&shape.vertices, 3);
+        let convex_factor = vertex_corner_offset_factor(&shape.vertices, 1);
+
+        assert!(concave_factor < convex_factor);
+        assert!(concave_factor < 0.3);
     }
 
     #[test]
