@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 use super::model::ParsedDocument;
 
@@ -46,7 +46,7 @@ impl ParserRegistry {
     }
 
     pub fn supported_extensions(&self) -> Vec<&'static str> {
-        let candidates = ["doc", "docx", "xls", "xlsx", "ppt", "pptx"];
+        let candidates = ["doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf"];
         candidates
             .into_iter()
             .filter(|extension| self.parsers.iter().any(|parser| parser.supports(extension)))
@@ -59,6 +59,9 @@ pub fn default_parser_registry() -> ParserRegistry {
 
     #[cfg(feature = "document-office-oxide")]
     registry.register(Box::new(super::providers::office_oxide::OfficeOxideParser));
+
+    #[cfg(feature = "document-pdf-extract")]
+    registry.register(Box::new(super::providers::pdf_extract::PdfExtractParser));
 
     registry
 }

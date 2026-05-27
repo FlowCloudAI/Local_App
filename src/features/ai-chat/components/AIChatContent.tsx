@@ -892,8 +892,8 @@ export default function AIChatContent({
             multiple: true,
             filters: [
                 {
-                    name: 'Office 文档',
-                    extensions: ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+                    name: '文档',
+                    extensions: ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'],
                 },
             ],
         })

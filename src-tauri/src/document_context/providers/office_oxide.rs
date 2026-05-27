@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::document_context::{
-    DocumentParser, ParseInput, ParsedDocument, split_markdown_into_chunks,
+    split_markdown_into_chunks, DocumentParser, ParseInput, ParsedDocument,
 };
 
 pub struct OfficeOxideParser;
