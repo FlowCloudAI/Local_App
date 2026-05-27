@@ -585,6 +585,32 @@
     height: 100%;
 }
 
+.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar {
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem !important;
+    align-items: center;
+}
+
+.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar ul {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1rem;
+    min-height: 1.75rem;
+}
+
+.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar ul > li > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.75rem;
+    min-width: 1.75rem;
+}
+
+.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar-divider {
+    height: 1.1rem;
+    margin-top: 0 !important;
+}
+
 .entry-editor-md-image-command {
     width: 1rem;
     height: 1rem;
