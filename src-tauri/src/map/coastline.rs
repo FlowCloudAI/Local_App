@@ -24,6 +24,7 @@ const COASTLINE_CORNER_SAFE_OFFSET_FACTOR: f64 = 0.75;
 const COASTLINE_LOCATION_SAFE_OFFSET_FACTOR: f64 = 0.50;
 const COASTLINE_CONCAVE_CORNER_FACTOR: f64 = 0.45;
 const COASTLINE_SHARP_CORNER_FACTOR_MIN: f64 = 0.35;
+const COASTLINE_SAFETY_RETRY_SCALES: [f64; 3] = [0.75, 0.55, 0.40];
 
 macro_rules! param {
     ($params:expr, $field:ident, $default:expr) => {
@@ -92,6 +93,21 @@ pub fn build_natural_coastline_polygon(
                 shape.id,
                 outside_count
             );
+        }
+    }
+
+    for scale in COASTLINE_SAFETY_RETRY_SCALES {
+        let retry_params = coastline_params_with_safety_scale(params, scale);
+        let retried = naturalize_vertices(canvas, shape, related_locations, Some(&retry_params));
+        if coastline_is_usable(&retried, related_locations) {
+            log::info!(
+                "海岸线计算成功：shape_id={}，分支=安全降扰，降扰系数={}，输出顶点数={}，耗时={}ms",
+                shape.id,
+                scale,
+                retried.len(),
+                started_at.elapsed().as_millis()
+            );
+            return to_polygon(&retried);
         }
     }
 
@@ -441,6 +457,32 @@ fn relax_polygon(vertices: &[MapShapeVertex], passes: usize, weight: f64) -> Vec
     a
 }
 
+fn coastline_params_with_safety_scale(
+    params: Option<&CoastlineParams>,
+    scale: f64,
+) -> CoastlineParams {
+    let safe_scale = scale.clamp(0.0, 1.0);
+    let mut scaled = params.cloned().unwrap_or_default();
+    scaled.amplitude_base =
+        Some(param!(params, amplitude_base, COASTLINE_AMPLITUDE_BASE) * safe_scale);
+    scaled.amplitude_min =
+        Some(param!(params, amplitude_min, COASTLINE_AMPLITUDE_MIN) * safe_scale.sqrt());
+    scaled.amplitude_canvas_ratio_max = Some(
+        param!(
+            params,
+            amplitude_canvas_ratio_max,
+            COASTLINE_AMPLITUDE_CANVAS_RATIO_MAX
+        ) * safe_scale,
+    );
+    scaled.wave_a_strength =
+        Some(param!(params, wave_a_strength, COASTLINE_WAVE_A_STRENGTH) * safe_scale);
+    scaled.wave_b_strength =
+        Some(param!(params, wave_b_strength, COASTLINE_WAVE_B_STRENGTH) * safe_scale);
+    scaled.wave_c_strength =
+        Some(param!(params, wave_c_strength, COASTLINE_WAVE_C_STRENGTH) * safe_scale);
+    scaled
+}
+
 fn segment_count_for_edge(
     edge_length: f64,
     perimeter: f64,
@@ -771,6 +813,30 @@ mod tests {
 
         assert!(concave_factor < convex_factor);
         assert!(concave_factor < 0.3);
+    }
+
+    #[test]
+    fn safety_scaled_params_reduce_amplitude_and_noise_strength() {
+        let params = CoastlineParams {
+            amplitude_base: Some(2.0),
+            amplitude_min: Some(4.0),
+            amplitude_canvas_ratio_max: Some(0.1),
+            wave_a_strength: Some(1.5),
+            wave_b_strength: Some(1.0),
+            wave_c_strength: Some(0.5),
+            max_segments: Some(80),
+            ..Default::default()
+        };
+
+        let scaled = coastline_params_with_safety_scale(Some(&params), 0.25);
+
+        assert_eq!(scaled.max_segments, Some(80));
+        assert_eq!(scaled.amplitude_base, Some(0.5));
+        assert_eq!(scaled.amplitude_min, Some(2.0));
+        assert_eq!(scaled.amplitude_canvas_ratio_max, Some(0.025));
+        assert_eq!(scaled.wave_a_strength, Some(0.375));
+        assert_eq!(scaled.wave_b_strength, Some(0.25));
+        assert_eq!(scaled.wave_c_strength, Some(0.125));
     }
 
     #[test]
