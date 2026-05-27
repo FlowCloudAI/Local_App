@@ -592,6 +592,12 @@
     min-width: 0;
 }
 
+.wm-coastline-quality-grid .wm-chip.is-active:hover:not(:disabled) {
+    background: var(--fc-color-primary);
+    border-color: var(--fc-color-primary);
+    color: #fff;
+}
+
 .wm-range-field {
     display: flex;
     flex-direction: column;
@@ -613,7 +619,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-.wm-range-field input[type='range'] {
+.wm-range-field .fc-slider {
     width: 100%;
 }
 

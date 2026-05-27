@@ -1,6 +1,7 @@
 import {type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     RollingBox,
+    Slider,
     useAlert,
     useContextMenu,
 } from 'flowcloudai-ui'
@@ -248,6 +249,10 @@ function clampNumber(value: number, min: number, max: number): number {
 function readNumber(value: unknown, fallback: number): number {
     const numeric = Number(value)
     return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function readSliderNumber(value: number | [number, number]): number {
+    return Array.isArray(value) ? value[1] : value
 }
 
 function readCoastlineSimpleConfig(params: CoastlineParamsPayload): CoastlineSimpleConfig {
@@ -1323,46 +1328,46 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                     </div>
                     <div className="wm-range-field">
                         <label>尺度系数 <span>{coastlineSimpleConfig.scaleFactor.toFixed(2)}</span></label>
-                        <input
-                            type="range"
+                        <Slider
                             min={0.2}
                             max={3}
                             step={0.05}
                             value={coastlineSimpleConfig.scaleFactor}
-                            onChange={event => updateCoastlineSimpleConfig({scaleFactor: Number(event.target.value)})}
+                            tooltip
+                            onChange={value => updateCoastlineSimpleConfig({scaleFactor: readSliderNumber(value)})}
                         />
                     </div>
                     <div className="wm-range-field">
                         <label>大尺度扰动 <span>{coastlineSimpleConfig.macroNoise.toFixed(2)}</span></label>
-                        <input
-                            type="range"
+                        <Slider
                             min={0}
                             max={2}
                             step={0.05}
                             value={coastlineSimpleConfig.macroNoise}
-                            onChange={event => updateCoastlineSimpleConfig({macroNoise: Number(event.target.value)})}
+                            tooltip
+                            onChange={value => updateCoastlineSimpleConfig({macroNoise: readSliderNumber(value)})}
                         />
                     </div>
                     <div className="wm-range-field">
                         <label>中尺度扰动 <span>{coastlineSimpleConfig.midNoise.toFixed(2)}</span></label>
-                        <input
-                            type="range"
+                        <Slider
                             min={0}
                             max={2}
                             step={0.05}
                             value={coastlineSimpleConfig.midNoise}
-                            onChange={event => updateCoastlineSimpleConfig({midNoise: Number(event.target.value)})}
+                            tooltip
+                            onChange={value => updateCoastlineSimpleConfig({midNoise: readSliderNumber(value)})}
                         />
                     </div>
                     <div className="wm-range-field">
                         <label>细节扰动 <span>{coastlineSimpleConfig.microNoise.toFixed(2)}</span></label>
-                        <input
-                            type="range"
+                        <Slider
                             min={0}
                             max={2}
                             step={0.05}
                             value={coastlineSimpleConfig.microNoise}
-                            onChange={event => updateCoastlineSimpleConfig({microNoise: Number(event.target.value)})}
+                            tooltip
+                            onChange={value => updateCoastlineSimpleConfig({microNoise: readSliderNumber(value)})}
                         />
                     </div>
                 </>
