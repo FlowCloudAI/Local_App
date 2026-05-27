@@ -1746,21 +1746,6 @@ export default function AIChatContent({
                         <div className="ai-input-meta-row">
                             <div className="ai-input-meta-controls">
                                 <button
-                                    type="button"
-                                    className="ai-input-meta-btn ai-document-context-add"
-                                    disabled={!activeConversation || isArchivedConversation}
-                                    title={activeConversation ? '添加文档上下文' : '创建对话后可添加文档上下文'}
-                                    onClick={(event) => {
-                                        event.stopPropagation()
-                                        void handleAttachDocuments()
-                                    }}
-                                >
-                                    <svg viewBox="0 0 16 16" aria-hidden="true">
-                                        <path d="M5 8.5 9.8 3.7a2.1 2.1 0 0 1 3 3L7.2 12.3a3.2 3.2 0 1 1-4.5-4.5l5.7-5.7"/>
-                                    </svg>
-                                    <span>添加文档</span>
-                                </button>
-                                <button
                                     ref={settingsToggleRef}
                                     type="button"
                                     className="ai-input-meta-btn ai-conversation-settings-toggle"
@@ -1926,6 +1911,23 @@ export default function AIChatContent({
                                 {showCharHint && (
                                     <span className="ai-floating-char-count">{charCount}/{MAX_CHARS}</span>
                                 )}
+                                <button
+                                    type="button"
+                                    className="ai-floating-attach-btn"
+                                    disabled={!activeConversation || isArchivedConversation}
+                                    title={activeConversation ? '添加文档上下文' : '创建对话后可添加文档上下文'}
+                                    aria-label="添加文档上下文"
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        void handleAttachDocuments()
+                                    }}
+                                >
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" strokeWidth="2.1" strokeLinecap="round"
+                                         strokeLinejoin="round" aria-hidden="true">
+                                        <path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.8-9.8a4 4 0 0 1 5.7 5.7l-9.8 9.8a2 2 0 1 1-2.8-2.8l9.4-9.4"/>
+                                    </svg>
+                                </button>
                                 {ctx.isStreaming ? (
                                     <button
                                         className="ai-floating-stop-btn"
