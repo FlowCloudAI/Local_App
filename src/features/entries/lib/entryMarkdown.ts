@@ -1,4 +1,6 @@
 import {openUrl} from '@tauri-apps/plugin-opener'
+import type {FCImage} from '../../../api'
+import {resolveEntryImageByFcimgRef, toEntryImageSrc} from './entryImage'
 
 const INTERNAL_ENTRY_HREF_PREFIX = 'entry://'
 const LEGACY_ENTRY_HREF_PREFIX = 'entry-title://'
@@ -42,8 +44,24 @@ export function parseInternalEntryLinks(content?: string | null): InternalEntryL
     return links
 }
 
-export function buildMarkdownPreviewSource(content: string): string {
-    return content.replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
+function encodeMarkdownUrl(value: string): string {
+    return value.replace(/[\s()]/g, (char) => encodeURIComponent(char))
+}
+
+function buildImagePreviewSource(content: string, images: FCImage[]): string {
+    if (!images.length || !/!\[[^\]\n]*]\(fcimg:/i.test(content)) return content
+
+    return content.replace(/!\[([^\]\n]*)]\((fcimg:[^)]+)\)/gi, (match, alt, rawSrc) => {
+        const image = resolveEntryImageByFcimgRef(String(rawSrc).trim(), images)
+        const src = toEntryImageSrc(image)
+        if (!src) return match
+        return `![${alt}](${encodeMarkdownUrl(src)})`
+    })
+}
+
+export function buildMarkdownPreviewSource(content: string, images: FCImage[] = []): string {
+    const withImages = buildImagePreviewSource(content, images)
+    return withImages.replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
         const title = String(rawTitle).trim()
         return `[${title}](${buildLegacyEntryHref(title)})`
     })

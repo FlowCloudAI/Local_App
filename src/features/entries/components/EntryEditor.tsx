@@ -719,7 +719,10 @@ export default function EntryEditor({
 
 
     // 预览源码缓存：draft.content 不变时不重算
-    const previewContent = useMemo(() => buildMarkdownPreviewSource(draft.content), [draft.content])
+    const previewContent = useMemo(
+        () => buildMarkdownPreviewSource(draft.content, draft.images),
+        [draft.content, draft.images],
+    )
 
     const backlinks = useMemo(() => {
         const linkedEntryIds = new Set(incomingLinks.map((link) => link.a_id))
