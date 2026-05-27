@@ -394,6 +394,7 @@ export default function AIChatContent({
     const [hasTtsPlugin, setHasTtsPlugin] = useState(false)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
+    const visibleDocumentContextItems = ctx.documentContextItems.filter((item) => item.status !== 'ready')
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
     const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
@@ -1724,9 +1725,9 @@ export default function AIChatContent({
                                 onOpenPluginManagement={onOpenPluginManagement}
                             />
                         )}
-                        {ctx.documentContextItems.length > 0 && (
+                        {visibleDocumentContextItems.length > 0 && (
                             <div className="ai-document-context-list" aria-label="文档上下文">
-                                {ctx.documentContextItems.map((item) => (
+                                {visibleDocumentContextItems.map((item) => (
                                     <div
                                         key={item.id}
                                         className={`ai-document-context-chip ai-document-context-chip--${item.status}`}
