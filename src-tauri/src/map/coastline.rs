@@ -18,6 +18,11 @@ use crate::map::types::{
 };
 use std::time::Instant;
 
+const COASTLINE_EDGE_SAFE_OFFSET_FACTOR: f64 = 0.35;
+const COASTLINE_NEAR_EDGE_SAFE_OFFSET_FACTOR: f64 = 0.38;
+const COASTLINE_CORNER_SAFE_OFFSET_FACTOR: f64 = 0.75;
+const COASTLINE_LOCATION_SAFE_OFFSET_FACTOR: f64 = 0.50;
+
 macro_rules! param {
     ($params:expr, $field:ident, $default:expr) => {
         $params.and_then(|p| p.$field).unwrap_or($default)
@@ -48,7 +53,7 @@ pub fn build_natural_coastline_polygon(
         return to_polygon(&shape.vertices);
     }
 
-    let naturalized = naturalize_vertices(canvas, shape, params);
+    let naturalized = naturalize_vertices(canvas, shape, related_locations, params);
     if coastline_is_usable(&naturalized, related_locations) {
         log::info!(
             "海岸线计算成功：shape_id={}，分支=自然化，输出顶点数={}，耗时={}ms",
@@ -123,6 +128,7 @@ pub fn build_natural_coastline_polygon(
 fn naturalize_vertices(
     canvas: &MapEditorCanvas,
     shape: &MapShapeDraft,
+    related_locations: &[MapKeyLocationDraft],
     params: Option<&CoastlineParams>,
 ) -> Vec<MapShapeVertex> {
     let vertices = &shape.vertices;
@@ -140,6 +146,7 @@ fn naturalize_vertices(
     refined.push(vertices[0].clone());
 
     let mut skipped_zero_length = 0usize;
+    let mut constrained_offsets = 0usize;
     for edge_index in 0..vertices.len() {
         let start = &vertices[edge_index];
         let end = &vertices[(edge_index + 1) % vertices.len()];
@@ -184,7 +191,20 @@ fn naturalize_vertices(
             let base_y = start.y + dy * t;
             let envelope = (std::f64::consts::PI * t).sin().powf(1.15);
             let signed_noise = layered_edge_noise(seed, edge_index, t, params);
-            let offset = amplitude * envelope * signed_noise;
+            let requested_offset = amplitude * envelope * signed_noise;
+            let offset = constrain_coastline_offset(
+                vertices,
+                related_locations,
+                edge_index,
+                base_x,
+                base_y,
+                edge_length,
+                t,
+                requested_offset,
+            );
+            if offset.abs() + f64::EPSILON < requested_offset.abs() {
+                constrained_offsets += 1;
+            }
 
             refined.push(MapShapeVertex {
                 id: format!("{}-coast-{}-{}", start.id, edge_index, segment_index),
@@ -217,7 +237,110 @@ fn naturalize_vertices(
         relaxed.len(),
         skipped_zero_length
     );
+    if constrained_offsets > 0 {
+        log::info!(
+            "自然化安全约束：shape_id={}，受限位移点数={}，细分点数={}",
+            shape.id,
+            constrained_offsets,
+            raw_refined_len
+        );
+    }
     relaxed
+}
+
+fn constrain_coastline_offset(
+    vertices: &[MapShapeVertex],
+    related_locations: &[MapKeyLocationDraft],
+    edge_index: usize,
+    base_x: f64,
+    base_y: f64,
+    edge_length: f64,
+    t: f64,
+    requested_offset: f64,
+) -> f64 {
+    if requested_offset.abs() <= f64::EPSILON || vertices.len() < 3 {
+        return requested_offset;
+    }
+
+    let mut max_offset = edge_length * COASTLINE_EDGE_SAFE_OFFSET_FACTOR;
+    let corner_distance = edge_length * t.min(1.0 - t);
+    max_offset = max_offset.min(corner_distance * COASTLINE_CORNER_SAFE_OFFSET_FACTOR);
+
+    if let Some(distance) = nearest_non_adjacent_edge_distance(vertices, edge_index, base_x, base_y)
+    {
+        max_offset = max_offset.min(distance * COASTLINE_NEAR_EDGE_SAFE_OFFSET_FACTOR);
+    }
+
+    if let Some(distance) = nearest_related_location_distance(related_locations, base_x, base_y) {
+        max_offset = max_offset.min(distance * COASTLINE_LOCATION_SAFE_OFFSET_FACTOR);
+    }
+
+    requested_offset.clamp(-max_offset.max(0.0), max_offset.max(0.0))
+}
+
+fn nearest_non_adjacent_edge_distance(
+    vertices: &[MapShapeVertex],
+    edge_index: usize,
+    x: f64,
+    y: f64,
+) -> Option<f64> {
+    let total = vertices.len();
+    if total < 4 {
+        return None;
+    }
+
+    let previous_edge = (edge_index + total - 1) % total;
+    let next_edge = (edge_index + 1) % total;
+    let mut nearest: Option<f64> = None;
+
+    for candidate_index in 0..total {
+        if candidate_index == edge_index
+            || candidate_index == previous_edge
+            || candidate_index == next_edge
+        {
+            continue;
+        }
+
+        let start = &vertices[candidate_index];
+        let end = &vertices[(candidate_index + 1) % total];
+        let distance = point_to_segment_distance(x, y, start, end);
+        nearest = Some(nearest.map_or(distance, |current| current.min(distance)));
+    }
+
+    nearest
+}
+
+fn nearest_related_location_distance(
+    related_locations: &[MapKeyLocationDraft],
+    x: f64,
+    y: f64,
+) -> Option<f64> {
+    related_locations
+        .iter()
+        .map(|location| {
+            let dx = location.x - x;
+            let dy = location.y - y;
+            (dx * dx + dy * dy).sqrt()
+        })
+        .reduce(f64::min)
+}
+
+fn point_to_segment_distance(x: f64, y: f64, start: &MapShapeVertex, end: &MapShapeVertex) -> f64 {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let length_squared = dx * dx + dy * dy;
+    if length_squared <= f64::EPSILON {
+        let px = x - start.x;
+        let py = y - start.y;
+        return (px * px + py * py).sqrt();
+    }
+
+    let t = (((x - start.x) * dx + (y - start.y) * dy) / length_squared).clamp(0.0, 1.0);
+    let projected_x = start.x + dx * t;
+    let projected_y = start.y + dy * t;
+    let px = x - projected_x;
+    let py = y - projected_y;
+    (px * px + py * py).sqrt()
 }
 
 fn coastline_is_usable(
@@ -491,6 +614,28 @@ mod tests {
         }
     }
 
+    fn build_narrow_shape() -> MapShapeDraft {
+        MapShapeDraft {
+            id: "shape-narrow".to_string(),
+            name: "狭湾大陆".to_string(),
+            vertices: vec![
+                vertex("n1", 100.0, 100.0),
+                vertex("n2", 420.0, 100.0),
+                vertex("n3", 420.0, 210.0),
+                vertex("n4", 260.0, 210.0),
+                vertex("n5", 260.0, 270.0),
+                vertex("n6", 420.0, 270.0),
+                vertex("n7", 420.0, 420.0),
+                vertex("n8", 100.0, 420.0),
+            ],
+            fill: None,
+            stroke: None,
+            biz_id: None,
+            kind: Some(MapShapeKind::Coastline),
+            ext: None,
+        }
+    }
+
     #[test]
     fn coastline_generation_adds_more_points() {
         let polygon = build_natural_coastline_polygon(
@@ -560,5 +705,57 @@ mod tests {
         let noise = layered_edge_noise(42, 3, 0.37, Some(&params));
 
         assert!(noise.abs() <= f64::EPSILON);
+    }
+
+    #[test]
+    fn safe_offset_caps_displacement_near_non_adjacent_edge() {
+        let shape = build_narrow_shape();
+        let offset =
+            constrain_coastline_offset(&shape.vertices, &[], 3, 260.0, 240.0, 60.0, 0.5, 50.0);
+
+        assert!(offset.abs() < 25.0);
+    }
+
+    #[test]
+    fn high_detail_coastline_uses_safe_offsets_for_narrow_shapes() {
+        let shape = build_narrow_shape();
+        let params = CoastlineParams {
+            min_segments: Some(10),
+            max_segments: Some(80),
+            segment_base: Some(34.0),
+            segment_length_factor: Some(18.0),
+            segment_edge_ratio_factor: Some(42.0),
+            amplitude_base: Some(1.6),
+            amplitude_min: Some(4.0),
+            amplitude_canvas_ratio_max: Some(0.08),
+            relax_passes: Some(1),
+            relax_weight: Some(0.08),
+            wave_a_strength: Some(1.8),
+            wave_b_strength: Some(1.8),
+            wave_c_strength: Some(1.8),
+            ..Default::default()
+        };
+
+        let polygon = build_natural_coastline_polygon(
+            &MapEditorCanvas {
+                width: 600.0,
+                height: 600.0,
+            },
+            &shape,
+            &[],
+            Some(&params),
+        );
+        let vertices = polygon
+            .iter()
+            .enumerate()
+            .map(|(index, point)| MapShapeVertex {
+                id: format!("n-generated-{index}"),
+                x: point[0],
+                y: point[1],
+            })
+            .collect::<Vec<_>>();
+
+        assert!(polygon.len() > shape.vertices.len());
+        assert!(find_polygon_self_intersections(&vertices).is_empty());
     }
 }
