@@ -925,7 +925,6 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             }, coastlineParams)
             setScene(response.scene)
             setSceneDirty(false)
-            setViewportMode('preview')
             setSelectedShapeId(null)
             setSelectedLocationId(null)
             setDrawingShape(null)
