@@ -233,7 +233,7 @@ function ProjectContradictionPanel({
         const entries = query
             ? projectEntries.filter((entry) => normalizeEntryLookupTitle(entry.title).startsWith(query))
             : projectEntries
-        return entries.slice(0, 8)
+        return entries.slice(0, 3)
     }, [projectEntries, targetEntryQuery])
 
     // 监听进度报告事件
