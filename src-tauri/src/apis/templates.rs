@@ -1,6 +1,6 @@
 use crate::template::{
-    get_default_template_content, get_template_document, get_template_effective_path,
-    get_template_local_root_dir, list_template_meta, save_template_content, TemplateDocument,
+    get_default_template_content, get_template_document, get_template_effective_path, get_template_local_root_dir,
+    list_template_meta, save_template_content, TemplateDocument,
     TemplateMeta, TemplateSaveResult,
 };
 

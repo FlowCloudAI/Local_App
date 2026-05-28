@@ -9,7 +9,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,14 +60,19 @@ pub async fn ai_generate_entry_summary(
     request: SummaryRequest,
 ) -> Result<SummaryResult, ApiError> {
     if request.entry_ids.is_empty() {
-        return Err(ApiError::new(ErrorCode::ValidationMissingField, "entryIds 不能为空")
-            .with_kv("field", "entryIds"));
+        return Err(
+            ApiError::new(ErrorCode::ValidationMissingField, "entryIds 不能为空")
+                .with_kv("field", "entryIds"),
+        );
     }
 
     let api_key = ApiKeyStore::get(&request.plugin_id).ok_or_else(|| {
         ApiError::new(
             ErrorCode::AuthApiKeyMissing,
-            format!("插件 '{}' 未配置 API Key，请在设置中配置", request.plugin_id),
+            format!(
+                "插件 '{}' 未配置 API Key，请在设置中配置",
+                request.plugin_id
+            ),
         )
         .with_kv("plugin_id", request.plugin_id.clone())
     })?;
@@ -196,7 +201,10 @@ pub async fn ai_fill_image_prompt(
     let api_key = ApiKeyStore::get(&request.plugin_id).ok_or_else(|| {
         ApiError::new(
             ErrorCode::AuthApiKeyMissing,
-            format!("插件 '{}' 未配置 API Key，请在设置中配置", request.plugin_id),
+            format!(
+                "插件 '{}' 未配置 API Key，请在设置中配置",
+                request.plugin_id
+            ),
         )
         .with_kv("plugin_id", request.plugin_id.clone())
     })?;

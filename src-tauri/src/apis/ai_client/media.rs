@@ -42,10 +42,11 @@ pub async fn ai_text_to_image(
     {
         request = request.size(size);
     }
-    let result = session
-        .generate(&request)
-        .await
-        .map_err(|e| ApiError::from(e).with_kv("plugin_id", plugin_id.clone()).with_kv("model", model.clone()))?;
+    let result = session.generate(&request).await.map_err(|e| {
+        ApiError::from(e)
+            .with_kv("plugin_id", plugin_id.clone())
+            .with_kv("model", model.clone())
+    })?;
 
     Ok(result
         .images
@@ -70,7 +71,11 @@ pub async fn ai_edit_image(
     let result = session
         .edit_image(&model, &prompt, &image_url)
         .await
-        .map_err(|e| ApiError::from(e).with_kv("plugin_id", plugin_id.clone()).with_kv("model", model.clone()))?;
+        .map_err(|e| {
+            ApiError::from(e)
+                .with_kv("plugin_id", plugin_id.clone())
+                .with_kv("model", model.clone())
+        })?;
 
     Ok(result
         .images
@@ -95,7 +100,11 @@ pub async fn ai_merge_images(
     let result = session
         .merge_images(&model, &prompt, image_urls)
         .await
-        .map_err(|e| ApiError::from(e).with_kv("plugin_id", plugin_id.clone()).with_kv("model", model.clone()))?;
+        .map_err(|e| {
+            ApiError::from(e)
+                .with_kv("plugin_id", plugin_id.clone())
+                .with_kv("model", model.clone())
+        })?;
 
     Ok(result
         .images

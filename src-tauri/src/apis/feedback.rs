@@ -10,7 +10,8 @@ use tokio::sync::Mutex;
 
 const FEEDBACK_ENDPOINT: &str = "https://www.flowcloudai.cn/api/v1/feedback";
 const FEEDBACK_SUBMIT_INTERVAL: Duration = Duration::from_secs(10);
-static LAST_FEEDBACK_SUBMIT_AT: LazyLock<Mutex<Option<Instant>>> = LazyLock::new(|| Mutex::new(None));
+static LAST_FEEDBACK_SUBMIT_AT: LazyLock<Mutex<Option<Instant>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 #[derive(Debug, Deserialize)]
 pub struct FeedbackPayload {
@@ -79,14 +80,17 @@ pub async fn submit_public_feedback(
         });
     }
 
-    let value: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|error| format!("反馈响应格式异常：{error}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|error| format!("反馈响应格式异常：{error}"))?;
     Ok(FeedbackSubmitResult {
         id: value
             .get("id")
             .and_then(|value| value.as_str())
             .map(str::to_string),
-        ok: value.get("ok").and_then(|value| value.as_bool()).unwrap_or(true),
+        ok: value
+            .get("ok")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(true),
     })
 }
 

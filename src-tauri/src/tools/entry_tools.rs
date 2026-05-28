@@ -2,7 +2,7 @@ use crate::tools;
 use crate::tools::format;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
-use flowcloudai_client::tool::{ToolRegistry, arg_str};
+use flowcloudai_client::tool::{arg_str, ToolRegistry};
 use std::sync::Arc;
 use tauri::Emitter;
 use tokio::sync::Mutex;
@@ -550,7 +550,6 @@ async fn dispatch_entry_op(
 
 /// 注册词条相关工具（查询、列表、更新）
 pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
-
     registry.register_async::<WorldflowToolState, _>(
         "list_entries_dev",
         "开发版：get_entries_dev 的语义化别名；按项目或分类的名称/ID 获取词条轻量列表，可按类型、摘要、排序和数量限制控制输出",

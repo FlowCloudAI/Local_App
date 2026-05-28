@@ -90,7 +90,6 @@
     padding: var(--fc-space-md);
     box-sizing: border-box;
     overscroll-behavior-x: contain;
-    scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -116,7 +115,6 @@
     border-radius: var(--fc-radius-lg);
     background: color-mix(in srgb, var(--fc-color-bg) 92%, transparent);
     box-shadow: var(--fc-shadow-xs);
-    scroll-snap-align: start;
 }
 
 .project-timeline__event-item:hover {
@@ -168,12 +166,19 @@
 .project-timeline__timeline-shell {
     flex: 1;
     min-height: 0;
-    padding: 0.9rem 1rem 1rem;
+    padding: 0 !important;
     box-sizing: border-box;
 }
 
 .project-timeline__timeline-shell > * {
     height: 100%;
+}
+
+.project-timeline__timeline-shell .timeline-flag {
+    border-radius: 0;
+    border: 0;
+    padding: 0;
+    box-shadow: none;
 }
 
 /* 覆盖 Timeline 库硬编码的选中态颜色，统一使用 --fc-color-primary */

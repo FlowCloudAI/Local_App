@@ -5,8 +5,12 @@ use super::market_client::*;
 
 /// 获取官方市场插件列表
 #[tauri::command]
-pub async fn plugin_market_list(net: State<'_, NetworkState>) -> Result<serde_json::Value, ApiError> {
-    market_list(&net.client).await.map_err(ApiError::from_display)
+pub async fn plugin_market_list(
+    net: State<'_, NetworkState>,
+) -> Result<serde_json::Value, ApiError> {
+    market_list(&net.client)
+        .await
+        .map_err(ApiError::from_display)
 }
 
 /// 从官方市场下载并安装插件

@@ -130,7 +130,7 @@ impl Default for LlmDefaults {
             top_p: 0.9,
             frequency_penalty: 0.0,
             presence_penalty: 0.0,
-            max_tokens: 2000,
+            max_tokens: 8192,
             stream: true,
             show_reasoning: false,
             app_sense_custom_prompt: String::new(),

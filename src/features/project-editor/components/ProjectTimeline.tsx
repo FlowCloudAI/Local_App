@@ -259,9 +259,21 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
         setSelectedEventId(eventId)
     }, [])
 
-    const handleEventStripWheelIntercept = useCallback((event: WheelEvent) => {
+    const handleEventStripWheelIntercept = useCallback((event: WheelEvent, container: HTMLDivElement) => {
+        const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
         event.stopPropagation()
-        return false
+
+        if (rawDelta === 0) return true
+
+        event.preventDefault()
+        const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? rawDelta * 16
+            : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                ? rawDelta * container.clientWidth
+                : rawDelta
+
+        container.scrollLeft += delta
+        return true
     }, [])
 
     const timelineEvents = useMemo<TimelineEvent[]>(

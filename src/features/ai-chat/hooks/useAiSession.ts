@@ -24,8 +24,8 @@ import {
     type AiUsage,
     type CharacterChatProjectSnapshot,
     type ConversationNode,
-    type StoredConversationSettings,
     formatApiError,
+    type StoredConversationSettings,
     toApiError,
 } from '../../../api'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
@@ -297,6 +297,20 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             })
             const runKey = event.payload.run_id
             const prev = blocksByRunRef.current[runKey] ?? []
+            const pendingToolIndexes = prev.flatMap(block => {
+                if (block.type === 'tool' && block.tool.result == null) return [block.tool.index]
+                if (block.type === 'tool_use') {
+                    return block.tools.filter(tool => tool.result == null).map(tool => tool.index)
+                }
+                return []
+            })
+            logger.info('[useAiSession][tool_call_state_before]', {
+                runId: runKey,
+                index: event.payload.index,
+                name: event.payload.name,
+                blockCount: prev.length,
+                pendingToolIndexes,
+            })
 
             // 按 index 去重：相同 tool_call 事件到达已有块
             const existingToolIdx = prev.findIndex(
@@ -318,6 +332,12 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 })
                 blocksByRunRef.current[runKey] = next
                 if (runIdRef.current === runKey) setBlocks(next)
+                logger.info('[useAiSession][tool_call_state_after]', {
+                    runId: runKey,
+                    index: event.payload.index,
+                    action: 'update_existing_tool',
+                    blockCount: next.length,
+                })
                 return
             }
 
@@ -339,6 +359,12 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 })
                 blocksByRunRef.current[runKey] = next
                 if (runIdRef.current === runKey) setBlocks(next)
+                logger.info('[useAiSession][tool_call_state_after]', {
+                    runId: runKey,
+                    index: event.payload.index,
+                    action: 'update_existing_tool_group',
+                    blockCount: next.length,
+                })
                 return
             }
 
@@ -372,6 +398,12 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
 
             blocksByRunRef.current[runKey] = next
             if (runIdRef.current === runKey) setBlocks(next)
+            logger.info('[useAiSession][tool_call_state_after]', {
+                runId: runKey,
+                index: event.payload.index,
+                action: last && (last.type === 'tool' || last.type === 'tool_use') ? 'append_or_group_tool' : 'append_tool',
+                blockCount: next.length,
+            })
         })
 
         const unlistenToolResult = listen<AiEventToolResult>('ai:tool_result', event => {
@@ -385,9 +417,25 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             })
             const runKey = event.payload.run_id
             const prev = blocksByRunRef.current[runKey] ?? []
+            const pendingToolIndexes = prev.flatMap(block => {
+                if (block.type === 'tool' && block.tool.result == null) return [block.tool.index]
+                if (block.type === 'tool_use') {
+                    return block.tools.filter(tool => tool.result == null).map(tool => tool.index)
+                }
+                return []
+            })
+            logger.info('[useAiSession][tool_result_state_before]', {
+                runId: runKey,
+                index: event.payload.index,
+                isError: event.payload.is_error,
+                blockCount: prev.length,
+                pendingToolIndexes,
+            })
+            let matchedToolResult = false
             const next = prev.map(b => {
                 // 独立 tool 块
                 if (b.type === 'tool' && b.tool.index === event.payload.index && b.tool.result == null) {
+                    matchedToolResult = true
                     return {
                         ...b,
                         tool: {
@@ -401,6 +449,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 if (b.type === 'tool_use') {
                     const updated = b.tools.map(t => {
                         if (t.index === event.payload.index && t.result == null) {
+                            matchedToolResult = true
                             return {
                                 ...t,
                                 result: event.payload.result ?? event.payload.output,
@@ -417,6 +466,21 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             if (runIdRef.current === runKey) {
                 setBlocks(next)
             }
+            if (!matchedToolResult) {
+                logger.warn('[useAiSession][tool_result_unmatched]', {
+                    runId: runKey,
+                    index: event.payload.index,
+                    isError: event.payload.is_error,
+                    blockCount: prev.length,
+                    pendingToolIndexes,
+                })
+            }
+            logger.info('[useAiSession][tool_result_state_after]', {
+                runId: runKey,
+                index: event.payload.index,
+                matched: matchedToolResult,
+                blockCount: next.length,
+            })
         })
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {

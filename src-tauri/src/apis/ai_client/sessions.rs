@@ -2,6 +2,9 @@ use super::common::*;
 use crate::senses::app_sense::AppSense;
 use flowcloudai_client::ErrorCode;
 
+const LEGACY_DEFAULT_MAX_TOKENS: i64 = 2000;
+const TOOL_SAFE_DEFAULT_MAX_TOKENS: i64 = 8192;
+
 /// 创建 LLM 会话并启动后台事件循环。
 ///
 /// 创建后立即可通过 `ai_send_message` 发送消息。
@@ -173,13 +176,29 @@ pub async fn ai_create_llm_session(
         })
         .unwrap_or(global_llm_defaults.presence_penalty)
         .clamp(-2.0, 2.0);
-    let max_tokens_to_apply = max_tokens.unwrap_or(global_llm_defaults.max_tokens).max(1);
+    let configured_max_tokens = max_tokens.unwrap_or(global_llm_defaults.max_tokens).max(1);
+    let max_tokens_to_apply = if max_tokens.is_none()
+        && configured_max_tokens <= LEGACY_DEFAULT_MAX_TOKENS
+    {
+        log::info!(
+            "[ai_create_llm_session][max_tokens_legacy_default_upgraded] trace_id={} session_id={} configured={} applied={}",
+            trace_id,
+            session_id,
+            configured_max_tokens,
+            TOOL_SAFE_DEFAULT_MAX_TOKENS
+        );
+        TOOL_SAFE_DEFAULT_MAX_TOKENS
+    } else {
+        configured_max_tokens
+    };
     session.set_temperature(temperature_to_apply).await;
     session.set_top_p(top_p_to_apply).await;
     session
         .set_frequency_penalty(frequency_penalty_to_apply)
         .await;
-    session.set_presence_penalty(presence_penalty_to_apply).await;
+    session
+        .set_presence_penalty(presence_penalty_to_apply)
+        .await;
     session.set_max_tokens(max_tokens_to_apply).await;
     session.set_stream(true).await;
     log::info!(
@@ -373,7 +392,10 @@ pub async fn ai_update_session(
     }
 
     let params: SessionUpdateParams = serde_json::from_value(params).map_err(|e| {
-        ApiError::new(ErrorCode::ValidationFormatError, format!("参数解析失败: {}", e))
+        ApiError::new(
+            ErrorCode::ValidationFormatError,
+            format!("参数解析失败: {}", e),
+        )
     })?;
 
     if let Some(Some(t)) = params.temperature {
@@ -399,11 +421,10 @@ pub async fn ai_update_session(
     }
     if let Some(Some(n)) = params.n {
         if n < 1 {
-            return Err(ApiError::new(
-                ErrorCode::ValidationFormatError,
-                "参数 'n' 必须大于 0",
-            )
-            .with_kv("field", "n"));
+            return Err(
+                ApiError::new(ErrorCode::ValidationFormatError, "参数 'n' 必须大于 0")
+                    .with_kv("field", "n"),
+            );
         }
     }
     if let Some(Some(tl)) = params.top_logprobs {

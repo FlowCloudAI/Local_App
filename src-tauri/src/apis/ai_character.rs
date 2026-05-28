@@ -1,17 +1,17 @@
-use crate::apis::ai_client::{CreateLlmSessionResult, spawn_session_event_loop};
+use crate::apis::ai_client::{spawn_session_event_loop, CreateLlmSessionResult};
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
 use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState};
 use flowcloudai_client::llm::config::SessionConfig;
-use flowcloudai_client::{DefaultOrchestrator, ErrorCode, sense::Sense};
+use flowcloudai_client::{sense::Sense, DefaultOrchestrator, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 use uuid::Uuid;
 use worldflow_core::{
-    CategoryOps, EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps,
-    models::{Category, Entry, EntryBrief, EntryFilter, EntryTag, FCImage, TagSchema},
+    models::{Category, Entry, EntryBrief, EntryFilter, EntryTag, FCImage, TagSchema}, CategoryOps, EntryOps, EntryRelationOps, ProjectOps,
+    TagSchemaOps,
 };
 
 const CHARACTER_SNAPSHOT_SCAN_LIMIT: usize = 1000;
@@ -263,9 +263,18 @@ pub async fn ai_build_character_project_snapshot(
     let state = state.inner().lock().await;
     let db = state.sqlite_db.lock().await;
 
-    let project = db.get_project(&project_id).await.map_err(ApiError::from_display)?;
-    let categories = db.list_categories(&project_id).await.map_err(ApiError::from_display)?;
-    let tag_schemas = db.list_tag_schemas(&project_id).await.map_err(ApiError::from_display)?;
+    let project = db
+        .get_project(&project_id)
+        .await
+        .map_err(ApiError::from_display)?;
+    let categories = db
+        .list_categories(&project_id)
+        .await
+        .map_err(ApiError::from_display)?;
+    let tag_schemas = db
+        .list_tag_schemas(&project_id)
+        .await
+        .map_err(ApiError::from_display)?;
     let entry_briefs: Vec<EntryBrief> = db
         .list_entries(
             &project_id,
@@ -279,7 +288,10 @@ pub async fn ai_build_character_project_snapshot(
         .list_relations_for_project(&project_id)
         .await
         .map_err(ApiError::from_display)?;
-    let character_entry = db.get_entry(&entry_id).await.map_err(ApiError::from_display)?;
+    let character_entry = db
+        .get_entry(&entry_id)
+        .await
+        .map_err(ApiError::from_display)?;
 
     let mut all_entries = Vec::with_capacity(entry_briefs.len());
     for brief in entry_briefs {

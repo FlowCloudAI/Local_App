@@ -1,7 +1,7 @@
 pub(super) use crate::state::PathsState;
 pub(super) use crate::{AiState, ApiError, NetworkState};
-pub(super) use flowcloudai_client::ErrorCode;
 pub(super) use flowcloudai_client::plugin::types::PluginMeta;
+pub(super) use flowcloudai_client::ErrorCode;
 pub(super) use reqwest::multipart;
 pub(super) use semver::Version;
 pub(super) use serde::{Deserialize, Serialize};
@@ -156,7 +156,10 @@ pub(super) async fn require_no_active_sessions(ai_state: &AiState) -> Result<(),
     if !sessions.is_empty() {
         return Err(ApiError::new(
             ErrorCode::PluginUnloadForbidden,
-            format!("请先关闭所有 AI 会话（当前 {} 个）后再操作插件", sessions.len()),
+            format!(
+                "请先关闭所有 AI 会话（当前 {} 个）后再操作插件",
+                sessions.len()
+            ),
         )
         .with_kv("active_sessions", sessions.len() as u64));
     }

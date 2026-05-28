@@ -2,11 +2,8 @@ use super::common::*;
 use flowcloudai_client::ErrorCode;
 
 fn conversation_not_found(id: &str) -> ApiError {
-    ApiError::new(
-        ErrorCode::LlmSessionNotFound,
-        format!("未找到会话：{}", id),
-    )
-    .with_kv("conversation_id", id.to_string())
+    ApiError::new(ErrorCode::LlmSessionNotFound, format!("未找到会话：{}", id))
+        .with_kv("conversation_id", id.to_string())
 }
 
 /// 列出所有已保存对话的元信息，按 updated_at 降序
@@ -166,7 +163,14 @@ pub async fn ai_compact_conversation(
         )
         .with_kv("plugin_id", plugin_id.clone())
     })?;
-    let raw_output = run_compact_once(ai_state.inner(), &plugin_id, &api_key, &model, detail, prompt)
+    let raw_output = run_compact_once(
+        ai_state.inner(),
+        &plugin_id,
+        &api_key,
+        &model,
+        detail,
+        prompt,
+    )
         .await
         .map_err(ApiError::internal)?;
     let summary = extract_compact_summary(&raw_output)
@@ -211,7 +215,9 @@ pub async fn ai_export_conversation(
 
     let content = match format.as_str() {
         "json" => serde_json::to_string_pretty(&conversation)?,
-        "markdown" | "md" => render_conversation_markdown(&conversation).map_err(ApiError::internal)?,
+        "markdown" | "md" => {
+            render_conversation_markdown(&conversation).map_err(ApiError::internal)?
+        }
         other => {
             return Err(ApiError::new(
                 ErrorCode::ValidationFormatError,
@@ -222,7 +228,10 @@ pub async fn ai_export_conversation(
     };
 
     std::fs::write(&path, content).map_err(|e| {
-        ApiError::new(ErrorCode::FsWriteFailed, format!("写入导出文件失败 {:?}: {}", path, e))
+        ApiError::new(
+            ErrorCode::FsWriteFailed,
+            format!("写入导出文件失败 {:?}: {}", path, e),
+        )
             .with_kv("path", path.clone())
     })
 }
@@ -257,7 +266,9 @@ pub fn ai_get_character_conversation_meta(
     }
 
     let content = std::fs::read_to_string(&path)?;
-    Ok(serde_json::from_str::<HashMap<String, CharacterConversationMeta>>(&content)?)
+    Ok(serde_json::from_str::<
+        HashMap<String, CharacterConversationMeta>,
+    >(&content)?)
 }
 
 /// 覆盖写入特殊对话附加元数据。
@@ -406,19 +417,35 @@ fn render_compact_source_history(
         }
         output.push_str("\n\n");
 
-        if let Some(content) = message.content.as_deref().filter(|content| !content.is_empty()) {
+        if let Some(content) = message
+            .content
+            .as_deref()
+            .filter(|content| !content.is_empty())
+        {
             output.push_str(&truncate_for_prompt(content, 12_000));
             output.push_str("\n\n");
         }
-        if let Some(reasoning) = message.reasoning.as_deref().filter(|reasoning| !reasoning.is_empty()) {
+        if let Some(reasoning) = message
+            .reasoning
+            .as_deref()
+            .filter(|reasoning| !reasoning.is_empty())
+        {
             output.push_str("### 思考过程\n\n");
             output.push_str(&truncate_for_prompt(reasoning, 4_000));
             output.push_str("\n\n");
         }
-        if let Some(tool_call_id) = message.tool_call_id.as_deref().filter(|tool_call_id| !tool_call_id.is_empty()) {
+        if let Some(tool_call_id) = message
+            .tool_call_id
+            .as_deref()
+            .filter(|tool_call_id| !tool_call_id.is_empty())
+        {
             output.push_str(&format!("### 工具调用 ID\n\n{}\n\n", tool_call_id));
         }
-        if let Some(tool_calls) = message.tool_calls.as_ref().filter(|tool_calls| !tool_calls.is_empty()) {
+        if let Some(tool_calls) = message
+            .tool_calls
+            .as_ref()
+            .filter(|tool_calls| !tool_calls.is_empty())
+        {
             if let Ok(json) = serde_json::to_string(tool_calls) {
                 output.push_str("### 工具调用\n\n");
                 output.push_str(&truncate_for_prompt(&json, 4_000));
@@ -441,9 +468,15 @@ fn truncate_for_prompt(content: &str, max_chars: usize) -> String {
 
 fn build_compact_prompt(title: &str, history_markdown: &str, detail: &str) -> String {
     let detail_instruction = match detail {
-        "brief" => "写成简略摘要，约 400-800 个中文字符，只保留长期有用的事实、约定、用户偏好和未完成事项。",
-        "detailed" => "写成详细摘要，约 1500-3000 个中文字符，保留创作设定、决策理由、约束、角色/地点/术语、悬而未决的问题和用户偏好。",
-        _ => "写成适中摘要，约 800-1500 个中文字符，保留后续对话需要延续的事实、目标、约束、决策、用户偏好和未完成事项。",
+        "brief" => {
+            "写成简略摘要，约 400-800 个中文字符，只保留长期有用的事实、约定、用户偏好和未完成事项。"
+        }
+        "detailed" => {
+            "写成详细摘要，约 1500-3000 个中文字符，保留创作设定、决策理由、约束、角色/地点/术语、悬而未决的问题和用户偏好。"
+        }
+        _ => {
+            "写成适中摘要，约 800-1500 个中文字符，保留后续对话需要延续的事实、目标、约束、决策、用户偏好和未完成事项。"
+        }
     };
 
     [
@@ -562,24 +595,40 @@ fn render_conversation_markdown(conversation: &StoredConversation) -> Result<Str
         }
         output.push('\n');
 
-        if let Some(content) = message.content.as_deref().filter(|content| !content.is_empty()) {
+        if let Some(content) = message
+            .content
+            .as_deref()
+            .filter(|content| !content.is_empty())
+        {
             output.push_str(content);
             output.push_str("\n\n");
         } else {
             output.push_str("（无正文）\n\n");
         }
 
-        if let Some(reasoning) = message.reasoning.as_deref().filter(|reasoning| !reasoning.is_empty()) {
+        if let Some(reasoning) = message
+            .reasoning
+            .as_deref()
+            .filter(|reasoning| !reasoning.is_empty())
+        {
             output.push_str("#### 推理过程\n\n");
             output.push_str(reasoning);
             output.push_str("\n\n");
         }
 
-        if let Some(tool_call_id) = message.tool_call_id.as_deref().filter(|tool_call_id| !tool_call_id.is_empty()) {
+        if let Some(tool_call_id) = message
+            .tool_call_id
+            .as_deref()
+            .filter(|tool_call_id| !tool_call_id.is_empty())
+        {
             output.push_str(&format!("#### 工具调用 ID\n\n{}\n\n", tool_call_id));
         }
 
-        if let Some(tool_calls) = message.tool_calls.as_ref().filter(|tool_calls| !tool_calls.is_empty()) {
+        if let Some(tool_calls) = message
+            .tool_calls
+            .as_ref()
+            .filter(|tool_calls| !tool_calls.is_empty())
+        {
             let json = serde_json::to_string_pretty(tool_calls)
                 .map_err(|e| format!("序列化工具调用失败: {}", e))?;
             output.push_str("#### 工具调用\n\n```json\n");

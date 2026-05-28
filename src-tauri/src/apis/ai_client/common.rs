@@ -7,9 +7,10 @@ pub(super) use crate::PendingEditsState;
 pub(super) use crate::SettingsState;
 pub(super) use flowcloudai_client::llm::config::SessionConfig;
 pub(super) use flowcloudai_client::{
-    AudioDecoder, AudioSource, ConversationNode, ConversationNodeSeed, DefaultOrchestrator,
-    ImageSession, PluginKind, SessionEvent, TaskContext, TurnStatus, Usage, image::ImageRequest,
-    llm::types::{Message, ToolCall},
+    image::ImageRequest, llm::types::{Message, ToolCall}, AudioDecoder, AudioSource, ConversationNode,
+    ConversationNodeSeed, DefaultOrchestrator, ImageSession, PluginKind, SessionEvent, TaskContext,
+    TurnStatus,
+    Usage,
 };
 pub(super) use futures::StreamExt;
 pub(super) use serde::{Deserialize, Serialize};
@@ -18,8 +19,8 @@ pub(super) use std::fs::File;
 pub(super) use std::io::{Read, Write};
 pub(super) use std::path::{Path, PathBuf};
 use std::sync::{
-    Arc,
     atomic::{AtomicU64, Ordering},
+    Arc,
 };
 use std::time::Duration;
 pub(super) use tauri::{AppHandle, Emitter, Manager, State};
@@ -207,7 +208,10 @@ pub struct StoredConversation {
     pub schema_version: u32,
     #[serde(flatten)]
     pub meta: ConversationMeta,
-    #[serde(default, skip_serializing_if = "StoredConversationSettings::is_default")]
+    #[serde(
+        default,
+        skip_serializing_if = "StoredConversationSettings::is_default"
+    )]
     pub settings: StoredConversationSettings,
     pub messages: Vec<StoredMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -233,9 +237,7 @@ pub(super) fn character_conversation_meta_path(
         .join("character_conversations.json"))
 }
 
-pub(super) fn conversation_ui_state_path(
-    paths: &PathsState,
-) -> Result<std::path::PathBuf, String> {
+pub(super) fn conversation_ui_state_path(paths: &PathsState) -> Result<std::path::PathBuf, String> {
     let db_dir = paths
         .db_path
         .parent()
@@ -307,8 +309,8 @@ pub(super) fn chat_store_get_conversation(
     if !path.exists() {
         return Ok(None);
     }
-    let content =
-        std::fs::read_to_string(&path).map_err(|e| format!("读取对话文件失败 {:?}: {}", path, e))?;
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取对话文件失败 {:?}: {}", path, e))?;
     serde_json::from_str::<StoredConversation>(&content)
         .map(Some)
         .map_err(|e| format!("解析对话文件失败 {:?}: {}", path, e))
@@ -324,8 +326,8 @@ pub(super) fn chat_store_save_conversation(
             .map_err(|e| format!("创建对话目录失败 {:?}: {}", parent, e))?;
     }
 
-    let json = serde_json::to_string_pretty(conversation)
-        .map_err(|e| format!("序列化对话失败: {}", e))?;
+    let json =
+        serde_json::to_string_pretty(conversation).map_err(|e| format!("序列化对话失败: {}", e))?;
     let temp_path = path.with_extension("json.tmp");
     {
         let mut file = std::fs::File::create(&temp_path)
@@ -972,18 +974,35 @@ pub(crate) fn spawn_session_event_loop<S>(
                         name,
                         arguments.len()
                     );
-                    app_clone
-                        .emit(
-                            "ai:tool_call",
-                            EventToolCall {
-                                session_id: sid.clone(),
-                                run_id: rid.clone(),
-                                index,
-                                name,
-                                arguments,
-                            },
-                        )
-                        .ok();
+                    let name_for_log = name.clone();
+                    let args_len = arguments.len();
+                    match app_clone.emit(
+                        "ai:tool_call",
+                        EventToolCall {
+                            session_id: sid.clone(),
+                            run_id: rid.clone(),
+                            index,
+                            name,
+                            arguments,
+                        },
+                    ) {
+                        Ok(()) => log::info!(
+                            "[ai:tool_call_emit_done] session_id={} run_id={} index={} name={} args_len={}",
+                            sid,
+                            rid,
+                            index,
+                            name_for_log,
+                            args_len
+                        ),
+                        Err(error) => log::warn!(
+                            "[ai:tool_call_emit_failed] session_id={} run_id={} index={} name={} error={}",
+                            sid,
+                            rid,
+                            index,
+                            name_for_log,
+                            error
+                        ),
+                    }
                 }
                 SessionEvent::ToolResult {
                     index,
@@ -997,19 +1016,35 @@ pub(crate) fn spawn_session_event_loop<S>(
                         is_error,
                         output.len()
                     );
-                    app_clone
-                        .emit(
-                            "ai:tool_result",
-                            EventToolResult {
-                                session_id: sid.clone(),
-                                run_id: rid.clone(),
-                                index,
-                                output: output.clone(),
-                                result: output.clone(),
-                                is_error,
-                            },
-                        )
-                        .ok();
+                    let output_len = output.len();
+                    match app_clone.emit(
+                        "ai:tool_result",
+                        EventToolResult {
+                            session_id: sid.clone(),
+                            run_id: rid.clone(),
+                            index,
+                            output: output.clone(),
+                            result: output,
+                            is_error,
+                        },
+                    ) {
+                        Ok(()) => log::info!(
+                            "[ai:tool_result_emit_done] session_id={} run_id={} index={} is_error={} output_len={}",
+                            sid,
+                            rid,
+                            index,
+                            is_error,
+                            output_len
+                        ),
+                        Err(error) => log::warn!(
+                            "[ai:tool_result_emit_failed] session_id={} run_id={} index={} is_error={} error={}",
+                            sid,
+                            rid,
+                            index,
+                            is_error,
+                            error
+                        ),
+                    }
                 }
                 SessionEvent::TurnEnd {
                     status,
