@@ -248,9 +248,9 @@ export function HealthMeter({score}: { score: number }) {
                 <span>{score}</span>
             </div>
             <div className="pe-dashboard-health__body">
-                <span className="pe-dashboard-health__label">世界观结构化评分</span>
+                <span className="pe-dashboard-health__label">资料整理评分</span>
                 <strong>{status}</strong>
-                <span>基于分类、词条类型、标签体系、内容体量和平均字数估算。</span>
+                <span>根据分类、词条类型、标签、内容数量和平均字数估算。</span>
             </div>
         </div>
     )

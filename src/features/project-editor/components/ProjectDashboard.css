@@ -14,21 +14,12 @@
     gap: var(--fc-space-md);
 }
 
-.pe-dashboard-section__badge,
 .pe-dashboard-check,
 .pe-dashboard-action__badge {
     flex-shrink: 0;
     border-radius: var(--fc-radius-full);
     font-size: var(--fc-font-size-xs);
     line-height: 1.2;
-}
-
-.pe-dashboard-section__badge {
-    padding: var(--fc-space-xs) var(--fc-space-sm);
-    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 38%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-    color: var(--fc-color-primary);
-    font-weight: var(--fc-font-weight-medium);
 }
 
 .pe-dashboard-status-strip,

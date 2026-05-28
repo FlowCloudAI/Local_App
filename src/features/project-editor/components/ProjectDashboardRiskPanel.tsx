@@ -18,7 +18,7 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary}: ProjectDashboard
             key: 'uncategorized',
             label: '未分类',
             value: projectStats?.uncategorizedEntryCount,
-            hint: '缺少管理归属',
+            hint: '还没有放进分类',
             severity: severityOf(projectStats?.uncategorizedEntryCount, 5),
         },
         {
@@ -69,7 +69,7 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary}: ProjectDashboard
     return (
         <article className="pe-dashboard-panel pe-dashboard-panel--quality">
             <div className="pe-dashboard-panel__header">
-                <h3>质量监控</h3>
+                <h3>待处理问题</h3>
                 <span>{issueTotal > 0 ? `${issueTotal} 项待处理` : '状态正常'}</span>
             </div>
             <DashboardIssueList items={qualityItems}/>

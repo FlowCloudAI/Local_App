@@ -203,7 +203,7 @@ function ProjectNextSteps({
             <div className="pe-next-steps__header">
                 <div>
                     <h2>下一步建议</h2>
-                    <p>按当前项目状态给出最直接的创作入口：先推进内容和结构，再回到驾驶舱查看规模与风险。</p>
+                    <p>按当前项目状态给出最直接的创作入口：先推进内容和结构，再回到项目总览查看规模与风险。</p>
                 </div>
             </div>
             <div className="pe-next-steps__grid">

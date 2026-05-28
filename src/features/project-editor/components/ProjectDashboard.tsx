@@ -26,12 +26,11 @@ function ProjectDashboard(props: ProjectDashboardProps) {
         <section className="pe-dashboard-section">
             <div className="pe-dashboard-section__header">
                 <div>
-                    <h2 className="pe-feature-section__title">项目驾驶舱</h2>
+                    <h2 className="pe-feature-section__title">项目总览</h2>
                     <p className="pe-feature-section__desc">
-                        从管理视角观察世界观规模、结构化程度和资料配置状态。
+                        查看这个世界已经写了多少、资料怎么分布，以及还有哪些地方需要补齐。
                     </p>
                 </div>
-                <div className="pe-dashboard-section__badge">MIS 视图</div>
             </div>
 
             <div className="pe-dashboard-status-strip">
@@ -57,8 +56,8 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                 <div className="pe-dashboard-main-column">
                     <article className="pe-dashboard-panel pe-dashboard-panel--primary">
                         <div className="pe-dashboard-panel__header">
-                            <h3>创作资产概览</h3>
-                            <span>{formatDashboardNumber(assetTotal)} 项资产</span>
+                            <h3>资料概览</h3>
+                            <span>{formatDashboardNumber(assetTotal)} 项内容</span>
                         </div>
                         <div className="pe-dashboard-distribution-grid">
                             <DashboardDistributionBlock
@@ -76,8 +75,8 @@ function ProjectDashboard(props: ProjectDashboardProps) {
 
                     <article className="pe-dashboard-panel">
                         <div className="pe-dashboard-panel__header">
-                            <h3>世界观结构分析</h3>
-                            <span>组织深度与连接密度</span>
+                            <h3>资料结构</h3>
+                            <span>分类、内链和内容厚度</span>
                         </div>
                         <div className="pe-dashboard-structure-grid">
                             <DashboardMetric
@@ -109,8 +108,8 @@ function ProjectDashboard(props: ProjectDashboardProps) {
 
                     <article className="pe-dashboard-panel pe-dashboard-panel--signals">
                         <div className="pe-dashboard-panel__header">
-                            <h3>管理信号</h3>
-                            <span>资料治理</span>
+                            <h3>需要留意的地方</h3>
+                            <span>资料整理</span>
                         </div>
                         <DashboardSignalList items={dashboard.signalItems}/>
                     </article>
