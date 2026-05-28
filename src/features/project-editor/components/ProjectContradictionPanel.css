@@ -50,8 +50,8 @@
     min-height: 0;
     display: grid;
     grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
-    gap: var(--fc-space-lg);
-    padding: var(--fc-space-lg) var(--fc-space-xl) var(--fc-space-xl);
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-md);
 }
 
 /* ── 历史与报告区域 ─────────────────────────────────────────────── */
@@ -511,6 +511,106 @@ button.pe-contradiction-chip--entry:hover {
     outline: none;
     border-color: var(--fc-color-primary);
     box-shadow: 0 0 0 2px var(--fc-color-primary-subtle);
+}
+
+.pe-contradiction-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: color-mix(in srgb, #000 48%, transparent);
+}
+
+.pe-contradiction-modal__dialog {
+    width: min(460px, 100%);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
+}
+
+.pe-contradiction-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.pe-contradiction-modal__title {
+    margin: 0;
+    font-size: var(--fc-font-size-lg);
+    font-weight: var(--fc-font-weight-bold);
+    color: var(--fc-color-text);
+}
+
+.pe-contradiction-modal__desc {
+    margin: 4px 0 0;
+    font-size: var(--fc-font-size-sm);
+    color: var(--fc-color-text-secondary);
+}
+
+.pe-contradiction-modal__close {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 6px;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.pe-contradiction-modal__close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pe-contradiction-modal__close:hover:not(:disabled) {
+    color: var(--fc-color-text);
+    border-color: var(--fc-color-primary);
+}
+
+.pe-contradiction-modal__close:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.pe-contradiction-modal__body {
+    display: grid;
+    gap: 12px;
+    padding: 16px 18px;
+}
+
+.pe-contradiction-field {
+    display: grid;
+    gap: 6px;
+    font-size: var(--fc-font-size-sm);
+    color: var(--fc-color-text-secondary);
+}
+
+.pe-contradiction-field > span {
+    color: var(--fc-color-text);
+    font-weight: 600;
+}
+
+.pe-contradiction-field .pe-contradiction-target-input {
+    width: 100%;
+}
+
+.pe-contradiction-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 18px 16px;
+    border-top: 1px solid var(--fc-color-border);
 }
 
 .pe-contradiction-model-selectors .ai-toolbar-btn {

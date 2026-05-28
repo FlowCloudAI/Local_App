@@ -69,6 +69,20 @@ function BackArrow() {
     )
 }
 
+function CloseIcon() {
+    return (
+        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path
+                d="M4.25 4.25L11.75 11.75M11.75 4.25L4.25 11.75"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+            />
+        </svg>
+    )
+}
+
 function formatDateTime(value: string): string {
     const parsed = new Date(value)
     if (Number.isNaN(parsed.getTime())) return value
@@ -199,6 +213,7 @@ function ProjectContradictionPanel({
     const [historyLoading, setHistoryLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
     const [generating, setGenerating] = useState(false)
+    const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
     const [progressMessage, setProgressMessage] = useState<string | null>(null)
     const debugRawRef = useRef<string | null>(null)
 
@@ -249,7 +264,7 @@ function ProjectContradictionPanel({
     const loadHistory = useCallback(async () => {
         setHistoryLoading(true)
         try {
-            const items = await ai_list_world_check_reports(projectId, checkKind)
+            const items = await ai_list_world_check_reports(projectId, null)
             setHistoryItems(items)
             setSelectedReportId((current) => {
                 if (current && items.some((item) => item.reportId === current)) return current
@@ -264,7 +279,7 @@ function ProjectContradictionPanel({
         } finally {
             setHistoryLoading(false)
         }
-    }, [checkKind, projectId, showAlert, setSelectedReportId])
+    }, [projectId, showAlert, setSelectedReportId])
 
     useEffect(() => {
         void loadHistory()
@@ -337,6 +352,7 @@ function ProjectContradictionPanel({
                     reportContext: buildReportConversationContext(record),
                 })
             }
+            setGenerateDialogOpen(false)
             await showAlert('设定检测完成，右侧已为这份报告新建讨论对话。', 'success', 'toast', 2200)
         } catch (error) {
             logger.error('[ProjectContradictionPanel] 生成设定检测报告失败', {
@@ -346,6 +362,7 @@ function ProjectContradictionPanel({
                 effectivePluginId,
                 effectiveModel,
                 projectId,
+                checkKind,
             })
             const errorMsg = error instanceof Error ? error.message : String(error)
             const userFriendly = errorMsg === 'error decoding response body'
@@ -444,63 +461,11 @@ function ProjectContradictionPanel({
                     </div>
                 </div>
                 <div className="pe-contradiction-toolbar__actions fc-op-header__actions">
-                    <div className="pe-contradiction-model-selectors">
-                        <Select
-                            options={CHECK_KIND_OPTIONS}
-                            value={checkKind}
-                            onChange={(v) => {
-                                setCheckKind(String(v) as WorldCheckKind)
-                                setSelectedReportId(null)
-                                setActiveRecord(null)
-                            }}
-                            placeholder="检测类型"
-                            radius="md"
-                            triggerBackground="var(--fc-color-bg)"
-                            triggerBorderColor="var(--fc-color-border)"
-                            selectedColor="var(--fc-color-primary)"
-                            selectedBackground="var(--fc-color-primary-subtle)"
-                        />
-                        {checkKind === 'entry_alignment' && (
-                            <input
-                                className="pe-contradiction-target-input"
-                                value={targetEntryId}
-                                onChange={(event) => setTargetEntryId(event.target.value)}
-                                placeholder={activeEntryTitle ? `当前：${activeEntryTitle}` : '目标词条 ID'}
-                            />
-                        )}
-                        <Select
-                            options={plugins.map((p) => ({value: p.id, label: p.name}))}
-                            value={effectivePluginId ?? ''}
-                            onChange={(v) => {
-                                setLocalPluginId(String(v))
-                                setLocalModel(null)
-                            }}
-                            placeholder="选择插件"
-                            radius="md"
-                            triggerBackground="var(--fc-color-bg)"
-                            triggerBorderColor="var(--fc-color-border)"
-                            selectedColor="var(--fc-color-primary)"
-                            selectedBackground="var(--fc-color-primary-subtle)"
-                        />
-                        {selectedPluginInfo && (
-                            <Select
-                                options={(selectedPluginInfo.models ?? []).map((m) => ({value: m, label: m}))}
-                                value={effectiveModel ?? ''}
-                                onChange={(v) => setLocalModel(String(v))}
-                                placeholder="选择模型"
-                                radius="md"
-                                triggerBackground="var(--fc-color-bg)"
-                                triggerBorderColor="var(--fc-color-border)"
-                                selectedColor="var(--fc-color-primary)"
-                                selectedBackground="var(--fc-color-primary-subtle)"
-                            />
-                        )}
-                    </div>
                     <Button type="button" variant="outline" size="sm" onClick={() => void loadHistory()}
                             disabled={historyLoading || generating}>
                         刷新历史
                     </Button>
-                    <Button type="button" variant="primary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
+                    <Button type="button" variant="primary" size="sm" onClick={() => setGenerateDialogOpen(true)} disabled={generating}>
                         {generating ? (
                             <span>{progressMessage ?? '检测中…'}</span>
                         ) : '生成新报告'}
@@ -519,7 +484,7 @@ function ProjectContradictionPanel({
                             {historyLoading && historyItems.length === 0 ? (
                                 <div className="pe-contradiction-empty">正在加载历史报告…</div>
                             ) : historyItems.length === 0 ? (
-                                <div className="pe-contradiction-empty">还没有生成过{checkKindLabel(checkKind)}报告。</div>
+                                <div className="pe-contradiction-empty">还没有生成过检测报告。</div>
                             ) : historyItems.map((item) => (
                                 <article
                                     key={item.reportId}
@@ -533,8 +498,9 @@ function ProjectContradictionPanel({
                                         <div className="pe-contradiction-history__topline">
                                             <span
                                                 className="fc-op-item__meta">{formatDateTime(item.createdAt)}</span>
-                                                <span
-                                                    className="fc-op-count">{item.findingCount} 个问题</span>
+                                            <span
+                                                className="fc-op-count">{item.findingCount} 个问题</span>
+                                            <span className="fc-op-count">{checkKindLabel(item.checkKind)}</span>
                                         </div>
                                         <div className="fc-op-item__title">{item.overview}</div>
                                         <div className="fc-op-item__meta">
@@ -575,6 +541,7 @@ function ProjectContradictionPanel({
                                         <div className="pe-contradiction-report__hero-main">
                                             <div className="pe-contradiction-report__meta">
                                                 <span>{formatDateTime(activeRecord.createdAt)}</span>
+                                                <span>{checkKindLabel(activeRecord.checkKind)}</span>
                                                 <span>范围：{activeRecord.scopeSummary}</span>
                                                 {activeRecord.truncated && <span
                                                     className="pe-contradiction-report__warning">本次资料已裁剪</span>}
@@ -749,6 +716,93 @@ function ProjectContradictionPanel({
                     )}
                 </section>
             </div>
+            {generateDialogOpen && (
+                <div className="pe-contradiction-modal" role="dialog" aria-modal="true" aria-labelledby="pe-generate-report-title">
+                    <div className="pe-contradiction-modal__dialog">
+                        <div className="pe-contradiction-modal__header">
+                            <div>
+                                <h3 id="pe-generate-report-title" className="pe-contradiction-modal__title">生成新报告</h3>
+                                <p className="pe-contradiction-modal__desc">选择检测方式、AI 插件和模型后开始生成。</p>
+                            </div>
+                            <button
+                                type="button"
+                                className="pe-contradiction-modal__close"
+                                onClick={() => setGenerateDialogOpen(false)}
+                                aria-label="关闭"
+                                disabled={generating}
+                            >
+                                <CloseIcon/>
+                            </button>
+                        </div>
+                        <div className="pe-contradiction-modal__body">
+                            <label className="pe-contradiction-field">
+                                <span>检测类型</span>
+                                <Select
+                                    options={CHECK_KIND_OPTIONS}
+                                    value={checkKind}
+                                    onChange={(v) => setCheckKind(String(v) as WorldCheckKind)}
+                                    placeholder="检测类型"
+                                    radius="md"
+                                    triggerBackground="var(--fc-color-bg)"
+                                    triggerBorderColor="var(--fc-color-border)"
+                                    selectedColor="var(--fc-color-primary)"
+                                    selectedBackground="var(--fc-color-primary-subtle)"
+                                />
+                            </label>
+                            {checkKind === 'entry_alignment' && (
+                                <label className="pe-contradiction-field">
+                                    <span>目标词条 ID</span>
+                                    <input
+                                        className="pe-contradiction-target-input"
+                                        value={targetEntryId}
+                                        onChange={(event) => setTargetEntryId(event.target.value)}
+                                        placeholder={activeEntryTitle ? `当前：${activeEntryTitle}` : '目标词条 ID'}
+                                    />
+                                </label>
+                            )}
+                            <label className="pe-contradiction-field">
+                                <span>AI 插件</span>
+                                <Select
+                                    options={plugins.map((p) => ({value: p.id, label: p.name}))}
+                                    value={effectivePluginId ?? ''}
+                                    onChange={(v) => {
+                                        setLocalPluginId(String(v))
+                                        setLocalModel(null)
+                                    }}
+                                    placeholder="选择插件"
+                                    radius="md"
+                                    triggerBackground="var(--fc-color-bg)"
+                                    triggerBorderColor="var(--fc-color-border)"
+                                    selectedColor="var(--fc-color-primary)"
+                                    selectedBackground="var(--fc-color-primary-subtle)"
+                                />
+                            </label>
+                            <label className="pe-contradiction-field">
+                                <span>模型</span>
+                                <Select
+                                    options={(selectedPluginInfo?.models ?? []).map((m) => ({value: m, label: m}))}
+                                    value={effectiveModel ?? ''}
+                                    onChange={(v) => setLocalModel(String(v))}
+                                    placeholder="选择模型"
+                                    radius="md"
+                                    triggerBackground="var(--fc-color-bg)"
+                                    triggerBorderColor="var(--fc-color-border)"
+                                    selectedColor="var(--fc-color-primary)"
+                                    selectedBackground="var(--fc-color-primary-subtle)"
+                                />
+                            </label>
+                        </div>
+                        <div className="pe-contradiction-modal__footer">
+                            <Button type="button" variant="outline" size="sm" onClick={() => setGenerateDialogOpen(false)} disabled={generating}>
+                                取消
+                            </Button>
+                            <Button type="button" variant="primary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
+                                {generating ? (progressMessage ?? '检测中…') : '开始生成'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
