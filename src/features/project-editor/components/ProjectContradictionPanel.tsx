@@ -405,7 +405,7 @@ function ProjectContradictionPanel({
                 })
             }
             setGenerateDialogOpen(false)
-            await showAlert('设定检测完成，右侧已为这份报告新建讨论对话。', 'success', 'toast', 2200)
+            await showAlert('设定检测完成，右侧已为这份报告新建讨论对话。', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('[ProjectContradictionPanel] 生成设定检测报告失败', {
                 error,
@@ -439,7 +439,7 @@ function ProjectContradictionPanel({
                     setActiveRecord(null)
                 }
             }
-            await showAlert('报告已删除。', 'success', 'toast', 1600)
+            await showAlert('报告已删除。', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('删除设定检测报告失败', error)
             await showAlert(`删除报告失败：${String(error)}`, 'error', 'toast', 2600)
