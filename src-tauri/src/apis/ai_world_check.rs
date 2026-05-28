@@ -7,6 +7,7 @@ use crate::apis::ai_client::{
     CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
     EventTurnBegin, EventTurnEnd, cleanup_session_state, save_api_usage, turn_status_str,
 };
+use crate::apis::ai_contradiction::StoredContradictionReport;
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
 use crate::senses::world_check_sense::WorldCheckSense;
 use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState, WorldCheckSessionBinding};
@@ -132,6 +133,64 @@ fn read_report_record(file_path: &Path) -> Result<StoredWorldCheckReport, String
         std::fs::read_to_string(file_path).map_err(|e| format!("读取检测报告文件失败: {}", e))?;
     serde_json::from_str::<StoredWorldCheckReport>(&content)
         .map_err(|e| format!("解析检测报告文件失败: {}", e))
+}
+
+fn legacy_contradiction_report_file_path(base_dir: &Path, report_id: &str) -> PathBuf {
+    base_dir.join(format!("{}.json", report_id))
+}
+
+fn legacy_record_to_world_check(record: StoredContradictionReport) -> StoredWorldCheckReport {
+    StoredWorldCheckReport {
+        report_id: record.report_id,
+        session_id: record.session_id,
+        conversation_id: record.conversation_id,
+        check_kind: WorldCheckKind::Contradiction,
+        plugin_id: record.plugin_id,
+        model: record.model,
+        project_id: record.project_id,
+        project_name: record.project_name,
+        created_at: record.created_at,
+        scope_summary: record.scope_summary,
+        source_entry_ids: record.source_entry_ids,
+        target_entry_id: None,
+        truncated: record.truncated,
+        report: WorldCheckReport::from(record.report),
+    }
+}
+
+fn read_legacy_contradiction_record(file_path: &Path) -> Result<StoredWorldCheckReport, String> {
+    let content =
+        std::fs::read_to_string(file_path).map_err(|e| format!("读取旧矛盾报告文件失败: {}", e))?;
+    let record = serde_json::from_str::<StoredContradictionReport>(&content)
+        .map_err(|e| format!("解析旧矛盾报告文件失败: {}", e))?;
+    Ok(legacy_record_to_world_check(record))
+}
+
+fn list_legacy_contradiction_records(
+    base_dir: &Path,
+    project_id: &str,
+) -> Result<Vec<StoredWorldCheckReport>, String> {
+    std::fs::create_dir_all(base_dir).map_err(|e| format!("创建旧矛盾报告目录失败: {}", e))?;
+
+    let mut records = Vec::new();
+    let entries =
+        std::fs::read_dir(base_dir).map_err(|e| format!("读取旧矛盾报告目录失败: {}", e))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取旧矛盾报告目录项失败: {}", e))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        match read_legacy_contradiction_record(&path) {
+            Ok(record) if record.project_id == project_id => records.push(record),
+            Ok(_) => {}
+            Err(error) => {
+                log::warn!("跳过损坏的旧矛盾报告文件 {:?}: {}", path, error);
+            }
+        }
+    }
+
+    Ok(records)
 }
 
 fn save_report_record(base_dir: &Path, record: &StoredWorldCheckReport) -> Result<(), String> {
@@ -440,8 +499,16 @@ pub async fn ai_list_world_check_reports(
     project_id: String,
     check_kind: Option<WorldCheckKind>,
 ) -> Result<Vec<WorldCheckReportHistoryItem>, ApiError> {
-    let records = list_report_records(&ai_state.world_check_reports_dir, &project_id, check_kind)
-        .map_err(ApiError::internal)?;
+    let mut records =
+        list_report_records(&ai_state.world_check_reports_dir, &project_id, check_kind)
+            .map_err(ApiError::internal)?;
+    if check_kind.is_none_or(|kind| kind == WorldCheckKind::Contradiction) {
+        records.extend(
+            list_legacy_contradiction_records(&ai_state.contradiction_reports_dir, &project_id)
+                .map_err(ApiError::internal)?,
+        );
+        records.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    }
     Ok(records.iter().map(history_item_from_record).collect())
 }
 
@@ -452,7 +519,14 @@ pub async fn ai_get_world_check_report_entry(
 ) -> Result<Option<StoredWorldCheckReport>, ApiError> {
     let file_path = world_check_report_file_path(&ai_state.world_check_reports_dir, &report_id);
     if !file_path.exists() {
-        return Ok(None);
+        let legacy_path =
+            legacy_contradiction_report_file_path(&ai_state.contradiction_reports_dir, &report_id);
+        if !legacy_path.exists() {
+            return Ok(None);
+        }
+        return Ok(Some(
+            read_legacy_contradiction_record(&legacy_path).map_err(ApiError::internal)?,
+        ));
     }
     Ok(Some(
         read_report_record(&file_path).map_err(ApiError::internal)?,
@@ -466,7 +540,13 @@ pub async fn ai_delete_world_check_report(
 ) -> Result<bool, ApiError> {
     let file_path = world_check_report_file_path(&ai_state.world_check_reports_dir, &report_id);
     if !file_path.exists() {
-        return Ok(false);
+        let legacy_path =
+            legacy_contradiction_report_file_path(&ai_state.contradiction_reports_dir, &report_id);
+        if !legacy_path.exists() {
+            return Ok(false);
+        }
+        std::fs::remove_file(&legacy_path)?;
+        return Ok(true);
     }
     std::fs::remove_file(&file_path)?;
     Ok(true)
