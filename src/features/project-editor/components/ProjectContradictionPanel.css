@@ -605,6 +605,59 @@ button.pe-contradiction-chip--entry:hover {
     width: 100%;
 }
 
+.pe-contradiction-target-selected {
+    color: var(--fc-color-primary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.pe-contradiction-entry-options {
+    max-height: 180px;
+    overflow: auto;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 6px;
+    background: var(--fc-color-bg);
+}
+
+.pe-contradiction-entry-option {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--fc-color-border);
+    padding: 8px 10px;
+    background: transparent;
+    color: var(--fc-color-text);
+    text-align: left;
+    cursor: pointer;
+    display: grid;
+    gap: 3px;
+}
+
+.pe-contradiction-entry-option:last-child {
+    border-bottom: 0;
+}
+
+.pe-contradiction-entry-option:hover,
+.pe-contradiction-entry-option.is-active {
+    background: var(--fc-color-primary-subtle);
+}
+
+.pe-contradiction-entry-option__title {
+    font-weight: 600;
+}
+
+.pe-contradiction-entry-option__meta {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pe-contradiction-entry-options__empty {
+    padding: 10px;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
 .pe-contradiction-modal__footer {
     display: flex;
     justify-content: flex-end;

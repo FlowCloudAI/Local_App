@@ -7,7 +7,9 @@ import {
     ai_list_world_check_reports,
     ai_list_plugins,
     ai_start_world_check_session,
+    db_list_entries,
     db_get_entry,
+    type EntryBrief,
     type PluginInfo,
     type StoredWorldCheckReport,
     type WorldCheckFinding,
@@ -17,6 +19,7 @@ import {
 } from '../../../api'
 import {listen} from '@tauri-apps/api/event'
 import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
+import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectContradictionPanel.css'
 
@@ -191,6 +194,9 @@ function ProjectContradictionPanel({
     const {showAlert} = useAlert()
     const [checkKind, setCheckKind] = useState<WorldCheckKind>('contradiction')
     const [targetEntryId, setTargetEntryId] = useState('')
+    const [targetEntryQuery, setTargetEntryQuery] = useState(activeEntryTitle ?? '')
+    const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
+    const [entriesLoading, setEntriesLoading] = useState(false)
 
     // ── 插件 & 模型选择 ──
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
@@ -217,6 +223,19 @@ function ProjectContradictionPanel({
     const [progressMessage, setProgressMessage] = useState<string | null>(null)
     const debugRawRef = useRef<string | null>(null)
 
+    const selectedTargetEntry = useMemo(
+        () => projectEntries.find((entry) => entry.id === targetEntryId) ?? null,
+        [projectEntries, targetEntryId],
+    )
+
+    const targetEntryOptions = useMemo(() => {
+        const query = normalizeEntryLookupTitle(targetEntryQuery)
+        const entries = query
+            ? projectEntries.filter((entry) => normalizeEntryLookupTitle(entry.title).startsWith(query))
+            : projectEntries
+        return entries.slice(0, 8)
+    }, [projectEntries, targetEntryQuery])
+
     // 监听进度报告事件
     useEffect(() => {
         let unlistenFn: (() => void) | null = null
@@ -238,8 +257,41 @@ function ProjectContradictionPanel({
     useEffect(() => {
         if (checkKind === 'entry_alignment' && !targetEntryId && activeEntryId) {
             setTargetEntryId(activeEntryId)
+            setTargetEntryQuery(activeEntryTitle ?? '')
         }
-    }, [activeEntryId, checkKind, targetEntryId])
+    }, [activeEntryId, activeEntryTitle, checkKind, targetEntryId])
+
+    useEffect(() => {
+        if (!generateDialogOpen || checkKind !== 'entry_alignment' || projectEntries.length > 0) return
+        let cancelled = false
+        setEntriesLoading(true)
+        db_list_entries({projectId, limit: 1000, offset: 0})
+            .then((entries) => {
+                if (cancelled) return
+                setProjectEntries(entries)
+            })
+            .catch(async (error) => {
+                if (cancelled) return
+                logger.error('加载词条候选失败', error)
+                await showAlert(`加载词条候选失败：${String(error)}`, 'error', 'toast', 2400)
+            })
+            .finally(() => {
+                if (!cancelled) setEntriesLoading(false)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [checkKind, generateDialogOpen, projectEntries.length, projectId, showAlert])
+
+    useEffect(() => {
+        setProjectEntries([])
+    }, [projectId])
+
+    useEffect(() => {
+        if (!selectedTargetEntry) return
+        if (targetEntryQuery.trim()) return
+        setTargetEntryQuery(selectedTargetEntry.title)
+    }, [selectedTargetEntry, targetEntryQuery])
 
     // 监听 Rust 端发出的原始 AI 响应，用于调试
     useEffect(() => {
@@ -314,7 +366,7 @@ function ProjectContradictionPanel({
         }
         const resolvedTargetEntryId = targetEntryId.trim()
         if (checkKind === 'entry_alignment' && !resolvedTargetEntryId) {
-            await showAlert('单词条契合度检测需要先填写目标词条 ID。', 'warning', 'toast', 2400)
+            await showAlert('单词条契合度检测需要先选择目标词条。', 'warning', 'toast', 2400)
             return
         }
 
@@ -750,15 +802,51 @@ function ProjectContradictionPanel({
                                 />
                             </label>
                             {checkKind === 'entry_alignment' && (
-                                <label className="pe-contradiction-field">
-                                    <span>目标词条 ID</span>
+                                <div className="pe-contradiction-field">
+                                    <span>目标词条</span>
                                     <input
                                         className="pe-contradiction-target-input"
-                                        value={targetEntryId}
-                                        onChange={(event) => setTargetEntryId(event.target.value)}
-                                        placeholder={activeEntryTitle ? `当前：${activeEntryTitle}` : '目标词条 ID'}
+                                        value={targetEntryQuery}
+                                        onChange={(event) => {
+                                            setTargetEntryQuery(event.target.value)
+                                            if (selectedTargetEntry?.title !== event.target.value) {
+                                                setTargetEntryId('')
+                                            }
+                                        }}
+                                        placeholder={activeEntryTitle ? `当前：${activeEntryTitle}` : '输入词条名前缀搜索'}
                                     />
-                                </label>
+                                    {selectedTargetEntry && (
+                                        <div className="pe-contradiction-target-selected">
+                                            已选择：{selectedTargetEntry.title}
+                                        </div>
+                                    )}
+                                    <div className="pe-contradiction-entry-options">
+                                        {entriesLoading ? (
+                                            <div className="pe-contradiction-entry-options__empty">正在加载词条…</div>
+                                        ) : targetEntryOptions.length > 0 ? (
+                                            targetEntryOptions.map((entry) => (
+                                                <button
+                                                    key={entry.id}
+                                                    type="button"
+                                                    className={`pe-contradiction-entry-option${entry.id === targetEntryId ? ' is-active' : ''}`}
+                                                    onClick={() => {
+                                                        setTargetEntryId(entry.id)
+                                                        setTargetEntryQuery(entry.title)
+                                                    }}
+                                                >
+                                                    <span className="pe-contradiction-entry-option__title">{entry.title}</span>
+                                                    {entry.summary && (
+                                                        <span className="pe-contradiction-entry-option__meta">{entry.summary}</span>
+                                                    )}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="pe-contradiction-entry-options__empty">
+                                                {targetEntryQuery.trim() ? '没有匹配的词条' : '输入词条名前缀以搜索'}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                             <label className="pe-contradiction-field">
                                 <span>AI 插件</span>
