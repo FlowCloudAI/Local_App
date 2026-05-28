@@ -493,6 +493,24 @@ button.pe-contradiction-chip--entry:hover {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
+}
+
+.pe-contradiction-target-input {
+    min-width: 180px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--fc-color-border);
+    border-radius: 6px;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+}
+
+.pe-contradiction-target-input:focus {
+    outline: none;
+    border-color: var(--fc-color-primary);
+    box-shadow: 0 0 0 2px var(--fc-color-primary-subtle);
 }
 
 .pe-contradiction-model-selectors .ai-toolbar-btn {
@@ -581,10 +599,14 @@ button.pe-contradiction-chip--entry:hover {
 /* ── 选择器宽度修复 ───────────────────────────────────────── */
 
 .pe-contradiction-model-selectors > :first-child {
-    min-width: 150px;
+    min-width: 132px;
 }
 
 .pe-contradiction-model-selectors > :nth-child(2) {
+    min-width: 150px;
+}
+
+.pe-contradiction-model-selectors > :nth-child(3) {
     min-width: 200px;
 }
 

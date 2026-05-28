@@ -187,7 +187,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             case 'timeline':
                 return `${projectName} · 时间线`
             case 'contradiction':
-                return `${projectName} · 矛盾检查`
+                return `${projectName} · 设定检测`
             case 'world-map':
                 return `${projectName} · 世界地图`
         }

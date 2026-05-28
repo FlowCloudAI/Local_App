@@ -2,18 +2,18 @@ import {logger} from '../../../shared/logger'
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {
-    ai_delete_contradiction_report,
-    ai_get_contradiction_report_entry,
-    ai_list_contradiction_reports,
+    ai_delete_world_check_report,
+    ai_get_world_check_report_entry,
+    ai_list_world_check_reports,
     ai_list_plugins,
-    ai_start_contradiction_session,
+    ai_start_world_check_session,
     db_get_entry,
-    type ContradictionCategory,
-    type ContradictionIssue,
-    type ContradictionReport,
-    type ContradictionReportHistoryItem,
     type PluginInfo,
-    type StoredContradictionReport,
+    type StoredWorldCheckReport,
+    type WorldCheckFinding,
+    type WorldCheckKind,
+    type WorldCheckReport,
+    type WorldCheckReportHistoryItem,
 } from '../../../api'
 import {listen} from '@tauri-apps/api/event'
 import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
@@ -25,6 +25,8 @@ interface ProjectContradictionPanelProps {
     projectName: string
     aiPluginId?: string | null
     aiModel?: string | null
+    activeEntryId?: string | null
+    activeEntryTitle?: string | null
     onBack: () => void
     onStartDiscussion?: (params: {
         title: string
@@ -33,6 +35,16 @@ interface ProjectContradictionPanelProps {
         reportContext: ReportConversationContext
     }) => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
+}
+
+const CHECK_KIND_OPTIONS: Array<{ value: WorldCheckKind; label: string }> = [
+    {value: 'contradiction', label: '矛盾检测'},
+    {value: 'entry_alignment', label: '单词条契合度'},
+    {value: 'publication_risk', label: '出版风险'},
+]
+
+function checkKindLabel(kind: WorldCheckKind): string {
+    return CHECK_KIND_OPTIONS.find((item) => item.value === kind)?.label ?? '设定检测'
 }
 
 function BackArrow() {
@@ -69,7 +81,7 @@ function formatDateTime(value: string): string {
     }).format(parsed)
 }
 
-function severityLabel(severity: ContradictionIssue['severity']): string {
+function severityLabel(severity: WorldCheckFinding['severity']): string {
     switch (severity) {
         case 'critical':
             return '严重'
@@ -82,7 +94,7 @@ function severityLabel(severity: ContradictionIssue['severity']): string {
     }
 }
 
-function categoryLabel(category: ContradictionCategory | null | undefined): string {
+function categoryLabel(category: string | null | undefined): string {
     switch (category) {
         case 'timeline':
             return '时间线'
@@ -94,20 +106,52 @@ function categoryLabel(category: ContradictionCategory | null | undefined): stri
             return '能力规则'
         case 'faction':
             return '阵营立场'
+        case 'rule_mismatch':
+            return '规则契合'
+        case 'timeline_fit':
+            return '时间契合'
+        case 'relationship_context':
+            return '关系上下文'
+        case 'geography_fit':
+            return '地理契合'
+        case 'terminology':
+            return '术语体系'
+        case 'tone_style':
+            return '风格语气'
+        case 'missing_context':
+            return '待补上下文'
+        case 'copyright_similarity':
+            return '版权相似'
+        case 'trademark_brand':
+            return '商标品牌'
+        case 'real_person_org':
+            return '现实指涉'
+        case 'defamation_privacy':
+            return '名誉隐私'
+        case 'sensitive_content':
+            return '敏感内容'
+        case 'age_rating':
+            return '分级风险'
+        case 'legal_compliance':
+            return '合规风险'
+        case 'platform_policy':
+            return '平台审核'
         default:
             return '其他'
     }
 }
 
-function reportStatus(report: ContradictionReport): string {
-    if (report.issues.some((issue) => issue.severity === 'critical')) return '高风险'
-    if (report.issues.some((issue) => issue.severity === 'high')) return '需重点处理'
-    if (report.issues.length > 0) return '存在冲突'
+function reportStatus(report: WorldCheckReport, kind: WorldCheckKind): string {
+    if (kind === 'entry_alignment' && typeof report.score === 'number') return `契合度 ${Math.round(report.score)}`
+    if (kind === 'publication_risk' && typeof report.score === 'number') return `风险指数 ${Math.round(report.score)}`
+    if (report.findings.some((finding) => finding.severity === 'critical')) return '高风险'
+    if (report.findings.some((finding) => finding.severity === 'high')) return '需重点处理'
+    if (report.findings.length > 0) return '存在问题'
     if (report.unresolvedQuestions.length > 0) return '待补证据'
     return '整体稳定'
 }
 
-function buildReportConversationContext(record: StoredContradictionReport): ReportConversationContext {
+function buildReportConversationContext(record: StoredWorldCheckReport): ReportConversationContext {
     return {
         reportId: record.reportId,
         projectId: record.projectId,
@@ -120,15 +164,19 @@ function buildReportConversationContext(record: StoredContradictionReport): Repo
 }
 
 function ProjectContradictionPanel({
-                                       projectId,
-                                       projectName,
-                                       aiPluginId = null,
-                                       aiModel = null,
-                                       onBack,
-                                       onStartDiscussion,
-                                       onOpenEntry,
-                                   }: ProjectContradictionPanelProps) {
+                                        projectId,
+                                        projectName,
+                                        aiPluginId = null,
+                                        aiModel = null,
+                                        activeEntryId = null,
+                                        activeEntryTitle = null,
+                                        onBack,
+                                        onStartDiscussion,
+                                        onOpenEntry,
+                                    }: ProjectContradictionPanelProps) {
     const {showAlert} = useAlert()
+    const [checkKind, setCheckKind] = useState<WorldCheckKind>('contradiction')
+    const [targetEntryId, setTargetEntryId] = useState('')
 
     // ── 插件 & 模型选择 ──
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
@@ -145,9 +193,9 @@ function ProjectContradictionPanel({
             .catch((err) => logger.warn('[ContradictionPanel] 获取插件列表失败', err))
     }, [])
 
-    const [historyItems, setHistoryItems] = useState<ContradictionReportHistoryItem[]>([])
+    const [historyItems, setHistoryItems] = useState<WorldCheckReportHistoryItem[]>([])
     const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
-    const [activeRecord, setActiveRecord] = useState<StoredContradictionReport | null>(null)
+    const [activeRecord, setActiveRecord] = useState<StoredWorldCheckReport | null>(null)
     const [historyLoading, setHistoryLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
     const [generating, setGenerating] = useState(false)
@@ -157,12 +205,12 @@ function ProjectContradictionPanel({
     // 监听进度报告事件
     useEffect(() => {
         let unlistenFn: (() => void) | null = null
-        listen('ai:contradiction_progress', (event) => {
+        listen('ai:world_check_progress', (event) => {
             const payload = event.payload as Record<string, unknown>
             const msg = String(payload?.message ?? '')
             if (msg) {
                 setProgressMessage(msg)
-                logger.log('[ContradictionPanel] 进度:', msg)
+                logger.log('[WorldCheckPanel] 进度:', msg)
             }
         }).then((fn) => {
             unlistenFn = fn
@@ -171,6 +219,12 @@ function ProjectContradictionPanel({
             unlistenFn?.()
         }
     }, [])
+
+    useEffect(() => {
+        if (checkKind === 'entry_alignment' && !targetEntryId && activeEntryId) {
+            setTargetEntryId(activeEntryId)
+        }
+    }, [activeEntryId, checkKind, targetEntryId])
 
     // 监听 Rust 端发出的原始 AI 响应，用于调试
     useEffect(() => {
@@ -195,7 +249,7 @@ function ProjectContradictionPanel({
     const loadHistory = useCallback(async () => {
         setHistoryLoading(true)
         try {
-            const items = await ai_list_contradiction_reports(projectId)
+            const items = await ai_list_world_check_reports(projectId, checkKind)
             setHistoryItems(items)
             setSelectedReportId((current) => {
                 if (current && items.some((item) => item.reportId === current)) return current
@@ -205,12 +259,12 @@ function ProjectContradictionPanel({
                 setActiveRecord(null)
             }
         } catch (error) {
-            logger.error('加载矛盾检测历史失败', error)
-            await showAlert(`加载矛盾检测历史失败：${String(error)}`, 'error', 'toast', 2600)
+            logger.error('加载设定检测历史失败', error)
+            await showAlert(`加载设定检测历史失败：${String(error)}`, 'error', 'toast', 2600)
         } finally {
             setHistoryLoading(false)
         }
-    }, [projectId, showAlert, setSelectedReportId])
+    }, [checkKind, projectId, showAlert, setSelectedReportId])
 
     useEffect(() => {
         void loadHistory()
@@ -220,14 +274,14 @@ function ProjectContradictionPanel({
         if (!selectedReportId) return
         let cancelled = false
         setDetailLoading(true)
-        ai_get_contradiction_report_entry(selectedReportId)
+        ai_get_world_check_report_entry(selectedReportId)
             .then((record) => {
                 if (cancelled) return
                 setActiveRecord(record)
             })
             .catch(async (error) => {
                 if (cancelled) return
-                logger.error('加载矛盾检测报告失败', error)
+                logger.error('加载设定检测报告失败', error)
                 await showAlert(`加载报告失败：${String(error)}`, 'error', 'toast', 2600)
             })
             .finally(() => {
@@ -243,42 +297,49 @@ function ProjectContradictionPanel({
             await showAlert('请先选择 AI 插件和模型。', 'warning', 'toast', 2200)
             return
         }
+        const resolvedTargetEntryId = targetEntryId.trim()
+        if (checkKind === 'entry_alignment' && !resolvedTargetEntryId) {
+            await showAlert('单词条契合度检测需要先填写目标词条 ID。', 'warning', 'toast', 2400)
+            return
+        }
 
         setGenerating(true)
         setProgressMessage(null)
         try {
             const startInput = {
-                sessionId: `contradiction_${Date.now()}`,
+                sessionId: `world_check_${checkKind}_${Date.now()}`,
                 pluginId: effectivePluginId,
                 model: effectiveModel,
                 projectId,
+                checkKind,
+                targetEntryId: checkKind === 'entry_alignment' ? resolvedTargetEntryId : null,
             }
-            logger.log('[ProjectContradictionPanel] start contradiction session', startInput)
-            const result = await ai_start_contradiction_session(startInput)
-            logger.log('[ProjectContradictionPanel] 矛盾检测原始返回（完整）:', JSON.stringify(result, null, 2))
+            logger.log('[ProjectContradictionPanel] start world check session', startInput)
+            const result = await ai_start_world_check_session(startInput)
+            logger.log('[ProjectContradictionPanel] 设定检测原始返回（完整）:', JSON.stringify(result, null, 2))
             logger.log('[ProjectContradictionPanel] report 字段:', JSON.stringify(result.report, null, 2))
-            const record = await ai_get_contradiction_report_entry(result.reportId)
+            const record = await ai_get_world_check_report_entry(result.reportId)
             logger.log('[ProjectContradictionPanel] 持久化报告记录（完整）:', JSON.stringify(record, null, 2))
             if (debugRawRef.current) {
                 logger.log('[ProjectContradictionPanel] 本次检测的原始 AI 输出:', debugRawRef.current)
             }
             if (!record) {
-                throw new Error('新生成的矛盾报告未能写入历史记录')
+                throw new Error('新生成的检测报告未能写入历史记录')
             }
             await loadHistory()
             setSelectedReportId(record.reportId)
             setActiveRecord(record)
             if (onStartDiscussion) {
                 onStartDiscussion({
-                    title: `设定矛盾检测：${projectName}`,
+                    title: `${checkKindLabel(checkKind)}：${projectName}`,
                     pluginId: result.pluginId,
                     model: result.model ?? effectiveModel,
                     reportContext: buildReportConversationContext(record),
                 })
             }
-            await showAlert('矛盾检测完成，右侧已为这份报告新建讨论对话。', 'success', 'toast', 2200)
+            await showAlert('设定检测完成，右侧已为这份报告新建讨论对话。', 'success', 'toast', 2200)
         } catch (error) {
-            logger.error('[ProjectContradictionPanel] 生成矛盾检测报告失败', {
+            logger.error('[ProjectContradictionPanel] 生成设定检测报告失败', {
                 error,
                 message: error instanceof Error ? error.message : String(error),
                 stack: error instanceof Error ? error.stack : undefined,
@@ -288,19 +349,19 @@ function ProjectContradictionPanel({
             })
             const errorMsg = error instanceof Error ? error.message : String(error)
             const userFriendly = errorMsg === 'error decoding response body'
-                ? 'AI 返回的内容格式异常，无法生成矛盾报告。请检查 AI 模型返回是否符合预期格式，或换一个模型重试。'
-                : `生成矛盾检测报告失败：${errorMsg}`
+                ? 'AI 返回的内容格式异常，无法生成检测报告。请检查 AI 模型返回是否符合预期格式，或换一个模型重试。'
+                : `生成设定检测报告失败：${errorMsg}`
             await showAlert(userFriendly, 'error', 'toast', 3000)
         } finally {
             setGenerating(false)
         }
-    }, [effectiveModel, effectivePluginId, loadHistory, onStartDiscussion, projectId, projectName, showAlert, setSelectedReportId])
+    }, [checkKind, effectiveModel, effectivePluginId, loadHistory, onStartDiscussion, projectId, projectName, showAlert, setSelectedReportId, targetEntryId])
 
     const handleDelete = useCallback(async (reportId: string) => {
         const confirmed = await showAlert('删除后将无法在历史中恢复这份报告。是否继续？', 'warning', 'confirm')
         if (confirmed !== 'yes') return
         try {
-            await ai_delete_contradiction_report(reportId)
+            await ai_delete_world_check_report(reportId)
             setHistoryItems((prev) => prev.filter((item) => item.reportId !== reportId))
             if (selectedReportId === reportId) {
                 const next = historyItems.find((item) => item.reportId !== reportId)
@@ -311,7 +372,7 @@ function ProjectContradictionPanel({
             }
             await showAlert('报告已删除。', 'success', 'toast', 1600)
         } catch (error) {
-            logger.error('删除矛盾检测报告失败', error)
+            logger.error('删除设定检测报告失败', error)
             await showAlert(`删除报告失败：${String(error)}`, 'error', 'toast', 2600)
         }
     }, [historyItems, selectedReportId, showAlert, setSelectedReportId])
@@ -324,7 +385,7 @@ function ProjectContradictionPanel({
             return
         }
         onStartDiscussion({
-            title: `设定矛盾检测：${activeRecord.projectName}`,
+            title: `${checkKindLabel(activeRecord.checkKind)}：${activeRecord.projectName}`,
             pluginId: activeRecord.pluginId,
             model,
             reportContext: buildReportConversationContext(activeRecord),
@@ -339,8 +400,8 @@ function ProjectContradictionPanel({
             return
         }
         const ids = new Set<string>()
-        for (const issue of activeRecord.report.issues) {
-            for (const id of issue.relatedEntryIds) ids.add(id)
+        for (const finding of activeRecord.report.findings) {
+            for (const id of finding.relatedEntryIds) ids.add(id)
         }
         if (ids.size === 0) return
         const idList = [...ids]
@@ -356,16 +417,16 @@ function ProjectContradictionPanel({
 
     const summary = useMemo(() => {
         if (!activeRecord) return null
-        const issues = activeRecord.report.issues
+        const findings = activeRecord.report.findings
         return {
-            issueCount: issues.length,
+            findingCount: findings.length,
             unresolvedCount: activeRecord.report.unresolvedQuestions.length,
-            status: reportStatus(activeRecord.report),
+            status: reportStatus(activeRecord.report, activeRecord.checkKind),
             severityDist: {
-                critical: issues.filter((i) => i.severity === 'critical').length,
-                high: issues.filter((i) => i.severity === 'high').length,
-                medium: issues.filter((i) => i.severity === 'medium').length,
-                low: issues.filter((i) => i.severity === 'low').length,
+                critical: findings.filter((i) => i.severity === 'critical').length,
+                high: findings.filter((i) => i.severity === 'high').length,
+                medium: findings.filter((i) => i.severity === 'medium').length,
+                low: findings.filter((i) => i.severity === 'low').length,
             },
         }
     }, [activeRecord])
@@ -378,12 +439,35 @@ function ProjectContradictionPanel({
                         <BackArrow/>返回
                     </button>
                     <div className="fc-op-header__title-block">
-                        <h2 className="pe-contradiction-title fc-op-header__title">设定矛盾检测</h2>
-                        <p className="pe-contradiction-desc fc-op-header__subtitle">生成结构化报告，保留历史记录，并可在右侧聊天区继续讨论这份报告。</p>
+                        <h2 className="pe-contradiction-title fc-op-header__title">设定检测</h2>
+                        <p className="pe-contradiction-desc fc-op-header__subtitle">生成结构化检测报告，保留历史记录，并可在右侧聊天区继续讨论这份报告。</p>
                     </div>
                 </div>
                 <div className="pe-contradiction-toolbar__actions fc-op-header__actions">
                     <div className="pe-contradiction-model-selectors">
+                        <Select
+                            options={CHECK_KIND_OPTIONS}
+                            value={checkKind}
+                            onChange={(v) => {
+                                setCheckKind(String(v) as WorldCheckKind)
+                                setSelectedReportId(null)
+                                setActiveRecord(null)
+                            }}
+                            placeholder="检测类型"
+                            radius="md"
+                            triggerBackground="var(--fc-color-bg)"
+                            triggerBorderColor="var(--fc-color-border)"
+                            selectedColor="var(--fc-color-primary)"
+                            selectedBackground="var(--fc-color-primary-subtle)"
+                        />
+                        {checkKind === 'entry_alignment' && (
+                            <input
+                                className="pe-contradiction-target-input"
+                                value={targetEntryId}
+                                onChange={(event) => setTargetEntryId(event.target.value)}
+                                placeholder={activeEntryTitle ? `当前：${activeEntryTitle}` : '目标词条 ID'}
+                            />
+                        )}
                         <Select
                             options={plugins.map((p) => ({value: p.id, label: p.name}))}
                             value={effectivePluginId ?? ''}
@@ -435,7 +519,7 @@ function ProjectContradictionPanel({
                             {historyLoading && historyItems.length === 0 ? (
                                 <div className="pe-contradiction-empty">正在加载历史报告…</div>
                             ) : historyItems.length === 0 ? (
-                                <div className="pe-contradiction-empty">还没有生成过矛盾检测报告。</div>
+                                <div className="pe-contradiction-empty">还没有生成过{checkKindLabel(checkKind)}报告。</div>
                             ) : historyItems.map((item) => (
                                 <article
                                     key={item.reportId}
@@ -449,8 +533,8 @@ function ProjectContradictionPanel({
                                         <div className="pe-contradiction-history__topline">
                                             <span
                                                 className="fc-op-item__meta">{formatDateTime(item.createdAt)}</span>
-                                            <span
-                                                className="fc-op-count">{item.issueCount} 个冲突</span>
+                                                <span
+                                                    className="fc-op-count">{item.findingCount} 个问题</span>
                                         </div>
                                         <div className="fc-op-item__title">{item.overview}</div>
                                         <div className="fc-op-item__meta">
@@ -477,7 +561,7 @@ function ProjectContradictionPanel({
                 <section className="pe-contradiction-report">
                     {!activeRecord ? (
                         <div className="pe-contradiction-empty pe-contradiction-empty--large">
-                            请选择一份历史报告，或直接生成新的矛盾检测结果。
+                            请选择一份历史报告，或直接生成新的检测结果。
                         </div>
                     ) : detailLoading ? (
                         <div className="pe-contradiction-empty pe-contradiction-empty--large">
@@ -508,10 +592,10 @@ function ProjectContradictionPanel({
 
                                     <div className="pe-contradiction-stats">
                                         <div className="pe-contradiction-stat-card">
-                                        <span
-                                            className="pe-contradiction-stat-card__value">{summary?.issueCount ?? 0}</span>
-                                            <span className="pe-contradiction-stat-card__label">冲突条目</span>
-                                            {(summary?.issueCount ?? 0) > 0 && (
+                                            <span
+                                                className="pe-contradiction-stat-card__value">{summary?.findingCount ?? 0}</span>
+                                            <span className="pe-contradiction-stat-card__label">问题条目</span>
+                                            {(summary?.findingCount ?? 0) > 0 && (
                                                 <div className="pe-contradiction-severity-dist">
                                                     {summary!.severityDist.critical > 0 && (
                                                         <span
@@ -546,40 +630,40 @@ function ProjectContradictionPanel({
 
                                     <section className="pe-contradiction-report__section">
                                         <div className="pe-contradiction-section__header">
-                                            <h4 className="pe-contradiction-section__title fc-section-title">冲突清单</h4>
+                                            <h4 className="pe-contradiction-section__title fc-section-title">问题清单</h4>
                                             <span
-                                                className="pe-contradiction-section__meta">{activeRecord.report.issues.length} 项</span>
+                                                className="pe-contradiction-section__meta">{activeRecord.report.findings.length} 项</span>
                                         </div>
                                         <div className="pe-contradiction-issue-list">
-                                            {activeRecord.report.issues.length === 0 ? (
+                                            {activeRecord.report.findings.length === 0 ? (
                                                 <div
-                                                    className="pe-contradiction-empty">当前范围内没有发现明确冲突。</div>
-                                            ) : activeRecord.report.issues.map((issue) => (
-                                                <article key={issue.issueId}
-                                                         className={`pe-contradiction-issue-card is-severity-${issue.severity}`}>
+                                                    className="pe-contradiction-empty">当前范围内没有发现明确问题。</div>
+                                            ) : activeRecord.report.findings.map((finding) => (
+                                                <article key={finding.findingId}
+                                                         className={`pe-contradiction-issue-card is-severity-${finding.severity}`}>
                                                     <div className="pe-contradiction-issue-card__header">
                                                         <div className="pe-contradiction-issue-card__title-group">
                                                         <span
-                                                            className={`pe-contradiction-issue-card__severity is-${issue.severity}`}>
-                                                            {severityLabel(issue.severity)}
+                                                            className={`pe-contradiction-issue-card__severity is-${finding.severity}`}>
+                                                            {severityLabel(finding.severity)}
                                                         </span>
-                                                            {issue.category && (
+                                                            {finding.category && (
                                                                 <span className="pe-contradiction-issue-card__category">
-                                                                {categoryLabel(issue.category)}
+                                                                {categoryLabel(finding.category)}
                                                             </span>
                                                             )}
-                                                            <h5 className="pe-contradiction-issue-card__title">{issue.title}</h5>
+                                                            <h5 className="pe-contradiction-issue-card__title">{finding.title}</h5>
                                                         </div>
                                                         <span
-                                                            className="pe-contradiction-issue-card__id">{issue.issueId}</span>
+                                                            className="pe-contradiction-issue-card__id">{finding.findingId}</span>
                                                     </div>
-                                                    <p className="pe-contradiction-issue-card__desc">{issue.description}</p>
-                                                    {issue.relatedEntryIds.length > 0 && (
+                                                    <p className="pe-contradiction-issue-card__desc">{finding.description}</p>
+                                                    {finding.relatedEntryIds.length > 0 && (
                                                         <div className="pe-contradiction-chip-list">
                                                             <span className="pe-contradiction-chip-list__label">相关词条</span>
-                                                            {issue.relatedEntryIds.map((entryId) => (
+                                                            {finding.relatedEntryIds.map((entryId) => (
                                                                 <button
-                                                                    key={`${issue.issueId}-${entryId}`}
+                                                                    key={`${finding.findingId}-${entryId}`}
                                                                     type="button"
                                                                     className="pe-contradiction-chip pe-contradiction-chip--entry"
                                                                     onClick={() => onOpenEntry?.({
@@ -593,8 +677,8 @@ function ProjectContradictionPanel({
                                                         </div>
                                                     )}
                                                     <div className="pe-contradiction-evidence-list">
-                                                        {issue.evidence.map((evidence, index) => (
-                                                            <div key={`${issue.issueId}-${index}`}
+                                                        {finding.evidence.map((evidence, index) => (
+                                                            <div key={`${finding.findingId}-${index}`}
                                                                  className="pe-contradiction-evidence-card">
                                                                 <div
                                                                     className="pe-contradiction-evidence-card__title">{evidence.entryTitle}</div>
@@ -608,9 +692,9 @@ function ProjectContradictionPanel({
                                                             </div>
                                                         ))}
                                                     </div>
-                                                    {issue.recommendation && (
+                                                    {finding.recommendation && (
                                                         <div className="pe-contradiction-issue-card__recommendation">
-                                                            <strong>建议：</strong>{issue.recommendation}
+                                                            <strong>建议：</strong>{finding.recommendation}
                                                         </div>
                                                     )}
                                                 </article>

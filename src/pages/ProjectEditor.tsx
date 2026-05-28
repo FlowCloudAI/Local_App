@@ -115,7 +115,7 @@ const PROJECT_PANEL_LABELS: Record<ProjectPanel, string> = {
     overview: '项目概览',
     'relation-graph': '关系图',
     timeline: '时间线',
-    contradiction: '矛盾检测',
+    contradiction: '设定检测',
     'world-map': '世界地图',
 }
 
@@ -1141,6 +1141,8 @@ function ProjectEditorInner({
                                 projectName={project.name}
                                 aiPluginId={aiPluginId}
                                 aiModel={aiModel}
+                                activeEntryId={activeEntryId}
+                                activeEntryTitle={activeEntryTitle}
                                 onBack={() => onBackToProject?.(projectId)}
                                 onStartDiscussion={onStartReportDiscussion}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}

@@ -195,8 +195,8 @@ function ProjectFeatureLinks({
                     <TimelineIcon/>
                 </FeatureEntry>
                 <FeatureEntry
-                    title="矛盾检测"
-                    description="集中检查设定冲突、时间不一致和角色叙述互相打架的地方。"
+                    title="设定检测"
+                    description="集中检查设定冲突、单词条契合度和公开发布前的风险点。"
                     onClick={onOpenContradiction}
                 >
                     <ConflictIcon/>

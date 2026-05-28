@@ -274,7 +274,7 @@ function getActionItems(input: ProjectQuickActionInput, relationCount: number): 
         {
             key: 'contradiction',
             title: 'AI 质检',
-            description: '进入矛盾检测，复核设定冲突和待补证据。',
+            description: '进入设定检测，复核冲突、契合度和出版风险。',
             tone: 'contradiction',
             badge: input.riskSummary?.reportCount ? `${input.riskSummary.reportCount} 份` : '质检',
             onClick: input.onOpenContradiction,
