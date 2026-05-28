@@ -1,0 +1,51 @@
+请执行{{ title }}，并按通用检测报告 JSON 对象格式输出。
+项目：{{ project_name }}。
+检测范围：{{ scope_summary }}。
+{% if truncated %}注意：本轮资料经过裁剪；若证据不足，请放入 unresolvedQuestions，不要硬判定。
+{% endif %}
+【目标词条】
+{% if target_entry_block %}{{ target_entry_block }}{% else %}未提供目标词条。{% endif %}
+
+【参考世界观资料】
+{% for block in entry_blocks %}
+{{ block }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+
+【判断标准】
+1. 评估目标词条与项目既有设定、时间线、规则、人物关系、地理空间、术语和叙事风格是否契合。
+2. 不把“参考资料没有提到目标词条”直接判为问题；只有目标词条与现有证据不协调时才放入 findings。
+3. score 表示契合度，范围 0-100；证据不足以量化时填 null。
+4. evidence.quote 必须直接引用目标词条或参考资料原文片段，不得改写或概括。
+
+【分类】
+- rule_mismatch：违反世界规则。
+- timeline_fit：时间线或年龄阶段不协调。
+- relationship_context：关系或阵营上下文不协调。
+- geography_fit：地理、距离、归属不协调。
+- terminology：术语、命名或概念体系不一致。
+- tone_style：文风、题材尺度或叙事语气明显偏离。
+- missing_context：需要补充上下文才能判断。
+- other：其他契合度问题。
+
+【严重程度】
+- low：轻微不协调，可通过补充一句解释修复。
+- medium：局部设定需要调整，否则影响理解。
+- high：与重要世界规则、时间线或核心关系冲突。
+- critical：目标词条难以并入当前世界观。
+
+【输出要求】
+1. 只输出一个 JSON 对象，不要输出 Markdown、解释文字或代码块。
+2. 顶层字段必须包含：checkKind、overview、score、findings、unresolvedQuestions、suggestions、metadata。
+3. checkKind 固定为 "{{ check_kind }}"。
+4. findings 中每一项必须包含：findingId、severity、category、title、description、relatedEntryIds、evidence、recommendation、metadata。
+5. severity 只能是 low、medium、high、critical 之一。
+6. evidence 中每一项必须包含：entryId、entryTitle、quote、note。
+7. 没有问题时 findings 使用空数组。
+
+请严格按照以上 JSON 格式输出：
+{
+  "checkKind": "{{ check_kind }}",
+  "overview": "

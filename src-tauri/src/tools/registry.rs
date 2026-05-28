@@ -68,6 +68,12 @@ pub fn register_worldflow_tools(
             if let Some(ref handle) = state.app_handle {
                 handle
                     .emit(
+                        "ai:world_check_progress",
+                        serde_json::json!({"message": message}),
+                    )
+                    .ok();
+                handle
+                    .emit(
                         "ai:contradiction_progress",
                         serde_json::json!({"message": message}),
                     )

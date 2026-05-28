@@ -44,6 +44,7 @@ export interface ContradictionSessionRequest extends ContradictionLoadRequest {
     model?: string | null
     temperature?: number | null
     maxTokens?: number | null
+    maxToolRounds?: number | null
 }
 
 export interface ContradictionSessionResult {

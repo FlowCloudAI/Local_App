@@ -8,12 +8,16 @@ use serde_json::Value;
 #[serde(rename_all = "snake_case")]
 pub enum WorldCheckKind {
     Contradiction,
+    EntryAlignment,
+    PublicationRisk,
 }
 
 impl WorldCheckKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Contradiction => "contradiction",
+            Self::EntryAlignment => "entry_alignment",
+            Self::PublicationRisk => "publication_risk",
         }
     }
 }
@@ -38,6 +42,7 @@ pub struct WorldCheckFinding {
     pub related_entry_ids: Vec<String>,
     pub evidence: Vec<WorldCheckEvidence>,
     pub recommendation: Option<String>,
+    #[serde(default)]
     pub metadata: Option<Value>,
 }
 
@@ -46,10 +51,15 @@ pub struct WorldCheckFinding {
 pub struct WorldCheckReport {
     pub check_kind: WorldCheckKind,
     pub overview: String,
+    #[serde(default)]
     pub score: Option<f64>,
+    #[serde(default)]
     pub findings: Vec<WorldCheckFinding>,
+    #[serde(default)]
     pub unresolved_questions: Vec<String>,
+    #[serde(default)]
     pub suggestions: Vec<String>,
+    #[serde(default)]
     pub metadata: Option<Value>,
 }
 

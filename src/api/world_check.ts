@@ -1,6 +1,7 @@
 import type {ContradictionEvidence, ContradictionIssue, ContradictionReport} from './contradiction'
+import {command} from './base'
 
-export type WorldCheckKind = 'contradiction'
+export type WorldCheckKind = 'contradiction' | 'entry_alignment' | 'publication_risk'
 
 export type WorldCheckSeverity = 'low' | 'medium' | 'high' | 'critical'
 
@@ -32,6 +33,46 @@ export interface WorldCheckReport {
     suggestions: string[]
     metadata?: Record<string, unknown> | null
 }
+
+export interface WorldCheckLoadRequest {
+    projectId: string
+    entryIds?: string[] | null
+    targetEntryId?: string | null
+    categoryId?: string | null
+    query?: string | null
+    maxEntries?: number | null
+    maxCharsPerEntry?: number | null
+    maxTotalChars?: number | null
+}
+
+export interface WorldCheckSessionRequest extends WorldCheckLoadRequest {
+    sessionId: string
+    pluginId: string
+    checkKind: WorldCheckKind
+    model?: string | null
+    temperature?: number | null
+    maxTokens?: number | null
+    maxToolRounds?: number | null
+}
+
+export interface WorldCheckSessionResult {
+    session_id: string
+    conversation_id: string
+    run_id: string
+    checkKind: WorldCheckKind
+    report: WorldCheckReport
+    projectId: string
+    projectName: string
+    pluginId: string
+    model?: string | null
+    scopeSummary: string
+    sourceEntryIds: string[]
+    targetEntryId?: string | null
+    truncated: boolean
+}
+
+export const ai_start_world_check_session = (input: WorldCheckSessionRequest) =>
+    command<WorldCheckSessionResult>('ai_start_world_check_session', {request: input})
 
 const contradictionEvidenceToWorldCheckEvidence = (
     evidence: ContradictionEvidence,

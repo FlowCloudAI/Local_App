@@ -1,0 +1,48 @@
+请执行{{ title }}，并按通用检测报告 JSON 对象格式输出。
+项目：{{ project_name }}。
+检测范围：{{ scope_summary }}。
+{% if truncated %}注意：本轮资料经过裁剪；若证据不足，请放入 unresolvedQuestions，不要硬判定。
+{% endif %}
+【判断标准】
+1. 只分析世界观设定内容本身（正文、摘要、标签值），不评判数据结构是否完整。
+2. 信息缺失、字段缺失、词条内容简短、类型或分类不同，都不是矛盾。
+3. 只有当两条或多条词条的设定内容存在明确逻辑冲突时，才放入 findings。
+4. unresolvedQuestions 只用于：有两条以上证据暗示可能存在冲突，但现有信息不足以确认。
+5. evidence.quote 必须直接引用词条原文片段，不得改写或概括。
+
+【分类】
+- timeline：时间线矛盾。
+- relationship：人物关系矛盾。
+- geography：地理空间矛盾。
+- ability：能力/规则矛盾。
+- faction：阵营/立场矛盾。
+- other：其他事实冲突。
+
+【严重程度】
+- low：局部措辞不一致，不影响主线理解。
+- medium：同一事实存在冲突，但可通过小幅改写修复。
+- high：影响角色身份、关系、时间线或世界规则的核心理解。
+- critical：导致主线事件、核心世界规则或主要人物设定无法成立。
+
+【输出要求】
+1. 只输出一个 JSON 对象，不要输出 Markdown、解释文字或代码块。
+2. 顶层字段必须包含：checkKind、overview、score、findings、unresolvedQuestions、suggestions、metadata。
+3. checkKind 固定为 "{{ check_kind }}"；score 没有明确量化依据时填 null。
+4. findings 中每一项必须包含：findingId、severity、category、title、description、relatedEntryIds、evidence、recommendation、metadata。
+5. severity 只能是 low、medium、high、critical 之一。
+6. evidence 中每一项必须包含：entryId、entryTitle、quote、note。
+7. 没有问题时 findings 使用空数组。
+
+资料如下：
+
+{% for block in entry_blocks %}
+{{ block }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+
+请严格按照以上 JSON 格式输出：
+{
+  "checkKind": "{{ check_kind }}",
+  "overview": "

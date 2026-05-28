@@ -1,3 +1,4 @@
+use crate::ai_services::world_check::world_check_tool_whitelist;
 use crate::template::render_global_template;
 use flowcloudai_client::llm::types::ChatRequest;
 use flowcloudai_client::{ToolRegistry, sense::Sense};
@@ -11,25 +12,7 @@ impl ContradictionSense {
     }
 
     pub fn tool_whitelist() -> Vec<String> {
-        [
-            "search_entries",
-            "get_entry",
-            "get_entry_content_by_line",
-            "list_all_entries",
-            "list_categories",
-            "list_entries_by_type",
-            "list_tag_schemas",
-            "get_entry_relations",
-            "get_project_summary",
-            "list_projects",
-            "list_entry_types",
-            "web_search",
-            "open_url",
-            "report_progress",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect()
+        world_check_tool_whitelist()
     }
 }
 

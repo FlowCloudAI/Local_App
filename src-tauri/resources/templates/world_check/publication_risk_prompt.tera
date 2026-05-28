@@ -1,0 +1,50 @@
+请执行{{ title }}，并按通用检测报告 JSON 对象格式输出。
+项目：{{ project_name }}。
+检测范围：{{ scope_summary }}。
+{% if truncated %}注意：本轮资料经过裁剪；若证据不足，请放入 unresolvedQuestions，不要硬判定。
+{% endif %}
+【重要边界】
+1. 你不是律师，不给法律结论；只做创作发布前的风险初筛。
+2. 只基于给定资料识别需要作者、编辑或法务复核的风险点。
+3. 不因题材本身敏感就直接判高风险；必须说明具体原文证据和可能影响。
+4. evidence.quote 必须直接引用词条原文片段，不得改写或概括。
+
+【分类】
+- copyright_similarity：可能与已知作品、角色、设定、歌词或长文本表达过度相似。
+- trademark_brand：商标、品牌、平台、机构名称使用风险。
+- real_person_org：现实人物、组织、地点或事件指涉风险。
+- defamation_privacy：名誉、隐私、肖像、可识别现实对象风险。
+- sensitive_content：暴力、色情、自伤、仇恨、歧视、极端内容等敏感表达风险。
+- age_rating：分级、未成年人适读或平台年龄限制风险。
+- legal_compliance：广告、医疗、金融、违法行为描写等合规风险。
+- platform_policy：常见内容平台审核风险。
+- other：其他公开发布前需复核风险。
+
+【严重程度】
+- low：发布前建议编辑复核，通常可通过措辞调整降低风险。
+- medium：存在明确风险点，建议改写、脱敏或补充免责声明。
+- high：可能影响公开发布或商业发行，需要重点复核。
+- critical：存在明显重大风险，发布前应暂停并进行专业审核。
+
+【输出要求】
+1. 只输出一个 JSON 对象，不要输出 Markdown、解释文字或代码块。
+2. 顶层字段必须包含：checkKind、overview、score、findings、unresolvedQuestions、suggestions、metadata。
+3. checkKind 固定为 "{{ check_kind }}"；score 表示出版风险指数，范围 0-100，越高风险越大；无法量化时填 null。
+4. findings 中每一项必须包含：findingId、severity、category、title、description、relatedEntryIds、evidence、recommendation、metadata。
+5. severity 只能是 low、medium、high、critical 之一。
+6. evidence 中每一项必须包含：entryId、entryTitle、quote、note。
+7. 没有问题时 findings 使用空数组。
+
+资料如下：
+
+{% for block in entry_blocks %}
+{{ block }}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+
+请严格按照以上 JSON 格式输出：
+{
+  "checkKind": "{{ check_kind }}",
+  "overview": "

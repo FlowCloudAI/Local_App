@@ -1,4 +1,5 @@
 use crate::ai_services::contradiction_loader::ContradictionCorpus;
+use crate::ai_services::world_check::{WorldCheckCorpus, WorldCheckDefinition};
 use crate::template::render_global_template;
 use flowcloudai_client::TaskContext;
 use serde::Serialize;
@@ -28,6 +29,20 @@ struct ContradictionPromptTemplateContext<'a> {
     project_name: &'a str,
     scope_summary: &'a str,
     truncated: bool,
+    entry_blocks: &'a [String],
+}
+
+#[derive(Serialize)]
+struct WorldCheckPromptTemplateContext<'a> {
+    check_kind: &'a str,
+    title: &'a str,
+    purpose: &'a str,
+    project_name: &'a str,
+    scope_summary: &'a str,
+    truncated: bool,
+    target_entry_id: Option<&'a str>,
+    target_entry_title: Option<&'a str>,
+    target_entry_block: Option<&'a str>,
     entry_blocks: &'a [String],
 }
 
@@ -271,6 +286,58 @@ pub fn build_contradiction_prompt(corpus: &ContradictionCorpus) -> String {
     prompt.push_str(&corpus.entry_blocks.join("\n\n"));
     // JSON priming：引导模型直接续写 JSON，避免输出解释性文本
     prompt.push_str("\n\n请严格按照以上 JSON 格式输出：\n{\n  \"overview\": \"");
+    prompt
+}
+
+pub fn build_world_check_prompt(
+    definition: &WorldCheckDefinition,
+    corpus: &WorldCheckCorpus,
+) -> String {
+    let context = WorldCheckPromptTemplateContext {
+        check_kind: definition.kind.as_str(),
+        title: definition.title,
+        purpose: definition.purpose,
+        project_name: &corpus.project_name,
+        scope_summary: &corpus.scope_summary,
+        truncated: corpus.truncated,
+        target_entry_id: corpus.target_entry_id.as_deref(),
+        target_entry_title: corpus.target_entry_title.as_deref(),
+        target_entry_block: corpus.target_entry_block.as_deref(),
+        entry_blocks: &corpus.entry_blocks,
+    };
+
+    if let Some(rendered) = render_global_template(definition.prompt_template, &context) {
+        return rendered;
+    }
+
+    let mut prompt = format!(
+        "请执行{}，并按约定 JSON 对象格式输出。\n项目：{}。\n检测范围：{}。\n检测目标：{}\n\n",
+        definition.title, corpus.project_name, corpus.scope_summary, definition.purpose
+    );
+    if corpus.truncated {
+        prompt.push_str(
+            "注意：本轮资料经过裁剪；若证据不足，请放入 unresolvedQuestions，不要硬判定。\n\n",
+        );
+    }
+    if let Some(target_entry_block) = corpus.target_entry_block.as_deref() {
+        prompt.push_str("【目标词条】\n");
+        prompt.push_str(target_entry_block);
+        prompt.push_str("\n\n");
+    }
+    prompt.push_str("【参考资料】\n");
+    prompt.push_str(&corpus.entry_blocks.join("\n\n"));
+    prompt.push_str("\n\n【输出要求】\n");
+    prompt.push_str("只输出一个 JSON 对象，不要输出 Markdown、解释文字或代码块。\n");
+    prompt.push_str("顶层字段必须包含：checkKind、overview、score、findings、unresolvedQuestions、suggestions、metadata。\n");
+    prompt.push_str("findings 中每一项必须包含：findingId、severity、category、title、description、relatedEntryIds、evidence、recommendation、metadata。\n");
+    prompt.push_str("evidence 中每一项必须包含：entryId、entryTitle、quote、note。\n");
+    prompt.push_str(
+        "severity 只能是 low、medium、high、critical 之一；没有问题时 findings 使用空数组。\n\n",
+    );
+    prompt.push_str(&format!(
+        "请严格按照以上 JSON 格式输出：\n{{\n  \"checkKind\": \"{}\",\n  \"overview\": \"",
+        definition.kind.as_str()
+    ));
     prompt
 }
 

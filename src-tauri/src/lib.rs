@@ -27,6 +27,7 @@ use apis::ai_client::tools::*;
 use apis::ai_client::usage::*;
 use apis::ai_contradiction::*;
 use apis::ai_summary::*;
+use apis::ai_world_check::*;
 use apis::app_settings::*;
 use apis::document_context::*;
 use apis::feedback::*;
@@ -411,6 +412,7 @@ pub fn run() {
             ai_build_character_project_snapshot,
             ai_create_character_session,
             ai_start_contradiction_session,
+            ai_start_world_check_session,
             ai_get_contradiction_report,
             ai_list_contradiction_reports,
             ai_get_contradiction_report_entry,

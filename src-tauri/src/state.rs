@@ -1,5 +1,5 @@
-use crate::reports::contradiction_report::ContradictionReport;
 use crate::apis::ai_client::StoredConversationSettings;
+use crate::reports::contradiction_report::ContradictionReport;
 use anyhow::Result;
 use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
 use std::collections::HashMap;
@@ -86,6 +86,7 @@ pub(crate) enum AiSessionKind {
     General,
     Character,
     Contradiction,
+    WorldCheck,
 }
 
 #[derive(Clone)]

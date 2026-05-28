@@ -2,6 +2,7 @@ pub mod ai_character;
 pub mod ai_client;
 pub mod ai_contradiction;
 pub mod ai_summary;
+pub mod ai_world_check;
 pub mod app_settings;
 pub mod document_context;
 pub mod feedback;

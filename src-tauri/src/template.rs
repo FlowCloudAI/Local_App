@@ -86,8 +86,24 @@ const EMBEDDED_TEMPLATE_SOURCES: &[(&str, &str)] = &[
         include_str!("../resources/templates/sense/contradiction_system.tera"),
     ),
     (
+        "sense/world_check_system",
+        include_str!("../resources/templates/sense/world_check_system.tera"),
+    ),
+    (
         "contradiction/detection_prompt",
         include_str!("../resources/templates/contradiction/detection_prompt.tera"),
+    ),
+    (
+        "world_check/contradiction_prompt",
+        include_str!("../resources/templates/world_check/contradiction_prompt.tera"),
+    ),
+    (
+        "world_check/entry_alignment_prompt",
+        include_str!("../resources/templates/world_check/entry_alignment_prompt.tera"),
+    ),
+    (
+        "world_check/publication_risk_prompt",
+        include_str!("../resources/templates/world_check/publication_risk_prompt.tera"),
     ),
     (
         "contradiction/summary_prompt",
@@ -208,6 +224,49 @@ const DETECTION_PROMPT_PARAMS: &[TemplateParamMeta] = &[
     TemplateParamMeta {
         name: "entry_blocks",
         description: "参与检测的词条资料块列表。",
+    },
+];
+
+const WORLD_CHECK_PROMPT_PARAMS: &[TemplateParamMeta] = &[
+    TemplateParamMeta {
+        name: "check_kind",
+        description: "通用检测类型，如 contradiction、entry_alignment、publication_risk。",
+    },
+    TemplateParamMeta {
+        name: "title",
+        description: "当前检测任务的中文标题。",
+    },
+    TemplateParamMeta {
+        name: "purpose",
+        description: "当前检测任务的目标说明。",
+    },
+    TemplateParamMeta {
+        name: "project_name",
+        description: "当前被检测项目的名称。",
+    },
+    TemplateParamMeta {
+        name: "scope_summary",
+        description: "本轮检测的范围说明。",
+    },
+    TemplateParamMeta {
+        name: "truncated",
+        description: "资料是否经过裁剪；为 true 时应提醒证据可能不足。",
+    },
+    TemplateParamMeta {
+        name: "target_entry_id",
+        description: "单词条检测的目标词条 ID，非单词条检测时为空。",
+    },
+    TemplateParamMeta {
+        name: "target_entry_title",
+        description: "单词条检测的目标词条标题，非单词条检测时为空。",
+    },
+    TemplateParamMeta {
+        name: "target_entry_block",
+        description: "单词条检测的目标词条资料块，非单词条检测时为空。",
+    },
+    TemplateParamMeta {
+        name: "entry_blocks",
+        description: "参与检测或作为世界观参考的词条资料块列表。",
     },
 ];
 
@@ -341,6 +400,15 @@ const TEMPLATE_REGISTRY: &[TemplateMeta] = &[
         params: NO_PARAMS,
     },
     TemplateMeta {
+        id: "sense/world_check_system",
+        group: "sense",
+        title: "通用检测系统模板",
+        relative_path: "sense/world_check_system.tera",
+        purpose: "定义通用世界观检测助手的系统提示词。",
+        appear_in: "用于通用检测会话，在创建检测会话时装载。",
+        params: WORLD_CHECK_PROMPT_PARAMS,
+    },
+    TemplateMeta {
         id: "contradiction/detection_prompt",
         group: "contradiction",
         title: "矛盾检测提示词",
@@ -348,6 +416,33 @@ const TEMPLATE_REGISTRY: &[TemplateMeta] = &[
         purpose: "生成矛盾扫描阶段的主提示词。",
         appear_in: "用于矛盾检测流程，在正式调用模型分析项目资料前生成检测提示词。",
         params: DETECTION_PROMPT_PARAMS,
+    },
+    TemplateMeta {
+        id: "world_check/contradiction_prompt",
+        group: "world_check",
+        title: "通用矛盾检测提示词",
+        relative_path: "world_check/contradiction_prompt.tera",
+        purpose: "以通用 WorldCheckReport 结构生成矛盾检测提示词。",
+        appear_in: "用于通用检测流程的 contradiction 类型。",
+        params: WORLD_CHECK_PROMPT_PARAMS,
+    },
+    TemplateMeta {
+        id: "world_check/entry_alignment_prompt",
+        group: "world_check",
+        title: "单词条契合度检测提示词",
+        relative_path: "world_check/entry_alignment_prompt.tera",
+        purpose: "检测指定词条与项目世界观的契合度。",
+        appear_in: "用于通用检测流程的 entry_alignment 类型。",
+        params: WORLD_CHECK_PROMPT_PARAMS,
+    },
+    TemplateMeta {
+        id: "world_check/publication_risk_prompt",
+        group: "world_check",
+        title: "公开出版风险检测提示词",
+        relative_path: "world_check/publication_risk_prompt.tera",
+        purpose: "检测项目资料公开发布或出版前的风险点。",
+        appear_in: "用于通用检测流程的 publication_risk 类型。",
+        params: WORLD_CHECK_PROMPT_PARAMS,
     },
     TemplateMeta {
         id: "contradiction/summary_prompt",
