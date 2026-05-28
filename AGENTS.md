@@ -28,6 +28,7 @@ cargo test
 
 - TypeScript/React 优先走 `strict` 配置，避免 Redux / Zustand；统一通过 `src/api` 与后端交互。
 - Rust Edition 2024，类型 `PascalCase`，函数与变量 `snake_case`。
+- 运行 `cargo fmt` 产生的其它 Rust 文件格式化变更无需额外回滚，可随当前阶段提交保留。
 - 样式优先使用 `flowcloudai-ui` 体系 token，避免硬编码数值和颜色。
 - 前端变更优先对齐仓库内既定组件与演示约束，避免引入外部不一致规范。
 
