@@ -59,6 +59,7 @@ export interface WorldCheckSessionResult {
     session_id: string
     conversation_id: string
     run_id: string
+    reportId: string
     checkKind: WorldCheckKind
     report: WorldCheckReport
     projectId: string
@@ -71,8 +72,61 @@ export interface WorldCheckSessionResult {
     truncated: boolean
 }
 
+export interface StoredWorldCheckReport {
+    reportId: string
+    sessionId: string
+    conversationId: string
+    checkKind: WorldCheckKind
+    pluginId: string
+    model?: string | null
+    projectId: string
+    projectName: string
+    createdAt: string
+    scopeSummary: string
+    sourceEntryIds: string[]
+    targetEntryId?: string | null
+    truncated: boolean
+    report: WorldCheckReport
+}
+
+export interface WorldCheckReportHistoryItem {
+    reportId: string
+    conversationId: string
+    checkKind: WorldCheckKind
+    pluginId: string
+    model?: string | null
+    projectId: string
+    projectName: string
+    createdAt: string
+    scopeSummary: string
+    sourceEntryIds: string[]
+    targetEntryId?: string | null
+    truncated: boolean
+    findingCount: number
+    unresolvedCount: number
+    overview: string
+}
+
 export const ai_start_world_check_session = (input: WorldCheckSessionRequest) =>
     command<WorldCheckSessionResult>('ai_start_world_check_session', {request: input})
+
+export const ai_get_world_check_report = (sessionId: string) =>
+    command<{
+        report: WorldCheckReport
+        scopeSummary: string
+        sourceEntryIds: string[]
+        targetEntryId?: string | null
+        truncated: boolean
+    } | null>('ai_get_world_check_report', {sessionId})
+
+export const ai_list_world_check_reports = (projectId: string, checkKind?: WorldCheckKind | null) =>
+    command<WorldCheckReportHistoryItem[]>('ai_list_world_check_reports', {projectId, checkKind})
+
+export const ai_get_world_check_report_entry = (reportId: string) =>
+    command<StoredWorldCheckReport | null>('ai_get_world_check_report_entry', {reportId})
+
+export const ai_delete_world_check_report = (reportId: string) =>
+    command<boolean>('ai_delete_world_check_report', {reportId})
 
 const contradictionEvidenceToWorldCheckEvidence = (
     evidence: ContradictionEvidence,

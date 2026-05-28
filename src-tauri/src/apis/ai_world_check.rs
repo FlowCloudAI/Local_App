@@ -9,13 +9,14 @@ use crate::apis::ai_client::{
 };
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
 use crate::senses::world_check_sense::WorldCheckSense;
-use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState};
+use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState, WorldCheckSessionBinding};
 use flowcloudai_client::llm::config::SessionConfig;
 use flowcloudai_client::{DefaultOrchestrator, ErrorCode, SessionEvent, TurnStatus};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::{Mutex, mpsc, oneshot};
@@ -40,6 +41,7 @@ pub struct WorldCheckSessionRequest {
 pub struct WorldCheckSessionResult {
     #[serde(flatten)]
     pub session: CreateLlmSessionResult,
+    pub report_id: String,
     pub check_kind: WorldCheckKind,
     pub report: WorldCheckReport,
     pub project_id: String,
@@ -50,6 +52,128 @@ pub struct WorldCheckSessionResult {
     pub source_entry_ids: Vec<String>,
     pub target_entry_id: Option<String>,
     pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredWorldCheckReport {
+    pub report_id: String,
+    pub session_id: String,
+    pub conversation_id: String,
+    pub check_kind: WorldCheckKind,
+    pub plugin_id: String,
+    pub model: Option<String>,
+    pub project_id: String,
+    pub project_name: String,
+    pub created_at: String,
+    pub scope_summary: String,
+    pub source_entry_ids: Vec<String>,
+    pub target_entry_id: Option<String>,
+    pub truncated: bool,
+    pub report: WorldCheckReport,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldCheckReportHistoryItem {
+    pub report_id: String,
+    pub conversation_id: String,
+    pub check_kind: WorldCheckKind,
+    pub plugin_id: String,
+    pub model: Option<String>,
+    pub project_id: String,
+    pub project_name: String,
+    pub created_at: String,
+    pub scope_summary: String,
+    pub source_entry_ids: Vec<String>,
+    pub target_entry_id: Option<String>,
+    pub truncated: bool,
+    pub finding_count: usize,
+    pub unresolved_count: usize,
+    pub overview: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldCheckReportView {
+    pub report: WorldCheckReport,
+    pub scope_summary: String,
+    pub source_entry_ids: Vec<String>,
+    pub target_entry_id: Option<String>,
+    pub truncated: bool,
+}
+
+fn world_check_report_file_path(base_dir: &Path, report_id: &str) -> PathBuf {
+    base_dir.join(format!("{}.json", report_id))
+}
+
+fn history_item_from_record(record: &StoredWorldCheckReport) -> WorldCheckReportHistoryItem {
+    WorldCheckReportHistoryItem {
+        report_id: record.report_id.clone(),
+        conversation_id: record.conversation_id.clone(),
+        check_kind: record.check_kind,
+        plugin_id: record.plugin_id.clone(),
+        model: record.model.clone(),
+        project_id: record.project_id.clone(),
+        project_name: record.project_name.clone(),
+        created_at: record.created_at.clone(),
+        scope_summary: record.scope_summary.clone(),
+        source_entry_ids: record.source_entry_ids.clone(),
+        target_entry_id: record.target_entry_id.clone(),
+        truncated: record.truncated,
+        finding_count: record.report.findings.len(),
+        unresolved_count: record.report.unresolved_questions.len(),
+        overview: record.report.overview.clone(),
+    }
+}
+
+fn read_report_record(file_path: &Path) -> Result<StoredWorldCheckReport, String> {
+    let content =
+        std::fs::read_to_string(file_path).map_err(|e| format!("读取检测报告文件失败: {}", e))?;
+    serde_json::from_str::<StoredWorldCheckReport>(&content)
+        .map_err(|e| format!("解析检测报告文件失败: {}", e))
+}
+
+fn save_report_record(base_dir: &Path, record: &StoredWorldCheckReport) -> Result<(), String> {
+    std::fs::create_dir_all(base_dir).map_err(|e| format!("创建检测报告目录失败: {}", e))?;
+    let file_path = world_check_report_file_path(base_dir, &record.report_id);
+    let content =
+        serde_json::to_string_pretty(record).map_err(|e| format!("序列化检测报告失败: {}", e))?;
+    std::fs::write(file_path, content).map_err(|e| format!("写入检测报告文件失败: {}", e))
+}
+
+fn list_report_records(
+    base_dir: &Path,
+    project_id: &str,
+    check_kind: Option<WorldCheckKind>,
+) -> Result<Vec<StoredWorldCheckReport>, String> {
+    std::fs::create_dir_all(base_dir).map_err(|e| format!("创建检测报告目录失败: {}", e))?;
+
+    let mut records = Vec::new();
+    let entries =
+        std::fs::read_dir(base_dir).map_err(|e| format!("读取检测报告目录失败: {}", e))?;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("读取检测报告目录项失败: {}", e))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        match read_report_record(&path) {
+            Ok(record)
+                if record.project_id == project_id
+                    && check_kind.is_none_or(|kind| record.check_kind == kind) =>
+            {
+                records.push(record)
+            }
+            Ok(_) => {}
+            Err(error) => {
+                log::warn!("跳过损坏的检测报告文件 {:?}: {}", path, error);
+            }
+        }
+    }
+
+    records.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(records)
 }
 
 #[tauri::command]
@@ -241,12 +365,45 @@ pub async fn ai_start_world_check_session(
             .await;
     }
 
+    let report_id = Uuid::new_v4().to_string();
+    let created_at = chrono::Utc::now().to_rfc3339();
+    let stored_record = StoredWorldCheckReport {
+        report_id: report_id.clone(),
+        session_id: request.session_id.clone(),
+        conversation_id: conversation_id.clone(),
+        check_kind: request.check_kind,
+        plugin_id: request.plugin_id.clone(),
+        model: request.model.clone(),
+        project_id: corpus.project_id.clone(),
+        project_name: corpus.project_name.clone(),
+        created_at,
+        scope_summary: corpus.scope_summary.clone(),
+        source_entry_ids: corpus.source_entry_ids.clone(),
+        target_entry_id: corpus.target_entry_id.clone(),
+        truncated: corpus.truncated,
+        report: report.clone(),
+    };
+    save_report_record(&ai_state.world_check_reports_dir, &stored_record)
+        .map_err(ApiError::internal)?;
+
+    ai_state.world_check_bindings.lock().await.insert(
+        request.session_id.clone(),
+        WorldCheckSessionBinding {
+            report: report.clone(),
+            scope_summary: corpus.scope_summary.clone(),
+            source_entry_ids: corpus.source_entry_ids.clone(),
+            target_entry_id: corpus.target_entry_id.clone(),
+            truncated: corpus.truncated,
+        },
+    );
+
     Ok(WorldCheckSessionResult {
         session: CreateLlmSessionResult {
             session_id: request.session_id,
             conversation_id,
             run_id,
         },
+        report_id,
         check_kind: request.check_kind,
         report,
         project_id: corpus.project_id,
@@ -258,6 +415,61 @@ pub async fn ai_start_world_check_session(
         target_entry_id: corpus.target_entry_id,
         truncated: corpus.truncated,
     })
+}
+
+#[tauri::command]
+pub async fn ai_get_world_check_report(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+) -> Result<Option<WorldCheckReportView>, ApiError> {
+    let bindings = ai_state.world_check_bindings.lock().await;
+    Ok(bindings
+        .get(&session_id)
+        .map(|binding| WorldCheckReportView {
+            report: binding.report.clone(),
+            scope_summary: binding.scope_summary.clone(),
+            source_entry_ids: binding.source_entry_ids.clone(),
+            target_entry_id: binding.target_entry_id.clone(),
+            truncated: binding.truncated,
+        }))
+}
+
+#[tauri::command]
+pub async fn ai_list_world_check_reports(
+    ai_state: State<'_, AiState>,
+    project_id: String,
+    check_kind: Option<WorldCheckKind>,
+) -> Result<Vec<WorldCheckReportHistoryItem>, ApiError> {
+    let records = list_report_records(&ai_state.world_check_reports_dir, &project_id, check_kind)
+        .map_err(ApiError::internal)?;
+    Ok(records.iter().map(history_item_from_record).collect())
+}
+
+#[tauri::command]
+pub async fn ai_get_world_check_report_entry(
+    ai_state: State<'_, AiState>,
+    report_id: String,
+) -> Result<Option<StoredWorldCheckReport>, ApiError> {
+    let file_path = world_check_report_file_path(&ai_state.world_check_reports_dir, &report_id);
+    if !file_path.exists() {
+        return Ok(None);
+    }
+    Ok(Some(
+        read_report_record(&file_path).map_err(ApiError::internal)?,
+    ))
+}
+
+#[tauri::command]
+pub async fn ai_delete_world_check_report(
+    ai_state: State<'_, AiState>,
+    report_id: String,
+) -> Result<bool, ApiError> {
+    let file_path = world_check_report_file_path(&ai_state.world_check_reports_dir, &report_id);
+    if !file_path.exists() {
+        return Ok(false);
+    }
+    std::fs::remove_file(&file_path)?;
+    Ok(true)
 }
 
 fn spawn_world_check_event_loop<S>(

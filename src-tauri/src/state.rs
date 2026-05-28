@@ -1,5 +1,6 @@
 use crate::apis::ai_client::StoredConversationSettings;
 use crate::reports::contradiction_report::ContradictionReport;
+use crate::reports::world_check_report::WorldCheckReport;
 use anyhow::Result;
 use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
 use std::collections::HashMap;
@@ -97,6 +98,15 @@ pub(crate) struct ContradictionSessionBinding {
     pub(crate) truncated: bool,
 }
 
+#[derive(Clone)]
+pub(crate) struct WorldCheckSessionBinding {
+    pub(crate) report: WorldCheckReport,
+    pub(crate) scope_summary: String,
+    pub(crate) source_entry_ids: Vec<String>,
+    pub(crate) target_entry_id: Option<String>,
+    pub(crate) truncated: bool,
+}
+
 pub(crate) struct SessionEntry {
     pub(crate) run_id: String,
     pub(crate) input_tx: mpsc::Sender<String>,
@@ -114,7 +124,9 @@ pub struct AiState {
     pub client: Mutex<FlowCloudAIClient>,
     pub(crate) sessions: Mutex<HashMap<String, SessionEntry>>,
     pub(crate) contradiction_bindings: Mutex<HashMap<String, ContradictionSessionBinding>>,
+    pub(crate) world_check_bindings: Mutex<HashMap<String, WorldCheckSessionBinding>>,
     pub(crate) contradiction_reports_dir: PathBuf,
+    pub(crate) world_check_reports_dir: PathBuf,
     _app_state: Arc<Mutex<AppState>>,
 }
 
@@ -131,9 +143,14 @@ impl AiState {
             .clone()
             .unwrap_or_else(|| PathBuf::from("chats"))
             .join("contradiction_reports");
+        let world_check_reports_dir = storage_path
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("chats"))
+            .join("world_check_reports");
         let mut client = FlowCloudAIClient::new(plugins_dir)?;
 
         std::fs::create_dir_all(&contradiction_reports_dir)?;
+        std::fs::create_dir_all(&world_check_reports_dir)?;
 
         // 注册 Worldflow 工具（在创建任何 Session 之前）
         client.install_tools(|registry| {
@@ -150,7 +167,9 @@ impl AiState {
             client: Mutex::new(client),
             sessions: Mutex::new(HashMap::new()),
             contradiction_bindings: Mutex::new(HashMap::new()),
+            world_check_bindings: Mutex::new(HashMap::new()),
             contradiction_reports_dir,
+            world_check_reports_dir,
             _app_state: app_state,
         })
     }
