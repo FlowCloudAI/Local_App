@@ -11,7 +11,7 @@ import {type HelpPanelRequest, useHelpPanel} from '../../features/help/useHelpPa
 import {useSnapshotPanel} from '../../features/snapshots/useSnapshotPanel'
 import {getCurrentWindow} from '@tauri-apps/api/window'
 import {listen} from '@tauri-apps/api/event'
-import {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react'
 import {useIdeaPanel} from '../../pages/useIdeaPanel'
 import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
@@ -48,7 +48,209 @@ type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
 type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
 const AI_MIN_PANEL_WIDTH = 500
 const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
+const RECENT_PAGE_LIMIT = 10
 let desktopWindowShown = false
+
+type DesktopTabState = {
+    tabs: TabItem[]
+    activeKey: string
+    projectTabMap: Record<string, string>
+    entryTabMap: Record<string, EntryTabMeta>
+    toolTabMap: Record<string, ProjectToolTabMeta>
+    entryDirtyMap: Record<string, boolean>
+    recentPageKeys: string[]
+}
+
+type DesktopTabAction =
+    | { type: 'add-tab'; tab: TabItem }
+    | { type: 'activate-tab'; tabKey: string }
+    | { type: 'clear-active' }
+    | { type: 'reorder-tabs'; tabs: TabItem[] }
+    | { type: 'touch-recent'; tabKey: string }
+    | { type: 'upsert-project-tab'; tabKey: string; project: { id: string; name: string }; activate?: boolean; touchRecent?: boolean }
+    | { type: 'upsert-entry-tab'; tabKey: string; projectId: string; entry: { id: string; title: string }; activate?: boolean; touchRecent?: boolean }
+    | { type: 'upsert-tool-tab'; tabKey: string; projectId: string; panel: ProjectToolPanel; label: string; activate?: boolean; touchRecent?: boolean }
+    | { type: 'rename-tab'; tabKey: string; label: string }
+    | { type: 'set-entry-dirty'; tabKey: string; dirty: boolean }
+    | { type: 'close-tabs'; keys: string[]; primaryKey?: string }
+
+const initialDesktopTabState: DesktopTabState = {
+    tabs: [],
+    activeKey: '',
+    projectTabMap: {},
+    entryTabMap: {},
+    toolTabMap: {},
+    entryDirtyMap: {},
+    recentPageKeys: [],
+}
+
+function touchRecentPageKeys(recentPageKeys: string[], tabKey: string) {
+    const next = [...recentPageKeys.filter((key) => key !== tabKey), tabKey]
+    return next.slice(-RECENT_PAGE_LIMIT)
+}
+
+function upsertTab(tabs: TabItem[], tab: TabItem) {
+    const index = tabs.findIndex((item) => item.key === tab.key)
+    if (index === -1) return [...tabs, tab]
+    return tabs.map((item) => item.key === tab.key ? {...item, ...tab, closable: tab.closable ?? item.closable} : item)
+}
+
+function renameTab(tabs: TabItem[], tabKey: string, label: string) {
+    return tabs.map((tab) => {
+        if (tab.key !== tabKey || tab.label === label) return tab
+        return {...tab, label}
+    })
+}
+
+function omitRecordKeys<T>(record: Record<string, T>, keys: Set<string>) {
+    let changed = false
+    const next = {...record}
+    for (const key of keys) {
+        if (key in next) {
+            delete next[key]
+            changed = true
+        }
+    }
+    return changed ? next : record
+}
+
+function isHomeWorkspaceTab(state: DesktopTabState, tabKey: string) {
+    return Boolean(state.projectTabMap[tabKey] || state.toolTabMap[tabKey] || state.entryTabMap[tabKey])
+}
+
+function getNextTabAfterClose(state: DesktopTabState, keysToRemove: Set<string>, primaryKey?: string) {
+    const remainingTabs = state.tabs.filter((tab) => !keysToRemove.has(tab.key))
+    const closedIndex = primaryKey
+        ? state.tabs.findIndex((tab) => tab.key === primaryKey)
+        : state.tabs.findIndex((tab) => keysToRemove.has(tab.key))
+    return remainingTabs[closedIndex] ?? remainingTabs[closedIndex - 1] ?? null
+}
+
+function desktopTabReducer(state: DesktopTabState, action: DesktopTabAction): DesktopTabState {
+    switch (action.type) {
+        case 'add-tab':
+            return {
+                ...state,
+                tabs: [...state.tabs, action.tab],
+                activeKey: action.tab.key,
+            }
+        case 'activate-tab':
+            return {
+                ...state,
+                activeKey: action.tabKey,
+            }
+        case 'clear-active':
+            return {
+                ...state,
+                activeKey: '',
+            }
+        case 'reorder-tabs':
+            return {
+                ...state,
+                tabs: action.tabs,
+            }
+        case 'touch-recent':
+            return {
+                ...state,
+                recentPageKeys: touchRecentPageKeys(state.recentPageKeys, action.tabKey),
+            }
+        case 'upsert-project-tab': {
+            const nextRecent = action.touchRecent
+                ? touchRecentPageKeys(state.recentPageKeys, action.tabKey)
+                : state.recentPageKeys
+            return {
+                ...state,
+                tabs: upsertTab(state.tabs, {key: action.tabKey, label: action.project.name, closable: true}),
+                activeKey: action.activate ? action.tabKey : state.activeKey,
+                projectTabMap: state.projectTabMap[action.tabKey] === action.project.id
+                    ? state.projectTabMap
+                    : {...state.projectTabMap, [action.tabKey]: action.project.id},
+                recentPageKeys: nextRecent,
+            }
+        }
+        case 'upsert-entry-tab': {
+            const nextRecent = action.touchRecent
+                ? touchRecentPageKeys(state.recentPageKeys, action.tabKey)
+                : state.recentPageKeys
+            return {
+                ...state,
+                tabs: upsertTab(state.tabs, {key: action.tabKey, label: action.entry.title, closable: true}),
+                activeKey: action.activate ? action.tabKey : state.activeKey,
+                entryTabMap: {
+                    ...state.entryTabMap,
+                    [action.tabKey]: {
+                        projectId: action.projectId,
+                        entryId: action.entry.id,
+                    },
+                },
+                recentPageKeys: nextRecent,
+            }
+        }
+        case 'upsert-tool-tab': {
+            const nextRecent = action.touchRecent
+                ? touchRecentPageKeys(state.recentPageKeys, action.tabKey)
+                : state.recentPageKeys
+            return {
+                ...state,
+                tabs: upsertTab(state.tabs, {key: action.tabKey, label: action.label, closable: true}),
+                activeKey: action.activate ? action.tabKey : state.activeKey,
+                toolTabMap: {
+                    ...state.toolTabMap,
+                    [action.tabKey]: {
+                        projectId: action.projectId,
+                        panel: action.panel,
+                    },
+                },
+                recentPageKeys: nextRecent,
+            }
+        }
+        case 'rename-tab':
+            return {
+                ...state,
+                tabs: renameTab(state.tabs, action.tabKey, action.label),
+            }
+        case 'set-entry-dirty': {
+            if (!action.dirty) {
+                if (!state.entryDirtyMap[action.tabKey]) return state
+                const next = {...state.entryDirtyMap}
+                delete next[action.tabKey]
+                return {...state, entryDirtyMap: next}
+            }
+            if (state.entryDirtyMap[action.tabKey]) return state
+            return {
+                ...state,
+                entryDirtyMap: {...state.entryDirtyMap, [action.tabKey]: true},
+            }
+        }
+        case 'close-tabs': {
+            const keysToRemove = new Set(action.keys)
+            if (keysToRemove.size === 0) return state
+
+            const nextTabs = state.tabs.filter((tab) => !keysToRemove.has(tab.key))
+            let nextActiveKey = state.activeKey
+            let nextRecentPageKeys = state.recentPageKeys.filter((tabKey) => !keysToRemove.has(tabKey))
+
+            if (keysToRemove.has(state.activeKey)) {
+                const nextTab = getNextTabAfterClose(state, keysToRemove, action.primaryKey)
+                nextActiveKey = nextTab?.key ?? ''
+                if (nextTab?.key && isHomeWorkspaceTab(state, nextTab.key)) {
+                    nextRecentPageKeys = touchRecentPageKeys(nextRecentPageKeys, nextTab.key)
+                }
+            }
+
+            return {
+                ...state,
+                tabs: nextTabs,
+                activeKey: nextActiveKey,
+                projectTabMap: omitRecordKeys(state.projectTabMap, keysToRemove),
+                entryTabMap: omitRecordKeys(state.entryTabMap, keysToRemove),
+                toolTabMap: omitRecordKeys(state.toolTabMap, keysToRemove),
+                entryDirtyMap: omitRecordKeys(state.entryDirtyMap, keysToRemove),
+                recentPageKeys: nextRecentPageKeys,
+            }
+        }
+    }
+}
 
 export default function DesktopApp({platformInfo}: DesktopAppProps) {
     const win = getCurrentWindow()
@@ -64,13 +266,16 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         }
     }, [win])
 
-    // Tabs 相关状态
-    const [tabs, setTabs] = useState<TabItem[]>([])
-    const [activeKey, setActiveKey] = useState('')
-    // projectTabMap: tabKey → projectId（仅项目标签页）
-    const [projectTabMap, setProjectTabMap] = useState<Record<string, string>>({})
-    const [entryTabMap, setEntryTabMap] = useState<Record<string, EntryTabMeta>>({})
-    const [toolTabMap, setToolTabMap] = useState<Record<string, ProjectToolTabMeta>>({})
+    const [tabState, dispatchTabState] = useReducer(desktopTabReducer, initialDesktopTabState)
+    const {
+        tabs,
+        activeKey,
+        projectTabMap,
+        entryTabMap,
+        toolTabMap,
+        entryDirtyMap,
+        recentPageKeys,
+    } = tabState
 
     const aiFocus = useMemo<AiFocus>(() => ({
         projectId: projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? null,
@@ -78,8 +283,6 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
     }), [activeKey, entryTabMap, projectTabMap, toolTabMap])
 
     const aiController = useAiController(aiFocus)
-    const [entryDirtyMap, setEntryDirtyMap] = useState<Record<string, boolean>>({})
-    const [recentPageKeys, setRecentPageKeys] = useState<string[]>([])
 
     const [selectedKey, setSelectedKey] = useState<string>('')
     const [mainContentKey, setMainContentKey] = useState<MainContentKey>('home')
@@ -174,10 +377,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
     }, [])
 
     const touchRecentPage = useCallback((tabKey: string) => {
-        setRecentPageKeys((prev) => {
-            const next = [...prev.filter((key) => key !== tabKey), tabKey]
-            return next.slice(-10)
-        })
+        dispatchTabState({type: 'touch-recent', tabKey})
     }, [])
 
     const getProjectToolLabel = useCallback((projectName: string, panel: ProjectToolPanel) => {
@@ -240,8 +440,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             setSelectedKey('')
         }
         const newKey = `tab-${Date.now()}`
-        setTabs(prev => [...prev, {key: newKey, label, closable: true}])
-        setActiveKey(newKey)
+        dispatchTabState({type: 'add-tab', tab: {key: newKey, label, closable: true}})
     }, [mainContentKey])
 
     const ensureProjectTab = useCallback((project: Project, options?: {
@@ -250,14 +449,14 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         touchRecent?: boolean
     }) => {
         const tabKey = `proj-${project.id}`
-        setTabs((prev) => {
-            const index = prev.findIndex((tab) => tab.key === tabKey)
-            if (index === -1) return [...prev, {key: tabKey, label: project.name, closable: true}]
-            return prev.map((tab) => tab.key === tabKey ? {...tab, label: project.name, closable: true} : tab)
+        dispatchTabState({
+            type: 'upsert-project-tab',
+            tabKey,
+            project: {id: project.id, name: project.name},
+            activate: options?.activate,
+            touchRecent: options?.touchRecent,
         })
-        setProjectTabMap(prev => prev[tabKey] === project.id ? prev : {...prev, [tabKey]: project.id})
         if (options?.activate) {
-            setActiveKey(tabKey)
             showHomeWorkspace()
         }
         if (options?.recordActivity) {
@@ -271,10 +470,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
                 updatedAt: project.updated_at ?? project.created_at ?? null,
             })
         }
-        if (options?.touchRecent) {
-            touchRecentPage(tabKey)
-        }
-    }, [showHomeWorkspace, touchRecentPage])
+    }, [showHomeWorkspace])
 
     // 打开项目标签页
     const handleOpenProject = useCallback((project: Project) => {
@@ -293,7 +489,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         const tabKey = `proj-${projectId}`
         if (projectTabMap[tabKey]) {
             if (options?.activate) {
-                setActiveKey(tabKey)
+                dispatchTabState({type: 'activate-tab', tabKey})
                 showHomeWorkspace()
             }
             if (options?.recordActivity) {
@@ -316,19 +512,14 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
     const handleOpenEntry = useCallback((projectId: string, entry: { id: string; title: string }) => {
         ensureProjectTabById(projectId)
         const tabKey = `entry-${projectId}-${entry.id}`
-        setTabs((prev) => {
-            const index = prev.findIndex((tab) => tab.key === tabKey)
-            if (index === -1) return [...prev, {key: tabKey, label: entry.title, closable: true}]
-            return prev.map((tab) => tab.key === tabKey ? {...tab, label: entry.title, closable: true} : tab)
+        dispatchTabState({
+            type: 'upsert-entry-tab',
+            tabKey,
+            projectId,
+            entry,
+            activate: true,
+            touchRecent: true,
         })
-        setEntryTabMap(prev => ({
-            ...prev,
-            [tabKey]: {
-                projectId,
-                entryId: entry.id,
-            },
-        }))
-        setActiveKey(tabKey)
         recordHomeActivity({
             type: 'entry',
             id: entry.id,
@@ -337,26 +528,21 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             title: entry.title,
             subtitle: '词条',
         })
-        touchRecentPage(tabKey)
         showHomeWorkspace()
-    }, [ensureProjectTabById, showHomeWorkspace, touchRecentPage])
+    }, [ensureProjectTabById, showHomeWorkspace])
 
     const handleOpenProjectTool = useCallback((panel: ProjectToolPanel, project: { id: string; name: string }) => {
         const tabKey = `tool-${project.id}-${panel}`
         const label = getProjectToolLabel(project.name, panel)
-        setTabs((prev) => {
-            const index = prev.findIndex((tab) => tab.key === tabKey)
-            if (index === -1) return [...prev, {key: tabKey, label, closable: true}]
-            return prev.map((tab) => tab.key === tabKey ? {...tab, label, closable: true} : tab)
+        dispatchTabState({
+            type: 'upsert-tool-tab',
+            tabKey,
+            projectId: project.id,
+            panel,
+            label,
+            activate: true,
+            touchRecent: true,
         })
-        setToolTabMap((prev) => ({
-            ...prev,
-            [tabKey]: {
-                projectId: project.id,
-                panel,
-            },
-        }))
-        setActiveKey(tabKey)
         recordHomeActivity({
             type: 'tool',
             id: `${project.id}:${panel}`,
@@ -365,38 +551,22 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             title: label,
             subtitle: project.name,
         })
-        touchRecentPage(tabKey)
         showHomeWorkspace()
-    }, [getProjectToolLabel, showHomeWorkspace, touchRecentPage])
+    }, [getProjectToolLabel, showHomeWorkspace])
 
     const handleEntryTitleChange = useCallback((projectId: string, entry: { id: string; title: string }) => {
         const tabKey = `entry-${projectId}-${entry.id}`
-        setTabs(prev => prev.map(tab => tab.key === tabKey ? {...tab, label: entry.title} : tab))
+        dispatchTabState({type: 'rename-tab', tabKey, label: entry.title})
     }, [])
 
     const handleProjectViewLabelChange = useCallback((projectId: string, label: string) => {
         const tabKey = `proj-${projectId}`
-        setTabs((prev) => prev.map((tab) => {
-            if (tab.key !== tabKey || tab.label === label) return tab
-            return {
-                ...tab,
-                label,
-            }
-        }))
+        dispatchTabState({type: 'rename-tab', tabKey, label})
     }, [])
 
     const handleEntryDirtyChange = useCallback((projectId: string, entryId: string, dirty: boolean) => {
         const tabKey = `entry-${projectId}-${entryId}`
-        setEntryDirtyMap(prev => {
-            if (!dirty) {
-                if (!prev[tabKey]) return prev
-                const next = {...prev}
-                delete next[tabKey]
-                return next
-            }
-            if (prev[tabKey]) return prev
-            return {...prev, [tabKey]: true}
-        })
+        dispatchTabState({type: 'set-entry-dirty', tabKey, dirty})
     }, [])
 
     const handleBackToProject = useCallback((projectId: string) => {
@@ -408,50 +578,27 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
     }, [ensureProjectTabById])
 
     const handleBackHome = useCallback(() => {
-        setActiveKey('')
+        dispatchTabState({type: 'clear-active'})
         setSelectedKey('')
         showHomeWorkspace()
     }, [showHomeWorkspace])
 
     const closeTabsForKeys = useCallback((keysToRemove: Set<string>) => {
-        const newTabs = tabs.filter((tab) => !keysToRemove.has(tab.key))
-        setTabs(newTabs)
-        setProjectTabMap((prev) => {
-            const next = {...prev}
-            for (const key of keysToRemove) delete next[key]
-            return next
-        })
-        setEntryTabMap((prev) => {
-            const next = {...prev}
-            for (const key of keysToRemove) delete next[key]
-            return next
-        })
-        setToolTabMap((prev) => {
-            const next = {...prev}
-            for (const key of keysToRemove) delete next[key]
-            return next
-        })
-        setEntryDirtyMap((prev) => {
-            const next = {...prev}
-            for (const key of keysToRemove) delete next[key]
-            return next
-        })
-        setRecentPageKeys((prev) => prev.filter((key) => !keysToRemove.has(key)))
+        const nextTab = keysToRemove.has(activeKey)
+            ? getNextTabAfterClose(tabState, keysToRemove)
+            : null
+        dispatchTabState({type: 'close-tabs', keys: [...keysToRemove]})
         if (keysToRemove.has(activeKey)) {
-            const closedIndex = tabs.findIndex((tab) => keysToRemove.has(tab.key))
-            const nextTab = newTabs[closedIndex] ?? newTabs[closedIndex - 1]
             if (nextTab?.key) {
-                if (projectTabMap[nextTab.key] || toolTabMap[nextTab.key] || entryTabMap[nextTab.key]) {
-                    touchRecentPage(nextTab.key)
+                if (isHomeWorkspaceTab(tabState, nextTab.key)) {
                     showHomeWorkspace()
                 }
             } else {
                 setMainContentKey('home')
                 setSelectedKey('')
             }
-            setActiveKey(nextTab?.key ?? '')
         }
-    }, [activeKey, entryTabMap, projectTabMap, tabs, toolTabMap, touchRecentPage, showHomeWorkspace])
+    }, [activeKey, showHomeWorkspace, tabState])
 
     const handleDeleteProject = useCallback((projectId: string) => {
         const projKey = `proj-${projectId}`
@@ -493,7 +640,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             }
             return
         }
-        setActiveKey(key)
+        dispatchTabState({type: 'activate-tab', tabKey: key})
         if (shouldReturnHomeWorkspace || shouldShowHomeWorkspace) {
             if (mainContentKey === 'settings') {
                 setSelectedKey('')
@@ -528,52 +675,21 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             const res = await showAlert(message, 'warning', 'confirm')
             if (res !== 'yes') return
         }
-        const newTabs = tabs.filter(tab => !keysToRemove.has(tab.key))
-        setTabs(newTabs)
-        setProjectTabMap(prev => {
-            const next = {...prev}
-            for (const removedKey of keysToRemove) {
-                delete next[removedKey]
-            }
-            return next
-        })
-        setEntryTabMap(prev => {
-            const next = {...prev}
-            for (const removedKey of keysToRemove) {
-                delete next[removedKey]
-            }
-            return next
-        })
-        setToolTabMap(prev => {
-            const next = {...prev}
-            for (const removedKey of keysToRemove) {
-                delete next[removedKey]
-            }
-            return next
-        })
-        setEntryDirtyMap(prev => {
-            const next = {...prev}
-            for (const removedKey of keysToRemove) {
-                delete next[removedKey]
-            }
-            return next
-        })
-        setRecentPageKeys(prev => prev.filter((tabKey) => !keysToRemove.has(tabKey)))
+        const nextTab = keysToRemove.has(activeKey)
+            ? getNextTabAfterClose(tabState, keysToRemove, key)
+            : null
+        dispatchTabState({type: 'close-tabs', keys: [...keysToRemove], primaryKey: key})
         if (keysToRemove.has(activeKey)) {
-            const closedIndex = tabs.findIndex(tab => tab.key === key)
-            const nextTab = newTabs[closedIndex] || newTabs[closedIndex - 1]
             if (nextTab?.key) {
-                if (projectTabMap[nextTab.key] || toolTabMap[nextTab.key] || entryTabMap[nextTab.key]) {
-                    touchRecentPage(nextTab.key)
+                if (isHomeWorkspaceTab(tabState, nextTab.key)) {
                     showHomeWorkspace()
                 }
             } else {
                 setMainContentKey('home')
                 setSelectedKey('')
             }
-            setActiveKey(nextTab?.key ?? '')
         }
-    }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, showHomeWorkspace, tabs, toolTabMap, touchRecentPage])
+    }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, showHomeWorkspace, tabState, toolTabMap])
 
     // 窗口关闭（右上角 X / Alt+F4 / 任务栏关闭均会触发 close-requested）
     const handleWindowClose = useCallback(async () => {
@@ -628,7 +744,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
             setSettingsInitialTab('system')
             setSettingsPluginKind('all')
             setSelectedKey('settings')
-            setActiveKey('')
+            dispatchTabState({type: 'clear-active'})
             setMainContentKey('settings')
             collapseAiPanel()
         }
@@ -638,7 +754,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         setSettingsInitialTab('ai')
         setSettingsPluginKind(kind)
         setSelectedKey('settings')
-        setActiveKey('')
+        dispatchTabState({type: 'clear-active'})
         setMainContentKey('settings')
         collapseAiPanel()
     }, [collapseAiPanel])
@@ -653,7 +769,7 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
         }
         const entryTabKey = `entry-${projectId}-${entry.id}`
         if (activeKey !== entryTabKey) {
-            setActiveKey(entryTabKey)
+            dispatchTabState({type: 'activate-tab', tabKey: entryTabKey})
         }
         recordHomeActivity({
             type: 'entry',
@@ -1058,7 +1174,9 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
                         minTabWidth="10rem"
                         items={tabs}
                         activeKey={activeKey}
-                        onReorder={setTabs}
+                        onReorder={(nextTabs) => {
+                            dispatchTabState({type: 'reorder-tabs', tabs: nextTabs})
+                        }}
                         onChange={(key) => {
                             void handleTabChange(key)
                         }}
