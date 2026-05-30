@@ -6,7 +6,6 @@ import {
     db_get_entry,
     db_get_project,
     db_import_project_fcworld,
-    db_list_projects,
     db_preview_project_fcworld,
     type FcworldImportPreview,
     type FcworldImportResult,
@@ -16,6 +15,7 @@ import ProjectCreator from '../features/projects/components/ProjectCreator'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
 import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
+import {invalidateProjectList, useProjectListStore} from '../features/projects/projectListStore'
 import {
     getHomeActivityTargetKey,
     HOME_ACTIVITY_CHANGED_EVENT,
@@ -130,11 +130,7 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
 
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
-    const [projects, setProjects] = useState<Project[]>([])
-    const [loading, setLoading] = useState(false)
     const [importing, setImporting] = useState(false)
-    const [hasLoadedProjects, setHasLoadedProjects] = useState(false)
-    const [error, setError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
@@ -144,30 +140,13 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
     const [pendingEntryTargetKeys, setPendingEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
-
-    const loadProjects = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const nextProjects = await db_list_projects()
-            setProjects(nextProjects)
-        } catch (e) {
-            setError(String(e))
-        } finally {
-            setLoading(false)
-            setHasLoadedProjects(true)
-        }
-    }, [])
-
-    useEffect(() => {
-        void loadProjects()
-    }, [loadProjects])
-
-    useEffect(() => {
-        const handler = () => void loadProjects()
-        window.addEventListener('fc:project-list-changed', handler)
-        return () => window.removeEventListener('fc:project-list-changed', handler)
-    }, [loadProjects])
+    const {
+        projects,
+        loading,
+        error,
+        hasLoaded: hasLoadedProjects,
+        refresh: refreshProjects,
+    } = useProjectListStore()
 
     useEffect(() => {
         const refreshDashboard = () => setDashboard(loadHomeDashboardData())
@@ -454,7 +433,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     }, [hasLoadedProjects, onOpenHomeTarget, onOpenProject, projectIdSet, projects, showAlert])
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
-        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+        await invalidateProjectList()
         const importedProject = await db_get_project(result.projectId)
         onOpenProject?.(importedProject)
     }, [onOpenProject])
@@ -567,7 +546,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
-                onCreated={() => void loadProjects()}
                 existingNames={projects.map(p => p.name)}
             />
             <ProjectImportConflictDialog
@@ -743,7 +721,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     variant="outline"
                                     size="sm"
                                     disabled={loading}
-                                    onClick={loadProjects}
+                                    onClick={() => void refreshProjects()}
                                 >
                                     刷新
                                 </Button>

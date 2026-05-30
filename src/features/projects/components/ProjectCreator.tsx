@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {db_create_project, type Project} from '../../../api'
+import {invalidateProjectList} from '../projectListStore'
 import './ProjectCreator.css'
 
 interface ProjectCreatorProps {
@@ -53,7 +54,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                 description: description.trim() || null,
             })
             void showAlert('世界观已创建', 'success', 'toast', 1000)
-            window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+            void invalidateProjectList()
             onCreated?.(project)
             onClose()
         } catch (e) {

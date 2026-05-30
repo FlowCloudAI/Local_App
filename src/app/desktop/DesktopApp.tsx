@@ -26,6 +26,7 @@ import {
     saveHomeLastSession,
     type HomeActivityTarget,
 } from '../../features/home/homeActivity'
+import {invalidateProjectList} from '../../features/projects/projectListStore'
 import {parseHelpTarget} from '../../shared/help/helpCatalog'
 
 interface DesktopAppProps {
@@ -667,7 +668,7 @@ function DesktopAppContent() {
             .map(([key]) => key)
         closeTabsForKeys(new Set([projKey, ...relatedToolKeys, ...relatedEntryKeys]))
         removeHomeProjectActivity(projectId)
-        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
+        void invalidateProjectList()
     }, [closeTabsForKeys, entryTabMap, toolTabMap])
 
     const handleDeleteEntry = useCallback((projectId: string, entryId: string) => {

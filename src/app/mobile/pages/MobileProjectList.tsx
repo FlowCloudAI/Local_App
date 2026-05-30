@@ -6,7 +6,6 @@ import {
     db_count_entries,
     db_get_project,
     db_import_project_fcworld,
-    db_list_projects,
     db_preview_project_fcworld,
     type FcworldImportPreview,
     type FcworldImportResult,
@@ -16,6 +15,7 @@ import FcworldProgressDialog from '../../../features/projects/components/Fcworld
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
+import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 
@@ -43,47 +43,51 @@ function formatDate(value?: string | null): string {
 
 export default function MobileProjectList({push, setAiFocus}: Props) {
     const {showAlert} = useAlert()
-    const [projects, setProjects] = useState<Project[]>([])
+    const {projects, loading: projectsLoading, error: projectError} = useProjectListStore()
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
-    const [loading, setLoading] = useState(false)
+    const [countsLoading, setCountsLoading] = useState(false)
     const [importing, setImporting] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const [countsError, setCountsError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
 
-    const load = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const list = await db_list_projects()
-            setProjects(list)
-            const counts = await Promise.all(
-                list.map(async p => {
-                    const c = await db_count_entries({projectId: p.id})
-                    return [p.id, c] as const
-                })
-            )
-            setEntryCounts(Object.fromEntries(counts))
-        } catch (e) {
-            setError(String(e))
-        } finally {
-            setLoading(false)
-        }
-    }, [])
-
     useEffect(() => {
-        void load()
-    }, [load])
-
-    useEffect(() => {
-        const handler = () => {
-            void load()
+        if (projects.length === 0) {
+            setEntryCounts({})
+            setCountsError(null)
+            setCountsLoading(false)
+            return
         }
-        window.addEventListener('fc:project-list-changed', handler)
-        return () => window.removeEventListener('fc:project-list-changed', handler)
-    }, [load])
+
+        let cancelled = false
+        setCountsLoading(true)
+        setCountsError(null)
+        const loadCounts = async () => {
+            try {
+                const counts = await Promise.all(
+                    projects.map(async p => {
+                        const c = await db_count_entries({projectId: p.id})
+                        return [p.id, c] as const
+                    })
+                )
+                if (!cancelled) setEntryCounts(Object.fromEntries(counts))
+            } catch (e) {
+                if (!cancelled) setCountsError(String(e))
+            } finally {
+                if (!cancelled) setCountsLoading(false)
+            }
+        }
+        void loadCounts()
+
+        return () => {
+            cancelled = true
+        }
+    }, [projects])
+
+    const loading = projectsLoading || countsLoading
+    const error = projectError ?? countsError
 
     const query = searchText.trim().toLowerCase()
     const filtered = projects
@@ -104,11 +108,10 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
     }, [push, setAiFocus])
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
-        window.dispatchEvent(new CustomEvent('fc:project-list-changed'))
-        await load()
+        await invalidateProjectList()
         const project = await db_get_project(result.projectId)
         handleOpenProject(project)
-    }, [handleOpenProject, load])
+    }, [handleOpenProject])
 
     const handleImportProject = useCallback(async () => {
         if (importing) return
@@ -213,7 +216,6 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
-                onCreated={() => void load()}
                 existingNames={projects.map(p => p.name)}
             />
             <ProjectImportConflictDialog
