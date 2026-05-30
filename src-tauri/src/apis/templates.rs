@@ -1,7 +1,7 @@
 use crate::template::{
-    get_default_template_content, get_template_document, get_template_effective_path, get_template_local_root_dir,
-    list_template_meta, save_template_content, TemplateDocument,
-    TemplateMeta, TemplateSaveResult,
+    TemplateDocument, TemplateMeta, TemplateSaveResult, get_default_template_content,
+    get_template_document, get_template_effective_path, get_template_local_root_dir,
+    list_template_meta, save_template_content,
 };
 
 /// 返回模板目录所需的全部元数据。

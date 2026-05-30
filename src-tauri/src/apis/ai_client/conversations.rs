@@ -171,8 +171,8 @@ pub async fn ai_compact_conversation(
         detail,
         prompt,
     )
-        .await
-        .map_err(ApiError::internal)?;
+    .await
+    .map_err(ApiError::internal)?;
     let summary = extract_compact_summary(&raw_output)
         .unwrap_or_else(|| raw_output.trim().to_string())
         .trim()
@@ -232,7 +232,7 @@ pub async fn ai_export_conversation(
             ErrorCode::FsWriteFailed,
             format!("写入导出文件失败 {:?}: {}", path, e),
         )
-            .with_kv("path", path.clone())
+        .with_kv("path", path.clone())
     })
 }
 
