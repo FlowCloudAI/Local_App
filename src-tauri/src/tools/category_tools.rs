@@ -36,12 +36,14 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .and_then(|v| v.as_str())
                     .map(str::trim)
                     .filter(|id| !id.is_empty());
-
-                let guard = app_state.lock().await;
-                let category =
-                    tools::create_category(&*guard, project_id, name.to_string(), parent_id)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
+                let category = tools::create_category(
+                    app_state.as_ref(),
+                    project_id,
+                    name.to_string(),
+                    parent_id,
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 
                 if let Some(ref h) = app_handle {
                     #[derive(serde::Serialize, Clone)]
@@ -89,8 +91,7 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                     "move_to_parent" => {
                         // 获取分类信息用于确认展示
                         let cat = {
-                            let guard = app_state.lock().await;
-                            tools::get_category(&*guard, category_id)
+                            tools::get_category(app_state.as_ref(), category_id)
                                 .await
                                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?
                         };
@@ -122,9 +123,7 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                         if !confirmed {
                             return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
                         }
-
-                        let guard = app_state.lock().await;
-                        tools::delete_category_move_to_parent(&*guard, category_id)
+                        tools::delete_category_move_to_parent(app_state.as_ref(), category_id)
                             .await
                             .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 
@@ -145,13 +144,13 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                     "cascade" => {
                         // 预览阶段：收集将被删除的数量
                         let (entry_count, subcategory_count, cat_name) = {
-                            let guard = app_state.lock().await;
-                            let cat = tools::get_category(&*guard, category_id)
+                            let cat = tools::get_category(app_state.as_ref(), category_id)
                                 .await
                                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
-                            let (ec, sc) = tools::preview_cascade_delete(&*guard, category_id)
-                                .await
-                                .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
+                            let (ec, sc) =
+                                tools::preview_cascade_delete(app_state.as_ref(), category_id)
+                                    .await
+                                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                             (ec, sc, cat.name.clone())
                         };
 
@@ -207,10 +206,8 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                         if !confirmed_final {
                             return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
                         }
-
-                        let guard = app_state.lock().await;
                         let (_deleted_entries, _deleted_cats) =
-                            tools::cascade_delete_category(&*guard, category_id)
+                            tools::cascade_delete_category(app_state.as_ref(), category_id)
                                 .await
                                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 
@@ -274,9 +271,7 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .map(|s| Uuid::parse_str(s))
                     .transpose()
                     .map_err(|e| anyhow::anyhow!("parent_id 格式无效：{}", e))?;
-
-                let guard = app_state.lock().await;
-                let categories = tools::list_categories(&*guard, project_id)
+                let categories = tools::list_categories(app_state.as_ref(), project_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("{}", e))?;
 

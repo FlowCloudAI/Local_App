@@ -24,11 +24,10 @@ pub fn register_project_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .get("description")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
-
-                let guard = app_state.lock().await;
-                let _project = tools::create_project(&*guard, name.to_string(), description)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
+                let _project =
+                    tools::create_project(app_state.as_ref(), name.to_string(), description)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 
                 Ok("修改已完成".to_string())
             })

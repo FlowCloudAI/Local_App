@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{Mutex, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
@@ -167,7 +167,7 @@ fn list_report_records(
 pub async fn ai_start_contradiction_session(
     app: AppHandle,
     ai_state: State<'_, AiState>,
-    app_state: State<'_, Arc<Mutex<AppState>>>,
+    app_state: State<'_, Arc<AppState>>,
     request: ContradictionSessionRequest,
 ) -> Result<ContradictionSessionResult, ApiError> {
     let api_key = ApiKeyStore::get(&request.plugin_id).ok_or_else(|| {
@@ -183,8 +183,8 @@ pub async fn ai_start_contradiction_session(
 
     let check_definition = world_check_definition(WorldCheckKind::Contradiction);
     let corpus = {
-        let app_state = app_state.inner().lock().await;
-        load_contradiction_corpus(&app_state, &request.load)
+        let app_state = app_state.inner().as_ref();
+        load_contradiction_corpus(app_state, &request.load)
             .await
             .map_err(ApiError::internal)?
     };

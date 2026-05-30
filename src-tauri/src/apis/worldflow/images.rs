@@ -456,12 +456,11 @@ pub async fn import_remote_images(
 
 #[tauri::command]
 pub async fn db_ensure_project_cover_thumbnails(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     project_id: String,
 ) -> Result<CoverThumbnailMigrationSummary, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     ensure_project_cover_thumbnails_with_progress(&db, paths.inner(), &project_id, |_, _| {}).await
 }

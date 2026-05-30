@@ -67,35 +67,33 @@ fn snapshot_unsupported<T>() -> Result<T, String> {
 }
 
 #[tauri::command]
-pub async fn db_snapshot(_state: State<'_, Arc<Mutex<AppState>>>) -> Result<bool, String> {
+pub async fn db_snapshot(_state: State<'_, Arc<AppState>>) -> Result<bool, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
 pub async fn db_snapshot_with_message(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _message: String,
 ) -> Result<bool, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
-pub async fn db_get_active_branch(
-    _state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<String, String> {
+pub async fn db_get_active_branch(_state: State<'_, Arc<AppState>>) -> Result<String, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
 pub async fn db_list_branches(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<SnapshotBranchInfoDto>, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
 pub async fn db_create_branch(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _branch_name: String,
     _from_ref: Option<String>,
 ) -> Result<(), String> {
@@ -104,7 +102,7 @@ pub async fn db_create_branch(
 
 #[tauri::command]
 pub async fn db_switch_branch(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _branch_name: String,
 ) -> Result<(), String> {
     snapshot_unsupported()
@@ -112,14 +110,14 @@ pub async fn db_switch_branch(
 
 #[tauri::command]
 pub async fn db_list_snapshots(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
 pub async fn db_list_snapshots_in_branch(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _branch_name: String,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
     snapshot_unsupported()
@@ -127,7 +125,7 @@ pub async fn db_list_snapshots_in_branch(
 
 #[tauri::command]
 pub async fn db_get_snapshot_graph(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _paths: State<'_, PathsState>,
 ) -> Result<SnapshotGraphDto, String> {
     snapshot_unsupported()
@@ -135,7 +133,7 @@ pub async fn db_get_snapshot_graph(
 
 #[tauri::command]
 pub async fn db_snapshot_to_branch(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _branch_name: String,
     _message: String,
 ) -> Result<bool, String> {
@@ -144,7 +142,7 @@ pub async fn db_snapshot_to_branch(
 
 #[tauri::command]
 pub async fn db_rollback_to(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _snapshot_id: String,
 ) -> Result<(), String> {
     snapshot_unsupported()
@@ -152,7 +150,7 @@ pub async fn db_rollback_to(
 
 #[tauri::command]
 pub async fn db_append_from(
-    _state: State<'_, Arc<Mutex<AppState>>>,
+    _state: State<'_, Arc<AppState>>,
     _snapshot_id: String,
 ) -> Result<AppendResultDto, String> {
     snapshot_unsupported()

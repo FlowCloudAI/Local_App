@@ -30,7 +30,7 @@ pub struct RelationGraphData {
 
 #[tauri::command]
 pub async fn db_create_relation(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     a_id: String,
     b_id: String,
@@ -40,8 +40,7 @@ pub async fn db_create_relation(
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
     let a_id = Uuid::parse_str(&a_id).map_err(|e| e.to_string())?;
     let b_id = Uuid::parse_str(&b_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let relation = db
         .create_relation(CreateEntryRelation {
             project_id,
@@ -60,24 +59,22 @@ pub async fn db_create_relation(
 /// 查询单条词条关系
 #[tauri::command]
 pub async fn db_get_relation(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<EntryRelation, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.get_relation(&id).await.map_err(|e| e.to_string())
 }
 
 /// 查询某词条的所有关系（含双向）
 #[tauri::command]
 pub async fn db_list_relations_for_entry(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     entry_id: String,
 ) -> Result<Vec<EntryRelation>, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_relations_for_entry(&entry_id)
         .await
         .map_err(|e| e.to_string())
@@ -86,12 +83,11 @@ pub async fn db_list_relations_for_entry(
 /// 查询项目下所有词条关系（用于构建关系图）
 #[tauri::command]
 pub async fn db_list_relations_for_project(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
 ) -> Result<Vec<EntryRelation>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_relations_for_project(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -100,12 +96,11 @@ pub async fn db_list_relations_for_project(
 /// 聚合关系图渲染所需的节点和边，避免前端重复拉取与转换。
 #[tauri::command]
 pub async fn db_get_relation_graph_data(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
 ) -> Result<RelationGraphData, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let entries = db
         .list_entries(&project_id, EntryFilter::default(), 1000, 0)
         .await
@@ -153,14 +148,13 @@ pub async fn db_get_relation_graph_data(
 /// 更新词条关系的方向或描述内容
 #[tauri::command]
 pub async fn db_update_relation(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     id: String,
     relation: Option<RelationDirection>,
     content: Option<String>,
 ) -> Result<EntryRelation, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let relation = db
         .update_relation(&id, UpdateEntryRelation { relation, content })
         .await
@@ -172,13 +166,9 @@ pub async fn db_update_relation(
 
 /// 删除单条词条关系
 #[tauri::command]
-pub async fn db_delete_relation(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn db_delete_relation(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let relation = db.get_relation(&id).await.map_err(|e| e.to_string())?;
     db.delete_relation(&id).await.map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &relation.project_id).await
@@ -187,14 +177,13 @@ pub async fn db_delete_relation(
 /// 删除两个词条之间的所有关系；返回删除的条数
 #[tauri::command]
 pub async fn db_delete_relations_between(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     entry_a_id: String,
     entry_b_id: String,
 ) -> Result<u64, String> {
     let entry_a_id = Uuid::parse_str(&entry_a_id).map_err(|e| e.to_string())?;
     let entry_b_id = Uuid::parse_str(&entry_b_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let entry = db.get_entry(&entry_a_id).await.map_err(|e| e.to_string())?;
     let deleted = db
         .delete_relations_between(&entry_a_id, &entry_b_id)

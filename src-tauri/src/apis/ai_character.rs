@@ -1,17 +1,17 @@
-use crate::apis::ai_client::{spawn_session_event_loop, CreateLlmSessionResult};
+use crate::apis::ai_client::{CreateLlmSessionResult, spawn_session_event_loop};
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
 use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState};
 use flowcloudai_client::llm::config::SessionConfig;
-use flowcloudai_client::{sense::Sense, DefaultOrchestrator, ErrorCode};
+use flowcloudai_client::{DefaultOrchestrator, ErrorCode, sense::Sense};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use uuid::Uuid;
 use worldflow_core::{
-    models::{Category, Entry, EntryBrief, EntryFilter, EntryTag, FCImage, TagSchema}, CategoryOps, EntryOps, EntryRelationOps, ProjectOps,
-    TagSchemaOps,
+    CategoryOps, EntryOps, EntryRelationOps, ProjectOps, TagSchemaOps,
+    models::{Category, Entry, EntryBrief, EntryFilter, EntryTag, FCImage, TagSchema},
 };
 
 const CHARACTER_SNAPSHOT_SCAN_LIMIT: usize = 1000;
@@ -242,7 +242,7 @@ fn read_character_voice_config(
 
 #[tauri::command]
 pub async fn ai_build_character_project_snapshot(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     entry_id: String,
 ) -> Result<CharacterProjectSnapshotBundle, ApiError> {
@@ -260,8 +260,7 @@ pub async fn ai_build_character_project_snapshot(
         )
         .with_kv("field", "entryId")
     })?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
 
     let project = db
         .get_project(&project_id)

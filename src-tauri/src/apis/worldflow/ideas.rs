@@ -2,7 +2,7 @@ use super::common::*;
 
 #[tauri::command]
 pub async fn db_create_idea_note(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: Option<String>,
     content: String,
     title: Option<String>,
@@ -11,8 +11,7 @@ pub async fn db_create_idea_note(
     let project_id = project_id
         .map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
         .transpose()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.create_idea_note(CreateIdeaNote {
         project_id,
         content,
@@ -26,19 +25,18 @@ pub async fn db_create_idea_note(
 /// 获取单条灵感便签
 #[tauri::command]
 pub async fn db_get_idea_note(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<IdeaNote, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.get_idea_note(&id).await.map_err(|e| e.to_string())
 }
 
 /// 查询灵感便签列表
 #[tauri::command]
 pub async fn db_list_idea_notes(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: Option<String>,
     only_global: Option<bool>,
     status: Option<IdeaNoteStatus>,
@@ -53,8 +51,7 @@ pub async fn db_list_idea_notes(
     let project_id = project_id
         .map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
         .transpose()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
 
     db.list_idea_notes(
         IdeaNoteFilter {
@@ -73,7 +70,7 @@ pub async fn db_list_idea_notes(
 /// 更新灵感便签
 #[tauri::command]
 pub async fn db_update_idea_note(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     id: String,
     project_id: Option<Option<String>>,
     title: Option<Option<String>>,
@@ -98,8 +95,7 @@ pub async fn db_update_idea_note(
                 .transpose()
         })
         .transpose()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
 
     db.update_idea_note(
         &id,
@@ -120,11 +116,10 @@ pub async fn db_update_idea_note(
 /// 删除灵感便签
 #[tauri::command]
 pub async fn db_delete_idea_note(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     id: String,
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.delete_idea_note(&id).await.map_err(|e| e.to_string())
 }

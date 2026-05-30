@@ -2022,7 +2022,7 @@ async fn preview_fcworld_package(
 #[tauri::command]
 pub async fn db_export_project_fcworld(
     app: AppHandle,
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     project_id: String,
     output_path: String,
@@ -2037,8 +2037,7 @@ pub async fn db_export_project_fcworld(
         let output_path_buf = PathBuf::from(&output_path);
 
         let (project, export) = {
-            let state = state.inner().lock().await;
-            let db = state.sqlite_db.lock().await;
+            let db = state.inner().sqlite_db.lock().await;
             let project = db
                 .get_project(&project_id)
                 .await
@@ -2097,7 +2096,7 @@ pub async fn db_export_project_fcworld(
 #[tauri::command]
 pub async fn db_import_project_fcworld(
     app: AppHandle,
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     input_path: String,
     options: Option<FcworldImportOptions>,
@@ -2109,8 +2108,7 @@ pub async fn db_import_project_fcworld(
     );
     let result = async {
         let input_path_buf = PathBuf::from(&input_path);
-        let state = state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
+        let db = state.inner().sqlite_db.lock().await;
         import_fcworld_package_to_db(
             &db,
             paths.inner(),
@@ -2132,7 +2130,7 @@ pub async fn db_import_project_fcworld(
 #[tauri::command]
 pub async fn db_preview_project_fcworld(
     app: AppHandle,
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     input_path: String,
     operation_id: Option<String>,
 ) -> Result<FcworldImportPreview, String> {
@@ -2142,8 +2140,7 @@ pub async fn db_preview_project_fcworld(
     );
     let result = async {
         let input_path_buf = PathBuf::from(&input_path);
-        let state = state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
+        let db = state.inner().sqlite_db.lock().await;
         preview_fcworld_package(&db, &input_path_buf, progress.clone()).await
     }
     .await;

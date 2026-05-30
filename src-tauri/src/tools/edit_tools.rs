@@ -27,7 +27,7 @@ enum EditOp {
 }
 
 async fn dispatch_edit_op(
-    app_state: Arc<Mutex<crate::AppState>>,
+    app_state: Arc<crate::AppState>,
     app_handle: AppHandle,
     pending_edits: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
     op: EditOp,
@@ -51,8 +51,7 @@ async fn dispatch_edit_op(
             }
 
             let (entry_title, before_content) = {
-                let guard = app_state.lock().await;
-                let entry = tools::get_entry(&*guard, &entry_id)
+                let entry = tools::get_entry(app_state.as_ref(), &entry_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 (entry.title.clone(), entry.content.clone())
@@ -106,11 +105,10 @@ async fn dispatch_edit_op(
             if !confirmed {
                 return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
             }
-
-            let guard = app_state.lock().await;
-            let entry = tools::update_entry_content(&*guard, &entry_id, Some(after_content))
-                .await
-                .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
+            let entry =
+                tools::update_entry_content(app_state.as_ref(), &entry_id, Some(after_content))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 
             #[derive(serde::Serialize, Clone)]
             struct Evt {
@@ -133,8 +131,7 @@ async fn dispatch_edit_op(
             new_content,
         } => {
             let (entry_title, before_content) = {
-                let guard = app_state.lock().await;
-                let entry = tools::get_entry(&*guard, &entry_id)
+                let entry = tools::get_entry(app_state.as_ref(), &entry_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 (entry.title.clone(), entry.content.clone())
@@ -168,11 +165,10 @@ async fn dispatch_edit_op(
             if !confirmed {
                 return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
             }
-
-            let guard = app_state.lock().await;
-            let entry = tools::update_entry_content(&*guard, &entry_id, Some(new_content))
-                .await
-                .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
+            let entry =
+                tools::update_entry_content(app_state.as_ref(), &entry_id, Some(new_content))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 
             #[derive(serde::Serialize, Clone)]
             struct Evt {
@@ -192,8 +188,7 @@ async fn dispatch_edit_op(
 
         EditOp::DeleteEntry { entry_id } => {
             let (entry_title, entry_summary) = {
-                let guard = app_state.lock().await;
-                let entry = tools::get_entry(&*guard, &entry_id)
+                let entry = tools::get_entry(app_state.as_ref(), &entry_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 (entry.title.clone(), entry.summary.clone())
@@ -224,9 +219,7 @@ async fn dispatch_edit_op(
             if !confirmed {
                 return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
             }
-
-            let guard = app_state.lock().await;
-            tools::delete_entry(&*guard, &entry_id)
+            tools::delete_entry(app_state.as_ref(), &entry_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
 

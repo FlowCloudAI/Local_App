@@ -343,7 +343,7 @@ fn resolve_relation_payload(
 
 #[tauri::command]
 pub async fn db_create_entry(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     project_id: String,
     category_id: Option<String>,
@@ -361,8 +361,7 @@ pub async fn db_create_entry(
     let images = copy_entry_images(paths.inner(), &project_id, images)?;
     let cover_path =
         prepare_entry_cover_path(paths.inner(), &project_id, images.as_deref()).flatten();
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let entry = db
         .create_entry(CreateEntry {
             project_id,
@@ -384,20 +383,16 @@ pub async fn db_create_entry(
 
 /// 获取完整词条（含 content、tags、images）
 #[tauri::command]
-pub async fn db_get_entry(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    id: String,
-) -> Result<Entry, String> {
+pub async fn db_get_entry(state: State<'_, Arc<AppState>>, id: String) -> Result<Entry, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.get_entry(&id).await.map_err(|e| e.to_string())
 }
 
 /// 分页列出词条简报（不含 content）；可按分类和词条类型过滤
 #[tauri::command]
 pub async fn db_list_entries(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     category_id: Option<String>,
     entry_type: Option<String>,
@@ -416,8 +411,7 @@ pub async fn db_list_entries(
     let category_id = category_id
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let category_id_ref = category_id.as_ref();
     let result = db
         .list_entries(
@@ -455,12 +449,11 @@ pub async fn db_list_entries(
 /// 聚合项目内带时间标签的词条，输出时间线事件数据
 #[tauri::command]
 pub async fn db_list_timeline_events(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
 ) -> Result<ProjectTimelineData, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
 
     let tag_schemas = db
         .list_tag_schemas(&project_id)
@@ -625,12 +618,11 @@ pub async fn db_list_timeline_events(
 /// 统计项目图片总数和总字数
 #[tauri::command]
 pub async fn db_get_project_stats(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
 ) -> Result<ProjectStats, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
 
     let mut image_count = 0usize;
     let mut word_count = 0usize;
@@ -828,7 +820,7 @@ pub async fn db_get_project_stats(
 /// 全文搜索词条（FTS）；可按分类和词条类型过滤
 #[tauri::command]
 pub async fn db_search_entries(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     query: String,
     category_id: Option<String>,
@@ -847,8 +839,7 @@ pub async fn db_search_entries(
     let category_id = category_id
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let category_id_ref = category_id.as_ref();
     let result = db
         .search_entries(
@@ -886,7 +877,7 @@ pub async fn db_search_entries(
 /// 统计词条数量；可按分类和词条类型过滤
 #[tauri::command]
 pub async fn db_count_entries(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     category_id: Option<String>,
     entry_type: Option<String>,
@@ -895,8 +886,7 @@ pub async fn db_count_entries(
     let category_id = category_id
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let category_id_ref = category_id.as_ref();
     db.count_entries(
         &project_id,
@@ -912,7 +902,7 @@ pub async fn db_count_entries(
 /// 更新词条；仅传入需要修改的字段，None 表示不变
 #[tauri::command]
 pub async fn db_update_entry(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     id: String,
     category_id: Option<String>,
@@ -930,8 +920,7 @@ pub async fn db_update_entry(
         images.as_ref().map(|v| v.len())
     );
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let current_entry = db.get_entry(&id).await.map_err(|e| e.to_string())?;
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, images)?;
     let cover_path =
@@ -972,7 +961,7 @@ pub async fn db_update_entry(
 /// 保存词条主体、正文内链和关系草稿，减少前端多轮 IPC。
 #[tauri::command]
 pub async fn db_save_entry_bundle(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     input: SaveEntryBundleInput,
 ) -> Result<SaveEntryBundleResponse, String> {
@@ -983,8 +972,7 @@ pub async fn db_save_entry_bundle(
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
 
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let current_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
 
     let category_id_ref = category_id.as_ref();
@@ -1152,13 +1140,9 @@ pub async fn db_save_entry_bundle(
 
 /// 删除词条
 #[tauri::command]
-pub async fn db_delete_entry(
-    state: State<'_, Arc<Mutex<AppState>>>,
-    id: String,
-) -> Result<(), String> {
+pub async fn db_delete_entry(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let entry = db.get_entry(&id).await.map_err(|e| e.to_string())?;
     db.delete_entry(&id).await.map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &entry.project_id).await
@@ -1167,11 +1151,10 @@ pub async fn db_delete_entry(
 /// 批量创建词条；返回成功插入的条数
 #[tauri::command]
 pub async fn db_create_entries_bulk(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     entries: Vec<CreateEntry>,
 ) -> Result<usize, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let project_ids = entries
         .iter()
         .map(|entry| entry.project_id)
@@ -1191,9 +1174,8 @@ pub async fn db_create_entries_bulk(
 
 /// 优化 FTS 索引，消除碎片；建议在 create_entries_bulk 后调用
 #[tauri::command]
-pub async fn db_optimize_fts(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+pub async fn db_optimize_fts(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    let db = state.inner().sqlite_db.lock().await;
     db.optimize_fts().await.map_err(|e| e.to_string())
 }
 

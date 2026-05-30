@@ -274,9 +274,9 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 match init_db(&db_path, snapshot_dir.as_deref()).await {
                     Ok(db) => {
-                        let app_state = Arc::new(Mutex::new(AppState {
+                        let app_state = Arc::new(AppState {
                             sqlite_db: Mutex::new(db),
-                        }));
+                        });
 
                         let app = app_handle.clone();
                         if let Err(e) = app_handle.run_on_main_thread(move || {

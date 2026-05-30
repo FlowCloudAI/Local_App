@@ -127,14 +127,14 @@ pub struct AiState {
     pub(crate) world_check_bindings: Mutex<HashMap<String, WorldCheckSessionBinding>>,
     pub(crate) contradiction_reports_dir: PathBuf,
     pub(crate) world_check_reports_dir: PathBuf,
-    _app_state: Arc<Mutex<AppState>>,
+    _app_state: Arc<AppState>,
 }
 
 impl AiState {
     pub fn new(
         plugins_dir: PathBuf,
         storage_path: Option<PathBuf>,
-        app_state: Arc<Mutex<AppState>>,
+        app_state: Arc<AppState>,
         search_engine: Arc<Mutex<String>>,
         app_handle: tauri::AppHandle,
         pending_edits: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,

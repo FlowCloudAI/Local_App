@@ -7,7 +7,6 @@ pub(super) use std::path::{Path, PathBuf};
 pub(super) use std::sync::Arc;
 pub(super) use tauri::{AppHandle, State, Window};
 pub(super) use tauri_plugin_opener::OpenerExt;
-pub(super) use tokio::sync::Mutex;
 pub(super) use uuid::Uuid;
 #[cfg(not(target_os = "android"))]
 pub(super) use worldflow_core::WorldflowError;

@@ -2,10 +2,9 @@ use crate::tools;
 use crate::tools::format;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
-use flowcloudai_client::tool::{arg_str, ToolRegistry};
+use flowcloudai_client::tool::{ToolRegistry, arg_str};
 use std::sync::Arc;
 use tauri::Emitter;
-use tokio::sync::Mutex;
 
 // ── 词条操作分派枚举 ─────────────────────────────────────────────────────────
 
@@ -113,7 +112,7 @@ enum EntryOp {
 }
 
 async fn dispatch_entry_op(
-    state: Arc<Mutex<crate::AppState>>,
+    state: Arc<crate::AppState>,
     app_handle: Option<tauri::AppHandle>,
     op: EntryOp,
 ) -> anyhow::Result<String> {
@@ -125,18 +124,19 @@ async fn dispatch_entry_op(
             info,
             sort,
             limit,
-        } => {
-            let guard = state.lock().await;
-            tools::get_entries_dev(&*guard, &key, kind.as_deref(), info, sort.as_deref(), limit)
-                .await
-                .map_err(|e| anyhow::anyhow!("{}", e))
-        }
-        GetEntryDev { keys, info } => {
-            let guard = state.lock().await;
-            tools::list_entry_dev(&*guard, &keys, info)
-                .await
-                .map_err(|e| anyhow::anyhow!("{}", e))
-        }
+        } => tools::get_entries_dev(
+            state.as_ref(),
+            &key,
+            kind.as_deref(),
+            info,
+            sort.as_deref(),
+            limit,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e)),
+        GetEntryDev { keys, info } => tools::list_entry_dev(state.as_ref(), &keys, info)
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e)),
         SearchEntries {
             project_id,
             query,
@@ -144,9 +144,8 @@ async fn dispatch_entry_op(
             category_id,
             limit,
         } => {
-            let guard = state.lock().await;
             let result = tools::search_entries(
-                &*guard,
+                state.as_ref(),
                 &project_id,
                 &query,
                 entry_type.as_deref(),
@@ -158,8 +157,7 @@ async fn dispatch_entry_op(
             Ok(format::format_entry_briefs(&result))
         }
         GetEntry { entry_id } => {
-            let guard = state.lock().await;
-            let entry = tools::get_entry(&*guard, &entry_id)
+            let entry = tools::get_entry(state.as_ref(), &entry_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_entry(&entry))
@@ -172,8 +170,7 @@ async fn dispatch_entry_op(
             if start_line == 0 {
                 anyhow::bail!("start_line 必须从 1 开始");
             }
-            let guard = state.lock().await;
-            let entry = tools::get_entry(&*guard, &entry_id)
+            let entry = tools::get_entry(state.as_ref(), &entry_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             let lines: Vec<&str> = entry.content.lines().collect();
@@ -213,9 +210,8 @@ async fn dispatch_entry_op(
             limit,
             offset,
         } => {
-            let guard = state.lock().await;
             let result = tools::list_all_entries(
-                &*guard,
+                state.as_ref(),
                 &project_id,
                 category_id.as_deref(),
                 limit,
@@ -226,8 +222,7 @@ async fn dispatch_entry_op(
             Ok(format::format_entry_briefs(&result))
         }
         ListCategories { project_id } => {
-            let guard = state.lock().await;
-            let categories = tools::list_categories(&*guard, &project_id)
+            let categories = tools::list_categories(state.as_ref(), &project_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_categories(&categories))
@@ -239,9 +234,8 @@ async fn dispatch_entry_op(
             limit,
             offset,
         } => {
-            let guard = state.lock().await;
             let result = tools::list_entries_by_type(
-                &*guard,
+                state.as_ref(),
                 &project_id,
                 &entry_type,
                 category_id.as_deref(),
@@ -253,15 +247,13 @@ async fn dispatch_entry_op(
             Ok(format::format_entry_briefs(&result))
         }
         ListTagSchemas { project_id } => {
-            let guard = state.lock().await;
-            let schemas = tools::list_tag_schemas(&*guard, &project_id)
+            let schemas = tools::list_tag_schemas(state.as_ref(), &project_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_tag_schemas(&schemas))
         }
         GetEntryRelations { entry_id } => {
-            let guard = state.lock().await;
-            let (relations, entry_names) = tools::get_entry_relations(&*guard, &entry_id)
+            let (relations, entry_names) = tools::get_entry_relations(state.as_ref(), &entry_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_relations(
@@ -271,22 +263,19 @@ async fn dispatch_entry_op(
             ))
         }
         GetProjectSummary { project_id } => {
-            let guard = state.lock().await;
-            let (project, counts) = tools::get_project_summary(&*guard, &project_id)
+            let (project, counts) = tools::get_project_summary(state.as_ref(), &project_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_project_summary(&project, &counts))
         }
         ListProjects => {
-            let guard = state.lock().await;
-            let projects = tools::list_projects(&*guard)
+            let projects = tools::list_projects(state.as_ref())
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_projects(&projects))
         }
         ListEntryTypes { project_id } => {
-            let guard = state.lock().await;
-            let types = tools::list_entry_types(&*guard, &project_id)
+            let types = tools::list_entry_types(state.as_ref(), &project_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("{}", e))?;
             Ok(format::format_entry_types(&types))
@@ -299,9 +288,8 @@ async fn dispatch_entry_op(
             summary,
             content,
         } => {
-            let guard = state.lock().await;
             let entry = tools::create_entry(
-                &*guard,
+                state.as_ref(),
                 &project_id,
                 &category_id,
                 title,
@@ -336,10 +324,10 @@ async fn dispatch_entry_op(
             if title.is_none() && summary.is_none() && entry_type.is_none() {
                 anyhow::bail!("修改未完成：title、summary、entry_type 至少需要提供一个");
             }
-            let guard = state.lock().await;
-            let entry = tools::update_entry_fields(&*guard, &entry_id, title, summary, entry_type)
-                .await
-                .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
+            let entry =
+                tools::update_entry_fields(state.as_ref(), &entry_id, title, summary, entry_type)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
                 #[derive(serde::Serialize, Clone)]
                 struct Evt {
@@ -357,8 +345,7 @@ async fn dispatch_entry_op(
         UpdateEntryTags { entry_id, tags } => {
             let tags: Vec<worldflow_core::models::EntryTag> = serde_json::from_value(tags)
                 .map_err(|e| anyhow::anyhow!("修改未完成：tags 格式错误: {}", e))?;
-            let guard = state.lock().await;
-            let entry = tools::update_entry_tags(&*guard, &entry_id, tags)
+            let entry = tools::update_entry_tags(state.as_ref(), &entry_id, tags)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
@@ -380,8 +367,7 @@ async fn dispatch_entry_op(
             schema_id,
             value,
         } => {
-            let guard = state.lock().await;
-            let entry = tools::add_entry_tag(&*guard, &entry_id, &schema_id, value)
+            let entry = tools::add_entry_tag(state.as_ref(), &entry_id, &schema_id, value)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
@@ -402,8 +388,7 @@ async fn dispatch_entry_op(
             entry_id,
             schema_id,
         } => {
-            let guard = state.lock().await;
-            let entry = tools::remove_entry_tag(&*guard, &entry_id, &schema_id)
+            let entry = tools::remove_entry_tag(state.as_ref(), &entry_id, &schema_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
@@ -426,8 +411,7 @@ async fn dispatch_entry_op(
             relation,
             content,
         } => {
-            let guard = state.lock().await;
-            let _rel = tools::create_relation(&*guard, &a_id, &b_id, relation, content)
+            let _rel = tools::create_relation(state.as_ref(), &a_id, &b_id, relation, content)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
@@ -459,14 +443,12 @@ async fn dispatch_entry_op(
                 anyhow::bail!("修改未完成：relation 和 content 至少需要提供一个");
             }
             let (a_id, b_id) = {
-                let guard = state.lock().await;
-                let rel = tools::get_relation(&*guard, &relation_id)
+                let rel = tools::get_relation(state.as_ref(), &relation_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 (rel.a_id, rel.b_id)
             };
-            let guard = state.lock().await;
-            let _rel = tools::update_relation(&*guard, &relation_id, relation, content)
+            let _rel = tools::update_relation(state.as_ref(), &relation_id, relation, content)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
@@ -491,14 +473,12 @@ async fn dispatch_entry_op(
         }
         DeleteRelation { relation_id } => {
             let (a_id, b_id) = {
-                let guard = state.lock().await;
-                let rel = tools::get_relation(&*guard, &relation_id)
+                let rel = tools::get_relation(state.as_ref(), &relation_id)
                     .await
                     .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
                 (rel.a_id, rel.b_id)
             };
-            let guard = state.lock().await;
-            tools::delete_relation(&*guard, &relation_id)
+            tools::delete_relation(state.as_ref(), &relation_id)
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {
@@ -525,8 +505,7 @@ async fn dispatch_entry_op(
             entry_id,
             category_id,
         } => {
-            let guard = state.lock().await;
-            let entry = tools::move_entry(&*guard, &entry_id, category_id.as_deref())
+            let entry = tools::move_entry(state.as_ref(), &entry_id, category_id.as_deref())
                 .await
                 .map_err(|e| anyhow::anyhow!("修改未完成：{}", e))?;
             if let Some(ref h) = app_handle {

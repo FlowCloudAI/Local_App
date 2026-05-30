@@ -7,10 +7,10 @@ pub(super) use crate::PendingEditsState;
 pub(super) use crate::SettingsState;
 pub(super) use flowcloudai_client::llm::config::SessionConfig;
 pub(super) use flowcloudai_client::{
-    image::ImageRequest, llm::types::{Message, ToolCall}, AudioDecoder, AudioSource, ConversationNode,
-    ConversationNodeSeed, DefaultOrchestrator, ImageSession, PluginKind, SessionEvent, TaskContext,
-    TurnStatus,
-    Usage,
+    AudioDecoder, AudioSource, ConversationNode, ConversationNodeSeed, DefaultOrchestrator,
+    ImageSession, PluginKind, SessionEvent, TaskContext, TurnStatus, Usage,
+    image::ImageRequest,
+    llm::types::{Message, ToolCall},
 };
 pub(super) use futures::StreamExt;
 pub(super) use serde::{Deserialize, Serialize};
@@ -19,8 +19,8 @@ pub(super) use std::fs::File;
 pub(super) use std::io::{Read, Write};
 pub(super) use std::path::{Path, PathBuf};
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
     Arc,
+    atomic::{AtomicU64, Ordering},
 };
 use std::time::Duration;
 pub(super) use tauri::{AppHandle, Emitter, Manager, State};
@@ -757,9 +757,8 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
         usage.total_tokens
     );
 
-    let app_state = app.state::<std::sync::Arc<tokio::sync::Mutex<crate::AppState>>>();
-    let state = app_state.lock().await;
-    let db = state.sqlite_db.lock().await;
+    let app_state = app.state::<std::sync::Arc<crate::AppState>>();
+    let db = app_state.inner().sqlite_db.lock().await;
     let input = worldflow_core::models::CreateApiUsageLog {
         id: Uuid::new_v4().to_string(),
         session_id: session_id.to_string(),

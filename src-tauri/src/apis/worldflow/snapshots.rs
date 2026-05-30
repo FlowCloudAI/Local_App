@@ -202,9 +202,8 @@ fn load_snapshot_graph(repo_dir: &Path, active_branch: &str) -> Result<SnapshotG
 /// 手动触发一次快照（消息前缀 "manual <unix_secs>"）
 /// 返回 true 表示创建了新快照，false 表示内容无变化跳过
 #[tauri::command]
-pub async fn db_snapshot(state: State<'_, Arc<Mutex<AppState>>>) -> Result<bool, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+pub async fn db_snapshot(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
+    let db = state.inner().sqlite_db.lock().await;
     match db.snapshot().await {
         Ok(()) => Ok(true),
         Err(WorldflowError::NoChanges) => Ok(false),
@@ -216,11 +215,10 @@ pub async fn db_snapshot(state: State<'_, Arc<Mutex<AppState>>>) -> Result<bool,
 /// 返回 true 表示创建了新快照，false 表示内容无变化跳过
 #[tauri::command]
 pub async fn db_snapshot_with_message(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     message: String,
 ) -> Result<bool, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     match db.snapshot_with_message(&message).await {
         Ok(()) => Ok(true),
         Err(WorldflowError::NoChanges) => Ok(false),
@@ -230,21 +228,17 @@ pub async fn db_snapshot_with_message(
 
 /// 获取当前活动分支
 #[tauri::command]
-pub async fn db_get_active_branch(
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<String, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+pub async fn db_get_active_branch(state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    let db = state.inner().sqlite_db.lock().await;
     db.active_branch().await.map_err(|e| e.to_string())
 }
 
 /// 列出所有本地分支
 #[tauri::command]
 pub async fn db_list_branches(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<SnapshotBranchInfoDto>, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_branches()
         .await
         .map(|list| list.into_iter().map(SnapshotBranchInfoDto::from).collect())
@@ -254,12 +248,11 @@ pub async fn db_list_branches(
 /// 创建分支。未传 from_ref 时，默认从当前活动分支分出
 #[tauri::command]
 pub async fn db_create_branch(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     branch_name: String,
     from_ref: Option<String>,
 ) -> Result<(), String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.create_branch(&branch_name, from_ref.as_deref())
         .await
         .map_err(|e| e.to_string())
@@ -268,11 +261,10 @@ pub async fn db_create_branch(
 /// 切换活动分支，并把数据库恢复到目标分支 tip
 #[tauri::command]
 pub async fn db_switch_branch(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     branch_name: String,
 ) -> Result<(), String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.switch_branch(&branch_name)
         .await
         .map_err(|e| e.to_string())
@@ -281,10 +273,9 @@ pub async fn db_switch_branch(
 /// 列出所有历史快照，最新的在 index 0
 #[tauri::command]
 pub async fn db_list_snapshots(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_snapshots()
         .await
         .map(|list| list.into_iter().map(SnapshotInfoDto::from).collect())
@@ -294,11 +285,10 @@ pub async fn db_list_snapshots(
 /// 查看指定分支的历史快照
 #[tauri::command]
 pub async fn db_list_snapshots_in_branch(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     branch_name: String,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_snapshots_in_branch(&branch_name)
         .await
         .map(|list| list.into_iter().map(SnapshotInfoDto::from).collect())
@@ -308,12 +298,11 @@ pub async fn db_list_snapshots_in_branch(
 /// 获取快照提交图，用于树状版本视图
 #[tauri::command]
 pub async fn db_get_snapshot_graph(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
 ) -> Result<SnapshotGraphDto, String> {
     let active_branch = {
-        let state = state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
+        let db = state.inner().sqlite_db.lock().await;
         db.active_branch().await.map_err(|e| e.to_string())?
     };
     let repo_dir = snapshot_repo_dir(&paths)?;
@@ -324,12 +313,11 @@ pub async fn db_get_snapshot_graph(
 /// 返回 true 表示创建了新快照，false 表示内容无变化跳过
 #[tauri::command]
 pub async fn db_snapshot_to_branch(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     branch_name: String,
     message: String,
 ) -> Result<bool, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     match db.snapshot_to_branch(&branch_name, &message).await {
         Ok(()) => Ok(true),
         Err(WorldflowError::NoChanges) => Ok(false),
@@ -340,11 +328,10 @@ pub async fn db_snapshot_to_branch(
 /// 回退到指定快照（先自动保存 pre-rollback 快照，再全量替换数据库）
 #[tauri::command]
 pub async fn db_rollback_to(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     snapshot_id: String,
 ) -> Result<(), String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.rollback_to(&snapshot_id)
         .await
         .map_err(|e| e.to_string())
@@ -353,11 +340,10 @@ pub async fn db_rollback_to(
 /// 追加恢复：把历史快照里有、当前 DB 没有的记录补回来（非破坏性）
 #[tauri::command]
 pub async fn db_append_from(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     snapshot_id: String,
 ) -> Result<AppendResultDto, String> {
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.append_from(&snapshot_id)
         .await
         .map(AppendResultDto::from)

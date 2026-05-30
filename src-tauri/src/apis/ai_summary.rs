@@ -9,7 +9,7 @@ use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,7 +56,7 @@ pub struct ImagePromptFillResult {
 #[tauri::command]
 pub async fn ai_generate_entry_summary(
     ai_state: State<'_, AiState>,
-    app_state: State<'_, Arc<Mutex<AppState>>>,
+    app_state: State<'_, Arc<AppState>>,
     request: SummaryRequest,
 ) -> Result<SummaryResult, ApiError> {
     if request.entry_ids.is_empty() {
@@ -78,13 +78,13 @@ pub async fn ai_generate_entry_summary(
     })?;
 
     let (project_name, entry_blocks) = {
-        let app_state = app_state.inner().lock().await;
-        let (project, _) = tools::get_project_summary(&app_state, &request.project_id)
+        let app_state = app_state.inner().as_ref();
+        let (project, _) = tools::get_project_summary(app_state, &request.project_id)
             .await
             .map_err(ApiError::internal)?;
         let mut blocks = Vec::new();
         for entry_id in &request.entry_ids {
-            let entry = tools::get_entry(&app_state, entry_id)
+            let entry = tools::get_entry(app_state, entry_id)
                 .await
                 .map_err(ApiError::internal)?;
             let block = if let Some(draft_entry) = request

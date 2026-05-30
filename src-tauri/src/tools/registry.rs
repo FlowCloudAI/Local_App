@@ -17,7 +17,7 @@ use super::web_tools;
 /// 注册所有 Worldflow 工具到 ToolRegistry
 pub fn register_worldflow_tools(
     registry: &mut flowcloudai_client::tool::ToolRegistry,
-    app_state: std::sync::Arc<tokio::sync::Mutex<AppState>>,
+    app_state: std::sync::Arc<AppState>,
     search_engine: std::sync::Arc<tokio::sync::Mutex<String>>,
     app_handle: AppHandle,
     pending_edits: std::sync::Arc<tokio::sync::Mutex<HashMap<String, oneshot::Sender<bool>>>>,

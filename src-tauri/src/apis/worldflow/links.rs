@@ -2,7 +2,7 @@ use super::common::*;
 
 #[tauri::command]
 pub async fn db_create_entry_link(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     a_id: String,
     b_id: String,
@@ -10,8 +10,7 @@ pub async fn db_create_entry_link(
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
     let a_id = Uuid::parse_str(&a_id).map_err(|e| e.to_string())?;
     let b_id = Uuid::parse_str(&b_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let link = db
         .create_link(CreateEntryLink {
             project_id,
@@ -27,12 +26,11 @@ pub async fn db_create_entry_link(
 /// 获取词条的出链列表
 #[tauri::command]
 pub async fn db_list_outgoing_links(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     entry_id: String,
 ) -> Result<Vec<EntryLink>, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_outgoing_links(&entry_id)
         .await
         .map_err(|e| e.to_string())
@@ -41,12 +39,11 @@ pub async fn db_list_outgoing_links(
 /// 获取词条的入链列表（反向链接）
 #[tauri::command]
 pub async fn db_list_incoming_links(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     entry_id: String,
 ) -> Result<Vec<EntryLink>, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     db.list_incoming_links(&entry_id)
         .await
         .map_err(|e| e.to_string())
@@ -55,12 +52,11 @@ pub async fn db_list_incoming_links(
 /// 删除词条的所有出链
 #[tauri::command]
 pub async fn db_delete_links_from_entry(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     entry_id: String,
 ) -> Result<u64, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let current_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
     let deleted = db
         .delete_links_from_entry(&entry_id)
@@ -75,7 +71,7 @@ pub async fn db_delete_links_from_entry(
 /// 替换词条的所有出链（先删除旧链接，再批量创建新链接）
 #[tauri::command]
 pub async fn db_replace_outgoing_links(
-    state: State<'_, Arc<Mutex<AppState>>>,
+    state: State<'_, Arc<AppState>>,
     project_id: String,
     entry_id: String,
     linked_entry_ids: Vec<String>,
@@ -86,8 +82,7 @@ pub async fn db_replace_outgoing_links(
         .into_iter()
         .map(|id| Uuid::parse_str(&id).map_err(|e| e.to_string()))
         .collect::<Result<Vec<_>, String>>()?;
-    let state = state.inner().lock().await;
-    let db = state.sqlite_db.lock().await;
+    let db = state.inner().sqlite_db.lock().await;
     let links = db
         .replace_outgoing_links(&project_id, &entry_id, &linked_entry_ids)
         .await

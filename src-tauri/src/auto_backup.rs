@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 use tokio::io::AsyncWriteExt;
-use tokio::sync::Mutex;
 
 const BACKUP_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const TIMESTAMP_LEN: usize = 19;
@@ -51,7 +50,7 @@ async fn run_csv_backup(app: &AppHandle) -> Result<()> {
         .try_state::<PathsState>()
         .context("路径状态尚未初始化")?;
     let app_state = app
-        .try_state::<Arc<Mutex<AppState>>>()
+        .try_state::<Arc<AppState>>()
         .context("数据库状态尚未初始化")?;
 
     let settings = settings_state.settings.lock().await.clone();
@@ -66,8 +65,7 @@ async fn run_csv_backup(app: &AppHandle) -> Result<()> {
     let max_backup_count = settings.max_backup_count.max(1) as usize;
 
     let pool = {
-        let state = app_state.inner().lock().await;
-        let db = state.sqlite_db.lock().await;
+        let db = app_state.inner().sqlite_db.lock().await;
         db.pool.clone()
     };
 

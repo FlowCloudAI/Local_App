@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 /// Worldflow 工具的状态结构
 #[derive(Clone)]
 pub struct WorldflowToolState {
-    pub app_state: Option<std::sync::Arc<tokio::sync::Mutex<AppState>>>,
+    pub app_state: Option<std::sync::Arc<AppState>>,
     pub http_client: reqwest::Client,
     pub search_engine: std::sync::Arc<tokio::sync::Mutex<String>>,
     pub app_handle: Option<tauri::AppHandle>,
