@@ -3,10 +3,11 @@ use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::WorldCheckReport;
 use anyhow::Result;
 use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex as StdMutex;
 use tokio::sync::{Mutex, mpsc, oneshot};
 use worldflow_core::SqliteDb;
 
@@ -37,22 +38,54 @@ impl NetworkState {
 /// 标记后端是否已经完成主线程状态注入。
 /// 仅在 AppState / PathsState / PendingEditsState / AiState 初始化流程完成后置为 true。
 pub struct BackendReadyState {
-    ready: AtomicBool,
+    status: StdMutex<BackendStartupStatus>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct BackendStartupStatus {
+    pub phase: String,
+    pub message: Option<String>,
 }
 
 impl BackendReadyState {
     pub fn new() -> Self {
         Self {
-            ready: AtomicBool::new(false),
+            status: StdMutex::new(BackendStartupStatus {
+                phase: "initializing".to_string(),
+                message: None,
+            }),
         }
     }
 
     pub fn is_ready(&self) -> bool {
-        self.ready.load(Ordering::SeqCst)
+        self.status().phase == "ready"
+    }
+
+    pub fn status(&self) -> BackendStartupStatus {
+        self.status
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     pub fn mark_ready(&self) {
-        self.ready.store(true, Ordering::SeqCst)
+        *self
+            .status
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = BackendStartupStatus {
+            phase: "ready".to_string(),
+            message: None,
+        };
+    }
+
+    pub fn mark_failed(&self, message: String) {
+        *self
+            .status
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = BackendStartupStatus {
+            phase: "failed".to_string(),
+            message: Some(message),
+        };
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::apis::ai_client::plugins::{PluginInfo, list_plugins_for_kind};
-use crate::state::{BackendReadyState, SearchEngineState};
+use crate::state::{BackendReadyState, BackendStartupStatus, SearchEngineState};
 use crate::{AiState, ApiKeyStore, AppSettings, SettingsState};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -294,6 +294,16 @@ pub fn setting_is_backend_ready(app: AppHandle) -> bool {
     app.try_state::<BackendReadyState>()
         .map(|state| state.is_ready())
         .unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn setting_get_backend_status(app: AppHandle) -> BackendStartupStatus {
+    app.try_state::<BackendReadyState>()
+        .map(|state| state.status())
+        .unwrap_or(BackendStartupStatus {
+            phase: "initializing".to_string(),
+            message: None,
+        })
 }
 
 // ── API Key 管理 ──────────────────────────────────────────────────────────────

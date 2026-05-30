@@ -63,7 +63,6 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime, UriSchemeContext,
     http::{Response, StatusCode, header::CONTENT_TYPE},
 };
-use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log;
 use tokio::sync::Mutex;
 #[cfg(not(target_os = "android"))]
@@ -267,8 +266,13 @@ pub fn run() {
             }
 
             // 异步初始化数据库
-            let db_path = prepare_db_path(&app_handle, &resolved_db_path)
-                .unwrap_or_else(|e| fatal(&app_handle, &e.to_string()));
+            let db_path = match prepare_db_path(&app_handle, &resolved_db_path) {
+                Ok(path) => path,
+                Err(e) => {
+                    mark_backend_failed(&app_handle, e.to_string());
+                    return Ok(());
+                }
+            };
             let snapshot_dir = db_path.parent().map(|p| p.join("snapshots"));
 
             tauri::async_runtime::spawn(async move {
@@ -302,7 +306,7 @@ pub fn run() {
                             // 再初始化 AI 客户端（需要 AppState）
                             std::fs::create_dir_all(&resolved_plugins_path).ok();
                             let chats_path = db_path.parent().map(|p| p.join("chats"));
-                            match AiState::new(
+                            let ai_state = match AiState::new(
                                 resolved_plugins_path,
                                 chats_path,
                                 app_state,
@@ -310,24 +314,33 @@ pub fn run() {
                                 app.clone(),
                                 pending_edits,
                             ) {
-                                Ok(ai_state) => {
-                                    app.manage(ai_state);
+                                Ok(ai_state) => ai_state,
+                                Err(e) => {
+                                    if let Some(ready_state) = app.try_state::<BackendReadyState>()
+                                    {
+                                        ready_state
+                                            .mark_failed(format!("AI 客户端初始化失败: {}", e));
+                                    }
+                                    emit_backend_status(&app);
+                                    return;
                                 }
-                                Err(e) => log::warn!("AI 客户端初始化失败（无插件）: {}", e),
-                            }
+                            };
+                            app.manage(ai_state);
                             if let Some(ready_state) = app.try_state::<BackendReadyState>() {
                                 ready_state.mark_ready();
                             }
                             start_auto_backup_worker(app.clone());
-                            app.emit("backend-ready", ()).ok();
+                            emit_backend_status(&app);
                         }) {
                             log::error!("run_on_main_thread failed: {}", e);
-                            fatal(&app_handle, &format!("run_on_main_thread failed: {}", e));
+                            mark_backend_failed(
+                                &app_handle,
+                                format!("run_on_main_thread failed: {}", e),
+                            );
                         }
                     }
                     Err(e) => {
-                        log::error!("数据库初始化失败: {}", e);
-                        fatal(&app_handle, &format!("数据库初始化失败: {}", e));
+                        mark_backend_failed(&app_handle, format!("数据库初始化失败: {}", e));
                     }
                 }
             });
@@ -471,6 +484,7 @@ pub fn run() {
             setting_open_backup_dir,
             setting_export_theme_config,
             setting_is_backend_ready,
+            setting_get_backend_status,
             setting_set_api_key,
             setting_has_api_key,
             setting_delete_api_key,
@@ -567,11 +581,25 @@ fn prepare_db_path(_app: &AppHandle, db_dir: &Path) -> Result<PathBuf> {
     Ok(db_path)
 }
 
-fn fatal<R: Runtime, M: Manager<R>>(manager: &M, msg: &str) -> ! {
-    if let Some(w) = manager.get_webview_window("main") {
-        let _ = w.dialog().message(msg).blocking_show();
+fn emit_backend_status<R: Runtime>(app: &AppHandle<R>) {
+    let Some(state) = app.try_state::<BackendReadyState>() else {
+        return;
+    };
+
+    let status = state.status();
+    let is_ready = status.phase == "ready";
+    app.emit("backend-status-changed", status).ok();
+    if is_ready {
+        app.emit("backend-ready", ()).ok();
     }
-    exit(1);
+}
+
+fn mark_backend_failed<R: Runtime>(app: &AppHandle<R>, message: String) {
+    log::error!("{}", message);
+    if let Some(state) = app.try_state::<BackendReadyState>() {
+        state.mark_failed(message);
+        emit_backend_status(app);
+    }
 }
 
 fn build_fcimg_response(

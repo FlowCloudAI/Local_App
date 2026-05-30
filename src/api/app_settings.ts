@@ -92,6 +92,13 @@ export interface SettingsBootstrap {
     defaultPaths: DefaultPaths
 }
 
+export type BackendStartupPhase = 'initializing' | 'ready' | 'failed'
+
+export interface BackendStartupStatus {
+    phase: BackendStartupPhase
+    message: string | null
+}
+
 export const setting_get_settings = () => command<AppSettings>('setting_get_settings')
 
 export const setting_get_settings_bootstrap = () =>
@@ -113,6 +120,9 @@ export const setting_export_theme_config = (path: string, content: string) =>
 
 export const setting_is_backend_ready = () =>
     command<boolean>('setting_is_backend_ready')
+
+export const setting_get_backend_status = () =>
+    command<BackendStartupStatus>('setting_get_backend_status')
 
 export const setting_set_api_key = (pluginId: string, apiKey: string) =>
   command<void>('setting_set_api_key', { pluginId, apiKey })

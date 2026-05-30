@@ -1,7 +1,7 @@
 import {logger} from '../../shared/logger'
 import '../../App.css'
 import {Button, SideBar, type SideBarItem, TabBar, type TabItem, useAlert} from 'flowcloudai-ui'
-import {db_get_entry, db_get_project, type PlatformInfo, type Project, setting_is_backend_ready, showWindow} from '../../api'
+import {db_get_entry, db_get_project, type BackendStartupStatus, type PlatformInfo, type Project, setting_get_backend_status, showWindow} from '../../api'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import EntryEditModal from '../../features/entries/components/EntryEditModal'
 import type {AiFocus} from '../../features/ai-chat/hooks/useAiController'
@@ -252,7 +252,100 @@ function desktopTabReducer(state: DesktopTabState, action: DesktopTabAction): De
     }
 }
 
+const initialBackendStartupStatus: BackendStartupStatus = {
+    phase: 'initializing',
+    message: null,
+}
+
+function useBackendStartupStatus() {
+    const [backendStatus, setBackendStatus] = useState<BackendStartupStatus>(initialBackendStartupStatus)
+
+    useEffect(() => {
+        let disposed = false
+
+        const applyStatus = (status: BackendStartupStatus) => {
+            if (disposed) return
+            setBackendStatus(status)
+        }
+
+        const statusListener = listen<BackendStartupStatus>('backend-status-changed', (event) => {
+            applyStatus(event.payload)
+        })
+
+        setting_get_backend_status()
+            .then(applyStatus)
+            .catch((error) => {
+                logger.warn('检查后端启动状态失败', error)
+            })
+
+        return () => {
+            disposed = true
+            statusListener.then(fn => fn())
+        }
+    }, [])
+
+    return backendStatus
+}
+
+function BackendStartupScreen({status}: { status: BackendStartupStatus }) {
+    const failed = status.phase === 'failed'
+
+    return (
+        <div className="app-layout" style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            background: 'var(--fc-color-bg)',
+            color: 'var(--fc-color-text-secondary)',
+            fontSize: 'var(--fc-font-size-sm)',
+            userSelect: 'none',
+            textAlign: 'center',
+            padding: 24,
+        }}>
+            <div>
+                <div style={{
+                    color: failed ? 'var(--fc-color-danger, #c2410c)' : 'var(--fc-color-text)',
+                    fontSize: 'var(--fc-font-size-md)',
+                    marginBottom: 8,
+                }}>
+                    {failed ? '启动失败' : '正在启动...'}
+                </div>
+                <div style={{
+                    maxWidth: 520,
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                }}>
+                    {failed ? status.message ?? '后端初始化失败' : '正在初始化本地数据'}
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function DesktopApp({platformInfo}: DesktopAppProps) {
+    const backendStatus = useBackendStartupStatus()
+
+    useEffect(() => {
+        const shouldShowWindow = backendStatus.phase === 'ready' || backendStatus.phase === 'failed'
+        if (!shouldShowWindow || !platformInfo.windowControls || desktopWindowShown) return
+        desktopWindowShown = true
+        requestAnimationFrame(() => {
+            showWindow().catch((error) => {
+                desktopWindowShown = false
+                logger.error('显示桌面窗口失败', error)
+            })
+        })
+    }, [backendStatus.phase, platformInfo.windowControls])
+
+    if (backendStatus.phase !== 'ready') {
+        return <BackendStartupScreen status={backendStatus}/>
+    }
+
+    return <DesktopAppContent/>
+}
+
+function DesktopAppContent() {
     const win = getCurrentWindow()
     const {showAlert} = useAlert()
     const windowClosingRef = useRef(false)
@@ -296,42 +389,6 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
     const [fullscreenSideWidth, setFullscreenSideWidth] = useState(FULLSCREEN_SIDE_DEFAULT_WIDTH)
     const [fullscreenSideCollapsed, setFullscreenSideCollapsed] = useState(false)
-    const [backendReady, setBackendReady] = useState(false)
-
-    useEffect(() => {
-        let disposed = false
-
-        const markBackendReady = () => {
-            if (!disposed) setBackendReady(true)
-        }
-
-        const p = listen('backend-ready', markBackendReady)
-
-        setting_is_backend_ready()
-            .then((ready) => {
-                if (ready) markBackendReady()
-            })
-            .catch((error) => {
-                logger.warn('检查后端启动状态失败', error)
-            })
-
-        return () => {
-            disposed = true
-            p.then(fn => fn())
-        }
-    }, [])
-
-    useEffect(() => {
-        if (!backendReady || !platformInfo.windowControls || desktopWindowShown) return
-        desktopWindowShown = true
-        requestAnimationFrame(() => {
-            showWindow().catch((error) => {
-                desktopWindowShown = false
-                logger.error('显示桌面窗口失败', error)
-            })
-        })
-    }, [backendReady, platformInfo.windowControls])
-
     useEffect(() => {
         if (aiPanelCollapsed) return
         setMountedSidePanelKeys(prev => (
@@ -1089,23 +1146,6 @@ export default function DesktopApp({platformInfo}: DesktopAppProps) {
     const bottomItems: SideBarItem[] = [
         {key: 'settings', label: '设置', icon: SettingsIcon},
     ]
-
-    if (!backendReady) {
-        return (
-            <div className="app-layout" style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100vh',
-                background: 'var(--fc-color-bg)',
-                color: 'var(--fc-color-text-secondary)',
-                fontSize: 'var(--fc-font-size-sm)',
-                userSelect: 'none',
-            }}>
-                正在启动…
-            </div>
-        )
-    }
 
     return (
         <div className="app-layout">
