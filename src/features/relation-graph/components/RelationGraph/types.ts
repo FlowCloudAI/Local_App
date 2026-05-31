@@ -28,6 +28,58 @@ export interface LayoutRequest {
     nodeOrigin?: [number, number];
     nodes: LayoutNode[];
     edges: LayoutEdge[];
+    /** 可选布局参数，由宿主决定是否转发给具体布局实现。 */
+    params?: RelationLayoutParams;
+}
+
+/** 后端布局算法支持的可选参数。字段为 camelCase，对应 Rust 侧 LayoutParamsPayload。 */
+export interface RelationLayoutParams {
+    collisionPadding?: number;
+    nodeGap?: number;
+    collisionPassesPerIteration?: number;
+    finalCollisionPasses?: number;
+    edgeLengthAlphaRho?: number;
+    edgeLengthAlphaCv?: number;
+    edgeLengthMin?: number;
+    edgeLengthMax?: number;
+    twoWayEdgeLengthFactor?: number;
+    twoWayAttractionWeight?: number;
+    initialTemperatureGamma?: number;
+    minTemperatureGamma?: number;
+    minTemperatureRatio?: number;
+    iterationBase?: number;
+    iterationSqrtScale?: number;
+    iterationRhoScale?: number;
+    iterationMin?: number;
+    iterationMax?: number;
+    initRadiusBetaRmax?: number;
+    estimatedAreaBetaRho?: number;
+    estimatedAreaBetaCv?: number;
+    pathishEdgeLengthReduction?: number;
+    pathishInitRadiusReduction?: number;
+    pathishAxisCompactionMax?: number;
+    pathishRadialPullMax?: number;
+    pathishLeafPullMax?: number;
+    pathishBranchSmoothingMax?: number;
+    postLayoutCompactionPasses?: number;
+    earlyStopThreshold?: number;
+    earlyStopStreak?: number;
+    componentGap?: number;
+    shelfRowMaxWidth?: number;
+    isolatedNodeHorizontalGap?: number;
+    clusterBoxGap?: number;
+    clusterLinkDistanceBase?: number;
+    clusterRepulsionSoft?: number;
+    clusterCenterPull?: number;
+    clusterTemperatureInitial?: number;
+    clusterTemperatureDecay?: number;
+    clusterIterations?: number;
+    clusterTwoWayBonus?: number;
+    fixedRandomSeed?: number;
+    minDistance?: number;
+    attractiveDirectionSalt?: number;
+    finalCollisionSalt?: number;
+    collisionDirectionSalt?: number;
 }
 
 /** 布局后端返回的单个节点位置。 */

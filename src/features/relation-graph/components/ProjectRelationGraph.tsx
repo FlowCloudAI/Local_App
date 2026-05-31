@@ -7,6 +7,7 @@ import type {
     LayoutFunction,
     LayoutRequest,
     LayoutResponse,
+    RelationLayoutParams,
     RelationLayoutState,
     RelationNodeInput,
 } from './RelationGraph/types'
@@ -60,6 +61,168 @@ type ProjectRelationNode = RelationNodeInput & RelationGraphNode & {entryType?: 
 
 /** 一次性拉取的词条数量上限，用于把 type 映射到图节点；超出的节点回退为无类型样式。 */
 const ENTRY_TYPE_LOOKUP_LIMIT = 2000
+const DEFAULT_LAYOUT_LOOSENESS = 1
+
+type LayoutParamMode = 'simple' | 'advanced'
+
+type LayoutParamKey =
+    | 'collisionPadding'
+    | 'nodeGap'
+    | 'collisionPassesPerIteration'
+    | 'finalCollisionPasses'
+    | 'edgeLengthAlphaRho'
+    | 'edgeLengthAlphaCv'
+    | 'edgeLengthMin'
+    | 'edgeLengthMax'
+    | 'twoWayEdgeLengthFactor'
+    | 'twoWayAttractionWeight'
+    | 'initialTemperatureGamma'
+    | 'minTemperatureGamma'
+    | 'minTemperatureRatio'
+    | 'iterationBase'
+    | 'iterationSqrtScale'
+    | 'iterationRhoScale'
+    | 'iterationMin'
+    | 'iterationMax'
+    | 'initRadiusBetaRmax'
+    | 'estimatedAreaBetaRho'
+    | 'estimatedAreaBetaCv'
+    | 'pathishEdgeLengthReduction'
+    | 'pathishInitRadiusReduction'
+    | 'pathishAxisCompactionMax'
+    | 'pathishRadialPullMax'
+    | 'pathishLeafPullMax'
+    | 'pathishBranchSmoothingMax'
+    | 'postLayoutCompactionPasses'
+    | 'earlyStopThreshold'
+    | 'earlyStopStreak'
+    | 'componentGap'
+    | 'shelfRowMaxWidth'
+    | 'isolatedNodeHorizontalGap'
+    | 'clusterBoxGap'
+    | 'clusterLinkDistanceBase'
+    | 'clusterRepulsionSoft'
+    | 'clusterCenterPull'
+    | 'clusterTemperatureInitial'
+    | 'clusterTemperatureDecay'
+    | 'clusterIterations'
+    | 'clusterTwoWayBonus'
+
+interface LayoutParamField {
+    key: LayoutParamKey
+    label: string
+    min?: number
+    max?: number
+    step?: number
+    integer?: boolean
+}
+
+const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
+    collisionPadding: 40,
+    nodeGap: 28,
+    collisionPassesPerIteration: 5,
+    finalCollisionPasses: 40,
+    edgeLengthAlphaRho: 0.7,
+    edgeLengthAlphaCv: 0.5,
+    edgeLengthMin: 100,
+    edgeLengthMax: 320,
+    twoWayEdgeLengthFactor: 0.84,
+    twoWayAttractionWeight: 1.68,
+    initialTemperatureGamma: 0.26,
+    minTemperatureGamma: 0.08,
+    minTemperatureRatio: 1.5,
+    iterationBase: 54,
+    iterationSqrtScale: 28,
+    iterationRhoScale: 150,
+    iterationMin: 72,
+    iterationMax: 360,
+    initRadiusBetaRmax: 1,
+    estimatedAreaBetaRho: 0.9,
+    estimatedAreaBetaCv: 0.65,
+    pathishEdgeLengthReduction: 0.32,
+    pathishInitRadiusReduction: 0.34,
+    pathishAxisCompactionMax: 0.36,
+    pathishRadialPullMax: 0.2,
+    pathishLeafPullMax: 0.34,
+    pathishBranchSmoothingMax: 0.28,
+    postLayoutCompactionPasses: 5,
+    earlyStopThreshold: 0.14,
+    earlyStopStreak: 12,
+    componentGap: 84,
+    shelfRowMaxWidth: 1800,
+    isolatedNodeHorizontalGap: 56,
+    clusterBoxGap: 56,
+    clusterLinkDistanceBase: 100,
+    clusterRepulsionSoft: 14,
+    clusterCenterPull: 0.02,
+    clusterTemperatureInitial: 42,
+    clusterTemperatureDecay: 0.95,
+    clusterIterations: 80,
+    clusterTwoWayBonus: 0.35,
+}
+
+const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}> = [
+    {
+        title: '间距',
+        fields: [
+            {key: 'collisionPadding', label: '碰撞留白', min: 0, step: 4},
+            {key: 'nodeGap', label: '节点空隙', min: 0, step: 4},
+            {key: 'componentGap', label: '分量间距', min: 0, step: 8},
+            {key: 'isolatedNodeHorizontalGap', label: '孤立节点间距', min: 0, step: 4},
+            {key: 'clusterBoxGap', label: '簇盒间距', min: 0, step: 4},
+            {key: 'shelfRowMaxWidth', label: '单行宽度', min: 300, step: 50},
+        ],
+    },
+    {
+        title: '边长',
+        fields: [
+            {key: 'edgeLengthMin', label: '最小边长', min: 20, step: 10},
+            {key: 'edgeLengthMax', label: '最大边长', min: 40, step: 10},
+            {key: 'edgeLengthAlphaRho', label: '密度放大', min: 0, step: 0.05},
+            {key: 'edgeLengthAlphaCv', label: '离散放大', min: 0, step: 0.05},
+            {key: 'twoWayEdgeLengthFactor', label: '双向边长度因子', min: 0.2, max: 1.5, step: 0.02},
+            {key: 'twoWayAttractionWeight', label: '双向边吸引权重', min: 0.1, step: 0.05},
+        ],
+    },
+    {
+        title: '迭代',
+        fields: [
+            {key: 'iterationBase', label: '基础轮数', min: 0, step: 2},
+            {key: 'iterationSqrtScale', label: '节点数轮数系数', min: 0, step: 2},
+            {key: 'iterationRhoScale', label: '密度轮数系数', min: 0, step: 10},
+            {key: 'iterationMin', label: '最少轮数', min: 1, step: 4, integer: true},
+            {key: 'iterationMax', label: '最多轮数', min: 1, step: 10, integer: true},
+            {key: 'collisionPassesPerIteration', label: '每轮碰撞修正', min: 0, step: 1, integer: true},
+            {key: 'finalCollisionPasses', label: '最终碰撞修正', min: 0, step: 2, integer: true},
+            {key: 'earlyStopThreshold', label: '早停阈值', min: 0, step: 0.01},
+            {key: 'earlyStopStreak', label: '早停连续轮数', min: 1, step: 1, integer: true},
+        ],
+    },
+    {
+        title: '链状结构',
+        fields: [
+            {key: 'pathishEdgeLengthReduction', label: '链状边长回缩', min: 0, max: 1, step: 0.02},
+            {key: 'pathishInitRadiusReduction', label: '链状初始回缩', min: 0, max: 1, step: 0.02},
+            {key: 'pathishAxisCompactionMax', label: '主轴压缩', min: 0, max: 1, step: 0.02},
+            {key: 'pathishRadialPullMax', label: '外圈回收', min: 0, max: 1, step: 0.02},
+            {key: 'pathishLeafPullMax', label: '叶节点回拽', min: 0, max: 1, step: 0.02},
+            {key: 'pathishBranchSmoothingMax', label: '枝条平滑', min: 0, max: 1, step: 0.02},
+            {key: 'postLayoutCompactionPasses', label: '后处理压缩轮数', min: 0, step: 1, integer: true},
+        ],
+    },
+    {
+        title: '簇布局',
+        fields: [
+            {key: 'clusterLinkDistanceBase', label: '簇连接距离', min: 0, step: 10},
+            {key: 'clusterRepulsionSoft', label: '簇斥力', min: 0, step: 1},
+            {key: 'clusterCenterPull', label: '簇向心力', min: 0, step: 0.01},
+            {key: 'clusterTemperatureInitial', label: '簇初始温度', min: 0, step: 2},
+            {key: 'clusterTemperatureDecay', label: '簇温度衰减', min: 0.5, max: 0.999, step: 0.005},
+            {key: 'clusterIterations', label: '簇迭代轮数', min: 1, step: 5, integer: true},
+            {key: 'clusterTwoWayBonus', label: '跨簇双向奖励', min: 0, step: 0.05},
+        ],
+    },
+]
 
 function normalizeError(error: unknown): Error {
     return error instanceof Error ? error : new Error(typeof error === 'string' ? error : '未知错误')
@@ -85,6 +248,54 @@ function coverSrc(node: RelationGraphNode): string {
     return convertFileSrc(String(cover), 'fcimg')
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value))
+}
+
+function roundLayoutParam(value: number): number {
+    return Number(value.toFixed(4))
+}
+
+function cloneDefaultLayoutParams(): RelationLayoutParams {
+    return {...LAYOUT_PARAM_DEFAULTS}
+}
+
+function normalizeLayoutParams(params: RelationLayoutParams): RelationLayoutParams {
+    const next: RelationLayoutParams = {}
+    for (const [key, value] of Object.entries(params) as Array<[keyof RelationLayoutParams, unknown]>) {
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            next[key] = value
+        }
+    }
+    return next
+}
+
+function buildSimpleLayoutParams(looseness: number): RelationLayoutParams {
+    const scale = clampNumber(looseness, 0.65, 1.8)
+    const edgeScale = Math.pow(scale, 1.08)
+
+    return {
+        collisionPadding: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.collisionPadding * scale),
+        nodeGap: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.nodeGap * scale),
+        edgeLengthMin: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.edgeLengthMin * edgeScale),
+        edgeLengthMax: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.edgeLengthMax * edgeScale),
+        componentGap: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.componentGap * scale),
+        isolatedNodeHorizontalGap: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.isolatedNodeHorizontalGap * scale),
+        clusterBoxGap: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.clusterBoxGap * scale),
+        clusterLinkDistanceBase: roundLayoutParam(LAYOUT_PARAM_DEFAULTS.clusterLinkDistanceBase * scale),
+    }
+}
+
+function parseLayoutParamInput(rawValue: string, integer?: boolean): number | undefined {
+    const trimmed = rawValue.trim()
+    if (!trimmed) return undefined
+
+    const parsed = Number(trimmed)
+    if (!Number.isFinite(parsed)) return undefined
+
+    return integer ? Math.round(parsed) : parsed
+}
+
 export default function ProjectRelationGraph({projectId, onBack}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
     const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
@@ -93,6 +304,13 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
     const [dataLoading, setDataLoading] = useState(false)
     const [dataError, setDataError] = useState<Error | null>(null)
     const [layoutState, setLayoutState] = useState<RelationLayoutState>(INITIAL_LAYOUT_STATE)
+    const [layoutPanelOpen, setLayoutPanelOpen] = useState(false)
+    const [layoutParamMode, setLayoutParamMode] = useState<LayoutParamMode>('simple')
+    const [layoutLooseness, setLayoutLooseness] = useState(DEFAULT_LAYOUT_LOOSENESS)
+    const [advancedLayoutParams, setAdvancedLayoutParams] = useState<RelationLayoutParams>(() => cloneDefaultLayoutParams())
+    const [appliedLayoutParams, setAppliedLayoutParams] = useState<RelationLayoutParams>(
+        () => buildSimpleLayoutParams(DEFAULT_LAYOUT_LOOSENESS),
+    )
 
     // 词条类型以 type key 索引，供节点解析颜色与图标。
     const entryTypeByKey = useMemo(() => {
@@ -136,6 +354,7 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
             nodeOrigin: request.nodeOrigin ?? null,
             nodes: request.nodes,
             edges: request.edges,
+            params: request.params ?? appliedLayoutParams,
         })
 
         return {
@@ -143,11 +362,43 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
             bounds: response.bounds ?? undefined,
             layoutHash: response.layoutHash ?? undefined,
         }
-    }, [])
+    }, [appliedLayoutParams])
 
     const handleRefresh = useCallback(() => {
         void loadGraphData()
     }, [loadGraphData])
+
+    const handleAdvancedLayoutParamChange = useCallback((
+        key: LayoutParamKey,
+        rawValue: string,
+        integer?: boolean,
+    ) => {
+        const value = parseLayoutParamInput(rawValue, integer)
+        setAdvancedLayoutParams((current) => ({
+            ...current,
+            [key]: value,
+        }))
+    }, [])
+
+    const handleResetLayoutParams = useCallback(() => {
+        if (layoutParamMode === 'simple') {
+            setLayoutLooseness(DEFAULT_LAYOUT_LOOSENESS)
+            return
+        }
+
+        setAdvancedLayoutParams(cloneDefaultLayoutParams())
+    }, [layoutParamMode])
+
+    const handleApplyLayoutParams = useCallback(() => {
+        const nextParams = layoutParamMode === 'simple'
+            ? buildSimpleLayoutParams(layoutLooseness)
+            : normalizeLayoutParams(advancedLayoutParams)
+
+        setAppliedLayoutParams(nextParams)
+        setLayoutState(INITIAL_LAYOUT_STATE)
+        setGraphKey((prev) => prev + 1)
+        setLayoutPanelOpen(false)
+    }, [advancedLayoutParams, layoutLooseness, layoutParamMode])
 
     const statsChips = [
         {label: '词条', value: nodes.length},
@@ -215,6 +466,9 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                     </p>
                 </div>
                 <div className="fc-op-header__actions">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(true)}>
+                        布局参数
+                    </Button>
                     <Button type="button" size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
                         {dataLoading ? '刷新中' : '刷新'}
                     </Button>
@@ -255,6 +509,103 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
             {layoutState.layoutError && (
                 <div className="fc-status-banner fc-status-banner--error">
                     布局失败：{layoutState.layoutError.message}
+                </div>
+            )}
+
+            {layoutPanelOpen && (
+                <div className="rg-layout-modal-backdrop" role="presentation" onMouseDown={() => setLayoutPanelOpen(false)}>
+                    <div
+                        className="rg-layout-dialog"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="布局参数"
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <div className="rg-layout-dialog__header">
+                            <h3>布局参数</h3>
+                            <button
+                                type="button"
+                                className="rg-layout-dialog__close"
+                                aria-label="关闭"
+                                onClick={() => setLayoutPanelOpen(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="rg-layout-dialog__body">
+                            <div className="rg-layout-mode">
+                                {(['simple', 'advanced'] as LayoutParamMode[]).map((mode) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        className={`rg-layout-mode__item${layoutParamMode === mode ? ' is-active' : ''}`}
+                                        onClick={() => setLayoutParamMode(mode)}
+                                    >
+                                        {mode === 'simple' ? '简单' : '高级'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {layoutParamMode === 'simple' ? (
+                                <div className="rg-layout-simple">
+                                    <div className="rg-layout-slider">
+                                        <label>
+                                            松散程度
+                                            <span>{layoutLooseness.toFixed(2)}x</span>
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min="0.65"
+                                            max="1.8"
+                                            step="0.05"
+                                            value={layoutLooseness}
+                                            onChange={(event) => setLayoutLooseness(Number(event.target.value))}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rg-layout-advanced">
+                                    {ADVANCED_LAYOUT_GROUPS.map((group) => (
+                                        <section key={group.title} className="rg-layout-group">
+                                            <h4>{group.title}</h4>
+                                            <div className="rg-layout-field-grid">
+                                                {group.fields.map((field) => (
+                                                    <label key={field.key} className="rg-layout-field">
+                                                        <span>{field.label}</span>
+                                                        <input
+                                                            type="number"
+                                                            min={field.min}
+                                                            max={field.max}
+                                                            step={field.step ?? (field.integer ? 1 : 0.01)}
+                                                            value={advancedLayoutParams[field.key] ?? ''}
+                                                            onChange={(event) => handleAdvancedLayoutParamChange(
+                                                                field.key,
+                                                                event.target.value,
+                                                                field.integer,
+                                                            )}
+                                                        />
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="rg-layout-dialog__footer">
+                            <Button type="button" size="sm" variant="outline" onClick={handleResetLayoutParams}>
+                                恢复默认
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(false)}>
+                                取消
+                            </Button>
+                            <Button type="button" size="sm" onClick={handleApplyLayoutParams}>
+                                应用并重新布局
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             )}
 
