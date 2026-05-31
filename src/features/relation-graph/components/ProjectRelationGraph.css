@@ -130,8 +130,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--fc-space-lg, 16px);
-    background: rgba(15, 23, 42, 0.34);
-    backdrop-filter: blur(2px);
+    background: rgba(0, 0, 0, 0.42);
 }
 
 .rg-layout-dialog {
@@ -167,21 +166,8 @@
 .rg-layout-dialog__close {
     width: 28px;
     height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: var(--fc-radius-sm, 4px);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
     font-size: 20px;
     line-height: 1;
-}
-
-.rg-layout-dialog__close:hover {
-    background: var(--fc-color-bg-secondary);
-    color: var(--fc-color-text);
 }
 
 .rg-layout-dialog__body {
@@ -194,36 +180,12 @@
     justify-content: flex-end;
     border-top: 1px solid var(--fc-color-border);
     border-bottom: none;
+    width: 100%;
 }
 
 .rg-layout-mode {
-    display: inline-flex;
-    padding: 3px;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md, 8px);
-    background: var(--fc-color-bg-secondary);
-}
-
-.rg-layout-mode__item {
-    min-width: 72px;
-    border: none;
-    border-radius: calc(var(--fc-radius-md, 8px) - 3px);
-    padding: 6px 12px;
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--fc-font-size-sm, 13px);
-}
-
-.rg-layout-mode__item:hover {
-    color: var(--fc-color-text);
-}
-
-.rg-layout-mode__item.is-active {
-    background: var(--fc-color-bg-elevated);
-    color: var(--fc-color-primary);
-    box-shadow: var(--fc-shadow-xs, 0 1px 2px rgba(0, 0, 0, 0.1));
+    width: max-content;
+    max-width: 100%;
 }
 
 .rg-layout-simple {
@@ -253,11 +215,6 @@
 .rg-layout-slider label span {
     color: var(--fc-color-primary);
     font-variant-numeric: tabular-nums;
-}
-
-.rg-layout-slider input[type="range"] {
-    width: 100%;
-    accent-color: var(--fc-color-primary);
 }
 
 .rg-layout-advanced {
@@ -292,24 +249,6 @@
     display: grid;
     gap: 4px;
     min-width: 0;
-}
-
-.rg-layout-field input {
-    width: 100%;
-    min-width: 0;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-sm, 4px);
-    padding: 6px 8px;
-    background: var(--fc-color-bg-elevated);
-    color: var(--fc-color-text);
-    font: inherit;
-    font-size: var(--fc-font-size-sm, 13px);
-}
-
-.rg-layout-field input:focus {
-    outline: none;
-    border-color: var(--fc-color-primary);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 20%, transparent);
 }
 
 @media (max-width: 640px) {

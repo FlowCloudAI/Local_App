@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {Button} from 'flowcloudai-ui'
+import {Button, ButtonToolbar, Input, Slider, TabBar} from 'flowcloudai-ui'
 import {RelationGraph} from './RelationGraph/RelationGraph'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
 import type {
@@ -380,6 +380,10 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
         }))
     }, [])
 
+    const handleLayoutLoosenessChange = useCallback((value: number | [number, number]) => {
+        setLayoutLooseness(Array.isArray(value) ? value[0] : value)
+    }, [])
+
     const handleResetLayoutParams = useCallback(() => {
         if (layoutParamMode === 'simple') {
             setLayoutLooseness(DEFAULT_LAYOUT_LOOSENESS)
@@ -523,29 +527,35 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                     >
                         <div className="rg-layout-dialog__header">
                             <h3>布局参数</h3>
-                            <button
+                            <Button
                                 type="button"
+                                size="xs"
+                                variant="ghost"
+                                iconOnly
                                 className="rg-layout-dialog__close"
                                 aria-label="关闭"
                                 onClick={() => setLayoutPanelOpen(false)}
                             >
                                 ×
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="rg-layout-dialog__body">
-                            <div className="rg-layout-mode">
-                                {(['simple', 'advanced'] as LayoutParamMode[]).map((mode) => (
-                                    <button
-                                        key={mode}
-                                        type="button"
-                                        className={`rg-layout-mode__item${layoutParamMode === mode ? ' is-active' : ''}`}
-                                        onClick={() => setLayoutParamMode(mode)}
-                                    >
-                                        {mode === 'simple' ? '简单' : '高级'}
-                                    </button>
-                                ))}
-                            </div>
+                            <TabBar
+                                className="rg-layout-mode"
+                                variant="floating"
+                                radius="md"
+                                tabRadius="sm"
+                                fillWidth={false}
+                                minTabWidth="72px"
+                                maxTabWidth="96px"
+                                items={[
+                                    {key: 'simple', label: '简单'},
+                                    {key: 'advanced', label: '高级'},
+                                ]}
+                                activeKey={layoutParamMode}
+                                onChange={(key) => setLayoutParamMode(key as LayoutParamMode)}
+                            />
 
                             {layoutParamMode === 'simple' ? (
                                 <div className="rg-layout-simple">
@@ -554,13 +564,13 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                                             松散程度
                                             <span>{layoutLooseness.toFixed(2)}x</span>
                                         </label>
-                                        <input
-                                            type="range"
-                                            min="0.65"
-                                            max="1.8"
-                                            step="0.05"
+                                        <Slider
                                             value={layoutLooseness}
-                                            onChange={(event) => setLayoutLooseness(Number(event.target.value))}
+                                            min={0.65}
+                                            max={1.8}
+                                            step={0.05}
+                                            tooltip
+                                            onChange={handleLayoutLoosenessChange}
                                         />
                                     </div>
                                 </div>
@@ -573,15 +583,17 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                                                 {group.fields.map((field) => (
                                                     <label key={field.key} className="rg-layout-field">
                                                         <span>{field.label}</span>
-                                                        <input
+                                                        <Input
+                                                            size="sm"
                                                             type="number"
                                                             min={field.min}
                                                             max={field.max}
                                                             step={field.step ?? (field.integer ? 1 : 0.01)}
                                                             value={advancedLayoutParams[field.key] ?? ''}
-                                                            onChange={(event) => handleAdvancedLayoutParamChange(
+                                                            showNumberStepper
+                                                            onValueChange={(value) => handleAdvancedLayoutParamChange(
                                                                 field.key,
-                                                                event.target.value,
+                                                                value,
                                                                 field.integer,
                                                             )}
                                                         />
@@ -594,7 +606,7 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                             )}
                         </div>
 
-                        <div className="rg-layout-dialog__footer">
+                        <ButtonToolbar align="right" className="rg-layout-dialog__footer">
                             <Button type="button" size="sm" variant="outline" onClick={handleResetLayoutParams}>
                                 恢复默认
                             </Button>
@@ -604,7 +616,7 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                             <Button type="button" size="sm" onClick={handleApplyLayoutParams}>
                                 应用并重新布局
                             </Button>
-                        </div>
+                        </ButtonToolbar>
                     </div>
                 </div>
             )}
