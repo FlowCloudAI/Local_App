@@ -46,10 +46,6 @@ fn normalize_entry_compare_text(value: &str) -> String {
         .to_string()
 }
 
-fn normalize_entry_lookup_title(value: &str) -> String {
-    value.trim().to_lowercase()
-}
-
 fn normalize_stats_entry_type(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
@@ -974,167 +970,53 @@ pub async fn db_save_entry_bundle(
 
     let db = state.inner().sqlite_db.lock().await;
     let current_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
-
-    let category_id_ref = category_id.as_ref();
-    let same_category_entries = db
-        .list_entries(
-            &project_id,
-            EntryFilter {
-                category_id: category_id_ref,
-                entry_type: None,
-            },
-            1000,
-            0,
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-    let normalized_title = normalize_entry_compare_text(&input.title);
-    if same_category_entries.iter().any(|entry| {
-        entry.id != entry_id && normalize_entry_compare_text(&entry.title) == normalized_title
-    }) {
-        return Err("当前分类下已存在同名词条，请更换标题。".to_string());
-    }
-
-    for draft in &input.relation_drafts {
-        resolve_relation_payload(&entry_id, draft)?;
-    }
+    let content = input.content.clone().unwrap_or_default();
+    let outgoing_link_targets = parse_internal_entry_links(&content)
+        .into_iter()
+        .map(|(entry_id, title)| SaveEntryLinkTarget { entry_id, title })
+        .collect::<Vec<_>>();
+    let relation_patches = input
+        .relation_drafts
+        .iter()
+        .map(|draft| {
+            let (a_id, b_id, relation, content) = resolve_relation_payload(&entry_id, draft)?;
+            let id = draft.id.as_deref().and_then(|id| Uuid::parse_str(id).ok());
+            Ok(SaveEntryRelationPatch {
+                id,
+                a_id,
+                b_id,
+                relation,
+                content,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
 
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, input.images)?;
     let cover_path =
         prepare_entry_cover_path(paths.inner(), &current_entry.project_id, images.as_deref());
-    let entry = db
-        .update_entry(
-            &entry_id,
-            UpdateEntry {
-                category_id: Some(category_id),
-                title: Some(normalized_title),
-                summary: Some(input.summary),
-                content: Some(input.content.clone().unwrap_or_default()),
-                r#type: Some(input.r#type),
-                tags: input.tags,
-                images,
-                cover_path,
-            },
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let all_entry_briefs = db
-        .list_entries(&project_id, EntryFilter::default(), 1000, 0)
-        .await
-        .map_err(|e| e.to_string())?;
-    let title_to_entry_id = all_entry_briefs
-        .iter()
-        .map(|entry| (normalize_entry_lookup_title(&entry.title), entry.id))
-        .collect::<HashMap<_, _>>();
-    let mut target_ids = Vec::<Uuid>::new();
-    for (entry_id_from_link, title) in
-        parse_internal_entry_links(input.content.as_deref().unwrap_or_default())
-    {
-        if let Some(id) = entry_id_from_link {
-            target_ids.push(id);
-            continue;
-        }
-        if let Some(id) = title_to_entry_id.get(&normalize_entry_lookup_title(&title)) {
-            target_ids.push(*id);
-        }
-    }
-    let outgoing_links = db
-        .replace_outgoing_links(&project_id, &entry_id, &target_ids)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let existing_relations = db
-        .list_relations_for_entry(&entry_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    let current_relation_map = existing_relations
-        .iter()
-        .map(|relation| (relation.id, relation))
-        .collect::<HashMap<_, _>>();
-    let next_relation_ids = input
-        .relation_drafts
-        .iter()
-        .filter_map(|draft| draft.id.as_deref())
-        .filter_map(|id| Uuid::parse_str(id).ok())
-        .collect::<BTreeSet<_>>();
-
-    for draft in &input.relation_drafts {
-        let (a_id, b_id, relation, content) = resolve_relation_payload(&entry_id, draft)?;
-        let existing = draft
-            .id
-            .as_deref()
-            .and_then(|id| Uuid::parse_str(id).ok())
-            .and_then(|id| current_relation_map.get(&id).copied());
-
-        let Some(existing) = existing else {
-            db.create_relation(CreateEntryRelation {
-                project_id,
-                a_id,
-                b_id,
-                relation,
-                content,
-            })
-            .await
-            .map_err(|e| e.to_string())?;
-            continue;
-        };
-
-        if existing.a_id != a_id || existing.b_id != b_id {
-            db.delete_relation(&existing.id)
-                .await
-                .map_err(|e| e.to_string())?;
-            db.create_relation(CreateEntryRelation {
-                project_id,
-                a_id,
-                b_id,
-                relation,
-                content,
-            })
-            .await
-            .map_err(|e| e.to_string())?;
-            continue;
-        }
-
-        if existing.relation != relation
-            || normalize_entry_compare_text(&existing.content) != content
-        {
-            db.update_relation(
-                &existing.id,
-                UpdateEntryRelation {
-                    relation: Some(relation),
-                    content: Some(content),
-                },
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-        }
-    }
-
-    for existing in &existing_relations {
-        if next_relation_ids.contains(&existing.id) {
-            continue;
-        }
-        db.delete_relation(&existing.id)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
-
-    touch_project_updated_at(&db, &project_id).await?;
-    let incoming_links = db
-        .list_incoming_links(&entry_id)
-        .await
-        .map_err(|e| e.to_string())?;
-    let relations = db
-        .list_relations_for_entry(&entry_id)
+    let result = db
+        .save_entry_bundle(SaveEntryBundle {
+            project_id,
+            entry_id,
+            category_id,
+            title: input.title,
+            summary: input.summary,
+            content,
+            r#type: input.r#type,
+            tags: input.tags,
+            images,
+            cover_path,
+            outgoing_link_targets,
+            relation_patches,
+        })
         .await
         .map_err(|e| e.to_string())?;
 
     Ok(SaveEntryBundleResponse {
-        entry,
-        outgoing_links,
-        incoming_links,
-        relations,
+        entry: result.entry,
+        outgoing_links: result.outgoing_links,
+        incoming_links: result.incoming_links,
+        relations: result.relations,
     })
 }
 
