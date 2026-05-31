@@ -24,6 +24,9 @@
         "visible": false,
         "transparent": true,
         "decorations": false,
+        "windowEffects": {
+          "effects": ["acrylic"]
+        },
         "center": true,
         "additionalBrowserArgs": "--disable-extensions --disable-background-networking --disable-sync --metrics-recording-only --disable-component-update --disable-default-apps --disable-domain-reliability --no-first-run --disable-features=Spellcheck,AutofillServerCommunication,Translate,AudioServiceOutOfProcess --proxy-bypass-list=*.localhost"      }
     ],

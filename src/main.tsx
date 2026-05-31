@@ -70,6 +70,13 @@ const initApp = async () => {
         document.body.classList.add('is-tauri')
     }
 
+    // 亚克力毛玻璃：仅 Windows 桌面端透明窗启用（windowEffects 的 acrylic 只在 Windows 生效）。
+    // 命中后外层 chrome 透出磨砂桌面，颜色统一由 CSS 半透明层控制——
+    // Win11 上 windowEffects 的 color 字段无效，故着色不走原生而走 CSS。
+    if (isTauriRuntime() && platformInfo.os === 'windows' && platformInfo.formFactor === 'desktop') {
+        document.documentElement.setAttribute('data-backdrop', 'acrylic')
+    }
+
     // 在 React 渲染前同步写入 data-theme，避免首帧闪白
     const resolvedTheme = initialTheme === 'system'
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')

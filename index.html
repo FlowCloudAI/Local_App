@@ -38,6 +38,11 @@
             }
         }
 
+        /* 亚克力毛玻璃模式：启动期也保持 body 透明，避免不透明底色盖住磨砂层 */
+        html[data-backdrop="acrylic"] body {
+            background: transparent;
+        }
+
         /*
          * 当 #root 为空（React 尚未挂载）时显示 loading 指示器。
          * React render() 后 #root 不再为空，:empty 自动失效，
