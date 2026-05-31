@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {Button} from 'flowcloudai-ui'
 import {RelationGraph} from './RelationGraph/RelationGraph'
+import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
 import type {
     LayoutFunction,
     LayoutRequest,
@@ -9,7 +10,16 @@ import type {
     RelationLayoutState,
     RelationNodeInput,
 } from './RelationGraph/types'
-import {compute_layout, db_get_relation_graph_data, type RelationGraphEdge, type RelationGraphNode,} from '../../../api'
+import {
+    compute_layout,
+    db_get_relation_graph_data,
+    db_list_all_entry_types,
+    db_list_entries,
+    entryTypeKey,
+    type EntryTypeView,
+    type RelationGraphEdge,
+    type RelationGraphNode,
+} from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectRelationGraph.css'
 
@@ -46,7 +56,10 @@ const INITIAL_LAYOUT_STATE: RelationLayoutState = {
     layoutError: null,
 }
 
-type ProjectRelationNode = RelationNodeInput & RelationGraphNode
+type ProjectRelationNode = RelationNodeInput & RelationGraphNode & {entryType?: string | null}
+
+/** 一次性拉取的词条数量上限，用于把 type 映射到图节点；超出的节点回退为无类型样式。 */
+const ENTRY_TYPE_LOOKUP_LIMIT = 2000
 
 function normalizeError(error: unknown): Error {
     return error instanceof Error ? error : new Error(typeof error === 'string' ? error : '未知错误')
@@ -72,26 +85,39 @@ function coverSrc(node: RelationGraphNode): string {
     return convertFileSrc(String(cover), 'fcimg')
 }
 
-function toProjectRelationNode(node: RelationGraphNode): ProjectRelationNode {
-    return {...node}
-}
-
 export default function ProjectRelationGraph({projectId, onBack}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
     const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
     const [edges, setEdges] = useState<RelationGraphEdge[]>([])
+    const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [dataLoading, setDataLoading] = useState(false)
     const [dataError, setDataError] = useState<Error | null>(null)
     const [layoutState, setLayoutState] = useState<RelationLayoutState>(INITIAL_LAYOUT_STATE)
+
+    // 词条类型以 type key 索引，供节点解析颜色与图标。
+    const entryTypeByKey = useMemo(() => {
+        const map = new Map<string, EntryTypeView>()
+        for (const et of entryTypes) {
+            map.set(entryTypeKey(et), et)
+        }
+        return map
+    }, [entryTypes])
 
     const loadGraphData = useCallback(async () => {
         setDataLoading(true)
         setDataError(null)
 
         try {
-            const data = await db_get_relation_graph_data(projectId)
-            setNodes(data.nodes.map(toProjectRelationNode))
+            // 图节点数据不含 type，需并行拉取词条列表（取 id→type）与类型定义（取 color/icon/name）。
+            const [data, entries, types] = await Promise.all([
+                db_get_relation_graph_data(projectId),
+                db_list_entries({projectId, limit: ENTRY_TYPE_LOOKUP_LIMIT, offset: 0}),
+                db_list_all_entry_types(projectId),
+            ])
+            const typeById = new Map(entries.map((entry) => [entry.id, entry.type ?? null]))
+            setNodes(data.nodes.map((node) => ({...node, entryType: typeById.get(node.id) ?? null})))
             setEdges(data.edges)
+            setEntryTypes(types)
             setLayoutState(INITIAL_LAYOUT_STATE)
             setGraphKey((prev) => prev + 1)
         } catch (error) {
@@ -137,27 +163,41 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
 
     const renderNode = useCallback((data: RelationNodeInput, selected: boolean) => {
         const node = data as unknown as ProjectRelationNode
+        const entryType = node.entryType ? entryTypeByKey.get(node.entryType) ?? null : null
+        const accentStyle = entryType?.color
+            ? ({'--rg-accent': entryType.color} as CSSProperties)
+            : undefined
 
         return (
-            <div className={selected ? 'relation-demo-node relation-demo-node--selected' : 'relation-demo-node'}>
-                <div className="relation-demo-node__cover-wrap">
+            <div
+                className={selected ? 'rg-node rg-node--selected' : 'rg-node'}
+                style={accentStyle}
+            >
+                <div className="rg-node__accent" aria-hidden="true"/>
+                <div className="rg-node__cover-wrap">
                     <img
-                        className="relation-demo-node__cover"
+                        className="rg-node__cover"
                         src={coverSrc(node)}
                         alt={node.title}
+                        loading="lazy"
                     />
+                    {entryType && (
+                        <span className="rg-node__type-badge" title={entryType.name}>
+                            <EntryTypeIcon entryType={entryType} className="rg-node__type-icon"/>
+                        </span>
+                    )}
                 </div>
-                <div className="relation-demo-node__body">
-                    <div className="relation-demo-node__title" title={node.title}>
+                <div className="rg-node__body">
+                    <div className="rg-node__title" title={node.title}>
                         {node.title}
                     </div>
-                    <div className="relation-demo-node__summary" title={node.summary}>
+                    <div className="rg-node__summary" title={node.summary}>
                         {node.summary}
                     </div>
                 </div>
             </div>
         )
-    }, [])
+    }, [entryTypeByKey])
 
     return (
         <div className="project-relation-graph fc-op-panel">
