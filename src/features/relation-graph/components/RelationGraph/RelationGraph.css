@@ -13,6 +13,7 @@
     --fc-rg-node-padding:      var(--fc-space-sm, 8px) var(--fc-space-md, 12px);
 
     --fc-rg-edge-color:         var(--fc-gray-400, #b3b3b3);
+    --fc-rg-edge-hover-color:   var(--fc-color-text-secondary, #5f5f5f);
     --fc-rg-edge-selected-color: var(--fc-color-primary, #378add);
 
     --fc-rg-overlay-bg:        rgba(255, 255, 255, 0.82);
@@ -120,14 +121,27 @@
 .fc-rg-edge-label {
     position: absolute;
     pointer-events: all;
-    background-color: var(--fc-rg-node-bg);
-    border: 1px solid var(--fc-rg-node-border);
-    border-radius: var(--fc-radius-sm, 4px);
-    padding: 1px 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--fc-rg-node-bg) 78%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fc-rg-node-border) 70%, transparent);
+    backdrop-filter: blur(3px);
     font-size: var(--fc-font-size-xs, 11px);
     color: var(--fc-color-text-secondary, #5f5f5f);
     white-space: nowrap;
-    line-height: 1.4;
+    line-height: 1.5;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.fc-rg-edge-label:hover {
+    color: var(--fc-color-text, #1a1a1a);
+    border-color: color-mix(in srgb, var(--fc-rg-edge-hover-color) 60%, transparent);
+}
+
+/* 悬停高亮整条边；选中态保持主色，不被悬停色覆盖 */
+.fc-rg .react-flow__edge:hover:not(.selected) .react-flow__edge-path {
+    stroke: var(--fc-rg-edge-hover-color) !important;
 }
 
 /* ─── 加载 / 错误覆盖层 ────────────────────────────────────────────── */

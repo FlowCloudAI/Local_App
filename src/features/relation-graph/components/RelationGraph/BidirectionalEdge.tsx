@@ -168,7 +168,7 @@ export function BidirectionalEdge({
                     stroke: selected
                         ? 'var(--fc-rg-edge-selected-color, var(--fc-color-primary))'
                         : 'var(--fc-rg-edge-color, var(--fc-gray-400))',
-                    strokeWidth: selected ? 2 : 1.5,
+                    strokeWidth: selected ? 2.75 : 2,
                     ...style,
                 }}
             />
