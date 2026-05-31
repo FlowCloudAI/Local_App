@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {Button, ButtonToolbar, Input, Slider, TabBar} from 'flowcloudai-ui'
+import {Button, ButtonGroup, ButtonToolbar, Input, Slider} from 'flowcloudai-ui'
 import {RelationGraph} from './RelationGraph/RelationGraph'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
 import type {
@@ -541,21 +541,24 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                         </div>
 
                         <div className="rg-layout-dialog__body">
-                            <TabBar
-                                className="rg-layout-mode"
-                                variant="floating"
-                                radius="md"
-                                tabRadius="sm"
-                                fillWidth={false}
-                                minTabWidth="72px"
-                                maxTabWidth="96px"
-                                items={[
-                                    {key: 'simple', label: '简单'},
-                                    {key: 'advanced', label: '高级'},
-                                ]}
-                                activeKey={layoutParamMode}
-                                onChange={(key) => setLayoutParamMode(key as LayoutParamMode)}
-                            />
+                            <ButtonGroup className="rg-layout-mode">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={layoutParamMode === 'simple' ? 'primary' : 'secondary'}
+                                    onClick={() => setLayoutParamMode('simple')}
+                                >
+                                    简单
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={layoutParamMode === 'advanced' ? 'primary' : 'secondary'}
+                                    onClick={() => setLayoutParamMode('advanced')}
+                                >
+                                    高级
+                                </Button>
+                            </ButtonGroup>
 
                             {layoutParamMode === 'simple' ? (
                                 <div className="rg-layout-simple">
