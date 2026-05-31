@@ -1833,51 +1833,12 @@ pub async fn cascade_delete_category(
 ) -> Result<(usize, usize), String> {
     let root_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    let root_cat = db.get_category(&root_id).await.map_err(|e| e.to_string())?;
-    let all_cats = db
-        .list_categories(&root_cat.project_id)
+    let result = db
+        .cascade_delete_category(&root_id)
         .await
         .map_err(|e| e.to_string())?;
-    let cat_ids = collect_subtree_ids(root_id, &all_cats);
 
-    let mut entries_deleted = 0usize;
-    for cid in &cat_ids {
-        let mut offset = 0usize;
-        loop {
-            let batch = db
-                .list_entries(
-                    &root_cat.project_id,
-                    EntryFilter {
-                        category_id: Some(cid),
-                        entry_type: None,
-                    },
-                    200,
-                    offset,
-                )
-                .await
-                .map_err(|e| e.to_string())?;
-            if batch.is_empty() {
-                break;
-            }
-            for brief in &batch {
-                db.delete_entry(&brief.id)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                entries_deleted += 1;
-            }
-            if batch.len() < 200 {
-                break;
-            }
-            offset += 200;
-        }
-    }
-
-    // 从叶到根删除分类
-    for cid in cat_ids.iter().rev() {
-        db.delete_category(cid).await.map_err(|e| e.to_string())?;
-    }
-
-    Ok((entries_deleted, cat_ids.len()))
+    Ok((result.deleted_entries, result.deleted_categories))
 }
 
 /// 删除分类并将直接子分类和词条上移到父分类（或根节点）。
@@ -1887,69 +1848,10 @@ pub async fn delete_category_move_to_parent(
 ) -> Result<(), String> {
     let cat_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    let category = db.get_category(&cat_id).await.map_err(|e| e.to_string())?;
-    let new_parent = category.parent_id; // None = 根节点
-
-    // 将直接子分类的 parent_id 指向祖父
-    let all_cats = db
-        .list_categories(&category.project_id)
+    db.delete_category_move_to_parent(&cat_id)
         .await
-        .map_err(|e| e.to_string())?;
-    for child in all_cats.iter().filter(|c| c.parent_id == Some(cat_id)) {
-        db.update_category(
-            &child.id,
-            UpdateCategory {
-                parent_id: Some(new_parent),
-                name: None,
-                sort_order: None,
-            },
-        )
-        .await
-        .map_err(|e| e.to_string())?;
-    }
-
-    // 将该分类下词条移到父分类
-    let mut offset = 0usize;
-    loop {
-        let batch = db
-            .list_entries(
-                &category.project_id,
-                EntryFilter {
-                    category_id: Some(&cat_id),
-                    entry_type: None,
-                },
-                200,
-                offset,
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-        if batch.is_empty() {
-            break;
-        }
-        for brief in &batch {
-            db.update_entry(
-                &brief.id,
-                UpdateEntry {
-                    category_id: Some(new_parent),
-                    title: None,
-                    summary: None,
-                    content: None,
-                    r#type: None,
-                    tags: None,
-                    images: None,
-                    cover_path: None,
-                },
-            )
-            .await
-            .map_err(|e| e.to_string())?;
-        }
-        if batch.len() < 200 {
-            break;
-        }
-        offset += 200;
-    }
-
-    db.delete_category(&cat_id).await.map_err(|e| e.to_string())
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 /// 列出项目所有词条类型（内置 + 自定义）
