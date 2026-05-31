@@ -1633,33 +1633,11 @@ pub async fn add_entry_tag(
     let entry_id_uuid = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let schema_id_uuid = Uuid::parse_str(schema_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    let entry = db
-        .get_entry(&entry_id_uuid)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut tags = entry.tags.0;
-    // 若已有同 schema_id 的标签则覆盖，否则追加
-    if let Some(existing) = tags.iter_mut().find(|t| t.schema_id == schema_id_uuid) {
-        existing.value = serde_json::Value::String(value);
-    } else {
-        tags.push(EntryTag {
+    db.upsert_entry_tag(
+        &entry_id_uuid,
+        EntryTag {
             schema_id: schema_id_uuid,
             value: serde_json::Value::String(value),
-        });
-    }
-
-    db.update_entry(
-        &entry_id_uuid,
-        UpdateEntry {
-            category_id: None,
-            title: None,
-            summary: None,
-            content: None,
-            r#type: None,
-            tags: Some(tags),
-            images: None,
-            cover_path: None,
         },
     )
     .await
@@ -1675,33 +1653,9 @@ pub async fn remove_entry_tag(
     let entry_id_uuid = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let schema_id_uuid = Uuid::parse_str(schema_id).map_err(|e| e.to_string())?;
     let db = state.sqlite_db.lock().await;
-    let entry = db
-        .get_entry(&entry_id_uuid)
+    db.remove_entry_tag(&entry_id_uuid, &schema_id_uuid)
         .await
-        .map_err(|e| e.to_string())?;
-
-    let tags: Vec<EntryTag> = entry
-        .tags
-        .0
-        .into_iter()
-        .filter(|t| t.schema_id != schema_id_uuid)
-        .collect();
-
-    db.update_entry(
-        &entry_id_uuid,
-        UpdateEntry {
-            category_id: None,
-            title: None,
-            summary: None,
-            content: None,
-            r#type: None,
-            tags: Some(tags),
-            images: None,
-            cover_path: None,
-        },
-    )
-    .await
-    .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())
 }
 
 /// 更新词条标签（全量替换）
