@@ -8,33 +8,13 @@ pub async fn db_create_project(
     cover_image: Option<String>,
 ) -> Result<Project, String> {
     let db = state.inner().sqlite_db.lock().await;
-    let project = db
-        .create_project(CreateProject {
-            name,
-            description,
-            cover_image,
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if let Err(error) = initialize_default_timeline_tags(&db, &project.id).await {
-        if let Err(cleanup_error) = db.delete_project(&project.id).await {
-            log::error!(
-                "[worldflow] 创建项目默认时间线标签失败，且回滚项目失败: project_id={} error={} cleanup_error={}",
-                project.id,
-                error,
-                cleanup_error
-            );
-            return Err(format!(
-                "{}；同时回滚项目失败，请手动检查该项目是否已创建。",
-                error
-            ));
-        }
-
-        return Err(error);
-    }
-
-    Ok(project)
+    db.create_project_with_default_timeline_tags(CreateProject {
+        name,
+        description,
+        cover_image,
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// 查询单个项目

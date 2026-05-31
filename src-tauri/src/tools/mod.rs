@@ -1,5 +1,4 @@
 use crate::AppState;
-use crate::apis::worldflow::common::initialize_default_timeline_tags;
 use uuid::Uuid;
 use worldflow_core::{
     CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps, models::*,
@@ -1855,23 +1854,11 @@ pub async fn create_project(
     description: Option<String>,
 ) -> Result<Project, String> {
     let db = state.sqlite_db.lock().await;
-    let project = db
-        .create_project(CreateProject {
-            name,
-            description,
-            cover_image: None,
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if let Err(error) = initialize_default_timeline_tags(&db, &project.id).await {
-        log::error!(
-            "[tools] AI 创建项目后初始化时间线标签失败: project_id={} error={}",
-            project.id,
-            error
-        );
-        // 不回滚项目，避免 AI 工具链因标签初始化失败而中断
-    }
-
-    Ok(project)
+    db.create_project_with_default_timeline_tags(CreateProject {
+        name,
+        description,
+        cover_image: None,
+    })
+    .await
+    .map_err(|e| e.to_string())
 }

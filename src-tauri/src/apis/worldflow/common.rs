@@ -106,57 +106,6 @@ pub struct ProjectStats {
     pub governance_score: ProjectGovernanceScore,
 }
 
-struct DefaultTimelineTagDefinition {
-    name: &'static str,
-    description: &'static str,
-    value_type: &'static str,
-    default_value: Option<&'static str>,
-    range_min: Option<f64>,
-    range_max: Option<f64>,
-    sort_order: i64,
-}
-
-const DEFAULT_TIMELINE_TAG_TARGETS: &[&str] = &["event"];
-
-const DEFAULT_TIMELINE_TAG_DEFINITIONS: &[DefaultTimelineTagDefinition] = &[
-    DefaultTimelineTagDefinition {
-        name: "开始年份",
-        description: "事件在时间线上的起始年份。公元前年份请填写负数，例如 -221。",
-        value_type: "number",
-        default_value: None,
-        range_min: None,
-        range_max: None,
-        sort_order: 0,
-    },
-    DefaultTimelineTagDefinition {
-        name: "结束年份",
-        description: "事件结束年份；若留空则视为单点事件。",
-        value_type: "number",
-        default_value: None,
-        range_min: None,
-        range_max: None,
-        sort_order: 1,
-    },
-    DefaultTimelineTagDefinition {
-        name: "父事件ID",
-        description: "用于把事件挂到上层事件下，可填写父事件词条 ID 或标题。",
-        value_type: "string",
-        default_value: None,
-        range_min: None,
-        range_max: None,
-        sort_order: 2,
-    },
-    DefaultTimelineTagDefinition {
-        name: "时间线",
-        description: "是否在项目时间线中显示该事件。",
-        value_type: "boolean",
-        default_value: Some("true"),
-        range_min: None,
-        range_max: None,
-        sort_order: 3,
-    },
-];
-
 pub(super) fn normalize_timeline_tag_name(name: &str) -> String {
     name.trim()
         .chars()
@@ -248,66 +197,6 @@ pub(super) fn parse_timeline_parent(value: &Value) -> Option<String> {
         Value::Number(number) => Some(number.to_string()),
         _ => None,
     }
-}
-
-pub(crate) async fn initialize_default_timeline_tags(
-    db: &SqliteDb,
-    project_id: &Uuid,
-) -> Result<(), String> {
-    log::info!(
-        "[worldflow] 开始初始化项目默认时间线标签: project_id={}",
-        project_id
-    );
-
-    let targets = DEFAULT_TIMELINE_TAG_TARGETS
-        .iter()
-        .map(|target| (*target).to_string())
-        .collect::<Vec<_>>();
-
-    for definition in DEFAULT_TIMELINE_TAG_DEFINITIONS {
-        log::info!(
-            "[worldflow] 创建时间线标签: name={} type={}",
-            definition.name,
-            definition.value_type
-        );
-        match db
-            .create_tag_schema(CreateTagSchema {
-                project_id: *project_id,
-                name: definition.name.to_string(),
-                description: Some(definition.description.to_string()),
-                r#type: definition.value_type.to_string(),
-                target: targets.clone(),
-                default_val: definition.default_value.map(|value| value.to_string()),
-                range_min: definition.range_min,
-                range_max: definition.range_max,
-                sort_order: Some(definition.sort_order),
-            })
-            .await
-        {
-            Ok(schema) => log::info!(
-                "[worldflow] 标签创建成功: id={} name={}",
-                schema.id,
-                schema.name
-            ),
-            Err(error) => {
-                log::error!(
-                    "[worldflow] 标签创建失败: name={} error={}",
-                    definition.name,
-                    error
-                );
-                return Err(format!(
-                    "初始化默认时间线标签 '{}' 失败: {}",
-                    definition.name, error
-                ));
-            }
-        }
-    }
-
-    log::info!(
-        "[worldflow] 项目默认时间线标签初始化完成: project_id={}",
-        project_id
-    );
-    Ok(())
 }
 
 // ============ 日志与窗口 ============
