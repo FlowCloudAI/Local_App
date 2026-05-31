@@ -19,6 +19,178 @@ function existsFile(filePath) {
     }
 }
 
+function existsDirectory(filePath) {
+    try {
+        return fs.statSync(filePath).isDirectory()
+    } catch {
+        return false
+    }
+}
+
+function compareVersionLike(a, b) {
+    const left = a.split(/[^\d]+/).filter(Boolean).map(Number)
+    const right = b.split(/[^\d]+/).filter(Boolean).map(Number)
+    const length = Math.max(left.length, right.length)
+
+    for (let i = 0; i < length; i += 1) {
+        const diff = (left[i] || 0) - (right[i] || 0)
+        if (diff !== 0) {
+            return diff
+        }
+    }
+
+    return a.localeCompare(b)
+}
+
+function findLatestNdkRoot(sdkRoot) {
+    if (!sdkRoot) {
+        return null
+    }
+
+    const ndkDir = path.join(sdkRoot, 'ndk')
+    if (!existsDirectory(ndkDir)) {
+        return null
+    }
+
+    const versions = fs
+        .readdirSync(ndkDir, {withFileTypes: true})
+        .filter((item) => item.isDirectory())
+        .map((item) => item.name)
+        .sort(compareVersionLike)
+
+    const latest = versions[versions.length - 1]
+    return latest ? path.join(ndkDir, latest) : null
+}
+
+function findAndroidNdkRoot() {
+    const explicitCandidates = [
+        process.env.ANDROID_NDK_HOME,
+        process.env.ANDROID_NDK_ROOT,
+        process.env.NDK_HOME,
+    ].filter(Boolean)
+
+    for (const candidate of explicitCandidates) {
+        if (existsDirectory(candidate)) {
+            return candidate
+        }
+    }
+
+    const sdkCandidates = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT].filter(Boolean)
+    for (const sdkRoot of sdkCandidates) {
+        const ndkRoot = findLatestNdkRoot(sdkRoot)
+        if (ndkRoot) {
+            return ndkRoot
+        }
+    }
+
+    for (const sdkRoot of sdkCandidates) {
+        const bundledRoot = path.join(sdkRoot, 'ndk-bundle')
+        if (existsDirectory(bundledRoot)) {
+            return bundledRoot
+        }
+    }
+
+    return null
+}
+
+function findNdkHostBin(ndkRoot) {
+    const prebuiltRoot = path.join(ndkRoot, 'toolchains', 'llvm', 'prebuilt')
+    if (!existsDirectory(prebuiltRoot)) {
+        return null
+    }
+
+    const preferredHosts =
+        process.platform === 'win32'
+            ? ['windows-x86_64', 'windows']
+            : process.platform === 'darwin'
+              ? ['darwin-x86_64', 'darwin-arm64']
+              : ['linux-x86_64']
+
+    for (const host of preferredHosts) {
+        const candidate = path.join(prebuiltRoot, host, 'bin')
+        if (existsDirectory(candidate)) {
+            return candidate
+        }
+    }
+
+    const fallbackHost = fs.readdirSync(prebuiltRoot, {withFileTypes: true}).find((item) => item.isDirectory())
+    return fallbackHost ? path.join(prebuiltRoot, fallbackHost.name, 'bin') : null
+}
+
+function findNdkExecutable(binDir, baseName) {
+    const candidates =
+        process.platform === 'win32'
+            ? [`${baseName}.cmd`, `${baseName}.exe`, baseName]
+            : [baseName]
+
+    for (const candidate of candidates) {
+        const full = path.join(binDir, candidate)
+        if (existsFile(full)) {
+            return full
+        }
+    }
+
+    return null
+}
+
+function configureAndroidNdkBuildEnv(baseEnv) {
+    const ndkRoot = findAndroidNdkRoot()
+    if (!ndkRoot) {
+        throw new Error('未找到 Android NDK，请先安装 NDK 并设置 ANDROID_NDK_HOME、ANDROID_NDK_ROOT 或 ANDROID_HOME。')
+    }
+
+    const binDir = findNdkHostBin(ndkRoot)
+    if (!binDir) {
+        throw new Error(`未找到 Android NDK LLVM 工具链目录: ${ndkRoot}`)
+    }
+
+    const apiLevel = process.env.ANDROID_NDK_API_LEVEL || '26'
+    const llvmAr = findNdkExecutable(binDir, 'llvm-ar')
+    const llvmRanlib = findNdkExecutable(binDir, 'llvm-ranlib')
+    const targets = [
+        {rust: 'aarch64-linux-android', clang: `aarch64-linux-android${apiLevel}-clang`},
+        {rust: 'armv7-linux-androideabi', clang: `armv7a-linux-androideabi${apiLevel}-clang`},
+        {rust: 'i686-linux-android', clang: `i686-linux-android${apiLevel}-clang`},
+        {rust: 'x86_64-linux-android', clang: `x86_64-linux-android${apiLevel}-clang`},
+    ]
+
+    const env = {
+        ...baseEnv,
+        ANDROID_NDK_HOME: ndkRoot,
+        ANDROID_NDK_ROOT: ndkRoot,
+        PATH: [binDir, baseEnv.PATH || process.env.PATH || ''].filter(Boolean).join(path.delimiter),
+    }
+
+    for (const target of targets) {
+        const cc = findNdkExecutable(binDir, target.clang)
+        const cxx = findNdkExecutable(binDir, `${target.clang}++`)
+        if (!cc || !cxx) {
+            throw new Error(`Android NDK 缺少 ${target.rust} 编译器，请检查 NDK 安装: ${binDir}`)
+        }
+
+        const suffix = target.rust.replace(/-/g, '_')
+        const cargoSuffix = suffix.toUpperCase()
+
+        env[`CC_${target.rust}`] = cc
+        env[`CC_${suffix}`] = cc
+        env[`CXX_${target.rust}`] = cxx
+        env[`CXX_${suffix}`] = cxx
+        env[`CARGO_TARGET_${cargoSuffix}_LINKER`] = cc
+
+        if (llvmAr) {
+            env[`AR_${target.rust}`] = llvmAr
+            env[`AR_${suffix}`] = llvmAr
+        }
+        if (llvmRanlib) {
+            env[`RANLIB_${target.rust}`] = llvmRanlib
+            env[`RANLIB_${suffix}`] = llvmRanlib
+        }
+    }
+
+    console.log(`使用 Android NDK 编译器环境: ${ndkRoot}`)
+    return env
+}
+
 function findExecutable(name) {
     const isWin = process.platform === 'win32'
     const exts = isWin ? (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').split(';') : ['']
@@ -355,11 +527,11 @@ async function main() {
     runCapture(adbPath, ['-s', serial, 'reverse', 'tcp:5175', 'tcp:5175'])
     runCapture(adbPath, ['-s', serial, 'reverse', 'tcp:1421', 'tcp:1421'])
 
-    const runEnv = {
+    const runEnv = configureAndroidNdkBuildEnv({
         ...process.env,
         CARGO_PROFILE_DEV_DEBUG: '0',
         CARGO_PROFILE_DEV_STRIP: 'debuginfo',
-    }
+    })
 
     const npmArgs = ['run', 'tauri', '--', 'android', 'dev', '--host', '127.0.0.1']
     const result =
