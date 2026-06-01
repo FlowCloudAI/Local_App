@@ -686,6 +686,12 @@ export const db_list_relations_for_project = (projectId: string) =>
 export const db_get_relation_graph_data = (projectId: string) =>
     command<RelationGraphData>('db_get_relation_graph_data', {projectId})
 
+export const db_get_project_setting = (projectId: string, key: string) =>
+    command<string | null>('db_get_project_setting', {projectId, key})
+
+export const db_set_project_setting = (projectId: string, key: string, value: string) =>
+    command<void>('db_set_project_setting', {projectId, key, value})
+
 export const db_update_relation = ({id, relation, content}: UpdateRelationInput) =>
     command<EntryRelation>('db_update_relation', {id, relation, content})
 

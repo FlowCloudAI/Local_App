@@ -46,6 +46,7 @@ use apis::worldflow::fcworld::*;
 use apis::worldflow::ideas::*;
 use apis::worldflow::images::*;
 use apis::worldflow::links::*;
+use apis::worldflow::project_settings::*;
 use apis::worldflow::projects::*;
 use apis::worldflow::relations::*;
 use apis::worldflow::snapshots::*;
@@ -399,6 +400,9 @@ pub fn run() {
             db_update_relation,
             db_delete_relation,
             db_delete_relations_between,
+            // 项目级设置
+            db_get_project_setting,
+            db_set_project_setting,
             // 词条类型
             db_list_all_entry_types,
             db_list_custom_entry_types,

@@ -12,7 +12,7 @@ pub(super) use uuid::Uuid;
 pub(super) use worldflow_core::WorldflowError;
 pub(super) use worldflow_core::{
     CategoryOps, EntryLinkOps, EntryOps, EntryRelationOps, EntryTypeOps, IdeaNoteOps, ProjectOps,
-    SqliteDb, TagSchemaOps, models::*,
+    ProjectSettingOps, SqliteDb, TagSchemaOps, models::*,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

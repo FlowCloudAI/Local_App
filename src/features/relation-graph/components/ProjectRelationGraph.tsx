@@ -13,9 +13,11 @@ import type {
 } from './RelationGraph/types'
 import {
     compute_layout,
+    db_get_project_setting,
     db_get_relation_graph_data,
     db_list_all_entry_types,
     db_list_entries,
+    db_set_project_setting,
     entryTypeKey,
     type EntryTypeView,
     type RelationGraphEdge,
@@ -62,6 +64,8 @@ type ProjectRelationNode = RelationNodeInput & RelationGraphNode & {entryType?: 
 /** 一次性拉取的词条数量上限，用于把 type 映射到图节点；超出的节点回退为无类型样式。 */
 const ENTRY_TYPE_LOOKUP_LIMIT = 2000
 const DEFAULT_LAYOUT_LOOSENESS = 1
+/** 项目级设置键：关系图谱布局参数。 */
+const RELATION_GRAPH_LAYOUT_SETTING_KEY = 'relation_graph_layout'
 
 type LayoutParamMode = 'simple' | 'advanced'
 
@@ -296,6 +300,30 @@ function parseLayoutParamInput(rawValue: string, integer?: boolean): number | un
     return integer ? Math.round(parsed) : parsed
 }
 
+interface PersistedLayoutConfig {
+    mode: LayoutParamMode
+    looseness: number
+    advanced: RelationLayoutParams
+}
+
+/** 解析持久化的布局配置；脏数据或缺字段时安全回退。 */
+function parsePersistedLayoutConfig(raw: string | null): PersistedLayoutConfig | null {
+    if (!raw) return null
+    try {
+        const parsed = JSON.parse(raw) as Partial<PersistedLayoutConfig>
+        const mode: LayoutParamMode = parsed.mode === 'advanced' ? 'advanced' : 'simple'
+        const looseness = typeof parsed.looseness === 'number' && Number.isFinite(parsed.looseness)
+            ? clampNumber(parsed.looseness, 0.65, 1.8)
+            : DEFAULT_LAYOUT_LOOSENESS
+        const advanced = parsed.advanced && typeof parsed.advanced === 'object'
+            ? normalizeLayoutParams(parsed.advanced as RelationLayoutParams)
+            : {}
+        return {mode, looseness, advanced}
+    } catch {
+        return null
+    }
+}
+
 export default function ProjectRelationGraph({projectId, onBack}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
     const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
@@ -326,16 +354,38 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
         setDataError(null)
 
         try {
-            // 图节点数据不含 type，需并行拉取词条列表（取 id→type）与类型定义（取 color/icon/name）。
-            const [data, entries, types] = await Promise.all([
+            // 图节点数据不含 type，需并行拉取词条列表（取 id→type）、类型定义（取 color/icon/name），
+            // 以及该项目持久化的布局参数。
+            const [data, entries, types, savedLayout] = await Promise.all([
                 db_get_relation_graph_data(projectId),
                 db_list_entries({projectId, limit: ENTRY_TYPE_LOOKUP_LIMIT, offset: 0}),
                 db_list_all_entry_types(projectId),
+                db_get_project_setting(projectId, RELATION_GRAPH_LAYOUT_SETTING_KEY),
             ])
             const typeById = new Map(entries.map((entry) => [entry.id, entry.type ?? null]))
             setNodes(data.nodes.map((node) => ({...node, entryType: typeById.get(node.id) ?? null})))
             setEdges(data.edges)
             setEntryTypes(types)
+
+            // 恢复持久化的布局参数；无记录则回到默认，避免不同项目之间串档。
+            const savedConfig = parsePersistedLayoutConfig(savedLayout)
+            if (savedConfig) {
+                const mergedAdvanced = {...cloneDefaultLayoutParams(), ...savedConfig.advanced}
+                setLayoutParamMode(savedConfig.mode)
+                setLayoutLooseness(savedConfig.looseness)
+                setAdvancedLayoutParams(mergedAdvanced)
+                setAppliedLayoutParams(
+                    savedConfig.mode === 'simple'
+                        ? buildSimpleLayoutParams(savedConfig.looseness)
+                        : normalizeLayoutParams(mergedAdvanced),
+                )
+            } else {
+                setLayoutParamMode('simple')
+                setLayoutLooseness(DEFAULT_LAYOUT_LOOSENESS)
+                setAdvancedLayoutParams(cloneDefaultLayoutParams())
+                setAppliedLayoutParams(buildSimpleLayoutParams(DEFAULT_LAYOUT_LOOSENESS))
+            }
+
             setLayoutState(INITIAL_LAYOUT_STATE)
             setGraphKey((prev) => prev + 1)
         } catch (error) {
@@ -402,7 +452,21 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
         setLayoutState(INITIAL_LAYOUT_STATE)
         setGraphKey((prev) => prev + 1)
         setLayoutPanelOpen(false)
-    }, [advancedLayoutParams, layoutLooseness, layoutParamMode])
+
+        // 持久化到项目级设置（失败不阻塞布局）。
+        const persisted: PersistedLayoutConfig = {
+            mode: layoutParamMode,
+            looseness: layoutLooseness,
+            advanced: advancedLayoutParams,
+        }
+        void db_set_project_setting(
+            projectId,
+            RELATION_GRAPH_LAYOUT_SETTING_KEY,
+            JSON.stringify(persisted),
+        ).catch(() => {
+            // 忽略持久化错误，避免影响交互。
+        })
+    }, [advancedLayoutParams, layoutLooseness, layoutParamMode, projectId])
 
     const statsChips = [
         {label: '词条', value: nodes.length},

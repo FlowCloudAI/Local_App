@@ -6,6 +6,7 @@ pub(crate) mod fcworld;
 pub(crate) mod ideas;
 pub(crate) mod images;
 pub(crate) mod links;
+pub(crate) mod project_settings;
 pub(crate) mod projects;
 pub(crate) mod relations;
 #[cfg_attr(target_os = "android", path = "snapshots_android.rs")]
