@@ -1606,14 +1606,24 @@
 }
 
 .ai-tool-access-select-btn {
+    display: grid;
+    grid-template-columns: 0.875rem minmax(0, 1fr);
     min-width: 6.25rem;
-    justify-content: flex-start;
+    column-gap: var(--fc-space-xs);
+    justify-content: stretch;
     border: 1px solid var(--fc-color-border);
 }
 
 .ai-tool-access-select-btn svg {
+    width: 0.875rem;
+    height: 0.875rem;
     transform-origin: center;
     transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ai-tool-access-select-btn span {
+    min-width: 0;
+    text-align: left;
 }
 
 .ai-tool-access-select-btn[aria-expanded='true'] svg {
