@@ -1,6 +1,6 @@
 use super::common::*;
 use crate::senses::app_sense::AppSense;
-use flowcloudai_client::{ErrorCode, sense::Sense};
+use flowcloudai_client::ErrorCode;
 
 const LEGACY_DEFAULT_MAX_TOKENS: i64 = 2000;
 const TOOL_SAFE_DEFAULT_MAX_TOKENS: i64 = 8192;
@@ -31,6 +31,8 @@ pub async fn ai_create_llm_session(
     conversation_id: Option<String>,
     client_trace_id: Option<String>,
     settings: Option<StoredConversationSettings>,
+    tool_access: Option<String>,
+    web_search_enabled: Option<bool>,
 ) -> Result<CreateLlmSessionResult, ApiError> {
     let trace_id = client_trace_id.as_deref().unwrap_or("none");
     let global_llm_defaults = {
@@ -38,7 +40,7 @@ pub async fn ai_create_llm_session(
         settings.llm.clone()
     };
     log::info!(
-        "[ai_create_llm_session][recv] trace_id={} session_id={} plugin_id={} model={:?} conversation_id={:?} temperature={:?} max_tokens={:?} max_tool_rounds={:?}",
+        "[ai_create_llm_session][recv] trace_id={} session_id={} plugin_id={} model={:?} conversation_id={:?} temperature={:?} max_tokens={:?} max_tool_rounds={:?} tool_access={:?} web_search_enabled={:?}",
         trace_id,
         session_id,
         plugin_id,
@@ -46,7 +48,9 @@ pub async fn ai_create_llm_session(
         conversation_id,
         temperature,
         max_tokens,
-        max_tool_rounds
+        max_tool_rounds,
+        tool_access,
+        web_search_enabled
     );
     let api_key = match ApiKeyStore::get(&plugin_id) {
         Some(api_key) => api_key,
@@ -131,8 +135,13 @@ pub async fn ai_create_llm_session(
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
     }
+    let allow_write_tools = matches!(tool_access.as_deref(), Some("edit"));
+    let allow_web_tools = web_search_enabled.unwrap_or(false);
     let sense = AppSense::new(Some(global_llm_defaults.app_sense_custom_prompt.clone()));
-    let whitelist = sense.tool_whitelist();
+    let whitelist = Some(AppSense::tool_whitelist_for(
+        allow_write_tools,
+        allow_web_tools,
+    ));
     session.load_sense(sense).await?;
     session.set_orchestrator(Box::new(
         DefaultOrchestrator::new(registry).with_whitelist(whitelist),

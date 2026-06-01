@@ -55,6 +55,11 @@ export interface SessionIdentity {
     runId: string
 }
 
+export interface CreateSessionToolAccess {
+    toolAccess: 'read' | 'edit'
+    webSearchEnabled: boolean
+}
+
 // ── 钩子 ─────────────────────────────────────────────────────
 
 interface UseAiSessionOptions {
@@ -679,6 +684,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         maxToolRounds?: number | null,
         traceId?: string,
         settings?: StoredConversationSettings | null,
+        toolAccess?: CreateSessionToolAccess,
     ): Promise<SessionIdentity | null> => {
         const newId = `session_${Date.now()}`
         try {
@@ -691,6 +697,8 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 conversationId: conversationId ?? null,
                 clientTraceId: traceId ?? null,
                 settings: settings ?? null,
+                toolAccess: toolAccess?.toolAccess ?? 'read',
+                webSearchEnabled: toolAccess?.webSearchEnabled ?? false,
             })
             logger.log('[useAiSession][createSession]', {
                 traceId: traceId ?? null,

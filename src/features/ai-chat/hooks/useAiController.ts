@@ -1828,6 +1828,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 sessionParams.maxToolRounds,
                 traceId,
                 toStoredConversationSettings(currentSettings, appSettingsRef.current),
+                {
+                    toolAccess: editModeEnabled ? 'edit' : 'read',
+                    webSearchEnabled,
+                },
             )
             if (!created) return null
 
@@ -2164,6 +2168,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         migrateDocumentContextConversation,
         sessionParams.maxToolRounds,
         tools.length,
+        editModeEnabled,
+        webSearchEnabled,
         onError,
     ])
 
@@ -2244,6 +2250,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 sessionParams.maxToolRounds,
                 undefined,
                 toStoredConversationSettings(convSettings, appSettingsRef.current),
+                {
+                    toolAccess: editModeEnabled ? 'edit' : 'read',
+                    webSearchEnabled,
+                },
             )
             if (!created) {
                 logger.error('[useAiController] 重说失败：无法创建会话')
@@ -2299,7 +2309,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ))
         setAutoScroll(true)
         await session.checkout(precedingUserMsg.nodeId, currentSid, currentRunId)
-    }, [session, sessionParams.maxToolRounds, resolveContextPayload, appendDocumentContext])
+    }, [
+        session,
+        sessionParams.maxToolRounds,
+        resolveContextPayload,
+        appendDocumentContext,
+        editModeEnabled,
+        webSearchEnabled,
+    ])
 
     const editMessage = useCallback((messageId: string) => {
         const conv = conversations.find((conversation) => conversation.id === activeConversationIdRef.current)
@@ -2309,27 +2326,43 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setEditingMessageId(messageId)
     }, [conversations])
 
+    const resetActiveBackendSessionForToolAccess = useCallback(async () => {
+        const conversationId = activeConversationIdRef.current
+        const conv = conversationsRef.current.find((conversation) => conversation.id === conversationId)
+        if (!conv?.sessionId) return
+        if (conv.runId && session.isRunStreaming(conv.runId)) return
+
+        await session.closeSession(conv.sessionId)
+        setConversations((prev) => prev.map((conversation) =>
+            conversation.id === conversationId
+                ? {...conversation, sessionId: null, runId: null}
+                : conversation,
+        ))
+    }, [session])
+
     const toggleWebSearch = useCallback(async () => {
         const next = !webSearchEnabled
         const webNames = ['web_search', 'open_url']
         setTools((prev) => prev.map((tool) => webNames.includes(tool.name) ? {...tool, enabled: next} : tool))
         setWebSearchEnabled(next)
+        await resetActiveBackendSessionForToolAccess()
         if (!session.sessionId) {
             const ops = tools
                 .filter((tool) => webNames.includes(tool.name))
                 .map((tool) => next ? ai_enable_tool(tool.name) : ai_disable_tool(tool.name))
             await Promise.all(ops).catch(logger.error)
         }
-    }, [session.sessionId, tools, webSearchEnabled])
+    }, [resetActiveBackendSessionForToolAccess, session.sessionId, tools, webSearchEnabled])
 
     const toggleEditMode = useCallback(async () => {
         const next = !editModeEnabled
         const webNames = ['web_search', 'open_url']
         setTools((prev) => prev.map((tool) => (!webNames.includes(tool.name)) ? {...tool, enabled: next} : tool))
         setEditModeEnabled(next)
+        await resetActiveBackendSessionForToolAccess()
         // registry 侧同步由 sendMessage 的工具初始化流程负责；
         // read_only flag 通过 resolveContextPayload → ai_set_task_context 在下一轮 assemble 生效
-    }, [editModeEnabled])
+    }, [editModeEnabled, resetActiveBackendSessionForToolAccess])
 
     return useMemo(() => ({
         plugins,

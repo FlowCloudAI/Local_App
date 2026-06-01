@@ -26,7 +26,11 @@ impl AppSense {
     }
 
     pub fn default_tool_whitelist() -> Vec<String> {
-        [
+        Self::tool_whitelist_for(false, false)
+    }
+
+    pub fn tool_whitelist_for(allow_write_tools: bool, allow_web_tools: bool) -> Vec<String> {
+        let mut tools = [
             "list_projects",
             "search_entries",
             "get_entry",
@@ -40,7 +44,42 @@ impl AppSense {
         ]
         .into_iter()
         .map(str::to_string)
-        .collect()
+        .collect::<Vec<_>>();
+
+        if allow_write_tools {
+            extend_tool_whitelist(
+                &mut tools,
+                &[
+                    "create_entry",
+                    "update_entry",
+                    "update_entry_tags",
+                    "edit_entry_content_lines",
+                    "replace_entry_content",
+                    "delete_entry",
+                    "move_entry",
+                    "create_relation",
+                    "update_relation",
+                    "delete_relation",
+                    "create_category",
+                    "delete_category",
+                    "create_project",
+                ],
+            );
+        }
+
+        if allow_web_tools {
+            extend_tool_whitelist(&mut tools, &["web_search", "open_url"]);
+        }
+
+        tools
+    }
+}
+
+fn extend_tool_whitelist(tools: &mut Vec<String>, names: &[&str]) {
+    for name in names {
+        if !tools.iter().any(|tool| tool == name) {
+            tools.push((*name).to_string());
+        }
     }
 }
 
@@ -117,5 +156,31 @@ mod tests {
                 "默认白名单不应包含 {forbidden}"
             );
         }
+    }
+
+    #[test]
+    fn app_sense_edit_tools_expose_confirmed_write_tools_but_not_dev_tools() {
+        let whitelist = AppSense::tool_whitelist_for(true, true);
+
+        for allowed in [
+            "search_entries",
+            "update_entry",
+            "edit_entry_content_lines",
+            "replace_entry_content",
+            "create_relation",
+            "delete_category",
+            "web_search",
+            "open_url",
+        ] {
+            assert!(
+                whitelist.contains(&allowed.to_string()),
+                "编辑模式白名单应包含 {allowed}"
+            );
+        }
+
+        assert!(
+            !whitelist.contains(&"list_entries_dev".to_string()),
+            "编辑模式白名单不应包含开发工具"
+        );
     }
 }

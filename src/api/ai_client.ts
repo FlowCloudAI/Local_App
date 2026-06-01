@@ -34,6 +34,8 @@ export interface AiCreateLlmSessionParams {
   conversationId?: string | null
     clientTraceId?: string | null
     settings?: StoredConversationSettings | null
+    toolAccess?: 'read' | 'edit' | null
+    webSearchEnabled?: boolean | null
 }
 
 export interface AiCreateLlmSessionResult {
