@@ -1601,6 +1601,55 @@
     flex-shrink: 0;
 }
 
+.ai-tool-access-select {
+    position: relative;
+}
+
+.ai-tool-access-select-btn {
+    min-width: 6.25rem;
+    justify-content: space-between;
+}
+
+.ai-tool-access-menu {
+    position: absolute;
+    bottom: calc(100% + var(--fc-space-xs));
+    left: 0;
+    min-width: 100%;
+    padding: var(--fc-space-xs);
+    background: var(--fc-color-bg-elevated);
+    border: 1px solid var(--dock-panel-border-color);
+    border-radius: var(--dock-panel-control-radius);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ai-tool-access-menu-item {
+    width: 100%;
+    padding: var(--fc-space-xs) var(--fc-space-sm);
+    font-size: var(--fc-font-size-sm);
+    border: none;
+    border-radius: var(--dock-panel-control-radius);
+    background: transparent;
+    color: var(--fc-color-text);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ai-tool-access-menu-item:hover {
+    background: var(--dock-panel-hover-bg);
+}
+
+.ai-tool-access-menu-item.active {
+    background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
+    color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
+    font-weight: var(--fc-font-weight-medium);
+}
+
 /* ========== 模型切换弹出菜单 ========== */
 .ai-model-switcher {
     position: relative;

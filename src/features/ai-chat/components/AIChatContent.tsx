@@ -19,7 +19,13 @@ import {
     setting_has_api_key,
     toApiError,
 } from '../../../api'
-import type {AiContextValue, Attachment, Conversation, ConversationSettings} from '../model/AiControllerTypes'
+import type {
+    AiContextValue,
+    AiToolAccessMode,
+    Attachment,
+    Conversation,
+    ConversationSettings,
+} from '../model/AiControllerTypes'
 import {CONVERSATION_TEMPERATURE_MAX, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {estimateMessagesTokens, estimateTextTokens, formatTokenCount} from '../lib/contextUsage'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
@@ -56,6 +62,16 @@ const CONVERSATION_SETTING_TOOLTIPS = {
     presencePenalty: '存在惩罚：启用后鼓励模型引入新内容，可设置具体强度。',
     systemPrompt: '当前对话独有提示词：只作用于当前对话，会作为额外 system 提示发送。',
 } as const
+const AI_TOOL_ACCESS_LABELS: Record<AiToolAccessMode, string> = {
+    reader: '读者模式',
+    assistant: '助手模式',
+    writer: '作家模式',
+}
+const AI_TOOL_ACCESS_TITLES: Record<AiToolAccessMode, string> = {
+    reader: '只允许读取项目资料',
+    assistant: '允许写入工具，但写入前需要确认',
+    writer: '常规写入跳过确认，删除仍需确认',
+}
 const formatConversationSettingNumber = (value: number) => {
     const fixed = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(2)
     const trimmed = fixed.replace(/\.?0+$/, '')
@@ -358,6 +374,12 @@ export default function AIChatContent({
 
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false)
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
+    const [isToolAccessMenuOpen, setIsToolAccessMenuOpen] = useState(false)
+    const toolAccessSelectRef = useRef<HTMLDivElement>(null)
+    const toolAccessOptions = useMemo<AiToolAccessMode[]>(
+        () => ctx.writerModeAvailable ? ['reader', 'assistant', 'writer'] : ['reader', 'assistant'],
+        [ctx.writerModeAvailable],
+    )
     const settingsDrawerRef = useRef<HTMLDivElement>(null)
     const settingsToggleRef = useRef<HTMLButtonElement>(null)
     const [inputLimitMessage, setInputLimitMessage] = useState('')
@@ -389,6 +411,17 @@ export default function AIChatContent({
         document.addEventListener('mousedown', handleClick)
         return () => document.removeEventListener('mousedown', handleClick)
     }, [isModelMenuOpen])
+
+    useEffect(() => {
+        if (!isToolAccessMenuOpen) return
+        const handleClick = (event: MouseEvent) => {
+            if (toolAccessSelectRef.current && !toolAccessSelectRef.current.contains(event.target as Node)) {
+                setIsToolAccessMenuOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClick)
+        return () => document.removeEventListener('mousedown', handleClick)
+    }, [isToolAccessMenuOpen])
 
     useEffect(() => {
         setSettingsDrawerOpen(false)
@@ -1972,38 +2005,55 @@ export default function AIChatContent({
                                         >
                                             联网搜索
                                         </button>
-                                        <button
-                                            className={`ai-toolbar-btn ${ctx.toolAccessMode === 'reader' ? 'active' : ''}`}
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                void ctx.setToolAccessMode('reader')
-                                            }}
-                                            title="读者模式：只允许读取项目资料"
-                                        >
-                                            读者
-                                        </button>
-                                        <button
-                                            className={`ai-toolbar-btn ${ctx.toolAccessMode === 'assistant' ? 'active' : ''}`}
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                void ctx.setToolAccessMode('assistant')
-                                            }}
-                                            title="助手模式：允许写入工具，但写入前需要确认"
-                                        >
-                                            助手
-                                        </button>
-                                        {ctx.writerModeAvailable && (
+                                        <div className="ai-tool-access-select" ref={toolAccessSelectRef}>
                                             <button
-                                                className={`ai-toolbar-btn ${ctx.toolAccessMode === 'writer' ? 'active' : ''}`}
+                                                type="button"
+                                                className="ai-toolbar-btn ai-tool-access-select-btn active"
                                                 onClick={(event) => {
                                                     event.stopPropagation()
-                                                    void ctx.setToolAccessMode('writer')
+                                                    setIsToolAccessMenuOpen((open) => !open)
                                                 }}
-                                                title="作家模式：常规写入跳过确认，删除仍需确认"
+                                                title={AI_TOOL_ACCESS_TITLES[ctx.toolAccessMode]}
+                                                aria-haspopup="listbox"
+                                                aria-expanded={isToolAccessMenuOpen}
                                             >
-                                                作家
+                                                <span>{AI_TOOL_ACCESS_LABELS[ctx.toolAccessMode]}</span>
+                                                <svg
+                                                    width="14"
+                                                    height="14"
+                                                    viewBox="0 0 16 16"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="1.8"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M4 10l4-4 4 4"/>
+                                                </svg>
                                             </button>
-                                        )}
+                                            {isToolAccessMenuOpen && (
+                                                <div className="ai-tool-access-menu" role="listbox">
+                                                    {toolAccessOptions.map((mode) => (
+                                                        <button
+                                                            key={mode}
+                                                            type="button"
+                                                            role="option"
+                                                            aria-selected={ctx.toolAccessMode === mode}
+                                                            className={`ai-tool-access-menu-item ${ctx.toolAccessMode === mode ? 'active' : ''}`}
+                                                            title={AI_TOOL_ACCESS_TITLES[mode]}
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                setIsToolAccessMenuOpen(false)
+                                                                void ctx.setToolAccessMode(mode)
+                                                            }}
+                                                        >
+                                                            {AI_TOOL_ACCESS_LABELS[mode]}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </>
                                 )}
                             </div>
