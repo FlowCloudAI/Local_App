@@ -1623,7 +1623,7 @@
 .ai-tool-access-select-btn.is-writer,
 .ai-floating-toolbar .ai-tool-access-select-btn.is-writer {
     background: var(--fc-color-warning-bg);
-    border-color: var(--fc-color-warning-border);
+    border-color: var(--fc-color-warning);
     color: var(--fc-color-warning);
 }
 
