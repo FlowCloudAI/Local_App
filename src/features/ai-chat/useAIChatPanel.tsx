@@ -11,6 +11,7 @@ interface UseAIChatPanelOptions {
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
+    onOpenWriterModeSettings?: () => void
 }
 
 export interface AIChatPanelSlots {

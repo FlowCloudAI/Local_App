@@ -67,6 +67,7 @@ const AI_TOOL_ACCESS_LABELS: Record<AiToolAccessMode, string> = {
     assistant: '助手模式',
     writer: '作家模式',
 }
+const AI_TOOL_ACCESS_OPTIONS: AiToolAccessMode[] = ['reader', 'assistant', 'writer']
 const AI_TOOL_ACCESS_TITLES: Record<AiToolAccessMode, string> = {
     reader: '只允许读取项目资料',
     assistant: '允许写入工具，但写入前需要确认',
@@ -311,6 +312,7 @@ interface AIChatContentProps {
     onToggleCollapsed?: () => void
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
+    onOpenWriterModeSettings?: () => void
     /** fullscreen 双 slot 模式下，sidebar JSX 会 portal 到这个元素；为 null 时正常 inline 渲染 */
     sidePortalTarget?: HTMLElement | null
 }
@@ -322,6 +324,7 @@ export default function AIChatContent({
                                            onToggleCollapsed,
                                            onOpenEntry,
                                            onOpenPluginManagement,
+                                           onOpenWriterModeSettings,
                                            sidePortalTarget,
                                        }: AIChatContentProps) {
     const ctx = controller
@@ -376,10 +379,7 @@ export default function AIChatContent({
     const modelSwitcherRef = useRef<HTMLDivElement>(null)
     const [isToolAccessMenuOpen, setIsToolAccessMenuOpen] = useState(false)
     const toolAccessSelectRef = useRef<HTMLDivElement>(null)
-    const toolAccessOptions = useMemo<AiToolAccessMode[]>(
-        () => ctx.writerModeAvailable ? ['reader', 'assistant', 'writer'] : ['reader', 'assistant'],
-        [ctx.writerModeAvailable],
-    )
+    const toolAccessOptions = AI_TOOL_ACCESS_OPTIONS
     const settingsDrawerRef = useRef<HTMLDivElement>(null)
     const settingsToggleRef = useRef<HTMLButtonElement>(null)
     const [inputLimitMessage, setInputLimitMessage] = useState('')
@@ -1054,6 +1054,22 @@ export default function AIChatContent({
         if (confirmed !== 'yes') return
         await ctx.deleteConversation(conversation.id)
     }, [ctx, showAlert])
+
+    const handleToolAccessModeSelect = useCallback(async (mode: AiToolAccessMode) => {
+        setIsToolAccessMenuOpen(false)
+        if (mode === 'writer' && !ctx.writerModeAvailable) {
+            const confirmed = await showAlert(
+                '作家模式会跳过新建、改写、移动等常规写入确认，AI 将更容易直接改动项目内容；删除操作仍会要求确认。需要先在设置中手动开启后才能使用。是否前往设置？',
+                'warning',
+                'confirm',
+            )
+            if (confirmed === 'yes') {
+                onOpenWriterModeSettings?.()
+            }
+            return
+        }
+        await ctx.setToolAccessMode(mode)
+    }, [ctx, onOpenWriterModeSettings, showAlert])
 
     const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
         const text = content.trim()
@@ -2008,7 +2024,7 @@ export default function AIChatContent({
                                         <div className="ai-tool-access-select" ref={toolAccessSelectRef}>
                                             <button
                                                 type="button"
-                                                className="ai-toolbar-btn ai-tool-access-select-btn active"
+                                                className={`ai-toolbar-btn ai-tool-access-select-btn active ${ctx.toolAccessMode === 'writer' ? 'is-writer' : ''}`}
                                                 onClick={(event) => {
                                                     event.stopPropagation()
                                                     setIsToolAccessMenuOpen((open) => !open)
@@ -2044,8 +2060,7 @@ export default function AIChatContent({
                                                             title={AI_TOOL_ACCESS_TITLES[mode]}
                                                             onClick={(event) => {
                                                                 event.stopPropagation()
-                                                                setIsToolAccessMenuOpen(false)
-                                                                void ctx.setToolAccessMode(mode)
+                                                                void handleToolAccessModeSelect(mode)
                                                             }}
                                                         >
                                                             {AI_TOOL_ACCESS_LABELS[mode]}

@@ -1620,6 +1620,19 @@
     transform: rotate(-90deg);
 }
 
+.ai-tool-access-select-btn.is-writer,
+.ai-floating-toolbar .ai-tool-access-select-btn.is-writer {
+    background: var(--fc-color-warning-bg);
+    border-color: var(--fc-color-warning-border);
+    color: var(--fc-color-warning);
+}
+
+.ai-tool-access-select-btn.is-writer:hover {
+    background: color-mix(in srgb, var(--fc-color-warning-bg) 82%, var(--fc-color-bg-elevated));
+    border-color: var(--fc-color-warning);
+    color: var(--fc-color-warning-hover);
+}
+
 .ai-tool-access-menu {
     position: absolute;
     bottom: calc(100% + var(--fc-space-xs));

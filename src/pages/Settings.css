@@ -398,6 +398,17 @@
   margin-top: var(--fc-space-md);
 }
 
+.settings-field--focus-target {
+  border-radius: var(--fc-radius-md);
+  background: var(--fc-color-warning-bg);
+  box-shadow: 0 0 0 1px var(--fc-color-warning-border);
+  transition: background var(--fc-transition), box-shadow var(--fc-transition);
+}
+
+.settings-field--focus-target .settings-checkbox-row {
+  color: var(--fc-color-warning-hover);
+}
+
 .settings-range-control,
 .settings-select-control {
   flex: 1;

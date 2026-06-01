@@ -15,7 +15,7 @@ import {type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, use
 import {useIdeaPanel} from '../../pages/useIdeaPanel'
 import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
-import Settings from '../../pages/Settings'
+import Settings, {type SettingsFocusTarget} from '../../pages/Settings'
 import DockableSidePanel from '../../shared/ui/layout/DockableSidePanel'
 import type {AiMissingPluginKind} from '../../shared/ui/AiPluginMissingOverlay'
 import type {ReportConversationContext} from '../../features/ai-chat/model/AiControllerTypes'
@@ -385,6 +385,8 @@ function DesktopAppContent() {
     const [helpRequest, setHelpRequest] = useState<HelpPanelRequest | null>(null)
     const [settingsInitialTab, setSettingsInitialTab] = useState<'system' | 'ai'>('system')
     const [settingsPluginKind, setSettingsPluginKind] = useState<AiMissingPluginKind | 'all'>('all')
+    const [settingsFocusTarget, setSettingsFocusTarget] = useState<SettingsFocusTarget | null>(null)
+    const [settingsFocusRequestId, setSettingsFocusRequestId] = useState(0)
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
@@ -801,6 +803,7 @@ function DesktopAppContent() {
         if (key === 'settings') {
             setSettingsInitialTab('system')
             setSettingsPluginKind('all')
+            setSettingsFocusTarget(null)
             setSelectedKey('settings')
             dispatchTabState({type: 'clear-active'})
             setMainContentKey('settings')
@@ -811,6 +814,18 @@ function DesktopAppContent() {
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
         setSettingsInitialTab('ai')
         setSettingsPluginKind(kind)
+        setSettingsFocusTarget(null)
+        setSelectedKey('settings')
+        dispatchTabState({type: 'clear-active'})
+        setMainContentKey('settings')
+        collapseAiPanel()
+    }, [collapseAiPanel])
+
+    const handleOpenWriterModeSettings = useCallback(() => {
+        setSettingsInitialTab('ai')
+        setSettingsPluginKind('all')
+        setSettingsFocusTarget('writer-mode')
+        setSettingsFocusRequestId((requestId) => requestId + 1)
         setSelectedKey('settings')
         dispatchTabState({type: 'clear-active'})
         setMainContentKey('settings')
@@ -1018,6 +1033,7 @@ function DesktopAppContent() {
         onToggleCollapsed: collapseAiPanel,
         onOpenEntry: handleOpenEntry,
         onOpenPluginManagement: handleOpenPluginManagement,
+        onOpenWriterModeSettings: handleOpenWriterModeSettings,
     })
     const helpSlots = useHelpPanel({
         panelMode: aiPanelMode,
@@ -1347,6 +1363,8 @@ function DesktopAppContent() {
                                 <Settings
                                     initialTab={settingsInitialTab}
                                     initialPluginKind={settingsPluginKind}
+                                    initialFocus={settingsFocusTarget}
+                                    focusRequestId={settingsFocusRequestId}
                                     onBack={() => {
                                     setMainContentKey('home')
                                     setSelectedKey('')

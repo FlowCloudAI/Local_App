@@ -64,6 +64,7 @@ import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
 type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
+export type SettingsFocusTarget = 'writer-mode'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 type TemplateView = 'list' | 'detail'
@@ -183,12 +184,23 @@ interface SettingsProps {
     onBack?: () => void
     initialTab?: SettingsTab
     initialPluginKind?: PluginKindFilter
+    initialFocus?: SettingsFocusTarget | null
+    focusRequestId?: number
 }
 
-export default function Settings({onBack, initialTab = 'system', initialPluginKind = 'all'}: SettingsProps) {
+export default function Settings({
+                                     onBack,
+                                     initialTab = 'system',
+                                     initialPluginKind = 'all',
+                                     initialFocus = null,
+                                     focusRequestId = 0,
+                                 }: SettingsProps) {
     const {showAlert} = useAlert()
     const showAlertRef = useRef(showAlert)
+    const writerModeFieldRef = useRef<HTMLDivElement>(null)
+    const handledFocusRequestIdRef = useRef<number | null>(null)
     const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
+    const [focusedSetting, setFocusedSetting] = useState<SettingsFocusTarget | null>(null)
 
     useEffect(() => {
         showAlertRef.current = showAlert
@@ -271,6 +283,21 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
             setKindFilter(initialPluginKind)
         }
     }, [initialPluginKind, initialTab])
+
+    useEffect(() => {
+        if (loading || !settings || activeTab !== 'ai' || initialFocus !== 'writer-mode') return
+        if (handledFocusRequestIdRef.current === focusRequestId) return
+        handledFocusRequestIdRef.current = focusRequestId
+        const frameId = window.requestAnimationFrame(() => {
+            writerModeFieldRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'})
+            setFocusedSetting('writer-mode')
+        })
+        const timeoutId = window.setTimeout(() => setFocusedSetting(null), 1800)
+        return () => {
+            window.cancelAnimationFrame(frameId)
+            window.clearTimeout(timeoutId)
+        }
+    }, [activeTab, focusRequestId, initialFocus, loading, settings])
 
     // 切换到用量统计 tab 时自动加载
     useEffect(() => {
@@ -1627,7 +1654,11 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                         这段提示词会作为通用 AI 对话的默认提示词；当前对话没有独有提示词时会自动填充。
                                     </span>
                                 </div>
-                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                <div
+                                    id="settings-ai-writer-mode"
+                                    ref={writerModeFieldRef}
+                                    className={`settings-field settings-field-stack settings-field-stack--full ${focusedSetting === 'writer-mode' ? 'settings-field--focus-target' : ''}`}
+                                >
                                     <label className="settings-checkbox-row">
                                         <input
                                             type="checkbox"
