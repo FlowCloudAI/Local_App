@@ -1,4 +1,5 @@
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 pub fn extract_json_block(raw: &str) -> &str {
     // 剥离 DeepSeek 等模型的思考内容 <think>...</think>
@@ -36,4 +37,8 @@ where
             candidate.chars().take(200).collect::<String>()
         )
     })
+}
+
+pub fn parse_json_value_artifact(raw: &str) -> Result<Value, String> {
+    parse_json_artifact(raw)
 }

@@ -1,4 +1,4 @@
-use crate::ai_services::artifact_parser::parse_json_artifact;
+use crate::ai_services::artifact_parser::parse_json_value_artifact;
 use crate::ai_services::context_builders::{build_task_context, build_world_check_prompt};
 use crate::ai_services::world_check::{
     WorldCheckLoadRequest, load_world_check_corpus, world_check_definition,
@@ -345,12 +345,18 @@ pub async fn ai_start_world_check_session(
         .map_err(ApiError::internal)?;
 
     let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<WorldCheckReport, String>>();
+    let mut quote_sources = corpus.entry_blocks.clone();
+    if let Some(target_entry_block) = &corpus.target_entry_block {
+        quote_sources.push(target_entry_block.clone());
+    }
     spawn_world_check_event_loop(
         app.clone(),
         request.session_id.clone(),
         run_id.clone(),
         event_stream,
         first_turn_tx,
+        request.check_kind,
+        quote_sources,
     );
 
     let resolved_model = request
@@ -558,6 +564,8 @@ fn spawn_world_check_event_loop<S>(
     run_id: String,
     event_stream: S,
     first_turn_tx: oneshot::Sender<Result<WorldCheckReport, String>>,
+    expected_kind: WorldCheckKind,
+    quote_sources: Vec<String>,
 ) where
     S: futures::Stream<Item = SessionEvent> + Send + 'static,
 {
@@ -568,6 +576,7 @@ fn spawn_world_check_event_loop<S>(
         futures::pin_mut!(event_stream);
         let mut first_turn_sender = Some(first_turn_tx);
         let mut first_turn_buffer = String::new();
+        let mut quote_sources = quote_sources;
 
         while let Some(event) = event_stream.next().await {
             match event {
@@ -645,6 +654,9 @@ fn spawn_world_check_event_loop<S>(
                     output,
                     is_error,
                 } => {
+                    if !is_error {
+                        quote_sources.push(output.clone());
+                    }
                     app_clone
                         .emit(
                             "ai:tool_result",
@@ -698,9 +710,14 @@ fn spawn_world_check_event_loop<S>(
 
                     if let Some(sender) = first_turn_sender.take() {
                         let result = match status {
-                            TurnStatus::Ok => {
-                                parse_json_artifact::<WorldCheckReport>(&first_turn_buffer)
-                            }
+                            TurnStatus::Ok => parse_json_value_artifact(&first_turn_buffer)
+                                .and_then(|value| {
+                                    WorldCheckReport::from_value_and_validate(
+                                        value,
+                                        expected_kind,
+                                        &quote_sources,
+                                    )
+                                }),
                             TurnStatus::Cancelled => Err("检测首轮已取消".to_string()),
                             TurnStatus::Interrupted => Err("检测首轮被中断".to_string()),
                             TurnStatus::Error(error) => Err(error.to_string()),
