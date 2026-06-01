@@ -140,7 +140,7 @@
 }
 
 .about-section-channel--github .about-section-channel-icon {
-    background: #fff;
+    background: var(--fc-color-bg-elevated);
 }
 
 .about-section-update {

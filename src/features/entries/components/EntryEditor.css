@@ -143,7 +143,7 @@
 
 .entry-editor-mode-chip.active {
     background: var(--fc-color-primary);
-    color: #fff;
+    color: var(--fc-color-text-on-primary);
 }
 
 .entry-editor-hero__content {
@@ -324,10 +324,10 @@
 }
 
 .entry-editor-summary-ai-button {
-    border: 1px solid #6a63ed;
+    border: 1px solid var(--fc-color-purple);
     border-radius: 8px;
     background: transparent;
-    color: #6a63ed;
+    color: var(--fc-color-purple);
     font: inherit;
     font-size: var(--fc-font-size-caption, 0.75rem);
     font-weight: 700;
@@ -338,9 +338,9 @@
 }
 
 .entry-editor-summary-ai-button:hover:not(:disabled) {
-    border-color: #8451ed;
-    color: #8451ed;
-    background: color-mix(in srgb, #9C1FED 8%, transparent);
+    border-color: var(--fc-color-purple);
+    color: var(--fc-color-purple);
+    background: color-mix(in srgb, var(--fc-color-purple) 8%, transparent);
 }
 
 .entry-editor-summary-ai-button:disabled {
@@ -675,7 +675,7 @@
 
 [data-color-mode="light"] .entry-editor-markdown,
 [data-color-mode="light"] .entry-editor-preview {
-    color: #18202b !important;
+    color: var(--fc-color-text) !important;
 }
 
 [data-color-mode="light"] .entry-editor-markdown .w-md-editor,
@@ -684,12 +684,12 @@
 [data-color-mode="light"] .entry-editor-markdown textarea,
 [data-color-mode="light"] .entry-editor-markdown pre,
 [data-color-mode="light"] .entry-editor-preview .wmde-markdown {
-    color: #18202b !important;
+    color: var(--fc-color-text) !important;
 }
 
 [data-color-mode="light"] .entry-editor-markdown .w-md-editor-text-input::placeholder,
 [data-color-mode="light"] .entry-editor-markdown textarea::placeholder {
-    color: #5f6b7a !important;
+    color: var(--fc-color-text-secondary) !important;
 }
 
 [data-color-mode="light"] .entry-editor-preview .wmde-markdown p,
@@ -709,7 +709,7 @@
 [data-color-mode="light"] .entry-editor-preview .wmde-markdown th,
 [data-color-mode="light"] .entry-editor-preview .wmde-markdown ul,
 [data-color-mode="light"] .entry-editor-preview .wmde-markdown ol {
-    color: #18202b !important;
+    color: var(--fc-color-text) !important;
 }
 
 .entry-editor-inline-link {

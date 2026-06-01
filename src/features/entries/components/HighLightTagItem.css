@@ -61,13 +61,13 @@
 }
 
 .highlight-tag-item__type.is-number {
-    background: color-mix(in srgb, #f59e0b 16%, transparent);
-    color: #b45309;
+    background: var(--fc-color-warning-bg);
+    color: var(--fc-color-warning-hover);
 }
 
 .highlight-tag-item__type.is-boolean {
-    background: color-mix(in srgb, #10b981 16%, transparent);
-    color: #047857;
+    background: var(--fc-color-success-bg);
+    color: var(--fc-color-success-hover);
 }
 
 .highlight-tag-item__hint {

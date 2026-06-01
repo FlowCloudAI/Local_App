@@ -521,7 +521,7 @@ button.pe-contradiction-chip--entry:hover {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: color-mix(in srgb, #000 48%, transparent);
+    background: var(--fc-color-bg-overlay);
 }
 
 .pe-contradiction-modal__dialog {
@@ -701,7 +701,7 @@ button.pe-contradiction-chip--entry:hover {
     min-width: 180px;
     max-height: 280px;
     overflow-y: auto;
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--fc-shadow-lg);
     z-index: 200;
     display: flex;
     flex-direction: column;

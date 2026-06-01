@@ -33,7 +33,7 @@
     z-index: 19;
     border: 0;
     padding: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--fc-color-bg-overlay);
     cursor: pointer;
 }
 

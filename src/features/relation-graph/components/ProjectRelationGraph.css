@@ -31,13 +31,13 @@
 .rg-node:hover {
     transform: translateY(-3px);
     border-color: color-mix(in srgb, var(--rg-accent) 45%, var(--fc-color-border));
-    box-shadow: 0 6px 18px rgba(8, 10, 18, 0.18);
+    box-shadow: var(--fc-shadow-md);
 }
 
 .rg-node--selected {
     border-color: var(--rg-accent);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--rg-accent) 45%, transparent),
-                0 6px 18px rgba(8, 10, 18, 0.2);
+                var(--fc-shadow-md);
 }
 
 /* 顶部类型色条 */
@@ -75,8 +75,8 @@
     height: 22px;
     border-radius: 50%;
     background: var(--rg-accent);
-    color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    color: var(--fc-color-text-on-primary);
+    box-shadow: var(--fc-shadow-sm);
 }
 
 .rg-node__type-icon {
@@ -130,7 +130,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--fc-space-lg, 16px);
-    background: rgba(0, 0, 0, 0.42);
+    background: var(--fc-color-bg-overlay);
 }
 
 .rg-layout-dialog {

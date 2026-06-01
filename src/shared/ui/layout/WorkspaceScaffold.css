@@ -476,7 +476,7 @@
 .fc-op-chip--active {
     background: var(--fc-color-primary);
     border-color: var(--fc-color-primary);
-    color: #fff;
+    color: var(--fc-color-text-on-primary);
 }
 
 .fc-op-chip--danger {

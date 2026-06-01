@@ -903,7 +903,7 @@
 .plugins-kind-tab.active {
   background: var(--fc-color-primary);
   border-color: var(--fc-color-primary);
-  color: #fff;
+  color: var(--fc-color-text-on-primary);
 }
 
 .plugins-error {

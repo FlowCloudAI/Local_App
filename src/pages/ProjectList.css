@@ -547,14 +547,14 @@
   min-height: 45%;
   justify-content: flex-end;
   gap: 0.45rem;
-  background: linear-gradient(180deg, rgba(8, 10, 18, 0.08) 0%, rgba(8, 10, 18, 0.7) 35%, rgba(8, 10, 18, 0.94) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-overlay) 20%, transparent) 0%, color-mix(in srgb, var(--fc-color-bg-overlay) 50%, var(--fc-gray-1000)) 35%, color-mix(in srgb, var(--fc-color-bg-overlay) 10%, var(--fc-gray-1000)) 100%);
   backdrop-filter: blur(1px);
 }
 
 .project-list-card .fc-card__title,
 .project-list-card .fc-card__description,
 .project-list-card .fc-card__extra-info {
-  color: #fff;
+  color: var(--fc-color-text-on-primary);
 }
 
 .project-list-card .fc-card__title {
@@ -562,14 +562,14 @@
 }
 
 .project-list-card .fc-card__description {
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--fc-color-text-on-primary) 80%, transparent);
   -webkit-line-clamp: 2;
 }
 
 .project-list-card .fc-card__extra-info {
   margin-top: 0;
   font-size: var(--fc-font-size-sm);
-  color: rgba(255, 255, 255, 0.95);
+  color: color-mix(in srgb, var(--fc-color-text-on-primary) 95%, transparent);
 }
 
 .project-list-meta {
@@ -578,7 +578,7 @@
   gap: 0 0.3rem;
   align-items: center;
   font-size: var(--fc-font-size-sm);
-  color: rgba(255, 255, 255, 0.95);
+  color: color-mix(in srgb, var(--fc-color-text-on-primary) 95%, transparent);
 }
 
 .project-list-meta span {
@@ -587,8 +587,8 @@
   min-height: 1.6rem;
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--fc-color-text-on-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 8%, transparent);
 }
 
 .project-list-placeholder {
@@ -599,8 +599,8 @@
   justify-content: flex-start;
   padding: 1rem;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 34%),
-    linear-gradient(135deg, rgba(66, 133, 244, 0.95), rgba(36, 96, 198, 0.85) 46%, rgba(13, 25, 56, 0.92));
+    radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-text-on-primary) 22%, transparent), transparent 34%),
+    linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 95%, transparent), color-mix(in srgb, var(--fc-color-primary-hover) 85%, transparent) 46%, color-mix(in srgb, var(--fc-blue-900) 92%, transparent));
 }
 
 .project-list-placeholder::after {
@@ -608,7 +608,7 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(140deg, transparent 0 55%, rgba(255, 255, 255, 0.08) 55% 65%, transparent 65% 100%);
+    linear-gradient(140deg, transparent 0 55%, color-mix(in srgb, var(--fc-color-text-on-primary) 8%, transparent) 55% 65%, transparent 65% 100%);
   mix-blend-mode: screen;
 }
 
@@ -621,9 +621,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: #fff;
+  background: color-mix(in srgb, var(--fc-color-text-on-primary) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 22%, transparent);
+  color: var(--fc-color-text-on-primary);
   font-size: var(--fc-font-size-lg);
   font-weight: 700;
   letter-spacing: 0.04em;

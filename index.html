@@ -27,14 +27,14 @@
 
         /* 页面底色与 React 渲染后的主题匹配，避免闪白 */
         body {
-            background: #ffffff;
-            color: #111111;
+            background: var(--fc-color-bg-elevated, #ffffff);
+            color: var(--fc-color-text, #111111);
         }
 
         @media (prefers-color-scheme: dark) {
             body {
-                background: #111111;
-                color: #f0f0f0;
+                background: var(--fc-color-bg, #111111);
+                color: var(--fc-color-text, #f0f0f0);
             }
         }
 
@@ -71,8 +71,8 @@
             content: '';
             width: 24px;
             height: 24px;
-            border: 2px solid rgba(128, 128, 128, 0.2);
-            border-top-color: rgba(128, 128, 128, 0.65);
+            border: 2px solid color-mix(in srgb, var(--fc-color-text-tertiary, #808080) 20%, transparent);
+            border-top-color: color-mix(in srgb, var(--fc-color-text-tertiary, #808080) 65%, transparent);
             border-radius: 50%;
             animation: fc-spin 0.75s linear infinite;
         }
