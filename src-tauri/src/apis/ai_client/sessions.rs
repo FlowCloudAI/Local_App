@@ -1,6 +1,6 @@
 use super::common::*;
 use crate::senses::app_sense::AppSense;
-use flowcloudai_client::ErrorCode;
+use flowcloudai_client::{ErrorCode, sense::Sense};
 
 const LEGACY_DEFAULT_MAX_TOKENS: i64 = 2000;
 const TOOL_SAFE_DEFAULT_MAX_TOKENS: i64 = 8192;
@@ -131,12 +131,12 @@ pub async fn ai_create_llm_session(
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
     }
-    session
-        .load_sense(AppSense::new(Some(
-            global_llm_defaults.app_sense_custom_prompt.clone(),
-        )))
-        .await?;
-    session.set_orchestrator(Box::new(DefaultOrchestrator::new(registry)));
+    let sense = AppSense::new(Some(global_llm_defaults.app_sense_custom_prompt.clone()));
+    let whitelist = sense.tool_whitelist();
+    session.load_sense(sense).await?;
+    session.set_orchestrator(Box::new(
+        DefaultOrchestrator::new(registry).with_whitelist(whitelist),
+    ));
     let runtime_settings = settings.as_ref().or(restored_settings.as_ref());
 
     let model_to_apply = model

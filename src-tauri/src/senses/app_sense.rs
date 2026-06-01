@@ -24,6 +24,24 @@ impl AppSense {
             ));
         }
     }
+
+    pub fn default_tool_whitelist() -> Vec<String> {
+        [
+            "list_projects",
+            "search_entries",
+            "get_entry",
+            "get_entry_content_by_line",
+            "query_categories",
+            "list_tag_schemas",
+            "get_entry_relations",
+            "get_project_summary",
+            "list_entry_types",
+            "report_progress",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+    }
 }
 
 #[derive(Serialize)]
@@ -57,5 +75,47 @@ impl Sense for AppSense {
 
     fn install_tools(&self, _registry: &mut ToolRegistry) -> anyhow::Result<()> {
         Ok(())
+    }
+
+    fn tool_whitelist(&self) -> Option<Vec<String>> {
+        Some(Self::default_tool_whitelist())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSense;
+    use flowcloudai_client::sense::Sense;
+
+    #[test]
+    fn app_sense_default_tools_do_not_expose_write_or_dev_tools() {
+        let sense = AppSense::new(None);
+        let whitelist = sense.tool_whitelist().expect("AppSense 应提供默认白名单");
+
+        assert!(whitelist.len() <= 12);
+        assert!(whitelist.contains(&"search_entries".to_string()));
+        assert!(whitelist.contains(&"get_entry".to_string()));
+        assert!(whitelist.contains(&"query_categories".to_string()));
+
+        for forbidden in [
+            "list_entries_dev",
+            "create_entry",
+            "update_entry",
+            "delete_entry",
+            "move_entry",
+            "create_relation",
+            "update_relation",
+            "delete_relation",
+            "create_category",
+            "delete_category",
+            "create_project",
+            "web_search",
+            "open_url",
+        ] {
+            assert!(
+                !whitelist.contains(&forbidden.to_string()),
+                "默认白名单不应包含 {forbidden}"
+            );
+        }
     }
 }
