@@ -1059,7 +1059,7 @@ export default function AIChatContent({
         setIsToolAccessMenuOpen(false)
         if (mode === 'writer' && !ctx.writerModeAvailable) {
             const confirmed = await showAlert(
-                '作家模式会跳过新建、改写、移动等常规写入确认，AI 将更容易直接改动项目内容；删除操作仍会要求确认。需要先在设置中手动开启后才能使用。是否前往设置？',
+                '作家模式会跳过新建、改写、移动等常规操作确认，\nAI 将更容易直接改动项目内容；\n删除操作仍会要求确认。\n\n需要先在设置中手动开启后才能使用。是否前往设置？',
                 'warning',
                 'confirm',
             )
