@@ -1933,7 +1933,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                         <label>填充色</label>
                                         <div className="wm-color-row">
                                             <span className="wm-color-swatch"
-                                                  style={{background: drawingShape.fill ?? '#ccc'}}/>
+                                                  style={{background: drawingShape.fill ?? 'var(--fc-color-border)'}}/>
                                             <input value={drawingShape.fill ?? ''} placeholder="#cccccc"
                                                    onChange={e => updateDrawingShapeField('fill', e.target.value)}/>
                                         </div>
@@ -1942,7 +1942,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                         <label>描边色</label>
                                         <div className="wm-color-row">
                                             <span className="wm-color-swatch"
-                                                  style={{background: drawingShape.stroke ?? '#888'}}/>
+                                                  style={{background: drawingShape.stroke ?? 'var(--fc-color-text-tertiary)'}}/>
                                             <input value={drawingShape.stroke ?? ''} placeholder="#888888"
                                                    onChange={e => updateDrawingShapeField('stroke', e.target.value)}/>
                                         </div>
@@ -1973,7 +1973,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                         <label>填充色</label>
                                         <div className="wm-color-row">
                                             <span className="wm-color-swatch"
-                                                  style={{background: selectedShape.fill ?? '#ccc'}}/>
+                                                  style={{background: selectedShape.fill ?? 'var(--fc-color-border)'}}/>
                                             <input value={selectedShape.fill ?? ''} placeholder="#cccccc"
                                                    onChange={e => updateSelectedShape('fill', e.target.value)}/>
                                         </div>
@@ -1982,7 +1982,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                                         <label>描边色</label>
                                         <div className="wm-color-row">
                                             <span className="wm-color-swatch"
-                                                  style={{background: selectedShape.stroke ?? '#888'}}/>
+                                                  style={{background: selectedShape.stroke ?? 'var(--fc-color-text-tertiary)'}}/>
                                             <input value={selectedShape.stroke ?? ''} placeholder="#888888"
                                                    onChange={e => updateSelectedShape('stroke', e.target.value)}/>
                                         </div>

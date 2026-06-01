@@ -1189,8 +1189,8 @@ function DesktopAppContent() {
                                 y2="371.5078125"
                                 gradientUnits="userSpaceOnUse"
                             >
-                                <stop offset="0" stopColor="#0DBDED"/>
-                                <stop offset="1" stopColor="#9C1FED"/>
+                                <stop offset="0" stopColor="var(--fc-color-info)"/>
+                                <stop offset="1" stopColor="var(--fc-color-purple)"/>
                             </linearGradient>
                         </defs>
                     </svg>
@@ -1297,7 +1297,7 @@ function DesktopAppContent() {
                         className="window-control-btn window-control-btn--danger"
                         variant="ghost"
                         onClick={handleWindowClose}
-                        hoverBackground="#aa1111"
+                        hoverBackground="var(--fc-color-danger)"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"

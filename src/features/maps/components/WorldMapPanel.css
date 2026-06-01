@@ -219,7 +219,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--fc-space-xl);
-    background: rgba(0, 0, 0, 0.42);
+    background: var(--fc-color-bg-overlay);
 }
 
 .wm-create-map-dialog {

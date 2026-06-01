@@ -382,13 +382,13 @@
     max-width: 260px;
     padding: 8px 10px;
     border-radius: 10px;
-    background: rgba(15, 23, 42, 0.92);
-    color: #ffffff;
+    background: color-mix(in srgb, var(--fc-gray-1000) 92%, transparent);
+    color: var(--fc-color-text-on-primary);
     font-size: var(--fc-font-size-xs);
     line-height: 1.5;
     white-space: pre-line;
     pointer-events: none;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+    box-shadow: var(--fc-shadow-lg);
 }
 
 .fc-map-shape-editor__shape-polygon {
@@ -438,7 +438,7 @@
 
 .fc-map-shape-editor__draft-vertex {
     fill: var(--fc-mse-selected);
-    stroke: #ffffff;
+    stroke: var(--fc-color-text-on-primary);
     stroke-width: 2;
     pointer-events: none;
 }
@@ -462,7 +462,7 @@
 }
 
 .fc-map-shape-editor__vertex {
-    fill: #ffffff;
+    fill: var(--fc-color-text-on-primary);
     stroke: var(--fc-mse-selected);
     stroke-width: 2;
     cursor: grab;
@@ -481,7 +481,7 @@
 }
 
 .fc-map-shape-editor__key-location-core {
-    stroke: #ffffff;
+    stroke: var(--fc-color-text-on-primary);
     stroke-width: 2;
     transition: transform var(--fc-transition-fast);
 }
