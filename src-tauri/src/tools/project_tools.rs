@@ -1,4 +1,5 @@
 use crate::tools;
+use crate::tools::confirm::request_write_confirmation;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{ToolRegistry, arg_str};
@@ -18,12 +19,27 @@ pub fn register_project_tools(registry: &mut ToolRegistry) -> Result<()> {
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
+            let app_handle = _state.app_handle.clone();
+            let pending_edits = _state.pending_edits.clone();
             Box::pin(async move {
                 let name = arg_str(args, "name")?;
                 let description = args
                     .get("description")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
+                let confirmed = request_write_confirmation(
+                    app_handle.as_ref(),
+                    &pending_edits,
+                    "create_project",
+                    format!("新建项目：{}", name),
+                    description.clone(),
+                    vec!["将创建一个新的项目。".to_string()],
+                    None,
+                )
+                .await?;
+                if !confirmed {
+                    return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
+                }
                 let _project =
                     tools::create_project(app_state.as_ref(), name.to_string(), description)
                         .await

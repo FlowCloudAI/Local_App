@@ -3,6 +3,16 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{Mutex, oneshot};
 
+#[derive(serde::Serialize, Clone)]
+pub struct AiWriteRequestPayload {
+    pub request_id: String,
+    pub operation: String,
+    pub title: String,
+    pub summary: Option<String>,
+    pub details: Vec<String>,
+    pub warning: Option<String>,
+}
+
 /// 向前端发送确认事件，等待用户响应。
 /// `make_payload` 接收生成的 request_id，调用方负责将其嵌入 payload 结构体。
 /// 返回 Ok(true) = 用户确认，Ok(false) = 用户取消，Err = 超时或通道异常。
@@ -30,4 +40,35 @@ pub async fn request_confirmation<P: serde::Serialize + Clone>(
             anyhow::bail!("用户未在规定时间内响应，操作已自动取消");
         }
     }
+}
+
+pub async fn request_write_confirmation(
+    app_handle: Option<&AppHandle>,
+    pending_edits: &Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+    operation: impl Into<String>,
+    title: impl Into<String>,
+    summary: Option<String>,
+    details: Vec<String>,
+    warning: Option<String>,
+) -> anyhow::Result<bool> {
+    let Some(app_handle) = app_handle else {
+        anyhow::bail!("缺少用户确认通道，操作已自动取消");
+    };
+    let operation = operation.into();
+    let title = title.into();
+    request_confirmation(
+        app_handle,
+        pending_edits,
+        "ai:write-request",
+        |request_id| AiWriteRequestPayload {
+            request_id,
+            operation: operation.clone(),
+            title: title.clone(),
+            summary: summary.clone(),
+            details: details.clone(),
+            warning: warning.clone(),
+        },
+        180,
+    )
+    .await
 }

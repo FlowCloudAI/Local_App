@@ -1,5 +1,5 @@
 use crate::tools;
-use crate::tools::confirm::request_confirmation;
+use crate::tools::confirm::{request_confirmation, request_write_confirmation};
 use crate::tools::format;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
@@ -28,6 +28,7 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
             let app_handle = _state.app_handle.clone();
+            let pending_edits = _state.pending_edits.clone();
             Box::pin(async move {
                 let project_id = arg_str(args, "project_id")?;
                 let name = arg_str(args, "name")?;
@@ -36,6 +37,22 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .and_then(|v| v.as_str())
                     .map(str::trim)
                     .filter(|id| !id.is_empty());
+                let confirmed = request_write_confirmation(
+                    app_handle.as_ref(),
+                    &pending_edits,
+                    "create_category",
+                    format!("新建分类：{}", name),
+                    None,
+                    vec![
+                        format!("项目ID：{}", project_id),
+                        format!("上级分类ID：{}", parent_id.unwrap_or("项目根分类")),
+                    ],
+                    None,
+                )
+                .await?;
+                if !confirmed {
+                    return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
+                }
                 let category = tools::create_category(
                     app_state.as_ref(),
                     project_id,

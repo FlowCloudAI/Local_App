@@ -2,9 +2,11 @@ import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
 import {listen} from '@tauri-apps/api/event'
 import {
+    AI_WRITE_REQUEST,
     CATEGORY_CASCADE_DELETE_REQUEST,
     CATEGORY_DELETE_REQUEST,
     ENTRY_DELETE_REQUEST,
+    type AiWriteRequestEvent,
     type CategoryCascadeDeleteRequestEvent,
     type CategoryDeleteRequestEvent,
     type EntryDeleteRequestEvent,
@@ -16,6 +18,7 @@ type ModalState =
     | { kind: 'entry-delete'; data: EntryDeleteRequestEvent }
     | { kind: 'category-move'; data: CategoryDeleteRequestEvent }
     | { kind: 'cascade'; data: CategoryCascadeDeleteRequestEvent }
+    | { kind: 'write'; data: AiWriteRequestEvent }
 
 export default function AiConfirmModal() {
     const [pending, setPending] = useState<ModalState | null>(null)
@@ -31,10 +34,14 @@ export default function AiConfirmModal() {
         const u3 = listen<CategoryCascadeDeleteRequestEvent>(CATEGORY_CASCADE_DELETE_REQUEST, e =>
             setPending({kind: 'cascade', data: e.payload})
         )
+        const u4 = listen<AiWriteRequestEvent>(AI_WRITE_REQUEST, e =>
+            setPending({kind: 'write', data: e.payload})
+        )
         return () => {
             u1.then(fn => fn())
             u2.then(fn => fn())
             u3.then(fn => fn())
+            u4.then(fn => fn())
         }
     }, [])
 
@@ -54,6 +61,7 @@ export default function AiConfirmModal() {
                 {pending.kind === 'entry-delete' && <EntryDeleteView data={pending.data}/>}
                 {pending.kind === 'category-move' && <CategoryMoveView data={pending.data}/>}
                 {pending.kind === 'cascade' && <CascadeView data={pending.data}/>}
+                {pending.kind === 'write' && <WriteView data={pending.data}/>}
 
                 <div className="acm-footer">
                     <button className="acm-btn acm-btn-cancel" onClick={() => void respond(false)} disabled={busy}>
@@ -69,6 +77,26 @@ export default function AiConfirmModal() {
                 </div>
             </div>
         </div>
+    )
+}
+
+function WriteView({data}: { data: AiWriteRequestEvent }) {
+    return (
+        <>
+            <div className="acm-header">
+                <span className="acm-title">AI 请求写入数据</span>
+            </div>
+            <div className="acm-body">
+                <p className="acm-entry-name">{data.title}</p>
+                {data.summary && <p className="acm-summary">{data.summary}</p>}
+                <div className="acm-details">
+                    {data.details.map((line, index) => (
+                        <div className="acm-detail" key={`${data.operation}-${index}`}>{line}</div>
+                    ))}
+                </div>
+                {data.warning && <p className="acm-warn">{data.warning}</p>}
+            </div>
+        </>
     )
 }
 

@@ -91,6 +91,22 @@
     font-size: var(--fc-font-size-xs);
 }
 
+.acm-details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-xs);
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    background: var(--fc-color-bg-secondary);
+    border-radius: var(--fc-radius-md);
+}
+
+.acm-detail {
+    font-size: var(--fc-font-size-xs);
+    color: var(--fc-color-text-secondary);
+    line-height: var(--fc-line-height-normal);
+    overflow-wrap: anywhere;
+}
+
 .acm-footer {
     display: flex;
     justify-content: flex-end;
