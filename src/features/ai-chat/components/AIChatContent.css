@@ -1608,6 +1608,7 @@
 .ai-tool-access-select-btn {
     min-width: 6.25rem;
     justify-content: space-between;
+    border: 1px solid var(--fc-color-border);
 }
 
 .ai-tool-access-menu {
