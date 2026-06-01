@@ -135,13 +135,22 @@ pub async fn ai_create_llm_session(
     if let Some(history) = restored_history {
         session.preload_history(history, restored_head);
     }
-    let allow_write_tools = matches!(tool_access.as_deref(), Some("edit"));
+    let requested_tool_access = tool_access.as_deref().unwrap_or("assistant");
+    let effective_tool_access =
+        if requested_tool_access == "writer" && !global_llm_defaults.writer_mode_enabled {
+            "assistant"
+        } else if matches!(requested_tool_access, "reader" | "assistant" | "writer") {
+            requested_tool_access
+        } else {
+            "assistant"
+        };
     let allow_web_tools = web_search_enabled.unwrap_or(false);
     let sense = AppSense::new(Some(global_llm_defaults.app_sense_custom_prompt.clone()));
-    let whitelist = Some(AppSense::tool_whitelist_for(
-        allow_write_tools,
-        allow_web_tools,
-    ));
+    let whitelist = Some(match effective_tool_access {
+        "reader" => AppSense::reader_tool_whitelist(allow_web_tools),
+        "assistant" | "writer" => AppSense::assistant_tool_whitelist(allow_web_tools),
+        _ => AppSense::assistant_tool_whitelist(allow_web_tools),
+    });
     session.load_sense(sense).await?;
     session.set_orchestrator(Box::new(
         DefaultOrchestrator::new(registry).with_whitelist(whitelist),

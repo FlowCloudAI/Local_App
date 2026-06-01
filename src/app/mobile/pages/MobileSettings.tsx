@@ -61,6 +61,9 @@ export default function MobileSettings(_props: Props) {
         try {
             await setting_update_settings(merged)
             setSettings(merged)
+            window.dispatchEvent(new CustomEvent('fc:settings-updated', {
+                detail: merged,
+            }))
             await showAlert('设置已保存', 'success', 'toast', 1500)
         } catch (e) {
             await showAlert(`保存失败：${String(e)}`, 'error', 'toast', 3000)

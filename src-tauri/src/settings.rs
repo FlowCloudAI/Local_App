@@ -111,6 +111,8 @@ pub struct LlmDefaults {
     pub show_reasoning: bool,
     /// 仅追加到通用 AI 对话默认系统提示词之后
     pub app_sense_custom_prompt: String,
+    /// 是否允许在 AI 面板中选择作家模式。作家模式会跳过常规写入确认。
+    pub writer_mode_enabled: bool,
     /// 是否在上下文接近模型窗口时自动压缩历史
     pub auto_compact_enabled: bool,
     /// 自动压缩触发阈值，取值 0.0 - 1.0
@@ -134,6 +136,7 @@ impl Default for LlmDefaults {
             stream: true,
             show_reasoning: false,
             app_sense_custom_prompt: String::new(),
+            writer_mode_enabled: false,
             auto_compact_enabled: false,
             auto_compact_threshold_ratio: 0.75,
             auto_compact_recent_messages: 8,

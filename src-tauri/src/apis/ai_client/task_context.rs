@@ -19,13 +19,23 @@ pub struct TaskContextDto {
 #[tauri::command]
 pub async fn ai_set_task_context(
     ai_state: State<'_, AiState>,
+    settings_state: State<'_, SettingsState>,
     session_id: String,
     ctx: TaskContextDto,
 ) -> Result<(), ApiError> {
     let project_id = ctx.project_id;
     let task_type = ctx.task_type.unwrap_or_default();
     let attributes = ctx.attributes.unwrap_or_default();
-    let flags = ctx.flags.unwrap_or_default();
+    let mut flags = ctx.flags.unwrap_or_default();
+    if flags.get("auto_confirm_writes").copied().unwrap_or(false) {
+        let writer_mode_enabled = {
+            let settings = settings_state.settings.lock().await;
+            settings.llm.writer_mode_enabled
+        };
+        if !writer_mode_enabled {
+            flags.insert("auto_confirm_writes".to_string(), false);
+        }
+    }
     log::info!(
         "[ai_set_task_context][recv] session_id={} project_id={:?} task_type={} attributes={} flags={}",
         session_id,

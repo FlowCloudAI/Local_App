@@ -60,6 +60,7 @@ import type {
     Message,
     ReportConversationContext,
     SessionParams,
+    AiToolAccessMode,
 } from '../model/AiControllerTypes'
 import {DEFAULT_CONVERSATION_SETTINGS, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {toEntryImageSrc} from '../../entries/lib/entryImage'
@@ -82,6 +83,32 @@ const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversati
 const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
 const DOCUMENT_CONTEXT_ATTRIBUTE = 'attached_documents'
 const DOCUMENT_CONTEXT_CHAR_BUDGET = 24_000
+const WEB_TOOL_NAMES = ['web_search', 'open_url']
+const READER_TOOL_NAMES = [
+    'list_projects',
+    'search_entries',
+    'get_entry',
+    'get_entry_content_by_line',
+    'list_all_entries',
+    'list_categories',
+    'list_entries_by_type',
+    'query_categories',
+    'list_tag_schemas',
+    'get_entry_relations',
+    'get_project_summary',
+    'list_entry_types',
+    'report_progress',
+]
+
+function isToolEnabledForAccessMode(
+    toolName: string,
+    mode: AiToolAccessMode,
+    webSearchEnabled: boolean,
+): boolean {
+    if (WEB_TOOL_NAMES.includes(toolName)) return webSearchEnabled
+    if (mode === 'reader') return READER_TOOL_NAMES.includes(toolName)
+    return true
+}
 
 type PreparedAiSession = { sid: string; runId: string; conversationId: string }
 
@@ -570,7 +597,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => { sessionParamsRef.current = sessionParams }, [sessionParams])
     const [tools, setTools] = useState<ToolStatus[]>([])
     const [webSearchEnabled, setWebSearchEnabled] = useState(true)
-    const [editModeEnabled, setEditModeEnabled] = useState(true)
+    const [toolAccessMode, setToolAccessModeState] = useState<AiToolAccessMode>('assistant')
+    const [writerModeAvailable, setWriterModeAvailable] = useState(false)
+    const editModeEnabled = toolAccessMode !== 'reader'
 
     const conversationsRef = useRef(conversations)
     useEffect(() => {
@@ -668,15 +697,20 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ])
 
         appSettingsRef.current = settings
+        setWriterModeAvailable(Boolean(settings?.llm?.writer_mode_enabled))
         syncPluginSelection(pluginList, settings)
         setPluginsReady(true)
 
         if (fetchedTools) {
+            const nextMode: AiToolAccessMode = 'assistant'
             const enableOps = fetchedTools.map((tool) => ai_enable_tool(tool.name))
             void Promise.all(enableOps)
-            setTools(fetchedTools.map((tool) => ({...tool, enabled: true})))
+            setTools(fetchedTools.map((tool) => ({
+                ...tool,
+                enabled: isToolEnabledForAccessMode(tool.name, nextMode, true),
+            })))
             setWebSearchEnabled(true)
-            setEditModeEnabled(true)
+            setToolAccessModeState(nextMode)
         }
     }, [syncPluginSelection])
 
@@ -1141,8 +1175,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
         if (!editModeEnabled) {
             hints.push(
-                '用户当前处于阅读模式，所有词条编辑工具已被禁用。' +
-                '若用户要求修改内容，请告知其切换到"编辑模式"后再操作。'
+                '用户当前处于读者模式，所有写入类工具已被禁用。' +
+                '若用户要求修改内容，请告知其切换到"助手模式"或"作家模式"后再操作。'
+            )
+        } else if (toolAccessMode === 'assistant') {
+            hints.push('用户当前处于助手模式，写入和删除操作必须等待用户确认后才能执行。')
+        } else if (toolAccessMode === 'writer') {
+            hints.push(
+                '用户当前处于作家模式，常规新建、改写和移动操作可直接执行；删除类操作仍必须等待用户确认。'
             )
         }
         if (hints.length > 0) {
@@ -1150,10 +1190,16 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         return {
-            attributes,
-            flags: {read_only: !editModeEnabled},
+            attributes: {
+                ...attributes,
+                ai_tool_mode: toolAccessMode,
+            },
+            flags: {
+                read_only: toolAccessMode === 'reader',
+                auto_confirm_writes: toolAccessMode === 'writer',
+            },
         }
-    }, [editModeEnabled, webSearchEnabled])
+    }, [editModeEnabled, toolAccessMode, webSearchEnabled])
 
     const appendDocumentContext = useCallback(async (
         ctx: TaskContextPayload,
@@ -1829,7 +1875,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 traceId,
                 toStoredConversationSettings(currentSettings, appSettingsRef.current),
                 {
-                    toolAccess: editModeEnabled ? 'edit' : 'read',
+                    toolAccess: toolAccessMode,
                     webSearchEnabled,
                 },
             )
@@ -1973,6 +2019,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 sessionParams.maxToolRounds,
                 traceId,
                 toStoredConversationSettings(currentSettings, appSettingsRef.current),
+                {
+                    toolAccess: toolAccessMode,
+                    webSearchEnabled,
+                },
             )
             if (!created) return null
             logger.log('[useAiController][发送链路] 后端会话创建完成', {
@@ -2168,7 +2218,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         migrateDocumentContextConversation,
         sessionParams.maxToolRounds,
         tools.length,
-        editModeEnabled,
+        toolAccessMode,
         webSearchEnabled,
         onError,
     ])
@@ -2251,7 +2301,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 undefined,
                 toStoredConversationSettings(convSettings, appSettingsRef.current),
                 {
-                    toolAccess: editModeEnabled ? 'edit' : 'read',
+                    toolAccess: toolAccessMode,
                     webSearchEnabled,
                 },
             )
@@ -2314,7 +2364,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         sessionParams.maxToolRounds,
         resolveContextPayload,
         appendDocumentContext,
-        editModeEnabled,
+        toolAccessMode,
         webSearchEnabled,
     ])
 
@@ -2340,29 +2390,52 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ))
     }, [session])
 
+    useEffect(() => {
+        const handleSettingsUpdated = (event: Event) => {
+            const nextSettings = (event as CustomEvent<AppSettings>).detail
+            if (!nextSettings) return
+            appSettingsRef.current = nextSettings
+            const writerEnabled = Boolean(nextSettings.llm?.writer_mode_enabled)
+            setWriterModeAvailable(writerEnabled)
+            if (!writerEnabled && toolAccessMode === 'writer') {
+                setToolAccessModeState((current) => current === 'writer' ? 'assistant' : current)
+                setTools((current) => current.map((tool) => ({
+                    ...tool,
+                    enabled: isToolEnabledForAccessMode(tool.name, 'assistant', webSearchEnabled),
+                })))
+                void resetActiveBackendSessionForToolAccess()
+            }
+        }
+        window.addEventListener('fc:settings-updated', handleSettingsUpdated)
+        return () => window.removeEventListener('fc:settings-updated', handleSettingsUpdated)
+    }, [resetActiveBackendSessionForToolAccess, toolAccessMode, webSearchEnabled])
+
     const toggleWebSearch = useCallback(async () => {
         const next = !webSearchEnabled
-        const webNames = ['web_search', 'open_url']
-        setTools((prev) => prev.map((tool) => webNames.includes(tool.name) ? {...tool, enabled: next} : tool))
+        setTools((prev) => prev.map((tool) => WEB_TOOL_NAMES.includes(tool.name) ? {...tool, enabled: next} : tool))
         setWebSearchEnabled(next)
         await resetActiveBackendSessionForToolAccess()
         if (!session.sessionId) {
             const ops = tools
-                .filter((tool) => webNames.includes(tool.name))
+                .filter((tool) => WEB_TOOL_NAMES.includes(tool.name))
                 .map((tool) => next ? ai_enable_tool(tool.name) : ai_disable_tool(tool.name))
             await Promise.all(ops).catch(logger.error)
         }
     }, [resetActiveBackendSessionForToolAccess, session.sessionId, tools, webSearchEnabled])
 
-    const toggleEditMode = useCallback(async () => {
-        const next = !editModeEnabled
-        const webNames = ['web_search', 'open_url']
-        setTools((prev) => prev.map((tool) => (!webNames.includes(tool.name)) ? {...tool, enabled: next} : tool))
-        setEditModeEnabled(next)
+    const setToolAccessMode = useCallback(async (mode: AiToolAccessMode) => {
+        const nextMode = mode === 'writer' && !writerModeAvailable ? 'assistant' : mode
+        setTools((prev) => prev.map((tool) => ({
+            ...tool,
+            enabled: isToolEnabledForAccessMode(tool.name, nextMode, webSearchEnabled),
+        })))
+        setToolAccessModeState(nextMode)
         await resetActiveBackendSessionForToolAccess()
-        // registry 侧同步由 sendMessage 的工具初始化流程负责；
-        // read_only flag 通过 resolveContextPayload → ai_set_task_context 在下一轮 assemble 生效
-    }, [editModeEnabled, resetActiveBackendSessionForToolAccess])
+    }, [resetActiveBackendSessionForToolAccess, webSearchEnabled, writerModeAvailable])
+
+    const toggleEditMode = useCallback(async () => {
+        await setToolAccessMode(toolAccessMode === 'reader' ? 'assistant' : 'reader')
+    }, [setToolAccessMode, toolAccessMode])
 
     return useMemo(() => ({
         plugins,
@@ -2390,9 +2463,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setEditingMessageId,
         tools,
         webSearchEnabled,
+        toolAccessMode,
+        writerModeAvailable,
         editModeEnabled,
         focusContext,
         toggleWebSearch,
+        setToolAccessMode,
         toggleEditMode,
         sessionParams,
         setSessionParams,
@@ -2419,11 +2495,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }), [
         plugins, pluginsReady, selectedPlugin, selectedModel, conversations, activeConversationId,
         documentContextItems, pendingDocumentAttachmentItems,
-        messages, inputValue, editingMessageId, tools, webSearchEnabled, editModeEnabled, focusContext,
+        messages, inputValue, editingMessageId, tools, webSearchEnabled, toolAccessMode,
+        writerModeAvailable, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         addDocumentContextFiles, removeDocumentContextItem, retryDocumentContextItem,
-        toggleWebSearch, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
+        toggleWebSearch, setToolAccessMode, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
         updateConversationSettings,

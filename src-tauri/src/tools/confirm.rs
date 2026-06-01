@@ -13,6 +13,10 @@ pub struct AiWriteRequestPayload {
     pub warning: Option<String>,
 }
 
+pub fn should_auto_confirm_writes() -> bool {
+    flowcloudai_client::tool::auto_confirm_writes_enabled()
+}
+
 /// 向前端发送确认事件，等待用户响应。
 /// `make_payload` 接收生成的 request_id，调用方负责将其嵌入 payload 结构体。
 /// 返回 Ok(true) = 用户确认，Ok(false) = 用户取消，Err = 超时或通道异常。
@@ -51,10 +55,13 @@ pub async fn request_write_confirmation(
     details: Vec<String>,
     warning: Option<String>,
 ) -> anyhow::Result<bool> {
+    let operation = operation.into();
+    if should_auto_confirm_writes() && !requires_manual_confirmation(&operation) {
+        return Ok(true);
+    }
     let Some(app_handle) = app_handle else {
         anyhow::bail!("缺少用户确认通道，操作已自动取消");
     };
-    let operation = operation.into();
     let title = title.into();
     request_confirmation(
         app_handle,
@@ -71,4 +78,8 @@ pub async fn request_write_confirmation(
         180,
     )
     .await
+}
+
+fn requires_manual_confirmation(operation: &str) -> bool {
+    operation.starts_with("delete_") || operation.starts_with("remove_")
 }

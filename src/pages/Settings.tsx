@@ -477,6 +477,9 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                 migrationMsg,
                 newMediaDir,
             })
+            window.dispatchEvent(new CustomEvent('fc:settings-updated', {
+                detail: savedSettings,
+            }))
             setMediaDir(current => current === newMediaDir ? current : newMediaDir)
             const shouldShowSuccessNotice = showSuccessNotice && settingsSaveSuccessNoticeEnabledRef.current
             settingsSaveSuccessNoticeEnabledRef.current = true
@@ -556,6 +559,7 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                 stream: true,
                 show_reasoning: false,
                 app_sense_custom_prompt: '',
+                writer_mode_enabled: false,
                 auto_compact_enabled: false,
                 auto_compact_threshold_ratio: 0.75,
                 auto_compact_recent_messages: 8,
@@ -1621,6 +1625,21 @@ export default function Settings({onBack, initialTab = 'system', initialPluginKi
                                     />
                                     <span className="settings-field-hint">
                                         这段提示词会作为通用 AI 对话的默认提示词；当前对话没有独有提示词时会自动填充。
+                                    </span>
+                                </div>
+                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                    <label className="settings-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.llm.writer_mode_enabled}
+                                            onChange={(event) => updateLlmDefaults({
+                                                writer_mode_enabled: event.target.checked,
+                                            })}
+                                        />
+                                        <span>允许 AI 作家模式</span>
+                                    </label>
+                                    <span className="settings-field-hint">
+                                        作家模式会跳过新建、改写、移动等常规写入确认；删除类操作仍会要求确认。
                                     </span>
                                 </div>
                                 <div className="settings-field settings-field-stack settings-field-stack--full">

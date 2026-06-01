@@ -26,15 +26,18 @@ impl AppSense {
     }
 
     pub fn default_tool_whitelist() -> Vec<String> {
-        Self::tool_whitelist_for(false, false)
+        Self::reader_tool_whitelist(false)
     }
 
-    pub fn tool_whitelist_for(allow_write_tools: bool, allow_web_tools: bool) -> Vec<String> {
+    pub fn reader_tool_whitelist(allow_web_tools: bool) -> Vec<String> {
         let mut tools = [
             "list_projects",
             "search_entries",
             "get_entry",
             "get_entry_content_by_line",
+            "list_all_entries",
+            "list_categories",
+            "list_entries_by_type",
             "query_categories",
             "list_tag_schemas",
             "get_entry_relations",
@@ -46,31 +49,39 @@ impl AppSense {
         .map(str::to_string)
         .collect::<Vec<_>>();
 
-        if allow_write_tools {
-            extend_tool_whitelist(
-                &mut tools,
-                &[
-                    "create_entry",
-                    "update_entry",
-                    "update_entry_tags",
-                    "edit_entry_content_lines",
-                    "replace_entry_content",
-                    "delete_entry",
-                    "move_entry",
-                    "create_relation",
-                    "update_relation",
-                    "delete_relation",
-                    "create_category",
-                    "delete_category",
-                    "create_project",
-                ],
-            );
-        }
-
         if allow_web_tools {
             extend_tool_whitelist(&mut tools, &["web_search", "open_url"]);
         }
 
+        tools
+    }
+
+    pub fn assistant_tool_whitelist(allow_web_tools: bool) -> Vec<String> {
+        let mut tools = Self::reader_tool_whitelist(false);
+        extend_tool_whitelist(
+            &mut tools,
+            &[
+                "list_entries_dev",
+                "create_entry",
+                "update_entry",
+                "update_entry_tags",
+                "add_entry_tag",
+                "remove_entry_tag",
+                "edit_entry_content_lines",
+                "replace_entry_content",
+                "delete_entry",
+                "move_entry",
+                "create_relation",
+                "update_relation",
+                "delete_relation",
+                "create_category",
+                "delete_category",
+                "create_project",
+            ],
+        );
+        if allow_web_tools {
+            extend_tool_whitelist(&mut tools, &["web_search", "open_url"]);
+        }
         tools
     }
 }
@@ -131,7 +142,7 @@ mod tests {
         let sense = AppSense::new(None);
         let whitelist = sense.tool_whitelist().expect("AppSense 应提供默认白名单");
 
-        assert!(whitelist.len() <= 12);
+        assert!(whitelist.len() <= 14);
         assert!(whitelist.contains(&"search_entries".to_string()));
         assert!(whitelist.contains(&"get_entry".to_string()));
         assert!(whitelist.contains(&"query_categories".to_string()));
@@ -159,14 +170,17 @@ mod tests {
     }
 
     #[test]
-    fn app_sense_edit_tools_expose_confirmed_write_tools_but_not_dev_tools() {
-        let whitelist = AppSense::tool_whitelist_for(true, true);
+    fn app_sense_assistant_tools_expose_all_tools() {
+        let whitelist = AppSense::assistant_tool_whitelist(true);
 
         for allowed in [
             "search_entries",
             "update_entry",
+            "add_entry_tag",
+            "remove_entry_tag",
             "edit_entry_content_lines",
             "replace_entry_content",
+            "list_entries_dev",
             "create_relation",
             "delete_category",
             "web_search",
@@ -178,9 +192,6 @@ mod tests {
             );
         }
 
-        assert!(
-            !whitelist.contains(&"list_entries_dev".to_string()),
-            "编辑模式白名单不应包含开发工具"
-        );
+        assert!(whitelist.contains(&"list_entries_dev".to_string()));
     }
 }

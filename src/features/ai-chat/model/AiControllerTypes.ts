@@ -125,6 +125,8 @@ export interface SessionParams {
     maxToolRounds?: number | null
 }
 
+export type AiToolAccessMode = 'reader' | 'assistant' | 'writer'
+
 export interface AiFocusContext {
     projectId: string | null
     projectName: string | null
@@ -164,9 +166,12 @@ export interface AiContextValue {
 
     tools: ToolStatus[]
     webSearchEnabled: boolean
+    toolAccessMode: AiToolAccessMode
+    writerModeAvailable: boolean
     editModeEnabled: boolean
     focusContext: AiFocusContext
     toggleWebSearch: () => Promise<void>
+    setToolAccessMode: (mode: AiToolAccessMode) => Promise<void>
     toggleEditMode: () => Promise<void>
     sessionParams: SessionParams
     setSessionParams: (v: SessionParams | ((prev: SessionParams) => SessionParams)) => void

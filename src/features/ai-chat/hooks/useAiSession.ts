@@ -29,6 +29,7 @@ import {
     toApiError,
 } from '../../../api'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
+import type {AiToolAccessMode} from '../model/AiControllerTypes'
 
 // ── 导出类型 ──────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ export interface SessionIdentity {
 }
 
 export interface CreateSessionToolAccess {
-    toolAccess: 'read' | 'edit'
+    toolAccess: AiToolAccessMode
     webSearchEnabled: boolean
 }
 
@@ -697,7 +698,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 conversationId: conversationId ?? null,
                 clientTraceId: traceId ?? null,
                 settings: settings ?? null,
-                toolAccess: toolAccess?.toolAccess ?? 'read',
+                toolAccess: toolAccess?.toolAccess ?? 'assistant',
                 webSearchEnabled: toolAccess?.webSearchEnabled ?? false,
             })
             logger.log('[useAiSession][createSession]', {

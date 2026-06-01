@@ -12,6 +12,7 @@ export interface LlmDefaults {
   stream: boolean
   show_reasoning: boolean
   app_sense_custom_prompt: string
+  writer_mode_enabled: boolean
   auto_compact_enabled: boolean
   auto_compact_threshold_ratio: number
   auto_compact_recent_messages: number

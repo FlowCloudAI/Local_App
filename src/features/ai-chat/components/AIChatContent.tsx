@@ -1973,15 +1973,37 @@ export default function AIChatContent({
                                             联网搜索
                                         </button>
                                         <button
-                                            className={`ai-toolbar-btn ${ctx.editModeEnabled ? 'active' : ''}`}
+                                            className={`ai-toolbar-btn ${ctx.toolAccessMode === 'reader' ? 'active' : ''}`}
                                             onClick={(event) => {
                                                 event.stopPropagation()
-                                                void ctx.toggleEditMode()
+                                                void ctx.setToolAccessMode('reader')
                                             }}
-                                            title={ctx.editModeEnabled ? '编辑模式' : '阅读模式'}
+                                            title="读者模式：只允许读取项目资料"
                                         >
-                                            {ctx.editModeEnabled ? '编辑模式' : '阅读模式'}
+                                            读者
                                         </button>
+                                        <button
+                                            className={`ai-toolbar-btn ${ctx.toolAccessMode === 'assistant' ? 'active' : ''}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                void ctx.setToolAccessMode('assistant')
+                                            }}
+                                            title="助手模式：允许写入工具，但写入前需要确认"
+                                        >
+                                            助手
+                                        </button>
+                                        {ctx.writerModeAvailable && (
+                                            <button
+                                                className={`ai-toolbar-btn ${ctx.toolAccessMode === 'writer' ? 'active' : ''}`}
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    void ctx.setToolAccessMode('writer')
+                                                }}
+                                                title="作家模式：常规写入跳过确认，删除仍需确认"
+                                            >
+                                                作家
+                                            </button>
+                                        )}
                                     </>
                                 )}
                             </div>

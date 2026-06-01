@@ -1,5 +1,5 @@
 use crate::tools;
-use crate::tools::confirm::request_confirmation;
+use crate::tools::confirm::{request_confirmation, should_auto_confirm_writes};
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{ToolRegistry, arg_str};
@@ -87,20 +87,24 @@ async fn dispatch_edit_op(
                 after_content: String,
             }
 
-            let confirmed = request_confirmation(
-                &app_handle,
-                &pending_edits,
-                "entry:edit-request",
-                |request_id| Payload {
-                    request_id,
-                    entry_id: entry_id.clone(),
-                    entry_title: entry_title.clone(),
-                    before_content: before_content.clone(),
-                    after_content: after_content.clone(),
-                },
-                180,
-            )
-            .await?;
+            let confirmed = if should_auto_confirm_writes() {
+                true
+            } else {
+                request_confirmation(
+                    &app_handle,
+                    &pending_edits,
+                    "entry:edit-request",
+                    |request_id| Payload {
+                        request_id,
+                        entry_id: entry_id.clone(),
+                        entry_title: entry_title.clone(),
+                        before_content: before_content.clone(),
+                        after_content: after_content.clone(),
+                    },
+                    180,
+                )
+                .await?
+            };
 
             if !confirmed {
                 return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
@@ -147,20 +151,24 @@ async fn dispatch_edit_op(
             }
 
             let after = new_content.clone();
-            let confirmed = request_confirmation(
-                &app_handle,
-                &pending_edits,
-                "entry:edit-request",
-                |request_id| Payload {
-                    request_id,
-                    entry_id: entry_id.clone(),
-                    entry_title: entry_title.clone(),
-                    before_content: before_content.clone(),
-                    after_content: after.clone(),
-                },
-                180,
-            )
-            .await?;
+            let confirmed = if should_auto_confirm_writes() {
+                true
+            } else {
+                request_confirmation(
+                    &app_handle,
+                    &pending_edits,
+                    "entry:edit-request",
+                    |request_id| Payload {
+                        request_id,
+                        entry_id: entry_id.clone(),
+                        entry_title: entry_title.clone(),
+                        before_content: before_content.clone(),
+                        after_content: after.clone(),
+                    },
+                    180,
+                )
+                .await?
+            };
 
             if !confirmed {
                 return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());

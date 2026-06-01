@@ -34,7 +34,7 @@ export interface AiCreateLlmSessionParams {
   conversationId?: string | null
     clientTraceId?: string | null
     settings?: StoredConversationSettings | null
-    toolAccess?: 'read' | 'edit' | null
+    toolAccess?: 'reader' | 'assistant' | 'writer' | null
     webSearchEnabled?: boolean | null
 }
 
@@ -243,6 +243,8 @@ export const ai_create_llm_session = ({
                                            conversationId,
                                            clientTraceId,
                                            settings,
+                                           toolAccess,
+                                           webSearchEnabled,
 }: AiCreateLlmSessionParams) =>
     command<AiCreateLlmSessionResult>('ai_create_llm_session', {
     sessionId,
@@ -254,6 +256,8 @@ export const ai_create_llm_session = ({
         conversationId,
         clientTraceId,
         settings,
+        toolAccess,
+        webSearchEnabled,
   })
 
 export const ai_create_character_session = ({
