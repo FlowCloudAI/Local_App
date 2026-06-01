@@ -66,9 +66,17 @@ import './Settings.css'
 type SettingsTab = 'system' | 'ai' | 'templates' | 'usage' | 'about'
 export type SettingsFocusTarget = 'writer-mode'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
+type AiSettingsSection = 'models' | 'permissions' | 'keys' | 'plugins'
 
 type TemplateView = 'list' | 'detail'
 type SelectValue = string | number | (string | number)[]
+
+const AI_SETTINGS_SECTIONS: Array<{ value: AiSettingsSection; label: string }> = [
+    {value: 'models', label: '模型'},
+    {value: 'permissions', label: '权限与工具'},
+    {value: 'keys', label: '密钥'},
+    {value: 'plugins', label: '插件'},
+]
 
 const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string }> = [
     {value: 'brief', label: '简略'},
@@ -251,6 +259,7 @@ export default function Settings({
     const [searchText, setSearchText] = useState('')
     const [kindFilter, setKindFilter] = useState<PluginKindFilter>(initialPluginKind)
     const [pluginDirectoryLoaded, setPluginDirectoryLoaded] = useState(false)
+    const [aiSettingsSection, setAiSettingsSection] = useState<AiSettingsSection>('models')
 
     const {setTheme} = useTheme();
 
@@ -281,6 +290,9 @@ export default function Settings({
         setActiveTab(initialTab)
         if (initialTab === 'ai') {
             setKindFilter(initialPluginKind)
+            if (initialPluginKind !== 'all') {
+                setAiSettingsSection('plugins')
+            }
         }
     }, [initialPluginKind, initialTab])
 
@@ -288,6 +300,7 @@ export default function Settings({
         if (loading || !settings || activeTab !== 'ai' || initialFocus !== 'writer-mode') return
         if (handledFocusRequestIdRef.current === focusRequestId) return
         handledFocusRequestIdRef.current = focusRequestId
+        setAiSettingsSection('permissions')
         const frameId = window.requestAnimationFrame(() => {
             writerModeFieldRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'})
             setFocusedSetting('writer-mode')
@@ -1460,6 +1473,23 @@ export default function Settings({
                                 }}
                             />
 
+                            <div className="settings-ai-section-tabs" role="tablist" aria-label="AI 配置分区">
+                                {AI_SETTINGS_SECTIONS.map((section) => (
+                                    <button
+                                        key={section.value}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={aiSettingsSection === section.value}
+                                        className={`settings-ai-section-tab ${aiSettingsSection === section.value ? 'active' : ''}`}
+                                        onClick={() => setAiSettingsSection(section.value)}
+                                    >
+                                        {section.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {aiSettingsSection === 'models' && (
+                                <>
                             {/* 默认模型 */}
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">默认模型</h2>
@@ -1654,87 +1684,12 @@ export default function Settings({
                                         这段提示词会作为通用 AI 对话的默认提示词；当前对话没有独有提示词时会自动填充。
                                     </span>
                                 </div>
-                                <div
-                                    id="settings-ai-writer-mode"
-                                    ref={writerModeFieldRef}
-                                    className={`settings-field settings-field-stack settings-field-stack--full ${focusedSetting === 'writer-mode' ? 'settings-field--focus-target' : ''}`}
-                                >
-                                    <label className="settings-checkbox-row">
-                                        <input
-                                            type="checkbox"
-                                            checked={settings.llm.writer_mode_enabled}
-                                            onChange={(event) => updateLlmDefaults({
-                                                writer_mode_enabled: event.target.checked,
-                                            })}
-                                        />
-                                        <span>允许 AI 作家模式</span>
-                                    </label>
-                                    <span className="settings-field-hint">
-                                        作家模式会跳过新建、改写、移动等常规写入确认；删除类操作仍会要求确认。
-                                    </span>
-                                </div>
-                                <div className="settings-field settings-field-stack settings-field-stack--full">
-                                    <label className="settings-checkbox-row">
-                                        <input
-                                            type="checkbox"
-                                            checked={settings.llm.auto_compact_enabled}
-                                            onChange={(event) => updateLlmDefaults({
-                                                auto_compact_enabled: event.target.checked,
-                                            })}
-                                        />
-                                        <span>自动压缩上下文</span>
-                                    </label>
-                                    <span className="settings-field-hint">
-                                        本轮回复结束后检测上下文占用，超过阈值时使用当前模型生成会话摘要。
-                                    </span>
-                                </div>
-                                {settings.llm.auto_compact_enabled && (
-                                    <div className="settings-row settings-row--compact settings-llm-compact-options">
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">压缩阈值</label>
-                                            <div className="settings-range-control">
-                                                <Slider
-                                                    min={50}
-                                                    max={95}
-                                                    step={5}
-                                                    value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
-                                                    onChange={handleLlmCompactThresholdChange}
-                                                />
-                                            </div>
-                                            <span className="settings-span">
-                                                {Math.round(settings.llm.auto_compact_threshold_ratio * 100)}%
-                                            </span>
-                                        </div>
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">保留近期消息</label>
-                                            <input
-                                                className="settings-number-input"
-                                                type="number"
-                                                min={2}
-                                                max={30}
-                                                step={1}
-                                                value={settings.llm.auto_compact_recent_messages}
-                                                onChange={(event) => handleLlmCompactRecentMessagesChange(event.target.value)}
-                                            />
-                                            <span className="settings-span">条</span>
-                                        </div>
-                                        <div className="settings-field">
-                                            <label className="settings-label-wide">摘要详细程度</label>
-                                            <div className="settings-select-control">
-                                                <Select
-                                                    options={LLM_COMPACT_DETAIL_OPTIONS}
-                                                    value={settings.llm.auto_compact_detail}
-                                                    onChange={(value) => updateLlmDefaults({
-                                                        auto_compact_detail: String(value) as LlmCompactDetail,
-                                                    })}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </section>
+                                </>
+                            )}
 
                             {/* API Key 管理 */}
+                            {aiSettingsSection === 'keys' && (
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">API Key 管理</h2>
                                 <div className="settings-row">
@@ -1838,8 +1793,11 @@ export default function Settings({
                                     )}
                                 </div>
                             </section>
+                            )}
 
                             {/* 已安装插件 */}
+                            {aiSettingsSection === 'plugins' && (
+                                <>
                             <section className="settings-section fc-section-card">
                                 <div className="plugins-section-header">
                                     <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
@@ -1959,10 +1917,91 @@ export default function Settings({
                                     )}
                                 </div>
                             </section>
+                                </>
+                            )}
 
                             {/* AI 工具配置 */}
+                            {aiSettingsSection === 'permissions' && (
                             <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">AI 工具配置</h2>
+                                <h2 className="settings-section-title fc-section-title">权限与工具</h2>
+                                <div
+                                    id="settings-ai-writer-mode"
+                                    ref={writerModeFieldRef}
+                                    className={`settings-field settings-field-stack settings-field-stack--full ${focusedSetting === 'writer-mode' ? 'settings-field--focus-target' : ''}`}
+                                >
+                                    <label className="settings-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.llm.writer_mode_enabled}
+                                            onChange={(event) => updateLlmDefaults({
+                                                writer_mode_enabled: event.target.checked,
+                                            })}
+                                        />
+                                        <span>允许 AI 作家模式</span>
+                                    </label>
+                                    <span className="settings-field-hint">
+                                        作家模式会跳过新建、改写、移动等常规操作确认；删除类操作仍会要求确认。
+                                    </span>
+                                </div>
+                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                    <label className="settings-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.llm.auto_compact_enabled}
+                                            onChange={(event) => updateLlmDefaults({
+                                                auto_compact_enabled: event.target.checked,
+                                            })}
+                                        />
+                                        <span>自动压缩上下文</span>
+                                    </label>
+                                    <span className="settings-field-hint">
+                                        本轮回复结束后检测上下文占用，超过阈值时使用当前模型生成会话摘要。
+                                    </span>
+                                </div>
+                                {settings.llm.auto_compact_enabled && (
+                                    <div className="settings-row settings-row--compact settings-llm-compact-options">
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">压缩阈值</label>
+                                            <div className="settings-range-control">
+                                                <Slider
+                                                    min={50}
+                                                    max={95}
+                                                    step={5}
+                                                    value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
+                                                    onChange={handleLlmCompactThresholdChange}
+                                                />
+                                            </div>
+                                            <span className="settings-span">
+                                                {Math.round(settings.llm.auto_compact_threshold_ratio * 100)}%
+                                            </span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">保留近期消息</label>
+                                            <input
+                                                className="settings-number-input"
+                                                type="number"
+                                                min={2}
+                                                max={30}
+                                                step={1}
+                                                value={settings.llm.auto_compact_recent_messages}
+                                                onChange={(event) => handleLlmCompactRecentMessagesChange(event.target.value)}
+                                            />
+                                            <span className="settings-span">条</span>
+                                        </div>
+                                        <div className="settings-field">
+                                            <label className="settings-label-wide">摘要详细程度</label>
+                                            <div className="settings-select-control">
+                                                <Select
+                                                    options={LLM_COMPACT_DETAIL_OPTIONS}
+                                                    value={settings.llm.auto_compact_detail}
+                                                    onChange={(value) => updateLlmDefaults({
+                                                        auto_compact_detail: String(value) as LlmCompactDetail,
+                                                    })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label">搜索引擎</label>
@@ -1982,6 +2021,7 @@ export default function Settings({
                                     </div>
                                 </div>
                             </section>
+                            )}
                         </div>
                     )}
                     {activeTab === 'usage' && (
