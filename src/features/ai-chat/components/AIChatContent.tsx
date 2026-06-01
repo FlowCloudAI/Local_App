@@ -2029,7 +2029,7 @@ export default function AIChatContent({
                                                     strokeLinejoin="round"
                                                     aria-hidden="true"
                                                 >
-                                                    <path d="M4 10l4-4 4 4"/>
+                                                    <path d="M6 4l4 4-4 4"/>
                                                 </svg>
                                             </button>
                                             {isToolAccessMenuOpen && (
