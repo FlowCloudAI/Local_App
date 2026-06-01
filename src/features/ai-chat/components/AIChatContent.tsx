@@ -2033,7 +2033,6 @@ export default function AIChatContent({
                                                 aria-haspopup="listbox"
                                                 aria-expanded={isToolAccessMenuOpen}
                                             >
-                                                <span>{AI_TOOL_ACCESS_LABELS[ctx.toolAccessMode]}</span>
                                                 <svg
                                                     width="14"
                                                     height="14"
@@ -2047,6 +2046,7 @@ export default function AIChatContent({
                                                 >
                                                     <path d="M6 4l4 4-4 4"/>
                                                 </svg>
+                                                <span>{AI_TOOL_ACCESS_LABELS[ctx.toolAccessMode]}</span>
                                             </button>
                                             {isToolAccessMenuOpen && (
                                                 <div className="ai-tool-access-menu" role="listbox">
