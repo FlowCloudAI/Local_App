@@ -15,7 +15,7 @@ import {type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, use
 import {useIdeaPanel} from '../../pages/useIdeaPanel'
 import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
-import Settings, {type SettingsFocusTarget} from '../../pages/Settings'
+import Settings, {type SettingsFocusTarget, type SettingsTab} from '../../pages/Settings'
 import DockableSidePanel from '../../shared/ui/layout/DockableSidePanel'
 import type {AiMissingPluginKind} from '../../shared/ui/AiPluginMissingOverlay'
 import type {ReportConversationContext} from '../../features/ai-chat/model/AiControllerTypes'
@@ -383,7 +383,7 @@ function DesktopAppContent() {
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
     const [helpRequest, setHelpRequest] = useState<HelpPanelRequest | null>(null)
-    const [settingsInitialTab, setSettingsInitialTab] = useState<'system' | 'ai'>('system')
+    const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('system')
     const [settingsPluginKind, setSettingsPluginKind] = useState<AiMissingPluginKind | 'all'>('all')
     const [settingsFocusTarget, setSettingsFocusTarget] = useState<SettingsFocusTarget | null>(null)
     const [settingsFocusRequestId, setSettingsFocusRequestId] = useState(0)
@@ -812,7 +812,7 @@ function DesktopAppContent() {
     }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, sidePanelContentKey])
 
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
-        setSettingsInitialTab('ai')
+        setSettingsInitialTab('plugins')
         setSettingsPluginKind(kind)
         setSettingsFocusTarget(null)
         setSelectedKey('settings')
