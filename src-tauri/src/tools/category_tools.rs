@@ -77,7 +77,8 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                 .desc("要删除的分类ID"),
             ToolFunctionArg::new("mode", "string")
                 .required(true)
-                .desc("删除模式：move_to_parent（上移内容）或 cascade（联级删除）"),
+                .desc("删除模式：move_to_parent（上移内容）或 cascade（联级删除）")
+                .enum_values(["move_to_parent", "cascade"]),
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();

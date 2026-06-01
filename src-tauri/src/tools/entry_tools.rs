@@ -539,7 +539,11 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
             ToolFunctionArg::new("kind", "string")
                 .desc("可选：词条类型名称、内置 key 或自定义类型 ID"),
             ToolFunctionArg::new("info", "array")
-                .desc("可选：EntryInfo 字符串数组；目前 SUM/SUMMARY/FULL 会为列表追加摘要"),
+                .desc("可选：EntryInfo 字符串数组；目前 SUM/SUMMARY/FULL 会为列表追加摘要")
+                .items(serde_json::json!({
+                    "type": "string",
+                    "enum": ["FULL", "TITLE", "TYPE", "SUMMARY", "TAG", "CONTENT", "RELATIONS"]
+                })),
             ToolFunctionArg::new("sort", "string")
                 .desc("可选：排序字段，支持 title、created_at、updated_at；前缀 - 表示倒序，例如 -updated_at"),
             ToolFunctionArg::new("limit", "integer")
@@ -984,7 +988,20 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 .desc("词条ID"),
             ToolFunctionArg::new("tags", "array")
                 .required(true)
-                .desc("标签对象数组，每个对象包含 schema_id（或 name）和 value"),
+                .desc("标签对象数组，每个对象包含 schema_id（或 name）和 value")
+                .items(serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "schema_id": { "type": "string", "description": "标签定义ID，优先使用 list_tag_schemas 返回的 schema_id" },
+                        "name": { "type": "string", "description": "标签名称；缺少 schema_id 时可用 name 匹配" },
+                        "value": { "description": "标签值，可为字符串、数字、布尔值、对象或数组" }
+                    },
+                    "anyOf": [
+                        { "required": ["schema_id", "value"] },
+                        { "required": ["name", "value"] }
+                    ],
+                    "additionalProperties": false
+                })),
         ],
         |_state, args| {
             let app_state = _state.app_state.clone().unwrap();
@@ -1082,7 +1099,8 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
                 .desc("关系终点词条ID"),
             ToolFunctionArg::new("relation", "string")
                 .required(true)
-                .desc("关系方向：one_way（a→b 单向）或 two_way（双向）"),
+                .desc("关系方向：one_way（a→b 单向）或 two_way（双向）")
+                .enum_values(["one_way", "two_way"]),
             ToolFunctionArg::new("content", "string")
                 .required(true)
                 .desc("关系描述内容"),
@@ -1117,7 +1135,9 @@ pub fn register_entry_tools(registry: &mut ToolRegistry) -> Result<()> {
             ToolFunctionArg::new("relation_id", "string")
                 .required(true)
                 .desc("关系ID"),
-            ToolFunctionArg::new("relation", "string").desc("新的关系方向：one_way 或 two_way"),
+            ToolFunctionArg::new("relation", "string")
+                .desc("新的关系方向：one_way 或 two_way")
+                .enum_values(["one_way", "two_way"]),
             ToolFunctionArg::new("content", "string").desc("新的关系描述内容"),
         ],
         |_state, args| {

@@ -92,7 +92,8 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
         vec![
             ToolFunctionArg::new("url", "string")
                 .required(true)
-                .desc("要访问的 URL（http 自动升级为 https，禁止内网地址）"),
+                .desc("要访问的 URL（http 自动升级为 https，禁止内网地址）")
+                .format("uri"),
         ],
         |_state, args| {
             Box::pin(async move {
