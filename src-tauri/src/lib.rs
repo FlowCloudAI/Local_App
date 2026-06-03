@@ -243,10 +243,14 @@ pub fn run() {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| data_root.join("plugins"));
 
-            // 搜索引擎状态（供 AI 工具实时读取，随设置更新）
+            // 搜索工具状态（供 AI 工具实时读取，随设置更新）
             let search_engine_arc = Arc::new(Mutex::new(settings.search_engine.clone()));
+            let search_sources_arc = Arc::new(Mutex::new(settings.search_sources.clone()));
             app.manage(SearchEngineState {
                 engine: search_engine_arc.clone(),
+            });
+            app.manage(SearchSourcesState {
+                sources: search_sources_arc.clone(),
             });
 
             app.manage(SettingsState {
@@ -317,6 +321,7 @@ pub fn run() {
                                 chats_path,
                                 app_state,
                                 search_engine_arc,
+                                search_sources_arc,
                                 app.clone(),
                                 pending_edits,
                             ) {

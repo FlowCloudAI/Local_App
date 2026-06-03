@@ -49,6 +49,8 @@ pub struct AppSettings {
     // ── AI 工具配置 ────────────────────────
     /// 网络搜索引擎："bing" | "baidu" | "duckduckgo"
     pub search_engine: String,
+    /// AI 搜索工具可使用的信源组
+    pub search_sources: SearchSourceSettings,
 }
 
 impl Default for AppSettings {
@@ -70,6 +72,7 @@ impl Default for AppSettings {
             image: ImageDefaults::default(),
             tts: TtsDefaults::default(),
             search_engine: "bing".to_string(),
+            search_sources: SearchSourceSettings::default(),
         }
     }
 }
@@ -169,6 +172,36 @@ impl Default for TtsDefaults {
             default_model: None,
             voice_id: None,
             auto_play: true,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
+pub struct SearchSourceSettings {
+    /// 维基媒体项目：维基百科、维基词典、维基文库、维基语录、维基导游
+    pub wikimedia: bool,
+    /// 技术类 wiki
+    pub technical_wiki: bool,
+    /// 游戏类 wiki
+    pub game_wiki: bool,
+    /// 作品设定类 wiki
+    pub fandom_wiki: bool,
+    /// 电竞资料 wiki
+    pub esports_wiki: bool,
+    /// 通用网页搜索兜底
+    pub web: bool,
+}
+
+impl Default for SearchSourceSettings {
+    fn default() -> Self {
+        Self {
+            wikimedia: true,
+            technical_wiki: true,
+            game_wiki: true,
+            fandom_wiki: true,
+            esports_wiki: true,
+            web: true,
         }
     }
 }

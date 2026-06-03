@@ -6,10 +6,11 @@
 //! `tests/` 下的集成测试可由 `build.rs` 的 `cargo:rustc-link-arg-tests` 注入清单（见
 //! `build.rs` 与 `common-controls.manifest`）。被测内部条目经 `app_lib::test_api` 暴露。
 
+use app_lib::SearchSourceSettings;
 use app_lib::test_api::{
     DICTIONARY_SOURCES, ENCYCLOPEDIA_SOURCES, ESPORTS_SOURCES, FANDOM_SOURCES, GAME_SOURCES,
     MediaWikiSource, QUOTE_SOURCES, SOURCE_TEXT_SOURCES, SearchIntent, TECHNICAL_SOURCES,
-    TRAVEL_SOURCES, search_mediawiki_source,
+    TRAVEL_SOURCES, provider_count_for_test, search_mediawiki_source,
 };
 
 #[test]
@@ -96,4 +97,40 @@ fn parses_supported_search_intents() {
             intent
         );
     }
+}
+
+#[test]
+fn source_settings_filter_providers() {
+    let defaults = SearchSourceSettings::default();
+    assert_eq!(
+        provider_count_for_test(SearchIntent::Auto, "bing", &defaults),
+        2,
+        "默认 auto 应同时包含百科和通用网页兜底"
+    );
+    assert_eq!(
+        provider_count_for_test(SearchIntent::Game, "bing", &defaults),
+        1,
+        "默认应启用游戏 wiki"
+    );
+
+    let mut no_web = defaults.clone();
+    no_web.web = false;
+    assert_eq!(
+        provider_count_for_test(SearchIntent::Auto, "bing", &no_web),
+        1,
+        "关闭网页兜底后 auto 仍应保留百科"
+    );
+    assert_eq!(
+        provider_count_for_test(SearchIntent::Web, "bing", &no_web),
+        0,
+        "关闭网页兜底后 web intent 不应生成 provider"
+    );
+
+    let mut no_game = defaults;
+    no_game.game_wiki = false;
+    assert_eq!(
+        provider_count_for_test(SearchIntent::Game, "bing", &no_game),
+        0,
+        "关闭游戏 wiki 后 game intent 不应生成 provider"
+    );
 }

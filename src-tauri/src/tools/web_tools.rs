@@ -1,3 +1,4 @@
+use crate::settings::SearchSourceSettings;
 use anyhow::Result;
 use ego_tree::NodeRef;
 use flowcloudai_client::llm::types::ToolFunctionArg;
@@ -77,6 +78,7 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
         |_state, args| {
             let http_client = _state.http_client.clone();
             let search_engine = _state.search_engine.clone();
+            let search_sources = _state.search_sources.clone();
             Box::pin(async move {
                 let query = arg_str(args, "query")?;
                 let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(8) as usize;
@@ -85,10 +87,12 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
                     .and_then(|v| v.as_str())
                     .unwrap_or("auto");
                 let engine = search_engine.lock().await.clone();
+                let source_settings = search_sources.lock().await.clone();
 
-                let response = do_web_search(&http_client, &engine, query, limit, intent)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                let response =
+                    do_web_search(&http_client, &engine, &source_settings, query, limit, intent)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("{}", e))?;
 
                 let mut output = serde_json::json!({
                     "status": response.status.as_str(),
@@ -417,6 +421,22 @@ impl SearchIntent {
             )),
         }
     }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Auto => "自动搜索",
+            Self::Encyclopedia => "百科搜索",
+            Self::Dictionary => "词典搜索",
+            Self::SourceText => "原文搜索",
+            Self::Quote => "语录搜索",
+            Self::Travel => "旅行搜索",
+            Self::Technical => "技术资料搜索",
+            Self::Game => "游戏资料搜索",
+            Self::Fandom => "作品设定搜索",
+            Self::Esports => "电竞资料搜索",
+            Self::Web => "通用网页搜索",
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -564,19 +584,32 @@ pub const ESPORTS_SOURCES: &[MediaWikiSource] = &[
 async fn do_web_search(
     client: &reqwest::Client,
     engine: &str,
+    source_settings: &SearchSourceSettings,
     query: &str,
     limit: usize,
     intent: &str,
 ) -> Result<SearchResponse> {
     let limit = limit.clamp(1, 20);
     let intent = SearchIntent::parse(intent)?;
+    let providers = providers_for_intent(intent, engine, source_settings);
+    if providers.is_empty() {
+        return Ok(SearchResponse {
+            status: SearchStatus::Unavailable,
+            message: format!(
+                "{} 没有启用可用信源；请在设置中启用对应搜索信源",
+                intent.label()
+            ),
+            providers: Vec::new(),
+            results: Vec::new(),
+        });
+    }
 
     let mut reports = Vec::new();
     let mut saw_empty = false;
     let mut saw_unavailable = false;
     let mut saw_error = false;
 
-    for provider in providers_for_intent(intent, engine) {
+    for provider in providers {
         let outcome = run_provider(client, query, limit, provider).await;
         match outcome.report.status {
             SearchStatus::Ok => {
@@ -621,53 +654,75 @@ enum ProviderPlan<'a> {
     },
 }
 
-fn providers_for_intent<'a>(intent: SearchIntent, engine: &'a str) -> Vec<ProviderPlan<'a>> {
+fn providers_for_intent<'a>(
+    intent: SearchIntent,
+    engine: &'a str,
+    source_settings: &SearchSourceSettings,
+) -> Vec<ProviderPlan<'a>> {
     match intent {
-        SearchIntent::Auto => vec![
-            ProviderPlan::MediaWiki {
-                name: "维基百科",
-                sources: ENCYCLOPEDIA_SOURCES,
-            },
-            ProviderPlan::Serp { engine },
-        ],
-        SearchIntent::Encyclopedia => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Auto => {
+            let mut providers = Vec::new();
+            if source_settings.wikimedia {
+                providers.push(ProviderPlan::MediaWiki {
+                    name: "维基百科",
+                    sources: ENCYCLOPEDIA_SOURCES,
+                });
+            }
+            if source_settings.web {
+                providers.push(ProviderPlan::Serp { engine });
+            }
+            providers
+        }
+        SearchIntent::Encyclopedia if source_settings.wikimedia => vec![ProviderPlan::MediaWiki {
             name: "维基百科",
             sources: ENCYCLOPEDIA_SOURCES,
         }],
-        SearchIntent::Dictionary => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Dictionary if source_settings.wikimedia => vec![ProviderPlan::MediaWiki {
             name: "维基词典",
             sources: DICTIONARY_SOURCES,
         }],
-        SearchIntent::SourceText => vec![ProviderPlan::MediaWiki {
+        SearchIntent::SourceText if source_settings.wikimedia => vec![ProviderPlan::MediaWiki {
             name: "维基文库",
             sources: SOURCE_TEXT_SOURCES,
         }],
-        SearchIntent::Quote => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Quote if source_settings.wikimedia => vec![ProviderPlan::MediaWiki {
             name: "维基语录",
             sources: QUOTE_SOURCES,
         }],
-        SearchIntent::Travel => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Travel if source_settings.wikimedia => vec![ProviderPlan::MediaWiki {
             name: "维基导游",
             sources: TRAVEL_SOURCES,
         }],
-        SearchIntent::Technical => vec![ProviderPlan::MediaWiki {
-            name: "技术 wiki",
-            sources: TECHNICAL_SOURCES,
-        }],
-        SearchIntent::Game => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Technical if source_settings.technical_wiki => {
+            vec![ProviderPlan::MediaWiki {
+                name: "技术 wiki",
+                sources: TECHNICAL_SOURCES,
+            }]
+        }
+        SearchIntent::Game if source_settings.game_wiki => vec![ProviderPlan::MediaWiki {
             name: "游戏 wiki",
             sources: GAME_SOURCES,
         }],
-        SearchIntent::Fandom => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Fandom if source_settings.fandom_wiki => vec![ProviderPlan::MediaWiki {
             name: "作品设定 wiki",
             sources: FANDOM_SOURCES,
         }],
-        SearchIntent::Esports => vec![ProviderPlan::MediaWiki {
+        SearchIntent::Esports if source_settings.esports_wiki => vec![ProviderPlan::MediaWiki {
             name: "电竞 wiki",
             sources: ESPORTS_SOURCES,
         }],
-        SearchIntent::Web => vec![ProviderPlan::Serp { engine }],
+        SearchIntent::Web if source_settings.web => vec![ProviderPlan::Serp { engine }],
+        _ => Vec::new(),
     }
+}
+
+#[doc(hidden)]
+pub fn provider_count_for_test(
+    intent: SearchIntent,
+    engine: &str,
+    source_settings: &SearchSourceSettings,
+) -> usize {
+    providers_for_intent(intent, engine, source_settings).len()
 }
 
 async fn run_provider(
@@ -1292,7 +1347,7 @@ pub mod __test_api {
     pub use super::{
         DICTIONARY_SOURCES, ENCYCLOPEDIA_SOURCES, ESPORTS_SOURCES, FANDOM_SOURCES, GAME_SOURCES,
         MediaWikiSource, QUOTE_SOURCES, SOURCE_TEXT_SOURCES, SearchIntent, SearchResult,
-        TECHNICAL_SOURCES, TRAVEL_SOURCES, search_mediawiki_source,
+        TECHNICAL_SOURCES, TRAVEL_SOURCES, provider_count_for_test, search_mediawiki_source,
     };
 }
 

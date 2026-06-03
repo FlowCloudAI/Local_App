@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::settings::SearchSourceSettings;
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::sense::sense_state_new;
@@ -19,6 +20,7 @@ pub fn register_worldflow_tools(
     registry: &mut flowcloudai_client::tool::ToolRegistry,
     app_state: std::sync::Arc<AppState>,
     search_engine: std::sync::Arc<tokio::sync::Mutex<String>>,
+    search_sources: std::sync::Arc<tokio::sync::Mutex<SearchSourceSettings>>,
     app_handle: AppHandle,
     pending_edits: std::sync::Arc<tokio::sync::Mutex<HashMap<String, oneshot::Sender<bool>>>>,
 ) -> Result<()> {
@@ -30,6 +32,7 @@ pub fn register_worldflow_tools(
             .build()
             .unwrap_or_default(),
         search_engine,
+        search_sources,
         app_handle: Some(app_handle),
         pending_edits,
     };

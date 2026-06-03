@@ -1,5 +1,7 @@
 use crate::apis::ai_client::plugins::{PluginInfo, list_plugins_for_kind};
-use crate::state::{BackendReadyState, BackendStartupStatus, SearchEngineState};
+use crate::state::{
+    BackendReadyState, BackendStartupStatus, SearchEngineState, SearchSourcesState,
+};
 use crate::{AiState, ApiKeyStore, AppSettings, SettingsState};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -87,9 +89,12 @@ pub async fn setting_update_settings(
     state: State<'_, SettingsState>,
     new_settings: AppSettings,
 ) -> Result<String, String> {
-    // 同步搜索引擎状态（供 AI 工具实时读取）
+    // 同步搜索工具状态（供 AI 工具实时读取）
     if let Some(se_state) = app.try_state::<SearchEngineState>() {
         *se_state.engine.lock().await = new_settings.search_engine.clone();
+    }
+    if let Some(ss_state) = app.try_state::<SearchSourcesState>() {
+        *ss_state.sources.lock().await = new_settings.search_sources.clone();
     }
 
     let mut s = state.settings.lock().await;

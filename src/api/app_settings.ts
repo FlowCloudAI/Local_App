@@ -33,6 +33,15 @@ export interface TtsDefaults {
   auto_play: boolean
 }
 
+export interface SearchSourceSettings {
+  wikimedia: boolean
+  technical_wiki: boolean
+  game_wiki: boolean
+  fandom_wiki: boolean
+  esports_wiki: boolean
+  web: boolean
+}
+
 export interface ThemeColorCustomValues {
   primarySeed: string
   primarySurfaceChroma: number
@@ -74,7 +83,8 @@ export interface AppSettings {
   llm: LlmDefaults
   image: ImageDefaults
   tts: TtsDefaults
-    search_engine: string
+  search_engine: string
+  search_sources: SearchSourceSettings
 }
 
 export interface DefaultPaths {

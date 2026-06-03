@@ -1,6 +1,7 @@
 use crate::apis::ai_client::StoredConversationSettings;
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::WorldCheckReport;
+use crate::settings::SearchSourceSettings;
 use anyhow::Result;
 use flowcloudai_client::{FlowCloudAIClient, SessionHandle};
 use serde::Serialize;
@@ -16,6 +17,11 @@ use worldflow_core::SqliteDb;
 /// 当前搜索引擎选择（与设置同步，供 AI 工具使用）
 pub struct SearchEngineState {
     pub engine: Arc<Mutex<String>>,
+}
+
+/// 当前启用的搜索信源组（与设置同步，供 AI 工具使用）
+pub struct SearchSourcesState {
+    pub sources: Arc<Mutex<SearchSourceSettings>>,
 }
 
 // ── 网络状态 ──────────────────────────────────────────────────────────────────
@@ -169,6 +175,7 @@ impl AiState {
         storage_path: Option<PathBuf>,
         app_state: Arc<AppState>,
         search_engine: Arc<Mutex<String>>,
+        search_sources: Arc<Mutex<SearchSourceSettings>>,
         app_handle: tauri::AppHandle,
         pending_edits: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
     ) -> Result<Self> {
@@ -191,6 +198,7 @@ impl AiState {
                 registry,
                 app_state.clone(),
                 search_engine.clone(),
+                search_sources.clone(),
                 app_handle.clone(),
                 pending_edits.clone(),
             )

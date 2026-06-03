@@ -38,6 +38,7 @@ import {
     plugin_uninstall,
     type PluginInfo,
     type RemotePluginInfo,
+    type SearchSourceSettings,
     setting_delete_api_key,
     setting_get_media_dir,
     setting_get_settings,
@@ -67,6 +68,7 @@ export type SettingsTab = 'system' | 'ai' | 'plugins' | 'templates' | 'usage' | 
 export type SettingsFocusTarget = 'writer-mode'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 type AiSettingsSection = 'models' | 'permissions' | 'keys'
+type SearchSourceKey = keyof SearchSourceSettings
 
 type TemplateView = 'list' | 'detail'
 type SelectValue = string | number | (string | number)[]
@@ -84,6 +86,47 @@ const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string
 ]
 const DEFAULT_ENABLED_FREQUENCY_PENALTY = 1.1
 const DEFAULT_ENABLED_PRESENCE_PENALTY = 0.5
+const DEFAULT_SEARCH_SOURCE_SETTINGS: SearchSourceSettings = {
+    wikimedia: true,
+    technical_wiki: true,
+    game_wiki: true,
+    fandom_wiki: true,
+    esports_wiki: true,
+    web: true,
+}
+
+const SEARCH_SOURCE_OPTIONS: Array<{ key: SearchSourceKey; label: string; hint: string }> = [
+    {
+        key: 'wikimedia',
+        label: '维基媒体',
+        hint: '维基百科、维基词典、维基文库、维基语录、维基导游。',
+    },
+    {
+        key: 'technical_wiki',
+        label: '技术 wiki',
+        hint: 'ArchWiki 等技术资料源。',
+    },
+    {
+        key: 'game_wiki',
+        label: '游戏 wiki',
+        hint: 'PCGamingWiki、Minecraft Wiki、UESP、Bulbapedia 等游戏资料源。',
+    },
+    {
+        key: 'fandom_wiki',
+        label: '作品设定 wiki',
+        hint: 'Wookieepedia、Harry Potter Wiki、All The Tropes 等设定资料源。',
+    },
+    {
+        key: 'esports_wiki',
+        label: '电竞 wiki',
+        hint: 'Liquipedia 的电竞资料源。',
+    },
+    {
+        key: 'web',
+        label: '通用网页兜底',
+        hint: '按上方搜索引擎发起通用网页搜索。',
+    },
+]
 
 function normalizeThemeSelectValue(value: SelectValue): Theme {
     const theme = String(Array.isArray(value) ? value[0] ?? 'system' : value)
@@ -95,6 +138,13 @@ function clampNumberValue(value: string, fallback: number, min: number, max: num
     const parsed = Number(value)
     if (!Number.isFinite(parsed)) return fallback
     return Math.min(max, Math.max(min, parsed))
+}
+
+function normalizeSearchSources(sources: Partial<SearchSourceSettings> | null | undefined): SearchSourceSettings {
+    return {
+        ...DEFAULT_SEARCH_SOURCE_SETTINGS,
+        ...sources,
+    }
 }
 
 interface ParsedPluginVersion {
@@ -475,13 +525,21 @@ export default function Settings({
                     ...normalizedTts,
                     voice_id: nextTtsVoiceId,
                 }
-            const changed = nextLlm !== prev.llm || nextImage !== prev.image || nextTts !== prev.tts
+            const nextSearchSources = normalizeSearchSources(prev.search_sources)
+            const searchSourcesChanged = SEARCH_SOURCE_OPTIONS.some(({key}) =>
+                nextSearchSources[key] !== prev.search_sources?.[key]
+            )
+            const changed = nextLlm !== prev.llm
+                || nextImage !== prev.image
+                || nextTts !== prev.tts
+                || searchSourcesChanged
 
             return changed ? {
                 ...prev,
                 llm: nextLlm,
                 image: nextImage,
-                tts: nextTts
+                tts: nextTts,
+                search_sources: nextSearchSources
             } : prev
         })
     }, [getPluginById, loading, resolveDefaultModel, settings])
@@ -611,7 +669,8 @@ export default function Settings({
                 voice_id: null,
                 auto_play: true
             },
-            search_engine: 'bing'
+            search_engine: 'bing',
+            search_sources: {...DEFAULT_SEARCH_SOURCE_SETTINGS}
         }
         setSettings(defaultSettings)
         void showAlert('已重置为默认设置', 'info')
@@ -731,6 +790,16 @@ export default function Settings({
             llm: {
                 ...prev.llm,
                 ...patch,
+            },
+        } : null)
+    }, [])
+
+    const updateSearchSource = useCallback((key: SearchSourceKey, enabled: boolean) => {
+        setSettings(prev => prev ? {
+            ...prev,
+            search_sources: {
+                ...normalizeSearchSources(prev.search_sources),
+                [key]: enabled,
             },
         } : null)
     }, [])
@@ -1097,6 +1166,10 @@ export default function Settings({
     const ttsVoiceOptions = useMemo(
         () => buildTtsVoiceOptions(selectedTtsPlugin, '未选择'),
         [selectedTtsPlugin],
+    )
+    const searchSources = useMemo(
+        () => normalizeSearchSources(settings?.search_sources),
+        [settings?.search_sources],
     )
 
     if (loading || !settings) {
@@ -1893,6 +1966,32 @@ export default function Settings({
                                             } : null)}
                                             style={{flex: 1}}
                                         />
+                                    </div>
+                                </div>
+                                <div className="settings-field settings-field-stack settings-field-stack--full">
+                                    <div className="settings-search-source-heading">
+                                        <span className="settings-search-source-heading-title">搜索信源</span>
+                                        <span className="settings-field-hint">
+                                            AI 搜索工具仅会使用已启用的信源组。
+                                        </span>
+                                    </div>
+                                    <div className="settings-search-source-list">
+                                        {SEARCH_SOURCE_OPTIONS.map((source) => (
+                                            <label className="settings-search-source-item" key={source.key}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={searchSources[source.key]}
+                                                    onChange={(event) => updateSearchSource(
+                                                        source.key,
+                                                        event.currentTarget.checked,
+                                                    )}
+                                                />
+                                                <span className="settings-search-source-copy">
+                                                    <span className="settings-search-source-title">{source.label}</span>
+                                                    <span className="settings-field-hint">{source.hint}</span>
+                                                </span>
+                                            </label>
+                                        ))}
                                     </div>
                                 </div>
                             </section>
