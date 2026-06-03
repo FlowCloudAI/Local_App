@@ -1,5 +1,5 @@
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::collections::HashSet;
 
 fn deserialize_overview_string<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -94,80 +94,6 @@ impl ContradictionReport {
             }
         }
         Ok(())
-    }
-
-    pub fn response_format_json_schema() -> Value {
-        json!({
-            "type": "json_schema",
-            "json_schema": {
-                "name": "contradiction_report",
-                "strict": true,
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["overview", "issues", "unresolvedQuestions", "suggestions"],
-                    "properties": {
-                        "overview": { "type": "string" },
-                        "issues": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": false,
-                                "required": [
-                                    "issueId",
-                                    "severity",
-                                    "category",
-                                    "title",
-                                    "description",
-                                    "relatedEntryIds",
-                                    "evidence"
-                                ],
-                                "properties": {
-                                    "issueId": { "type": "string" },
-                                    "severity": {
-                                        "type": "string",
-                                        "enum": ["low", "medium", "high", "critical"]
-                                    },
-                                    "category": {
-                                        "type": ["string", "null"],
-                                        "enum": ["timeline", "relationship", "geography", "ability", "faction", "other", null]
-                                    },
-                                    "title": { "type": "string" },
-                                    "description": { "type": "string" },
-                                    "relatedEntryIds": {
-                                        "type": "array",
-                                        "items": { "type": "string" }
-                                    },
-                                    "evidence": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "additionalProperties": false,
-                                            "required": ["entryId", "entryTitle", "quote"],
-                                            "properties": {
-                                                "entryId": { "type": "string" },
-                                                "entryTitle": { "type": "string" },
-                                                "quote": { "type": "string" },
-                                                "note": { "type": ["string", "null"] }
-                                            }
-                                        }
-                                    },
-                                    "recommendation": { "type": ["string", "null"] }
-                                }
-                            }
-                        },
-                        "unresolvedQuestions": {
-                            "type": "array",
-                            "items": { "type": "string" }
-                        },
-                        "suggestions": {
-                            "type": "array",
-                            "items": { "type": "string" }
-                        }
-                    }
-                }
-            }
-        })
     }
 }
 
@@ -289,6 +215,7 @@ fn escape_xml_like_text(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn validates_contradiction_report_and_quote_source() {
