@@ -1616,6 +1616,7 @@ export default function AIChatContent({
                                         blocks={message.role === 'assistant'
                                             ? buildRenderableAiChatBlocks(message.blocks)
                                             : message.blocks}
+                                        contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                         content={message.role === 'assistant'
                                             ? buildRenderableAiChatMarkdown(message.content)
                                             : message.content}
