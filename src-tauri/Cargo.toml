@@ -94,3 +94,6 @@ windows = "0.62"
 
 [dev-dependencies]
 tempfile = "3"
+# web_tools 集成测试（tests/web_tools.rs）需要在测试 crate 内构建 HTTP 客户端与运行时
+tokio = { version = "1.50", features = ["rt-multi-thread"] }
+reqwest = { version = "0.13.2", features = ["json"] }

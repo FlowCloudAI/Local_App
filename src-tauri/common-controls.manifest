@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <!--
+    仅用于让 cargo test 生成的测试可执行文件也依赖 common-controls v6，
+    否则 comctl32 绑定到 System32 的 v5.82（缺 TaskDialogIndirect 等 v6 导出），
+    测试二进制在加载期即报 STATUS_ENTRYPOINT_NOT_FOUND。正式构建由 tauri 注入清单，
+    这里的同名依赖会被链接器合并去重。
+  -->
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>

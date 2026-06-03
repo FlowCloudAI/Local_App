@@ -12,6 +12,11 @@ mod state;
 mod template;
 mod tools;
 
+/// 仅供集成测试访问 `web_tools` 内部实现的桥接（`#[doc(hidden)]`，非稳定公开 API）。
+/// 详见 `tests/web_tools.rs` 与 `web_tools::__test_api`。
+#[doc(hidden)]
+pub use crate::tools::web_tools::__test_api as test_api;
+
 pub use api_error::ApiError;
 pub use settings::*;
 pub use state::*;

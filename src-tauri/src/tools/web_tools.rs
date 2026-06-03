@@ -44,7 +44,7 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
     registry.register_async::<WorldflowToolState, _>(
         "web_search",
         "查找资料候选链接，不返回完整正文；需要正文时继续调用 open_url。\
-         intent 默认 auto，除非用户明确要求词义、原文、语录、旅行、技术、游戏资料、作品设定或 ACG 资料。\
+         intent 默认 auto，除非用户明确要求词义、原文、语录、旅行、技术、游戏资料或作品设定。\
          返回 JSON，status 为 ok/empty/unavailable/error；status=unavailable 时不得推断信息不存在。",
         vec![
             ToolFunctionArg::new("query", "string")
@@ -52,7 +52,7 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
                 .desc("搜索关键词"),
             ToolFunctionArg::new("intent", "string")
                 .desc(
-                    "搜索意图：auto=自动；encyclopedia=百科/概念；dictionary=词义/语源；source_text=原文/公版文本；quote=语录；travel=地理/城市；technical=技术资料；game=游戏资料；fandom=作品设定；acg=ACG/二次元；esports=电竞资料；web=通用网页兜底",
+                    "搜索意图：auto=自动；encyclopedia=百科/概念；dictionary=词义/语源；source_text=原文/公版文本；quote=语录；travel=地理/城市；technical=技术资料；game=游戏资料；fandom=作品设定；esports=电竞资料；web=通用网页兜底",
                 )
                 .enum_values([
                     "auto",
@@ -64,7 +64,6 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
                     "technical",
                     "game",
                     "fandom",
-                    "acg",
                     "esports",
                     "web",
                 ])
@@ -312,11 +311,11 @@ impl SearchStatus {
     }
 }
 
-struct SearchResult {
-    title: String,
-    url: String,
-    snippet: String,
-    source: String,
+pub struct SearchResult {
+    pub title: String,
+    pub url: String,
+    pub snippet: String,
+    pub source: String,
 }
 
 struct ProviderReport {
@@ -384,7 +383,7 @@ struct SearchResponse {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SearchIntent {
+pub enum SearchIntent {
     Auto,
     Encyclopedia,
     Dictionary,
@@ -394,13 +393,12 @@ enum SearchIntent {
     Technical,
     Game,
     Fandom,
-    Acg,
     Esports,
     Web,
 }
 
 impl SearchIntent {
-    fn parse(raw: &str) -> Result<Self> {
+    pub fn parse(raw: &str) -> Result<Self> {
         match raw {
             "auto" => Ok(Self::Auto),
             "encyclopedia" => Ok(Self::Encyclopedia),
@@ -411,11 +409,10 @@ impl SearchIntent {
             "technical" => Ok(Self::Technical),
             "game" => Ok(Self::Game),
             "fandom" => Ok(Self::Fandom),
-            "acg" => Ok(Self::Acg),
             "esports" => Ok(Self::Esports),
             "web" => Ok(Self::Web),
             other => Err(anyhow::anyhow!(
-                "intent 仅支持 auto、encyclopedia、dictionary、source_text、quote、travel、technical、game、fandom、acg、esports 或 web，不支持: {}",
+                "intent 仅支持 auto、encyclopedia、dictionary、source_text、quote、travel、technical、game、fandom、esports 或 web，不支持: {}",
                 other
             )),
         }
@@ -423,13 +420,13 @@ impl SearchIntent {
 }
 
 #[derive(Clone, Copy)]
-struct MediaWikiSource {
-    name: &'static str,
+pub struct MediaWikiSource {
+    pub name: &'static str,
     api_url: &'static str,
-    article_base_url: &'static str,
+    pub article_base_url: &'static str,
 }
 
-const ENCYCLOPEDIA_SOURCES: &[MediaWikiSource] = &[
+pub const ENCYCLOPEDIA_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "中文维基百科",
         api_url: "https://zh.wikipedia.org/w/api.php",
@@ -442,7 +439,7 @@ const ENCYCLOPEDIA_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const DICTIONARY_SOURCES: &[MediaWikiSource] = &[
+pub const DICTIONARY_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "中文维基词典",
         api_url: "https://zh.wiktionary.org/w/api.php",
@@ -455,7 +452,7 @@ const DICTIONARY_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const SOURCE_TEXT_SOURCES: &[MediaWikiSource] = &[
+pub const SOURCE_TEXT_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "中文维基文库",
         api_url: "https://zh.wikisource.org/w/api.php",
@@ -468,7 +465,7 @@ const SOURCE_TEXT_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const QUOTE_SOURCES: &[MediaWikiSource] = &[
+pub const QUOTE_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "中文维基语录",
         api_url: "https://zh.wikiquote.org/w/api.php",
@@ -481,7 +478,7 @@ const QUOTE_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const TRAVEL_SOURCES: &[MediaWikiSource] = &[
+pub const TRAVEL_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "中文维基导游",
         api_url: "https://zh.wikivoyage.org/w/api.php",
@@ -494,13 +491,13 @@ const TRAVEL_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const TECHNICAL_SOURCES: &[MediaWikiSource] = &[MediaWikiSource {
+pub const TECHNICAL_SOURCES: &[MediaWikiSource] = &[MediaWikiSource {
     name: "ArchWiki",
     api_url: "https://wiki.archlinux.org/api.php",
     article_base_url: "https://wiki.archlinux.org/title/",
 }];
 
-const GAME_SOURCES: &[MediaWikiSource] = &[
+pub const GAME_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "PCGamingWiki",
         api_url: "https://www.pcgamingwiki.com/w/api.php",
@@ -533,7 +530,7 @@ const GAME_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const FANDOM_SOURCES: &[MediaWikiSource] = &[
+pub const FANDOM_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "Wookieepedia",
         api_url: "https://starwars.fandom.com/api.php",
@@ -551,7 +548,7 @@ const FANDOM_SOURCES: &[MediaWikiSource] = &[
     },
 ];
 
-const ESPORTS_SOURCES: &[MediaWikiSource] = &[
+pub const ESPORTS_SOURCES: &[MediaWikiSource] = &[
     MediaWikiSource {
         name: "Liquipedia StarCraft II",
         api_url: "https://liquipedia.net/starcraft2/api.php",
@@ -619,7 +616,6 @@ enum ProviderPlan<'a> {
         name: &'static str,
         sources: &'a [MediaWikiSource],
     },
-    MoegirlOpenSearch,
     Serp {
         engine: &'a str,
     },
@@ -632,7 +628,6 @@ fn providers_for_intent<'a>(intent: SearchIntent, engine: &'a str) -> Vec<Provid
                 name: "维基百科",
                 sources: ENCYCLOPEDIA_SOURCES,
             },
-            ProviderPlan::MoegirlOpenSearch,
             ProviderPlan::Serp { engine },
         ],
         SearchIntent::Encyclopedia => vec![ProviderPlan::MediaWiki {
@@ -667,13 +662,6 @@ fn providers_for_intent<'a>(intent: SearchIntent, engine: &'a str) -> Vec<Provid
             name: "作品设定 wiki",
             sources: FANDOM_SOURCES,
         }],
-        SearchIntent::Acg => vec![
-            ProviderPlan::MoegirlOpenSearch,
-            ProviderPlan::MediaWiki {
-                name: "维基百科",
-                sources: ENCYCLOPEDIA_SOURCES,
-            },
-        ],
         SearchIntent::Esports => vec![ProviderPlan::MediaWiki {
             name: "电竞 wiki",
             sources: ESPORTS_SOURCES,
@@ -692,7 +680,6 @@ async fn run_provider(
         ProviderPlan::MediaWiki { name, sources } => {
             search_mediawiki_sources(client, name, sources, query, limit).await
         }
-        ProviderPlan::MoegirlOpenSearch => search_moegirl_opensearch(client, query, limit).await,
         ProviderPlan::Serp { engine } => search_serp(client, engine, query, limit).await,
     }
 }
@@ -768,10 +755,6 @@ async fn search_mediawiki_sources(
             Ok(mut items) => {
                 reachable_sources += 1;
                 results.append(&mut items);
-                if results.len() >= limit {
-                    results.truncate(limit);
-                    break;
-                }
             }
             Err(e) => {
                 log::warn!("[web_search][mediawiki] {} failed: {}", source.name, e);
@@ -781,8 +764,7 @@ async fn search_mediawiki_sources(
     }
 
     if !results.is_empty() {
-        rank_results(&mut results, query);
-        results.truncate(limit);
+        let results = finalize_results(results, query, limit);
         return ProviderOutcome::ok(provider_name, results);
     }
 
@@ -798,7 +780,7 @@ async fn search_mediawiki_sources(
     }
 }
 
-async fn search_mediawiki_source(
+pub async fn search_mediawiki_source(
     client: &reqwest::Client,
     source: MediaWikiSource,
     query: &str,
@@ -863,78 +845,21 @@ async fn search_mediawiki_source(
     Ok(results)
 }
 
-async fn search_moegirl_opensearch(
-    client: &reqwest::Client,
+fn finalize_results(
+    mut results: Vec<SearchResult>,
     query: &str,
     limit: usize,
-) -> ProviderOutcome {
-    match search_moegirl_opensearch_inner(client, query, limit).await {
-        Ok(results) if !results.is_empty() => ProviderOutcome::ok("萌娘百科", results),
-        Ok(_) => ProviderOutcome::empty("萌娘百科", "萌娘百科可用，但没有找到匹配结果"),
-        Err(e) => ProviderOutcome::unavailable("萌娘百科", format!("萌娘百科搜索不可用: {}", e)),
-    }
-}
-
-async fn search_moegirl_opensearch_inner(
-    client: &reqwest::Client,
-    query: &str,
-    limit: usize,
-) -> Result<Vec<SearchResult>> {
-    let mut url = reqwest::Url::parse("https://zh.moegirl.org.cn/api.php")?;
-    url.query_pairs_mut()
-        .append_pair("action", "opensearch")
-        .append_pair("format", "json")
-        .append_pair("search", query)
-        .append_pair("limit", &limit.to_string());
-
-    log::info!("[web_search][moegirl] url={}", url);
-
-    let response = client
-        .get(url)
-        .header(
-            "User-Agent",
-            "FlowCloudAI/0.1 (+https://github.com/FlowCloudAI/Local_App)",
-        )
-        .header("Accept", "application/json")
-        .timeout(Duration::from_secs(15))
-        .send()
-        .await?;
-
-    let status = response.status();
-    if !status.is_success() {
-        return Err(anyhow::anyhow!("萌娘百科返回 {}", status));
-    }
-
-    let (_, titles, snippets, urls): (String, Vec<String>, Vec<String>, Vec<String>) =
-        response.json().await?;
-    let results = titles
-        .into_iter()
-        .enumerate()
-        .filter(|(_, title)| !title.trim().is_empty())
-        .filter_map(|(i, title)| {
-            let url = urls.get(i)?.clone();
-            if url.trim().is_empty() {
-                return None;
-            }
-            Some(SearchResult {
-                title,
-                url,
-                snippet: snippets.get(i).cloned().unwrap_or_default(),
-                source: "萌娘百科".to_string(),
-            })
-        })
-        .take(limit)
-        .collect::<Vec<_>>();
-
-    log::info!("[web_search][moegirl] parsed_results={}", results.len());
-    Ok(results)
+) -> Vec<SearchResult> {
+    results.retain(|result| !result.title.trim().is_empty() && !result.url.trim().is_empty());
+    rank_results(&mut results, query);
+    dedup_results(results).into_iter().take(limit).collect()
 }
 
 fn rank_results(results: &mut [SearchResult], query: &str) {
     let normalized_query = query.trim().to_lowercase();
     results.sort_by_key(|result| {
         let title = result.title.trim().to_lowercase();
-        let rank = if title == normalized_query {
+        let title_rank = if title == normalized_query {
             0
         } else if title.starts_with(&normalized_query) {
             1
@@ -943,8 +868,80 @@ fn rank_results(results: &mut [SearchResult], query: &str) {
         } else {
             3
         };
-        (rank, title.len())
+        let disambiguation_rank = if is_disambiguation_title(&title) {
+            1
+        } else {
+            0
+        };
+        let snippet_rank = if result.snippet.trim().is_empty() {
+            1
+        } else {
+            0
+        };
+        (
+            title_rank,
+            disambiguation_rank,
+            snippet_rank,
+            title.len(),
+            result.source.clone(),
+        )
     });
+}
+
+fn dedup_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
+    let mut seen_urls = std::collections::HashSet::new();
+    let mut seen_titles = std::collections::HashSet::new();
+    let mut deduped = Vec::new();
+
+    for result in results {
+        let url_key = normalize_url_for_dedup(&result.url);
+        let title_key = normalize_title_for_dedup(&result.title);
+        if url_key.is_empty() || title_key.is_empty() {
+            continue;
+        }
+        if seen_urls.contains(&url_key) || seen_titles.contains(&title_key) {
+            continue;
+        }
+        seen_urls.insert(url_key);
+        seen_titles.insert(title_key);
+        deduped.push(result);
+    }
+
+    deduped
+}
+
+fn normalize_url_for_dedup(url: &str) -> String {
+    let trimmed = url.trim();
+    if let Ok(mut parsed) = reqwest::Url::parse(trimmed) {
+        parsed.set_fragment(None);
+        parsed.set_query(None);
+        let mut normalized = parsed.to_string();
+        while normalized.ends_with('/') {
+            normalized.pop();
+        }
+        return normalized.to_lowercase();
+    }
+
+    trimmed
+        .trim_end_matches('/')
+        .split('#')
+        .next()
+        .unwrap_or("")
+        .split('?')
+        .next()
+        .unwrap_or("")
+        .to_lowercase()
+}
+
+fn normalize_title_for_dedup(title: &str) -> String {
+    title
+        .trim()
+        .to_lowercase()
+        .replace(['_', ' ', '　', '-', '—', ':', '：'], "")
+}
+
+fn is_disambiguation_title(title: &str) -> bool {
+    title.contains("disambiguation") || title.contains("消歧义") || title.contains("消歧義")
 }
 
 async fn search_serp(
@@ -959,7 +956,9 @@ async fn search_serp(
         search_baidu(client, &encoded, limit).await
     } else {
         match search_bing(client, &encoded, limit).await {
-            Ok(results) if !results.is_empty() => return ProviderOutcome::ok("web", results),
+            Ok(results) if !results.is_empty() => {
+                return ProviderOutcome::ok("web", finalize_results(results, query, limit));
+            }
             Ok(_) => log::warn!("[web_search] bing returned empty, fallback to duckduckgo"),
             Err(e) => log::warn!("[web_search] bing failed: {}, fallback to duckduckgo", e),
         };
@@ -968,7 +967,9 @@ async fn search_serp(
     };
 
     match search_result {
-        Ok(results) if !results.is_empty() => ProviderOutcome::ok("web", results),
+        Ok(results) if !results.is_empty() => {
+            ProviderOutcome::ok("web", finalize_results(results, query, limit))
+        }
         Ok(_) => ProviderOutcome::unavailable(
             "web",
             "通用网页搜索返回了页面但无法解析结果，可能是反爬或页面结构变化",
@@ -1281,125 +1282,18 @@ fn collect_text(node: NodeRef<'_, Node>, buf: &mut String) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[ignore = "需要访问公网 MediaWiki API，手动验证 wiki 搜索链路时运行"]
-    fn mediawiki_search_smoke() {
-        let rt = tokio::runtime::Runtime::new().expect("创建 tokio runtime 失败");
-
-        rt.block_on(async {
-            let client = reqwest::Client::builder()
-                .user_agent("FlowCloudAI/0.1 (+https://github.com/FlowCloudAI/Local_App)")
-                .build()
-                .expect("构建 HTTP 客户端失败");
-
-            for (source, query) in mediawiki_smoke_cases() {
-                let results = search_mediawiki_source(&client, source, query, 3)
-                    .await
-                    .unwrap_or_else(|e| panic!("{} 搜索失败: {}", source.name, e));
-
-                println!("[{}] query={} count={}", source.name, query, results.len());
-                for result in &results {
-                    println!(
-                        "[{}] {} -> {} | {}",
-                        result.source, result.title, result.url, result.snippet
-                    );
-                }
-
-                assert!(!results.is_empty(), "{} 搜索结果不应为空", source.name);
-                assert!(
-                    results
-                        .iter()
-                        .all(|result| result.url.starts_with(source.article_base_url)),
-                    "{} 搜索结果应使用对应站点文章链接",
-                    source.name
-                );
-            }
-        });
-    }
-
-    #[test]
-    #[ignore = "需要访问公网萌娘百科 OpenSearch API，手动验证 ACG 搜索链路时运行"]
-    fn moegirl_opensearch_smoke() {
-        let rt = tokio::runtime::Runtime::new().expect("创建 tokio runtime 失败");
-
-        rt.block_on(async {
-            let client = reqwest::Client::builder()
-                .user_agent("FlowCloudAI/0.1 (+https://github.com/FlowCloudAI/Local_App)")
-                .build()
-                .expect("构建 HTTP 客户端失败");
-
-            let results = search_moegirl_opensearch_inner(&client, "初音未来", 3)
-                .await
-                .expect("萌娘百科 OpenSearch 应可用");
-
-            for result in &results {
-                println!("[{}] {} -> {}", result.source, result.title, result.url);
-            }
-
-            assert!(!results.is_empty(), "萌娘百科搜索结果不应为空");
-            assert!(
-                results
-                    .iter()
-                    .all(|result| result.url.starts_with("https://zh.moegirl.org.cn/")),
-                "萌娘百科结果应使用萌娘百科文章链接"
-            );
-        });
-    }
-
-    fn mediawiki_smoke_cases() -> Vec<(MediaWikiSource, &'static str)> {
-        vec![
-            (ENCYCLOPEDIA_SOURCES[0], "三国演义"),
-            (ENCYCLOPEDIA_SOURCES[1], "Romance of the Three Kingdoms"),
-            (DICTIONARY_SOURCES[0], "天空"),
-            (DICTIONARY_SOURCES[1], "sky"),
-            (SOURCE_TEXT_SOURCES[0], "三国演义"),
-            (SOURCE_TEXT_SOURCES[1], "Hamlet"),
-            (QUOTE_SOURCES[0], "孔子"),
-            (QUOTE_SOURCES[1], "Shakespeare"),
-            (TRAVEL_SOURCES[0], "北京"),
-            (TRAVEL_SOURCES[1], "Paris"),
-            (TECHNICAL_SOURCES[0], "systemd"),
-            (GAME_SOURCES[0], "Elden Ring"),
-            (GAME_SOURCES[1], "Creeper"),
-            (GAME_SOURCES[2], "Skyrim"),
-            (GAME_SOURCES[3], "Pikachu"),
-            (GAME_SOURCES[4], "Zenith"),
-            (GAME_SOURCES[5], "Iron Ore"),
-            (FANDOM_SOURCES[0], "Darth Vader"),
-            (FANDOM_SOURCES[1], "Hogwarts"),
-            (FANDOM_SOURCES[2], "Hero"),
-            (ESPORTS_SOURCES[0], "Serral"),
-            (ESPORTS_SOURCES[1], "The International"),
-        ]
-    }
-
-    #[test]
-    fn parses_supported_search_intents() {
-        for intent in [
-            "auto",
-            "encyclopedia",
-            "dictionary",
-            "source_text",
-            "quote",
-            "travel",
-            "technical",
-            "game",
-            "fandom",
-            "acg",
-            "esports",
-            "web",
-        ] {
-            assert!(
-                SearchIntent::parse(intent).is_ok(),
-                "{} 应该是合法 intent",
-                intent
-            );
-        }
-    }
+/// 仅供集成测试访问 `web_tools` 内部实现的桥接模块（`#[doc(hidden)]`，非稳定公开 API）。
+/// 这些条目本身保持私有，只经此公开路径再导出，供 `tests/web_tools.rs` 调用——
+/// 因为外部 test crate 无法访问 crate 私有项。为何测试必须放在 `tests/` 下而非
+/// `#[cfg(test)]` 单元测试：见 `build.rs` 与 `common-controls.manifest`（lib 单元测试
+/// 二进制拿不到 common-controls v6 清单，加载期会 STATUS_ENTRYPOINT_NOT_FOUND）。
+#[doc(hidden)]
+pub mod __test_api {
+    pub use super::{
+        DICTIONARY_SOURCES, ENCYCLOPEDIA_SOURCES, ESPORTS_SOURCES, FANDOM_SOURCES, GAME_SOURCES,
+        MediaWikiSource, QUOTE_SOURCES, SOURCE_TEXT_SOURCES, SearchIntent, SearchResult,
+        TECHNICAL_SOURCES, TRAVEL_SOURCES, search_mediawiki_source,
+    };
 }
 
 // 需要引用 state 模块中的 WorldflowToolState
