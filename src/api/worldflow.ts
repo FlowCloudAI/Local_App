@@ -2,6 +2,12 @@ import {command} from './base'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
+export interface AppLogSnapshot {
+    path: string
+    content: string
+    truncated: boolean
+}
+
 export interface Project {
     id: string
     name: string
@@ -400,6 +406,9 @@ export interface RelationGraphData {
 
 export const log_message = (level: LogLevel, message: string, source?: string) =>
     command<void>('log_message', {level, message, source})
+
+export const read_app_log = () =>
+    command<AppLogSnapshot>('read_app_log')
 
 export const open_in_file_manager = (path: string) =>
     command<void>('open_in_file_manager', {path})

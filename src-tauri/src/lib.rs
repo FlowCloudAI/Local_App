@@ -360,6 +360,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             log_message,
+            read_app_log,
             open_in_file_manager,
             show_main_window,
             exit_app,

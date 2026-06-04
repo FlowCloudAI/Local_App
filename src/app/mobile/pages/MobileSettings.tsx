@@ -9,19 +9,19 @@ import {
     plugin_list_local,
     plugin_market_install,
     plugin_market_list,
-    open_in_file_manager,
+    read_app_log,
     setting_delete_api_key,
     setting_get_settings,
     setting_has_api_key,
     setting_set_api_key,
     setting_update_settings,
+    type AppLogSnapshot,
     type AppSettings,
     type LocalPluginInfo,
     type PluginInfo,
     type RemotePluginInfo,
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
-import {appConfigDir} from '@tauri-apps/api/path'
 import {open} from '@tauri-apps/plugin-dialog'
 import {type MobilePage} from '../usePageStack'
 import './MobileSettings.css'
@@ -93,6 +93,67 @@ function ChevronRightIcon() {
     )
 }
 
+function LogIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
+            <path
+                d="M7 4h7l4 4v12H7z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M14 4v4h4M10 12h5M10 16h5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    )
+}
+
+function RefreshIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
+            <path
+                d="M20 12a8 8 0 0 1-13.66 5.66M4 12A8 8 0 0 1 17.66 6.34"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M20 5v6h-6M4 19v-6h6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    )
+}
+
+function CopyIcon() {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
+            <path
+                d="M8 8h10v10H8zM6 14H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    )
+}
+
 export default function MobileSettings({push, page}: Props) {
     const {showAlert} = useAlert()
     const {theme, setTheme} = useTheme()
@@ -113,6 +174,10 @@ export default function MobileSettings({push, page}: Props) {
     const [settings, setSettings] = useState<AppSettings | null>(null)
     const [version, setVersion] = useState('')
     const [loading, setLoading] = useState(true)
+    const [logViewerOpen, setLogViewerOpen] = useState(false)
+    const [logSnapshot, setLogSnapshot] = useState<AppLogSnapshot | null>(null)
+    const [logLoading, setLogLoading] = useState(false)
+    const [logError, setLogError] = useState('')
 
     useEffect(() => {
         getVersion().then(setVersion).catch(() => {
@@ -377,15 +442,36 @@ export default function MobileSettings({push, page}: Props) {
         }
     }, [showAlert])
 
-    const handleOpenLogDir = useCallback(async () => {
+    const loadAppLog = useCallback(async () => {
+        setLogLoading(true)
+        setLogError('')
         try {
-            const configDir = await appConfigDir()
-            await open_in_file_manager(configDir)
+            setLogSnapshot(await read_app_log())
         } catch (error) {
-            logger.error('[MobileSettings] 打开日志目录失败', error)
-            await showAlert(`打开日志目录失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
+            const message = formatUnknownError(error)
+            logger.error('[MobileSettings] 读取应用日志失败', error)
+            setLogError(message)
+            await showAlert(`读取日志失败：${message}`, 'error', 'toast', 3000)
+        } finally {
+            setLogLoading(false)
         }
     }, [showAlert])
+
+    const handleOpenLogViewer = useCallback(() => {
+        setLogViewerOpen(true)
+        void loadAppLog()
+    }, [loadAppLog])
+
+    const handleCopyLog = useCallback(async () => {
+        if (!logSnapshot?.content) return
+        try {
+            await navigator.clipboard.writeText(logSnapshot.content)
+            await showAlert('日志内容已复制', 'success', 'toast', 1500)
+        } catch (error) {
+            logger.error('[MobileSettings] 复制日志失败', error)
+            await showAlert(`复制日志失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
+        }
+    }, [logSnapshot, showAlert])
 
     const openSettingsPage = useCallback((type: string) => {
         push?.({type})
@@ -651,21 +737,76 @@ export default function MobileSettings({push, page}: Props) {
                     <div className="mobile-settings-about-actions">
                         <div className="mobile-settings-about-action">
                             <div className="mobile-settings-about-action__copy">
-                                <span className="mobile-settings-about-action__title">日志目录</span>
+                                <span className="mobile-settings-about-action__title">应用日志</span>
                                 <span className="mobile-settings-about-action__desc">
-                                    app.log 位于配置目录内，用于排查插件安装等运行问题。
+                                    查看最近 app.log 内容，用于排查插件安装等运行问题。
                                 </span>
                             </div>
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => void handleOpenLogDir()}
+                                onClick={handleOpenLogViewer}
                             >
-                                查看日志
+                                <span className="mobile-settings-button-content">
+                                    <LogIcon/>
+                                    查看日志
+                                </span>
                             </Button>
                         </div>
                     </div>
+                    {logViewerOpen && (
+                        <div className="mobile-settings-log-viewer">
+                            <div className="mobile-settings-log-viewer__header">
+                                <div className="mobile-settings-log-viewer__copy">
+                                    <div className="mobile-settings-log-viewer__title">最近日志</div>
+                                    <div className="mobile-settings-log-viewer__path">
+                                        {logSnapshot?.path || '正在读取日志路径…'}
+                                    </div>
+                                </div>
+                                <div className="mobile-settings-log-viewer__actions">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void loadAppLog()}
+                                        disabled={logLoading}
+                                    >
+                                        <span className="mobile-settings-button-content">
+                                            <RefreshIcon/>
+                                            {logLoading ? '读取中…' : '刷新'}
+                                        </span>
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void handleCopyLog()}
+                                        disabled={!logSnapshot?.content}
+                                    >
+                                        <span className="mobile-settings-button-content">
+                                            <CopyIcon/>
+                                            复制
+                                        </span>
+                                    </Button>
+                                </div>
+                            </div>
+                            {logSnapshot?.truncated && (
+                                <div className="mobile-settings-log-viewer__notice">
+                                    日志较大，仅显示最近 256KB。
+                                </div>
+                            )}
+                            {logError ? (
+                                <div className="mobile-settings-log-viewer__error">
+                                    读取失败：{logError}
+                                </div>
+                            ) : (
+                                <pre className="mobile-settings-log-viewer__content">{logLoading && !logSnapshot
+                                    ? '正在读取日志…'
+                                    : logSnapshot?.content || '暂无日志内容'}</pre>
+                            )}
+                        </div>
+                    )}
                     <Button
                         type="button"
                         variant="ghost"

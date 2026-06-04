@@ -1,4 +1,9 @@
 use super::common::*;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
+use tauri::Manager;
+
+const MAX_APP_LOG_BYTES: u64 = 256 * 1024;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -6,6 +11,14 @@ pub struct PlatformInfo {
     pub os: &'static str,
     pub form_factor: &'static str,
     pub window_controls: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppLogSnapshot {
+    pub path: String,
+    pub content: String,
+    pub truncated: bool,
 }
 
 #[tauri::command]
@@ -22,6 +35,43 @@ pub fn log_message(level: &str, message: &str, source: Option<String>) {
         "warn" => log::warn!("{message}"),
         _ => log::debug!("{message}"),
     }
+}
+
+/// 读取应用日志末尾内容，移动端用于页面内查看，避免打开私有目录失败。
+#[tauri::command]
+pub fn read_app_log(app: AppHandle) -> Result<AppLogSnapshot, String> {
+    let log_path = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("app.log");
+    let path = log_path.display().to_string();
+
+    if !log_path.exists() {
+        return Ok(AppLogSnapshot {
+            path,
+            content: String::new(),
+            truncated: false,
+        });
+    }
+
+    let mut file = File::open(&log_path).map_err(|e| e.to_string())?;
+    let len = file.metadata().map_err(|e| e.to_string())?.len();
+    let truncated = len > MAX_APP_LOG_BYTES;
+
+    if truncated {
+        file.seek(SeekFrom::Start(len.saturating_sub(MAX_APP_LOG_BYTES)))
+            .map_err(|e| e.to_string())?;
+    }
+
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+
+    Ok(AppLogSnapshot {
+        path,
+        content: String::from_utf8_lossy(&bytes).to_string(),
+        truncated,
+    })
 }
 
 /// 在系统文件管理器中打开指定路径。
