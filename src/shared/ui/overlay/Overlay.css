@@ -7,7 +7,7 @@
     display: flex;
     background: var(--fc-color-bg-overlay);
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--fc-transition-slow);
     box-sizing: border-box;
 }
 
@@ -20,10 +20,10 @@
     align-items: center;
     justify-content: center;
     padding:
-        max(16px, env(safe-area-inset-top, 0px))
-        max(16px, env(safe-area-inset-right, 0px))
-        max(16px, env(safe-area-inset-bottom, 0px))
-        max(16px, env(safe-area-inset-left, 0px));
+        max(var(--fc-space-lg), env(safe-area-inset-top, 0px))
+        max(var(--fc-space-lg), env(safe-area-inset-right, 0px))
+        max(var(--fc-space-lg), env(safe-area-inset-bottom, 0px))
+        max(var(--fc-space-lg), env(safe-area-inset-left, 0px));
 }
 
 /* 上滑：贴底铺满，底部留安全区。变体组件后续接入。 */
@@ -39,7 +39,7 @@
     overflow: auto;
     outline: none;
     -webkit-overflow-scrolling: touch;
-    transition: transform 0.2s ease, opacity 0.2s ease;
+    transition: transform var(--fc-transition-slow), opacity var(--fc-transition-slow);
 }
 
 .fc-overlay__panel--sheet {
