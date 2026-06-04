@@ -4,6 +4,7 @@ import {createRoot} from 'react-dom/client'
 
 import AppShell from './app/index/AppShell'
 import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
+import {getFormFactorOverride, isTauriRuntime} from './shared/devPreview'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
 
@@ -24,12 +25,6 @@ window.addEventListener('unhandledrejection', (e) => {
 document.addEventListener('securitypolicyviolation', (e) => {
     logger.error(`[CSPViolation] directive="${e.violatedDirective}" blocked="${e.blockedURI}" src="${e.sourceFile}:${e.lineNumber}"`)
 })
-
-function isTauriRuntime(): boolean {
-    return typeof window !== 'undefined'
-        && (Object.prototype.hasOwnProperty.call(window, '__TAURI_INTERNALS__')
-            || Object.prototype.hasOwnProperty.call(window, '__TAURI__'))
-}
 
 function getFallbackPlatformInfo(): PlatformInfo {
     return {
@@ -63,6 +58,13 @@ const initApp = async () => {
         platformInfo = platformResult.value
     } else {
         logger.warn('Failed to load platform info, using fallback:', platformResult.reason)
+    }
+
+    // 开发期浏览器预览：用 ?ff=mobile|desktop 覆盖壳层分流（仅 dev 生效，生产为空操作）。
+    const formFactorOverride = getFormFactorOverride()
+    if (formFactorOverride) {
+        platformInfo = {...platformInfo, formFactor: formFactorOverride}
+        logger.info('[Bootstrap] 应用 formFactor 覆盖（开发预览）:', formFactorOverride)
     }
 
     if (isTauriRuntime()) {

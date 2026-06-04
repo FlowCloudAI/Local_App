@@ -59,7 +59,7 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
                 title: '未命名词条',
             })
             setAiFocus({projectId, entryId: created.id})
-            push({type: 'entryEditor', params: {projectId, entryId: created.id, displayName: '未命名词条'}})
+            push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit'}})
         } catch (e) {
             logger.error('新建词条失败', e)
         }

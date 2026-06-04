@@ -1,4 +1,7 @@
 import {logger} from '../../shared/logger'
+import {isBrowserPreview} from '../../shared/devPreview'
+import {closeTopOverlay} from '../../shared/ui/overlay/overlayStack'
+import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
@@ -8,7 +11,6 @@ import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileEntryDetail from './pages/MobileEntryDetail'
-import MobileEntryEditor from './pages/MobileEntryEditor'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileIdea from './pages/MobileIdea'
 import MobileProjectHome from './pages/MobileProjectHome'
@@ -37,9 +39,23 @@ function getPageTitle(type: string, params?: Record<string, unknown>): string {
         case 'projectList': return '项目'
         case 'projectHome': return name || '项目'
         case 'entryList':   return name || '词条'
-        case 'entryDetail': return name || '词条详情'
-        case 'entryEditor': return name ? `编辑・${name}` : '编辑词条'
+        case 'entryDetail': return name || '词条'
         case 'aiChat': return 'AI 对话'
+        case 'ideas': return '灵感便签'
+        case 'settings': return '设置'
+        default: return ''
+    }
+}
+
+// 顶部标题收口：栈内页用 getPageTitle，无栈页（Tab 根）回退到 Tab 名称。
+function getHeaderTitle(activeTab: MobileTab, page: MobilePage | null): string {
+    if (page) {
+        const title = getPageTitle(page.type, page.params)
+        if (title) return title
+    }
+    switch (activeTab) {
+        case 'projects': return '项目'
+        case 'ai': return 'AI 对话'
         case 'ideas': return '灵感便签'
         case 'settings': return '设置'
         default: return ''
@@ -66,10 +82,13 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const activeStack = stacks[activeTab]
     const currentPage = activeStack.currentPage
 
-    const [backendReady, setBackendReady] = useState(false)
+    // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
+    const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
 
     useEffect(() => {
+        // 浏览器预览无后端信号，跳过监听（backendReady 初始已为 true）。
+        if (isBrowserPreview()) return
         let disposed = false
         const mark = () => { if (!disposed) setBackendReady(true) }
         const p = listen('backend-ready', mark)
@@ -105,6 +124,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [])
 
     const handleBack = useCallback(() => {
+        // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
+        if (closeTopOverlay()) return
         if (activeStack.canGoBack) {
             activeStack.pop()
         } else {
@@ -165,7 +186,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }
 
     const pageType = currentPage?.type ?? ''
-    const pageTitle = getPageTitle(pageType, currentPage?.params)
 
     return (
         <div className="mobile-app">
@@ -179,11 +199,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 ) : (
                     <div className="mobile-app__header-spacer"/>
                 )}
-                <h1 className="mobile-app__title">{pageTitle || (
-                    activeTab === 'projects' ? '项目' :
-                        activeTab === 'ai' ? 'AI 对话' :
-                            activeTab === 'ideas' ? '灵感便签' : '设置'
-                )}</h1>
+                <h1 className="mobile-app__title">{getHeaderTitle(activeTab, currentPage)}</h1>
                 <div className="mobile-app__header-spacer"/>
             </header>
 
@@ -202,9 +218,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         )}
                         {pageType === 'entryDetail' && currentPage && (
                             <MobileEntryDetail {...pageProps} params={currentPage.params}/>
-                        )}
-                        {pageType === 'entryEditor' && currentPage && (
-                            <MobileEntryEditor {...pageProps} params={currentPage.params}/>
                         )}
                     </>
                 )}
@@ -226,6 +239,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             </div>
 
             <MobileNav activeTab={activeTab} onTabChange={handleTabChange}/>
+
+            <AiConfirmModal/>
         </div>
     )
 }
