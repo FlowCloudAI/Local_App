@@ -29,6 +29,23 @@
     text-align: left;
     cursor: pointer;
     touch-action: manipulation;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 120ms ease;
+    user-select: none;
+}
+
+.mobile-settings-menu-item:focus {
+    outline: none;
+}
+
+.mobile-settings-menu-item:active {
+    background: var(--fc-color-bg-secondary);
+}
+
+.mobile-settings-menu-item:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    outline-offset: -2px;
 }
 
 .mobile-settings-menu-item__icon {
