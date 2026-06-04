@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Input, Select, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_close_all_sessions,
@@ -178,6 +178,8 @@ export default function MobileSettings({push, page}: Props) {
     const [logSnapshot, setLogSnapshot] = useState<AppLogSnapshot | null>(null)
     const [logLoading, setLogLoading] = useState(false)
     const [logError, setLogError] = useState('')
+    const marketLoadSeqRef = useRef(0)
+    const pluginRefreshSeqRef = useRef(0)
 
     useEffect(() => {
         getVersion().then(setVersion).catch(() => {
@@ -193,36 +195,82 @@ export default function MobileSettings({push, page}: Props) {
     }, [])
 
     const loadLocalPlugins = useCallback(async () => {
+        const startedAt = Date.now()
+        logger.info('[MobileSettings] 开始加载本地插件列表')
         setLoadingLocalPlugins(true)
         setLocalPluginError(null)
         try {
-            setLocalPlugins(await plugin_list_local())
+            const nextLocalPlugins = await plugin_list_local()
+            logger.info('[MobileSettings] 本地插件列表加载成功', {
+                count: nextLocalPlugins.length,
+                elapsedMs: Date.now() - startedAt,
+            })
+            setLocalPlugins(nextLocalPlugins)
         } catch (error) {
+            const message = formatUnknownError(error)
             logger.error('[MobileSettings] 加载本地插件失败', error)
-            setLocalPluginError(String(error))
+            setLocalPluginError(message)
         } finally {
+            logger.info('[MobileSettings] 本地插件列表加载结束', {
+                elapsedMs: Date.now() - startedAt,
+            })
             setLoadingLocalPlugins(false)
         }
     }, [])
 
     const loadMarketPlugins = useCallback(async () => {
+        const requestId = marketLoadSeqRef.current + 1
+        marketLoadSeqRef.current = requestId
+        const startedAt = Date.now()
+        logger.info('[MobileSettings] 开始加载插件库列表', {requestId})
+        const slowTimer = window.setTimeout(() => {
+            logger.warn('[MobileSettings] 插件库列表加载超过 15 秒仍未完成', {
+                requestId,
+                elapsedMs: Date.now() - startedAt,
+            })
+        }, 15000)
+
         setLoadingMarketPlugins(true)
         setMarketPluginError(null)
         try {
-            setMarketPlugins(await plugin_market_list())
+            const nextMarketPlugins = await plugin_market_list()
+            logger.info('[MobileSettings] 插件库列表加载成功', {
+                requestId,
+                count: nextMarketPlugins.length,
+                elapsedMs: Date.now() - startedAt,
+            })
+            setMarketPlugins(nextMarketPlugins)
         } catch (error) {
-            logger.error('[MobileSettings] 加载插件库失败', error)
-            setMarketPluginError(String(error))
+            const message = formatUnknownError(error)
+            logger.error('[MobileSettings] 加载插件库失败', {
+                requestId,
+                elapsedMs: Date.now() - startedAt,
+                error: message,
+            })
+            setMarketPluginError(message)
         } finally {
+            window.clearTimeout(slowTimer)
+            logger.info('[MobileSettings] 插件库列表加载结束', {
+                requestId,
+                elapsedMs: Date.now() - startedAt,
+            })
             setLoadingMarketPlugins(false)
         }
     }, [])
 
     const refreshPluginInstallSources = useCallback(async () => {
+        const refreshId = pluginRefreshSeqRef.current + 1
+        pluginRefreshSeqRef.current = refreshId
+        const startedAt = Date.now()
+        logger.info('[MobileSettings] 开始刷新插件安装来源', {refreshId})
         await Promise.all([
             loadLocalPlugins(),
             loadMarketPlugins(),
         ])
+        logger.info('[MobileSettings] 插件安装来源刷新结束', {
+            refreshId,
+            elapsedMs: Date.now() - startedAt,
+        })
     }, [loadLocalPlugins, loadMarketPlugins])
 
     useEffect(() => {

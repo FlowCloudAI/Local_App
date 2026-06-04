@@ -1,5 +1,6 @@
 use super::common::*;
 use super::market_client::*;
+use std::time::Instant;
 
 // ============ Tauri Commands — 官方市场 ============
 
@@ -8,9 +9,26 @@ use super::market_client::*;
 pub async fn plugin_market_list(
     net: State<'_, NetworkState>,
 ) -> Result<serde_json::Value, ApiError> {
-    market_list(&net.client)
-        .await
-        .map_err(ApiError::from_display)
+    let started_at = Instant::now();
+    log::info!("[plugin_market_list] 收到插件库列表请求");
+
+    match market_list(&net.client).await {
+        Ok(value) => {
+            log::info!(
+                "[plugin_market_list] 插件库列表请求完成 elapsed_ms={}",
+                started_at.elapsed().as_millis()
+            );
+            Ok(value)
+        }
+        Err(error) => {
+            log::error!(
+                "[plugin_market_list] 插件库列表请求失败 elapsed_ms={} error={:#}",
+                started_at.elapsed().as_millis(),
+                error
+            );
+            Err(ApiError::from_display(error))
+        }
+    }
 }
 
 /// 从官方市场下载并安装插件

@@ -164,9 +164,9 @@ pub fn run() {
             // ── 日志初始化 ────────────────────────────────────────────────────────
             // release 模式：写入 settings.json 同目录（app_config_dir）；
             //   文件目标过滤至 Info 级，避免 wasmtime/cranelift Debug 噪音。
-            // debug 模式：仅 stdout，只对自有 crate 保留 Debug 级别。
+            // debug 模式：桌面仅 stdout；移动端同时写 app.log，便于在关于页查看。
             {
-                #[cfg(not(debug_assertions))]
+                #[cfg(any(not(debug_assertions), target_os = "android"))]
                 let log_config_dir = app
                     .handle()
                     .path()
@@ -194,7 +194,7 @@ pub fn run() {
                         ),
                     );
 
-                #[cfg(not(debug_assertions))]
+                #[cfg(any(not(debug_assertions), target_os = "android"))]
                 let log_builder = log_builder.target(
                     tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
                         path: log_config_dir,
