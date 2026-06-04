@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -17,6 +19,56 @@ val keepRustDebugSymbols = providers
     .gradleProperty("flowcloudai.keepRustDebugSymbols")
     .map { it.toBoolean() }
     .orElse(false)
+
+data class RustlsPlatformVerifierAndroidArtifact(
+    val mavenRepository: String,
+    val version: String,
+)
+
+fun findRustlsPlatformVerifierAndroidArtifact(): RustlsPlatformVerifierAndroidArtifact {
+    val dependencyText = providers.exec {
+        workingDir = file("../../..")
+        commandLine(
+            "cargo",
+            "metadata",
+            "--format-version",
+            "1",
+            "--filter-platform",
+            "aarch64-linux-android",
+            "--locked",
+            "--manifest-path",
+            file("../../../Cargo.toml").absolutePath,
+        )
+    }.standardOutput.asText.get()
+
+    val dependencyJson = JsonSlurper().parseText(dependencyText) as Map<*, *>
+    val packages = dependencyJson["packages"] as List<*>
+    val verifierPackage = packages
+        .filterIsInstance<Map<*, *>>()
+        .firstOrNull { it["name"] == "rustls-platform-verifier-android" }
+        ?: error("未找到 rustls-platform-verifier-android 包，请先执行 cargo metadata 检查依赖解析")
+    val manifestPath = verifierPackage["manifest_path"]?.toString()
+        ?: error("rustls-platform-verifier-android 缺少 manifest_path")
+    val version = verifierPackage["version"]?.toString()
+        ?: error("rustls-platform-verifier-android 缺少 version")
+
+    return RustlsPlatformVerifierAndroidArtifact(
+        mavenRepository = File(File(manifestPath).parentFile, "maven").path,
+        version = version,
+    )
+}
+
+val rustlsPlatformVerifierAndroid = findRustlsPlatformVerifierAndroidArtifact()
+
+repositories {
+    maven {
+        url = uri(rustlsPlatformVerifierAndroid.mavenRepository)
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
+}
 
 android {
     compileSdk = 36
@@ -50,6 +102,7 @@ android {
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
+                    .plus(file("../../../rustls-platform-verifier.pro"))
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
                     .toList().toTypedArray()
             )
@@ -68,6 +121,7 @@ rust {
 }
 
 dependencies {
+    implementation("rustls:rustls-platform-verifier:${rustlsPlatformVerifierAndroid.version}")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")

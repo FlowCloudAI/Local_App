@@ -8,8 +8,17 @@ import androidx.activity.enableEdgeToEdge
 class MainActivity : TauriActivity() {
   private var webView: WebView? = null
 
+  companion object {
+    init {
+      System.loadLibrary("app_lib")
+    }
+  }
+
+  private external fun initRustlsPlatformVerifier()
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
+    initRustlsPlatformVerifier()
     super.onCreate(savedInstanceState)
     onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {

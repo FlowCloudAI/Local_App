@@ -63,6 +63,7 @@ use template::install_global_template_runtime;
 
 use anyhow::Result;
 use std::path::{Path, PathBuf};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use std::process::exit;
 use std::sync::Arc;
 use tauri::{
@@ -74,6 +75,43 @@ use tokio::sync::Mutex;
 #[cfg(not(target_os = "android"))]
 use worldflow_core::SnapshotConfig;
 use worldflow_core::SqliteDb;
+
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_cn_flowcloudai_www_MainActivity_initRustlsPlatformVerifier<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    activity: jni::objects::JObject<'local>,
+) {
+    let outcome = env.with_env(|env| -> jni::errors::Result<()> {
+        rustls_platform_verifier::android::init_with_env(env, activity)
+    });
+
+    match outcome.into_outcome() {
+        jni::Outcome::Ok(()) => {
+            log::info!("Android TLS 证书校验器初始化完成");
+        }
+        jni::Outcome::Err(error) => {
+            log::error!("Android TLS 证书校验器初始化失败: {}", error);
+        }
+        jni::Outcome::Panic(payload) => {
+            log::error!(
+                "Android TLS 证书校验器初始化 panic: {}",
+                panic_payload_to_string(payload.as_ref())
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+fn panic_payload_to_string(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "未知 panic 载荷".to_string()
+}
 
 /// 运行时设置状态：持有设置值 + 配置文件路径（供保存时使用）
 pub struct SettingsState {
