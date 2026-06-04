@@ -1,0 +1,118 @@
+import {type ReactNode, useEffect, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
+import {pushOverlay, removeOverlay} from './overlayStack'
+import './Overlay.css'
+
+/** 退场动画时长，需与 Overlay.css 中的 transition 一致。 */
+const EXIT_DURATION_MS = 220
+
+export type OverlayVariant = 'floating' | 'sheet'
+
+export interface OverlayProps {
+    open: boolean
+    onClose?: () => void
+    /** 背板点击 / Esc / 返回键是否关闭，默认 true。需强制用户做选择时传 false。 */
+    dismissible?: boolean
+    variant?: OverlayVariant
+    /** 浮层面板附加类名，用于承载自定义卡片样式。 */
+    className?: string
+    ariaLabel?: string
+    labelledBy?: string
+    children?: ReactNode
+}
+
+/**
+ * 浮层基座：背板 + 定位 + 进出动画 + 焦点/滚动管理 + 返回栈接入。
+ * 不规定卡片外观，卡片由子内容自带（或由变体组件 / className 提供）。
+ */
+export default function Overlay({
+    open,
+    onClose,
+    dismissible = true,
+    variant = 'floating',
+    className,
+    ariaLabel,
+    labelledBy,
+    children,
+}: OverlayProps) {
+    const [mounted, setMounted] = useState(open)
+    const [active, setActive] = useState(false)
+    const panelRef = useRef<HTMLDivElement>(null)
+    // 用 ref 持有最新回调与可关闭标志，使下方副作用只依赖 open，避免 dismissible 抖动重跑。
+    // 在 effect 中同步（不在渲染期写 ref，遵循 react-hooks/refs）。
+    const onCloseRef = useRef(onClose)
+    const dismissibleRef = useRef(dismissible)
+    useEffect(() => {
+        onCloseRef.current = onClose
+        dismissibleRef.current = dismissible
+    })
+
+    // 开启即挂载并触发进场；关闭先播放退场再卸载。
+    useEffect(() => {
+        if (open) {
+            setMounted(true)
+            const raf = requestAnimationFrame(() => setActive(true))
+            return () => cancelAnimationFrame(raf)
+        }
+        setActive(false)
+        const timer = setTimeout(() => setMounted(false), EXIT_DURATION_MS)
+        return () => clearTimeout(timer)
+    }, [open])
+
+    // 开启期间：注册返回栈、捕获阶段 Esc（优先于页面返回）、锁定滚动、聚焦面板。
+    useEffect(() => {
+        if (!open) return
+        const id = pushOverlay(() => onCloseRef.current?.())
+
+        // 捕获阶段拦截 Esc：先于 window 冒泡监听（如移动端返回处理）执行并阻断，避免连带回退页面。
+        const onKeyDownCapture = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && dismissibleRef.current) {
+                e.preventDefault()
+                e.stopPropagation()
+                onCloseRef.current?.()
+            }
+        }
+        window.addEventListener('keydown', onKeyDownCapture, true)
+
+        const bodyOverflow = document.body.style.overflow
+        document.body.style.overflow = 'hidden'
+
+        const prevFocus = document.activeElement as HTMLElement | null
+        const focusRaf = requestAnimationFrame(() => panelRef.current?.focus())
+
+        return () => {
+            removeOverlay(id)
+            window.removeEventListener('keydown', onKeyDownCapture, true)
+            document.body.style.overflow = bodyOverflow
+            cancelAnimationFrame(focusRaf)
+            prevFocus?.focus?.()
+        }
+    }, [open])
+
+    if (!mounted) return null
+
+    return createPortal(
+        <div
+            className={`fc-overlay fc-overlay--${variant}`}
+            data-state={active ? 'open' : 'closed'}
+            onMouseDown={(e) => {
+                // 仅背板（自身）被按下时关闭，面板内部按下不触发。
+                if (e.target === e.currentTarget && dismissibleRef.current) onCloseRef.current?.()
+            }}
+        >
+            <div
+                ref={panelRef}
+                className={`fc-overlay__panel fc-overlay__panel--${variant}${className ? ` ${className}` : ''}`}
+                role="dialog"
+                aria-modal="true"
+                aria-label={ariaLabel}
+                aria-labelledby={labelledBy}
+                tabIndex={-1}
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                {children}
+            </div>
+        </div>,
+        document.body,
+    )
+}

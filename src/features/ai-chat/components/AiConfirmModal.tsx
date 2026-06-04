@@ -12,6 +12,7 @@ import {
     type EntryDeleteRequestEvent,
     confirm_entry_edit,
 } from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import './AiConfirmModal.css'
 
 type ModalState =
@@ -53,30 +54,35 @@ export default function AiConfirmModal() {
         setBusy(false)
     }
 
-    if (!pending) return null
-
     return (
-        <div className="acm-overlay">
-            <div className={`acm-dialog ${pending.kind === 'cascade' && pending.data.step === 2 ? 'acm-danger' : ''}`}>
-                {pending.kind === 'entry-delete' && <EntryDeleteView data={pending.data}/>}
-                {pending.kind === 'category-move' && <CategoryMoveView data={pending.data}/>}
-                {pending.kind === 'cascade' && <CascadeView data={pending.data}/>}
-                {pending.kind === 'write' && <WriteView data={pending.data}/>}
+        <FloatingPanel
+            open={!!pending}
+            dismissible={!busy}
+            onClose={() => void respond(false)}
+            ariaLabel="AI 操作确认"
+        >
+            {pending && (
+                <div className={`acm-dialog ${pending.kind === 'cascade' && pending.data.step === 2 ? 'acm-danger' : ''}`}>
+                    {pending.kind === 'entry-delete' && <EntryDeleteView data={pending.data}/>}
+                    {pending.kind === 'category-move' && <CategoryMoveView data={pending.data}/>}
+                    {pending.kind === 'cascade' && <CascadeView data={pending.data}/>}
+                    {pending.kind === 'write' && <WriteView data={pending.data}/>}
 
-                <div className="acm-footer">
-                    <button className="acm-btn acm-btn-cancel" onClick={() => void respond(false)} disabled={busy}>
-                        取消
-                    </button>
-                    <button
-                        className={`acm-btn ${pending.kind === 'cascade' && pending.data.step === 2 ? 'acm-btn-danger' : 'acm-btn-confirm'}`}
-                        onClick={() => void respond(true)}
-                        disabled={busy}
-                    >
-                        {pending.kind === 'cascade' && pending.data.step === 2 ? '确认删除' : '确认'}
-                    </button>
+                    <div className="acm-footer">
+                        <button className="acm-btn acm-btn-cancel" onClick={() => void respond(false)} disabled={busy}>
+                            取消
+                        </button>
+                        <button
+                            className={`acm-btn ${pending.kind === 'cascade' && pending.data.step === 2 ? 'acm-btn-danger' : 'acm-btn-confirm'}`}
+                            onClick={() => void respond(true)}
+                            disabled={busy}
+                        >
+                            {pending.kind === 'cascade' && pending.data.step === 2 ? '确认删除' : '确认'}
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </div>
+            )}
+        </FloatingPanel>
     )
 }
 

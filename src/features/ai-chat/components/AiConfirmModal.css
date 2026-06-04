@@ -1,12 +1,4 @@
-.acm-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--fc-color-bg-overlay);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--fc-z-modal);
-}
+/* 背板/定位/动画由 shared/ui/overlay 的 FloatingPanel 提供，这里只保留卡片与内容样式。 */
 
 .acm-dialog {
     background: var(--fc-color-bg-elevated);
