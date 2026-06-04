@@ -4,6 +4,64 @@
     font-size: var(--fc-font-size-xs);
 }
 
+.mobile-settings-page {
+    padding: var(--fc-space-md) var(--fc-space-lg);
+}
+
+.mobile-settings-menu {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-sm);
+}
+
+.mobile-settings-menu-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fc-space-md);
+    width: 100%;
+    padding: var(--fc-space-md);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-settings-menu-item::after {
+    content: ">";
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+}
+
+.mobile-settings-menu-item__content {
+    min-width: 0;
+}
+
+.mobile-settings-menu-item__label,
+.mobile-settings-menu-item__summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-settings-menu-item__label {
+    font-size: var(--fc-font-size-sm);
+    font-weight: 600;
+}
+
+.mobile-settings-menu-item__summary {
+    display: block;
+    margin-top: var(--fc-space-xs);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    font-weight: 400;
+}
+
 .mobile-settings-section {
     margin-bottom: var(--fc-space-xl);
 }
@@ -21,6 +79,16 @@
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
     font-weight: 600;
+}
+
+.mobile-settings-form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-md);
+}
+
+.mobile-settings-full-button {
+    width: 100%;
 }
 
 .mobile-settings-api-key {
@@ -158,4 +226,26 @@
 
 .mobile-settings-plugin-item__status.is-update {
     color: var(--fc-color-warning);
+}
+
+.mobile-settings-about-card {
+    padding: var(--fc-space-md);
+    margin-bottom: var(--fc-space-md);
+    border-radius: var(--fc-radius-sm);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.45;
+}
+
+.mobile-settings-about-card__title {
+    margin-bottom: var(--fc-space-xs);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    font-weight: 600;
+}
+
+.mobile-settings-exit-button {
+    width: 100%;
+    color: var(--fc-color-error);
 }

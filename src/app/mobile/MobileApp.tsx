@@ -45,6 +45,10 @@ function getPageTitle(type: string, params?: Record<string, unknown>): string {
         case 'aiChat': return 'AI 对话'
         case 'ideas': return '灵感便签'
         case 'settings': return '设置'
+        case 'settingsAi': return 'AI 设置'
+        case 'settingsPlugins': return '插件安装'
+        case 'settingsAppearance': return '外观'
+        case 'settingsAbout': return '关于'
         default: return ''
     }
 }
@@ -247,7 +251,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                 {/* 设置 Tab */}
                 {activeTab === 'settings' && (
-                    <MobileSettings {...pageProps}/>
+                    <MobileSettings {...pageProps} page={currentPage}/>
                 )}
             </div>
 
