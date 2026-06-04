@@ -1,3 +1,41 @@
+.mobile-ai-empty {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.mobile-ai-empty__body {
+    flex: 1;
+    padding: var(--fc-space-xl);
+    gap: var(--fc-space-lg);
+}
+
+.mobile-ai-plugin-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--fc-space-sm);
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    background: var(--fc-color-bg-elevated);
+    border-bottom: 1px solid var(--fc-color-border);
+    flex-shrink: 0;
+}
+
+.mobile-ai-plugin-field {
+    min-width: 0;
+}
+
+.mobile-ai-plugin-label {
+    display: block;
+    margin-bottom: var(--fc-space-xs);
+    font-size: var(--fc-font-size-xs);
+    color: var(--fc-color-text-secondary);
+}
+
+.mobile-ai-plugin-select {
+    width: 100%;
+}
+
 .mobile-ai-conversation-item {
     display: flex;
     align-items: center;

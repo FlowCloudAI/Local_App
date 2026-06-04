@@ -1,11 +1,19 @@
-import {useCallback, useEffect, useRef, useState} from 'react'
-import {Button, useAlert} from 'flowcloudai-ui'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import type {Message} from '../../../features/ai-chat/model/AiControllerTypes'
+import {type MobileTab} from '../MobileNav'
 import './MobileAiChat.css'
 
 interface Props {
     aiFocus: AiFocus
+    navigateToTab: (tab: MobileTab) => void
+}
+
+type SelectValue = string | number | (string | number)[]
+
+function normalizeSelectValue(value: SelectValue): string {
+    return String(Array.isArray(value) ? value[0] ?? '' : value ?? '')
 }
 
 function MessageBubble({message}: { message: Message }) {
@@ -102,7 +110,7 @@ function MessageBubble({message}: { message: Message }) {
     )
 }
 
-export default function MobileAiChat({aiFocus}: Props) {
+export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
     const {showAlert} = useAlert()
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -112,9 +120,41 @@ export default function MobileAiChat({aiFocus}: Props) {
         messages, sendMessage, stopStreaming,
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
+        plugins, pluginsReady, selectedPlugin, selectedModel, setSelectedPlugin, setSelectedModel,
     } = controller
 
     const [showConvList, setShowConvList] = useState(false)
+    const currentPlugin = useMemo(
+        () => plugins.find(plugin => plugin.id === selectedPlugin) ?? null,
+        [plugins, selectedPlugin],
+    )
+    const pluginOptions = useMemo(
+        () => plugins.map(plugin => ({value: plugin.id, label: plugin.name || plugin.id})),
+        [plugins],
+    )
+    const modelOptions = useMemo(() => {
+        const modelInfoById = new Map(
+            (currentPlugin?.model_infos ?? []).map(modelInfo => [modelInfo.id, modelInfo]),
+        )
+        return (currentPlugin?.models ?? []).map(model => {
+            const modelInfo = modelInfoById.get(model)
+            const label = modelInfo?.name && modelInfo.name !== model
+                ? `${modelInfo.name} (${model})`
+                : model
+            return {value: model, label}
+        })
+    }, [currentPlugin])
+    const pluginsLoading = !pluginsReady
+    const llmUnavailable = pluginsReady && plugins.length === 0
+    const pluginSelectionIncomplete = pluginsReady && plugins.length > 0 && (!selectedPlugin || !selectedModel)
+    const inputDisabled = pluginsLoading || llmUnavailable || pluginSelectionIncomplete
+    const inputPlaceholder = pluginsLoading
+        ? '正在加载 LLM 插件…'
+        : llmUnavailable
+            ? '请先配置 LLM 插件'
+            : pluginSelectionIncomplete
+                ? '请选择插件和模型'
+                : '输入消息…'
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'})
@@ -126,10 +166,33 @@ export default function MobileAiChat({aiFocus}: Props) {
         }
     }, [conversations, activeConversationId, setActiveConversationId])
 
+    const handlePluginChange = useCallback((value: SelectValue) => {
+        const nextPluginId = normalizeSelectValue(value)
+        const nextPlugin = plugins.find(plugin => plugin.id === nextPluginId) ?? null
+        setSelectedPlugin(nextPluginId)
+        setSelectedModel(nextPlugin?.default_model ?? nextPlugin?.models[0] ?? '')
+    }, [plugins, setSelectedModel, setSelectedPlugin])
+
+    const handleModelChange = useCallback((value: SelectValue) => {
+        setSelectedModel(normalizeSelectValue(value))
+    }, [setSelectedModel])
+
     const handleSend = useCallback(async () => {
         if (!inputValue.trim() || isStreaming) return
+        if (pluginsLoading) {
+            await showAlert('AI 插件仍在加载，请稍后再发送。', 'warning', 'toast', 1800)
+            return
+        }
+        if (llmUnavailable) {
+            await showAlert('当前没有可用的 LLM 插件，请先在设置中配置。', 'warning', 'toast', 2200)
+            return
+        }
+        if (pluginSelectionIncomplete) {
+            await showAlert('请先选择 LLM 插件和模型。', 'warning', 'toast', 1800)
+            return
+        }
         await sendMessage(inputValue)
-    }, [inputValue, isStreaming, sendMessage])
+    }, [inputValue, isStreaming, llmUnavailable, pluginSelectionIncomplete, pluginsLoading, sendMessage, showAlert])
 
     const handleNewConv = useCallback(async () => {
         await createNewConversation()
@@ -148,15 +211,54 @@ export default function MobileAiChat({aiFocus}: Props) {
         await deleteConversation(convId)
     }, [deleteConversation, showAlert])
 
+    const pluginControls = (
+        <div className="mobile-ai-plugin-bar" aria-label="AI 插件与模型">
+            <div className="mobile-ai-plugin-field">
+                <span className="mobile-ai-plugin-label">插件</span>
+                <Select
+                    value={selectedPlugin}
+                    onChange={handlePluginChange}
+                    options={pluginOptions}
+                    placeholder={pluginsLoading ? '加载中' : '选择 LLM 插件'}
+                    disabled={pluginsLoading || pluginOptions.length === 0}
+                    className="mobile-ai-plugin-select"
+                />
+            </div>
+            <div className="mobile-ai-plugin-field">
+                <span className="mobile-ai-plugin-label">模型</span>
+                <Select
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    options={modelOptions}
+                    placeholder={pluginsLoading ? '加载中' : '选择模型'}
+                    disabled={pluginsLoading || modelOptions.length === 0}
+                    className="mobile-ai-plugin-select"
+                />
+            </div>
+            {llmUnavailable && (
+                <Button type="button" size="sm" variant="outline" onClick={() => navigateToTab('settings')}>
+                    去设置
+                </Button>
+            )}
+        </div>
+    )
+
     // 无对话时的欢迎页
     if (conversations.length === 0 && !isStreaming) {
         return (
-            <div className="mobile-page__empty" style={{padding: '24px', gap: 16}}>
-                <p style={{fontSize: 'var(--fc-font-size-lg)', fontWeight: 600, margin: 0}}>AI 对话</p>
-                <p style={{color: 'var(--fc-color-text-secondary)', textAlign: 'center', margin: 0}}>
-                    与 AI 讨论你的世界观项目，获取创作建议、检查设定矛盾、或与角色对话
-                </p>
-                <Button type="button" onClick={handleNewConv}>开始新对话</Button>
+            <div className="mobile-ai-empty">
+                {pluginControls}
+                <div className="mobile-page__empty mobile-ai-empty__body">
+                    <p style={{fontSize: 'var(--fc-font-size-lg)', fontWeight: 600, margin: 0}}>AI 对话</p>
+                    <p style={{color: 'var(--fc-color-text-secondary)', textAlign: 'center', margin: 0}}>
+                        与 AI 讨论你的世界观项目，获取创作建议、检查设定矛盾、或与角色对话
+                    </p>
+                    {llmUnavailable ? (
+                        <Button type="button" onClick={() => navigateToTab('settings')}>去设置插件</Button>
+                    ) : (
+                        <Button type="button" onClick={handleNewConv} disabled={inputDisabled}>开始新对话</Button>
+                    )}
+                </div>
             </div>
         )
     }
@@ -198,6 +300,7 @@ export default function MobileAiChat({aiFocus}: Props) {
                 <Button type="button" size="sm" variant="ghost" onClick={handleNewConv} style={{marginLeft: 'auto', flexShrink: 0}}>+
                     新建</Button>
             </div>
+            {pluginControls}
 
             {/* 对话列表：内联展开，撑开布局而非绝对浮层 */}
             {showConvList && (
@@ -307,8 +410,9 @@ export default function MobileAiChat({aiFocus}: Props) {
                             void handleSend()
                         }
                     }}
-                    placeholder="输入消息…"
+                    placeholder={inputPlaceholder}
                     rows={1}
+                    disabled={inputDisabled && !isStreaming}
                     style={{
                         flex: 1, padding: '8px 12px', borderRadius: 20,
                         border: '1px solid var(--fc-color-border)',
@@ -324,7 +428,7 @@ export default function MobileAiChat({aiFocus}: Props) {
                     onClick={isStreaming ? stopStreaming : () => {
                         void handleSend()
                     }}
-                    disabled={!inputValue.trim() && !isStreaming}
+                    disabled={!isStreaming && (!inputValue.trim() || inputDisabled)}
                     style={{borderRadius: 20, minWidth: 48}}
                 >
                     {isStreaming ? '■' : '↑'}
