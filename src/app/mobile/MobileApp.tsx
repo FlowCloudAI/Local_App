@@ -23,12 +23,14 @@ interface MobileAppProps {
 }
 
 let mobileWindowShown = false
+type MobileBeforeBack = () => boolean | Promise<boolean>
 
 type PageProps = {
     push: (page: MobilePage) => void
     pop: () => void
     replace: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
+    setBeforeBack: (handler: MobileBeforeBack | null) => void
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
 }
@@ -65,6 +67,7 @@ function getHeaderTitle(activeTab: MobileTab, page: MobilePage | null): string {
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
+    const beforeBackRef = useRef<MobileBeforeBack | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('projects')
 
     const projectsStack = usePageStack()
@@ -107,7 +110,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         })
     }, [backendReady, platformInfo.windowControls])
 
-    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus'>>(() => ({
+    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeBack'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
         replace: (page: MobilePage) => stacks[activeTab].replace(page),
@@ -123,13 +126,22 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         setActiveTab(tab)
     }, [])
 
+    const setBeforeBack = useCallback((handler: MobileBeforeBack | null) => {
+        beforeBackRef.current = handler
+    }, [])
+
     const handleBack = useCallback(() => {
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
         if (closeTopOverlay()) return
-        if (activeStack.canGoBack) {
-            activeStack.pop()
-        } else {
-            void (async () => {
+        void (async () => {
+            const beforeBack = beforeBackRef.current
+            if (beforeBack) {
+                const allowed = await beforeBack()
+                if (!allowed) return
+            }
+            if (activeStack.canGoBack) {
+                activeStack.pop()
+            } else {
                 const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
                 if (result === 'yes') {
                     if (closingRef.current) return
@@ -141,8 +153,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         logger.error('关闭移动端窗口失败', error)
                     }
                 }
-            })()
-        }
+            }
+        })()
     }, [activeStack, showAlert])
 
     useEffect(() => {
@@ -169,9 +181,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     const pageProps: PageProps = useMemo(() => ({
         ...navigation,
+        setBeforeBack,
         aiFocus,
         setAiFocus,
-    }), [navigation, aiFocus])
+    }), [navigation, setBeforeBack, aiFocus])
 
     if (!backendReady) {
         return (
@@ -191,7 +204,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         <div className="mobile-app">
             <header className="mobile-app__header">
                 {activeStack.canGoBack ? (
-                    <button className="mobile-app__back-btn" onClick={() => activeStack.pop()}>
+                    <button className="mobile-app__back-btn" onClick={handleBack}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="15 18 9 12 15 6"/>
                         </svg>

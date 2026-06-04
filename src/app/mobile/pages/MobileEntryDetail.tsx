@@ -22,6 +22,7 @@ interface Props {
     pop: () => void
     replace: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
+    setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
     setAiFocus: (focus: AiFocus) => void
     params?: Record<string, unknown>
 }
@@ -32,7 +33,7 @@ type Mode = 'view' | 'edit'
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
  * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
  */
-export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFocus, params}: Props) {
+export default function MobileEntryDetail({pop, replace, navigateToTab, setBeforeBack, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
     const entryId = params?.entryId as string
     const {showAlert} = useAlert()
@@ -67,6 +68,14 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
         setCategoryId(e.category_id ?? null)
     }, [])
 
+    const isDirty = mode === 'edit' && !!entry && (
+        title !== entry.title
+        || content !== (entry.content ?? '')
+        || summary !== (entry.summary ?? '')
+        || entryType !== (entry.type ?? null)
+        || categoryId !== (entry.category_id ?? null)
+    )
+
     useEffect(() => {
         if (!entryId) return
         setLoading(true)
@@ -87,11 +96,31 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
         setMode('edit')
     }, [entry, syncForm])
 
+    const confirmDiscard = useCallback(async () => {
+        if (!isDirty) return true
+        const result = await showAlert('未保存的更改将丢失，是否继续？', 'warning', 'confirm')
+        return result === 'yes'
+    }, [isDirty, showAlert])
+
+    useEffect(() => {
+        if (mode !== 'edit') {
+            setBeforeBack(null)
+            return
+        }
+        setBeforeBack(confirmDiscard)
+        return () => setBeforeBack(null)
+    }, [confirmDiscard, mode, setBeforeBack])
+
     // 取消：已有可回退的查看态则回查看；否则（极端情况无 entry）回退页面。
-    const handleCancel = useCallback(() => {
-        if (entry) setMode('view')
-        else pop()
-    }, [entry, pop])
+    const handleCancel = useCallback(async () => {
+        if (!await confirmDiscard()) return
+        if (entry) {
+            syncForm(entry)
+            setMode('view')
+        } else {
+            pop()
+        }
+    }, [confirmDiscard, entry, pop, syncForm])
 
     const handleAiDiscuss = useCallback(() => {
         setAiFocus({projectId, entryId})
@@ -148,7 +177,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
         return (
             <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
                 <div className="mobile-entry-detail__actions">
-                    <Button type="button" size="sm" variant="outline" onClick={handleCancel} disabled={saving}>取消</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void handleCancel()} disabled={saving}>取消</Button>
                     <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving}>
                         {saving ? '保存中…' : '保存'}
                     </Button>
