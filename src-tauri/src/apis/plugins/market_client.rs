@@ -1,4 +1,6 @@
 use super::common::*;
+use futures::FutureExt;
+use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
 
 // ============ 官方市场 HTTP 客户端函数 ============
@@ -14,6 +16,43 @@ fn market_plugin_count(value: &serde_json::Value) -> Option<usize> {
     })
 }
 
+fn panic_payload_to_string(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return (*message).to_string();
+    }
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+    "未知 panic 载荷".to_string()
+}
+
+fn market_panic_error(
+    stage: &str,
+    started_at: Instant,
+    panic: Box<dyn std::any::Any + Send>,
+) -> anyhow::Error {
+    let message = panic_payload_to_string(panic.as_ref());
+    let elapsed_ms = started_at.elapsed().as_millis();
+
+    #[cfg(target_os = "android")]
+    log::error!(
+        "[plugin_market_http] 插件库列表{}时发生 panic elapsed_ms={} panic={} hint=检查 rustls-platform-verifier Android 初始化",
+        stage,
+        elapsed_ms,
+        message
+    );
+
+    #[cfg(not(target_os = "android"))]
+    log::error!(
+        "[plugin_market_http] 插件库列表{}时发生 panic elapsed_ms={} panic={}",
+        stage,
+        elapsed_ms,
+        message
+    );
+
+    anyhow::anyhow!("插件库列表请求内部错误: {}", message)
+}
+
 pub(super) async fn market_list(client: &reqwest::Client) -> anyhow::Result<serde_json::Value> {
     let started_at = Instant::now();
     log::info!(
@@ -26,30 +65,37 @@ pub(super) async fn market_list(client: &reqwest::Client) -> anyhow::Result<serd
         .timeout(Duration::from_secs(MARKET_LIST_TIMEOUT_SECS))
         .send();
 
-    let response =
-        match tokio::time::timeout(Duration::from_secs(MARKET_LIST_TIMEOUT_SECS), request).await {
-            Ok(Ok(response)) => response,
-            Ok(Err(error)) => {
-                log::error!(
-                    "[plugin_market_http] 插件库列表请求发送失败 timeout={} elapsed_ms={} error={}",
-                    error.is_timeout(),
-                    started_at.elapsed().as_millis(),
-                    error
-                );
-                return Err(error.into());
-            }
-            Err(_) => {
-                log::error!(
-                    "[plugin_market_http] 插件库列表请求硬超时 timeout_secs={} elapsed_ms={}",
-                    MARKET_LIST_TIMEOUT_SECS,
-                    started_at.elapsed().as_millis()
-                );
-                return Err(anyhow::anyhow!(
-                    "插件库列表请求超时（{} 秒）",
-                    MARKET_LIST_TIMEOUT_SECS
-                ));
-            }
-        };
+    let response = match tokio::time::timeout(
+        Duration::from_secs(MARKET_LIST_TIMEOUT_SECS),
+        AssertUnwindSafe(request).catch_unwind(),
+    )
+    .await
+    {
+        Ok(Ok(Ok(response))) => response,
+        Ok(Ok(Err(error))) => {
+            log::error!(
+                "[plugin_market_http] 插件库列表请求发送失败 timeout={} elapsed_ms={} error={}",
+                error.is_timeout(),
+                started_at.elapsed().as_millis(),
+                error
+            );
+            return Err(error.into());
+        }
+        Ok(Err(panic)) => {
+            return Err(market_panic_error("发送请求", started_at, panic));
+        }
+        Err(_) => {
+            log::error!(
+                "[plugin_market_http] 插件库列表请求硬超时 timeout_secs={} elapsed_ms={}",
+                MARKET_LIST_TIMEOUT_SECS,
+                started_at.elapsed().as_millis()
+            );
+            return Err(anyhow::anyhow!(
+                "插件库列表请求超时（{} 秒）",
+                MARKET_LIST_TIMEOUT_SECS
+            ));
+        }
+    };
 
     let status = response.status();
     let content_length = response.content_length();
@@ -77,20 +123,24 @@ pub(super) async fn market_list(client: &reqwest::Client) -> anyhow::Result<serd
         return Err(anyhow::anyhow!(message));
     }
 
+    let json_request = response.json::<serde_json::Value>();
     let value = match tokio::time::timeout(
         Duration::from_secs(MARKET_LIST_TIMEOUT_SECS),
-        response.json::<serde_json::Value>(),
+        AssertUnwindSafe(json_request).catch_unwind(),
     )
     .await
     {
-        Ok(Ok(value)) => value,
-        Ok(Err(error)) => {
+        Ok(Ok(Ok(value))) => value,
+        Ok(Ok(Err(error))) => {
             log::error!(
                 "[plugin_market_http] 插件库列表 JSON 解析失败 elapsed_ms={} error={}",
                 started_at.elapsed().as_millis(),
                 error
             );
             return Err(error.into());
+        }
+        Ok(Err(panic)) => {
+            return Err(market_panic_error("解析响应", started_at, panic));
         }
         Err(_) => {
             log::error!(
