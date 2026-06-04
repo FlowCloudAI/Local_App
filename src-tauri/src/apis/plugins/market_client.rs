@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 // ============ 官方市场 HTTP 客户端函数 ============
 
-const MARKET_LIST_TIMEOUT_SECS: u64 = 20;
+const MARKET_LIST_TIMEOUT_SECS: u64 = 12;
 
 fn market_plugin_count(value: &serde_json::Value) -> Option<usize> {
     value.as_array().map(Vec::len).or_else(|| {
@@ -21,23 +21,35 @@ pub(super) async fn market_list(client: &reqwest::Client) -> anyhow::Result<serd
         MARKET_LIST_TIMEOUT_SECS
     );
 
-    let response = match client
+    let request = client
         .get(MARKET_BASE)
         .timeout(Duration::from_secs(MARKET_LIST_TIMEOUT_SECS))
-        .send()
-        .await
-    {
-        Ok(response) => response,
-        Err(error) => {
-            log::error!(
-                "[plugin_market_http] 插件库列表请求发送失败 timeout={} elapsed_ms={} error={}",
-                error.is_timeout(),
-                started_at.elapsed().as_millis(),
-                error
-            );
-            return Err(error.into());
-        }
-    };
+        .send();
+
+    let response =
+        match tokio::time::timeout(Duration::from_secs(MARKET_LIST_TIMEOUT_SECS), request).await {
+            Ok(Ok(response)) => response,
+            Ok(Err(error)) => {
+                log::error!(
+                    "[plugin_market_http] 插件库列表请求发送失败 timeout={} elapsed_ms={} error={}",
+                    error.is_timeout(),
+                    started_at.elapsed().as_millis(),
+                    error
+                );
+                return Err(error.into());
+            }
+            Err(_) => {
+                log::error!(
+                    "[plugin_market_http] 插件库列表请求硬超时 timeout_secs={} elapsed_ms={}",
+                    MARKET_LIST_TIMEOUT_SECS,
+                    started_at.elapsed().as_millis()
+                );
+                return Err(anyhow::anyhow!(
+                    "插件库列表请求超时（{} 秒）",
+                    MARKET_LIST_TIMEOUT_SECS
+                ));
+            }
+        };
 
     let status = response.status();
     let content_length = response.content_length();
@@ -65,15 +77,31 @@ pub(super) async fn market_list(client: &reqwest::Client) -> anyhow::Result<serd
         return Err(anyhow::anyhow!(message));
     }
 
-    let value = match response.json::<serde_json::Value>().await {
-        Ok(value) => value,
-        Err(error) => {
+    let value = match tokio::time::timeout(
+        Duration::from_secs(MARKET_LIST_TIMEOUT_SECS),
+        response.json::<serde_json::Value>(),
+    )
+    .await
+    {
+        Ok(Ok(value)) => value,
+        Ok(Err(error)) => {
             log::error!(
                 "[plugin_market_http] 插件库列表 JSON 解析失败 elapsed_ms={} error={}",
                 started_at.elapsed().as_millis(),
                 error
             );
             return Err(error.into());
+        }
+        Err(_) => {
+            log::error!(
+                "[plugin_market_http] 插件库列表 JSON 解析硬超时 timeout_secs={} elapsed_ms={}",
+                MARKET_LIST_TIMEOUT_SECS,
+                started_at.elapsed().as_millis()
+            );
+            return Err(anyhow::anyhow!(
+                "插件库列表响应解析超时（{} 秒）",
+                MARKET_LIST_TIMEOUT_SECS
+            ));
         }
     };
 

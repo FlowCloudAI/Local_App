@@ -35,6 +35,19 @@ export interface PluginUpdateInfo {
 
 let pluginMarketListInFlight: Promise<RemotePluginInfo[]> | null = null
 
+const PLUGIN_MARKET_LIST_TIMEOUT_MS = 18000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof window.setTimeout> | null = null
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+  })
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) window.clearTimeout(timeoutId)
+  })
+}
+
 function translatePluginMarketUploadError(error: unknown): string {
   const raw = String(error)
   const httpMatch = raw.match(/HTTP\s+(\d{3})[^:]*:\s*([\s\S]*)$/)
@@ -117,8 +130,12 @@ export const plugin_check_updates = (registryUrl: string) =>
 
 export const plugin_market_list = () => {
   if (!pluginMarketListInFlight) {
-    pluginMarketListInFlight = command<RemotePluginInfo[] | unknown>('plugin_market_list')
-      .then((value) => value as RemotePluginInfo[])
+    pluginMarketListInFlight = withTimeout(
+      command<RemotePluginInfo[] | unknown>('plugin_market_list')
+        .then((value) => value as RemotePluginInfo[]),
+      PLUGIN_MARKET_LIST_TIMEOUT_MS,
+      `插件库列表加载超时（${PLUGIN_MARKET_LIST_TIMEOUT_MS / 1000} 秒）`,
+    )
       .finally(() => {
         pluginMarketListInFlight = null
       })
