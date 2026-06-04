@@ -2,6 +2,8 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import type {Message} from '../../../features/ai-chat/model/AiControllerTypes'
+import {setting_has_api_key} from '../../../api'
+import {logger} from '../../../shared/logger'
 import {type MobileTab} from '../MobileNav'
 import './MobileAiChat.css'
 
@@ -11,6 +13,7 @@ interface Props {
 }
 
 type SelectValue = string | number | (string | number)[]
+type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
 
 function normalizeSelectValue(value: SelectValue): string {
     return String(Array.isArray(value) ? value[0] ?? '' : value ?? '')
@@ -124,10 +127,22 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
     } = controller
 
     const [showConvList, setShowConvList] = useState(false)
+    const [apiKeyRefreshTick, setApiKeyRefreshTick] = useState(0)
+    const [llmApiKeyAvailability, setLlmApiKeyAvailability] = useState<ApiKeyAvailability>('unknown')
+    const activeConversation = useMemo(
+        () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
+        [activeConversationId, conversations],
+    )
     const currentPlugin = useMemo(
         () => plugins.find(plugin => plugin.id === selectedPlugin) ?? null,
         [plugins, selectedPlugin],
     )
+    const activeLlmPluginId = activeConversation?.pluginId || selectedPlugin
+    const activeLlmPluginInfo = useMemo(
+        () => plugins.find(plugin => plugin.id === activeLlmPluginId) ?? null,
+        [activeLlmPluginId, plugins],
+    )
+    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 LLM 插件'
     const pluginOptions = useMemo(
         () => plugins.map(plugin => ({value: plugin.id, label: plugin.name || plugin.id})),
         [plugins],
@@ -147,14 +162,30 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
     const pluginsLoading = !pluginsReady
     const llmUnavailable = pluginsReady && plugins.length === 0
     const pluginSelectionIncomplete = pluginsReady && plugins.length > 0 && (!selectedPlugin || !selectedModel)
-    const inputDisabled = pluginsLoading || llmUnavailable || pluginSelectionIncomplete
+    const llmApiKeyChecking = pluginsReady
+        && !llmUnavailable
+        && Boolean(activeLlmPluginId)
+        && llmApiKeyAvailability === 'checking'
+    const llmApiKeyMissing = pluginsReady
+        && !llmUnavailable
+        && Boolean(activeLlmPluginId)
+        && llmApiKeyAvailability === 'missing'
+    const inputDisabled = pluginsLoading
+        || llmUnavailable
+        || pluginSelectionIncomplete
+        || llmApiKeyChecking
+        || llmApiKeyMissing
     const inputPlaceholder = pluginsLoading
         ? '正在加载 LLM 插件…'
         : llmUnavailable
             ? '请先配置 LLM 插件'
             : pluginSelectionIncomplete
                 ? '请选择插件和模型'
-                : '输入消息…'
+                : llmApiKeyChecking
+                    ? '正在检查 API Key…'
+                    : llmApiKeyMissing
+                        ? '请先配置 API Key'
+                        : '输入消息…'
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'})
@@ -165,6 +196,50 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
             setActiveConversationId(conversations[0].id)
         }
     }, [conversations, activeConversationId, setActiveConversationId])
+
+    useEffect(() => {
+        if (!pluginsReady || llmUnavailable || !activeLlmPluginId) {
+            setLlmApiKeyAvailability('unknown')
+            return
+        }
+
+        let cancelled = false
+        setLlmApiKeyAvailability('checking')
+
+        setting_has_api_key(activeLlmPluginId)
+            .then(hasApiKey => {
+                if (cancelled) return
+                setLlmApiKeyAvailability(hasApiKey ? 'configured' : 'missing')
+            })
+            .catch(error => {
+                logger.error('[MobileAiChat] API Key 状态检查失败', error)
+                if (!cancelled) setLlmApiKeyAvailability('error')
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [activeLlmPluginId, apiKeyRefreshTick, llmUnavailable, pluginsReady])
+
+    useEffect(() => {
+        const refreshApiKeyState = () => setApiKeyRefreshTick(tick => tick + 1)
+        const handleApiKeyChanged = (event: Event) => {
+            const detail = (event as CustomEvent<{ pluginId?: string, hasApiKey?: boolean }>).detail
+            if (detail?.pluginId && detail.pluginId !== activeLlmPluginId) return
+            if (typeof detail?.hasApiKey === 'boolean') {
+                setLlmApiKeyAvailability(detail.hasApiKey ? 'configured' : 'missing')
+                return
+            }
+            refreshApiKeyState()
+        }
+
+        window.addEventListener('fc:api-key-changed', handleApiKeyChanged as EventListener)
+        window.addEventListener('fc:plugins-changed', refreshApiKeyState)
+        return () => {
+            window.removeEventListener('fc:api-key-changed', handleApiKeyChanged as EventListener)
+            window.removeEventListener('fc:plugins-changed', refreshApiKeyState)
+        }
+    }, [activeLlmPluginId])
 
     const handlePluginChange = useCallback((value: SelectValue) => {
         const nextPluginId = normalizeSelectValue(value)
@@ -191,8 +266,27 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
             await showAlert('请先选择 LLM 插件和模型。', 'warning', 'toast', 1800)
             return
         }
+        if (llmApiKeyChecking) {
+            await showAlert('正在检查 API Key，请稍后再发送。', 'warning', 'toast', 1800)
+            return
+        }
+        if (llmApiKeyMissing) {
+            await showAlert(`请先在设置中配置 ${activeLlmPluginName} 的 API Key。`, 'warning', 'toast', 2200)
+            return
+        }
         await sendMessage(inputValue)
-    }, [inputValue, isStreaming, llmUnavailable, pluginSelectionIncomplete, pluginsLoading, sendMessage, showAlert])
+    }, [
+        activeLlmPluginName,
+        inputValue,
+        isStreaming,
+        llmApiKeyChecking,
+        llmApiKeyMissing,
+        llmUnavailable,
+        pluginSelectionIncomplete,
+        pluginsLoading,
+        sendMessage,
+        showAlert,
+    ])
 
     const handleNewConv = useCallback(async () => {
         await createNewConversation()
@@ -235,9 +329,9 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
                     className="mobile-ai-plugin-select"
                 />
             </div>
-            {llmUnavailable && (
+            {(llmUnavailable || llmApiKeyMissing) && (
                 <Button type="button" size="sm" variant="outline" onClick={() => navigateToTab('settings')}>
-                    去设置
+                    {llmApiKeyMissing ? '配置 Key' : '去设置'}
                 </Button>
             )}
         </div>
@@ -253,8 +347,10 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
                     <p style={{color: 'var(--fc-color-text-secondary)', textAlign: 'center', margin: 0}}>
                         与 AI 讨论你的世界观项目，获取创作建议、检查设定矛盾、或与角色对话
                     </p>
-                    {llmUnavailable ? (
-                        <Button type="button" onClick={() => navigateToTab('settings')}>去设置插件</Button>
+                    {llmUnavailable || llmApiKeyMissing ? (
+                        <Button type="button" onClick={() => navigateToTab('settings')}>
+                            {llmApiKeyMissing ? '配置 API Key' : '去设置插件'}
+                        </Button>
                     ) : (
                         <Button type="button" onClick={handleNewConv} disabled={inputDisabled}>开始新对话</Button>
                     )}
