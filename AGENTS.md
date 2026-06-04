@@ -72,5 +72,5 @@ app_main/
 
 ## 文档同步依据（本次核对）
 
-- 同步时间：2026-06-03 21:04:46 +08:00
+- 同步时间：2026-06-04 17:03:10 +08:00
 - 依据文件：`app_main/package.json`、`app_main/vite.config.ts`、`app_main/src-tauri/Cargo.toml`、`app_main/src-tauri/tauri.conf.json`、`app_main/src`、`app_main/src-tauri/src`

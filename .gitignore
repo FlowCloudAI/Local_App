@@ -28,6 +28,7 @@ package-lock.json
 *.sln
 *.sw?
 .claude/
+.codegraph/
 src-tauri/gen/
 
 bugreport-sdk_gphone*
