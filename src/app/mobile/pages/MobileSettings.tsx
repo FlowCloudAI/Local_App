@@ -60,6 +60,25 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
     }
 }
 
+function ChevronRightIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="mobile-settings-menu-item__icon"
+        >
+            <path
+                d="M9 6l6 6-6 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    )
+}
+
 export default function MobileSettings({push, page}: Props) {
     const {showAlert} = useAlert()
     const {theme, setTheme} = useTheme()
@@ -380,6 +399,7 @@ export default function MobileSettings({push, page}: Props) {
                                 {currentPlugin?.name ?? '未选择插件'} · {apiKeyStatusLabel}
                             </span>
                         </span>
+                        <ChevronRightIcon/>
                     </button>
                     <button
                         type="button"
@@ -392,6 +412,7 @@ export default function MobileSettings({push, page}: Props) {
                                 已安装 {localPlugins.length} 个 · {marketSummary}
                             </span>
                         </span>
+                        <ChevronRightIcon/>
                     </button>
                     <button
                         type="button"
@@ -402,6 +423,7 @@ export default function MobileSettings({push, page}: Props) {
                             <span className="mobile-settings-menu-item__label">外观</span>
                             <span className="mobile-settings-menu-item__summary">{themeLabel}</span>
                         </span>
+                        <ChevronRightIcon/>
                     </button>
                     <button
                         type="button"
@@ -414,6 +436,7 @@ export default function MobileSettings({push, page}: Props) {
                                 FlowCloudAI 移动端{version ? ` · ${version}` : ''}
                             </span>
                         </span>
+                        <ChevronRightIcon/>
                     </button>
                 </div>
             </div>

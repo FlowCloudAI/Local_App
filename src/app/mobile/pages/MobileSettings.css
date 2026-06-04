@@ -11,7 +11,7 @@
 .mobile-settings-menu {
     display: flex;
     flex-direction: column;
-    gap: var(--fc-space-sm);
+    border-top: 1px solid var(--fc-color-border);
 }
 
 .mobile-settings-menu-item {
@@ -20,10 +20,10 @@
     align-items: center;
     gap: var(--fc-space-md);
     width: 100%;
-    padding: var(--fc-space-md);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-sm);
-    background: var(--fc-color-bg-secondary);
+    padding: var(--fc-space-md) 0;
+    border: 0;
+    border-bottom: 1px solid var(--fc-color-border);
+    background: transparent;
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
@@ -31,10 +31,10 @@
     touch-action: manipulation;
 }
 
-.mobile-settings-menu-item::after {
-    content: ">";
+.mobile-settings-menu-item__icon {
+    width: 1rem;
+    height: 1rem;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
 }
 
 .mobile-settings-menu-item__content {
@@ -95,10 +95,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--fc-space-sm);
-    padding: var(--fc-space-md);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-sm);
-    background: var(--fc-color-bg-secondary);
+    padding-top: var(--fc-space-md);
+    border-top: 1px solid var(--fc-color-border);
 }
 
 .mobile-settings-api-key__header {
@@ -116,22 +114,17 @@
 
 .mobile-settings-api-key__status {
     flex-shrink: 0;
-    padding: 2px var(--fc-space-sm);
-    border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     white-space: nowrap;
 }
 
 .mobile-settings-api-key__status--configured {
-    background: var(--fc-color-success-bg);
     color: var(--fc-color-success);
 }
 
 .mobile-settings-api-key__status--missing,
 .mobile-settings-api-key__status--error {
-    background: var(--fc-color-warning-bg);
     color: var(--fc-color-warning);
 }
 
@@ -161,20 +154,17 @@
 
 .mobile-settings-plugin-error,
 .mobile-settings-plugin-empty {
-    padding: var(--fc-space-sm) var(--fc-space-md);
-    border-radius: var(--fc-radius-sm);
+    padding: var(--fc-space-sm) 0;
     font-size: var(--fc-font-size-xs);
     line-height: 1.45;
 }
 
 .mobile-settings-plugin-error {
     margin-bottom: var(--fc-space-sm);
-    background: var(--fc-color-warning-bg);
     color: var(--fc-color-warning);
 }
 
 .mobile-settings-plugin-empty {
-    background: var(--fc-color-bg-secondary);
     color: var(--fc-color-text-secondary);
     text-align: center;
 }
@@ -182,7 +172,7 @@
 .mobile-settings-plugin-list {
     display: flex;
     flex-direction: column;
-    gap: var(--fc-space-sm);
+    border-top: 1px solid var(--fc-color-border);
 }
 
 .mobile-settings-plugin-item {
@@ -190,10 +180,8 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--fc-space-sm);
-    padding: var(--fc-space-md);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-sm);
-    background: var(--fc-color-bg-secondary);
+    padding: var(--fc-space-md) 0;
+    border-bottom: 1px solid var(--fc-color-border);
 }
 
 .mobile-settings-plugin-item__body {
@@ -229,10 +217,9 @@
 }
 
 .mobile-settings-about-card {
-    padding: var(--fc-space-md);
+    padding: var(--fc-space-sm) 0 var(--fc-space-md);
     margin-bottom: var(--fc-space-md);
-    border-radius: var(--fc-radius-sm);
-    background: var(--fc-color-bg-secondary);
+    border-bottom: 1px solid var(--fc-color-border);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     line-height: 1.45;
