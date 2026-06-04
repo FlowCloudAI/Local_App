@@ -1,15 +1,14 @@
 # 流云AI 桌面端（app_main）
 
-`app_main` 是 FlowCloudAI 的主桌面应用，提供世界观项目、关系图、AI 会话与插件生命周期的统一入口。  
-前后端（React + Rust）在同仓库协同，兼顾启动时序与主窗口交互稳定性。
+`app_main` 是 FlowCloudAI 的桌面端主仓库（Tauri + React），为世界观编辑、关系图、地图与快照、插件加载和 AI 会话提供统一交互入口。前端和 Rust 后端共存于同一工程，支持从本地工作流到桌面打包发布的完整链路。
 
 ## 项目简介
 
-该仓库负责编排桌面端核心体验：项目创建、关系与世界观编辑、地图/快照呈现，以及与插件与 AI 后端事件的交互桥接。
+仓库按“界面层 + 桌面桥接层”职责切分。`src` 承担页面、状态与交互逻辑，`src-tauri` 承载窗口、文件、外部服务与插件运行时交互。更新需重点关注启动时序，避免透明窗口白屏。
 
 ## 快速开始
 
-### 安装与启动
+### 安装与启动（最小路径）
 
 ```bash
 cd app_main
@@ -17,24 +16,35 @@ npm install
 npm run tauri -- dev
 ```
 
+### 基础校验
+
+```bash
+npm run lint
+npm run build
+cd src-tauri
+cargo build
+cargo test
+```
+
 ### 最小示例
 
-1. 运行桌面端并完成一个本地登录/初始化流程。  
-2. 创建世界观项目与至少两个实体关系。  
-3. 发起一次 AI 对话并确认会话状态回写到界面。  
+1. 完成世界观初始化后，创建 2 个实体并连线。  
+2. 启动一次 AI 会话并确认状态回写。  
+3. 使用插件加载/卸载验证 `src-tauri` 与前端事件链一致。  
 
 ## 主要功能 / 使用方式
 
-- 世界观项目与关系图管理。  
-- 地图与快照查看。  
-- AI 会话与工具调用。  
-- 插件加载与生命周期管理。  
-- `backend-ready` 触发下的初始化顺序校验。  
+- 世界观项目、实体与关系图编辑。  
+- 地图与快照展示与复原流程。  
+- AI 会话、工具调用与会话状态同步。  
+- 插件安装、配置与生命周期联动。  
+- 无边框透明窗口场景下的启动与初始化管理。  
 
 ## 技术栈
 
-- React 19、TypeScript、Vite。  
-- Tauri 2、Rust 2024、`flowcloudai-ui`。  
+- React 19 + TypeScript + Vite  
+- Tauri 2 + Rust 2024  
+- `flowcloudai-ui`、`@deck.gl`、`pixi.js`  
 
 ## 目录结构（仅顶层）
 
@@ -42,13 +52,16 @@ npm run tauri -- dev
 app_main/
 ├── src/
 ├── src-tauri/
-└── scripts/
+├── public/
+├── scripts/
+├── docs/
+└── todo/
 ```
 
 ## 许可证与贡献方式
 
-- 许可证与依赖声明按子仓库约定。  
-- 贡献前需补充 `npm run lint`、`npm run build`、`cd src-tauri && cargo test`（必要时含 `cargo check`）结果。  
-- PR 说明需明确 AI 事件链与启动时序影响。  
+- 许可证：当前仓库未发现独立 `LICENSE` 文件（TODO：确认统一授权策略）。  
+- 贡献前需补充 `npm run lint`、`npm run build`、`cd src-tauri && cargo test` 与最小回归结果。  
+- PR 建议说明：启动序列影响、异常复现场景、兼容性边界与风险。  
 
-文档同步时间：2026-06-03 16:28:02 +08:00
+文档同步时间：2026-06-03 21:04:46 +08:00
