@@ -9,6 +9,7 @@ import {
     plugin_list_local,
     plugin_market_install,
     plugin_market_list,
+    open_in_file_manager,
     setting_delete_api_key,
     setting_get_settings,
     setting_has_api_key,
@@ -20,6 +21,7 @@ import {
     type RemotePluginInfo,
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
+import {appConfigDir} from '@tauri-apps/api/path'
 import {open} from '@tauri-apps/plugin-dialog'
 import {type MobilePage} from '../usePageStack'
 import './MobileSettings.css'
@@ -48,6 +50,18 @@ function getPluginKindLabel(kind: string): string {
     if (kind.includes('image')) return 'IMAGE'
     if (kind.includes('tts')) return 'TTS'
     return 'LLM'
+}
+
+function formatUnknownError(error: unknown): string {
+    if (error instanceof Error) return error.message || error.name
+    if (typeof error === 'string') return error
+    try {
+        const text = JSON.stringify(error)
+        if (text && text !== '{}') return text
+    } catch {
+        // 失败时回退到 String，避免错误格式化自身中断流程。
+    }
+    return String(error)
 }
 
 function getSettingsSection(page?: MobilePage | null): SettingsSection {
@@ -296,7 +310,7 @@ export default function MobileSettings({push, page}: Props) {
             ],
         }).catch(error => {
             logger.error('[MobileSettings] 打开本地插件选择器失败', error)
-            void showAlert(`打开文件选择器失败：${String(error)}`, 'error', 'toast', 3000)
+            void showAlert(`打开文件选择器失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
             return null
         })
         if (!selected || Array.isArray(selected)) return
@@ -310,7 +324,8 @@ export default function MobileSettings({push, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
             await showAlert(`${info.name} 安装成功`, 'success', 'toast', 1800)
         } catch (error) {
-            await showAlert(`本地插件安装失败：${String(error)}`, 'error', 'toast', 3000)
+            logger.error('[MobileSettings] 本地插件安装失败', error)
+            await showAlert(`本地插件安装失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
         } finally {
             setInstallingLocalFile(false)
         }
@@ -326,7 +341,8 @@ export default function MobileSettings({push, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
             await showAlert(`${info.name} 安装成功`, 'success', 'toast', 1800)
         } catch (error) {
-            await showAlert(`插件安装失败：${String(error)}`, 'error', 'toast', 3000)
+            logger.error('[MobileSettings] 插件安装失败', error)
+            await showAlert(`插件安装失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
         } finally {
             setInstallingPluginIds(current => {
                 const next = new Set(current)
@@ -358,6 +374,16 @@ export default function MobileSettings({push, page}: Props) {
             await exit_app()
         } catch (e) {
             logger.error('退出失败', e)
+        }
+    }, [showAlert])
+
+    const handleOpenLogDir = useCallback(async () => {
+        try {
+            const configDir = await appConfigDir()
+            await open_in_file_manager(configDir)
+        } catch (error) {
+            logger.error('[MobileSettings] 打开日志目录失败', error)
+            await showAlert(`打开日志目录失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
         }
     }, [showAlert])
 
@@ -621,6 +647,24 @@ export default function MobileSettings({push, page}: Props) {
                     <div className="mobile-settings-about-card">
                         <div className="mobile-settings-about-card__title">FlowCloudAI 移动端</div>
                         {version && <div>版本 {version}</div>}
+                    </div>
+                    <div className="mobile-settings-about-actions">
+                        <div className="mobile-settings-about-action">
+                            <div className="mobile-settings-about-action__copy">
+                                <span className="mobile-settings-about-action__title">日志目录</span>
+                                <span className="mobile-settings-about-action__desc">
+                                    app.log 位于配置目录内，用于排查插件安装等运行问题。
+                                </span>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleOpenLogDir()}
+                            >
+                                查看日志
+                            </Button>
+                        </div>
                     </div>
                     <Button
                         type="button"
