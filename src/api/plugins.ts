@@ -33,6 +33,8 @@ export interface PluginUpdateInfo {
   has_update: boolean
 }
 
+let pluginMarketListInFlight: Promise<RemotePluginInfo[]> | null = null
+
 function translatePluginMarketUploadError(error: unknown): string {
   const raw = String(error)
   const httpMatch = raw.match(/HTTP\s+(\d{3})[^:]*:\s*([\s\S]*)$/)
@@ -113,10 +115,17 @@ export const plugin_fetch_remote = (registryUrl: string) =>
 export const plugin_check_updates = (registryUrl: string) =>
   command<PluginUpdateInfo[]>('plugin_check_updates', { registryUrl })
 
-export const plugin_market_list = () =>
-  command<RemotePluginInfo[] | unknown>('plugin_market_list').then(
-    (value) => value as RemotePluginInfo[],
-  )
+export const plugin_market_list = () => {
+  if (!pluginMarketListInFlight) {
+    pluginMarketListInFlight = command<RemotePluginInfo[] | unknown>('plugin_market_list')
+      .then((value) => value as RemotePluginInfo[])
+      .finally(() => {
+        pluginMarketListInFlight = null
+      })
+  }
+
+  return pluginMarketListInFlight
+}
 
 export const plugin_market_install = (pluginId: string) =>
   command<LocalPluginInfo>('plugin_market_install', { pluginId })

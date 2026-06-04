@@ -1,7 +1,9 @@
 use super::common::*;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 // ============ 官方市场 HTTP 客户端函数 ============
+
+const MARKET_LIST_TIMEOUT_SECS: u64 = 20;
 
 fn market_plugin_count(value: &serde_json::Value) -> Option<usize> {
     value.as_array().map(Vec::len).or_else(|| {
@@ -14,13 +16,22 @@ fn market_plugin_count(value: &serde_json::Value) -> Option<usize> {
 
 pub(super) async fn market_list(client: &reqwest::Client) -> anyhow::Result<serde_json::Value> {
     let started_at = Instant::now();
-    log::info!("[plugin_market_http] 开始请求插件库列表 url={MARKET_BASE}");
+    log::info!(
+        "[plugin_market_http] 开始请求插件库列表 url={MARKET_BASE} timeout_secs={}",
+        MARKET_LIST_TIMEOUT_SECS
+    );
 
-    let response = match client.get(MARKET_BASE).send().await {
+    let response = match client
+        .get(MARKET_BASE)
+        .timeout(Duration::from_secs(MARKET_LIST_TIMEOUT_SECS))
+        .send()
+        .await
+    {
         Ok(response) => response,
         Err(error) => {
             log::error!(
-                "[plugin_market_http] 插件库列表请求发送失败 elapsed_ms={} error={}",
+                "[plugin_market_http] 插件库列表请求发送失败 timeout={} elapsed_ms={} error={}",
+                error.is_timeout(),
                 started_at.elapsed().as_millis(),
                 error
             );

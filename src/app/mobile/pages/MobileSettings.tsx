@@ -180,6 +180,7 @@ export default function MobileSettings({push, page}: Props) {
     const [logError, setLogError] = useState('')
     const marketLoadSeqRef = useRef(0)
     const pluginRefreshSeqRef = useRef(0)
+    const pluginRefreshInFlightRef = useRef(false)
 
     useEffect(() => {
         getVersion().then(setVersion).catch(() => {
@@ -259,18 +260,28 @@ export default function MobileSettings({push, page}: Props) {
     }, [])
 
     const refreshPluginInstallSources = useCallback(async () => {
+        if (pluginRefreshInFlightRef.current) {
+            logger.warn('[MobileSettings] 已有插件安装来源刷新进行中，跳过重复请求')
+            return
+        }
+
         const refreshId = pluginRefreshSeqRef.current + 1
         pluginRefreshSeqRef.current = refreshId
         const startedAt = Date.now()
+        pluginRefreshInFlightRef.current = true
         logger.info('[MobileSettings] 开始刷新插件安装来源', {refreshId})
-        await Promise.all([
-            loadLocalPlugins(),
-            loadMarketPlugins(),
-        ])
-        logger.info('[MobileSettings] 插件安装来源刷新结束', {
-            refreshId,
-            elapsedMs: Date.now() - startedAt,
-        })
+        try {
+            await Promise.all([
+                loadLocalPlugins(),
+                loadMarketPlugins(),
+            ])
+        } finally {
+            pluginRefreshInFlightRef.current = false
+            logger.info('[MobileSettings] 插件安装来源刷新结束', {
+                refreshId,
+                elapsedMs: Date.now() - startedAt,
+            })
+        }
     }, [loadLocalPlugins, loadMarketPlugins])
 
     useEffect(() => {
