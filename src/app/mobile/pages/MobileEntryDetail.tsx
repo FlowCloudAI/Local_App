@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import MarkdownPreview from '@uiw/react-markdown-preview'
-import {useCallback, useEffect, useState} from 'react'
+import {type CSSProperties, useCallback, useEffect, useState} from 'react'
 import {Button, Input, Select, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
@@ -16,6 +16,7 @@ import EntryTypeIcon from '../../../features/project-editor/components/EntryType
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import './MobileEntryDetail.css'
 
 interface Props {
     pop: () => void
@@ -145,9 +146,8 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
             ...entryTypes.map(et => ({value: entryTypeKey(et), label: et.name})),
         ]
         return (
-            <div className="mobile-page"
-                 style={{padding: '12px 16px', display: 'flex', flexDirection: 'column', minHeight: 0}}>
-                <div style={{display: 'flex', gap: 8, marginBottom: 12, justifyContent: 'flex-end'}}>
+            <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
+                <div className="mobile-entry-detail__actions">
                     <Button type="button" size="sm" variant="outline" onClick={handleCancel} disabled={saving}>取消</Button>
                     <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving}>
                         {saving ? '保存中…' : '保存'}
@@ -158,23 +158,23 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
                     placeholder="词条标题"
                     value={title}
                     onValueChange={setTitle}
-                    style={{marginBottom: 12, fontWeight: 600, fontSize: 'var(--fc-font-size-lg)'}}
+                    className="mobile-entry-detail__title-input"
                 />
 
-                <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
+                <div className="mobile-entry-detail__meta-row">
                     <Select
                         value={entryType ?? ''}
                         onChange={v => setEntryType(v ? String(v) : null)}
                         options={typeOptions}
                         placeholder="类型"
-                        style={{flex: 1}}
+                        className="mobile-entry-detail__meta-select"
                     />
                     <Select
                         value={categoryId ?? ''}
                         onChange={v => setCategoryId(v ? String(v) : null)}
                         options={categoryOptions}
                         placeholder="分类"
-                        style={{flex: 1}}
+                        className="mobile-entry-detail__meta-select"
                     />
                 </div>
 
@@ -182,23 +182,14 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
                     placeholder="摘要（可选）"
                     value={summary}
                     onValueChange={setSummary}
-                    style={{marginBottom: 12}}
+                    className="mobile-entry-detail__summary-input"
                 />
 
                 <textarea
                     placeholder="正文内容…"
                     value={content}
                     onChange={e => setContent(e.target.value)}
-                    style={{
-                        flex: '1 1 240px', minHeight: 200, width: '100%', padding: 10,
-                        background: 'var(--fc-color-bg-secondary)',
-                        color: 'var(--fc-color-text)',
-                        border: '1px solid var(--fc-color-border)',
-                        borderRadius: 'var(--fc-radius-sm)',
-                        fontSize: 'var(--fc-font-size-md)',
-                        lineHeight: 1.8, resize: 'vertical',
-                        fontFamily: 'inherit', boxSizing: 'border-box',
-                    }}
+                    className="mobile-entry-detail__content-input"
                 />
             </div>
         )
@@ -206,56 +197,48 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setAiFoc
 
     // ---------- 查看态 ----------
     const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
+    const typeBadgeStyle = et?.color
+        ? {
+            '--mobile-entry-type-bg': `${et.color}22`,
+            '--mobile-entry-type-color': et.color,
+        } as CSSProperties
+        : undefined
 
     return (
-        <div className="mobile-page" style={{padding: '12px 16px'}}>
-            <h1 style={{fontSize: 'var(--fc-font-size-xl)', fontWeight: 700, margin: '0 0 8px'}}>
+        <div className="mobile-page mobile-entry-detail">
+            <h1 className="mobile-entry-detail__title">
                 {entry.title}
             </h1>
 
             {et && (
-                <div style={{marginBottom: 12}}>
-                    <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        background: et.color ? `${et.color}22` : 'var(--fc-color-bg-tertiary)',
-                        color: et.color ?? 'var(--fc-color-text)',
-                        padding: '4px 10px', borderRadius: 999,
-                        fontSize: 'var(--fc-font-size-xs)', fontWeight: 500,
-                    }}>
+                <div className="mobile-entry-detail__type">
+                    <span className="mobile-entry-detail__type-badge" style={typeBadgeStyle}>
                         <EntryTypeIcon entryType={et} className=""/> {et.name}
                     </span>
                 </div>
             )}
 
             {entry.summary && (
-                <p style={{
-                    color: 'var(--fc-color-text-secondary)',
-                    fontSize: 'var(--fc-font-size-sm)',
-                    fontStyle: 'italic',
-                    margin: '0 0 16px',
-                    padding: '8px 12px',
-                    background: 'var(--fc-color-bg-secondary)',
-                    borderRadius: 'var(--fc-radius-sm)',
-                }}>
+                <p className="mobile-entry-detail__summary">
                     {entry.summary}
                 </p>
             )}
 
             {entry.content ? (
-                <div data-color-mode={colorMode} style={{fontSize: 'var(--fc-font-size-md)'}}>
+                <div className="mobile-entry-detail__markdown" data-color-mode={colorMode}>
                     <MarkdownPreview
                         source={entry.content}
-                        style={{background: 'transparent', color: 'var(--fc-color-text)'}}
+                        className="mobile-entry-detail__markdown-preview"
                         wrapperElement={{'data-color-mode': colorMode}}
                     />
                 </div>
             ) : (
-                <div className="mobile-page__empty" style={{height: 120, marginTop: 24}}>
+                <div className="mobile-page__empty mobile-entry-detail__empty">
                     暂无正文内容
                 </div>
             )}
 
-            <div className="mobile-bottom-bar" style={{marginTop: 24}}>
+            <div className="mobile-bottom-bar mobile-entry-detail__bottom-bar">
                 <Button type="button" variant="outline" onClick={handleAiDiscuss}>AI 讨论</Button>
                 <Button type="button" onClick={enterEdit}>编辑</Button>
             </div>
