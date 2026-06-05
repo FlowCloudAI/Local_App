@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {Button, Select, useAlert} from 'flowcloudai-ui'
+import {Button, MessageBox, Select, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import type {Message} from '../../../features/ai-chat/model/AiControllerTypes'
 import {setting_has_api_key} from '../../../api'
 import {logger} from '../../../shared/logger'
 import {type MobileTab} from '../MobileNav'
@@ -17,100 +16,6 @@ type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'e
 
 function normalizeSelectValue(value: SelectValue): string {
     return String(Array.isArray(value) ? value[0] ?? '' : value ?? '')
-}
-
-function MessageBubble({message}: { message: Message }) {
-    const isUser = message.role === 'user'
-    const hasBlocks = message.blocks && message.blocks.length > 0
-
-    const renderContent = () => {
-        if (hasBlocks) {
-            return message.blocks!.map((block, i) => {
-                if (block.type === 'content') {
-                    return (
-                        <div key={i} style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
-                            {block.content}
-                        </div>
-                    )
-                }
-                if (block.type === 'reasoning') {
-                    return (
-                        <details key={i} style={{marginTop: 4, fontSize: 'var(--fc-font-size-xs)', opacity: 0.7}}>
-                            <summary style={{cursor: 'pointer'}}>思考过程</summary>
-                            <p style={{margin: '4px 0 0', whiteSpace: 'pre-wrap'}}>{block.content}</p>
-                        </details>
-                    )
-                }
-                if (block.type === 'tool' || block.type === 'tool_use') {
-                    const tools = block.type === 'tool_use' ? block.tools : [block.tool]
-                    return tools.map((tool, j) => (
-                        <details key={`${i}-${j}`}
-                                 style={{marginTop: 4, fontSize: 'var(--fc-font-size-xs)', opacity: 0.75}}>
-                            <summary style={{cursor: 'pointer'}}>
-                                {tool.result != null ? '✓' : '⟳'} 工具: {tool.name}
-                            </summary>
-                            <div style={{
-                                margin: '4px 0',
-                                padding: '4px 8px',
-                                background: 'var(--fc-color-bg-secondary)',
-                                borderRadius: 4,
-                                maxHeight: 120,
-                                overflow: 'auto'
-                            }}>
-                                <div style={{fontSize: 10, opacity: 0.6}}>参数:</div>
-                                <pre style={{margin: 0, fontSize: 10, whiteSpace: 'pre-wrap'}}>{tool.args}</pre>
-                                {tool.result != null && (
-                                    <>
-                                        <div style={{fontSize: 10, opacity: 0.6, marginTop: 4}}>结果:</div>
-                                        <pre style={{
-                                            margin: 0,
-                                            fontSize: 10,
-                                            whiteSpace: 'pre-wrap'
-                                        }}>{tool.result}</pre>
-                                    </>
-                                )}
-                            </div>
-                        </details>
-                    ))
-                }
-                return null
-            })
-        }
-
-        if (message.content) {
-            return <div style={{whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>{message.content}</div>
-        }
-        return null
-    }
-
-    return (
-        <div style={{
-            display: 'flex', flexDirection: 'column',
-            alignItems: isUser ? 'flex-end' : 'flex-start',
-            marginBottom: 12,
-        }}>
-            <div style={{
-                maxWidth: '85%',
-                padding: '10px 14px',
-                borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                background: isUser ? 'var(--fc-color-primary)' : 'var(--fc-color-bg-secondary)',
-                color: isUser ? '#fff' : 'var(--fc-color-text)',
-                fontSize: 'var(--fc-font-size-sm)',
-                lineHeight: 1.55,
-            }}>
-                {renderContent()}
-            </div>
-            <span style={{
-                fontSize: 10, color: 'var(--fc-color-text-secondary)',
-                marginTop: 2, padding: '0 4px',
-            }}>
-                {isUser ? '你' : 'AI'} · {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-                hour: '2-digit',
-                minute: '2-digit'
-            })}
-            </span>
-        </div>
-    )
 }
 
 export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
@@ -447,47 +352,37 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
                 </div>
             )}
 
-            {/* 消息列表：min-height:0 保证 flex 子元素可以收缩 */}
-            <div style={{flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px'}}>
+            {/* 消息列表：flex 列布局让 MessageBox 的 user/assistant 自对齐生效；min-height:0 保证可收缩 */}
+            <div style={{
+                flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px',
+                display: 'flex', flexDirection: 'column', gap: 'var(--fc-space-md)',
+            }}>
                 {messages.length === 0 && !isStreaming && (
                     <div className="mobile-page__empty" style={{height: '100%'}}>
                         <p>发送消息开始对话</p>
                     </div>
                 )}
                 {messages.map(message => (
-                    <MessageBubble key={message.id} message={message}/>
+                    <MessageBox
+                        key={message.id}
+                        role={message.role}
+                        blocks={message.blocks}
+                        content={message.content}
+                        markdown={message.role === 'assistant'}
+                        contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
+                        toolCallDetail="verbose"
+                        lineHeight={1.5}
+                    />
                 ))}
                 {isStreaming && streamingBlocks.length > 0 && (
-                    <div style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginBottom: 12,
-                    }}>
-                        <div style={{
-                            maxWidth: '85%', padding: '10px 14px',
-                            borderRadius: '16px 16px 16px 4px',
-                            background: 'var(--fc-color-bg-secondary)',
-                            color: 'var(--fc-color-text)',
-                            fontSize: 'var(--fc-font-size-sm)',
-                        }}>
-                            {streamingBlocks.map((block, i) => {
-                                if (block.type === 'content') {
-                                    return <span key={i} style={{whiteSpace: 'pre-wrap'}}>{block.content}</span>
-                                }
-                                if (block.type === 'reasoning') {
-                                    return (
-                                        <details key={i} style={{fontSize: 'var(--fc-font-size-xs)', opacity: 0.7}}>
-                                            <summary>思考中…</summary>
-                                            <p>{block.content}</p>
-                                        </details>
-                                    )
-                                }
-                                return null
-                            })}
-                            <span className="fc-cursor-blink" style={{
-                                display: 'inline-block', width: 2, height: '1em',
-                                background: 'var(--fc-color-primary)', marginLeft: 2, verticalAlign: 'text-bottom',
-                            }}/>
-                        </div>
-                    </div>
+                    <MessageBox
+                        role="assistant"
+                        blocks={streamingBlocks}
+                        streaming
+                        markdown
+                        toolCallDetail="verbose"
+                        lineHeight={1.5}
+                    />
                 )}
                 <div ref={messagesEndRef}/>
             </div>
