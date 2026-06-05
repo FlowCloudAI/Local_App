@@ -208,11 +208,19 @@ impl Default for SearchSourceSettings {
 
 // ── API 密钥存储 ───────────────────────────────────────────────────────────
 
-const KEYRING_SERVICE: &str = "cn.flowcloudai.www";
+// 桌面（Windows / Linux / macOS）与 iOS：系统密钥链（keyring crate），不落任何文件。
+// Android：keyring 无可用后端会退回内存 mock（set 写进随即丢弃的临时对象、get 永远空
+// → 表现为"保存成功但切页就没了"），故改存应用私有目录下的明文文件 api_keys.json。
+// 该文件在应用沙箱内，未 root 的设备其它应用读不到；存储目录在启动时由
+// `init_api_key_storage` 注入（见 lib.rs setup）。如需更强安全可后续接 Android Keystore 加密。
 
-/// API 密钥存取（系统密钥链，不写入任何文件）
+/// API 密钥存取。
 pub struct ApiKeyStore;
 
+#[cfg(not(target_os = "android"))]
+const KEYRING_SERVICE: &str = "cn.flowcloudai.www";
+
+#[cfg(not(target_os = "android"))]
 impl ApiKeyStore {
     /// 读取插件的 API Key；不存在时返回 None
     pub fn get(plugin_id: &str) -> Option<String> {
@@ -236,4 +244,140 @@ impl ApiKeyStore {
             .delete_credential()
             .map_err(|e| anyhow::anyhow!("keyring delete error: {}", e))
     }
+}
+
+/// 基于应用私有目录明文文件的 API Key 存储（Android 实际使用；目录显式传入，便于宿主侧测试）。
+/// 每次操作都直接读/写文件、无内存缓存，因此重新挂载页面重新查询能拿到已保存值。
+#[cfg(any(target_os = "android", test))]
+mod file_key_store {
+    use anyhow::Result;
+    use std::collections::BTreeMap;
+    use std::path::Path;
+
+    const FILE_NAME: &str = "api_keys.json";
+
+    fn read_all(dir: &Path) -> BTreeMap<String, String> {
+        std::fs::read(dir.join(FILE_NAME))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+            .unwrap_or_default()
+    }
+
+    fn write_all(dir: &Path, map: &BTreeMap<String, String>) -> Result<()> {
+        std::fs::create_dir_all(dir).map_err(|e| anyhow::anyhow!("创建密钥目录失败: {}", e))?;
+        let json =
+            serde_json::to_vec_pretty(map).map_err(|e| anyhow::anyhow!("序列化密钥失败: {}", e))?;
+        std::fs::write(dir.join(FILE_NAME), json)
+            .map_err(|e| anyhow::anyhow!("写入密钥文件失败: {}", e))
+    }
+
+    pub fn get(dir: &Path, plugin_id: &str) -> Option<String> {
+        read_all(dir).get(plugin_id).cloned()
+    }
+
+    pub fn set(dir: &Path, plugin_id: &str, api_key: &str) -> Result<()> {
+        let mut map = read_all(dir);
+        map.insert(plugin_id.to_string(), api_key.to_string());
+        write_all(dir, &map)
+    }
+
+    pub fn delete(dir: &Path, plugin_id: &str) -> Result<()> {
+        let mut map = read_all(dir);
+        map.remove(plugin_id);
+        write_all(dir, &map)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn roundtrip_persists_through_file() {
+            let dir = std::env::temp_dir().join(format!("fc_apikey_test_{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+
+            // 复现 bug 场景：保存后"重新读取"（每次都读文件，模拟切页重挂载）应拿到值。
+            assert_eq!(get(&dir, "deepseek-llm"), None);
+            set(&dir, "deepseek-llm", "sk-abc").unwrap();
+            assert_eq!(get(&dir, "deepseek-llm"), Some("sk-abc".to_string()));
+
+            // 覆盖 + 多插件互不影响
+            set(&dir, "deepseek-llm", "sk-xyz").unwrap();
+            set(&dir, "qwen-llm", "sk-q").unwrap();
+            assert_eq!(get(&dir, "deepseek-llm"), Some("sk-xyz".to_string()));
+            assert_eq!(get(&dir, "qwen-llm"), Some("sk-q".to_string()));
+
+            // 删除只影响目标
+            delete(&dir, "deepseek-llm").unwrap();
+            assert_eq!(get(&dir, "deepseek-llm"), None);
+            assert_eq!(get(&dir, "qwen-llm"), Some("sk-q".to_string()));
+
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+mod android_key_store {
+    use anyhow::Result;
+    use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+
+    static STORAGE_DIR: OnceLock<PathBuf> = OnceLock::new();
+    /// 串行化文件读改写，避免并发覆盖。
+    static FILE_LOCK: Mutex<()> = Mutex::new(());
+
+    pub fn init_storage_dir(dir: PathBuf) {
+        let _ = STORAGE_DIR.set(dir);
+    }
+
+    fn dir() -> Result<&'static PathBuf> {
+        STORAGE_DIR
+            .get()
+            .ok_or_else(|| anyhow::anyhow!("API Key 存储目录未初始化"))
+    }
+
+    pub fn get(plugin_id: &str) -> Option<String> {
+        let _guard = FILE_LOCK.lock().ok()?;
+        super::file_key_store::get(dir().ok()?, plugin_id)
+    }
+
+    pub fn set(plugin_id: &str, api_key: &str) -> Result<()> {
+        let _guard = FILE_LOCK
+            .lock()
+            .map_err(|_| anyhow::anyhow!("密钥文件锁异常"))?;
+        super::file_key_store::set(dir()?, plugin_id, api_key)
+    }
+
+    pub fn delete(plugin_id: &str) -> Result<()> {
+        let _guard = FILE_LOCK
+            .lock()
+            .map_err(|_| anyhow::anyhow!("密钥文件锁异常"))?;
+        super::file_key_store::delete(dir()?, plugin_id)
+    }
+}
+
+#[cfg(target_os = "android")]
+impl ApiKeyStore {
+    /// 读取插件的 API Key；不存在时返回 None
+    pub fn get(plugin_id: &str) -> Option<String> {
+        android_key_store::get(plugin_id)
+    }
+
+    /// 写入插件的 API Key
+    pub fn set(plugin_id: &str, api_key: &str) -> Result<()> {
+        android_key_store::set(plugin_id, api_key)
+    }
+
+    /// 删除插件的 API Key
+    pub fn delete(plugin_id: &str) -> Result<()> {
+        android_key_store::delete(plugin_id)
+    }
+}
+
+/// 注入 Android 的 API Key 明文存储目录（应用私有目录）。仅 Android 需要；
+/// 桌面 / iOS 走系统密钥链，不调用。
+#[cfg(target_os = "android")]
+pub fn init_api_key_storage(dir: std::path::PathBuf) {
+    android_key_store::init_storage_dir(dir);
 }

@@ -74,7 +74,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 semver = "1"
-keyring = { version = "3", features = ["windows-native", "linux-native"] }
+# apple-native 让 macOS / iOS 走系统 Keychain；不加时这两个平台会退回内存 mock（密钥存不住）。
+# Android 没有可用后端，改用应用私有目录文件存储（见 settings.rs ApiKeyStore）。
+keyring = { version = "3", features = ["windows-native", "linux-native", "apple-native"] }
 moka = { version = "0.12", features = ["future"] }
 tera = "1"
 

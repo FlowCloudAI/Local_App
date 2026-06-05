@@ -270,6 +270,10 @@ pub fn run() {
 
             // 解析用户自定义路径（在 settings 移入 manage 之前读取）
             let data_root = default_data_root(&app_handle);
+
+            // Android 无系统密钥链，API Key 改存应用私有目录的明文文件，此处注入存储目录。
+            #[cfg(target_os = "android")]
+            settings::init_api_key_storage(data_root.clone());
             let resolved_db_path = settings
                 .db_path
                 .as_deref()
