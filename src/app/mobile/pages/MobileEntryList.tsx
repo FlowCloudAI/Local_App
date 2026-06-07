@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {type CSSProperties, useCallback, useEffect, useRef, useState} from 'react'
-import {Button, Input} from 'flowcloudai-ui'
+import {Button, Card, Input} from 'flowcloudai-ui'
 import {
     db_create_entry,
     db_list_all_entry_types,
@@ -168,50 +168,50 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                             const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
                             const coverSrc = toEntryCoverSrc(entry.cover)
                             return (
-                                <button
-                                    type="button"
+                                <Card
                                     className="mobile-entry-card"
                                     key={entry.id}
-                                    onClick={() => handleOpenEntry(entry)}
                                     style={{'--mobile-entry-card-color': et?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
-                                >
-                                    <span className="mobile-entry-card__visual">
-                                        {coverSrc ? (
-                                            <img
-                                                src={coverSrc}
-                                                alt={entry.title}
-                                                className="mobile-entry-card__cover"
-                                                loading="lazy"
-                                                decoding="async"
-                                            />
-                                        ) : (
-                                            <span className="mobile-entry-card__placeholder">
-                                                <span className="mobile-entry-card__placeholder-icon">
-                                                    {et ? (
-                                                        <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
-                                                    ) : (
-                                                        <span className="mobile-entry-card__placeholder-mark">{placeholderMark(entry.title)}</span>
-                                                    )}
-                                                </span>
-                                                <span className="mobile-entry-card__placeholder-ghost">
-                                                    {placeholderMark(entry.title)}
-                                                </span>
+                                    imageSlot={coverSrc ? (
+                                        <img
+                                            src={coverSrc}
+                                            alt={entry.title}
+                                            className="mobile-entry-card__cover"
+                                            loading="lazy"
+                                            decoding="async"
+                                        />
+                                    ) : (
+                                        <span className="mobile-entry-card__placeholder">
+                                            <span className="mobile-entry-card__placeholder-icon">
+                                                {et ? (
+                                                    <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
+                                                ) : (
+                                                    <span className="mobile-entry-card__placeholder-mark">{placeholderMark(entry.title)}</span>
+                                                )}
                                             </span>
-                                        )}
-                                    </span>
-                                    {et && (
+                                            <span className="mobile-entry-card__placeholder-ghost">
+                                                {placeholderMark(entry.title)}
+                                            </span>
+                                        </span>
+                                    )}
+                                    title={entry.title}
+                                    description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
+                                    extraInfo={<div className="mobile-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
+                                    tag={et ? (
                                         <span className="mobile-entry-card__tag">
                                             <EntryTypeIcon entryType={et} className="mobile-entry-card__tag-icon"/> {et.name}
                                         </span>
-                                    )}
-                                    <span className="mobile-entry-card__content">
-                                        <span className="mobile-entry-card__title">{entry.title}</span>
-                                        <span className="mobile-entry-card__description">
-                                            {entry.summary || '这个词条还没有摘要。'}
-                                        </span>
-                                        <span className="mobile-entry-card__meta">更新于 {formatDate(entry.updated_at)}</span>
-                                    </span>
-                                </button>
+                                    ) : undefined}
+                                    variant="shadow"
+                                    hoverable
+                                    expandContentOnHover
+                                    imageHeight="100%"
+                                    contentAreaRatio={0.5}
+                                    hoverContentAreaRatio={0.8}
+                                    overlayStartOpacity={1}
+                                    overlayEndOpacity={0}
+                                    onClick={() => handleOpenEntry(entry)}
+                                />
                             )
                         })}
                 </div>
