@@ -1,5 +1,6 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {convertFileSrc} from '@tauri-apps/api/core'
+import {type CSSProperties, useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import {
     db_create_entry,
@@ -13,6 +14,7 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import './MobileEntryList.css'
 
 interface Props {
     push: (page: MobilePage) => void
@@ -28,6 +30,17 @@ function formatDate(s?: string | null): string {
     return Number.isNaN(t) ? '未知' : new Intl.DateTimeFormat('zh-CN', {
         month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     }).format(t)
+}
+
+function placeholderMark(title: string): string {
+    const trimmed = title.trim()
+    return trimmed ? trimmed[0] : '词'
+}
+
+function toEntryCoverSrc(cover?: string | null): string | undefined {
+    if (!cover) return undefined
+    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(cover)) return cover
+    return convertFileSrc(String(cover), 'fcimg')
 }
 
 export default function MobileEntryList({push, setAiFocus, params}: Props) {
@@ -96,32 +109,24 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
     }
 
     return (
-        <div className="mobile-page" style={{padding: '12px 16px'}}>
-            <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
+        <div className="mobile-page mobile-entry-list">
+            <div className="mobile-entry-list__toolbar">
                 <Input
                     placeholder="搜索词条…"
                     value={searchText}
                     onValueChange={handleSearch}
-                    style={{flex: 1}}
+                    className="mobile-entry-list__search"
                 />
                 <Button type="button" size="sm" onClick={handleCreateEntry}>新建</Button>
             </div>
 
             {/* 类型筛选 */}
             {entryTypes.length > 0 && (
-                <div style={{display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap'}}>
+                <div className="mobile-entry-list__filters">
                     <button
-                        className={typeFilter === null ? 'active' : ''}
+                        type="button"
+                        className={`mobile-entry-list__filter${typeFilter === null ? ' active' : ''}`}
                         onClick={() => setTypeFilter(null)}
-                        style={{
-                            padding: '4px 10px',
-                            borderRadius: 999,
-                            fontSize: 'var(--fc-font-size-xs)',
-                            border: '1px solid var(--fc-color-border)',
-                            background: typeFilter === null ? 'var(--fc-color-primary)' : undefined,
-                            color: typeFilter === null ? '#fff' : 'var(--fc-color-text-secondary)',
-                            cursor: 'pointer',
-                        }}
                     >
                         全部
                     </button>
@@ -131,19 +136,10 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                         return (
                             <button
                                 key={key}
+                                type="button"
+                                className={`mobile-entry-list__filter${active ? ' active' : ''}`}
                                 onClick={() => setTypeFilter(active ? null : key)}
-                                style={{
-                                    padding: '4px 10px',
-                                    borderRadius: 999,
-                                    fontSize: 'var(--fc-font-size-xs)',
-                                    border: '1px solid var(--fc-color-border)',
-                                    background: active ? (et.color ?? undefined) : undefined,
-                                    color: active ? '#fff' : 'var(--fc-color-text-secondary)',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 4,
-                                }}
+                                style={{'--mobile-entry-type-color': et.color ?? 'var(--fc-color-primary)'} as CSSProperties}
                             >
                                 <EntryTypeIcon entryType={et} className=""/>
                                 {et.name}
@@ -161,7 +157,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                     <Button type="button" size="sm" onClick={handleCreateEntry}>新建第一个词条</Button>
                 </div>
             ) : (
-                <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
+                <div className="mobile-entry-list__grid">
                     {entries
                         .sort((a, b) => {
                             const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
@@ -170,32 +166,51 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                         })
                         .map(entry => {
                             const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
+                            const coverSrc = toEntryCoverSrc(entry.cover)
                             return (
                                 <button
                                     type="button"
-                                    className="mobile-list-card"
+                                    className="mobile-entry-card"
                                     key={entry.id}
                                     onClick={() => handleOpenEntry(entry)}
+                                    style={{'--mobile-entry-card-color': et?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
                                 >
-                                    <span className="mobile-list-card__row">
-                                        <span className="mobile-list-card__main">
-                                            <span className="mobile-list-card__title">{entry.title}</span>
-                                            {entry.summary && (
-                                                <span className="mobile-list-card__description">{entry.summary}</span>
-                                            )}
-                                        </span>
-                                        <span className="mobile-list-card__meta">{formatDate(entry.updated_at)}</span>
+                                    <span className="mobile-entry-card__visual">
+                                        {coverSrc ? (
+                                            <img
+                                                src={coverSrc}
+                                                alt={entry.title}
+                                                className="mobile-entry-card__cover"
+                                                loading="lazy"
+                                                decoding="async"
+                                            />
+                                        ) : (
+                                            <span className="mobile-entry-card__placeholder">
+                                                <span className="mobile-entry-card__placeholder-icon">
+                                                    {et ? (
+                                                        <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
+                                                    ) : (
+                                                        <span className="mobile-entry-card__placeholder-mark">{placeholderMark(entry.title)}</span>
+                                                    )}
+                                                </span>
+                                                <span className="mobile-entry-card__placeholder-ghost">
+                                                    {placeholderMark(entry.title)}
+                                                </span>
+                                            </span>
+                                        )}
                                     </span>
-                                    {et && (
-                                        <span className="mobile-list-card__tag" style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: 3,
-                                            background: et.color ? `${et.color}22` : 'var(--fc-color-bg-tertiary)',
-                                            color: et.color ?? 'var(--fc-color-text)',
-                                            padding: '2px 6px', borderRadius: 999, fontSize: 'var(--fc-font-size-xs)',
-                                        }}>
-                                            <EntryTypeIcon entryType={et} className=""/> {et.name}
+                                    <span className="mobile-entry-card__content">
+                                        {et && (
+                                            <span className="mobile-entry-card__tag">
+                                                <EntryTypeIcon entryType={et} className=""/> {et.name}
+                                            </span>
+                                        )}
+                                        <span className="mobile-entry-card__title">{entry.title}</span>
+                                        <span className="mobile-entry-card__description">
+                                            {entry.summary || '这个词条还没有摘要。'}
                                         </span>
-                                    )}
+                                        <span className="mobile-entry-card__meta">更新于 {formatDate(entry.updated_at)}</span>
+                                    </span>
                                 </button>
                             )
                         })}
