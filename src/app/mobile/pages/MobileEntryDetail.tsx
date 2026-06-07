@@ -5,6 +5,7 @@ import {Button, Input, Select, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
     db_get_entry,
+    db_delete_entry,
     db_list_all_entry_types,
     db_list_categories,
     db_update_entry,
@@ -13,6 +14,7 @@ import {
     entryTypeKey,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
+import {ActionMenu} from '../../../shared/ui/overlay'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -52,6 +54,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const [entryType, setEntryType] = useState<string | null>(null)
     const [categoryId, setCategoryId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
+    const [menuOpen, setMenuOpen] = useState(false)
 
     // wrapperElement 的 data-color-mode 只接受 "light" | "dark"，不接受 "auto"
     const colorMode: 'light' | 'dark' = theme === 'dark'
@@ -160,6 +163,17 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             setSaving(false)
         }
     }, [title, content, summary, entryType, categoryId, entryId, projectId, params, replace, setAiFocus, showAlert])
+
+    const handleDelete = useCallback(async () => {
+        const result = await showAlert(`确定删除词条「${entry?.title ?? ''}」？此操作不可撤销。`, 'warning', 'confirm')
+        if (result !== 'yes') return
+        try {
+            await db_delete_entry(entryId)
+            pop()
+        } catch (e) {
+            await showAlert(`删除失败：${String(e)}`, 'error', 'toast', 3000)
+        }
+    }, [entry, entryId, pop, showAlert])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
@@ -270,7 +284,17 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             <div className="mobile-bottom-bar mobile-entry-detail__bottom-bar">
                 <Button type="button" variant="outline" onClick={handleAiDiscuss}>AI 讨论</Button>
                 <Button type="button" onClick={enterEdit}>编辑</Button>
+                <Button type="button" variant="ghost" onClick={() => setMenuOpen(true)} aria-label="更多操作">⋯</Button>
             </div>
+
+            <ActionMenu
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                title={entry.title}
+                items={[
+                    {key: 'delete', label: '删除词条', danger: true, onSelect: () => void handleDelete()},
+                ]}
+            />
         </div>
     )
 }

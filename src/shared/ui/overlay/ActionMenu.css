@@ -1,0 +1,53 @@
+/* 动作菜单卡片：背板/居中由 FloatingPanel(Overlay) 提供，这里只管卡片与列表项。 */
+
+.fc-action-menu {
+    width: min(20rem, 100%);
+    background: var(--fc-color-bg-elevated);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    box-shadow: var(--fc-shadow-lg);
+    padding: var(--fc-space-xs);
+    overflow: hidden;
+}
+
+.fc-action-menu__title {
+    padding: var(--fc-space-sm) var(--fc-space-md) var(--fc-space-xs);
+    font-size: var(--fc-font-size-xs);
+    color: var(--fc-color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-action-menu__list {
+    display: flex;
+    flex-direction: column;
+}
+
+.fc-action-menu__item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: var(--fc-space-md);
+    border: none;
+    background: transparent;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    text-align: left;
+    border-radius: var(--fc-radius-md);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.fc-action-menu__item:active {
+    background: var(--fc-color-bg-secondary);
+}
+
+.fc-action-menu__item--danger {
+    color: var(--fc-color-error);
+}
+
+.fc-action-menu__item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
