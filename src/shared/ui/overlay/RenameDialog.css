@@ -1,0 +1,34 @@
+/* 重命名浮层卡片：背板/居中由 FloatingPanel(Overlay) 提供。 */
+
+.fc-rename-dialog {
+    width: min(22rem, 100%);
+    background: var(--fc-color-bg-elevated);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    box-shadow: var(--fc-shadow-lg);
+    padding: var(--fc-space-lg);
+    box-sizing: border-box;
+}
+
+.fc-rename-dialog__title {
+    font-size: var(--fc-font-size-md);
+    font-weight: var(--fc-font-weight-semibold);
+    margin-bottom: var(--fc-space-sm);
+}
+
+.fc-rename-dialog__label {
+    font-size: var(--fc-font-size-xs);
+    color: var(--fc-color-text-secondary);
+    margin-bottom: var(--fc-space-xs);
+}
+
+.fc-rename-dialog__input {
+    width: 100%;
+}
+
+.fc-rename-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--fc-space-sm);
+    margin-top: var(--fc-space-lg);
+}

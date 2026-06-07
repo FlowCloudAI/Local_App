@@ -1,12 +1,14 @@
 import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useState} from 'react'
-import {Button} from 'flowcloudai-ui'
+import {Button, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {
     db_create_entry,
+    db_delete_project,
     db_get_project,
     db_get_project_stats,
     db_list_categories,
+    db_update_project,
     type Category,
     type Project,
     type ProjectStats,
@@ -14,6 +16,9 @@ import {
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
+import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
+import {invalidateProjectList} from '../../../features/projects/projectListStore'
 
 interface Props {
     push: (page: MobilePage) => void
@@ -30,12 +35,17 @@ function toProjectImageSrc(coverPath?: string | null): string | undefined {
     return convertFileSrc(coverPath, 'fcimg')
 }
 
-export default function MobileProjectHome({push, navigateToTab, setAiFocus, params}: Props) {
+export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
+    const {showAlert} = useAlert()
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
     const [stats, setStats] = useState<ProjectStats | null>(null)
     const [loading, setLoading] = useState(true)
+    const [menuOpen, setMenuOpen] = useState(false)
+    const [renameOpen, setRenameOpen] = useState(false)
+    const [renaming, setRenaming] = useState(false)
+    const [coverOpen, setCoverOpen] = useState(false)
 
     useEffect(() => {
         if (!projectId) return
@@ -73,6 +83,47 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
         setAiFocus({projectId, entryId: null})
         navigateToTab('ai')
     }, [navigateToTab, projectId, setAiFocus])
+
+    const handleRename = useCallback(async (name: string) => {
+        setRenaming(true)
+        try {
+            await db_update_project({id: projectId, name})
+            setProject(prev => prev ? {...prev, name} : prev)
+            invalidateProjectList()
+            setRenameOpen(false)
+        } catch (e) {
+            await showAlert(`重命名失败：${String(e)}`, 'error', 'toast', 3000)
+        } finally {
+            setRenaming(false)
+        }
+    }, [projectId, showAlert])
+
+    const handleChangeCover = useCallback(async (coverPath: string | null) => {
+        try {
+            await db_update_project({id: projectId, coverPath})
+            setProject(prev => prev ? {...prev, cover_path: coverPath} : prev)
+            invalidateProjectList()
+            setCoverOpen(false)
+        } catch (e) {
+            await showAlert(`更换封面失败：${String(e)}`, 'error', 'toast', 3000)
+        }
+    }, [projectId, showAlert])
+
+    const handleDeleteProject = useCallback(async () => {
+        const result = await showAlert(
+            `确定删除项目「${project?.name ?? ''}」？将永久删除其中所有词条、分类与图片，且不可撤销。`,
+            'warning',
+            'confirm',
+        )
+        if (result !== 'yes') return
+        try {
+            await db_delete_project(projectId)
+            invalidateProjectList()
+            pop()
+        } catch (e) {
+            await showAlert(`删除项目失败：${String(e)}`, 'error', 'toast', 3000)
+        }
+    }, [project, projectId, pop, showAlert])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!project) return <div className="mobile-page__error">项目不存在</div>
@@ -121,6 +172,7 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
             <div style={{display: 'flex', gap: 8, marginBottom: 20}}>
                 <Button type="button" size="sm" onClick={() => handleCreateEntry(null)}>+ 新建词条</Button>
                 <Button type="button" size="sm" variant="outline" onClick={handleOpenAi}>AI 讨论</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setMenuOpen(true)} aria-label="项目管理" style={{marginLeft: 'auto'}}>⋯</Button>
             </div>
 
             <button
@@ -160,6 +212,35 @@ export default function MobileProjectHome({push, navigateToTab, setAiFocus, para
                     </div>
                 </div>
             )}
+            <ActionMenu
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                title={project.name}
+                items={[
+                    {key: 'rename', label: '重命名', onSelect: () => setRenameOpen(true)},
+                    {key: 'cover', label: '换封面', onSelect: () => setCoverOpen(true)},
+                    {key: 'delete', label: '删除项目', danger: true, onSelect: () => void handleDeleteProject()},
+                ]}
+            />
+
+            <RenameDialog
+                open={renameOpen}
+                title="重命名项目"
+                initialValue={project.name}
+                placeholder="项目名称"
+                busy={renaming}
+                onClose={() => setRenameOpen(false)}
+                onConfirm={(name) => void handleRename(name)}
+            />
+
+            <ProjectCoverPickerModal
+                open={coverOpen}
+                projectId={projectId}
+                projectName={project.name}
+                currentCoverPath={project.cover_path}
+                onClose={() => setCoverOpen(false)}
+                onSelectCover={(coverPath) => handleChangeCover(coverPath)}
+            />
         </div>
     )
 }
