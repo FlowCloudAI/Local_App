@@ -1,7 +1,8 @@
 import {logger} from '../../../shared/logger'
 import MarkdownPreview from '@uiw/react-markdown-preview'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
-import {type CSSProperties, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {openUrl} from '@tauri-apps/plugin-opener'
+import {type CSSProperties, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Input, Select, TagItem, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
@@ -33,7 +34,12 @@ import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {buildTagValueMap} from '../../../features/entries/lib/entryCommon'
-import {buildMarkdownPreviewSource} from '../../../features/entries/lib/entryMarkdown'
+import {
+    buildMarkdownPreviewSource,
+    isSafeExternalHref,
+    parseInternalEntryHref,
+    resolveMarkdownAnchor,
+} from '../../../features/entries/lib/entryMarkdown'
 import {
     areTagMapsEqual,
     getComparableTagValue,
@@ -284,6 +290,43 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             },
         })
     }, [entryId, projectEntries, projectId, push])
+
+    const handleMarkdownClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+        const anchor = resolveMarkdownAnchor(event.target)
+        if (!anchor) return
+
+        const href = anchor.getAttribute('href') ?? ''
+        const internalLink = parseInternalEntryHref(href, anchor.textContent ?? '')
+        if (internalLink) {
+            event.preventDefault()
+            if (internalLink.entryId) {
+                handleOpenLinkedEntry(internalLink.entryId)
+                return
+            }
+            const targetTitle = internalLink.title.trim()
+            const target = projectEntries.find(item => item.title.trim() === targetTitle)
+            if (!target) {
+                void showAlert(`未找到词条「${targetTitle}」`, 'warning', 'toast', 1800)
+                return
+            }
+            handleOpenLinkedEntry(target.id)
+            return
+        }
+
+        if (isSafeExternalHref(href)) {
+            event.preventDefault()
+            void openUrl(href).catch((error) => {
+                logger.error('打开链接失败', error)
+                void showAlert('打开链接失败', 'error', 'toast', 1800)
+            })
+            return
+        }
+
+        if (href) {
+            event.preventDefault()
+            void showAlert('无效链接，已阻止跳转', 'warning', 'toast', 1500)
+        }
+    }, [handleOpenLinkedEntry, projectEntries, showAlert])
 
     const handleSave = useCallback(async () => {
         if (!title.trim()) {
@@ -821,7 +864,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             )}
 
             {entry.content ? (
-                <div className="mobile-entry-detail__markdown" data-color-mode={colorMode}>
+                <div className="mobile-entry-detail__markdown" data-color-mode={colorMode} onClick={handleMarkdownClick}>
                     <MarkdownPreview
                         source={viewMarkdownSource}
                         className="mobile-entry-detail__markdown-preview"
