@@ -15,7 +15,7 @@ import {
     db_list_outgoing_links,
     db_list_relations_for_entry,
     db_list_tag_schemas,
-    db_update_entry,
+    db_save_entry_bundle,
     import_entry_images,
     type Entry,
     type EntryBrief,
@@ -45,11 +45,16 @@ import {
     normalizeEntryImages,
     toEntryImageSrc,
 } from '../../../features/entries/lib/entryImage'
-import {buildRelationDraft} from '../../../features/entries/lib/entryRelation'
+import {
+    areRelationDraftsEqual,
+    buildRelationDraft,
+    hasInvalidRelationDraft,
+} from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload, type EntryTagRuntimeValue} from '../../../features/entries/components/entryTagUtils'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
+import EntryRelationCreator, {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -159,6 +164,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
+    const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
 
     const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
         setTagDraft(nextTags)
@@ -170,6 +176,10 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         entryId,
         onTagsChange: handleTagDraftChange,
     })
+    const initialRelationDrafts = useMemo(
+        () => entryRelations.map(relation => buildRelationDraft(entryId, relation)),
+        [entryId, entryRelations],
+    )
 
     // wrapperElement 的 data-color-mode 只接受 "light" | "dark"，不接受 "auto"
     const colorMode: 'light' | 'dark' = theme === 'dark'
@@ -196,6 +206,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         || categoryId !== (entry.category_id ?? null)
         || !areTagMapsEqual(tagDraft, buildTagValueMap(entry), tagSchemas)
         || !areImagesEqual(images, normalizeEntryImages(entry.images))
+        || !areRelationDraftsEqual(relationDrafts, initialRelationDrafts)
     )
 
     useEffect(() => {
@@ -219,6 +230,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setOutgoingLinks(outgoing)
             setIncomingLinks(incoming)
             setEntryRelations(relations)
+            setRelationDrafts(relations.map(relation => buildRelationDraft(entryId, relation)))
             syncForm(e)
         }).catch(logger.error).finally(() => setLoading(false))
     }, [entryId, projectId, syncForm])
@@ -248,11 +260,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         if (!await confirmDiscard()) return
         if (entry) {
             syncForm(entry)
+            setRelationDrafts(initialRelationDrafts)
             setMode('view')
         } else {
             pop()
         }
-    }, [confirmDiscard, entry, pop, syncForm])
+    }, [confirmDiscard, entry, initialRelationDrafts, pop, syncForm])
 
     const handleAiDiscuss = useCallback(() => {
         setAiFocus({projectId, entryId})
@@ -278,11 +291,16 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             return
         }
         if (!entry) return
+        if (relationDrafts.some(draft => hasInvalidRelationDraft(draft, entryId))) {
+            await showAlert('存在未完成关系，请先选择目标词条或删除该关系。', 'warning', 'toast', 2400)
+            return
+        }
         setSaving(true)
         const tags = buildEntryTagsPayload(tagDraft, entryTags.localTagSchemas, entry.tags)
         try {
-            await db_update_entry({
+            const savedBundle = await db_save_entry_bundle({
                 id: entryId,
+                projectId,
                 title: title.trim(),
                 content: content.trim() || null,
                 summary: summary.trim() || null,
@@ -290,17 +308,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 categoryId: categoryId || null,
                 tags,
                 images,
+                relationDrafts,
             })
-            setEntry(prev => prev ? {
-                ...prev,
-                title: title.trim(),
-                content: content.trim() || null,
-                summary: summary.trim() || null,
-                type: entryType,
-                category_id: categoryId || null,
-                tags,
-                images,
-            } : prev)
+            setEntry(savedBundle.entry)
+            syncForm(savedBundle.entry)
+            setOutgoingLinks(savedBundle.outgoingLinks)
+            setIncomingLinks(savedBundle.incomingLinks)
+            setEntryRelations(savedBundle.relations)
+            setRelationDrafts(savedBundle.relations.map(relation => buildRelationDraft(entryId, relation)))
             setAiFocus({projectId, entryId})
             // 同步页面标题（顶部标题取自 params.displayName）。
             replace({type: 'entryDetail', params: {...(params ?? {}), projectId, entryId, displayName: title.trim(), mode: 'view'}})
@@ -310,7 +325,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         } finally {
             setSaving(false)
         }
-    }, [title, content, summary, entryType, categoryId, tagDraft, entryTags.localTagSchemas, entry, entryId, images, projectId, params, replace, setAiFocus, showAlert])
+    }, [title, content, summary, entryType, categoryId, relationDrafts, tagDraft, entryTags.localTagSchemas, entry, entryId, images, projectId, params, replace, setAiFocus, showAlert, syncForm])
 
     const handleDelete = useCallback(async () => {
         const result = await showAlert(`确定删除词条「${entry?.title ?? ''}」？此操作不可撤销。`, 'warning', 'confirm')
@@ -574,6 +589,26 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     )}
                 </div>
 
+                <div className="mobile-entry-detail__relations">
+                    <div className="mobile-entry-detail__relations-header">
+                        <div className="mobile-entry-detail__relations-label">关系</div>
+                    </div>
+                    <EntryRelationCreator
+                        drafts={relationDrafts}
+                        entries={projectEntries}
+                        categories={categories}
+                        currentEntryId={entryId}
+                        disabled={saving}
+                        onChange={setRelationDrafts}
+                        onOpenEntry={(target) => {
+                            void (async () => {
+                                if (!await confirmDiscard()) return
+                                handleOpenLinkedEntry(target.id)
+                            })()
+                        }}
+                    />
+                </div>
+
                 <EntryTypeCreator
                     open={typeCreatorOpen}
                     projectId={projectId}
@@ -637,10 +672,10 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const viewTagSchemas = entryTags.browseVisibleTagSchemas
     const viewImages = normalizeEntryImages(entry.images)
     const viewMarkdownSource = buildMarkdownPreviewSource(entry.content ?? '', viewImages)
-    const relationDrafts = entryRelations
+    const viewRelationDrafts = entryRelations
         .map(relation => buildRelationDraft(entryId, relation))
         .filter(relation => relation.otherEntryId)
-    const hasConnections = relationDrafts.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
+    const hasConnections = viewRelationDrafts.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
 
     return (
         <div className="mobile-page mobile-entry-detail">
@@ -698,10 +733,10 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             {hasConnections && (
                 <div className="mobile-entry-detail__connections">
                     <h3 className="mobile-entry-detail__section-title">关联</h3>
-                    {relationDrafts.length > 0 && (
+                    {viewRelationDrafts.length > 0 && (
                         <div className="mobile-entry-detail__connection-group">
                             <div className="mobile-entry-detail__connection-label">结构化关系</div>
-                            {relationDrafts.map((relation, index) => {
+                            {viewRelationDrafts.map((relation, index) => {
                                 const target = relation.otherEntryId ? entryBriefById.get(relation.otherEntryId) : null
                                 const directionLabel = relation.direction === 'two_way'
                                     ? '双向'
