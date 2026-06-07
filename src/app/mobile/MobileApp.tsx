@@ -16,6 +16,7 @@ import MobileIdea from './pages/MobileIdea'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileSettings from './pages/MobileSettings'
+import MobileTypeTagManager from './pages/MobileTypeTagManager'
 import {type MobilePage, usePageStack} from './usePageStack'
 
 interface MobileAppProps {
@@ -42,6 +43,7 @@ function getPageTitle(type: string, params?: Record<string, unknown>): string {
         case 'projectHome': return name || '项目'
         case 'entryList':   return name || '词条'
         case 'entryDetail': return name || '词条'
+        case 'projectDefs': return name || '类型与标签'
         case 'aiChat': return 'AI 对话'
         case 'ideas': return '灵感便签'
         case 'settings': return '设置'
@@ -235,6 +237,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         )}
                         {pageType === 'entryDetail' && currentPage && (
                             <MobileEntryDetail {...pageProps} params={currentPage.params}/>
+                        )}
+                        {pageType === 'projectDefs' && currentPage && (
+                            <MobileTypeTagManager params={currentPage.params}/>
                         )}
                     </>
                 )}

@@ -185,6 +185,16 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 <span className="mobile-list-card__description">浏览项目中所有词条</span>
             </button>
 
+            <button
+                type="button"
+                className="mobile-list-card"
+                onClick={() => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}})}
+                style={{marginBottom: 12}}
+            >
+                <span className="mobile-list-card__title">类型与标签</span>
+                <span className="mobile-list-card__description">管理词条类型与标签定义</span>
+            </button>
+
             {categories.length > 0 && (
                 <div>
                     <h3 style={{
