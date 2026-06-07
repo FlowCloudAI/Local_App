@@ -10,10 +10,17 @@ import {
     db_delete_entry,
     db_list_all_entry_types,
     db_list_categories,
+    db_list_entries,
+    db_list_incoming_links,
+    db_list_outgoing_links,
+    db_list_relations_for_entry,
     db_list_tag_schemas,
     db_update_entry,
     import_entry_images,
     type Entry,
+    type EntryBrief,
+    type EntryLink,
+    type EntryRelation,
     type EntryTypeView,
     entryTypeKey,
     type TagSchema,
@@ -38,6 +45,7 @@ import {
     normalizeEntryImages,
     toEntryImageSrc,
 } from '../../../features/entries/lib/entryImage'
+import {buildRelationDraft} from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload, type EntryTagRuntimeValue} from '../../../features/entries/components/entryTagUtils'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
@@ -45,6 +53,7 @@ import EntryImageLightbox from '../../../features/entries/components/EntryImageL
 import './MobileEntryDetail.css'
 
 interface Props {
+    push: (page: MobilePage) => void
     pop: () => void
     replace: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
@@ -96,11 +105,28 @@ function appendImages(current: EntryImage[], incoming: EntryImage[]): EntryImage
     return nextImages
 }
 
+function stripMarkdown(value: string): string {
+    return value
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/!\[[^\]]*]\([^)]+\)/g, ' ')
+        .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
+        .replace(/[#>*_~-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+function buildExcerpt(value?: string | null, maxLength = 64): string {
+    const normalized = stripMarkdown(value ?? '')
+    if (!normalized) return ''
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
+}
+
 /**
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
  * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
  */
-export default function MobileEntryDetail({pop, replace, navigateToTab, setBeforeBack, setAiFocus, params}: Props) {
+export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeBack, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
     const entryId = params?.entryId as string
     const {showAlert} = useAlert()
@@ -129,6 +155,10 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
+    const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
+    const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
+    const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
+    const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
 
     const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
         setTagDraft(nextTags)
@@ -176,11 +206,19 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             db_list_all_entry_types(projectId),
             db_list_categories(projectId),
             db_list_tag_schemas(projectId),
-        ]).then(([e, types, cats, schemas]) => {
+            db_list_entries({projectId, limit: 1000, offset: 0}),
+            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
+        ]).then(([e, types, cats, schemas, briefs, outgoing, incoming, relations]) => {
             setEntry(e)
             setEntryTypes(types)
             setCategories(cats)
             setTagSchemas(schemas)
+            setProjectEntries(briefs)
+            setOutgoingLinks(outgoing)
+            setIncomingLinks(incoming)
+            setEntryRelations(relations)
             syncForm(e)
         }).catch(logger.error).finally(() => setLoading(false))
     }, [entryId, projectId, syncForm])
@@ -220,6 +258,19 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         setAiFocus({projectId, entryId})
         navigateToTab('ai')
     }, [navigateToTab, projectId, entryId, setAiFocus])
+
+    const handleOpenLinkedEntry = useCallback((targetId: string) => {
+        if (targetId === entryId) return
+        const target = projectEntries.find(item => item.id === targetId)
+        push({
+            type: 'entryDetail',
+            params: {
+                projectId,
+                entryId: targetId,
+                displayName: target?.title ?? '词条',
+            },
+        })
+    }, [entryId, projectEntries, projectId, push])
 
     const handleSave = useCallback(async () => {
         if (!title.trim()) {
@@ -291,6 +342,11 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         ...image,
         src: toEntryImageSrc(image),
     })), [images])
+
+    const entryBriefById = useMemo(
+        () => new Map(projectEntries.map(item => [item.id, item])),
+        [projectEntries],
+    )
 
     const handleUploadImages = useCallback(async (): Promise<EntryImage[]> => {
         try {
@@ -581,6 +637,10 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const viewTagSchemas = entryTags.browseVisibleTagSchemas
     const viewImages = normalizeEntryImages(entry.images)
     const viewMarkdownSource = buildMarkdownPreviewSource(entry.content ?? '', viewImages)
+    const relationDrafts = entryRelations
+        .map(relation => buildRelationDraft(entryId, relation))
+        .filter(relation => relation.otherEntryId)
+    const hasConnections = relationDrafts.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
 
     return (
         <div className="mobile-page mobile-entry-detail">
@@ -632,6 +692,96 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                             )
                         })}
                     </div>
+                </div>
+            )}
+
+            {hasConnections && (
+                <div className="mobile-entry-detail__connections">
+                    <h3 className="mobile-entry-detail__section-title">关联</h3>
+                    {relationDrafts.length > 0 && (
+                        <div className="mobile-entry-detail__connection-group">
+                            <div className="mobile-entry-detail__connection-label">结构化关系</div>
+                            {relationDrafts.map((relation, index) => {
+                                const target = relation.otherEntryId ? entryBriefById.get(relation.otherEntryId) : null
+                                const directionLabel = relation.direction === 'two_way'
+                                    ? '双向'
+                                    : relation.direction === 'incoming' ? '来自对方' : '指向对方'
+                                return (
+                                    <button
+                                        type="button"
+                                        className="mobile-entry-detail__connection-card"
+                                        key={relation.id ?? `relation-${index}`}
+                                        disabled={!target}
+                                        onClick={() => relation.otherEntryId && handleOpenLinkedEntry(relation.otherEntryId)}
+                                    >
+                                        <span className="mobile-entry-detail__connection-title">
+                                            {target?.title ?? '词条不存在或已删除'}
+                                        </span>
+                                        <span className="mobile-entry-detail__connection-meta">
+                                            {directionLabel}{relation.content ? ` · ${relation.content}` : ''}
+                                        </span>
+                                        {target?.summary && (
+                                            <span className="mobile-entry-detail__connection-excerpt">
+                                                {buildExcerpt(target.summary)}
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+                    {outgoingLinks.length > 0 && (
+                        <div className="mobile-entry-detail__connection-group">
+                            <div className="mobile-entry-detail__connection-label">正文提到</div>
+                            {outgoingLinks.map(link => {
+                                const target = entryBriefById.get(link.b_id)
+                                return (
+                                    <button
+                                        type="button"
+                                        className="mobile-entry-detail__connection-card"
+                                        key={link.id}
+                                        disabled={!target}
+                                        onClick={() => handleOpenLinkedEntry(link.b_id)}
+                                    >
+                                        <span className="mobile-entry-detail__connection-title">
+                                            {target?.title ?? '词条不存在或已删除'}
+                                        </span>
+                                        {target?.summary && (
+                                            <span className="mobile-entry-detail__connection-excerpt">
+                                                {buildExcerpt(target.summary)}
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
+                    {incomingLinks.length > 0 && (
+                        <div className="mobile-entry-detail__connection-group">
+                            <div className="mobile-entry-detail__connection-label">被这些词条提到</div>
+                            {incomingLinks.map(link => {
+                                const source = entryBriefById.get(link.a_id)
+                                return (
+                                    <button
+                                        type="button"
+                                        className="mobile-entry-detail__connection-card"
+                                        key={link.id}
+                                        disabled={!source}
+                                        onClick={() => handleOpenLinkedEntry(link.a_id)}
+                                    >
+                                        <span className="mobile-entry-detail__connection-title">
+                                            {source?.title ?? '词条不存在或已删除'}
+                                        </span>
+                                        {source?.summary && (
+                                            <span className="mobile-entry-detail__connection-excerpt">
+                                                {buildExcerpt(source.summary)}
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 
