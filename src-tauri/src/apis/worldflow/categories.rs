@@ -1,5 +1,12 @@
 use super::common::*;
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryCascadeDeleteResult {
+    pub deleted_entries: usize,
+    pub deleted_categories: usize,
+}
+
 #[tauri::command]
 pub async fn db_create_category(
     state: State<'_, Arc<AppState>>,
@@ -91,6 +98,41 @@ pub async fn db_delete_category(state: State<'_, Arc<AppState>>, id: String) -> 
     let db = state.inner().sqlite_db.lock().await;
     let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
     db.delete_category(&id).await.map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &category.project_id).await
+}
+
+/// 级联删除分类子树及其中词条。
+#[tauri::command]
+pub async fn db_cascade_delete_category(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<CategoryCascadeDeleteResult, String> {
+    let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let db = state.inner().sqlite_db.lock().await;
+    let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
+    let result = db
+        .cascade_delete_category(&id)
+        .await
+        .map_err(|e| e.to_string())?;
+    touch_project_updated_at(&db, &category.project_id).await?;
+    Ok(CategoryCascadeDeleteResult {
+        deleted_entries: result.deleted_entries,
+        deleted_categories: result.deleted_categories,
+    })
+}
+
+/// 删除分类并将直接子分类和词条上移到父分类（或根节点）。
+#[tauri::command]
+pub async fn db_delete_category_move_to_parent(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<(), String> {
+    let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let db = state.inner().sqlite_db.lock().await;
+    let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
+    db.delete_category_move_to_parent(&id)
+        .await
+        .map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &category.project_id).await
 }
 

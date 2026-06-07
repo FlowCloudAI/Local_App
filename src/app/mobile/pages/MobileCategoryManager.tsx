@@ -1,0 +1,442 @@
+import {logger} from '../../../shared/logger'
+import {type CSSProperties, useCallback, useEffect, useMemo, useState} from 'react'
+import {Button, useAlert} from 'flowcloudai-ui'
+import {
+    db_cascade_delete_category,
+    db_create_category,
+    db_delete_category,
+    db_delete_category_move_to_parent,
+    db_get_project_stats,
+    db_list_categories,
+    db_update_category,
+    type Category,
+    type CategoryCascadeDeleteResult,
+    type ProjectStats,
+} from '../../../api'
+import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {type MobilePage} from '../usePageStack'
+import './MobileCategoryManager.css'
+
+interface Props {
+    push: (page: MobilePage) => void
+    params?: Record<string, unknown>
+}
+
+interface CategoryRow {
+    category: Category
+    depth: number
+}
+
+type RenameTarget =
+    | {mode: 'create'; parentId: string | null}
+    | {mode: 'rename'; category: Category}
+
+type DeleteMode = 'empty' | 'lift' | 'cascade'
+
+const ROOT_PARENT_KEY = '__root__'
+
+function parentKey(parentId: string | null | undefined): string {
+    return parentId ?? ROOT_PARENT_KEY
+}
+
+function sortCategories(a: Category, b: Category): number {
+    return (a.sort_order - b.sort_order) || a.name.localeCompare(b.name, 'zh-Hans-CN')
+}
+
+function buildChildrenMap(categories: Category[]): Map<string, Category[]> {
+    const map = new Map<string, Category[]>()
+    for (const category of categories) {
+        const key = parentKey(category.parent_id)
+        const list = map.get(key)
+        if (list) {
+            list.push(category)
+        } else {
+            map.set(key, [category])
+        }
+    }
+    for (const list of map.values()) {
+        list.sort(sortCategories)
+    }
+    return map
+}
+
+function buildRows(childrenMap: Map<string, Category[]>): CategoryRow[] {
+    const rows: CategoryRow[] = []
+    const visit = (parentId: string | null, depth: number) => {
+        const children = childrenMap.get(parentKey(parentId)) ?? []
+        for (const category of children) {
+            rows.push({category, depth})
+            visit(category.id, depth + 1)
+        }
+    }
+    visit(null, 0)
+    return rows
+}
+
+function collectDescendantIds(categoryId: string, childrenMap: Map<string, Category[]>): string[] {
+    const result: string[] = []
+    const visit = (parentId: string) => {
+        const children = childrenMap.get(parentKey(parentId)) ?? []
+        for (const child of children) {
+            result.push(child.id)
+            visit(child.id)
+        }
+    }
+    visit(categoryId)
+    return result
+}
+
+function getEntryCountMap(stats: ProjectStats | null): Map<string, number> {
+    const map = new Map<string, number>()
+    for (const row of stats?.entriesByCategory ?? []) {
+        if (row.categoryId) map.set(row.categoryId, row.count)
+    }
+    return map
+}
+
+export default function MobileCategoryManager({push, params}: Props) {
+    const projectId = params?.projectId as string
+    const {showAlert} = useAlert()
+
+    const [categories, setCategories] = useState<Category[]>([])
+    const [stats, setStats] = useState<ProjectStats | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [busy, setBusy] = useState(false)
+    const [menuTarget, setMenuTarget] = useState<Category | null>(null)
+    const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
+    const [moveTarget, setMoveTarget] = useState<Category | null>(null)
+    const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
+
+    const reload = useCallback(async () => {
+        const [nextCategories, nextStats] = await Promise.all([
+            db_list_categories(projectId),
+            db_get_project_stats(projectId),
+        ])
+        setCategories(nextCategories)
+        setStats(nextStats)
+    }, [projectId])
+
+    useEffect(() => {
+        if (!projectId) return
+        setLoading(true)
+        reload().catch(logger.error).finally(() => setLoading(false))
+    }, [projectId, reload])
+
+    const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
+    const rows = useMemo(() => buildRows(childrenMap), [childrenMap])
+    const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories])
+    const entryCountMap = useMemo(() => getEntryCountMap(stats), [stats])
+
+    const getRecursiveEntryCount = useCallback((categoryId: string) => {
+        const ids = [categoryId, ...collectDescendantIds(categoryId, childrenMap)]
+        return ids.reduce((sum, id) => sum + (entryCountMap.get(id) ?? 0), 0)
+    }, [childrenMap, entryCountMap])
+
+    const handleOpenEntries = useCallback((category: Category) => {
+        push({type: 'entryList', params: {projectId, categoryId: category.id, displayName: category.name}})
+    }, [projectId, push])
+
+    const handleConfirmName = useCallback(async (name: string) => {
+        if (!renameTarget) return
+        setBusy(true)
+        try {
+            if (renameTarget.mode === 'create') {
+                const parentId = renameTarget.parentId
+                const siblings = categories.filter(category => (category.parent_id ?? null) === parentId)
+                const maxOrder = siblings.length > 0 ? Math.max(...siblings.map(category => category.sort_order)) : -1
+                await db_create_category({
+                    projectId,
+                    parentId,
+                    name,
+                    sortOrder: maxOrder + 1,
+                })
+            } else {
+                await db_update_category({id: renameTarget.category.id, name})
+            }
+            setRenameTarget(null)
+            await reload()
+        } catch (error) {
+            await showAlert(`保存分类失败：${String(error)}`, 'error', 'toast', 3000)
+        } finally {
+            setBusy(false)
+        }
+    }, [categories, projectId, reload, renameTarget, showAlert])
+
+    const handleMoveToParent = useCallback(async (parentId: string | null) => {
+        if (!moveTarget) return
+        if ((moveTarget.parent_id ?? null) === parentId) {
+            setMoveTarget(null)
+            return
+        }
+
+        setBusy(true)
+        try {
+            const siblings = categories.filter(category =>
+                (category.parent_id ?? null) === parentId && category.id !== moveTarget.id
+            )
+            const maxOrder = siblings.length > 0 ? Math.max(...siblings.map(category => category.sort_order)) : -1
+            await db_update_category({
+                id: moveTarget.id,
+                parentId,
+                sortOrder: maxOrder + 1,
+            })
+            setMoveTarget(null)
+            await reload()
+        } catch (error) {
+            await showAlert(`移动分类失败：${String(error)}`, 'error', 'toast', 3000)
+        } finally {
+            setBusy(false)
+        }
+    }, [categories, moveTarget, reload, showAlert])
+
+    const handleDelete = useCallback(async (mode: DeleteMode) => {
+        if (!deleteTarget) return
+        setBusy(true)
+        try {
+            let result: CategoryCascadeDeleteResult | null = null
+            if (mode === 'empty') {
+                await db_delete_category(deleteTarget.id)
+            } else if (mode === 'lift') {
+                await db_delete_category_move_to_parent(deleteTarget.id)
+            } else {
+                result = await db_cascade_delete_category(deleteTarget.id)
+            }
+            setDeleteTarget(null)
+            await reload()
+            if (result) {
+                await showAlert(
+                    `已删除 ${result.deletedCategories} 个分类、${result.deletedEntries} 个词条。`,
+                    'success',
+                    'toast',
+                    2600,
+                )
+            }
+        } catch (error) {
+            await showAlert(`删除分类失败：${String(error)}`, 'error', 'toast', 3200)
+        } finally {
+            setBusy(false)
+        }
+    }, [deleteTarget, reload, showAlert])
+
+    const moveCandidates = useMemo(() => {
+        if (!moveTarget) return rows
+        const blocked = new Set([moveTarget.id, ...collectDescendantIds(moveTarget.id, childrenMap)])
+        return rows.filter(row => !blocked.has(row.category.id))
+    }, [childrenMap, moveTarget, rows])
+
+    const deleteImpact = useMemo(() => {
+        if (!deleteTarget) return null
+        const descendantIds = collectDescendantIds(deleteTarget.id, childrenMap)
+        return {
+            childCount: (childrenMap.get(parentKey(deleteTarget.id)) ?? []).length,
+            categoryCount: descendantIds.length + 1,
+            entryCount: getRecursiveEntryCount(deleteTarget.id),
+        }
+    }, [childrenMap, deleteTarget, getRecursiveEntryCount])
+
+    const renameInitialValue = renameTarget?.mode === 'rename' ? renameTarget.category.name : ''
+    const renameTitle = renameTarget?.mode === 'rename' ? '重命名分类' : '新建分类'
+
+    if (loading) return <div className="mobile-page__loading">加载中…</div>
+
+    return (
+        <div className="mobile-page mobile-category-manager">
+            <div className="mobile-category-manager__head">
+                <h3 className="mobile-category-manager__title">分类（{categories.length}）</h3>
+                <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setRenameTarget({mode: 'create', parentId: null})}
+                >
+                    + 新建分类
+                </Button>
+            </div>
+
+            {rows.length === 0 ? (
+                <div className="mobile-page__empty mobile-category-manager__empty">
+                    还没有分类。新建后可在词条编辑时选择分类。
+                </div>
+            ) : (
+                <div className="mobile-category-manager__list">
+                    {rows.map(({category, depth}) => {
+                        const childCount = (childrenMap.get(parentKey(category.id)) ?? []).length
+                        const directEntryCount = entryCountMap.get(category.id) ?? 0
+                        return (
+                            <div
+                                key={category.id}
+                                className="mobile-category-row"
+                                style={{'--mobile-category-depth': depth} as CSSProperties}
+                            >
+                                <button
+                                    type="button"
+                                    className="mobile-category-row__main"
+                                    onClick={() => handleOpenEntries(category)}
+                                >
+                                    <span className="mobile-category-row__branch" aria-hidden="true"/>
+                                    <span className="mobile-category-row__body">
+                                        <span className="mobile-category-row__name">{category.name}</span>
+                                        <span className="mobile-category-row__meta">
+                                            {directEntryCount} 个词条{childCount > 0 ? ` · ${childCount} 个子分类` : ''}
+                                        </span>
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="mobile-category-row__menu"
+                                    aria-label={`管理分类 ${category.name}`}
+                                    onClick={() => setMenuTarget(category)}
+                                >
+                                    ⋯
+                                </button>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            <ActionMenu
+                open={!!menuTarget}
+                onClose={() => setMenuTarget(null)}
+                title={menuTarget?.name}
+                items={[
+                    {
+                        key: 'open',
+                        label: '浏览词条',
+                        onSelect: () => menuTarget && handleOpenEntries(menuTarget),
+                    },
+                    {
+                        key: 'create-child',
+                        label: '新建子分类',
+                        onSelect: () => menuTarget && setRenameTarget({mode: 'create', parentId: menuTarget.id}),
+                    },
+                    {
+                        key: 'rename',
+                        label: '重命名',
+                        onSelect: () => menuTarget && setRenameTarget({mode: 'rename', category: menuTarget}),
+                    },
+                    {
+                        key: 'move',
+                        label: '移动到…',
+                        onSelect: () => menuTarget && setMoveTarget(menuTarget),
+                    },
+                    {
+                        key: 'delete',
+                        label: '删除分类',
+                        danger: true,
+                        onSelect: () => menuTarget && setDeleteTarget(menuTarget),
+                    },
+                ]}
+            />
+
+            <RenameDialog
+                open={!!renameTarget}
+                title={renameTitle}
+                label={renameTarget?.mode === 'create' && renameTarget.parentId
+                    ? `父分类：${categoryById.get(renameTarget.parentId)?.name ?? '未知分类'}`
+                    : undefined}
+                initialValue={renameInitialValue}
+                placeholder="分类名称"
+                confirmText={renameTarget?.mode === 'create' ? '新建' : '保存'}
+                busy={busy}
+                onClose={() => setRenameTarget(null)}
+                onConfirm={(name) => void handleConfirmName(name)}
+            />
+
+            <FloatingPanel
+                open={!!moveTarget}
+                onClose={() => setMoveTarget(null)}
+                dismissible={!busy}
+                ariaLabel="移动分类"
+                className="mobile-category-dialog"
+            >
+                <div className="mobile-category-dialog__title">移动分类</div>
+                <div className="mobile-category-dialog__summary">
+                    将「{moveTarget?.name ?? ''}」移动到新的父分类。
+                </div>
+                <div className="mobile-category-parent-list">
+                    <button
+                        type="button"
+                        className={`mobile-category-parent-list__item${(moveTarget?.parent_id ?? null) === null ? ' is-current' : ''}`}
+                        disabled={busy}
+                        onClick={() => void handleMoveToParent(null)}
+                    >
+                        根级分类
+                    </button>
+                    {moveCandidates.map(row => (
+                        <button
+                            type="button"
+                            key={row.category.id}
+                            className={`mobile-category-parent-list__item${moveTarget?.parent_id === row.category.id ? ' is-current' : ''}`}
+                            style={{'--mobile-category-depth': row.depth} as CSSProperties}
+                            disabled={busy}
+                            onClick={() => void handleMoveToParent(row.category.id)}
+                        >
+                            {row.category.name}
+                        </button>
+                    ))}
+                </div>
+                <div className="mobile-category-dialog__actions">
+                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setMoveTarget(null)}>
+                        取消
+                    </Button>
+                </div>
+            </FloatingPanel>
+
+            <FloatingPanel
+                open={!!deleteTarget}
+                onClose={() => setDeleteTarget(null)}
+                dismissible={!busy}
+                ariaLabel="删除分类"
+                className="mobile-category-dialog"
+            >
+                <div className="mobile-category-dialog__title">删除分类</div>
+                <div className="mobile-category-dialog__summary">
+                    「{deleteTarget?.name ?? ''}」包含 {deleteImpact?.categoryCount ?? 0} 个分类节点、
+                    {deleteImpact?.entryCount ?? 0} 个词条。
+                </div>
+                <div className="mobile-category-delete-options">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        block
+                        disabled={busy}
+                        onClick={() => void handleDelete('empty')}
+                    >
+                        仅删除空分类
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        block
+                        disabled={busy}
+                        onClick={() => void handleDelete('lift')}
+                    >
+                        子项上移保留
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        block
+                        disabled={busy}
+                        onClick={() => void handleDelete('cascade')}
+                    >
+                        连同子分类和词条删除
+                    </Button>
+                </div>
+                {deleteImpact && deleteImpact.childCount > 0 && (
+                    <div className="mobile-category-dialog__hint">
+                        “子项上移保留”会把直接子分类和词条移动到当前分类的父级。
+                    </div>
+                )}
+                <div className="mobile-category-dialog__actions">
+                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setDeleteTarget(null)}>
+                        取消
+                    </Button>
+                </div>
+            </FloatingPanel>
+        </div>
+    )
+}

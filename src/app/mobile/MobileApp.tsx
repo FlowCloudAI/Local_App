@@ -10,6 +10,7 @@ import {exit_app, setting_is_backend_ready, showWindow, type PlatformInfo} from 
 import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
+import MobileCategoryManager from './pages/MobileCategoryManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileIdea from './pages/MobileIdea'
@@ -44,6 +45,7 @@ function getPageTitle(type: string, params?: Record<string, unknown>): string {
         case 'entryList':   return name || '词条'
         case 'entryDetail': return name || '词条'
         case 'projectDefs': return name || '类型与标签'
+        case 'categoryManager': return name || '分类管理'
         case 'aiChat': return 'AI 对话'
         case 'ideas': return '灵感便签'
         case 'settings': return '设置'
@@ -240,6 +242,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         )}
                         {pageType === 'projectDefs' && currentPage && (
                             <MobileTypeTagManager params={currentPage.params}/>
+                        )}
+                        {pageType === 'categoryManager' && currentPage && (
+                            <MobileCategoryManager {...pageProps} params={currentPage.params}/>
                         )}
                     </>
                 )}

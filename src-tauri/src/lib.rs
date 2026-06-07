@@ -422,6 +422,8 @@ pub fn run() {
             db_list_categories,
             db_update_category,
             db_delete_category,
+            db_cascade_delete_category,
+            db_delete_category_move_to_parent,
             // 词条
             db_create_entry,
             db_get_entry,

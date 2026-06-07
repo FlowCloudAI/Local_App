@@ -284,6 +284,11 @@ export interface UpdateCategoryInput {
     sortOrder?: number | null
 }
 
+export interface CategoryCascadeDeleteResult {
+    deletedEntries: number
+    deletedCategories: number
+}
+
 export interface ListEntriesParams {
     projectId: string
     categoryId?: string | null
@@ -482,6 +487,12 @@ export const db_update_category = ({id, parentId, name, sortOrder}: UpdateCatego
 
 export const db_delete_category = (id: string) =>
     command<void>('db_delete_category', {id})
+
+export const db_cascade_delete_category = (id: string) =>
+    command<CategoryCascadeDeleteResult>('db_cascade_delete_category', {id})
+
+export const db_delete_category_move_to_parent = (id: string) =>
+    command<void>('db_delete_category_move_to_parent', {id})
 
 export const db_create_entry = ({
                                     projectId,

@@ -195,6 +195,16 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 <span className="mobile-list-card__description">管理词条类型与标签定义</span>
             </button>
 
+            <button
+                type="button"
+                className="mobile-list-card"
+                onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
+                style={{marginBottom: 12}}
+            >
+                <span className="mobile-list-card__title">分类管理</span>
+                <span className="mobile-list-card__description">新建、重命名、移动或删除分类</span>
+            </button>
+
             {categories.length > 0 && (
                 <div>
                     <h3 style={{
