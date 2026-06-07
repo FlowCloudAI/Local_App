@@ -4,6 +4,7 @@ import {type CSSProperties, useCallback, useEffect, useState} from 'react'
 import {Button, Input, Select, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
+    type CustomEntryType,
     db_get_entry,
     db_delete_entry,
     db_list_all_entry_types,
@@ -15,6 +16,7 @@ import {
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {ActionMenu} from '../../../shared/ui/overlay'
+import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -55,6 +57,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const [categoryId, setCategoryId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
+    const [typeCreatorOpen, setTypeCreatorOpen] = useState(false)
 
     // wrapperElement 的 data-color-mode 只接受 "light" | "dark"，不接受 "auto"
     const colorMode: 'light' | 'dark' = theme === 'dark'
@@ -175,6 +178,15 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         }
     }, [entry, entryId, pop, showAlert])
 
+    const handleTypeCreated = useCallback(async (created: CustomEntryType) => {
+        try {
+            setEntryTypes(await db_list_all_entry_types(projectId))
+        } catch (e) {
+            logger.error('刷新词条类型失败', e)
+        }
+        setEntryType(created.id)
+    }, [projectId])
+
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
 
@@ -221,6 +233,14 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     />
                 </div>
 
+                <button
+                    type="button"
+                    className="mobile-entry-detail__add-type"
+                    onClick={() => setTypeCreatorOpen(true)}
+                >
+                    + 新建类型
+                </button>
+
                 <Input
                     placeholder="摘要（可选）"
                     value={summary}
@@ -233,6 +253,14 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     value={content}
                     onChange={e => setContent(e.target.value)}
                     className="mobile-entry-detail__content-input"
+                />
+
+                <EntryTypeCreator
+                    open={typeCreatorOpen}
+                    projectId={projectId}
+                    existingNames={entryTypes.map(et => et.name)}
+                    onClose={() => setTypeCreatorOpen(false)}
+                    onSaved={(created) => void handleTypeCreated(created)}
                 />
             </div>
         )
