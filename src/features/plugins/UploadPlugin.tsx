@@ -62,7 +62,7 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
         setApiError(null)
         try {
             await plugin_market_upload(filePath.trim(), password)
-            void showAlert('插件已上传', 'success', 'toast', 1200)
+            void showAlert('插件已上传', 'success', 'nonInvasive', 1200)
             onUploaded?.()
             onClose()
         } catch (e) {

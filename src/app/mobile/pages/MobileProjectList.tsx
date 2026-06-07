@@ -216,6 +216,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
+                onCreated={handleOpenProject}
                 existingNames={projects.map(p => p.name)}
             />
             <ProjectImportConflictDialog

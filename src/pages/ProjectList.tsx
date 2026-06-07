@@ -546,6 +546,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
+                onCreated={project => onOpenProject?.(project)}
                 existingNames={projects.map(p => p.name)}
             />
             <ProjectImportConflictDialog

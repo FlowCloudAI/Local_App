@@ -197,7 +197,7 @@ export default function TagCreator({
                     ...payload,
                 })
                 : await db_create_tag_schema(payload)
-            void showAlert(isEditMode ? '标签已更新' : '标签已创建', 'success', 'toast', 1000)
+            void showAlert(isEditMode ? '标签已更新' : '标签已创建', 'success', 'nonInvasive', 1000)
             onSaved?.(schema)
             onClose()
         } catch (e) {
@@ -217,7 +217,7 @@ export default function TagCreator({
 
         try {
             await db_delete_tag_schema(initialTag.id)
-            void showAlert('标签已删除', 'success', 'toast', 1000)
+            void showAlert('标签已删除', 'success', 'nonInvasive', 1000)
             onDeleted?.(initialTag.id)
             onClose()
         } catch (e) {

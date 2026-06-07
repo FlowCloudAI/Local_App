@@ -375,6 +375,10 @@ export default function EntryEditor({
             return {id: created.id, title: created.title}
         },
         onShowAlert: (message, type) => {
+            if (type === 'success') {
+                void showAlert(message, type, 'nonInvasive')
+                return
+            }
             void showAlert(message, type, 'toast', 1000)
         },
     })

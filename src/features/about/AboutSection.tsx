@@ -91,7 +91,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
     const handleCopyEmail = useCallback(async () => {
         try {
             await navigator.clipboard.writeText(OFFICIAL_EMAIL)
-            void showAlert('邮箱已复制', 'success', 'toast', 1600)
+            void showAlert('邮箱已复制', 'success', 'nonInvasive', 1600)
         } catch (error) {
             logger.error('复制官方邮箱失败:', error)
             void showAlert(`复制邮箱失败：${String(error)}`, 'error', 'toast', 2200)
@@ -118,7 +118,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             setFeedbackContent('')
             setFeedbackContact('')
             setFeedbackKind('suggestion')
-            void showAlert('反馈已提交，感谢你的帮助', 'success', 'toast', 2200)
+            void showAlert('反馈已提交，感谢你的帮助', 'success', 'nonInvasive', 2200)
         } catch (error) {
             logger.error('提交反馈失败:', error)
             void showAlert(String(error), 'error', 'toast', 3000)
@@ -137,7 +137,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             const update = await check({timeout: 30000})
             if (!update) {
                 setUpdateStatus('当前已是最新版本')
-                void showAlert('当前已是最新版本', 'success', 'toast', 1800)
+                void showAlert('当前已是最新版本', 'success', 'nonInvasive', 1800)
                 return
             }
             setAvailableUpdate(update)

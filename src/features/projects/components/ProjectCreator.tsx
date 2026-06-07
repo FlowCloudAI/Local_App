@@ -53,7 +53,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                 name: trimmedName,
                 description: description.trim() || null,
             })
-            void showAlert('世界观已创建', 'success', 'toast', 1000)
+            void showAlert('世界观已创建', 'success', 'nonInvasive', 1000)
             void invalidateProjectList()
             onCreated?.(project)
             onClose()

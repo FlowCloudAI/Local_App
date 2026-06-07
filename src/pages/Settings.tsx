@@ -673,7 +673,7 @@ export default function Settings({
             search_sources: {...DEFAULT_SEARCH_SOURCE_SETTINGS}
         }
         setSettings(defaultSettings)
-        void showAlert('已重置为默认设置', 'info')
+        void showAlert('已重置为默认设置', 'info', 'nonInvasive')
     }
 
     // 在系统文件管理器中打开目录

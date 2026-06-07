@@ -367,7 +367,7 @@ export default function MobileSettings({push, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:settings-updated', {
                 detail: merged,
             }))
-            await showAlert('设置已保存', 'success', 'toast', 1500)
+            await showAlert('设置已保存', 'success', 'nonInvasive', 1500)
         } catch (e) {
             await showAlert(`保存失败：${String(e)}`, 'error', 'toast', 3000)
         }
@@ -392,7 +392,7 @@ export default function MobileSettings({push, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:api-key-changed', {
                 detail: {pluginId: selectedPlugin, hasApiKey: true},
             }))
-            await showAlert('API Key 已保存', 'success', 'toast', 1500)
+            await showAlert('API Key 已保存', 'success', 'nonInvasive', 1500)
         } catch (error) {
             await showAlert(`API Key 保存失败：${String(error)}`, 'error', 'toast', 3000)
         } finally {
@@ -413,7 +413,7 @@ export default function MobileSettings({push, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:api-key-changed', {
                 detail: {pluginId: selectedPlugin, hasApiKey: false},
             }))
-            await showAlert('API Key 已删除', 'success', 'toast', 1500)
+            await showAlert('API Key 已删除', 'success', 'nonInvasive', 1500)
         } catch (error) {
             await showAlert(`API Key 删除失败：${String(error)}`, 'error', 'toast', 3000)
         } finally {
@@ -446,7 +446,7 @@ export default function MobileSettings({push, page}: Props) {
             upsertLocalPlugin(info)
             await refreshLlmPluginSelection(info.kind.includes('llm') ? info.id : undefined)
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
-            await showAlert(`${info.name} 安装成功`, 'success', 'toast', 1800)
+            await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 本地插件安装失败', error)
             await showAlert(`本地插件安装失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
@@ -463,7 +463,7 @@ export default function MobileSettings({push, page}: Props) {
             upsertLocalPlugin(info)
             await refreshLlmPluginSelection(info.kind.includes('llm') ? info.id : undefined)
             window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
-            await showAlert(`${info.name} 安装成功`, 'success', 'toast', 1800)
+            await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 插件安装失败', error)
             await showAlert(`插件安装失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
@@ -525,7 +525,7 @@ export default function MobileSettings({push, page}: Props) {
         if (!logSnapshot?.content) return
         try {
             await navigator.clipboard.writeText(logSnapshot.content)
-            await showAlert('日志内容已复制', 'success', 'toast', 1500)
+            await showAlert('日志内容已复制', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('[MobileSettings] 复制日志失败', error)
             await showAlert(`复制日志失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)

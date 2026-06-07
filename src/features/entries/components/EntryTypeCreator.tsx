@@ -96,7 +96,7 @@ export default function EntryTypeCreator({
                     projectId,
                     ...payload,
                 })
-            void showAlert(isEditMode ? '词条类型已更新' : '词条类型已创建', 'success', 'toast', 1000)
+            void showAlert(isEditMode ? '词条类型已更新' : '词条类型已创建', 'success', 'nonInvasive', 1000)
             onSaved?.(entryType)
             onClose()
         } catch (e) {
@@ -116,7 +116,7 @@ export default function EntryTypeCreator({
 
         try {
             await db_delete_entry_type(initialEntryType.id)
-            void showAlert('词条类型已删除', 'success', 'toast', 1000)
+            void showAlert('词条类型已删除', 'success', 'nonInvasive', 1000)
             onDeleted?.(initialEntryType.id)
             onClose()
         } catch (e) {
