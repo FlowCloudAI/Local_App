@@ -1,6 +1,7 @@
 import {logger} from '../../../shared/logger'
 import MarkdownPreview from '@uiw/react-markdown-preview'
-import {type CSSProperties, useCallback, useEffect, useState} from 'react'
+import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {type CSSProperties, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Input, Select, TagItem, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
@@ -11,6 +12,7 @@ import {
     db_list_categories,
     db_list_tag_schemas,
     db_update_entry,
+    import_entry_images,
     type Entry,
     type EntryTypeView,
     entryTypeKey,
@@ -24,13 +26,22 @@ import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {buildTagValueMap} from '../../../features/entries/lib/entryCommon'
+import {buildMarkdownPreviewSource} from '../../../features/entries/lib/entryMarkdown'
 import {
     areTagMapsEqual,
     getComparableTagValue,
     normalizeComparableTagValue,
 } from '../../../features/entries/lib/entryTag'
+import {
+    buildEntryImageMarkdownRef,
+    type EntryImage,
+    normalizeEntryImages,
+    toEntryImageSrc,
+} from '../../../features/entries/lib/entryImage'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload, type EntryTagRuntimeValue} from '../../../features/entries/components/entryTagUtils'
+import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
+import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -50,6 +61,41 @@ function buildTagDraft(e: Entry): TagValueMap {
     return buildTagValueMap(e)
 }
 
+function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
+    if (left.length !== right.length) return false
+    return left.every((image, index) => {
+        const target = right[index]
+        return image.path === target.path
+            && image.url === target.url
+            && image.alt === target.alt
+            && image.caption === target.caption
+            && Boolean(image.is_cover) === Boolean(target.is_cover)
+    })
+}
+
+function escapeMarkdownImageAlt(value: string): string {
+    return value.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function getImageLabel(image: EntryImage, index: number): string {
+    if (image.alt) return image.alt
+    if (image.caption) return image.caption
+    const raw = image.path ?? image.url ?? ''
+    const fileName = String(raw).split(/[\\/]/).pop()
+    return fileName || `图片 ${index + 1}`
+}
+
+function appendImages(current: EntryImage[], incoming: EntryImage[]): EntryImage[] {
+    const nextImages = [...current]
+    incoming.forEach((image, index) => {
+        nextImages.push({
+            ...image,
+            is_cover: nextImages.length === 0 && index === 0,
+        })
+    })
+    return nextImages
+}
+
 /**
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
  * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
@@ -59,6 +105,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const entryId = params?.entryId as string
     const {showAlert} = useAlert()
     const {theme} = useTheme()
+    const contentInputRef = useRef<HTMLTextAreaElement | null>(null)
 
     const [entry, setEntry] = useState<Entry | null>(null)
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
@@ -78,6 +125,10 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [tagDraft, setTagDraft] = useState<TagValueMap>({})
+    const [images, setImages] = useState<EntryImage[]>([])
+    const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
+    const [lightboxOpen, setLightboxOpen] = useState(false)
+    const [lightboxIndex, setLightboxIndex] = useState(0)
 
     const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
         setTagDraft(nextTags)
@@ -104,6 +155,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         setEntryType(e.type ?? null)
         setCategoryId(e.category_id ?? null)
         setTagDraft(buildTagDraft(e))
+        setImages(normalizeEntryImages(e.images))
     }, [])
 
     const isDirty = mode === 'edit' && !!entry && (
@@ -113,6 +165,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         || entryType !== (entry.type ?? null)
         || categoryId !== (entry.category_id ?? null)
         || !areTagMapsEqual(tagDraft, buildTagValueMap(entry), tagSchemas)
+        || !areImagesEqual(images, normalizeEntryImages(entry.images))
     )
 
     useEffect(() => {
@@ -185,6 +238,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                 type: entryType,
                 categoryId: categoryId || null,
                 tags,
+                images,
             })
             setEntry(prev => prev ? {
                 ...prev,
@@ -194,6 +248,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                 type: entryType,
                 category_id: categoryId || null,
                 tags,
+                images,
             } : prev)
             setAiFocus({projectId, entryId})
             // 同步页面标题（顶部标题取自 params.displayName）。
@@ -204,7 +259,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         } finally {
             setSaving(false)
         }
-    }, [title, content, summary, entryType, categoryId, tagDraft, entryTags.localTagSchemas, entry, entryId, projectId, params, replace, setAiFocus, showAlert])
+    }, [title, content, summary, entryType, categoryId, tagDraft, entryTags.localTagSchemas, entry, entryId, images, projectId, params, replace, setAiFocus, showAlert])
 
     const handleDelete = useCallback(async () => {
         const result = await showAlert(`确定删除词条「${entry?.title ?? ''}」？此操作不可撤销。`, 'warning', 'confirm')
@@ -231,6 +286,84 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         setTagSchemas(nextSchemas)
         setTagCreatorOpen(false)
     }, [entryTags])
+
+    const lightboxImages = useMemo(() => images.map((image) => ({
+        ...image,
+        src: toEntryImageSrc(image),
+    })), [images])
+
+    const handleUploadImages = useCallback(async (): Promise<EntryImage[]> => {
+        try {
+            const selected = await openFileDialog({
+                multiple: true,
+                filters: [{
+                    name: 'Images',
+                    extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
+                }],
+            })
+            const paths = Array.isArray(selected) ? selected : selected ? [selected] : []
+            if (!paths.length) return []
+            const imported = await import_entry_images(projectId, paths)
+            const nextImportedImages: EntryImage[] = imported.map((image, index) => ({
+                ...image,
+                alt: image.alt || (image.path?.split(/[\\/]/).pop() ?? `图片 ${index + 1}`),
+                is_cover: false,
+            }))
+            setImages(current => appendImages(current, nextImportedImages))
+            return nextImportedImages
+        } catch (error) {
+            await showAlert(`导入图片失败：${String(error)}`, 'error', 'toast', 3000)
+            return []
+        }
+    }, [projectId, showAlert])
+
+    const handleAddAiImages = useCallback((aiImages: EntryImage[]) => {
+        setImages(current => appendImages(current, aiImages))
+    }, [])
+
+    const handleSetCover = useCallback((targetIndex: number) => {
+        setImages(current => current.map((image, index) => ({
+            ...image,
+            is_cover: index === targetIndex,
+        })))
+    }, [])
+
+    const handleRemoveImage = useCallback((targetIndex: number) => {
+        setImages(current => {
+            const nextImages = current.filter((_, index) => index !== targetIndex)
+            if (nextImages.length > 0 && !nextImages.some(image => image.is_cover)) {
+                nextImages[0] = {...nextImages[0], is_cover: true}
+            }
+            return nextImages
+        })
+        setLightboxIndex(current => Math.min(current, Math.max(0, images.length - 2)))
+    }, [images.length])
+
+    const handleInsertImageMarkdown = useCallback((targetIndex: number) => {
+        const image = images[targetIndex]
+        const imageRef = buildEntryImageMarkdownRef(image)
+        if (!image || !imageRef) {
+            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'toast', 1800)
+            return
+        }
+        const textarea = contentInputRef.current
+        const fallbackAlt = getImageLabel(image, targetIndex) || title || entry?.title || `图片 ${targetIndex + 1}`
+        const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
+        const start = textarea?.selectionStart ?? content.length
+        const end = textarea?.selectionEnd ?? start
+        const prefix = content.slice(0, start)
+        const suffix = content.slice(end)
+        const before = prefix && !prefix.endsWith('\n') ? '\n\n' : ''
+        const after = suffix && !suffix.startsWith('\n') ? '\n\n' : ''
+        const nextContent = `${prefix}${before}${markdown}${after}${suffix}`
+        const nextCursor = prefix.length + before.length + markdown.length
+        setContent(nextContent)
+        setLightboxOpen(false)
+        window.requestAnimationFrame(() => {
+            contentInputRef.current?.focus()
+            contentInputRef.current?.setSelectionRange(nextCursor, nextCursor)
+        })
+    }, [content, entry?.title, images, showAlert, title])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
@@ -294,7 +427,46 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     className="mobile-entry-detail__summary-input"
                 />
 
+                <div className="mobile-entry-detail__images">
+                    <div className="mobile-entry-detail__images-header">
+                        <div className="mobile-entry-detail__images-label">图片</div>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setImageAddModalOpen(true)}>
+                            + 添加图片
+                        </Button>
+                    </div>
+                    {images.length > 0 ? (
+                        <div className="mobile-entry-detail__image-grid">
+                            {images.map((image, index) => {
+                                const src = toEntryImageSrc(image)
+                                return (
+                                    <button
+                                        type="button"
+                                        className="mobile-entry-detail__image-thumb"
+                                        key={`${image.path ?? image.url ?? index}-${index}`}
+                                        onClick={() => {
+                                            setLightboxIndex(index)
+                                            setLightboxOpen(true)
+                                        }}
+                                    >
+                                        {src ? (
+                                            <img src={src} alt={getImageLabel(image, index)}/>
+                                        ) : (
+                                            <span>无预览</span>
+                                        )}
+                                        {image.is_cover && <span className="mobile-entry-detail__image-badge">主图</span>}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    ) : (
+                        <div className="mobile-page__empty mobile-entry-detail__images-empty">
+                            还没有图片
+                        </div>
+                    )}
+                </div>
+
                 <textarea
+                    ref={contentInputRef}
                     placeholder="正文内容…"
                     value={content}
                     onChange={e => setContent(e.target.value)}
@@ -362,6 +534,36 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     onClose={() => setTagCreatorOpen(false)}
                     onSaved={handleTagSchemaSaved}
                 />
+                <EntryImageLightbox
+                    open={lightboxOpen}
+                    images={lightboxImages}
+                    currentIndex={lightboxIndex}
+                    infoTitle={title || entry.title || '未命名词条'}
+                    onClose={() => setLightboxOpen(false)}
+                    onIndexChange={setLightboxIndex}
+                    onSetCover={handleSetCover}
+                    onRemove={handleRemoveImage}
+                    onAddImage={() => {
+                        setLightboxOpen(false)
+                        setImageAddModalOpen(true)
+                    }}
+                    onInsertMarkdown={handleInsertImageMarkdown}
+                />
+                <EntryImageAddModal
+                    open={imageAddModalOpen}
+                    projectId={projectId}
+                    entryTitle={title || entry.title || null}
+                    entrySummary={summary || entry.summary || null}
+                    entryType={entryType || entry.type || null}
+                    existingImages={images}
+                    onClose={() => setImageAddModalOpen(false)}
+                    onUploadLocal={handleUploadImages}
+                    onAddAiImages={handleAddAiImages}
+                    onInsertImage={(image) => {
+                        const nextIndex = images.findIndex(item => item.path === image.path && item.url === image.url)
+                        handleInsertImageMarkdown(nextIndex >= 0 ? nextIndex : images.length)
+                    }}
+                />
             </div>
         )
     }
@@ -377,6 +579,8 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
 
     const viewTagMap = tagDraft
     const viewTagSchemas = entryTags.browseVisibleTagSchemas
+    const viewImages = normalizeEntryImages(entry.images)
+    const viewMarkdownSource = buildMarkdownPreviewSource(entry.content ?? '', viewImages)
 
     return (
         <div className="mobile-page mobile-entry-detail">
@@ -411,10 +615,30 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                 </p>
             )}
 
+            {viewImages.length > 0 && (
+                <div className="mobile-entry-detail__images mobile-entry-detail__images--view">
+                    <div className="mobile-entry-detail__image-grid">
+                        {viewImages.map((image, index) => {
+                            const src = toEntryImageSrc(image)
+                            return (
+                                <div className="mobile-entry-detail__image-thumb mobile-entry-detail__image-thumb--static" key={`${image.path ?? image.url ?? index}-${index}`}>
+                                    {src ? (
+                                        <img src={src} alt={getImageLabel(image, index)}/>
+                                    ) : (
+                                        <span>无预览</span>
+                                    )}
+                                    {image.is_cover && <span className="mobile-entry-detail__image-badge">主图</span>}
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             {entry.content ? (
                 <div className="mobile-entry-detail__markdown" data-color-mode={colorMode}>
                     <MarkdownPreview
-                        source={entry.content}
+                        source={viewMarkdownSource}
                         className="mobile-entry-detail__markdown-preview"
                         wrapperElement={{'data-color-mode': colorMode}}
                     />
