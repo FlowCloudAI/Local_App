@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import MarkdownPreview from '@uiw/react-markdown-preview'
 import {type CSSProperties, useCallback, useEffect, useState} from 'react'
-import {Button, Input, Select, useAlert, useTheme} from 'flowcloudai-ui'
+import {Button, Input, Select, TagItem, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -9,10 +9,13 @@ import {
     db_delete_entry,
     db_list_all_entry_types,
     db_list_categories,
+    db_list_tag_schemas,
     db_update_entry,
     type Entry,
+    type EntryTag,
     type EntryTypeView,
     entryTypeKey,
+    type TagSchema,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {ActionMenu} from '../../../shared/ui/overlay'
@@ -20,6 +23,14 @@ import EntryTypeCreator from '../../../features/entries/components/EntryTypeCrea
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import {buildTagValueMap} from '../../../features/entries/lib/entryCommon'
+import {
+    areTagMapsEqual,
+    getComparableTagValue,
+    isSchemaImplantedForType,
+    normalizeComparableTagValue,
+    normalizeTagTargets,
+} from '../../../features/entries/lib/entryTag'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -32,6 +43,18 @@ interface Props {
 }
 
 type Mode = 'view' | 'edit'
+type TagValueMap = Record<string, string | number | boolean | null>
+
+/** 把词条已有标签（EntryTag[]）按 schema.id 摊平成可编辑的值表。 */
+function buildTagDraft(e: Entry, schemas: TagSchema[]): TagValueMap {
+    const map = buildTagValueMap(e)
+    return Object.fromEntries(schemas.map(s => [s.id, getComparableTagValue(map, s)]))
+}
+
+/** 该 schema 是否适用于此词条类型：target 为空（通用）或包含该类型。 */
+function isTagSchemaApplicable(s: TagSchema, entryType: string | null | undefined): boolean {
+    return normalizeTagTargets(s.target).length === 0 || isSchemaImplantedForType(s, entryType ?? null)
+}
 
 /**
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
@@ -58,6 +81,8 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const [saving, setSaving] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
     const [typeCreatorOpen, setTypeCreatorOpen] = useState(false)
+    const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
+    const [tagDraft, setTagDraft] = useState<TagValueMap>({})
 
     // wrapperElement 的 data-color-mode 只接受 "light" | "dark"，不接受 "auto"
     const colorMode: 'light' | 'dark' = theme === 'dark'
@@ -66,12 +91,13 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             ? 'light'
             : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 
-    const syncForm = useCallback((e: Entry) => {
+    const syncForm = useCallback((e: Entry, schemas: TagSchema[]) => {
         setTitle(e.title)
         setContent(e.content ?? '')
         setSummary(e.summary ?? '')
         setEntryType(e.type ?? null)
         setCategoryId(e.category_id ?? null)
+        setTagDraft(buildTagDraft(e, schemas))
     }, [])
 
     const isDirty = mode === 'edit' && !!entry && (
@@ -80,6 +106,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         || summary !== (entry.summary ?? '')
         || entryType !== (entry.type ?? null)
         || categoryId !== (entry.category_id ?? null)
+        || !areTagMapsEqual(tagDraft, buildTagValueMap(entry), tagSchemas)
     )
 
     useEffect(() => {
@@ -89,18 +116,20 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             db_get_entry(entryId),
             db_list_all_entry_types(projectId),
             db_list_categories(projectId),
-        ]).then(([e, types, cats]) => {
+            db_list_tag_schemas(projectId),
+        ]).then(([e, types, cats, schemas]) => {
             setEntry(e)
             setEntryTypes(types)
             setCategories(cats)
-            syncForm(e)
+            setTagSchemas(schemas)
+            syncForm(e, schemas)
         }).catch(logger.error).finally(() => setLoading(false))
     }, [entryId, projectId, syncForm])
 
     const enterEdit = useCallback(() => {
-        if (entry) syncForm(entry)
+        if (entry) syncForm(entry, tagSchemas)
         setMode('edit')
-    }, [entry, syncForm])
+    }, [entry, syncForm, tagSchemas])
 
     const confirmDiscard = useCallback(async () => {
         if (!isDirty) return true
@@ -121,12 +150,12 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const handleCancel = useCallback(async () => {
         if (!await confirmDiscard()) return
         if (entry) {
-            syncForm(entry)
+            syncForm(entry, tagSchemas)
             setMode('view')
         } else {
             pop()
         }
-    }, [confirmDiscard, entry, pop, syncForm])
+    }, [confirmDiscard, entry, pop, syncForm, tagSchemas])
 
     const handleAiDiscuss = useCallback(() => {
         setAiFocus({projectId, entryId})
@@ -139,6 +168,12 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             return
         }
         setSaving(true)
+        const tags: EntryTag[] = tagSchemas
+            .map<EntryTag | null>(s => {
+                const v = tagDraft[s.id]
+                return v == null || v === '' ? null : {schema_id: s.id, name: s.name, value: v}
+            })
+            .filter((t): t is EntryTag => t !== null)
         try {
             await db_update_entry({
                 id: entryId,
@@ -147,6 +182,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                 summary: summary.trim() || null,
                 type: entryType,
                 categoryId: categoryId || null,
+                tags,
             })
             setEntry(prev => prev ? {
                 ...prev,
@@ -155,6 +191,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                 summary: summary.trim() || null,
                 type: entryType,
                 category_id: categoryId || null,
+                tags,
             } : prev)
             setAiFocus({projectId, entryId})
             // 同步页面标题（顶部标题取自 params.displayName）。
@@ -165,7 +202,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         } finally {
             setSaving(false)
         }
-    }, [title, content, summary, entryType, categoryId, entryId, projectId, params, replace, setAiFocus, showAlert])
+    }, [title, content, summary, entryType, categoryId, tagSchemas, tagDraft, entryId, projectId, params, replace, setAiFocus, showAlert])
 
     const handleDelete = useCallback(async () => {
         const result = await showAlert(`确定删除词条「${entry?.title ?? ''}」？此操作不可撤销。`, 'warning', 'confirm')
@@ -200,6 +237,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             {value: '', label: '无类型'},
             ...entryTypes.map(et => ({value: entryTypeKey(et), label: et.name})),
         ]
+        const editTagSchemas = tagSchemas.filter(s => isTagSchemaApplicable(s, entryType))
         return (
             <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
                 <div className="mobile-entry-detail__actions">
@@ -255,6 +293,23 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     className="mobile-entry-detail__content-input"
                 />
 
+                {editTagSchemas.length > 0 && (
+                    <div className="mobile-entry-detail__tags">
+                        <div className="mobile-entry-detail__tags-label">标签</div>
+                        <div className="mobile-entry-detail__tags-list">
+                            {editTagSchemas.map(s => (
+                                <TagItem
+                                    key={s.id}
+                                    schema={{id: s.id, name: s.name, type: s.type as 'number' | 'string' | 'boolean', range_min: s.range_min ?? null, range_max: s.range_max ?? null}}
+                                    value={tagDraft[s.id] ?? undefined}
+                                    mode="edit"
+                                    onChange={(v) => setTagDraft(prev => ({...prev, [s.id]: normalizeComparableTagValue(v)}))}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <EntryTypeCreator
                     open={typeCreatorOpen}
                     projectId={projectId}
@@ -275,6 +330,11 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         } as CSSProperties
         : undefined
 
+    const viewTagMap = buildTagValueMap(entry)
+    const viewTagSchemas = tagSchemas.filter(s =>
+        isTagSchemaApplicable(s, entry.type) && getComparableTagValue(viewTagMap, s) !== null
+    )
+
     return (
         <div className="mobile-page mobile-entry-detail">
             <h1 className="mobile-entry-detail__title">
@@ -286,6 +346,19 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     <span className="mobile-entry-detail__type-badge" style={typeBadgeStyle}>
                         <EntryTypeIcon entryType={et} className=""/> {et.name}
                     </span>
+                </div>
+            )}
+
+            {viewTagSchemas.length > 0 && (
+                <div className="mobile-entry-detail__tags mobile-entry-detail__tags--view">
+                    {viewTagSchemas.map(s => (
+                        <TagItem
+                            key={s.id}
+                            schema={{id: s.id, name: s.name, type: s.type as 'number' | 'string' | 'boolean', range_min: s.range_min ?? null, range_max: s.range_max ?? null}}
+                            value={getComparableTagValue(viewTagMap, s) ?? undefined}
+                            mode="show"
+                        />
+                    ))}
                 </div>
             )}
 

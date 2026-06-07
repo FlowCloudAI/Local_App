@@ -46,6 +46,28 @@
     cursor: pointer;
 }
 
+.mobile-entry-detail__tags {
+    margin-bottom: var(--fc-space-md);
+}
+
+.mobile-entry-detail__tags--view {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-xs);
+}
+
+.mobile-entry-detail__tags-label {
+    font-size: var(--fc-font-size-sm);
+    color: var(--fc-color-text-secondary);
+    margin-bottom: var(--fc-space-xs);
+}
+
+.mobile-entry-detail__tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-sm);
+}
+
 .mobile-entry-detail__content-input {
     flex: 1 1 15rem;
     min-height: 12.5rem;
