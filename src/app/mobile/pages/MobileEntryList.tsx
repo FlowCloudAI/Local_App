@@ -199,12 +199,12 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                                             </span>
                                         )}
                                     </span>
+                                    {et && (
+                                        <span className="mobile-entry-card__tag">
+                                            <EntryTypeIcon entryType={et} className="mobile-entry-card__tag-icon"/> {et.name}
+                                        </span>
+                                    )}
                                     <span className="mobile-entry-card__content">
-                                        {et && (
-                                            <span className="mobile-entry-card__tag">
-                                                <EntryTypeIcon entryType={et} className=""/> {et.name}
-                                            </span>
-                                        )}
                                         <span className="mobile-entry-card__title">{entry.title}</span>
                                         <span className="mobile-entry-card__description">
                                             {entry.summary || '这个词条还没有摘要。'}

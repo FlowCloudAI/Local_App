@@ -156,17 +156,35 @@
 }
 
 .mobile-entry-card__tag {
-    align-self: flex-start;
+    position: absolute;
+    top: var(--fc-space-sm);
+    left: var(--fc-space-sm);
+    z-index: 2;
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
-    max-width: 100%;
-    padding: 0.12rem 0.4rem;
+    gap: 0.25rem;
+    max-width: calc(100% - (var(--fc-space-sm) * 2));
+    padding: 0.1rem 0.45rem;
     border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--mobile-entry-card-color) 34%, color-mix(in srgb, var(--fc-gray-1000) 42%, transparent));
-    color: var(--fc-color-text-on-primary);
+    border: 1px solid color-mix(in srgb, var(--mobile-entry-card-color) 58%, color-mix(in srgb, var(--fc-color-text-on-primary) 32%, transparent));
+    background: color-mix(in srgb, var(--fc-color-bg-overlay) 60%, var(--fc-gray-1000));
+    color: color-mix(in srgb, var(--fc-color-text-on-primary) 94%, transparent);
     font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
     line-height: 1.25;
+    box-shadow: var(--fc-shadow-md);
+    backdrop-filter: blur(4px);
+}
+
+.mobile-entry-card__tag-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.05em;
+    height: 1.05em;
+    flex-shrink: 0;
+    line-height: 1;
+    color: color-mix(in srgb, var(--mobile-entry-card-color) 82%, #fff 18%);
 }
 
 .mobile-entry-card__title,
