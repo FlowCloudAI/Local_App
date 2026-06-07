@@ -12,7 +12,6 @@ import {
     db_list_tag_schemas,
     db_update_entry,
     type Entry,
-    type EntryTag,
     type EntryTypeView,
     entryTypeKey,
     type TagSchema,
@@ -20,6 +19,7 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {ActionMenu} from '../../../shared/ui/overlay'
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
+import TagCreator from '../../../features/entries/components/TagCreator'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -27,10 +27,10 @@ import {buildTagValueMap} from '../../../features/entries/lib/entryCommon'
 import {
     areTagMapsEqual,
     getComparableTagValue,
-    isSchemaImplantedForType,
     normalizeComparableTagValue,
-    normalizeTagTargets,
 } from '../../../features/entries/lib/entryTag'
+import useEntryTags from '../../../features/entries/hooks/useEntryTags'
+import {buildEntryTagsPayload, type EntryTagRuntimeValue} from '../../../features/entries/components/entryTagUtils'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -43,17 +43,11 @@ interface Props {
 }
 
 type Mode = 'view' | 'edit'
-type TagValueMap = Record<string, string | number | boolean | null>
+type TagValueMap = Record<string, EntryTagRuntimeValue>
 
-/** 把词条已有标签（EntryTag[]）按 schema.id 摊平成可编辑的值表。 */
-function buildTagDraft(e: Entry, schemas: TagSchema[]): TagValueMap {
-    const map = buildTagValueMap(e)
-    return Object.fromEntries(schemas.map(s => [s.id, getComparableTagValue(map, s)]))
-}
-
-/** 该 schema 是否适用于此词条类型：target 为空（通用）或包含该类型。 */
-function isTagSchemaApplicable(s: TagSchema, entryType: string | null | undefined): boolean {
-    return normalizeTagTargets(s.target).length === 0 || isSchemaImplantedForType(s, entryType ?? null)
+/** 保留 schema 标签和桌面端使用的额外标签（如角色语音配置），避免移动端保存时丢字段。 */
+function buildTagDraft(e: Entry): TagValueMap {
+    return buildTagValueMap(e)
 }
 
 /**
@@ -81,8 +75,20 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const [saving, setSaving] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
     const [typeCreatorOpen, setTypeCreatorOpen] = useState(false)
+    const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [tagDraft, setTagDraft] = useState<TagValueMap>({})
+
+    const handleTagDraftChange = useCallback((nextTags: TagValueMap) => {
+        setTagDraft(nextTags)
+    }, [])
+    const entryTags = useEntryTags({
+        tagSchemas,
+        draftTags: tagDraft,
+        draftType: entryType,
+        entryId,
+        onTagsChange: handleTagDraftChange,
+    })
 
     // wrapperElement 的 data-color-mode 只接受 "light" | "dark"，不接受 "auto"
     const colorMode: 'light' | 'dark' = theme === 'dark'
@@ -91,13 +97,13 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             ? 'light'
             : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 
-    const syncForm = useCallback((e: Entry, schemas: TagSchema[]) => {
+    const syncForm = useCallback((e: Entry) => {
         setTitle(e.title)
         setContent(e.content ?? '')
         setSummary(e.summary ?? '')
         setEntryType(e.type ?? null)
         setCategoryId(e.category_id ?? null)
-        setTagDraft(buildTagDraft(e, schemas))
+        setTagDraft(buildTagDraft(e))
     }, [])
 
     const isDirty = mode === 'edit' && !!entry && (
@@ -122,14 +128,14 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             setEntryTypes(types)
             setCategories(cats)
             setTagSchemas(schemas)
-            syncForm(e, schemas)
+            syncForm(e)
         }).catch(logger.error).finally(() => setLoading(false))
     }, [entryId, projectId, syncForm])
 
     const enterEdit = useCallback(() => {
-        if (entry) syncForm(entry, tagSchemas)
+        if (entry) syncForm(entry)
         setMode('edit')
-    }, [entry, syncForm, tagSchemas])
+    }, [entry, syncForm])
 
     const confirmDiscard = useCallback(async () => {
         if (!isDirty) return true
@@ -150,12 +156,12 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
     const handleCancel = useCallback(async () => {
         if (!await confirmDiscard()) return
         if (entry) {
-            syncForm(entry, tagSchemas)
+            syncForm(entry)
             setMode('view')
         } else {
             pop()
         }
-    }, [confirmDiscard, entry, pop, syncForm, tagSchemas])
+    }, [confirmDiscard, entry, pop, syncForm])
 
     const handleAiDiscuss = useCallback(() => {
         setAiFocus({projectId, entryId})
@@ -167,13 +173,9 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             await showAlert('请输入词条标题', 'warning', 'toast', 2000)
             return
         }
+        if (!entry) return
         setSaving(true)
-        const tags: EntryTag[] = tagSchemas
-            .map<EntryTag | null>(s => {
-                const v = tagDraft[s.id]
-                return v == null || v === '' ? null : {schema_id: s.id, name: s.name, value: v}
-            })
-            .filter((t): t is EntryTag => t !== null)
+        const tags = buildEntryTagsPayload(tagDraft, entryTags.localTagSchemas, entry.tags)
         try {
             await db_update_entry({
                 id: entryId,
@@ -202,7 +204,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         } finally {
             setSaving(false)
         }
-    }, [title, content, summary, entryType, categoryId, tagSchemas, tagDraft, entryId, projectId, params, replace, setAiFocus, showAlert])
+    }, [title, content, summary, entryType, categoryId, tagDraft, entryTags.localTagSchemas, entry, entryId, projectId, params, replace, setAiFocus, showAlert])
 
     const handleDelete = useCallback(async () => {
         const result = await showAlert(`确定删除词条「${entry?.title ?? ''}」？此操作不可撤销。`, 'warning', 'confirm')
@@ -224,6 +226,12 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         setEntryType(created.id)
     }, [projectId])
 
+    const handleTagSchemaSaved = useCallback((schema: TagSchema) => {
+        const nextSchemas = entryTags.handleTagSchemaSaved(schema)
+        setTagSchemas(nextSchemas)
+        setTagCreatorOpen(false)
+    }, [entryTags])
+
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
 
@@ -237,7 +245,7 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
             {value: '', label: '无类型'},
             ...entryTypes.map(et => ({value: entryTypeKey(et), label: et.name})),
         ]
-        const editTagSchemas = tagSchemas.filter(s => isTagSchemaApplicable(s, entryType))
+        const editTagSchemas = entryTags.visibleTagSchemas
         return (
             <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
                 <div className="mobile-entry-detail__actions">
@@ -293,22 +301,50 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     className="mobile-entry-detail__content-input"
                 />
 
-                {editTagSchemas.length > 0 && (
-                    <div className="mobile-entry-detail__tags">
+                <div className="mobile-entry-detail__tags">
+                    <div className="mobile-entry-detail__tags-header">
                         <div className="mobile-entry-detail__tags-label">标签</div>
+                        <div className="mobile-entry-detail__tags-actions">
+                            {entryTags.availableTagSchemaOptions.length > 0 && (
+                                <Select
+                                    value={entryTags.tagSchemaPickerValue}
+                                    onChange={(value) => {
+                                        if (typeof value !== 'string') return
+                                        entryTags.handleAddVisibleTagSchema(value)
+                                    }}
+                                    options={entryTags.availableTagSchemaOptions}
+                                    placeholder="添加已有标签"
+                                    searchable
+                                    className="mobile-entry-detail__tag-select"
+                                />
+                            )}
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setTagCreatorOpen(true)}>
+                                + 新建标签
+                            </Button>
+                        </div>
+                    </div>
+                    {entryTags.localTagSchemas.length === 0 ? (
+                        <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前项目还没有标签定义</div>
+                    ) : editTagSchemas.length > 0 ? (
                         <div className="mobile-entry-detail__tags-list">
                             {editTagSchemas.map(s => (
                                 <TagItem
                                     key={s.id}
                                     schema={{id: s.id, name: s.name, type: s.type as 'number' | 'string' | 'boolean', range_min: s.range_min ?? null, range_max: s.range_max ?? null}}
-                                    value={tagDraft[s.id] ?? undefined}
+                                    value={tagDraft[s.id] ?? tagDraft[s.name] ?? undefined}
                                     mode="edit"
-                                    onChange={(v) => setTagDraft(prev => ({...prev, [s.id]: normalizeComparableTagValue(v)}))}
+                                    onChange={(v) => setTagDraft(prev => {
+                                        const nextValue = normalizeComparableTagValue(v)
+                                        if (getComparableTagValue(prev, s) === nextValue) return prev
+                                        return {...prev, [s.id]: nextValue}
+                                    })}
                                 />
                             ))}
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前词条还没有已添加标签</div>
+                    )}
+                </div>
 
                 <EntryTypeCreator
                     open={typeCreatorOpen}
@@ -316,6 +352,15 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
                     existingNames={entryTypes.map(et => et.name)}
                     onClose={() => setTypeCreatorOpen(false)}
                     onSaved={(created) => void handleTypeCreated(created)}
+                />
+                <TagCreator
+                    open={tagCreatorOpen}
+                    projectId={projectId}
+                    entryTypes={entryTypes}
+                    existingNames={entryTags.localTagSchemas.map(s => s.name)}
+                    existingCount={entryTags.localTagSchemas.length}
+                    onClose={() => setTagCreatorOpen(false)}
+                    onSaved={handleTagSchemaSaved}
                 />
             </div>
         )
@@ -330,10 +375,8 @@ export default function MobileEntryDetail({pop, replace, navigateToTab, setBefor
         } as CSSProperties
         : undefined
 
-    const viewTagMap = buildTagValueMap(entry)
-    const viewTagSchemas = tagSchemas.filter(s =>
-        isTagSchemaApplicable(s, entry.type) && getComparableTagValue(viewTagMap, s) !== null
-    )
+    const viewTagMap = tagDraft
+    const viewTagSchemas = entryTags.browseVisibleTagSchemas
 
     return (
         <div className="mobile-page mobile-entry-detail">

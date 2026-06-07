@@ -120,7 +120,9 @@ export default function MobileTypeTagManager({params}: Props) {
                 open={typeCreatorOpen}
                 projectId={projectId}
                 initialEntryType={editingType}
-                existingNames={customTypes.filter(t => t.id !== editingType?.id).map(t => t.name)}
+                existingNames={allEntryTypes
+                    .filter(t => !(t.kind === 'custom' && t.id === editingType?.id))
+                    .map(t => t.name)}
                 onClose={() => { setTypeCreatorOpen(false); setEditingType(null) }}
                 onSaved={() => { setTypeCreatorOpen(false); setEditingType(null); void reloadTypes() }}
                 onDeleted={() => { setTypeCreatorOpen(false); setEditingType(null); void reloadTypes() }}
