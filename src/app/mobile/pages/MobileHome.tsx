@@ -729,7 +729,7 @@ export default function MobileHome({push, navigateToTab, setAiFocus, activePanel
                                 aria-label="筛选与排序"
                                 onClick={() => setFilterOpen(true)}
                             >
-                                筛选
+                                …
                             </button>
                         </div>
                     </div>

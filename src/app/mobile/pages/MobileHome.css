@@ -270,34 +270,52 @@
 }
 
 .mobile-home-worlds__actions {
+    position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
     flex: 0 0 auto;
-}
-
-.mobile-home-worlds__icon-btn {
-    width: 3rem;
-    height: 3rem;
-    background: var(--fc-color-primary);
-    color: var(--fc-color-text-on-primary);
-    font-size: 2rem;
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1;
-    box-shadow: 0 0.55rem 1.1rem color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
-}
-
-.mobile-home-worlds__filter {
-    min-height: 3rem;
-    padding: 0 0.9rem;
+    gap: 0;
+    padding: 0.18rem;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-bg-elevated);
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--fc-font-weight-semibold);
     box-shadow:
         0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
         inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+}
+
+.mobile-home-worlds__actions::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1px;
+    height: 1.35rem;
+    background: color-mix(in srgb, var(--fc-color-border) 72%, transparent);
+    transform: translate(-50%, -50%);
+}
+
+.mobile-home-worlds__icon-btn,
+.mobile-home-worlds__filter {
+    position: relative;
+    z-index: 1;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    background: transparent;
+    color: var(--fc-color-primary);
+    line-height: 1;
+    box-shadow: none;
+}
+
+.mobile-home-worlds__icon-btn {
+    font-size: 1.75rem;
+    font-weight: var(--fc-font-weight-medium);
+}
+
+.mobile-home-worlds__filter {
+    font-size: 1.45rem;
+    font-weight: 720;
 }
 
 .mobile-home-worlds__grid {
