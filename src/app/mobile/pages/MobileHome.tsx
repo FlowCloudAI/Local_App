@@ -1,4 +1,5 @@
 import {
+    type CSSProperties,
     type TouchEvent as ReactTouchEvent,
     useCallback,
     useEffect,
@@ -172,7 +173,9 @@ export default function MobileHome({
         refresh: refreshProjects,
     } = useProjectListStore()
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
+    const homeRef = useRef<HTMLDivElement | null>(null)
     const worldPanelRef = useRef<HTMLElement | null>(null)
+    const worldActionsRef = useRef<HTMLDivElement | null>(null)
     const touchStartYRef = useRef<number | null>(null)
     const touchWorldScrollTopRef = useRef(0)
 
@@ -186,9 +189,41 @@ export default function MobileHome({
     const [displayMode, setDisplayMode] = useState<WorldDisplayMode>('card')
     const [sortMode, setSortMode] = useState<WorldSortMode>('updated-desc')
     const [filterOpen, setFilterOpen] = useState(false)
+    const [filterAnchor, setFilterAnchor] = useState<{top: number; right: number} | null>(null)
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importing, setImporting] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
+
+    const updateFilterAnchor = useCallback(() => {
+        const homeElement = homeRef.current
+        const actionsElement = worldActionsRef.current
+        if (!homeElement || !actionsElement) return
+        const homeRect = homeElement.getBoundingClientRect()
+        const actionsRect = actionsElement.getBoundingClientRect()
+        setFilterAnchor({
+            top: Math.max(0, actionsRect.top - homeRect.top),
+            right: Math.max(0, homeRect.right - actionsRect.right),
+        })
+    }, [])
+
+    const toggleFilterMenu = useCallback(() => {
+        setFilterOpen(open => {
+            if (!open) updateFilterAnchor()
+            return !open
+        })
+    }, [updateFilterAnchor])
+
+    useEffect(() => {
+        if (!filterOpen) return undefined
+        updateFilterAnchor()
+        const viewport = window.visualViewport
+        window.addEventListener('resize', updateFilterAnchor)
+        viewport?.addEventListener('resize', updateFilterAnchor)
+        return () => {
+            window.removeEventListener('resize', updateFilterAnchor)
+            viewport?.removeEventListener('resize', updateFilterAnchor)
+        }
+    }, [filterOpen, updateFilterAnchor])
 
     useEffect(() => {
         if (!filterOpen) return undefined
@@ -641,6 +676,7 @@ export default function MobileHome({
 
     return (
         <div
+            ref={homeRef}
             className={`mobile-page mobile-home mobile-home--${activePanel}`}
             onTouchStart={handlePagerTouchStart}
             onTouchEnd={handlePagerTouchEnd}
@@ -743,7 +779,7 @@ export default function MobileHome({
                             </span>
                             <h2 className="mobile-home-worlds__title">世界观</h2>
                         </div>
-                        <div className="mobile-home-worlds__actions">
+                        <div ref={worldActionsRef} className="mobile-home-worlds__actions">
                             <button
                                 type="button"
                                 className="mobile-home-worlds__icon-btn"
@@ -758,7 +794,7 @@ export default function MobileHome({
                                 aria-label="筛选与排序"
                                 aria-haspopup="menu"
                                 aria-expanded={filterOpen}
-                                onClick={() => setFilterOpen(open => !open)}
+                                onClick={toggleFilterMenu}
                             >
                                 …
                             </button>
@@ -806,6 +842,10 @@ export default function MobileHome({
                         className="mobile-home-filter"
                         role="menu"
                         aria-label="世界观筛选与排序"
+                        style={filterAnchor ? {
+                            '--mobile-home-filter-top': `${filterAnchor.top}px`,
+                            '--mobile-home-filter-right': `${filterAnchor.right}px`,
+                        } as CSSProperties : undefined}
                         onPointerDown={event => event.stopPropagation()}
                     >
                         <div className="mobile-home-filter__group" aria-label="显示方式">

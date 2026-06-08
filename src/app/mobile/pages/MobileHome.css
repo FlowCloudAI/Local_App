@@ -437,10 +437,10 @@
 
 .mobile-home-filter {
     position: absolute;
-    top: 6.75rem;
-    right: var(--mobile-home-x);
+    top: var(--mobile-home-filter-top, 2.25rem);
+    right: var(--mobile-home-filter-right, var(--mobile-home-x));
     width: min(18.5rem, calc(100% - var(--mobile-home-x) * 2));
-    max-height: min(31rem, calc(100% - 7.5rem));
+    max-height: min(31rem, calc(100% - var(--mobile-home-filter-top, 2.25rem) - 1rem));
     box-sizing: border-box;
     padding: 0.75rem 0;
     overflow-y: auto;
