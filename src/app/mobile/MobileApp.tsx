@@ -52,6 +52,7 @@ interface CategoryDrawerDragState {
     startX: number
     startY: number
     baseOffset: number
+    latestOffset: number
     tracking: boolean
 }
 
@@ -267,6 +268,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             startX: event.clientX,
             startY: event.clientY,
             baseOffset: categoryDrawerOpen ? categoryDrawerWidth : 0,
+            latestOffset: categoryDrawerOpen ? categoryDrawerWidth : 0,
             tracking: false,
         }
         dragElement.setPointerCapture(event.pointerId)
@@ -286,7 +288,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 cancelCategoryDrawerDrag(event.pointerId)
                 return
             }
-            if (horizontal < 18 || horizontal < vertical * 1.45) return
+            if (horizontal < 12 || horizontal < vertical * 1.25) return
             if (!categoryDrawerOpen && dx < 0) {
                 cancelCategoryDrawerDrag(event.pointerId)
                 return
@@ -296,16 +298,23 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
 
         event.preventDefault()
-        setCategoryDrawerOffset(clamp(dragState.baseOffset + dx, 0, categoryDrawerWidth))
+        const nextOffset = clamp(dragState.baseOffset + dx, 0, categoryDrawerWidth)
+        dragState.latestOffset = nextOffset
+        setCategoryDrawerOffset(nextOffset)
     }, [cancelCategoryDrawerDrag, categoryDrawerOpen, categoryDrawerWidth])
 
     const finishCategoryDrawerDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
         const dragState = categoryDrawerDragRef.current
         if (!dragState || dragState.pointerId !== event.pointerId) return
 
-        const currentOffset = categoryDrawerOffset ?? (categoryDrawerOpen ? categoryDrawerWidth : 0)
+        const currentOffset = dragState.latestOffset
+        const dragDistance = currentOffset - dragState.baseOffset
+        const openDistance = Math.min(48, categoryDrawerWidth * 0.18)
+        const closeDistance = Math.min(56, categoryDrawerWidth * 0.18)
         const shouldOpen = dragState.tracking
-            ? currentOffset > categoryDrawerWidth * 0.46
+            ? categoryDrawerOpen
+                ? dragDistance > -closeDistance
+                : dragDistance >= openDistance
             : categoryDrawerOpen
         if (dragState.tracking) {
             suppressCategoryDrawerClickRef.current = true
@@ -323,7 +332,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             dragElement.releasePointerCapture(event.pointerId)
         }
         categoryDrawerDragElementRef.current = null
-    }, [categoryDrawerOffset, categoryDrawerOpen, categoryDrawerWidth])
+    }, [categoryDrawerOpen, categoryDrawerWidth])
 
     const handleCategoryDrawerClickCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
         if (!suppressCategoryDrawerClickRef.current) return
