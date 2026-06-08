@@ -36,7 +36,6 @@ import {
     type HomeActivityTarget,
     type HomeDashboardData,
 } from '../../../features/home/homeActivity'
-import {FloatingPanel} from '../../../shared/ui/overlay'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -46,6 +45,7 @@ interface Props {
     push: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setAiFocus: (focus: AiFocus) => void
+    setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
     activePanel: MobileHomePanel
     onActivePanelChange: (panel: MobileHomePanel) => void
 }
@@ -68,6 +68,19 @@ const WORLD_SORT_OPTIONS: Array<{key: WorldSortMode; label: string}> = [
     {key: 'name-asc', label: '名称排序'},
     {key: 'size-desc', label: '项目体量'},
 ]
+
+const WORLD_DISPLAY_ICONS: Record<WorldDisplayMode, string> = {
+    card: '▦',
+    list: '☰',
+    compact: '▤',
+}
+
+const WORLD_SORT_DETAILS: Record<WorldSortMode, string> = {
+    'updated-desc': '最新到最旧',
+    'created-desc': '新建到较早',
+    'name-asc': 'A 到 Z',
+    'size-desc': '词条多到少',
+}
 
 function parseDateValue(value?: string | null): number {
     if (!value) return 0
@@ -142,7 +155,14 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
     return targets
 }
 
-export default function MobileHome({push, navigateToTab, setAiFocus, activePanel, onActivePanelChange}: Props) {
+export default function MobileHome({
+    push,
+    navigateToTab,
+    setAiFocus,
+    setBeforeBack,
+    activePanel,
+    onActivePanelChange,
+}: Props) {
     const {showAlert} = useAlert()
     const {
         projects,
@@ -169,6 +189,15 @@ export default function MobileHome({push, navigateToTab, setAiFocus, activePanel
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importing, setImporting] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
+
+    useEffect(() => {
+        if (!filterOpen) return undefined
+        setBeforeBack(() => {
+            setFilterOpen(false)
+            return false
+        })
+        return () => setBeforeBack(null)
+    }, [filterOpen, setBeforeBack])
 
     useEffect(() => {
         const refreshDashboard = () => setDashboard(loadHomeDashboardData())
@@ -727,7 +756,9 @@ export default function MobileHome({push, navigateToTab, setAiFocus, activePanel
                                 type="button"
                                 className="mobile-home-worlds__filter"
                                 aria-label="筛选与排序"
-                                onClick={() => setFilterOpen(true)}
+                                aria-haspopup="menu"
+                                aria-expanded={filterOpen}
+                                onClick={() => setFilterOpen(open => !open)}
                             >
                                 …
                             </button>
@@ -763,64 +794,113 @@ export default function MobileHome({push, navigateToTab, setAiFocus, activePanel
                 </section>
             </div>
 
-            <FloatingPanel
-                open={filterOpen}
-                onClose={() => setFilterOpen(false)}
-                ariaLabel="世界观筛选与排序"
-                className="mobile-home-filter"
-            >
-                <div className="mobile-home-filter__section">
-                    <div className="mobile-home-filter__title">显示模式</div>
-                    <div className="mobile-home-filter__options">
-                        {WORLD_DISPLAY_OPTIONS.map(option => (
+            {filterOpen ? (
+                <div
+                    className="mobile-home-filter-layer"
+                    role="presentation"
+                    onPointerDown={event => {
+                        if (event.target === event.currentTarget) setFilterOpen(false)
+                    }}
+                >
+                    <div
+                        className="mobile-home-filter"
+                        role="menu"
+                        aria-label="世界观筛选与排序"
+                        onPointerDown={event => event.stopPropagation()}
+                    >
+                        <div className="mobile-home-filter__group" aria-label="显示方式">
+                            {WORLD_DISPLAY_OPTIONS.map(option => {
+                                const active = displayMode === option.key
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        role="menuitemradio"
+                                        aria-checked={active}
+                                        className={`mobile-home-filter__row${active ? ' is-active' : ''}`}
+                                        onClick={() => setDisplayMode(option.key)}
+                                    >
+                                        <span className="mobile-home-filter__check" aria-hidden="true">
+                                            {active ? '✓' : ''}
+                                        </span>
+                                        <span className="mobile-home-filter__icon" aria-hidden="true">
+                                            {WORLD_DISPLAY_ICONS[option.key]}
+                                        </span>
+                                        <span className="mobile-home-filter__text">
+                                            <span>{option.label}</span>
+                                            <small>{option.desc}</small>
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <div className="mobile-home-filter__divider" role="separator"/>
+                        <div className="mobile-home-filter__group" aria-label="排序方式">
+                            {WORLD_SORT_OPTIONS.map(option => {
+                                const active = sortMode === option.key
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        role="menuitemradio"
+                                        aria-checked={active}
+                                        className={`mobile-home-filter__row${active ? ' is-active' : ''}`}
+                                        onClick={() => setSortMode(option.key)}
+                                    >
+                                        <span className="mobile-home-filter__check" aria-hidden="true">
+                                            {active ? '✓' : ''}
+                                        </span>
+                                        <span className="mobile-home-filter__icon" aria-hidden="true">
+                                            ↕
+                                        </span>
+                                        <span className="mobile-home-filter__text">
+                                            <span>{option.label}</span>
+                                            <small>{WORLD_SORT_DETAILS[option.key]}</small>
+                                        </span>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <div className="mobile-home-filter__divider" role="separator"/>
+                        <div className="mobile-home-filter__group" aria-label="列表操作">
                             <button
-                                key={option.key}
                                 type="button"
-                                className={`mobile-home-filter__option${displayMode === option.key ? ' is-active' : ''}`}
-                                onClick={() => setDisplayMode(option.key)}
+                                role="menuitem"
+                                className="mobile-home-filter__row"
+                                disabled={importing}
+                                onClick={() => {
+                                    setFilterOpen(false)
+                                    void handleImportProject()
+                                }}
                             >
-                                <span>{option.label}</span>
-                                <small>{option.desc}</small>
+                                <span className="mobile-home-filter__check" aria-hidden="true"/>
+                                <span className="mobile-home-filter__icon" aria-hidden="true">⇩</span>
+                                <span className="mobile-home-filter__text">
+                                    <span>{importing ? '导入中…' : '导入世界'}</span>
+                                    <small>从 .fcworld 文件导入</small>
+                                </span>
                             </button>
-                        ))}
+                            <button
+                                type="button"
+                                role="menuitem"
+                                className="mobile-home-filter__row"
+                                disabled={loading}
+                                onClick={() => {
+                                    setFilterOpen(false)
+                                    void refreshProjects()
+                                }}
+                            >
+                                <span className="mobile-home-filter__check" aria-hidden="true"/>
+                                <span className="mobile-home-filter__icon" aria-hidden="true">↻</span>
+                                <span className="mobile-home-filter__text">
+                                    <span>刷新列表</span>
+                                    <small>重新同步世界观</small>
+                                </span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div className="mobile-home-filter__section">
-                    <div className="mobile-home-filter__title">排序方法</div>
-                    <div className="mobile-home-filter__options">
-                        {WORLD_SORT_OPTIONS.map(option => (
-                            <button
-                                key={option.key}
-                                type="button"
-                                className={`mobile-home-filter__option${sortMode === option.key ? ' is-active' : ''}`}
-                                onClick={() => setSortMode(option.key)}
-                            >
-                                <span>{option.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={importing}
-                        className="mobile-home-filter__import"
-                        onClick={() => void handleImportProject()}
-                    >
-                        {importing ? '导入中…' : '导入世界'}
-                    </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={loading}
-                        className="mobile-home-filter__import"
-                        onClick={() => void refreshProjects()}
-                    >
-                        刷新列表
-                    </Button>
-                </div>
-            </FloatingPanel>
+            ) : null}
         </div>
     )
 }
