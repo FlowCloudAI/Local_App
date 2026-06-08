@@ -835,6 +835,14 @@ export default function MobileHome({
                             <p className="mobile-home__muted">打开项目或词条后，会在这里保留回到现场的入口。</p>
                         )}
                     </section>
+
+                    <button
+                        type="button"
+                        className="mobile-home__project-list-button"
+                        onClick={() => onActivePanelChange('worlds')}
+                    >
+                        项目列表
+                    </button>
                 </section>
 
                 <section

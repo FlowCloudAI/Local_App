@@ -88,7 +88,8 @@
 .mobile-home-worlds__icon-btn:active,
 .mobile-home-worlds__filter:active,
 .mobile-home__continue:active,
-.mobile-home-recent-item:active {
+.mobile-home-recent-item:active,
+.mobile-home__project-list-button:active {
     transform: scale(0.98);
 }
 
@@ -242,6 +243,26 @@
     font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-medium);
     white-space: nowrap;
+}
+
+.mobile-home__project-list-button {
+    align-self: center;
+    flex: 0 0 auto;
+    width: min(10rem, 64%);
+    min-height: 2.45rem;
+    margin-top: 0.2rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
+    color: var(--fc-color-primary);
+    font: inherit;
+    font-size: var(--fc-font-size-sm);
+    font-weight: 680;
+    box-shadow:
+        0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
+    cursor: pointer;
+    touch-action: manipulation;
 }
 
 .mobile-home__state-panel {
