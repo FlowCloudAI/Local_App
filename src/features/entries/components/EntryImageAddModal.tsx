@@ -147,7 +147,7 @@ export default function EntryImageAddModal({
     const handleFillPrompt = async () => {
         if (fillingPrompt || generateState === 'generating') return
         if (!aiPluginId) {
-            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'toast', 2200)
+            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
             return
         }
 
@@ -169,7 +169,7 @@ export default function EntryImageAddModal({
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error)
             setErrorMessage(msg)
-            void showAlert(msg, 'error', 'toast', 3000)
+            void showAlert(msg, 'error', 'nonInvasive', 3000)
         } finally {
             setFillingPrompt(false)
         }
@@ -194,7 +194,7 @@ export default function EntryImageAddModal({
             const msg = e instanceof Error ? e.message : String(e)
             setErrorMessage(msg)
             setGenerateState('error')
-            void showAlert(msg, 'error', 'toast', 3000)
+            void showAlert(msg, 'error', 'nonInvasive', 3000)
         }
     }
 
@@ -232,7 +232,7 @@ export default function EntryImageAddModal({
             const msg = e instanceof Error ? e.message : String(e)
             setErrorMessage(`下载图片失败: ${msg}`)
             setGenerateState('error')
-            void showAlert(msg, 'error', 'toast', 3000)
+            void showAlert(msg, 'error', 'nonInvasive', 3000)
         }
     }
 
@@ -246,7 +246,7 @@ export default function EntryImageAddModal({
 
     const handleInsertExisting = (image: EntryImage) => {
         if (!buildEntryImageMarkdownRef(image)) {
-            void showAlert('当前图片没有可插入的 uuid 引用。', 'warning', 'toast', 1800)
+            void showAlert('当前图片没有可插入的 uuid 引用。', 'warning', 'nonInvasive', 1800)
             return
         }
         onInsertImage?.(image)

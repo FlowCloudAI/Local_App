@@ -418,7 +418,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             } else {
                 removeHomeActivityTarget(target)
             }
-            void showAlert('这个首页入口指向的内容已不存在，已从首页移除。', 'warning', 'toast', 3000)
+            void showAlert('这个首页入口指向的内容已不存在，已从首页移除。', 'warning', 'nonInvasive', 3000)
             return
         }
         if (target.type === 'project') {
@@ -468,7 +468,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             await openImportedProject(result)
         } catch (error) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'nonInvasive', 3600)
         } finally {
             setImporting(false)
         }
@@ -493,7 +493,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             await openImportedProject(result)
         } catch (error) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'nonInvasive', 3600)
         } finally {
             setImporting(false)
         }
@@ -522,7 +522,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             await openImportedProject(result)
         } catch (error) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(error)}`, 'error', 'toast', 3600)
+            await showAlert(`导入世界失败：${String(error)}`, 'error', 'nonInvasive', 3600)
         } finally {
             setImporting(false)
         }

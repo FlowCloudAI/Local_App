@@ -156,7 +156,7 @@ export default function MobileCategoryManager({push, params}: Props) {
             setRenameTarget(null)
             await reload()
         } catch (error) {
-            await showAlert(`保存分类失败：${String(error)}`, 'error', 'toast', 3000)
+            await showAlert(`保存分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setBusy(false)
         }
@@ -183,7 +183,7 @@ export default function MobileCategoryManager({push, params}: Props) {
             setMoveTarget(null)
             await reload()
         } catch (error) {
-            await showAlert(`移动分类失败：${String(error)}`, 'error', 'toast', 3000)
+            await showAlert(`移动分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setBusy(false)
         }
@@ -207,12 +207,12 @@ export default function MobileCategoryManager({push, params}: Props) {
                 await showAlert(
                     `已删除 ${result.deletedCategories} 个分类、${result.deletedEntries} 个词条。`,
                     'success',
-                    'toast',
+                    'nonInvasive',
                     2600,
                 )
             }
         } catch (error) {
-            await showAlert(`删除分类失败：${String(error)}`, 'error', 'toast', 3200)
+            await showAlert(`删除分类失败：${String(error)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setBusy(false)
         }

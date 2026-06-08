@@ -600,18 +600,18 @@ export function useIdeaPanel({
         }
 
         if (!selectedIdea.project_id) {
-            await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'toast', 1800)
+            await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'nonInvasive', 1800)
             return
         }
 
         if (!convertCategoryId) {
-            await showAlert('请先选择目标分类，避免生成悬空词条。', 'warning', 'toast', 1800)
+            await showAlert('请先选择目标分类，避免生成悬空词条。', 'warning', 'nonInvasive', 1800)
             return
         }
 
         const targetTitle = buildEntryTitleFromIdea(draftTitle, draftContent)
         if (!targetTitle) {
-            await showAlert('便签标题和正文都为空，暂时无法转为词条。', 'warning', 'toast', 1800)
+            await showAlert('便签标题和正文都为空，暂时无法转为词条。', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -637,7 +637,7 @@ export function useIdeaPanel({
             }
 
             if (!latestIdea.project_id) {
-                await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'toast', 1800)
+                await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'nonInvasive', 1800)
                 setSaveState('idle')
                 setStatusMessage('请先为便签设置所属项目')
                 return

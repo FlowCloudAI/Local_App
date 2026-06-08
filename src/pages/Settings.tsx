@@ -578,7 +578,7 @@ export default function Settings({
             const shouldShowSuccessNotice = showSuccessNotice && settingsSaveSuccessNoticeEnabledRef.current
             settingsSaveSuccessNoticeEnabledRef.current = true
             if (migrationMsg) {
-                await showAlertRef.current(migrationMsg, 'info', 'toast', 3500)
+                await showAlertRef.current(migrationMsg, 'info', 'nonInvasive', 3500)
             } else if (shouldShowSuccessNotice) {
                 void showAlertRef.current('设置已保存', 'success', 'nonInvasive', 1200)
             }
@@ -681,7 +681,7 @@ export default function Settings({
         if (!path) return
         open_in_file_manager(path).catch((err) => {
             logger.error('打开目录失败', err)
-            void showAlert(`打开目录失败：${String(err)}`, 'error', 'toast', 2200)
+            void showAlert(`打开目录失败：${String(err)}`, 'error', 'nonInvasive', 2200)
         })
     }, [showAlert])
 
@@ -749,7 +749,7 @@ export default function Settings({
         if (!path) return
         setting_open_backup_dir(path).catch((err) => {
             logger.error('打开备份目录失败', err)
-            void showAlert(`打开备份目录失败：${String(err)}`, 'error', 'toast', 2200)
+            void showAlert(`打开备份目录失败：${String(err)}`, 'error', 'nonInvasive', 2200)
         })
     }, [showAlert])
 
@@ -967,7 +967,7 @@ export default function Settings({
             const message = String(error)
             logger.error('提示词模板目录加载失败:', error)
             setTemplateListError(message)
-            void showAlert(`提示词模板目录加载失败：${message}`, 'error', 'toast', 3000)
+            void showAlert(`提示词模板目录加载失败：${message}`, 'error', 'nonInvasive', 3000)
         } finally {
             setTemplateListLoading(false)
         }

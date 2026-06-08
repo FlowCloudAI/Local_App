@@ -94,13 +94,13 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             void showAlert('邮箱已复制', 'success', 'nonInvasive', 1600)
         } catch (error) {
             logger.error('复制官方邮箱失败:', error)
-            void showAlert(`复制邮箱失败：${String(error)}`, 'error', 'toast', 2200)
+            void showAlert(`复制邮箱失败：${String(error)}`, 'error', 'nonInvasive', 2200)
         }
     }, [showAlert])
 
     const handleSubmitFeedback = useCallback(async () => {
         if (!feedbackContent.trim()) {
-            void showAlert('请先填写反馈内容', 'warning', 'toast', 1800)
+            void showAlert('请先填写反馈内容', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -121,7 +121,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             void showAlert('反馈已提交，感谢你的帮助', 'success', 'nonInvasive', 2200)
         } catch (error) {
             logger.error('提交反馈失败:', error)
-            void showAlert(String(error), 'error', 'toast', 3000)
+            void showAlert(String(error), 'error', 'nonInvasive', 3000)
         } finally {
             setSubmittingFeedback(false)
         }
@@ -146,7 +146,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             logger.error('检查更新失败:', error)
             const message = error instanceof Error ? error.message : String(error)
             setUpdateStatus(`检查更新失败：${message}`)
-            void showAlert(`检查更新失败：${message}`, 'error', 'toast', 3200)
+            void showAlert(`检查更新失败：${message}`, 'error', 'nonInvasive', 3200)
         } finally {
             setCheckingUpdate(false)
         }
@@ -183,7 +183,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
             logger.error('安装更新失败:', error)
             const message = error instanceof Error ? error.message : String(error)
             setUpdateStatus(`安装更新失败：${message}`)
-            void showAlert(`安装更新失败：${message}`, 'error', 'toast', 3600)
+            void showAlert(`安装更新失败：${message}`, 'error', 'nonInvasive', 3600)
         } finally {
             setInstallingUpdate(false)
         }

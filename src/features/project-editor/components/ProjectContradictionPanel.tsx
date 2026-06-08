@@ -273,7 +273,7 @@ function ProjectContradictionPanel({
             .catch(async (error) => {
                 if (cancelled) return
                 logger.error('加载词条候选失败', error)
-                await showAlert(`加载词条候选失败：${String(error)}`, 'error', 'toast', 2400)
+                await showAlert(`加载词条候选失败：${String(error)}`, 'error', 'nonInvasive', 2400)
             })
             .finally(() => {
                 if (!cancelled) setEntriesLoading(false)
@@ -327,7 +327,7 @@ function ProjectContradictionPanel({
             }
         } catch (error) {
             logger.error('加载设定检测历史失败', error)
-            await showAlert(`加载设定检测历史失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`加载设定检测历史失败：${String(error)}`, 'error', 'nonInvasive', 2600)
         } finally {
             setHistoryLoading(false)
         }
@@ -349,7 +349,7 @@ function ProjectContradictionPanel({
             .catch(async (error) => {
                 if (cancelled) return
                 logger.error('加载设定检测报告失败', error)
-                await showAlert(`加载报告失败：${String(error)}`, 'error', 'toast', 2600)
+                await showAlert(`加载报告失败：${String(error)}`, 'error', 'nonInvasive', 2600)
             })
             .finally(() => {
                 if (!cancelled) setDetailLoading(false)
@@ -361,12 +361,12 @@ function ProjectContradictionPanel({
 
     const handleGenerate = useCallback(async () => {
         if (!effectivePluginId || !effectiveModel) {
-            await showAlert('请先选择 AI 插件和模型。', 'warning', 'toast', 2200)
+            await showAlert('请先选择 AI 插件和模型。', 'warning', 'nonInvasive', 2200)
             return
         }
         const resolvedTargetEntryId = targetEntryId.trim()
         if (checkKind === 'entry_alignment' && !resolvedTargetEntryId) {
-            await showAlert('单词条契合度检测需要先选择目标词条。', 'warning', 'toast', 2400)
+            await showAlert('单词条契合度检测需要先选择目标词条。', 'warning', 'nonInvasive', 2400)
             return
         }
 
@@ -420,7 +420,7 @@ function ProjectContradictionPanel({
             const userFriendly = errorMsg === 'error decoding response body'
                 ? 'AI 返回的内容格式异常，无法生成检测报告。请检查 AI 模型返回是否符合预期格式，或换一个模型重试。'
                 : `生成设定检测报告失败：${errorMsg}`
-            await showAlert(userFriendly, 'error', 'toast', 3000)
+            await showAlert(userFriendly, 'error', 'nonInvasive', 3000)
         } finally {
             setGenerating(false)
         }
@@ -442,7 +442,7 @@ function ProjectContradictionPanel({
             await showAlert('报告已删除。', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('删除设定检测报告失败', error)
-            await showAlert(`删除报告失败：${String(error)}`, 'error', 'toast', 2600)
+            await showAlert(`删除报告失败：${String(error)}`, 'error', 'nonInvasive', 2600)
         }
     }, [historyItems, selectedReportId, showAlert, setSelectedReportId])
 
@@ -450,7 +450,7 @@ function ProjectContradictionPanel({
         if (!activeRecord || !onStartDiscussion) return
         const model = activeRecord.model ?? effectiveModel
         if (!model) {
-            await showAlert('当前缺少可用模型，无法创建报告讨论对话。', 'warning', 'toast', 2200)
+            await showAlert('当前缺少可用模型，无法创建报告讨论对话。', 'warning', 'nonInvasive', 2200)
             return
         }
         onStartDiscussion({

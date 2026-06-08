@@ -172,23 +172,23 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
     const handleSend = useCallback(async () => {
         if (!inputValue.trim() || isStreaming) return
         if (pluginsLoading) {
-            await showAlert('AI 插件仍在加载，请稍后再发送。', 'warning', 'toast', 1800)
+            await showAlert('AI 插件仍在加载，请稍后再发送。', 'warning', 'nonInvasive', 1800)
             return
         }
         if (llmUnavailable) {
-            await showAlert('当前没有可用的 LLM 插件，请先在设置中配置。', 'warning', 'toast', 2200)
+            await showAlert('当前没有可用的 LLM 插件，请先在设置中配置。', 'warning', 'nonInvasive', 2200)
             return
         }
         if (pluginSelectionIncomplete) {
-            await showAlert('请先选择 LLM 插件和模型。', 'warning', 'toast', 1800)
+            await showAlert('请先选择 LLM 插件和模型。', 'warning', 'nonInvasive', 1800)
             return
         }
         if (llmApiKeyChecking) {
-            await showAlert('正在检查 API Key，请稍后再发送。', 'warning', 'toast', 1800)
+            await showAlert('正在检查 API Key，请稍后再发送。', 'warning', 'nonInvasive', 1800)
             return
         }
         if (llmApiKeyMissing) {
-            await showAlert(`请先在设置中配置 ${activeLlmPluginName} 的 API Key。`, 'warning', 'toast', 2200)
+            await showAlert(`请先在设置中配置 ${activeLlmPluginName} 的 API Key。`, 'warning', 'nonInvasive', 2200)
             return
         }
         await sendMessage(inputValue)

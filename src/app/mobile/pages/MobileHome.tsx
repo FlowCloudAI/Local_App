@@ -511,7 +511,7 @@ export default function MobileHome({
             } else {
                 removeHomeActivityTarget(target)
             }
-            void showAlert('这个首页入口指向的内容已不存在，已从首页移除。', 'warning', 'toast', 3000)
+            void showAlert('这个首页入口指向的内容已不存在，已从首页移除。', 'warning', 'nonInvasive', 3000)
             return
         }
 
@@ -545,7 +545,7 @@ export default function MobileHome({
             const project = projects.find(item => item.id === projectId)
             if (project) {
                 handleOpenProject(project)
-                void showAlert('移动端暂未单独打开该工具面板，已进入对应世界。', 'info', 'toast', 2200)
+                void showAlert('移动端暂未单独打开该工具面板，已进入对应世界。', 'info', 'nonInvasive', 2200)
                 return
             }
         }
@@ -560,7 +560,7 @@ export default function MobileHome({
             return
         }
 
-        void showAlert(target.description || '该入口暂未接入移动端。', 'info', 'toast', 2600)
+        void showAlert(target.description || '该入口暂未接入移动端。', 'info', 'nonInvasive', 2600)
     }, [handleOpenProject, hasLoadedProjects, navigateToTab, projectIdSet, projects, push, setAiFocus, showAlert])
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
@@ -599,7 +599,7 @@ export default function MobileHome({
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -624,7 +624,7 @@ export default function MobileHome({
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -653,14 +653,14 @@ export default function MobileHome({
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
     }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
     const handleHelp = useCallback(() => {
-        void showAlert('首页展示桌面端同一套继续创作和最近内容；向上滑动即可进入世界观列表。', 'info', 'toast', 2800)
+        void showAlert('首页展示桌面端同一套继续创作和最近内容；向上滑动即可进入世界观列表。', 'info', 'nonInvasive', 2800)
     }, [showAlert])
 
     const handlePagerTouchStart = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {

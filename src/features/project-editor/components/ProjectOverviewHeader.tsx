@@ -85,7 +85,7 @@ function ProjectOverviewHeader({
         try {
             await onDelete()
         } catch (e) {
-            void showAlert(`删除失败：${String(e)}`, 'error', 'toast', 2200)
+            void showAlert(`删除失败：${String(e)}`, 'error', 'nonInvasive', 2200)
         }
     }
 
@@ -101,7 +101,7 @@ function ProjectOverviewHeader({
             await onDescriptionChange(descDraft.trim())
             setDescEditing(false)
         } catch (e) {
-            void showAlert(`保存失败：${String(e)}`, 'error', 'toast', 2200)
+            void showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 2200)
         } finally {
             setDescSaving(false)
         }

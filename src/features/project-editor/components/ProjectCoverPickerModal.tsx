@@ -152,7 +152,7 @@ export default function ProjectCoverPickerModal({
                     const message = error instanceof Error ? error.message : String(error)
                     setPluginLoadError(message)
                     setErrorMessage(message)
-                    void showAlert(message, 'error', 'toast', 3000)
+                    void showAlert(message, 'error', 'nonInvasive', 3000)
                 }
             } finally {
                 if (!cancelled) {
@@ -221,7 +221,7 @@ export default function ProjectCoverPickerModal({
             onClose()
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            void showAlert(message, 'error', 'toast', 3000)
+            void showAlert(message, 'error', 'nonInvasive', 3000)
         } finally {
             setApplying(false)
         }
@@ -247,7 +247,7 @@ export default function ProjectCoverPickerModal({
             await handleApplyCover(firstImage.path)
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            void showAlert(message, 'error', 'toast', 3000)
+            void showAlert(message, 'error', 'nonInvasive', 3000)
         }
     }
 
@@ -270,14 +270,14 @@ export default function ProjectCoverPickerModal({
             const message = error instanceof Error ? error.message : String(error)
             setErrorMessage(message)
             setGenerateState('error')
-            void showAlert(message, 'error', 'toast', 3000)
+            void showAlert(message, 'error', 'nonInvasive', 3000)
         }
     }
 
     const handleFillPrompt = async () => {
         if (fillingPrompt || generateState === 'generating' || applying) return
         if (!aiPluginId) {
-            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'toast', 2200)
+            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
             return
         }
 
@@ -296,7 +296,7 @@ export default function ProjectCoverPickerModal({
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             setErrorMessage(message)
-            void showAlert(message, 'error', 'toast', 3000)
+            void showAlert(message, 'error', 'nonInvasive', 3000)
         } finally {
             setFillingPrompt(false)
         }
@@ -317,7 +317,7 @@ export default function ProjectCoverPickerModal({
             const message = error instanceof Error ? error.message : String(error)
             setErrorMessage(message)
             setGenerateState('error')
-            void showAlert(message, 'error', 'toast', 3000)
+            void showAlert(message, 'error', 'nonInvasive', 3000)
         }
     }
 

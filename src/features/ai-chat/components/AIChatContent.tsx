@@ -705,7 +705,7 @@ export default function AIChatContent({
         onContentChange: ctx.setInputValue,
         onCreateEntry: async () => null,
         onShowAlert: (message, type) => {
-            void showAlert(message, type, 'toast', 1600)
+            void showAlert(message, type, 'nonInvasive', 1600)
         },
         canCreateEntry: false,
     })
@@ -773,7 +773,7 @@ export default function AIChatContent({
         void showAlert(
             `文档「${failedItem.fileName}」解析失败${failedItem.error ? `：${failedItem.error}` : ''}`,
             'error',
-            'toast',
+            'nonInvasive',
             3200,
         )
     }, [ctx.documentContextItems, showAlert])
@@ -824,7 +824,7 @@ export default function AIChatContent({
         const internalLink = getEntryLinkFromAnchor(anchor)
         if (!internalLink) return
         if (!linkPreviewProjectId) {
-            void showAlert('当前对话没有项目上下文，无法打开词条链接。', 'warning', 'toast', 1800)
+            void showAlert('当前对话没有项目上下文，无法打开词条链接。', 'warning', 'nonInvasive', 1800)
             return
         }
         void ensureProjectEntriesLoaded().then(() => {
@@ -927,7 +927,7 @@ export default function AIChatContent({
     const handleSendCurrentInput = useCallback(async () => {
         const rawInput = ctx.inputValue
         if (llmApiKeyMissing) {
-            await showAlert(`LLM 插件「${activeLlmPluginName}」尚未配置 API Key。`, 'warning', 'toast', 2600)
+            await showAlert(`LLM 插件「${activeLlmPluginName}」尚未配置 API Key。`, 'warning', 'nonInvasive', 2600)
             return
         }
         if (isArchivedConversation || llmUnavailable || !rawInput.trim() || ctx.isStreaming) return
@@ -1011,7 +1011,7 @@ export default function AIChatContent({
             await ctx.addDocumentContextFiles(paths)
         } catch (error) {
             logger.warn('[AIChatContent] 添加文档上下文失败', error)
-            await showAlert('添加文档失败，请确认文件可读取且格式受支持。', 'error', 'toast', 2400)
+            await showAlert('添加文档失败，请确认文件可读取且格式受支持。', 'error', 'nonInvasive', 2400)
         }
     }, [activeConversation, ctx, isArchivedConversation, showAlert])
 
@@ -1024,7 +1024,7 @@ export default function AIChatContent({
         setActionMenuConversationId(null)
 
         if (conversation.id.startsWith('conv_')) {
-            await showAlert('这条会话尚未写入历史，发送消息后再导出。', 'warning', 'toast', 2200)
+            await showAlert('这条会话尚未写入历史，发送消息后再导出。', 'warning', 'nonInvasive', 2200)
             return
         }
 
@@ -1043,7 +1043,7 @@ export default function AIChatContent({
             await ai_export_conversation(conversation.id, selectedPath, format)
             await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'nonInvasive', 1000)
         } catch (error) {
-            await showAlert(`导出会话失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
+            await showAlert(`导出会话失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
         }
     }, [showAlert])
 
@@ -1074,7 +1074,7 @@ export default function AIChatContent({
     const handlePlayRoleMessage = useCallback(async (content: string, overrideVoiceId?: string | null) => {
         const text = content.trim()
         if (!text) {
-            await showAlert('当前消息没有可播放的文本内容。', 'warning', 'toast', 1800)
+            await showAlert('当前消息没有可播放的文本内容。', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -1086,19 +1086,19 @@ export default function AIChatContent({
                 ai_list_plugins('tts'),
             ])
         } catch (error) {
-            await showAlert(`读取语音设置失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
+            await showAlert(`读取语音设置失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
             return
         }
 
         if (plugins.length === 0) {
-            await showAlert('当前没有可用的语音插件，请先安装 TTS 插件。', 'warning', 'toast', 2600)
+            await showAlert('当前没有可用的语音插件，请先安装 TTS 插件。', 'warning', 'nonInvasive', 2600)
             return
         }
 
         const selectedPlugin = resolvePreferredTtsPlugin(plugins, settings.tts.plugin_id)
 
         if (!selectedPlugin) {
-            await showAlert('默认语音插件不可用，请在设置中重新选择。', 'warning', 'toast', 2600)
+            await showAlert('默认语音插件不可用，请在设置中重新选择。', 'warning', 'nonInvasive', 2600)
             return
         }
 
@@ -1106,12 +1106,12 @@ export default function AIChatContent({
         try {
             hasApiKey = await setting_has_api_key(selectedPlugin.id)
         } catch (error) {
-            await showAlert(`读取语音插件密钥状态失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2600)
+            await showAlert(`读取语音插件密钥状态失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
             return
         }
 
         if (!hasApiKey) {
-            await showAlert(`语音插件「${selectedPlugin.name}」尚未配置 API Key。`, 'warning', 'toast', 2600)
+            await showAlert(`语音插件「${selectedPlugin.name}」尚未配置 API Key。`, 'warning', 'nonInvasive', 2600)
             return
         }
 
@@ -1121,7 +1121,7 @@ export default function AIChatContent({
             : (selectedPlugin.default_model ?? selectedPlugin.models[0] ?? '')
 
         if (!model) {
-            await showAlert(`语音插件「${selectedPlugin.name}」没有可用模型。`, 'warning', 'toast', 2600)
+            await showAlert(`语音插件「${selectedPlugin.name}」没有可用模型。`, 'warning', 'nonInvasive', 2600)
             return
         }
 
@@ -1139,7 +1139,7 @@ export default function AIChatContent({
                 voiceId,
             })
         } catch (error) {
-            await showAlert(`语音播放失败：${formatApiError(toApiError(error))}`, 'error', 'toast', 2800)
+            await showAlert(`语音播放失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2800)
         }
     }, [showAlert])
 

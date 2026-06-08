@@ -369,18 +369,18 @@ export default function MobileSettings({push, page}: Props) {
             }))
             await showAlert('设置已保存', 'success', 'nonInvasive', 1500)
         } catch (e) {
-            await showAlert(`保存失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         }
     }, [selectedPlugin, selectedModel, theme, settings, showAlert])
 
     const handleSaveApiKey = useCallback(async () => {
         if (!selectedPlugin) {
-            await showAlert('请先选择 LLM 插件', 'warning', 'toast', 1800)
+            await showAlert('请先选择 LLM 插件', 'warning', 'nonInvasive', 1800)
             return
         }
         const nextApiKey = apiKeyDraft.trim()
         if (!nextApiKey) {
-            await showAlert('请输入 API Key', 'warning', 'toast', 1800)
+            await showAlert('请输入 API Key', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -394,7 +394,7 @@ export default function MobileSettings({push, page}: Props) {
             }))
             await showAlert('API Key 已保存', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            await showAlert(`API Key 保存失败：${String(error)}`, 'error', 'toast', 3000)
+            await showAlert(`API Key 保存失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setApiKeyBusy(false)
         }
@@ -415,7 +415,7 @@ export default function MobileSettings({push, page}: Props) {
             }))
             await showAlert('API Key 已删除', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            await showAlert(`API Key 删除失败：${String(error)}`, 'error', 'toast', 3000)
+            await showAlert(`API Key 删除失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setApiKeyBusy(false)
         }
@@ -434,7 +434,7 @@ export default function MobileSettings({push, page}: Props) {
             ],
         }).catch(error => {
             logger.error('[MobileSettings] 打开本地插件选择器失败', error)
-            void showAlert(`打开文件选择器失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
+            void showAlert(`打开文件选择器失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
             return null
         })
         if (!selected || Array.isArray(selected)) return
@@ -449,7 +449,7 @@ export default function MobileSettings({push, page}: Props) {
             await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 本地插件安装失败', error)
-            await showAlert(`本地插件安装失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
+            await showAlert(`本地插件安装失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setInstallingLocalFile(false)
         }
@@ -466,7 +466,7 @@ export default function MobileSettings({push, page}: Props) {
             await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 插件安装失败', error)
-            await showAlert(`插件安装失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
+            await showAlert(`插件安装失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setInstallingPluginIds(current => {
                 const next = new Set(current)
@@ -510,7 +510,7 @@ export default function MobileSettings({push, page}: Props) {
             const message = formatUnknownError(error)
             logger.error('[MobileSettings] 读取应用日志失败', error)
             setLogError(message)
-            await showAlert(`读取日志失败：${message}`, 'error', 'toast', 3000)
+            await showAlert(`读取日志失败：${message}`, 'error', 'nonInvasive', 3000)
         } finally {
             setLogLoading(false)
         }
@@ -528,7 +528,7 @@ export default function MobileSettings({push, page}: Props) {
             await showAlert('日志内容已复制', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('[MobileSettings] 复制日志失败', error)
-            await showAlert(`复制日志失败：${formatUnknownError(error)}`, 'error', 'toast', 3000)
+            await showAlert(`复制日志失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
         }
     }, [logSnapshot, showAlert])
 

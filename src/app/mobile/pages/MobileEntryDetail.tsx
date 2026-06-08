@@ -300,7 +300,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
             if (event.payload.entry_id !== entryId) return
             if (mode === 'edit' && isDirty) {
-                void showAlert('词条已在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'toast', 2200)
+                void showAlert('词条已在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'nonInvasive', 2200)
                 return
             }
             void reloadEntryState()
@@ -315,16 +315,16 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             mode,
                         },
                     })
-                    void showAlert('词条已在后台更新，页面已刷新。', 'success', 'toast', 1500)
+                    void showAlert('词条已在后台更新，页面已刷新。', 'success', 'nonInvasive', 1500)
                 })
                 .catch((error) => {
                     logger.error('刷新后台更新的词条失败', error)
-                    void showAlert('词条已更新，但页面刷新失败，请重新打开词条。', 'warning', 'toast', 2200)
+                    void showAlert('词条已更新，但页面刷新失败，请重新打开词条。', 'warning', 'nonInvasive', 2200)
                 })
         })
         const deletedListener = listen<EntryDeletedEvent>(ENTRY_DELETED, (event) => {
             if (event.payload.entry_id !== entryId) return
-            void showAlert('词条已在后台删除。', 'warning', 'toast', 2200)
+            void showAlert('词条已在后台删除。', 'warning', 'nonInvasive', 2200)
             pop()
         })
 
@@ -379,7 +379,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             const targetTitle = internalLink.title.trim()
             const target = projectEntries.find(item => item.title.trim() === targetTitle)
             if (!target) {
-                void showAlert(`未找到词条「${targetTitle}」`, 'warning', 'toast', 1800)
+                void showAlert(`未找到词条「${targetTitle}」`, 'warning', 'nonInvasive', 1800)
                 return
             }
             handleOpenLinkedEntry(target.id)
@@ -390,25 +390,25 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             event.preventDefault()
             void openUrl(href).catch((error) => {
                 logger.error('打开链接失败', error)
-                void showAlert('打开链接失败', 'error', 'toast', 1800)
+                void showAlert('打开链接失败', 'error', 'nonInvasive', 1800)
             })
             return
         }
 
         if (href) {
             event.preventDefault()
-            void showAlert('无效链接，已阻止跳转', 'warning', 'toast', 1500)
+            void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
         }
     }, [handleOpenLinkedEntry, projectEntries, showAlert])
 
     const handleSave = useCallback(async () => {
         if (!title.trim()) {
-            await showAlert('请输入词条标题', 'warning', 'toast', 2000)
+            await showAlert('请输入词条标题', 'warning', 'nonInvasive', 2000)
             return
         }
         if (!entry) return
         if (relationDrafts.some(draft => hasInvalidRelationDraft(draft, entryId))) {
-            await showAlert('存在未完成关系，请先选择目标词条或删除该关系。', 'warning', 'toast', 2400)
+            await showAlert('存在未完成关系，请先选择目标词条或删除该关系。', 'warning', 'nonInvasive', 2400)
             return
         }
         setSaving(true)
@@ -437,7 +437,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             replace({type: 'entryDetail', params: {...(params ?? {}), projectId, entryId, displayName: title.trim(), mode: 'view'}})
             setMode('view')
         } catch (e) {
-            await showAlert(`保存失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setSaving(false)
         }
@@ -450,7 +450,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             await db_delete_entry(entryId)
             pop()
         } catch (e) {
-            await showAlert(`删除失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`删除失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         }
     }, [entry, entryId, pop, showAlert])
 
@@ -574,7 +574,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             const nextCategoryId = categoryId ?? null
             const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, nextCategoryId, nextTitle)
             if (duplicatedEntry) {
-                await showAlert('当前分类下已存在同名词条，请直接选择已有词条。', 'warning', 'toast', 1800)
+                await showAlert('当前分类下已存在同名词条，请直接选择已有词条。', 'warning', 'nonInvasive', 1800)
                 setActiveWikiOptionIndex(0)
                 return
             }
@@ -601,10 +601,10 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             }
             setProjectEntries((current) => [brief, ...current])
             applyWikiLink({id: created.id, title: created.title}, draft)
-            await showAlert('已创建并插入双链', 'success', 'toast', 1500)
+            await showAlert('已创建并插入双链', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('创建双链词条失败', error)
-            await showAlert(`创建词条失败：${String(error)}`, 'error', 'toast', 2200)
+            await showAlert(`创建词条失败：${String(error)}`, 'error', 'nonInvasive', 2200)
         } finally {
             setCreatingLinkedEntry(false)
         }
@@ -691,7 +691,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setImages(current => appendImages(current, nextImportedImages))
             return nextImportedImages
         } catch (error) {
-            await showAlert(`导入图片失败：${String(error)}`, 'error', 'toast', 3000)
+            await showAlert(`导入图片失败：${String(error)}`, 'error', 'nonInvasive', 3000)
             return []
         }
     }, [projectId, showAlert])
@@ -722,7 +722,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const image = images[targetIndex]
         const imageRef = buildEntryImageMarkdownRef(image)
         if (!image || !imageRef) {
-            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'toast', 1800)
+            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
             return
         }
         const textarea = contentInputRef.current

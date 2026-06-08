@@ -90,7 +90,7 @@ export default function MobileIdea(_props: Props) {
             setDraftContent(null)
             setDraftProjectId('')
         } catch {
-            await showAlert('创建失败', 'error', 'toast', 2000)
+            await showAlert('创建失败', 'error', 'nonInvasive', 2000)
         }
     }
 
@@ -110,7 +110,7 @@ export default function MobileIdea(_props: Props) {
             } : i))
             setEditingId(null)
         } catch {
-            await showAlert('保存失败', 'error', 'toast', 2000)
+            await showAlert('保存失败', 'error', 'nonInvasive', 2000)
         }
     }
 
@@ -121,7 +121,7 @@ export default function MobileIdea(_props: Props) {
             await db_delete_idea_note(id)
             setIdeas(prev => prev.filter(i => i.id !== id))
         } catch {
-            await showAlert('删除失败', 'error', 'toast', 2000)
+            await showAlert('删除失败', 'error', 'nonInvasive', 2000)
         }
     }
 

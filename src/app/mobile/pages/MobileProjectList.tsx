@@ -144,7 +144,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -169,7 +169,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -198,7 +198,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }

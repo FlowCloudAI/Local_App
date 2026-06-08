@@ -343,7 +343,7 @@ export default function EntryEditor({
         onCreateEntry: async (title) => {
             const duplicatedEntry = await findCategoryDuplicatedEntry(projectId, entry?.category_id ?? null, title)
             if (duplicatedEntry) {
-                await showAlert('当前分类下已存在同名词条，请直接选择已有词条。', 'warning', 'toast', 1800)
+                await showAlert('当前分类下已存在同名词条，请直接选择已有词条。', 'warning', 'nonInvasive', 1800)
                 return null
             }
             const created = await db_create_entry({
@@ -379,7 +379,7 @@ export default function EntryEditor({
                 void showAlert(message, type, 'nonInvasive')
                 return
             }
-            void showAlert(message, type, 'toast', 1000)
+            void showAlert(message, type, 'nonInvasive', 1000)
         },
     })
 
@@ -632,14 +632,14 @@ export default function EntryEditor({
     const handleGenerateSummary = useCallback(async () => {
         if (generatingSummary || loading || saving) return
         if (!aiPluginId) {
-            await showAlert('当前还没有可用的 AI 插件，请先在右侧 AI 面板选择或配置模型。', 'warning', 'toast', 2200)
+            await showAlert('当前还没有可用的 AI 插件，请先在右侧 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
             return
         }
 
         const fallbackTitle = normalizeComparableText(draft.title) || entry?.title || '未命名词条'
         const draftContent = normalizeComparableContent(draft.content)
         if (!draftContent) {
-            await showAlert('正文为空，无法生成摘要。', 'warning', 'toast', 1800)
+            await showAlert('正文为空，无法生成摘要。', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -675,7 +675,7 @@ export default function EntryEditor({
         } catch (summaryError) {
             logger.error('generate summary failed', summaryError)
             const message = summaryError instanceof Error ? summaryError.message : '生成摘要失败'
-            await showAlert(message, 'error', 'toast', 2200)
+            await showAlert(message, 'error', 'nonInvasive', 2200)
         } finally {
             setGeneratingSummary(false)
         }
@@ -820,13 +820,13 @@ export default function EntryEditor({
             if (event.payload.entry_id !== entryId) return
 
             if (hasChangesRef.current) {
-                void showAlert('词条已被 AI 在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'toast', 2200)
+                void showAlert('词条已被 AI 在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'nonInvasive', 2200)
                 return
             }
 
             void reloadEntryFromDatabase('external').catch((e) => {
                 logger.error('reload entry after AI update failed', e)
-                void showAlert('词条已更新，但页面刷新失败，请手动重新打开词条。', 'warning', 'toast', 2200)
+                void showAlert('词条已更新，但页面刷新失败，请手动重新打开词条。', 'warning', 'nonInvasive', 2200)
             })
         })
 
@@ -838,7 +838,7 @@ export default function EntryEditor({
     useEffect(() => {
         const unlisten = listen<EntryDeletedEvent>(ENTRY_DELETED, (event) => {
             if (event.payload.entry_id !== entryId) return
-            void showAlert('词条已被 AI 删除', 'warning', 'toast', 2500)
+            void showAlert('词条已被 AI 删除', 'warning', 'nonInvasive', 2500)
             void onBack?.()
         })
         return () => {
@@ -858,7 +858,7 @@ export default function EntryEditor({
             await db_delete_entry(entry.id)
             await onDelete?.()
         } catch (e) {
-            void showAlert(`删除失败：${String(e)}`, 'error', 'toast', 2200)
+            void showAlert(`删除失败：${String(e)}`, 'error', 'nonInvasive', 2200)
         }
     }, [entry, onDelete, showAlert])
 
@@ -905,7 +905,7 @@ export default function EntryEditor({
             const message = String(e)
             setError(message)
             if (message.includes('同名词条')) {
-                void showAlert(message, 'warning', 'toast', 1800)
+                void showAlert(message, 'warning', 'nonInvasive', 1800)
             }
         } finally {
             setSaving(false)
@@ -1059,7 +1059,7 @@ export default function EntryEditor({
     function insertImageMarkdown(image: EntryImage | undefined, fallbackIndex = 0, closeLightbox = false) {
         const imageRef = buildEntryImageMarkdownRef(image)
         if (!image || !imageRef) {
-            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'toast', 1800)
+            void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -1334,11 +1334,11 @@ export default function EntryEditor({
                                         if (isSafeExternalHref(href)) {
                                             void openUrl(href).catch((error) => {
                                                 logger.error('open external link failed', error)
-                                                void showAlert('打开链接失败', 'error', 'toast', 1500)
+                                                void showAlert('打开链接失败', 'error', 'nonInvasive', 1500)
                                             })
                                             return
                                         }
-                                        void showAlert('无效链接，已阻止跳转', 'warning', 'toast', 1500)
+                                        void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
                                     }}
                                     onMouseOver={(e) => {
                                         const anchor = resolveEntryAnchor(e.target)

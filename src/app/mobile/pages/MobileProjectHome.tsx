@@ -196,7 +196,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
     }, [navigateToTab, projectId, setAiFocus])
 
     const handleUnavailableTool = useCallback((label: string) => {
-        void showAlert(`移动端暂未开放「${label}」，可以先在桌面端使用。`, 'info', 'toast', 2400)
+        void showAlert(`移动端暂未开放「${label}」，可以先在桌面端使用。`, 'info', 'nonInvasive', 2400)
     }, [showAlert])
 
     const handleRename = useCallback(async (name: string) => {
@@ -207,7 +207,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             invalidateProjectList()
             setRenameOpen(false)
         } catch (e) {
-            await showAlert(`重命名失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`重命名失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setRenaming(false)
         }
@@ -220,7 +220,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             invalidateProjectList()
             setCoverOpen(false)
         } catch (e) {
-            await showAlert(`更换封面失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`更换封面失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         }
     }, [projectId, showAlert])
 
@@ -238,7 +238,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             invalidateProjectList()
             setDescriptionOpen(false)
         } catch (e) {
-            await showAlert(`保存描述失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`保存描述失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setDescriptionSaving(false)
         }
@@ -262,7 +262,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             finishProgress()
         } catch (e) {
             closeProgress()
-            await showAlert(`导出世界失败：${String(e)}`, 'error', 'toast', 3200)
+            await showAlert(`导出世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setExporting(false)
         }
@@ -280,7 +280,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             invalidateProjectList()
             pop()
         } catch (e) {
-            await showAlert(`删除项目失败：${String(e)}`, 'error', 'toast', 3000)
+            await showAlert(`删除项目失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         }
     }, [project, projectId, pop, showAlert])
 

@@ -892,7 +892,7 @@ function DesktopAppContent() {
                     handleOpenProject(project)
                 } catch {
                     removeHomeProjectActivity(target.projectId ?? target.id)
-                    await showAlert('这个项目已被删除，已从首页移除。', 'warning', 'toast', 3000)
+                    await showAlert('这个项目已被删除，已从首页移除。', 'warning', 'nonInvasive', 3000)
                 }
                 return
             case 'entry':
@@ -901,7 +901,7 @@ function DesktopAppContent() {
                     const entry = await db_get_entry(target.entryId)
                     if (entry.project_id !== target.projectId) {
                         removeHomeEntryActivity(target.projectId, target.entryId)
-                        await showAlert('这个词条已不属于原项目，已从首页移除。', 'warning', 'toast', 3000)
+                        await showAlert('这个词条已不属于原项目，已从首页移除。', 'warning', 'nonInvasive', 3000)
                         return
                     }
                     handleOpenEntry(entry.project_id, {
@@ -910,7 +910,7 @@ function DesktopAppContent() {
                     })
                 } catch {
                     removeHomeEntryActivity(target.projectId, target.entryId)
-                    await showAlert('这个词条已被删除，已从首页移除。', 'warning', 'toast', 3000)
+                    await showAlert('这个词条已被删除，已从首页移除。', 'warning', 'nonInvasive', 3000)
                 }
                 return
             case 'tool':
@@ -923,7 +923,7 @@ function DesktopAppContent() {
                     })
                 } catch {
                     removeHomeProjectActivity(target.projectId)
-                    await showAlert('这个项目已被删除，已从首页移除。', 'warning', 'toast', 3000)
+                    await showAlert('这个项目已被删除，已从首页移除。', 'warning', 'nonInvasive', 3000)
                 }
                 return
             case 'idea':

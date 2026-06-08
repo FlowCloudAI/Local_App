@@ -544,7 +544,7 @@ function ProjectEditorInner({
             touchProjectUpdatedAt()
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            await showAlert(message, 'error', 'toast', 3000)
+            await showAlert(message, 'error', 'nonInvasive', 3000)
             throw error
         } finally {
             setCoverUpdating(false)
@@ -570,7 +570,7 @@ function ProjectEditorInner({
             finishProgress()
         } catch (error) {
             closeProgress()
-            await showAlert(`导出世界失败：${String(error)}`, 'error', 'toast', 3200)
+            await showAlert(`导出世界失败：${String(error)}`, 'error', 'nonInvasive', 3200)
         } finally {
             setExporting(false)
         }
@@ -659,7 +659,7 @@ function ProjectEditorInner({
             touchProjectUpdatedAt()
             onOpenEntry?.(projectId, {id: created.id, title: created.title})
         } catch (e) {
-            await showAlert(`新建词条失败：${String(e)}`, 'error', 'toast', 2200)
+            await showAlert(`新建词条失败：${String(e)}`, 'error', 'nonInvasive', 2200)
         }
     }, [projectId, onOpenEntry, showAlert, touchProjectUpdatedAt])
 
