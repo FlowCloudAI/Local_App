@@ -1,6 +1,6 @@
 import './MobileNav.css'
 
-export type MobileTab = 'projects' | 'ai' | 'ideas' | 'settings'
+export type MobileTab = 'home' | 'ai' | 'ideas' | 'settings'
 
 interface MobileNavProps {
     activeTab: MobileTab
@@ -8,7 +8,7 @@ interface MobileNavProps {
 }
 
 const TAB_CONFIG: Array<{ key: MobileTab; label: string }> = [
-    {key: 'projects', label: '项目'},
+    {key: 'home', label: '首页'},
     {key: 'ai', label: 'AI'},
     {key: 'ideas', label: '灵感'},
     {key: 'settings', label: '设置'},
@@ -16,11 +16,12 @@ const TAB_CONFIG: Array<{ key: MobileTab; label: string }> = [
 
 function TabIcon({tab}: { tab: MobileTab }) {
     switch (tab) {
-        case 'projects':
+        case 'home':
             return (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
                      strokeLinejoin="round">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    <path d="M3 10.5 12 3l9 7.5"/>
+                    <path d="M5.5 9.5V20h5v-5.5h3V20h5V9.5"/>
                 </svg>
             )
         case 'ai':

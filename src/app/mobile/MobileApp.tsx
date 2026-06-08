@@ -13,6 +13,7 @@ import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
 import MobileEntryList from './pages/MobileEntryList'
+import MobileHome from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
@@ -40,7 +41,7 @@ type PageProps = {
 function getPageTitle(type: string, params?: Record<string, unknown>): string {
     const name = params?.displayName as string | undefined
     switch (type) {
-        case 'projectList': return '项目'
+        case 'projectList': return name || '世界观'
         case 'projectHome': return name || '项目'
         case 'entryList':   return name || '词条'
         case 'entryDetail': return name || '词条'
@@ -64,7 +65,7 @@ function getHeaderTitle(activeTab: MobileTab, page: MobilePage | null): string {
         if (title) return title
     }
     switch (activeTab) {
-        case 'projects': return '项目'
+        case 'home': return '首页'
         case 'ai': return 'AI 对话'
         case 'ideas': return '灵感便签'
         case 'settings': return '设置'
@@ -76,19 +77,19 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
     const beforeBackRef = useRef<MobileBeforeBack | null>(null)
-    const [activeTab, setActiveTab] = useState<MobileTab>('projects')
+    const [activeTab, setActiveTab] = useState<MobileTab>('home')
 
-    const projectsStack = usePageStack()
+    const homeStack = usePageStack()
     const aiStack = usePageStack()
     const ideasStack = usePageStack()
     const settingsStack = usePageStack()
 
     const stacks = useMemo(() => ({
-        projects: projectsStack,
+        home: homeStack,
         ai: aiStack,
         ideas: ideasStack,
         settings: settingsStack,
-    }), [projectsStack, aiStack, ideasStack, settingsStack])
+    }), [homeStack, aiStack, ideasStack, settingsStack])
 
     const activeStack = stacks[activeTab]
     const currentPage = activeStack.currentPage
@@ -225,10 +226,13 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             </header>
 
             <div className="mobile-app__content">
-                {/* 项目 Tab */}
-                {activeTab === 'projects' && (
+                {/* 首页 Tab */}
+                {activeTab === 'home' && (
                     <>
-                        {(!currentPage || pageType === 'projectList') && (
+                        {!currentPage && (
+                            <MobileHome {...pageProps}/>
+                        )}
+                        {pageType === 'projectList' && currentPage && (
                             <MobileProjectList {...pageProps}/>
                         )}
                         {pageType === 'projectHome' && currentPage && (
