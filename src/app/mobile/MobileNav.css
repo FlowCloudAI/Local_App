@@ -3,10 +3,13 @@
     justify-content: space-around;
     align-items: stretch;
     /* 按钮区 56px + 安全区底部间距，两者不互相覆盖 */
-    padding-bottom: env(safe-area-inset-bottom, 0);
-    background: var(--fc-color-bg-elevated);
-    border-top: 1px solid var(--fc-color-border);
+    padding: 0 8px env(safe-area-inset-bottom, 0);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 90%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    box-shadow: 0 -0.4rem 1.4rem color-mix(in srgb, var(--fc-color-text) 7%, transparent);
+    backdrop-filter: blur(18px);
     flex-shrink: 0;
+    z-index: 30;
 }
 
 .mobile-nav__item {
@@ -16,7 +19,7 @@
     justify-content: center;
     gap: 2px;
     flex: 1;
-    min-height: 56px;
+    min-height: 58px;
     border: none;
     background: none;
     cursor: pointer;
@@ -24,12 +27,17 @@
     font-size: var(--fc-font-size-xs);
     transition: color 0.15s;
     padding: 8px 4px;
+    border-radius: 14px;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
 
 .mobile-nav__item.active {
     color: var(--fc-color-primary);
+}
+
+.mobile-nav__item:active {
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
 }
 
 .mobile-nav__icon {
@@ -46,6 +54,7 @@
 }
 
 .mobile-nav__label {
-    font-size: var(--fc-font-size-2xs, 0.625rem);
+    font-size: 0.68rem;
+    font-weight: var(--fc-font-weight-medium);
     line-height: 1;
 }

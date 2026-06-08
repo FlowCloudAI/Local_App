@@ -5,6 +5,7 @@
     height: 100dvh;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--fc-font-family), sans-serif;
     overflow: hidden;
 }
 
@@ -12,12 +13,14 @@
     display: flex;
     align-items: flex-end; /* 内容贴底，safe-area 在上方 */
     box-sizing: border-box;
-    height: calc(44px + env(safe-area-inset-top, 0));
-    padding: 0 8px 0; /* 顶部由 height 撑开，无需 padding-top */
+    height: calc(48px + env(safe-area-inset-top, 0));
+    padding: 0 10px 0; /* 顶部由 height 撑开，无需 padding-top */
     padding-top: env(safe-area-inset-top, 0);
-    background: var(--fc-color-bg-elevated);
-    border-bottom: 1px solid var(--fc-color-border);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    backdrop-filter: blur(18px);
     flex-shrink: 0;
+    z-index: 20;
 }
 
 .mobile-app__back-btn {
@@ -31,14 +34,14 @@
     background: none;
     color: var(--fc-color-primary);
     cursor: pointer;
-    border-radius: var(--fc-radius-sm);
+    border-radius: var(--fc-radius-full);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation; /* 去掉 300ms 点击延迟 */
     flex-shrink: 0;
 }
 
 .mobile-app__back-btn:active {
-    background: var(--fc-color-bg-tertiary);
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
 }
 
 .mobile-app__back-btn svg {
@@ -55,12 +58,14 @@
 .mobile-app__title {
     flex: 1;
     text-align: center;
-    font-size: var(--fc-font-size-md);
-    font-weight: 600;
+    font-size: 0.98rem;
+    font-weight: 650;
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    letter-spacing: 0;
+    padding-bottom: 0.75rem;
 }
 
 .mobile-app__content {
@@ -68,6 +73,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    background: var(--fc-color-bg);
 }
 
 /* 移动端页面通用样式 */
@@ -75,6 +81,12 @@
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+}
+
+.mobile-page::-webkit-scrollbar {
+    display: none;
 }
 
 .mobile-page__loading {
@@ -117,21 +129,24 @@
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
-    padding: 12px;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-sm);
+    padding: 14px 15px;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
+    border-radius: 14px;
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
     cursor: pointer;
-    box-shadow: var(--fc-shadow-sm);
+    box-shadow:
+        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
 
 .mobile-list-card:active {
-    background: var(--fc-color-bg-tertiary);
+    transform: scale(0.99);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg-elevated));
 }
 
 .mobile-list-card__row {
@@ -150,7 +165,7 @@
 .mobile-list-card__title {
     display: block;
     font-size: var(--fc-font-size-md);
-    font-weight: 600;
+    font-weight: 650;
     line-height: 1.35;
     color: var(--fc-color-text);
     overflow: hidden;
@@ -211,8 +226,9 @@
     gap: 8px;
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
-    background: var(--fc-color-bg-elevated);
-    border-top: 1px solid var(--fc-color-border);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    backdrop-filter: blur(18px);
     flex-shrink: 0;
 }
 

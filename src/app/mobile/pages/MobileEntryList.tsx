@@ -46,6 +46,7 @@ function toEntryCoverSrc(cover?: string | null): string | undefined {
 export default function MobileEntryList({push, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
     const categoryId = (params?.categoryId as string) || null
+    const listTitle = (params?.displayName as string | undefined) || '全部词条'
 
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
@@ -110,14 +111,31 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
 
     return (
         <div className="mobile-page mobile-entry-list">
+            <div className="mobile-entry-list__hero">
+                <div className="mobile-entry-list__hero-copy">
+                    <span className="mobile-entry-list__eyebrow">{loading ? '正在同步' : `${entries.length} 个词条`}</span>
+                    <h2 className="mobile-entry-list__title">{listTitle}</h2>
+                </div>
+                <button
+                    type="button"
+                    className="mobile-entry-list__create"
+                    onClick={handleCreateEntry}
+                    aria-label="新建词条"
+                >
+                    +
+                </button>
+            </div>
+
             <div className="mobile-entry-list__toolbar">
                 <Input
                     placeholder="搜索词条…"
                     value={searchText}
                     onValueChange={handleSearch}
                     className="mobile-entry-list__search"
+                    radius="full"
+                    size="lg"
+                    allowClear
                 />
-                <Button type="button" size="sm" onClick={handleCreateEntry}>新建</Button>
             </div>
 
             {/* 类型筛选 */}
@@ -204,12 +222,7 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                                     ) : undefined}
                                     variant="shadow"
                                     hoverable
-                                    expandContentOnHover
-                                    imageHeight="100%"
-                                    contentAreaRatio={0.5}
-                                    hoverContentAreaRatio={0.8}
-                                    overlayStartOpacity={1}
-                                    overlayEndOpacity={0}
+                                    imageHeight="58%"
                                     onClick={() => handleOpenEntry(entry)}
                                 />
                             )
