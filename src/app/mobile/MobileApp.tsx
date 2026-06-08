@@ -251,7 +251,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         reason: string,
         detail?: Record<string, unknown>,
     ) => {
-        logger.debug('[移动端分类抽屉手势] 取消', {
+        logger.info('[移动端分类抽屉手势] 取消', {
             pointerId,
             reason,
             ...detail,
@@ -281,7 +281,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             tracking: false,
         }
         dragElement.setPointerCapture(event.pointerId)
-        logger.debug('[移动端分类抽屉手势] 按下', {
+        logger.info('[移动端分类抽屉手势] 按下', {
             pointerId: event.pointerId,
             pointerType: event.pointerType,
             open: categoryDrawerOpen,
@@ -324,7 +324,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             }
             dragState.tracking = true
             setCategoryDrawerDragging(true)
-            logger.debug('[移动端分类抽屉手势] 开始识别', {
+            logger.info('[移动端分类抽屉手势] 开始识别', {
                 pointerId: event.pointerId,
                 open: categoryDrawerOpen,
                 dx: Math.round(dx),
@@ -355,7 +355,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 ? dragDistance > -closeDistance
                 : dragDistance >= openDistance
             : categoryDrawerOpen
-        logger.debug('[移动端分类抽屉手势] 结算', {
+        logger.info('[移动端分类抽屉手势] 结算', {
             pointerId: event.pointerId,
             tracking: dragState.tracking,
             openBefore: categoryDrawerOpen,
