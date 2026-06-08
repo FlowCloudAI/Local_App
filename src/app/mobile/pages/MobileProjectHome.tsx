@@ -2,9 +2,11 @@ import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
+import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {
     db_create_entry,
     db_delete_project,
+    db_export_project_fcworld,
     db_get_project,
     db_get_project_stats,
     db_list_categories,
@@ -16,9 +18,11 @@ import {
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
+import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
 import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
+import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
+import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
 
 interface Props {
     push: (page: MobilePage) => void
@@ -35,9 +39,21 @@ function toProjectImageSrc(coverPath?: string | null): string | undefined {
     return convertFileSrc(coverPath, 'fcimg')
 }
 
+function buildProjectExportFileName(projectName: string): string {
+    const safeName = projectName
+        .split('')
+        .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80)
+    return `${safeName || '世界观'}.fcworld`
+}
+
 export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
     const {showAlert} = useAlert()
+    const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
     const [stats, setStats] = useState<ProjectStats | null>(null)
@@ -46,6 +62,10 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
     const [renameOpen, setRenameOpen] = useState(false)
     const [renaming, setRenaming] = useState(false)
     const [coverOpen, setCoverOpen] = useState(false)
+    const [descriptionOpen, setDescriptionOpen] = useState(false)
+    const [descriptionDraft, setDescriptionDraft] = useState('')
+    const [descriptionSaving, setDescriptionSaving] = useState(false)
+    const [exporting, setExporting] = useState(false)
 
     useEffect(() => {
         if (!projectId) return
@@ -108,6 +128,50 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             await showAlert(`更换封面失败：${String(e)}`, 'error', 'toast', 3000)
         }
     }, [projectId, showAlert])
+
+    const handleOpenDescription = useCallback(() => {
+        setDescriptionDraft(project?.description ?? '')
+        setDescriptionOpen(true)
+    }, [project?.description])
+
+    const handleSaveDescription = useCallback(async () => {
+        setDescriptionSaving(true)
+        try {
+            const description = descriptionDraft.trim() || null
+            const updated = await db_update_project({id: projectId, description})
+            setProject(prev => prev ? {...prev, description: updated.description ?? null} : updated)
+            invalidateProjectList()
+            setDescriptionOpen(false)
+        } catch (e) {
+            await showAlert(`保存描述失败：${String(e)}`, 'error', 'toast', 3000)
+        } finally {
+            setDescriptionSaving(false)
+        }
+    }, [descriptionDraft, projectId, showAlert])
+
+    const handleExportProject = useCallback(async () => {
+        if (!project || exporting) return
+        const selectedPath = await saveFileDialog({
+            defaultPath: buildProjectExportFileName(project.name),
+            filters: [{
+                name: 'FlowCloudAI World',
+                extensions: ['fcworld'],
+            }],
+        })
+        if (!selectedPath) return
+
+        setExporting(true)
+        try {
+            const operationId = startProgress('export', '导出世界')
+            await db_export_project_fcworld(projectId, selectedPath, operationId)
+            finishProgress()
+        } catch (e) {
+            closeProgress()
+            await showAlert(`导出世界失败：${String(e)}`, 'error', 'toast', 3200)
+        } finally {
+            setExporting(false)
+        }
+    }, [closeProgress, exporting, finishProgress, project, projectId, showAlert, startProgress])
 
     const handleDeleteProject = useCallback(async () => {
         const result = await showAlert(
@@ -238,7 +302,9 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 title={project.name}
                 items={[
                     {key: 'rename', label: '重命名', onSelect: () => setRenameOpen(true)},
+                    {key: 'description', label: '编辑描述', onSelect: handleOpenDescription},
                     {key: 'cover', label: '换封面', onSelect: () => setCoverOpen(true)},
+                    {key: 'export', label: exporting ? '导出中…' : '导出 .fcworld', disabled: exporting, onSelect: () => void handleExportProject()},
                     {key: 'delete', label: '删除项目', danger: true, onSelect: () => void handleDeleteProject()},
                 ]}
             />
@@ -253,6 +319,41 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 onConfirm={(name) => void handleRename(name)}
             />
 
+            <FloatingPanel
+                open={descriptionOpen}
+                onClose={() => setDescriptionOpen(false)}
+                dismissible={!descriptionSaving}
+                ariaLabel="编辑项目描述"
+                className="fc-rename-dialog"
+            >
+                <div className="fc-rename-dialog__title">编辑项目描述</div>
+                <textarea
+                    value={descriptionDraft}
+                    onChange={(event) => setDescriptionDraft(event.currentTarget.value)}
+                    disabled={descriptionSaving}
+                    placeholder="项目描述"
+                    rows={5}
+                    style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: 'var(--fc-space-sm)',
+                        border: '1px solid var(--fc-color-border)',
+                        borderRadius: 'var(--fc-radius-sm)',
+                        background: 'var(--fc-color-bg-secondary)',
+                        color: 'var(--fc-color-text)',
+                        font: 'inherit',
+                        lineHeight: 'var(--fc-line-height-normal)',
+                        resize: 'vertical',
+                    }}
+                />
+                <div className="fc-rename-dialog__actions">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setDescriptionOpen(false)} disabled={descriptionSaving}>取消</Button>
+                    <Button type="button" size="sm" onClick={() => void handleSaveDescription()} disabled={descriptionSaving}>
+                        {descriptionSaving ? '保存中…' : '保存'}
+                    </Button>
+                </div>
+            </FloatingPanel>
+
             <ProjectCoverPickerModal
                 open={coverOpen}
                 projectId={projectId}
@@ -261,6 +362,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 onClose={() => setCoverOpen(false)}
                 onSelectCover={(coverPath) => handleChangeCover(coverPath)}
             />
+            <FcworldProgressDialog progress={fcworldProgress} />
         </div>
     )
 }
