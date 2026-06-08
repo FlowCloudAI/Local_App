@@ -283,6 +283,14 @@
     justify-content: flex-end;
 }
 
+.mobile-entry-detail__content-field {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-xs);
+    margin-bottom: var(--fc-space-md);
+}
+
 .mobile-entry-detail__content-input {
     flex: 1 1 15rem;
     min-height: 12.5rem;
@@ -297,6 +305,84 @@
     resize: vertical;
     font-family: inherit;
     box-sizing: border-box;
+}
+
+.mobile-entry-detail__wiki-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: 16rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
+}
+
+.mobile-entry-detail__wiki-panel-title {
+    padding: var(--fc-space-xs) var(--fc-space-sm);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.mobile-entry-detail__wiki-options {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.mobile-entry-detail__wiki-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
+    min-height: 2.75rem;
+    padding: var(--fc-space-sm);
+    border: 0;
+    border-bottom: 1px solid var(--fc-color-border);
+    background: transparent;
+    color: var(--fc-color-text);
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-entry-detail__wiki-option:last-child {
+    border-bottom: 0;
+}
+
+.mobile-entry-detail__wiki-option.is-active {
+    background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+}
+
+.mobile-entry-detail__wiki-option--create {
+    color: var(--fc-color-primary);
+}
+
+.mobile-entry-detail__wiki-option:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
+.mobile-entry-detail__wiki-option-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fc-font-size-sm);
+    font-weight: var(--fc-font-weight-medium);
+}
+
+.mobile-entry-detail__wiki-option-meta {
+    flex: 0 0 auto;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.mobile-entry-detail__wiki-empty {
+    padding: var(--fc-space-sm);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
 }
 
 .mobile-entry-detail__title {
