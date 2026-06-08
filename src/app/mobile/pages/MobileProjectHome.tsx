@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
@@ -22,7 +22,14 @@ import {
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {
+    MobileAnchoredActionMenu,
+    type MobileAnchoredMenuItem,
+    MobileBackIcon,
+    MobileTopActionPill,
+    MobileTopIconButton,
+} from '../components/MobileTopControls'
 import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
@@ -77,8 +84,59 @@ function formatNumber(value?: number | null): string {
     return (value ?? 0).toLocaleString('zh-CN')
 }
 
+function ProjectMenuIcon({type}: {type: 'rename' | 'description' | 'cover' | 'export' | 'delete'}) {
+    if (type === 'rename') {
+        return (
+            <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M4.5 16.5 15.8 5.2a2.1 2.1 0 0 1 3 3L7.5 19.5h-3Z"/>
+                <path d="m14 7 3 3"/>
+            </svg>
+        )
+    }
+    if (type === 'description') {
+        return (
+            <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M6 5.5h12"/>
+                <path d="M6 10h12"/>
+                <path d="M6 14.5h8"/>
+                <path d="M6 19h5"/>
+            </svg>
+        )
+    }
+    if (type === 'cover') {
+        return (
+            <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+                <rect x="4" y="5" width="16" height="14" rx="2.5"/>
+                <path d="m7 16 3.5-3.5 2.5 2.5 2-2 3 3"/>
+                <path d="M8.5 9.5h.1"/>
+            </svg>
+        )
+    }
+    if (type === 'export') {
+        return (
+            <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 4v10"/>
+                <path d="m8 10 4 4 4-4"/>
+                <path d="M5 18.5h14"/>
+            </svg>
+        )
+    }
+    return (
+        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M5.5 7h13"/>
+            <path d="M9 7V5.5h6V7"/>
+            <path d="M8 10v8"/>
+            <path d="M12 10v8"/>
+            <path d="M16 10v8"/>
+            <path d="M7 7.5 8 20h8l1-12.5"/>
+        </svg>
+    )
+}
+
 export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
+    const pageRef = useRef<HTMLDivElement>(null)
+    const topActionsRef = useRef<HTMLDivElement>(null)
     const {showAlert} = useAlert()
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
     const [project, setProject] = useState<Project | null>(null)
@@ -288,36 +346,76 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
         {key: 'map', label: '世界地图', meta: '地图'},
         {key: 'check', label: '设定检测', meta: internalLinkCount > 0 ? `${formatNumber(internalLinkCount)} 内链` : '质检'},
     ]
+    const projectMenuItems: MobileAnchoredMenuItem[] = [
+        {
+            key: 'rename',
+            label: '重命名',
+            description: '修改世界名称',
+            icon: <ProjectMenuIcon type="rename"/>,
+            onSelect: () => setRenameOpen(true),
+        },
+        {
+            key: 'description',
+            label: '编辑描述',
+            description: '记录项目简介',
+            icon: <ProjectMenuIcon type="description"/>,
+            onSelect: handleOpenDescription,
+        },
+        {
+            key: 'cover',
+            label: '换封面',
+            description: '设置顶部封面',
+            icon: <ProjectMenuIcon type="cover"/>,
+            onSelect: () => setCoverOpen(true),
+        },
+        {
+            key: 'export',
+            label: exporting ? '导出中…' : '导出 .fcworld',
+            description: '保存到本地文件',
+            icon: <ProjectMenuIcon type="export"/>,
+            disabled: exporting,
+            onSelect: () => void handleExportProject(),
+        },
+        {
+            key: 'delete',
+            label: '删除项目',
+            description: '永久删除当前世界',
+            icon: <ProjectMenuIcon type="delete"/>,
+            danger: true,
+            onSelect: () => void handleDeleteProject(),
+        },
+    ]
 
     return (
-        <div className="mobile-page mobile-project-home">
+        <div ref={pageRef} className="mobile-page mobile-project-home">
             <div className="mobile-project-home__topbar">
-                <button
+                <MobileTopIconButton
                     type="button"
-                    className="mobile-project-home__back"
+                    icon={<MobileBackIcon/>}
                     aria-label="返回"
                     onClick={pop}
-                >
-                    ‹
-                </button>
-                <div className="mobile-project-home__top-actions">
-                    <button
-                        type="button"
-                        className="mobile-project-home__top-action"
-                        aria-label="新建词条"
-                        onClick={() => void handleCreateEntry(null)}
-                    >
-                        +
-                    </button>
-                    <button
-                        type="button"
-                        className="mobile-project-home__top-action"
-                        aria-label="项目管理"
-                        onClick={() => setMenuOpen(true)}
-                    >
-                        …
-                    </button>
-                </div>
+                />
+                <MobileTopActionPill
+                    ref={topActionsRef}
+                    actions={[
+                        {
+                            key: 'create',
+                            label: '新建词条',
+                            icon: '+',
+                            kind: 'add',
+                            onClick: () => void handleCreateEntry(null),
+                        },
+                        {
+                            key: 'menu',
+                            label: '项目管理',
+                            icon: '…',
+                            kind: 'more',
+                            ariaHasPopup: 'menu',
+                            ariaExpanded: menuOpen,
+                            onClick: () => setMenuOpen(open => !open),
+                        },
+                    ]}
+                />
             </div>
 
             <section className="mobile-project-home__hero">
@@ -480,17 +578,13 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                     </div>
                 </section>
             )}
-            <ActionMenu
+            <MobileAnchoredActionMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                title={project.name}
-                items={[
-                    {key: 'rename', label: '重命名', onSelect: () => setRenameOpen(true)},
-                    {key: 'description', label: '编辑描述', onSelect: handleOpenDescription},
-                    {key: 'cover', label: '换封面', onSelect: () => setCoverOpen(true)},
-                    {key: 'export', label: exporting ? '导出中…' : '导出 .fcworld', disabled: exporting, onSelect: () => void handleExportProject()},
-                    {key: 'delete', label: '删除项目', danger: true, onSelect: () => void handleDeleteProject()},
-                ]}
+                anchorRef={topActionsRef}
+                containerRef={pageRef}
+                ariaLabel="项目管理"
+                items={projectMenuItems}
             />
 
             <RenameDialog

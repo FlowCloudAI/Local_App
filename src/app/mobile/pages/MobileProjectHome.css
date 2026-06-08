@@ -1,6 +1,7 @@
 .mobile-project-home {
     --mobile-project-home-x: clamp(1rem, 4vw, 1.35rem);
 
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 1.05rem;
@@ -15,63 +16,12 @@
     min-height: 2.55rem;
 }
 
-.mobile-project-home__back,
-.mobile-project-home__top-action,
 .mobile-project-home__section-action {
     border: 0;
     font: inherit;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-}
-
-.mobile-project-home__back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.45rem;
-    height: 2.45rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 84%, transparent);
-    color: var(--fc-color-primary);
-    font-size: 2rem;
-    line-height: 1;
-    box-shadow:
-        0 0.25rem 0.85rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
-}
-
-.mobile-project-home__top-actions {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.12rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
-    box-shadow:
-        0 0.25rem 0.85rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
-}
-
-.mobile-project-home__top-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.35rem;
-    height: 2.25rem;
-    padding: 0;
-    border-radius: var(--fc-radius-full);
-    background: transparent;
-    color: var(--fc-color-primary);
-    font-size: 1.55rem;
-    font-weight: 720;
-    line-height: 1;
-}
-
-.mobile-project-home__top-action:first-child {
-    font-size: 1.72rem;
-    font-weight: var(--fc-font-weight-medium);
 }
 
 .mobile-project-home__hero {
@@ -402,8 +352,6 @@
     font-size: var(--fc-font-size-xs);
 }
 
-.mobile-project-home__back:active,
-.mobile-project-home__top-action:active,
 .mobile-project-home__description:active,
 .mobile-project-home__next-card:active,
 .mobile-project-home__cell:active,

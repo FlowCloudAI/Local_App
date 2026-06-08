@@ -40,6 +40,7 @@ import {
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import {MobileTopActionPill} from '../components/MobileTopControls'
 import './MobileHome.css'
 
 interface Props {
@@ -857,26 +858,27 @@ export default function MobileHome({
                             </span>
                             <h2 className="mobile-home-worlds__title">世界观</h2>
                         </div>
-                        <div ref={worldActionsRef} className="mobile-home-worlds__actions">
-                            <button
-                                type="button"
-                                className="mobile-home-worlds__icon-btn"
-                                aria-label="新建世界观"
-                                onClick={() => setCreatorOpen(true)}
-                            >
-                                +
-                            </button>
-                            <button
-                                type="button"
-                                className="mobile-home-worlds__filter"
-                                aria-label="筛选与排序"
-                                aria-haspopup="menu"
-                                aria-expanded={filterOpen}
-                                onClick={toggleFilterMenu}
-                            >
-                                …
-                            </button>
-                        </div>
+                        <MobileTopActionPill
+                            ref={worldActionsRef}
+                            actions={[
+                                {
+                                    key: 'create',
+                                    label: '新建世界观',
+                                    icon: '+',
+                                    kind: 'add',
+                                    onClick: () => setCreatorOpen(true),
+                                },
+                                {
+                                    key: 'filter',
+                                    label: '筛选与排序',
+                                    icon: '…',
+                                    kind: 'more',
+                                    ariaHasPopup: 'menu',
+                                    ariaExpanded: filterOpen,
+                                    onClick: toggleFilterMenu,
+                                },
+                            ]}
+                        />
                     </div>
 
                     <Input
