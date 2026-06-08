@@ -9,11 +9,15 @@ import {
     db_export_project_fcworld,
     db_get_project,
     db_get_project_stats,
+    db_list_all_entry_types,
     db_list_categories,
+    db_list_tag_schemas,
     db_update_project,
     type Category,
+    type EntryTypeView,
     type Project,
     type ProjectStats,
+    type TagSchema,
 } from '../../../api'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
@@ -51,12 +55,36 @@ function buildProjectExportFileName(projectName: string): string {
     return `${safeName || '世界观'}.fcworld`
 }
 
+function parseDateMs(value?: string | null): number {
+    if (!value) return 0
+    const normalized = value.includes('T') ? value : value.replace(' ', 'T')
+    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
+    const time = new Date(withTimezone).getTime()
+    return Number.isNaN(time) ? 0 : time
+}
+
+function formatDate(value?: string | null): string {
+    const timestamp = parseDateMs(value)
+    if (!timestamp) return '时间未知'
+    return new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(timestamp)
+}
+
+function formatNumber(value?: number | null): string {
+    return (value ?? 0).toLocaleString('zh-CN')
+}
+
 export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
     const {showAlert} = useAlert()
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
+    const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
+    const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
     const [stats, setStats] = useState<ProjectStats | null>(null)
     const [loading, setLoading] = useState(true)
     const [menuOpen, setMenuOpen] = useState(false)
@@ -75,10 +103,14 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
             db_get_project(projectId),
             db_list_categories(projectId),
             db_get_project_stats(projectId),
-        ]).then(([p, cats, s]) => {
+            db_list_all_entry_types(projectId),
+            db_list_tag_schemas(projectId),
+        ]).then(([p, cats, s, types, tags]) => {
             setProject(p)
             setCategories(cats)
             setStats(s)
+            setEntryTypes(types)
+            setTagSchemas(tags)
         }).catch(logger.error).finally(() => setLoading(false))
     }, [projectId])
 
@@ -104,6 +136,10 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
         setAiFocus({projectId, entryId: null})
         navigateToTab('ai')
     }, [navigateToTab, projectId, setAiFocus])
+
+    const handleUnavailableTool = useCallback((label: string) => {
+        void showAlert(`移动端暂未开放「${label}」，可以先在桌面端使用。`, 'info', 'toast', 2400)
+    }, [showAlert])
 
     const handleRename = useCallback(async (name: string) => {
         setRenaming(true)
@@ -194,9 +230,96 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
     if (!project) return <div className="mobile-page__error">项目不存在</div>
 
     const image = toProjectImageSrc(project.cover_path)
+    const entryCount = stats?.entryCount ?? 0
+    const imageCount = stats?.imageCount ?? 0
+    const wordCount = stats?.wordCount ?? 0
+    const relationCount = stats?.relationCount ?? 0
+    const internalLinkCount = stats?.internalLinkCount ?? 0
+    const categoryCount = categories.length
+    const rootCategories = categories
+        .filter(category => !category.parent_id)
+        .sort((first, second) => first.sort_order - second.sort_order)
+    const categoryChildCounts = new Map<string, number>()
+    categories.forEach(category => {
+        if (!category.parent_id) return
+        categoryChildCounts.set(category.parent_id, (categoryChildCounts.get(category.parent_id) ?? 0) + 1)
+    })
+    const categoryEntryCounts = new Map<string, number>()
+    stats?.entriesByCategory.forEach(item => {
+        if (item.categoryId) categoryEntryCounts.set(item.categoryId, item.count)
+    })
+    const statItems = [
+        {key: 'entries', label: '词条', value: formatNumber(entryCount)},
+        {key: 'categories', label: '分类', value: formatNumber(categoryCount)},
+        {key: 'types', label: '类型', value: formatNumber(entryTypes.length)},
+        {key: 'tags', label: '标签', value: formatNumber(tagSchemas.length)},
+        {key: 'images', label: '图片', value: formatNumber(imageCount)},
+        {key: 'words', label: '字数', value: formatNumber(wordCount)},
+    ]
+    const nextSteps = [
+        {
+            key: 'entry',
+            title: entryCount > 0 ? '继续补充词条' : '创建第一条词条',
+            description: entryCount > 0 ? '把新的角色、地点或事件写进当前世界。' : '先落下世界里的第一个实体。',
+            action: entryCount > 0 ? '新建词条' : '写第一条',
+            tone: 'primary',
+            onClick: () => void handleCreateEntry(null),
+        },
+        {
+            key: 'ai',
+            title: project.description?.trim() ? '让 AI 梳理下一步' : '让 AI 起草世界框架',
+            description: project.description?.trim() ? '基于现有资料扩写设定、整理缺口。' : '先生成世界方向、核心冲突和设定清单。',
+            action: 'AI 讨论',
+            tone: 'ai',
+            onClick: handleOpenAi,
+        },
+        {
+            key: 'structure',
+            title: categoryCount > 0 && tagSchemas.length > 0 ? '完善资料结构' : '建立资料规则',
+            description: categoryCount > 0 && tagSchemas.length > 0 ? '继续补齐类型、标签和分类规则。' : '为词条准备清晰的分类和标签。',
+            action: '类型与标签',
+            tone: 'structure',
+            onClick: () => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}}),
+        },
+    ]
+    const advancedTools = [
+        {key: 'relation', label: '关系图谱', meta: `${formatNumber(relationCount)} 关系`},
+        {key: 'timeline', label: '时间线', meta: '时序'},
+        {key: 'map', label: '世界地图', meta: '地图'},
+        {key: 'check', label: '设定检测', meta: internalLinkCount > 0 ? `${formatNumber(internalLinkCount)} 内链` : '质检'},
+    ]
 
     return (
         <div className="mobile-page mobile-project-home">
+            <div className="mobile-project-home__topbar">
+                <button
+                    type="button"
+                    className="mobile-project-home__back"
+                    aria-label="返回"
+                    onClick={pop}
+                >
+                    ‹
+                </button>
+                <div className="mobile-project-home__top-actions">
+                    <button
+                        type="button"
+                        className="mobile-project-home__top-action"
+                        aria-label="新建词条"
+                        onClick={() => void handleCreateEntry(null)}
+                    >
+                        +
+                    </button>
+                    <button
+                        type="button"
+                        className="mobile-project-home__top-action"
+                        aria-label="项目管理"
+                        onClick={() => setMenuOpen(true)}
+                    >
+                        …
+                    </button>
+                </div>
+            </div>
+
             <section className="mobile-project-home__hero">
                 {image ? (
                     <img
@@ -214,21 +337,26 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                         <span className="mobile-project-home__eyebrow">世界观</span>
                         <h2 className="mobile-project-home__title">{project.name}</h2>
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={() => setMenuOpen(true)}>
-                        管理
-                    </Button>
                 </div>
-                {project.description && (
-                    <p className="mobile-project-home__description">
-                        {project.description}
-                    </p>
-                )}
-                {stats && (
-                    <div className="mobile-project-home__stats">
-                        <span className="mobile-project-home__stat">{stats.wordCount?.toLocaleString() ?? 0} 字</span>
-                        <span className="mobile-project-home__stat">{stats.imageCount ?? 0} 张图片</span>
-                    </div>
-                )}
+                <button
+                    type="button"
+                    className={`mobile-project-home__description${project.description ? '' : ' is-placeholder'}`}
+                    onClick={handleOpenDescription}
+                >
+                    {project.description || '添加项目描述'}
+                </button>
+                <div className="mobile-project-home__meta-row">
+                    <span>创建 {formatDate(project.created_at)}</span>
+                    <span>更新 {formatDate(project.updated_at)}</span>
+                </div>
+                <div className="mobile-project-home__stats" aria-label="项目统计">
+                    {statItems.map(item => (
+                        <span key={item.key} className="mobile-project-home__stat">
+                            <strong>{item.value}</strong>
+                            <span>{item.label}</span>
+                        </span>
+                    ))}
+                </div>
             </section>
 
             <div className="mobile-project-home__actions">
@@ -236,53 +364,119 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 <Button type="button" size="sm" variant="outline" className="mobile-project-home__action" onClick={handleOpenAi}>AI 讨论</Button>
             </div>
 
-            <button
-                type="button"
-                className="mobile-list-card"
-                onClick={() => handleOpenEntryList(null, '全部词条')}
-            >
-                <span className="mobile-list-card__title">全部词条</span>
-                <span className="mobile-list-card__description">浏览项目中所有词条</span>
-            </button>
+            <section className="mobile-project-home__section">
+                <div className="mobile-project-home__section-head">
+                    <h3 className="mobile-project-home__section-title">下一步建议</h3>
+                </div>
+                <div className="mobile-project-home__next-steps">
+                    {nextSteps.map(item => (
+                        <button
+                            type="button"
+                            key={item.key}
+                            className={`mobile-project-home__next-card mobile-project-home__next-card--${item.tone}`}
+                            onClick={item.onClick}
+                        >
+                            <span className="mobile-project-home__next-title">{item.title}</span>
+                            <span className="mobile-project-home__next-desc">{item.description}</span>
+                            <span className="mobile-project-home__next-action">{item.action}</span>
+                        </button>
+                    ))}
+                </div>
+            </section>
 
-            <button
-                type="button"
-                className="mobile-list-card"
-                onClick={() => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}})}
-            >
-                <span className="mobile-list-card__title">类型与标签</span>
-                <span className="mobile-list-card__description">管理词条类型与标签定义</span>
-            </button>
+            <section className="mobile-project-home__section">
+                <div className="mobile-project-home__section-head">
+                    <h3 className="mobile-project-home__section-title">资料</h3>
+                </div>
+                <div className="mobile-project-home__list">
+                    <button
+                        type="button"
+                        className="mobile-project-home__cell"
+                        onClick={() => handleOpenEntryList(null, '全部词条')}
+                    >
+                        <span>
+                            <strong>全部词条</strong>
+                            <small>浏览项目中所有词条</small>
+                        </span>
+                        <em>{formatNumber(entryCount)}</em>
+                    </button>
 
-            <button
-                type="button"
-                className="mobile-list-card"
-                onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
-            >
-                <span className="mobile-list-card__title">分类管理</span>
-                <span className="mobile-list-card__description">新建、重命名、移动或删除分类</span>
-            </button>
+                    <button
+                        type="button"
+                        className="mobile-project-home__cell"
+                        onClick={() => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}})}
+                    >
+                        <span>
+                            <strong>类型与标签</strong>
+                            <small>管理词条类型与标签定义</small>
+                        </span>
+                        <em>{entryTypes.length} / {tagSchemas.length}</em>
+                    </button>
+
+                    <button
+                        type="button"
+                        className="mobile-project-home__cell"
+                        onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
+                    >
+                        <span>
+                            <strong>分类管理</strong>
+                            <small>新建、重命名、移动或删除分类</small>
+                        </span>
+                        <em>{formatNumber(categoryCount)}</em>
+                    </button>
+                </div>
+            </section>
+
+            <section className="mobile-project-home__section">
+                <div className="mobile-project-home__section-head">
+                    <h3 className="mobile-project-home__section-title">高级工具</h3>
+                </div>
+                <div className="mobile-project-home__tool-grid">
+                    {advancedTools.map(tool => (
+                        <button
+                            type="button"
+                            key={tool.key}
+                            className="mobile-project-home__tool"
+                            onClick={() => handleUnavailableTool(tool.label)}
+                        >
+                            <span>{tool.label}</span>
+                            <small>{tool.meta}</small>
+                        </button>
+                    ))}
+                </div>
+            </section>
 
             {categories.length > 0 && (
-                <section className="mobile-project-home__category-section">
-                    <h3 className="mobile-project-home__section-title">
-                        分类 ({categories.length})
-                    </h3>
+                <section className="mobile-project-home__section mobile-project-home__category-section">
+                    <div className="mobile-project-home__section-head">
+                        <h3 className="mobile-project-home__section-title">分类</h3>
+                        <button
+                            type="button"
+                            className="mobile-project-home__section-action"
+                            onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
+                        >
+                            管理
+                        </button>
+                    </div>
                     <div className="mobile-project-home__category-list">
-                        {categories
-                            .filter(c => !c.parent_id)
-                            .sort((a, b) => a.sort_order - b.sort_order)
-                            .map(cat => (
+                        {rootCategories.map(category => {
+                            const childCount = categoryChildCounts.get(category.id) ?? 0
+                            const count = categoryEntryCounts.get(category.id) ?? 0
+                            return (
                                 <button
                                     type="button"
-                                    className="mobile-list-card"
-                                    key={cat.id}
-                                    onClick={() => handleOpenEntryList(cat.id, cat.name)}
+                                    className="mobile-project-home__cell"
+                                    key={category.id}
+                                    onClick={() => handleOpenEntryList(category.id, category.name)}
                                 >
-                                    <span className="mobile-list-card__title">{cat.name}</span>
+                                    <span>
+                                        <strong>{category.name}</strong>
+                                        <small>{count} 词条{childCount > 0 ? ` · ${childCount} 子分类` : ''}</small>
+                                    </span>
+                                    <em>›</em>
                                 </button>
-                            ))
-                        }
+                            )
+                        })}
                     </div>
                 </section>
             )}
