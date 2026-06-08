@@ -4,10 +4,17 @@
     align-items: stretch;
     /* 按钮区 56px + 安全区底部间距，两者不互相覆盖 */
     padding: 0 8px env(safe-area-inset-bottom, 0);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 90%, transparent);
-    border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    box-shadow: 0 -0.4rem 1.4rem color-mix(in srgb, var(--fc-color-text) 7%, transparent);
+    background:
+        linear-gradient(
+            to bottom,
+            transparent 0,
+            transparent 0.8rem,
+            color-mix(in srgb, var(--fc-color-bg-elevated) 24%, transparent) 1.15rem,
+            color-mix(in srgb, var(--fc-color-bg-elevated) 78%, transparent) 2.1rem,
+            color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent) 100%
+        );
     backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     flex-shrink: 0;
     z-index: 30;
 }
