@@ -374,6 +374,12 @@ body {
     border-left: none !important;
 }
 
+.fc-alert-overlay {
+    /* Alert 背景遮罩只保留透明度，不参与磨砂模糊。 */
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
 .fc-alert {
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent) !important;
     -webkit-backdrop-filter: blur(var(--fc-space-xs)) !important;
