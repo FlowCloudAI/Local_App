@@ -190,6 +190,18 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
         push({type: 'entryList', params: {projectId, categoryId: categoryId ?? '', displayName: categoryName}})
     }, [projectId, push])
 
+    const handleOpenUncategorizedEntryList = useCallback(() => {
+        push({
+            type: 'entryList',
+            params: {
+                projectId,
+                categoryId: '',
+                uncategorizedOnly: true,
+                displayName: '默认分类',
+            },
+        })
+    }, [projectId, push])
+
     const handleOpenAi = useCallback(() => {
         setAiFocus({projectId, entryId: null})
         navigateToTab('ai')
@@ -293,6 +305,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
     const wordCount = stats?.wordCount ?? 0
     const relationCount = stats?.relationCount ?? 0
     const internalLinkCount = stats?.internalLinkCount ?? 0
+    const uncategorizedEntryCount = stats?.uncategorizedEntryCount ?? 0
     const categoryCount = categories.length
     const rootCategories = categories
         .filter(category => !category.parent_id)
@@ -544,40 +557,49 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 </div>
             </section>
 
-            {categories.length > 0 && (
-                <section className="mobile-project-home__section mobile-project-home__category-section">
-                    <div className="mobile-project-home__section-head">
-                        <h3 className="mobile-project-home__section-title">分类</h3>
-                        <button
-                            type="button"
-                            className="mobile-project-home__section-action"
-                            onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
-                        >
-                            管理
-                        </button>
-                    </div>
-                    <div className="mobile-project-home__category-list">
-                        {rootCategories.map(category => {
-                            const childCount = categoryChildCounts.get(category.id) ?? 0
-                            const count = categoryEntryCounts.get(category.id) ?? 0
-                            return (
-                                <button
-                                    type="button"
-                                    className="mobile-project-home__cell"
-                                    key={category.id}
-                                    onClick={() => handleOpenEntryList(category.id, category.name)}
-                                >
-                                    <span>
-                                        <strong>{category.name}</strong>
-                                        <small>{count} 词条{childCount > 0 ? ` · ${childCount} 子分类` : ''}</small>
-                                    </span>
-                                    <em>›</em>
-                                </button>
-                            )
-                        })}
-                    </div>
-                </section>
-            )}
+            <section className="mobile-project-home__section mobile-project-home__category-section">
+                <div className="mobile-project-home__section-head">
+                    <h3 className="mobile-project-home__section-title">分类</h3>
+                    <button
+                        type="button"
+                        className="mobile-project-home__section-action"
+                        onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
+                    >
+                        管理
+                    </button>
+                </div>
+                <div className="mobile-project-home__category-list">
+                    <button
+                        type="button"
+                        className="mobile-project-home__cell"
+                        onClick={handleOpenUncategorizedEntryList}
+                    >
+                        <span>
+                            <strong>默认分类</strong>
+                            <small>{formatNumber(uncategorizedEntryCount)} 词条 · 未分类词条</small>
+                        </span>
+                        <em>›</em>
+                    </button>
+                    {rootCategories.map(category => {
+                        const childCount = categoryChildCounts.get(category.id) ?? 0
+                        const count = categoryEntryCounts.get(category.id) ?? 0
+                        return (
+                            <button
+                                type="button"
+                                className="mobile-project-home__cell"
+                                key={category.id}
+                                onClick={() => handleOpenEntryList(category.id, category.name)}
+                            >
+                                <span>
+                                    <strong>{category.name}</strong>
+                                    <small>{count} 词条{childCount > 0 ? ` · ${childCount} 子分类` : ''}</small>
+                                </span>
+                                <em>›</em>
+                            </button>
+                        )
+                    })}
+                </div>
+            </section>
             <MobileAnchoredActionMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}

@@ -45,6 +45,7 @@ function toEntryCoverSrc(cover?: string | null): string | undefined {
 
 export default function MobileEntryList({push, setAiFocus, params}: Props) {
     const projectId = params?.projectId as string
+    const uncategorizedOnly = Boolean(params?.uncategorizedOnly)
     const categoryId = (params?.categoryId as string) || null
     const listTitle = (params?.displayName as string | undefined) || '全部词条'
 
@@ -63,20 +64,26 @@ export default function MobileEntryList({push, setAiFocus, params}: Props) {
                 result = await db_search_entries({
                     projectId,
                     query: query.trim(),
-                    categoryId,
+                    categoryId: uncategorizedOnly ? null : categoryId,
                     entryType: type,
                     limit: 200
                 })
             } else {
-                result = await db_list_entries({projectId, categoryId, entryType: type, limit: 200, offset: 0})
+                result = await db_list_entries({
+                    projectId,
+                    categoryId: uncategorizedOnly ? null : categoryId,
+                    entryType: type,
+                    limit: 200,
+                    offset: 0,
+                })
             }
-            setEntries(result)
+            setEntries(uncategorizedOnly ? result.filter(entry => !entry.category_id) : result)
         } catch (e) {
             logger.error('加载词条失败', e)
         } finally {
             setLoading(false)
         }
-    }, [projectId, categoryId])
+    }, [projectId, categoryId, uncategorizedOnly])
 
     useEffect(() => {
         void load(searchText, typeFilter)
