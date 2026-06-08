@@ -28,7 +28,6 @@ import {
     type MobileAnchoredMenuItem,
     MobileBackIcon,
     MobileTopActionPill,
-    MobileTopIconButton,
 } from '../components/MobileTopControls'
 import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
@@ -42,6 +41,8 @@ interface Props {
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
+    categoryDrawerOpen?: boolean
+    onOpenCategoryDrawer?: () => void
     params?: Record<string, unknown>
 }
 
@@ -133,7 +134,25 @@ function ProjectMenuIcon({type}: {type: 'rename' | 'description' | 'cover' | 'ex
     )
 }
 
-export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus, params}: Props) {
+function CategoryDrawerIcon() {
+    return (
+        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M5 7h14"/>
+            <path d="M5 12h14"/>
+            <path d="M5 17h14"/>
+        </svg>
+    )
+}
+
+export default function MobileProjectHome({
+    push,
+    pop,
+    navigateToTab,
+    setAiFocus,
+    categoryDrawerOpen = false,
+    onOpenCategoryDrawer,
+    params,
+}: Props) {
     const projectId = params?.projectId as string
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
@@ -402,11 +421,22 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
     return (
         <div ref={pageRef} className="mobile-page mobile-project-home">
             <div className="mobile-project-home__topbar">
-                <MobileTopIconButton
-                    type="button"
-                    icon={<MobileBackIcon/>}
-                    aria-label="返回"
-                    onClick={pop}
+                <MobileTopActionPill
+                    actions={[
+                        {
+                            key: 'back',
+                            label: '返回',
+                            icon: <MobileBackIcon/>,
+                            onClick: pop,
+                        },
+                        {
+                            key: 'categories',
+                            label: '显示分类树',
+                            icon: <CategoryDrawerIcon/>,
+                            ariaExpanded: categoryDrawerOpen,
+                            onClick: () => onOpenCategoryDrawer?.(),
+                        },
+                    ]}
                 />
                 <MobileTopActionPill
                     ref={topActionsRef}

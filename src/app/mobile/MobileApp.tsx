@@ -472,7 +472,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     <MobileProjectList {...pageProps}/>
                                 )}
                                 {pageType === 'projectHome' && currentPage && (
-                                    <MobileProjectHome {...pageProps} params={currentPage.params}/>
+                                    <MobileProjectHome
+                                        {...pageProps}
+                                        params={currentPage.params}
+                                        categoryDrawerOpen={categoryDrawerOpen}
+                                        onOpenCategoryDrawer={openCategoryDrawer}
+                                    />
                                 )}
                                 {pageType === 'entryList' && currentPage && (
                                     <MobileEntryList
