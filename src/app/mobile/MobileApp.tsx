@@ -246,7 +246,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
-    const cancelCategoryDrawerDrag = useCallback((pointerId: number) => {
+    const cancelCategoryDrawerDrag = useCallback((
+        pointerId: number,
+        reason: string,
+        detail?: Record<string, unknown>,
+    ) => {
+        logger.debug('[移动端分类抽屉手势] 取消', {
+            pointerId,
+            reason,
+            ...detail,
+        })
         categoryDrawerDragRef.current = null
         const dragElement = categoryDrawerDragElementRef.current
         if (dragElement?.hasPointerCapture(pointerId)) {
@@ -272,6 +281,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             tracking: false,
         }
         dragElement.setPointerCapture(event.pointerId)
+        logger.debug('[移动端分类抽屉手势] 按下', {
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            open: categoryDrawerOpen,
+            drawerWidth: categoryDrawerWidth,
+            startX: Math.round(event.clientX),
+            startY: Math.round(event.clientY),
+            target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
+            area: dragElement.className,
+        })
     }, [categoryDrawerEnabled, categoryDrawerOpen, categoryDrawerWidth])
 
     const handleCategoryDrawerPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -285,16 +304,36 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
         if (!dragState.tracking) {
             if (vertical > 16 && vertical > horizontal) {
-                cancelCategoryDrawerDrag(event.pointerId)
+                cancelCategoryDrawerDrag(event.pointerId, '判定为竖向滚动', {
+                    dx: Math.round(dx),
+                    dy: Math.round(dy),
+                    horizontal: Math.round(horizontal),
+                    vertical: Math.round(vertical),
+                })
                 return
             }
-            if (horizontal < 12 || horizontal < vertical * 1.25) return
+            if (horizontal < 8 || horizontal < vertical * 1.25) return
             if (!categoryDrawerOpen && dx < 0) {
-                cancelCategoryDrawerDrag(event.pointerId)
+                cancelCategoryDrawerDrag(event.pointerId, '关闭状态下左滑', {
+                    dx: Math.round(dx),
+                    dy: Math.round(dy),
+                    horizontal: Math.round(horizontal),
+                    vertical: Math.round(vertical),
+                })
                 return
             }
             dragState.tracking = true
             setCategoryDrawerDragging(true)
+            logger.debug('[移动端分类抽屉手势] 开始识别', {
+                pointerId: event.pointerId,
+                open: categoryDrawerOpen,
+                dx: Math.round(dx),
+                dy: Math.round(dy),
+                horizontal: Math.round(horizontal),
+                vertical: Math.round(vertical),
+                baseOffset: Math.round(dragState.baseOffset),
+                drawerWidth: Math.round(categoryDrawerWidth),
+            })
         }
 
         event.preventDefault()
@@ -316,6 +355,17 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 ? dragDistance > -closeDistance
                 : dragDistance >= openDistance
             : categoryDrawerOpen
+        logger.debug('[移动端分类抽屉手势] 结算', {
+            pointerId: event.pointerId,
+            tracking: dragState.tracking,
+            openBefore: categoryDrawerOpen,
+            shouldOpen,
+            currentOffset: Math.round(currentOffset),
+            dragDistance: Math.round(dragDistance),
+            openDistance: Math.round(openDistance),
+            closeDistance: Math.round(closeDistance),
+            drawerWidth: Math.round(categoryDrawerWidth),
+        })
         if (dragState.tracking) {
             suppressCategoryDrawerClickRef.current = true
             window.setTimeout(() => {
