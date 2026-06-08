@@ -4,10 +4,29 @@ import {closeTopOverlay} from '../../shared/ui/overlay/overlayStack'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {
+    type CSSProperties,
+    type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
 import {listen} from '@tauri-apps/api/event'
-import {exit_app, setting_is_backend_ready, showWindow, type PlatformInfo} from '../../api'
+import {
+    type Category,
+    db_get_project_stats,
+    db_list_categories,
+    exit_app,
+    type ProjectStats,
+    setting_is_backend_ready,
+    showWindow,
+    type PlatformInfo,
+} from '../../api'
 import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
+import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from './components/MobileCategoryDrawer'
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
@@ -28,6 +47,14 @@ interface MobileAppProps {
 let mobileWindowShown = false
 type MobileBeforeBack = () => boolean | Promise<boolean>
 
+interface CategoryDrawerDragState {
+    pointerId: number
+    startX: number
+    startY: number
+    baseOffset: number
+    tracking: boolean
+}
+
 type PageProps = {
     push: (page: MobilePage) => void
     pop: () => void
@@ -36,6 +63,21 @@ type PageProps = {
     setBeforeBack: (handler: MobileBeforeBack | null) => void
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value))
+}
+
+function getCategoryDrawerWidth(): number {
+    if (typeof window === 'undefined') return 320
+    const width = window.innerWidth || 360
+    return clamp(width - 54, 260, 360)
+}
+
+function isTextEditingTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 }
 
 export default function MobileApp({platformInfo}: MobileAppProps) {
@@ -59,10 +101,32 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     const activeStack = stacks[activeTab]
     const currentPage = activeStack.currentPage
+    const pageType = currentPage?.type ?? ''
 
     // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
+    const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false)
+    const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getCategoryDrawerWidth)
+    const [categoryDrawerOffset, setCategoryDrawerOffset] = useState<number | null>(null)
+    const [categoryDrawerDragging, setCategoryDrawerDragging] = useState(false)
+    const [categoryDrawerCategories, setCategoryDrawerCategories] = useState<Category[]>([])
+    const [categoryDrawerStats, setCategoryDrawerStats] = useState<ProjectStats | null>(null)
+    const categoryDrawerDragRef = useRef<CategoryDrawerDragState | null>(null)
+    const categoryDrawerDragElementRef = useRef<HTMLElement | null>(null)
+    const suppressCategoryDrawerClickRef = useRef(false)
+
+    const categoryDrawerProjectId = activeTab === 'home'
+        && (pageType === 'projectHome' || pageType === 'entryList')
+        ? currentPage?.params?.projectId as string | undefined
+        : undefined
+    const categoryDrawerEnabled = Boolean(categoryDrawerProjectId)
+    const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
+        if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'all'}
+        if (currentPage.params.uncategorizedOnly) return {kind: 'uncategorized'}
+        const categoryId = (currentPage.params.categoryId as string | undefined) || ''
+        return categoryId ? {kind: 'category', categoryId} : {kind: 'all'}
+    }, [currentPage?.params, pageType])
 
     useEffect(() => {
         // 浏览器预览无后端信号，跳过监听（backendReady 初始已为 true）。
@@ -85,6 +149,52 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         })
     }, [backendReady, platformInfo.windowControls])
 
+    useEffect(() => {
+        const updateCategoryDrawerWidth = () => {
+            setCategoryDrawerWidth(getCategoryDrawerWidth())
+        }
+        updateCategoryDrawerWidth()
+        window.addEventListener('resize', updateCategoryDrawerWidth)
+        window.visualViewport?.addEventListener('resize', updateCategoryDrawerWidth)
+        return () => {
+            window.removeEventListener('resize', updateCategoryDrawerWidth)
+            window.visualViewport?.removeEventListener('resize', updateCategoryDrawerWidth)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!categoryDrawerEnabled) {
+            setCategoryDrawerOpen(false)
+            setCategoryDrawerOffset(null)
+            setCategoryDrawerDragging(false)
+            categoryDrawerDragRef.current = null
+            return
+        }
+    }, [categoryDrawerEnabled])
+
+    useEffect(() => {
+        if (!categoryDrawerProjectId) {
+            setCategoryDrawerCategories([])
+            setCategoryDrawerStats(null)
+            return
+        }
+        let disposed = false
+        Promise.all([
+            db_list_categories(categoryDrawerProjectId),
+            db_get_project_stats(categoryDrawerProjectId),
+        ]).then(([categories, stats]) => {
+            if (disposed) return
+            setCategoryDrawerCategories(categories)
+            setCategoryDrawerStats(stats)
+        }).catch(error => {
+            if (disposed) return
+            logger.error('加载移动端分类抽屉失败', error)
+        })
+        return () => {
+            disposed = true
+        }
+    }, [categoryDrawerProjectId])
+
     const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeBack'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
@@ -97,9 +207,134 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         },
     }), [activeTab, stacks])
 
-    const handleTabChange = useCallback((tab: MobileTab) => {
-        setActiveTab(tab)
+    const closeCategoryDrawer = useCallback(() => {
+        setCategoryDrawerOpen(false)
+        setCategoryDrawerOffset(null)
+        setCategoryDrawerDragging(false)
+        categoryDrawerDragRef.current = null
+        categoryDrawerDragElementRef.current = null
     }, [])
+
+    const openCategoryDrawer = useCallback(() => {
+        if (!categoryDrawerEnabled) return
+        setCategoryDrawerOffset(null)
+        setCategoryDrawerOpen(true)
+    }, [categoryDrawerEnabled])
+
+    const handleSelectDrawerCategory = useCallback((selection: MobileCategoryDrawerSelection, label: string) => {
+        if (!categoryDrawerProjectId) return
+        closeCategoryDrawer()
+        const nextPage: MobilePage = selection.kind === 'all'
+            ? {type: 'entryList', params: {projectId: categoryDrawerProjectId, categoryId: '', displayName: label}}
+            : selection.kind === 'uncategorized'
+                ? {
+                    type: 'entryList',
+                    params: {
+                        projectId: categoryDrawerProjectId,
+                        categoryId: '',
+                        uncategorizedOnly: true,
+                        displayName: label,
+                    },
+                }
+                : {type: 'entryList', params: {projectId: categoryDrawerProjectId, categoryId: selection.categoryId, displayName: label}}
+
+        if (pageType === 'entryList') {
+            navigation.replace(nextPage)
+        } else {
+            navigation.push(nextPage)
+        }
+    }, [categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
+
+    const cancelCategoryDrawerDrag = useCallback((pointerId: number) => {
+        categoryDrawerDragRef.current = null
+        const dragElement = categoryDrawerDragElementRef.current
+        if (dragElement?.hasPointerCapture(pointerId)) {
+            dragElement.releasePointerCapture(pointerId)
+        }
+        categoryDrawerDragElementRef.current = null
+    }, [])
+
+    const handleCategoryDrawerPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        if (!categoryDrawerEnabled) return
+        if (!event.isPrimary) return
+        if (event.pointerType === 'mouse' && event.button !== 0) return
+        if (isTextEditingTarget(event.target)) return
+
+        const dragElement = event.currentTarget
+        categoryDrawerDragElementRef.current = dragElement
+        categoryDrawerDragRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            baseOffset: categoryDrawerOpen ? categoryDrawerWidth : 0,
+            tracking: false,
+        }
+        dragElement.setPointerCapture(event.pointerId)
+    }, [categoryDrawerEnabled, categoryDrawerOpen, categoryDrawerWidth])
+
+    const handleCategoryDrawerPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        const dragState = categoryDrawerDragRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+
+        const dx = event.clientX - dragState.startX
+        const dy = event.clientY - dragState.startY
+        const horizontal = Math.abs(dx)
+        const vertical = Math.abs(dy)
+
+        if (!dragState.tracking) {
+            if (vertical > 16 && vertical > horizontal) {
+                cancelCategoryDrawerDrag(event.pointerId)
+                return
+            }
+            if (horizontal < 18 || horizontal < vertical * 1.45) return
+            if (!categoryDrawerOpen && dx < 0) {
+                cancelCategoryDrawerDrag(event.pointerId)
+                return
+            }
+            dragState.tracking = true
+            setCategoryDrawerDragging(true)
+        }
+
+        event.preventDefault()
+        setCategoryDrawerOffset(clamp(dragState.baseOffset + dx, 0, categoryDrawerWidth))
+    }, [cancelCategoryDrawerDrag, categoryDrawerOpen, categoryDrawerWidth])
+
+    const finishCategoryDrawerDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        const dragState = categoryDrawerDragRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+
+        const currentOffset = categoryDrawerOffset ?? (categoryDrawerOpen ? categoryDrawerWidth : 0)
+        const shouldOpen = dragState.tracking
+            ? currentOffset > categoryDrawerWidth * 0.46
+            : categoryDrawerOpen
+        if (dragState.tracking) {
+            suppressCategoryDrawerClickRef.current = true
+            window.setTimeout(() => {
+                suppressCategoryDrawerClickRef.current = false
+            }, 180)
+        }
+        categoryDrawerDragRef.current = null
+        setCategoryDrawerOffset(null)
+        setCategoryDrawerDragging(false)
+        setCategoryDrawerOpen(shouldOpen)
+
+        const dragElement = categoryDrawerDragElementRef.current
+        if (dragElement?.hasPointerCapture(event.pointerId)) {
+            dragElement.releasePointerCapture(event.pointerId)
+        }
+        categoryDrawerDragElementRef.current = null
+    }, [categoryDrawerOffset, categoryDrawerOpen, categoryDrawerWidth])
+
+    const handleCategoryDrawerClickCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+        if (!suppressCategoryDrawerClickRef.current) return
+        event.preventDefault()
+        event.stopPropagation()
+    }, [])
+
+    const handleTabChange = useCallback((tab: MobileTab) => {
+        closeCategoryDrawer()
+        setActiveTab(tab)
+    }, [closeCategoryDrawer])
 
     const setBeforeBack = useCallback((handler: MobileBeforeBack | null) => {
         beforeBackRef.current = handler
@@ -108,6 +343,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const handleBack = useCallback(() => {
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
         if (closeTopOverlay()) return
+        if (categoryDrawerOpen) {
+            closeCategoryDrawer()
+            return
+        }
         void (async () => {
             const beforeBack = beforeBackRef.current
             if (beforeBack) {
@@ -130,7 +369,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 }
             }
         })()
-    }, [activeStack, showAlert])
+    }, [activeStack, categoryDrawerOpen, closeCategoryDrawer, showAlert])
 
     useEffect(() => {
         const handleAndroidBack = () => {
@@ -173,59 +412,107 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         )
     }
 
-    const pageType = currentPage?.type ?? ''
+    const categoryDrawerSurfaceOffset = categoryDrawerOffset ?? (categoryDrawerOpen ? categoryDrawerWidth : 0)
 
     return (
         <div className="mobile-app">
-            <div className="mobile-app__content">
-                {/* 首页 Tab */}
-                {activeTab === 'home' && (
-                    <>
-                        {!currentPage && (
-                            <MobileHome
-                                {...pageProps}
-                                activePanel={homePanel}
-                                onActivePanelChange={setHomePanel}
-                            />
-                        )}
-                        {pageType === 'projectList' && currentPage && (
-                            <MobileProjectList {...pageProps}/>
-                        )}
-                        {pageType === 'projectHome' && currentPage && (
-                            <MobileProjectHome {...pageProps} params={currentPage.params}/>
-                        )}
-                        {pageType === 'entryList' && currentPage && (
-                            <MobileEntryList {...pageProps} params={currentPage.params}/>
-                        )}
-                        {pageType === 'entryDetail' && currentPage && (
-                            <MobileEntryDetail {...pageProps} params={currentPage.params}/>
-                        )}
-                        {pageType === 'projectDefs' && currentPage && (
-                            <MobileTypeTagManager params={currentPage.params}/>
-                        )}
-                        {pageType === 'categoryManager' && currentPage && (
-                            <MobileCategoryManager {...pageProps} params={currentPage.params}/>
-                        )}
-                    </>
+            <div
+                className={`mobile-app-category-shell${categoryDrawerEnabled ? ' is-enabled' : ''}${categoryDrawerOpen ? ' is-open' : ''}${categoryDrawerDragging ? ' is-dragging' : ''}`}
+                style={{
+                    '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
+                    '--mobile-entry-drawer-shift': `${categoryDrawerSurfaceOffset}px`,
+                } as CSSProperties}
+            >
+                {categoryDrawerEnabled && (
+                    <div
+                        className="mobile-app-category-shell__drawer"
+                        onPointerDown={handleCategoryDrawerPointerDown}
+                        onPointerMove={handleCategoryDrawerPointerMove}
+                        onPointerUp={finishCategoryDrawerDrag}
+                        onPointerCancel={finishCategoryDrawerDrag}
+                        onPointerLeave={finishCategoryDrawerDrag}
+                        onClickCapture={handleCategoryDrawerClickCapture}
+                    >
+                        <MobileCategoryDrawer
+                            categories={categoryDrawerCategories}
+                            stats={categoryDrawerStats}
+                            selected={categoryDrawerSelection}
+                            onSelect={handleSelectDrawerCategory}
+                        />
+                    </div>
                 )}
+                <div
+                    className="mobile-app-category-shell__surface"
+                    onPointerDown={handleCategoryDrawerPointerDown}
+                    onPointerMove={handleCategoryDrawerPointerMove}
+                    onPointerUp={finishCategoryDrawerDrag}
+                    onPointerCancel={finishCategoryDrawerDrag}
+                    onPointerLeave={finishCategoryDrawerDrag}
+                    onClickCapture={handleCategoryDrawerClickCapture}
+                >
+                    <button
+                        type="button"
+                        className="mobile-app-category-shell__surface-close"
+                        aria-label="关闭分类树"
+                        tabIndex={categoryDrawerOpen ? 0 : -1}
+                        onClick={closeCategoryDrawer}
+                    />
+                    <div className="mobile-app__content">
+                        {/* 首页 Tab */}
+                        {activeTab === 'home' && (
+                            <>
+                                {!currentPage && (
+                                    <MobileHome
+                                        {...pageProps}
+                                        activePanel={homePanel}
+                                        onActivePanelChange={setHomePanel}
+                                    />
+                                )}
+                                {pageType === 'projectList' && currentPage && (
+                                    <MobileProjectList {...pageProps}/>
+                                )}
+                                {pageType === 'projectHome' && currentPage && (
+                                    <MobileProjectHome {...pageProps} params={currentPage.params}/>
+                                )}
+                                {pageType === 'entryList' && currentPage && (
+                                    <MobileEntryList
+                                        {...pageProps}
+                                        params={currentPage.params}
+                                        categoryDrawerOpen={categoryDrawerOpen}
+                                        onOpenCategoryDrawer={openCategoryDrawer}
+                                    />
+                                )}
+                                {pageType === 'entryDetail' && currentPage && (
+                                    <MobileEntryDetail {...pageProps} params={currentPage.params}/>
+                                )}
+                                {pageType === 'projectDefs' && currentPage && (
+                                    <MobileTypeTagManager params={currentPage.params}/>
+                                )}
+                                {pageType === 'categoryManager' && currentPage && (
+                                    <MobileCategoryManager {...pageProps} params={currentPage.params}/>
+                                )}
+                            </>
+                        )}
 
-                {/* AI Tab */}
-                {activeTab === 'ai' && (
-                    <MobileAiChat {...pageProps}/>
-                )}
+                        {/* AI Tab */}
+                        {activeTab === 'ai' && (
+                            <MobileAiChat {...pageProps}/>
+                        )}
 
-                {/* 灵感 Tab */}
-                {activeTab === 'ideas' && (
-                    <MobileIdea {...pageProps}/>
-                )}
+                        {/* 灵感 Tab */}
+                        {activeTab === 'ideas' && (
+                            <MobileIdea {...pageProps}/>
+                        )}
 
-                {/* 设置 Tab */}
-                {activeTab === 'settings' && (
-                    <MobileSettings {...pageProps} page={currentPage}/>
-                )}
+                        {/* 设置 Tab */}
+                        {activeTab === 'settings' && (
+                            <MobileSettings {...pageProps} page={currentPage}/>
+                        )}
+                    </div>
+
+                    <MobileNav activeTab={activeTab} onTabChange={handleTabChange}/>
+                </div>
             </div>
-
-            <MobileNav activeTab={activeTab} onTabChange={handleTabChange}/>
 
             <AiConfirmModal/>
         </div>

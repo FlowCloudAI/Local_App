@@ -1,40 +1,27 @@
 import {logger} from '../../../shared/logger'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {type CSSProperties, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type CSSProperties, useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Card, Input} from 'flowcloudai-ui'
 import {
-    db_get_project_stats,
-    db_list_categories,
     db_create_entry,
     db_list_all_entry_types,
     db_list_entries,
     db_search_entries,
-    type Category,
     type EntryBrief,
     entryTypeKey,
     type EntryTypeView,
-    type ProjectStats,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from '../components/MobileCategoryDrawer'
 import './MobileEntryList.css'
 
 interface Props {
     push: (page: MobilePage) => void
-    replace: (page: MobilePage) => void
-    setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
     setAiFocus: (focus: AiFocus) => void
+    categoryDrawerOpen?: boolean
+    onOpenCategoryDrawer?: () => void
     params?: Record<string, unknown>
-}
-
-interface DragState {
-    pointerId: number
-    startX: number
-    startY: number
-    baseOffset: number
-    tracking: boolean
 }
 
 function formatDate(s?: string | null): string {
@@ -58,22 +45,7 @@ function toEntryCoverSrc(cover?: string | null): string | undefined {
     return convertFileSrc(String(cover), 'fcimg')
 }
 
-function clamp(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value))
-}
-
-function getDrawerWidth(): number {
-    if (typeof window === 'undefined') return 320
-    const width = window.innerWidth || 360
-    return clamp(width - 54, 260, 360)
-}
-
-function isInteractiveTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false
-    return Boolean(target.closest('button, input, textarea, select, a, [role="button"], [contenteditable="true"]'))
-}
-
-export default function MobileEntryList({push, replace, setBeforeBack, setAiFocus, params}: Props) {
+export default function MobileEntryList({push, setAiFocus, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
     const projectId = params?.projectId as string
     const uncategorizedOnly = Boolean(params?.uncategorizedOnly)
     const categoryId = (params?.categoryId as string) || null
@@ -81,18 +53,10 @@ export default function MobileEntryList({push, replace, setBeforeBack, setAiFocu
 
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
-    const [categories, setCategories] = useState<Category[]>([])
-    const [projectStats, setProjectStats] = useState<ProjectStats | null>(null)
     const [loading, setLoading] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
-    const [drawerOpen, setDrawerOpen] = useState(false)
-    const [drawerWidth, setDrawerWidth] = useState(getDrawerWidth)
-    const [dragOffset, setDragOffset] = useState<number | null>(null)
-    const [dragging, setDragging] = useState(false)
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const dragStateRef = useRef<DragState | null>(null)
-    const surfaceRef = useRef<HTMLDivElement>(null)
 
     const load = useCallback(async (query: string, type: string | null) => {
         setLoading(true)
@@ -133,143 +97,6 @@ export default function MobileEntryList({push, replace, setBeforeBack, setAiFocu
         })
     }, [projectId])
 
-    useEffect(() => {
-        if (!projectId) return
-        Promise.all([
-            db_list_categories(projectId),
-            db_get_project_stats(projectId),
-        ]).then(([nextCategories, nextStats]) => {
-            setCategories(nextCategories)
-            setProjectStats(nextStats)
-        }).catch(error => {
-            logger.error('加载分类树失败', error)
-        })
-    }, [projectId])
-
-    useEffect(() => {
-        const updateDrawerWidth = () => {
-            setDrawerWidth(getDrawerWidth())
-        }
-        updateDrawerWidth()
-        window.addEventListener('resize', updateDrawerWidth)
-        window.visualViewport?.addEventListener('resize', updateDrawerWidth)
-        return () => {
-            window.removeEventListener('resize', updateDrawerWidth)
-            window.visualViewport?.removeEventListener('resize', updateDrawerWidth)
-        }
-    }, [])
-
-    const closeDrawer = useCallback(() => {
-        setDrawerOpen(false)
-        setDragOffset(null)
-        setDragging(false)
-        dragStateRef.current = null
-    }, [])
-
-    useEffect(() => {
-        if (!drawerOpen) return undefined
-        setBeforeBack(() => {
-            closeDrawer()
-            return false
-        })
-        return () => setBeforeBack(null)
-    }, [closeDrawer, drawerOpen, setBeforeBack])
-
-    const selectedCategory = useMemo<MobileCategoryDrawerSelection>(() => {
-        if (uncategorizedOnly) return {kind: 'uncategorized'}
-        if (categoryId) return {kind: 'category', categoryId}
-        return {kind: 'all'}
-    }, [categoryId, uncategorizedOnly])
-
-    const handleSelectCategory = useCallback((selection: MobileCategoryDrawerSelection, label: string) => {
-        closeDrawer()
-        if (selection.kind === 'all') {
-            replace({type: 'entryList', params: {projectId, categoryId: '', displayName: label}})
-            return
-        }
-        if (selection.kind === 'uncategorized') {
-            replace({
-                type: 'entryList',
-                params: {
-                    projectId,
-                    categoryId: '',
-                    uncategorizedOnly: true,
-                    displayName: label,
-                },
-            })
-            return
-        }
-        replace({type: 'entryList', params: {projectId, categoryId: selection.categoryId, displayName: label}})
-    }, [closeDrawer, projectId, replace])
-
-    const handleDrawerToggle = useCallback(() => {
-        setDragOffset(null)
-        setDrawerOpen(open => !open)
-    }, [])
-
-    const handleSurfacePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-        if (!event.isPrimary) return
-        if (event.pointerType === 'mouse' && event.button !== 0) return
-        if (!drawerOpen && isInteractiveTarget(event.target)) return
-        const baseOffset = drawerOpen ? drawerWidth : 0
-        dragStateRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            baseOffset,
-            tracking: false,
-        }
-        surfaceRef.current?.setPointerCapture(event.pointerId)
-    }, [drawerOpen, drawerWidth])
-
-    const handleSurfacePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        const dx = event.clientX - dragState.startX
-        const dy = event.clientY - dragState.startY
-        const horizontal = Math.abs(dx)
-        const vertical = Math.abs(dy)
-
-        if (!dragState.tracking) {
-            if (vertical > 16 && vertical > horizontal) {
-                dragStateRef.current = null
-                if (surfaceRef.current?.hasPointerCapture(event.pointerId)) {
-                    surfaceRef.current.releasePointerCapture(event.pointerId)
-                }
-                return
-            }
-            if (horizontal < 18 || horizontal < vertical * 1.45) return
-            if (!drawerOpen && dx < 0) {
-                dragStateRef.current = null
-                if (surfaceRef.current?.hasPointerCapture(event.pointerId)) {
-                    surfaceRef.current.releasePointerCapture(event.pointerId)
-                }
-                return
-            }
-            dragState.tracking = true
-            setDragging(true)
-        }
-
-        event.preventDefault()
-        setDragOffset(clamp(dragState.baseOffset + dx, 0, drawerWidth))
-    }, [drawerOpen, drawerWidth])
-
-    const finishSurfaceDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        const currentOffset = dragOffset ?? (drawerOpen ? drawerWidth : 0)
-        const shouldOpen = dragState.tracking
-            ? currentOffset > drawerWidth * 0.46
-            : drawerOpen
-        dragStateRef.current = null
-        setDragOffset(null)
-        setDragging(false)
-        setDrawerOpen(shouldOpen)
-        if (surfaceRef.current?.hasPointerCapture(event.pointerId)) {
-            surfaceRef.current.releasePointerCapture(event.pointerId)
-        }
-    }, [dragOffset, drawerOpen, drawerWidth])
-
     const handleSearch = (value: string) => {
         setSearchText(value)
         if (searchTimer.current) clearTimeout(searchTimer.current)
@@ -291,47 +118,15 @@ export default function MobileEntryList({push, replace, setBeforeBack, setAiFocu
         push({type: 'entryDetail', params: {projectId, entryId: entry.id, displayName: entry.title}})
     }
 
-    const surfaceOffset = dragOffset ?? (drawerOpen ? drawerWidth : 0)
-
     return (
-        <div
-            className={`mobile-entry-list-shell${drawerOpen ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}`}
-            style={{
-                '--mobile-entry-drawer-width': `${drawerWidth}px`,
-                '--mobile-entry-drawer-shift': `${surfaceOffset}px`,
-            } as CSSProperties}
-        >
-            <div className="mobile-entry-list-shell__drawer">
-                <MobileCategoryDrawer
-                    categories={categories}
-                    stats={projectStats}
-                    selected={selectedCategory}
-                    onSelect={handleSelectCategory}
-                />
-            </div>
-            <div
-                ref={surfaceRef}
-                className="mobile-page mobile-entry-list mobile-entry-list-shell__surface"
-                onPointerDown={handleSurfacePointerDown}
-                onPointerMove={handleSurfacePointerMove}
-                onPointerUp={finishSurfaceDrag}
-                onPointerCancel={finishSurfaceDrag}
-                onPointerLeave={finishSurfaceDrag}
-            >
-            <button
-                type="button"
-                className="mobile-entry-list-shell__surface-close"
-                aria-label="关闭分类树"
-                tabIndex={drawerOpen ? 0 : -1}
-                onClick={closeDrawer}
-            />
+        <div className="mobile-page mobile-entry-list">
             <div className="mobile-entry-list__hero">
                 <button
                     type="button"
                     className="mobile-entry-list__drawer-toggle"
-                    aria-label={drawerOpen ? '关闭分类树' : '打开分类树'}
-                    aria-expanded={drawerOpen}
-                    onClick={handleDrawerToggle}
+                    aria-label="打开分类树"
+                    aria-expanded={categoryDrawerOpen}
+                    onClick={onOpenCategoryDrawer}
                 >
                     <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
                         <path d="M5 7h14"/>
@@ -456,7 +251,6 @@ export default function MobileEntryList({push, replace, setBeforeBack, setAiFocu
                         })}
                 </div>
             )}
-            </div>
         </div>
     )
 }
