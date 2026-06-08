@@ -9,67 +9,10 @@
     overflow: hidden;
 }
 
-.mobile-app__header {
-    display: flex;
-    align-items: flex-end; /* 内容贴底，safe-area 在上方 */
-    box-sizing: border-box;
-    height: calc(48px + env(safe-area-inset-top, 0));
-    padding: 0 10px 0; /* 顶部由 height 撑开，无需 padding-top */
-    padding-top: env(safe-area-inset-top, 0);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    backdrop-filter: blur(18px);
-    flex-shrink: 0;
-    z-index: 20;
-}
-
-.mobile-app__back-btn {
-    /* 44×44 是 iOS HIG 推荐的最小触摸目标 */
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: none;
-    color: var(--fc-color-primary);
-    cursor: pointer;
-    border-radius: var(--fc-radius-full);
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation; /* 去掉 300ms 点击延迟 */
-    flex-shrink: 0;
-}
-
-.mobile-app__back-btn:active {
-    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-}
-
-.mobile-app__back-btn svg {
-    width: 22px;
-    height: 22px;
-    pointer-events: none; /* 防止 SVG 吃掉点击事件 */
-}
-
-.mobile-app__header-spacer {
-    width: 44px;
-    flex-shrink: 0;
-}
-
-.mobile-app__title {
-    flex: 1;
-    text-align: center;
-    font-size: 0.98rem;
-    font-weight: 650;
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    letter-spacing: 0;
-    padding-bottom: 0.75rem;
-}
-
 .mobile-app__content {
     flex: 1;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0);
     overflow: hidden;
     display: flex;
     flex-direction: column;

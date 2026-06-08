@@ -38,41 +38,6 @@ type PageProps = {
     setAiFocus: (focus: AiFocus) => void
 }
 
-function getPageTitle(type: string, params?: Record<string, unknown>): string {
-    const name = params?.displayName as string | undefined
-    switch (type) {
-        case 'projectList': return name || '世界观'
-        case 'projectHome': return name || '项目'
-        case 'entryList':   return name || '词条'
-        case 'entryDetail': return name || '词条'
-        case 'projectDefs': return name || '类型与标签'
-        case 'categoryManager': return name || '分类管理'
-        case 'aiChat': return 'AI 对话'
-        case 'ideas': return '灵感便签'
-        case 'settings': return '设置'
-        case 'settingsAi': return 'AI 设置'
-        case 'settingsPlugins': return '插件安装'
-        case 'settingsAppearance': return '外观'
-        case 'settingsAbout': return '关于'
-        default: return ''
-    }
-}
-
-// 顶部标题收口：栈内页用 getPageTitle，无栈页（Tab 根）回退到 Tab 名称。
-function getHeaderTitle(activeTab: MobileTab, page: MobilePage | null): string {
-    if (page) {
-        const title = getPageTitle(page.type, page.params)
-        if (title) return title
-    }
-    switch (activeTab) {
-        case 'home': return '首页'
-        case 'ai': return 'AI 对话'
-        case 'ideas': return '灵感便签'
-        case 'settings': return '设置'
-        default: return ''
-    }
-}
-
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
@@ -212,20 +177,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     return (
         <div className="mobile-app">
-            <header className="mobile-app__header">
-                {activeStack.canGoBack ? (
-                    <button className="mobile-app__back-btn" onClick={handleBack}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="15 18 9 12 15 6"/>
-                        </svg>
-                    </button>
-                ) : (
-                    <div className="mobile-app__header-spacer"/>
-                )}
-                <h1 className="mobile-app__title">{getHeaderTitle(activeTab, currentPage)}</h1>
-                <div className="mobile-app__header-spacer"/>
-            </header>
-
             <div className="mobile-app__content">
                 {/* 首页 Tab */}
                 {activeTab === 'home' && (
