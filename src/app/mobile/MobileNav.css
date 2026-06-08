@@ -43,10 +43,6 @@
     color: var(--fc-color-primary);
 }
 
-.mobile-nav__item:active {
-    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
-}
-
 .mobile-nav__icon {
     width: 24px;
     height: 24px;
