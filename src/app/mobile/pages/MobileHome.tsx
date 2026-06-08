@@ -46,11 +46,13 @@ interface Props {
     push: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setAiFocus: (focus: AiFocus) => void
+    activePanel: MobileHomePanel
+    onActivePanelChange: (panel: MobileHomePanel) => void
 }
 
 type WorldSortMode = 'updated-desc' | 'created-desc' | 'name-asc' | 'size-desc'
 type WorldDisplayMode = 'card' | 'list' | 'compact'
-type HomePanel = 'dashboard' | 'worlds'
+export type MobileHomePanel = 'dashboard' | 'worlds'
 
 const PANEL_SWITCH_THRESHOLD = 72
 
@@ -140,7 +142,7 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
     return targets
 }
 
-export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
+export default function MobileHome({push, navigateToTab, setAiFocus, activePanel, onActivePanelChange}: Props) {
     const {showAlert} = useAlert()
     const {
         projects,
@@ -154,7 +156,6 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
     const touchStartYRef = useRef<number | null>(null)
     const touchWorldScrollTopRef = useRef(0)
 
-    const [activePanel, setActivePanel] = useState<HomePanel>('dashboard')
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [countsError, setCountsError] = useState<string | null>(null)
@@ -542,25 +543,25 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
         if (Math.abs(deltaY) < PANEL_SWITCH_THRESHOLD) return
 
         if (activePanel === 'dashboard' && deltaY < 0) {
-            setActivePanel('worlds')
+            onActivePanelChange('worlds')
             return
         }
 
         if (activePanel === 'worlds' && deltaY > 0 && touchWorldScrollTopRef.current <= 4) {
-            setActivePanel('dashboard')
+            onActivePanelChange('dashboard')
         }
-    }, [activePanel])
+    }, [activePanel, onActivePanelChange])
 
     const handlePagerWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
         if (Math.abs(event.deltaY) < 32) return
         if (activePanel === 'dashboard' && event.deltaY > 0) {
-            setActivePanel('worlds')
+            onActivePanelChange('worlds')
             return
         }
         if (activePanel === 'worlds' && event.deltaY < 0 && (worldPanelRef.current?.scrollTop ?? 0) <= 4) {
-            setActivePanel('dashboard')
+            onActivePanelChange('dashboard')
         }
-    }, [activePanel])
+    }, [activePanel, onActivePanelChange])
 
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button

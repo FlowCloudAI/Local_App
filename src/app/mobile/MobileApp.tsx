@@ -13,7 +13,7 @@ import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
 import MobileEntryList from './pages/MobileEntryList'
-import MobileHome from './pages/MobileHome'
+import MobileHome, {type MobileHomePanel} from './pages/MobileHome'
 import MobileIdea from './pages/MobileIdea'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
@@ -78,6 +78,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const closingRef = useRef(false)
     const beforeBackRef = useRef<MobileBeforeBack | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('home')
+    const [homePanel, setHomePanel] = useState<MobileHomePanel>('dashboard')
 
     const homeStack = usePageStack()
     const aiStack = usePageStack()
@@ -230,7 +231,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 {activeTab === 'home' && (
                     <>
                         {!currentPage && (
-                            <MobileHome {...pageProps}/>
+                            <MobileHome
+                                {...pageProps}
+                                activePanel={homePanel}
+                                onActivePanelChange={setHomePanel}
+                            />
                         )}
                         {pageType === 'projectList' && currentPage && (
                             <MobileProjectList {...pageProps}/>
