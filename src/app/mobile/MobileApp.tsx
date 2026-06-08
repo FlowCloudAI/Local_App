@@ -348,8 +348,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
         const currentOffset = dragState.latestOffset
         const dragDistance = currentOffset - dragState.baseOffset
-        const openDistance = Math.min(24, Math.max(16, categoryDrawerWidth * 0.05))
-        const closeDistance = Math.min(32, Math.max(20, categoryDrawerWidth * 0.07))
+        const openDistance = 6
+        const closeDistance = 12
         const shouldOpen = dragState.tracking
             ? categoryDrawerOpen
                 ? dragDistance > -closeDistance
