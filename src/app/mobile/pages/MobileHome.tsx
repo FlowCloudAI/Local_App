@@ -1,4 +1,12 @@
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {
+    type TouchEvent as ReactTouchEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type WheelEvent as ReactWheelEvent,
+} from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
@@ -42,6 +50,9 @@ interface Props {
 
 type WorldSortMode = 'updated-desc' | 'created-desc' | 'name-asc' | 'size-desc'
 type WorldDisplayMode = 'card' | 'list' | 'compact'
+type HomePanel = 'dashboard' | 'worlds'
+
+const PANEL_SWITCH_THRESHOLD = 72
 
 const WORLD_DISPLAY_OPTIONS: Array<{key: WorldDisplayMode; label: string; desc: string}> = [
     {key: 'card', label: '卡片', desc: '两列封面卡片'},
@@ -139,7 +150,11 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
         refresh: refreshProjects,
     } = useProjectListStore()
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
+    const worldPanelRef = useRef<HTMLElement | null>(null)
+    const touchStartYRef = useRef<number | null>(null)
+    const touchWorldScrollTopRef = useRef(0)
 
+    const [activePanel, setActivePanel] = useState<HomePanel>('dashboard')
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [countsError, setCountsError] = useState<string | null>(null)
@@ -512,6 +527,41 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
         void showAlert('首页展示桌面端同一套继续创作和最近内容；向上滑动即可进入世界观列表。', 'info', 'toast', 2800)
     }, [showAlert])
 
+    const handlePagerTouchStart = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+        touchStartYRef.current = event.touches[0]?.clientY ?? null
+        touchWorldScrollTopRef.current = worldPanelRef.current?.scrollTop ?? 0
+    }, [])
+
+    const handlePagerTouchEnd = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+        const startY = touchStartYRef.current
+        touchStartYRef.current = null
+        if (startY == null) return
+
+        const endY = event.changedTouches[0]?.clientY ?? startY
+        const deltaY = endY - startY
+        if (Math.abs(deltaY) < PANEL_SWITCH_THRESHOLD) return
+
+        if (activePanel === 'dashboard' && deltaY < 0) {
+            setActivePanel('worlds')
+            return
+        }
+
+        if (activePanel === 'worlds' && deltaY > 0 && touchWorldScrollTopRef.current <= 4) {
+            setActivePanel('dashboard')
+        }
+    }, [activePanel])
+
+    const handlePagerWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+        if (Math.abs(event.deltaY) < 32) return
+        if (activePanel === 'dashboard' && event.deltaY > 0) {
+            setActivePanel('worlds')
+            return
+        }
+        if (activePanel === 'worlds' && event.deltaY < 0 && (worldPanelRef.current?.scrollTop ?? 0) <= 4) {
+            setActivePanel('dashboard')
+        }
+    }, [activePanel])
+
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button
             key={item.key}
@@ -560,7 +610,12 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
     }
 
     return (
-        <div className="mobile-page mobile-home">
+        <div
+            className={`mobile-page mobile-home mobile-home--${activePanel}`}
+            onTouchStart={handlePagerTouchStart}
+            onTouchEnd={handlePagerTouchEnd}
+            onWheel={handlePagerWheel}
+        >
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
@@ -578,127 +633,133 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
             />
             <FcworldProgressDialog progress={fcworldProgress} />
 
-            <section className="mobile-home__dashboard">
-                <div className="mobile-home__hero">
-                    <h2 className="mobile-home__title">首页</h2>
-                    <button
-                        type="button"
-                        className="mobile-home__help"
-                        aria-label="帮助"
-                        onClick={handleHelp}
-                    >
-                        ?
-                    </button>
-                </div>
-
-                <Input
-                    placeholder="搜索世界观…"
-                    value={searchText}
-                    onValueChange={setSearchText}
-                    className="mobile-home__search"
-                    radius="full"
-                    size="lg"
-                    allowClear
-                />
-
-                <section className="mobile-home__section">
-                    <div className="mobile-home__section-head">
-                        <h3 className="mobile-home__section-title">继续创作</h3>
-                    </div>
-                    {continueItem ? (
+            <div className="mobile-home__pager">
+                <section className="mobile-home__panel mobile-home__dashboard">
+                    <div className="mobile-home__hero">
+                        <h2 className="mobile-home__title">首页</h2>
                         <button
                             type="button"
-                            className="mobile-home__continue"
-                            onClick={() => openDashboardTarget(continueItem)}
+                            className="mobile-home__help"
+                            aria-label="帮助"
+                            onClick={handleHelp}
                         >
-                            <span className="mobile-home__eyebrow">上次停在这里</span>
-                            <span className="mobile-home__continue-title">{continueItem.title}</span>
-                            <span className="mobile-home__continue-desc">
-                                {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
-                                {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
-                            </span>
+                            ?
                         </button>
-                    ) : (
-                        <button
-                            type="button"
-                            className="mobile-home__continue mobile-home__continue--empty"
-                            onClick={() => setCreatorOpen(true)}
-                        >
-                            <span className="mobile-home__continue-title">创建你的第一个世界</span>
-                            <span className="mobile-home__continue-desc">从世界观容器开始，再补词条、关系和图片。</span>
-                        </button>
-                    )}
-                </section>
-
-                <section className="mobile-home__section mobile-home__section--recent">
-                    <div className="mobile-home__section-head">
-                        <h3 className="mobile-home__section-title">最近内容</h3>
                     </div>
-                    {recentItems.length > 0 ? (
-                        <div className="mobile-home__recent-list">
-                            {recentItems.map(renderRecentItem)}
+
+                    <Input
+                        placeholder="搜索世界观…"
+                        value={searchText}
+                        onValueChange={setSearchText}
+                        className="mobile-home__search"
+                        radius="full"
+                        size="lg"
+                        allowClear
+                    />
+
+                    <section className="mobile-home__section">
+                        <div className="mobile-home__section-head">
+                            <h3 className="mobile-home__section-title">继续创作</h3>
                         </div>
+                        {continueItem ? (
+                            <button
+                                type="button"
+                                className="mobile-home__continue"
+                                onClick={() => openDashboardTarget(continueItem)}
+                            >
+                                <span className="mobile-home__eyebrow">上次停在这里</span>
+                                <span className="mobile-home__continue-title">{continueItem.title}</span>
+                                <span className="mobile-home__continue-desc">
+                                    {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
+                                    {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
+                                </span>
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                className="mobile-home__continue mobile-home__continue--empty"
+                                onClick={() => setCreatorOpen(true)}
+                            >
+                                <span className="mobile-home__continue-title">创建你的第一个世界</span>
+                                <span className="mobile-home__continue-desc">从世界观容器开始，再补词条、关系和图片。</span>
+                            </button>
+                        )}
+                    </section>
+
+                    <section className="mobile-home__section mobile-home__section--recent">
+                        <div className="mobile-home__section-head">
+                            <h3 className="mobile-home__section-title">最近内容</h3>
+                        </div>
+                        {recentItems.length > 0 ? (
+                            <div className="mobile-home__recent-list">
+                                {recentItems.map(renderRecentItem)}
+                            </div>
+                        ) : (
+                            <p className="mobile-home__muted">打开项目或词条后，会在这里保留回到现场的入口。</p>
+                        )}
+                    </section>
+                </section>
+
+                <section
+                    ref={worldPanelRef}
+                    className="mobile-home__panel mobile-home-worlds"
+                    aria-label="世界观列表"
+                >
+                    <div className="mobile-home-worlds__head">
+                        <div className="mobile-home-worlds__copy">
+                            <span className="mobile-home__eyebrow">
+                                {loadingWorlds ? '正在同步' : `${worldProjects.length} 个世界`}
+                            </span>
+                            <h2 className="mobile-home-worlds__title">世界观</h2>
+                        </div>
+                        <div className="mobile-home-worlds__actions">
+                            <button
+                                type="button"
+                                className="mobile-home-worlds__icon-btn"
+                                aria-label="新建世界观"
+                                onClick={() => setCreatorOpen(true)}
+                            >
+                                +
+                            </button>
+                            <button
+                                type="button"
+                                className="mobile-home-worlds__filter"
+                                aria-label="筛选与排序"
+                                onClick={() => setFilterOpen(true)}
+                            >
+                                筛选
+                            </button>
+                        </div>
+                    </div>
+
+                    <Input
+                        placeholder="搜索世界观…"
+                        value={searchText}
+                        onValueChange={setSearchText}
+                        className="mobile-home-worlds__search"
+                        radius="full"
+                        size="lg"
+                        allowClear
+                    />
+
+                    {worldError && projects.length === 0 ? (
+                        <div className="mobile-page__error">加载失败：{worldError}</div>
+                    ) : loadingWorlds ? (
+                        <div className="mobile-page__loading mobile-home__state-panel">加载中…</div>
+                    ) : projects.length === 0 ? (
+                        <div className="mobile-page__empty mobile-home__state-panel">
+                            <p>还没有任何世界观</p>
+                            <Button type="button" onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
+                        </div>
+                    ) : worldProjects.length === 0 ? (
+                        <div className="mobile-page__empty mobile-home__state-panel">没有匹配的世界观</div>
                     ) : (
-                        <p className="mobile-home__muted">打开项目或词条后，会在这里保留回到现场的入口。</p>
+                        <div className={`mobile-home-worlds__grid mobile-home-worlds__grid--${displayMode}`}>
+                            {worldProjects.map(renderWorldCard)}
+                        </div>
                     )}
                 </section>
-            </section>
-
-            <section className="mobile-home-worlds" aria-label="世界观列表">
-                <div className="mobile-home-worlds__head">
-                    <div className="mobile-home-worlds__copy">
-                        <span className="mobile-home__eyebrow">
-                            {loadingWorlds ? '正在同步' : `${worldProjects.length} 个世界`}
-                        </span>
-                        <h2 className="mobile-home-worlds__title">世界观</h2>
-                    </div>
-                    <div className="mobile-home-worlds__actions">
-                        <button
-                            type="button"
-                            className="mobile-home-worlds__icon-btn"
-                            aria-label="新建世界观"
-                            onClick={() => setCreatorOpen(true)}
-                        >
-                            +
-                        </button>
-                        <button
-                            type="button"
-                            className="mobile-home-worlds__filter"
-                            aria-label="筛选与排序"
-                            onClick={() => setFilterOpen(true)}
-                        >
-                            筛选
-                        </button>
-                    </div>
-                </div>
-
-                <Input
-                    placeholder="搜索世界观…"
-                    value={searchText}
-                    onValueChange={setSearchText}
-                    className="mobile-home-worlds__search"
-                    radius="full"
-                    size="lg"
-                    allowClear
-                />
-
-                {worldError && projects.length === 0 ? (
-                    <div className="mobile-page__error">加载失败：{worldError}</div>
-                ) : loadingWorlds ? (
-                    <div className="mobile-page__loading mobile-home__panel">加载中…</div>
-                ) : projects.length === 0 ? (
-                    <div className="mobile-page__empty mobile-home__panel">
-                        <p>还没有任何世界观</p>
-                        <Button type="button" onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
-                    </div>
-                ) : worldProjects.length === 0 ? (
-                    <div className="mobile-page__empty mobile-home__panel">没有匹配的世界观</div>
-                ) : (
-                    <div className={`mobile-home-worlds__grid mobile-home-worlds__grid--${displayMode}`}>
-                        {worldProjects.map(renderWorldCard)}
-                    </div>
-                )}
-            </section>
+            </div>
 
             <FloatingPanel
                 open={filterOpen}
