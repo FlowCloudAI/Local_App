@@ -39,6 +39,7 @@ type RenameTarget =
     | {mode: 'rename'; category: Category}
 
 type DeleteMode = 'empty' | 'lift' | 'cascade'
+type SiblingDirection = 'up' | 'down'
 
 function parentKey(parentId: string | null | undefined): string {
     return parentId ?? ROOT_PARENT_KEY
@@ -149,6 +150,12 @@ function getEntryCountMap(stats: ProjectStats | null): Map<string, number> {
         if (row.categoryId) map.set(row.categoryId, row.count)
     }
     return map
+}
+
+function getSortedSiblings(categories: Category[], parentId: string | null): Category[] {
+    return categories
+        .filter(category => (category.parent_id ?? null) === parentId)
+        .sort(sortCategories)
 }
 
 function TreeIcon({expanded}: {expanded: boolean}) {
@@ -282,6 +289,32 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         }
     }, [categories, moveTarget, notifyChanged, showAlert])
 
+    const handleMoveWithinSiblings = useCallback(async (target: Category, direction: SiblingDirection) => {
+        const parentId = target.parent_id ?? null
+        const siblings = getSortedSiblings(categories, parentId)
+        const currentIndex = siblings.findIndex(category => category.id === target.id)
+        const nextIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.length) return
+
+        const reordered = [...siblings]
+        const [moved] = reordered.splice(currentIndex, 1)
+        reordered.splice(nextIndex, 0, moved)
+
+        setBusy(true)
+        try {
+            await Promise.all(reordered.map((category, index) => (
+                category.sort_order === index
+                    ? Promise.resolve()
+                    : db_update_category({id: category.id, sortOrder: index})
+            )))
+            await notifyChanged()
+        } catch (error) {
+            await showAlert(`调整分类顺序失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setBusy(false)
+        }
+    }, [categories, notifyChanged, showAlert])
+
     const handleDelete = useCallback(async (mode: DeleteMode) => {
         if (!deleteTarget) return
         setBusy(true)
@@ -316,6 +349,16 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const blocked = new Set([moveTarget.id, ...collectDescendantIds(moveTarget.id, childrenMap)])
         return allRows.filter(row => !blocked.has(row.category.id))
     }, [allRows, childrenMap, moveTarget])
+
+    const menuTargetSiblingState = useMemo(() => {
+        if (!menuTarget) return {canMoveUp: false, canMoveDown: false}
+        const siblings = getSortedSiblings(categories, menuTarget.parent_id ?? null)
+        const index = siblings.findIndex(category => category.id === menuTarget.id)
+        return {
+            canMoveUp: index > 0,
+            canMoveDown: index >= 0 && index < siblings.length - 1,
+        }
+    }, [categories, menuTarget])
 
     const deleteImpact = useMemo(() => {
         if (!deleteTarget) return null
@@ -465,6 +508,18 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         key: 'move',
                         label: '移动到…',
                         onSelect: () => menuTarget && setMoveTarget(menuTarget),
+                    },
+                    {
+                        key: 'move-up',
+                        label: '上移一位',
+                        disabled: !menuTargetSiblingState.canMoveUp || busy,
+                        onSelect: () => menuTarget && void handleMoveWithinSiblings(menuTarget, 'up'),
+                    },
+                    {
+                        key: 'move-down',
+                        label: '下移一位',
+                        disabled: !menuTargetSiblingState.canMoveDown || busy,
+                        onSelect: () => menuTarget && void handleMoveWithinSiblings(menuTarget, 'down'),
                     },
                     {
                         key: 'delete',
