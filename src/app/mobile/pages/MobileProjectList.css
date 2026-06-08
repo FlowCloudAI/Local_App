@@ -1,0 +1,171 @@
+.mobile-project-list {
+    --mobile-project-page-x: clamp(1rem, 4vw, 1.35rem);
+
+    padding: 1rem var(--mobile-project-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    background: var(--fc-color-bg);
+}
+
+.mobile-project-list__hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+    margin-bottom: 1.05rem;
+}
+
+.mobile-project-list__hero-copy {
+    min-width: 0;
+}
+
+.mobile-project-list__eyebrow {
+    display: block;
+    margin-bottom: 0.15rem;
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
+    line-height: 1.2;
+}
+
+.mobile-project-list__title {
+    margin: 0;
+    color: var(--fc-color-text);
+    font-size: clamp(2rem, 9vw, 2.65rem);
+    font-weight: 750;
+    letter-spacing: 0;
+    line-height: 0.98;
+}
+
+.mobile-project-list__create {
+    flex: 0 0 auto;
+    width: 3rem;
+    height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-primary);
+    color: var(--fc-color-text-on-primary);
+    font: inherit;
+    font-size: 2rem;
+    font-weight: var(--fc-font-weight-medium);
+    line-height: 1;
+    box-shadow: 0 0.55rem 1.1rem color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.mobile-project-list__create:active {
+    transform: scale(0.96);
+}
+
+.mobile-project-list__toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fc-space-sm);
+    margin-bottom: var(--fc-space-md);
+}
+
+.mobile-project-list__search .fc-input__wrapper {
+    height: 3.25rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+}
+
+.mobile-project-list__search .fc-input__field {
+    font-size: 1rem;
+    font-weight: var(--fc-font-weight-medium);
+}
+
+.mobile-project-list__import.fc-btn {
+    min-height: 2.9rem;
+    border-radius: var(--fc-radius-full);
+    padding-inline: 1rem;
+}
+
+.mobile-project-list__cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.mobile-project-card {
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+.mobile-project-card.fc-card {
+    min-height: 0;
+    background: var(--fc-color-bg-elevated);
+    box-shadow:
+        0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+}
+
+.mobile-project-card.fc-card--hoverable:hover {
+    transform: none;
+    box-shadow:
+        0 0.4rem 1.2rem color-mix(in srgb, var(--fc-color-text) 11%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+}
+
+.mobile-project-card:active {
+    transform: scale(0.99);
+}
+
+.mobile-project-card .fc-card__image-wrapper {
+    position: relative;
+    height: 8.5rem !important;
+    min-height: 0;
+    background: var(--fc-color-bg-secondary);
+}
+
+.mobile-project-card .fc-card__content {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    height: auto;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    padding: 0.9rem 1rem 1rem;
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+}
+
+.mobile-project-card[data-has-media="false"] .fc-card__content {
+    min-height: 0;
+}
+
+.mobile-project-card .fc-card__title,
+.mobile-project-card .fc-card__description,
+.mobile-project-card .fc-card__extra-info {
+    color: var(--fc-color-text);
+    transform: none;
+}
+
+.mobile-project-card .fc-card__title {
+    font-size: 1.1rem;
+    font-weight: 720;
+    line-height: 1.2;
+}
+
+.mobile-project-card .fc-card__description {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.45;
+}
+
+.mobile-project-card .fc-card__extra-info,
+.mobile-project-card__meta {
+    margin-top: 0;
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
+}

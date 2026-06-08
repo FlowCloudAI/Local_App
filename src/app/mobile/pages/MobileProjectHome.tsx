@@ -23,6 +23,7 @@ import ProjectCoverPickerModal from '../../../features/project-editor/components
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
+import './MobileProjectHome.css'
 
 interface Props {
     push: (page: MobilePage) => void
@@ -195,55 +196,50 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
     const image = toProjectImageSrc(project.cover_path)
 
     return (
-        <div className="mobile-page" style={{padding: '12px 16px'}}>
-            <div style={{marginBottom: 16}}>
-                {image && (
+        <div className="mobile-page mobile-project-home">
+            <section className="mobile-project-home__hero">
+                {image ? (
                     <img
                         src={image}
                         alt={project.name}
-                        style={{
-                            width: '100%',
-                            height: 140,
-                            objectFit: 'cover',
-                            borderRadius: 'var(--fc-radius-md)',
-                            marginBottom: 12
-                        }}
+                        className="mobile-project-home__cover"
                     />
+                ) : (
+                    <div className="mobile-project-home__cover mobile-project-home__cover--empty">
+                        {project.name.trim()[0] ?? '世'}
+                    </div>
                 )}
-                <h2 style={{margin: '0 0 4px', fontSize: 'var(--fc-font-size-xl)', fontWeight: 700}}>{project.name}</h2>
+                <div className="mobile-project-home__title-row">
+                    <div className="mobile-project-home__title-copy">
+                        <span className="mobile-project-home__eyebrow">世界观</span>
+                        <h2 className="mobile-project-home__title">{project.name}</h2>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setMenuOpen(true)}>
+                        管理
+                    </Button>
+                </div>
                 {project.description && (
-                    <p style={{
-                        margin: '0 0 8px',
-                        color: 'var(--fc-color-text-secondary)',
-                        fontSize: 'var(--fc-font-size-sm)'
-                    }}>
+                    <p className="mobile-project-home__description">
                         {project.description}
                     </p>
                 )}
                 {stats && (
-                    <div style={{
-                        display: 'flex',
-                        gap: 16,
-                        fontSize: 'var(--fc-font-size-xs)',
-                        color: 'var(--fc-color-text-secondary)'
-                    }}>
-                        <span>{stats.wordCount?.toLocaleString() ?? 0} 字</span>
-                        <span>{stats.imageCount ?? 0} 张图片</span>
+                    <div className="mobile-project-home__stats">
+                        <span className="mobile-project-home__stat">{stats.wordCount?.toLocaleString() ?? 0} 字</span>
+                        <span className="mobile-project-home__stat">{stats.imageCount ?? 0} 张图片</span>
                     </div>
                 )}
-            </div>
+            </section>
 
-            <div style={{display: 'flex', gap: 8, marginBottom: 20}}>
-                <Button type="button" size="sm" onClick={() => handleCreateEntry(null)}>+ 新建词条</Button>
-                <Button type="button" size="sm" variant="outline" onClick={handleOpenAi}>AI 讨论</Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setMenuOpen(true)} aria-label="项目管理" style={{marginLeft: 'auto'}}>⋯</Button>
+            <div className="mobile-project-home__actions">
+                <Button type="button" size="sm" className="mobile-project-home__action" onClick={() => handleCreateEntry(null)}>+ 新建词条</Button>
+                <Button type="button" size="sm" variant="outline" className="mobile-project-home__action" onClick={handleOpenAi}>AI 讨论</Button>
             </div>
 
             <button
                 type="button"
                 className="mobile-list-card"
                 onClick={() => handleOpenEntryList(null, '全部词条')}
-                style={{marginBottom: 12}}
             >
                 <span className="mobile-list-card__title">全部词条</span>
                 <span className="mobile-list-card__description">浏览项目中所有词条</span>
@@ -253,7 +249,6 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 type="button"
                 className="mobile-list-card"
                 onClick={() => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}})}
-                style={{marginBottom: 12}}
             >
                 <span className="mobile-list-card__title">类型与标签</span>
                 <span className="mobile-list-card__description">管理词条类型与标签定义</span>
@@ -263,22 +258,17 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                 type="button"
                 className="mobile-list-card"
                 onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
-                style={{marginBottom: 12}}
             >
                 <span className="mobile-list-card__title">分类管理</span>
                 <span className="mobile-list-card__description">新建、重命名、移动或删除分类</span>
             </button>
 
             {categories.length > 0 && (
-                <div>
-                    <h3 style={{
-                        fontSize: 'var(--fc-font-size-sm)',
-                        color: 'var(--fc-color-text-secondary)',
-                        margin: '0 0 8px'
-                    }}>
+                <section className="mobile-project-home__category-section">
+                    <h3 className="mobile-project-home__section-title">
                         分类 ({categories.length})
                     </h3>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                    <div className="mobile-project-home__category-list">
                         {categories
                             .filter(c => !c.parent_id)
                             .sort((a, b) => a.sort_order - b.sort_order)
@@ -294,7 +284,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                             ))
                         }
                     </div>
-                </div>
+                </section>
             )}
             <ActionMenu
                 open={menuOpen}
@@ -333,18 +323,7 @@ export default function MobileProjectHome({push, pop, navigateToTab, setAiFocus,
                     disabled={descriptionSaving}
                     placeholder="项目描述"
                     rows={5}
-                    style={{
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        padding: 'var(--fc-space-sm)',
-                        border: '1px solid var(--fc-color-border)',
-                        borderRadius: 'var(--fc-radius-sm)',
-                        background: 'var(--fc-color-bg-secondary)',
-                        color: 'var(--fc-color-text)',
-                        font: 'inherit',
-                        lineHeight: 'var(--fc-line-height-normal)',
-                        resize: 'vertical',
-                    }}
+                    className="mobile-project-home__description-input"
                 />
                 <div className="fc-rename-dialog__actions">
                     <Button type="button" variant="ghost" size="sm" onClick={() => setDescriptionOpen(false)} disabled={descriptionSaving}>取消</Button>

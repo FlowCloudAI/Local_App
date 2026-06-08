@@ -18,6 +18,7 @@ import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldPro
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import './MobileProjectList.css'
 
 interface Props {
     push: (page: MobilePage) => void
@@ -212,7 +213,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
     }
 
     return (
-        <div className="mobile-page" style={{padding: '12px 16px'}}>
+        <div className="mobile-page mobile-project-list">
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
@@ -230,18 +231,38 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             />
             <FcworldProgressDialog progress={fcworldProgress} />
 
-            <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
+            <div className="mobile-project-list__hero">
+                <div className="mobile-project-list__hero-copy">
+                    <span className="mobile-project-list__eyebrow">
+                        {loading ? '正在同步' : `${filtered.length} 个世界`}
+                    </span>
+                    <h2 className="mobile-project-list__title">项目</h2>
+                </div>
+                <button
+                    type="button"
+                    className="mobile-project-list__create"
+                    onClick={() => setCreatorOpen(true)}
+                    aria-label="新建项目"
+                >
+                    +
+                </button>
+            </div>
+
+            <div className="mobile-project-list__toolbar">
                 <Input
                     placeholder="搜索项目…"
                     value={searchText}
                     onValueChange={setSearchText}
-                    style={{flex: 1}}
+                    className="mobile-project-list__search"
+                    radius="full"
+                    size="lg"
+                    allowClear
                 />
-                <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>新建</Button>
                 <Button
                     type="button"
                     size="sm"
                     variant="outline"
+                    className="mobile-project-list__import"
                     disabled={importing}
                     onClick={() => void handleImportProject()}
                 >
@@ -255,7 +276,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                     <Button type="button" onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
                 </div>
             ) : (
-                <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+                <div className="mobile-project-list__cards">
                     {filtered.length === 0 ? (
                         <div className="mobile-page__empty">没有匹配的项目</div>
                     ) : (
@@ -264,15 +285,13 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                             return (
                                 <Card
                                     key={project.id}
+                                    className="mobile-project-card"
                                     title={project.name}
                                     description={project.description || '暂无描述'}
                                     image={image}
-                                    imageHeight="120px"
+                                    imageHeight="8.5rem"
                                     extraInfo={
-                                        <span style={{
-                                            fontSize: 'var(--fc-font-size-xs)',
-                                            color: 'var(--fc-color-text-secondary)'
-                                        }}>
+                                        <span className="mobile-project-card__meta">
                                             {entryCounts[project.id] ?? 0} 词条 · {formatDate(project.updated_at)}
                                         </span>
                                     }
