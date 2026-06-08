@@ -10,15 +10,20 @@
     gap: var(--fc-space-lg);
 }
 
+.mobile-ai-control-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--fc-color-bg-elevated);
+    border-bottom: 1px solid var(--fc-color-border);
+    flex-shrink: 0;
+}
+
 .mobile-ai-plugin-bar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items: end;
     gap: var(--fc-space-sm);
     padding: var(--fc-space-sm) var(--fc-space-md);
-    background: var(--fc-color-bg-elevated);
-    border-bottom: 1px solid var(--fc-color-border);
-    flex-shrink: 0;
 }
 
 .mobile-ai-plugin-field {
@@ -34,6 +39,53 @@
 
 .mobile-ai-plugin-select {
     width: 100%;
+}
+
+.mobile-ai-tool-mode-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-sm);
+    padding: 0 var(--fc-space-md) var(--fc-space-sm);
+}
+
+.mobile-ai-tool-mode-label {
+    flex: 0 0 auto;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.mobile-ai-tool-mode-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 1;
+    min-width: 0;
+    padding: 0.125rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-secondary);
+}
+
+.mobile-ai-tool-mode-option {
+    min-height: 2rem;
+    padding: 0 var(--fc-space-sm);
+    border: 0;
+    border-radius: calc(var(--fc-radius-md) - 0.125rem);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-ai-tool-mode-option.active {
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-primary);
+    box-shadow: var(--fc-shadow-xs);
+}
+
+.mobile-ai-tool-mode-option:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .mobile-ai-conversation-item {

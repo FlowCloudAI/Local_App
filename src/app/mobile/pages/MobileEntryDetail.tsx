@@ -1,5 +1,6 @@
 import {logger} from '../../../shared/logger'
 import MarkdownPreview from '@uiw/react-markdown-preview'
+import {listen} from '@tauri-apps/api/event'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {openUrl} from '@tauri-apps/plugin-opener'
 import {
@@ -31,8 +32,12 @@ import {
     import_entry_images,
     type Entry,
     type EntryBrief,
+    ENTRY_DELETED,
+    type EntryDeletedEvent,
     type EntryLink,
     type EntryRelation,
+    ENTRY_UPDATED,
+    type EntryUpdatedEvent,
     type EntryTypeView,
     entryTypeKey,
     type TagSchema,
@@ -230,6 +235,30 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setImages(normalizeEntryImages(e.images))
     }, [])
 
+    const reloadEntryState = useCallback(async () => {
+        const [e, types, cats, schemas, briefs, outgoing, incoming, relations] = await Promise.all([
+            db_get_entry(entryId),
+            db_list_all_entry_types(projectId),
+            db_list_categories(projectId),
+            db_list_tag_schemas(projectId),
+            db_list_entries({projectId, limit: 1000, offset: 0}),
+            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
+        ])
+        setEntry(e)
+        setEntryTypes(types)
+        setCategories(cats)
+        setTagSchemas(schemas)
+        setProjectEntries(briefs)
+        setOutgoingLinks(outgoing)
+        setIncomingLinks(incoming)
+        setEntryRelations(relations)
+        setRelationDrafts(relations.map(relation => buildRelationDraft(entryId, relation)))
+        syncForm(e)
+        return e
+    }, [entryId, projectId, syncForm])
+
     const isDirty = mode === 'edit' && !!entry && (
         title !== entry.title
         || content !== (entry.content ?? '')
@@ -244,28 +273,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     useEffect(() => {
         if (!entryId) return
         setLoading(true)
-        Promise.all([
-            db_get_entry(entryId),
-            db_list_all_entry_types(projectId),
-            db_list_categories(projectId),
-            db_list_tag_schemas(projectId),
-            db_list_entries({projectId, limit: 1000, offset: 0}),
-            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
-        ]).then(([e, types, cats, schemas, briefs, outgoing, incoming, relations]) => {
-            setEntry(e)
-            setEntryTypes(types)
-            setCategories(cats)
-            setTagSchemas(schemas)
-            setProjectEntries(briefs)
-            setOutgoingLinks(outgoing)
-            setIncomingLinks(incoming)
-            setEntryRelations(relations)
-            setRelationDrafts(relations.map(relation => buildRelationDraft(entryId, relation)))
-            syncForm(e)
-        }).catch(logger.error).finally(() => setLoading(false))
-    }, [entryId, projectId, syncForm])
+        reloadEntryState().catch(logger.error).finally(() => setLoading(false))
+    }, [entryId, reloadEntryState])
 
     const enterEdit = useCallback(() => {
         if (entry) syncForm(entry)
@@ -286,6 +295,44 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setBeforeBack(confirmDiscard)
         return () => setBeforeBack(null)
     }, [confirmDiscard, mode, setBeforeBack])
+
+    useEffect(() => {
+        const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
+            if (event.payload.entry_id !== entryId) return
+            if (mode === 'edit' && isDirty) {
+                void showAlert('词条已在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'toast', 2200)
+                return
+            }
+            void reloadEntryState()
+                .then((updatedEntry) => {
+                    replace({
+                        type: 'entryDetail',
+                        params: {
+                            ...(params ?? {}),
+                            projectId,
+                            entryId,
+                            displayName: updatedEntry.title,
+                            mode,
+                        },
+                    })
+                    void showAlert('词条已在后台更新，页面已刷新。', 'success', 'toast', 1500)
+                })
+                .catch((error) => {
+                    logger.error('刷新后台更新的词条失败', error)
+                    void showAlert('词条已更新，但页面刷新失败，请重新打开词条。', 'warning', 'toast', 2200)
+                })
+        })
+        const deletedListener = listen<EntryDeletedEvent>(ENTRY_DELETED, (event) => {
+            if (event.payload.entry_id !== entryId) return
+            void showAlert('词条已在后台删除。', 'warning', 'toast', 2200)
+            pop()
+        })
+
+        return () => {
+            updatedListener.then((fn) => fn())
+            deletedListener.then((fn) => fn())
+        }
+    }, [entryId, isDirty, mode, params, pop, projectId, reloadEntryState, replace, showAlert])
 
     // 取消：已有可回退的查看态则回查看；否则（极端情况无 entry）回退页面。
     const handleCancel = useCallback(async () => {

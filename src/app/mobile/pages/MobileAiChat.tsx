@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, MessageBox, Select, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import type {AiToolAccessMode} from '../../../features/ai-chat/model/AiControllerTypes'
 import {setting_has_api_key} from '../../../api'
 import {logger} from '../../../shared/logger'
 import {type MobileTab} from '../MobileNav'
@@ -29,6 +30,7 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
         plugins, pluginsReady, selectedPlugin, selectedModel, setSelectedPlugin, setSelectedModel,
+        toolAccessMode, writerModeAvailable, setToolAccessMode, focusContext,
     } = controller
 
     const [showConvList, setShowConvList] = useState(false)
@@ -64,6 +66,11 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
             return {value: model, label}
         })
     }, [currentPlugin])
+    const toolModeOptions = useMemo(() => ([
+        {mode: 'reader' as const, label: '读者', disabled: false},
+        {mode: 'assistant' as const, label: '助手', disabled: false},
+        {mode: 'writer' as const, label: '作家', disabled: !writerModeAvailable},
+    ]), [writerModeAvailable])
     const pluginsLoading = !pluginsReady
     const llmUnavailable = pluginsReady && plugins.length === 0
     const pluginSelectionIncomplete = pluginsReady && plugins.length > 0 && (!selectedPlugin || !selectedModel)
@@ -157,6 +164,11 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         setSelectedModel(normalizeSelectValue(value))
     }, [setSelectedModel])
 
+    const handleToolModeChange = useCallback(async (mode: AiToolAccessMode) => {
+        if (mode === toolAccessMode) return
+        await setToolAccessMode(mode)
+    }, [setToolAccessMode, toolAccessMode])
+
     const handleSend = useCallback(async () => {
         if (!inputValue.trim() || isStreaming) return
         if (pluginsLoading) {
@@ -211,34 +223,53 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
     }, [deleteConversation, showAlert])
 
     const pluginControls = (
-        <div className="mobile-ai-plugin-bar" aria-label="AI 插件与模型">
-            <div className="mobile-ai-plugin-field">
-                <span className="mobile-ai-plugin-label">插件</span>
-                <Select
-                    value={selectedPlugin}
-                    onChange={handlePluginChange}
-                    options={pluginOptions}
-                    placeholder={pluginsLoading ? '加载中' : '选择 LLM 插件'}
-                    disabled={pluginsLoading || pluginOptions.length === 0}
-                    className="mobile-ai-plugin-select"
-                />
+        <div className="mobile-ai-control-panel" aria-label="AI 对话设置">
+            <div className="mobile-ai-plugin-bar" aria-label="AI 插件与模型">
+                <div className="mobile-ai-plugin-field">
+                    <span className="mobile-ai-plugin-label">插件</span>
+                    <Select
+                        value={selectedPlugin}
+                        onChange={handlePluginChange}
+                        options={pluginOptions}
+                        placeholder={pluginsLoading ? '加载中' : '选择 LLM 插件'}
+                        disabled={pluginsLoading || pluginOptions.length === 0}
+                        className="mobile-ai-plugin-select"
+                    />
+                </div>
+                <div className="mobile-ai-plugin-field">
+                    <span className="mobile-ai-plugin-label">模型</span>
+                    <Select
+                        value={selectedModel}
+                        onChange={handleModelChange}
+                        options={modelOptions}
+                        placeholder={pluginsLoading ? '加载中' : '选择模型'}
+                        disabled={pluginsLoading || modelOptions.length === 0}
+                        className="mobile-ai-plugin-select"
+                    />
+                </div>
+                {(llmUnavailable || llmApiKeyMissing) && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => navigateToTab('settings')}>
+                        {llmApiKeyMissing ? '配置 Key' : '去设置'}
+                    </Button>
+                )}
             </div>
-            <div className="mobile-ai-plugin-field">
-                <span className="mobile-ai-plugin-label">模型</span>
-                <Select
-                    value={selectedModel}
-                    onChange={handleModelChange}
-                    options={modelOptions}
-                    placeholder={pluginsLoading ? '加载中' : '选择模型'}
-                    disabled={pluginsLoading || modelOptions.length === 0}
-                    className="mobile-ai-plugin-select"
-                />
+            <div className="mobile-ai-tool-mode-bar" aria-label="AI 工具模式">
+                <span className="mobile-ai-tool-mode-label">模式</span>
+                <div className="mobile-ai-tool-mode-options">
+                    {toolModeOptions.map(option => (
+                        <button
+                            key={option.mode}
+                            type="button"
+                            className={`mobile-ai-tool-mode-option${toolAccessMode === option.mode ? ' active' : ''}`}
+                            aria-pressed={toolAccessMode === option.mode}
+                            disabled={option.disabled || isStreaming}
+                            onClick={() => void handleToolModeChange(option.mode)}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
             </div>
-            {(llmUnavailable || llmApiKeyMissing) && (
-                <Button type="button" size="sm" variant="outline" onClick={() => navigateToTab('settings')}>
-                    {llmApiKeyMissing ? '配置 Key' : '去设置'}
-                </Button>
-            )}
         </div>
     )
 
@@ -264,9 +295,9 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         )
     }
 
-    const contextLabel = aiFocus.entryId
-        ? `正在讨论：词条`
-        : aiFocus.projectId ? '正在讨论：项目' : ''
+    const contextLabel = focusContext.entryId
+        ? `正在讨论：${focusContext.entryTitle ?? '词条'}`
+        : focusContext.projectId ? `正在讨论：${focusContext.projectName ?? '项目'}` : ''
 
     return (
         <div style={{display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden'}}>
