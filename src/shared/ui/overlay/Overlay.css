@@ -5,7 +5,7 @@
     inset: 0;
     z-index: var(--fc-z-modal);
     display: flex;
-    background: var(--fc-color-bg-overlay);
+    background: color-mix(in srgb, var(--fc-color-bg-overlay) 72%, transparent);
     opacity: 0;
     transition: opacity var(--fc-transition-slow);
     box-sizing: border-box;
@@ -40,6 +40,11 @@
     outline: none;
     -webkit-overflow-scrolling: touch;
     transition: transform var(--fc-transition-slow), opacity var(--fc-transition-slow);
+    scrollbar-width: none;
+}
+
+.fc-overlay__panel::-webkit-scrollbar {
+    display: none;
 }
 
 .fc-overlay__panel--sheet {

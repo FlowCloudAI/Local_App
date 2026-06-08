@@ -2,12 +2,13 @@
 
 .fc-action-menu {
     width: min(20rem, 100%);
-    background: var(--fc-color-bg-elevated);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
-    box-shadow: var(--fc-shadow-lg);
-    padding: var(--fc-space-xs);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
+    border-radius: 1.15rem;
+    box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    padding: 0.35rem;
     overflow: hidden;
+    backdrop-filter: blur(18px);
 }
 
 .fc-action-menu__title {
@@ -28,19 +29,20 @@
     display: flex;
     align-items: center;
     width: 100%;
-    padding: var(--fc-space-md);
+    min-height: 3.05rem;
+    padding: 0.75rem var(--fc-space-md);
     border: none;
     background: transparent;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);
     text-align: left;
-    border-radius: var(--fc-radius-md);
+    border-radius: 0.85rem;
     cursor: pointer;
     touch-action: manipulation;
 }
 
 .fc-action-menu__item:active {
-    background: var(--fc-color-bg-secondary);
+    background: color-mix(in srgb, var(--fc-color-primary) 8%, transparent);
 }
 
 .fc-action-menu__item--danger {

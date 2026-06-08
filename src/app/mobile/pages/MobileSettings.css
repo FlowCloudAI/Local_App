@@ -364,3 +364,66 @@
     width: 100%;
     color: var(--fc-color-error);
 }
+
+/* Native iOS direction overrides */
+.mobile-settings-page {
+    padding: 1rem clamp(1rem, 4vw, 1.35rem) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    background: var(--fc-color-bg);
+}
+
+.mobile-settings-menu,
+.mobile-settings-plugin-list {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    border-radius: 1rem;
+    background: var(--fc-color-bg-elevated);
+    box-shadow:
+        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+}
+
+.mobile-settings-menu-item,
+.mobile-settings-plugin-item {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+}
+
+.mobile-settings-menu-item:last-child,
+.mobile-settings-plugin-item:last-child {
+    border-bottom: 0;
+}
+
+.mobile-settings-menu-item:active {
+    background: color-mix(in srgb, var(--fc-color-primary) 8%, transparent);
+}
+
+.mobile-settings-section__title {
+    color: var(--fc-color-text);
+    font-weight: 700;
+}
+
+.mobile-settings-api-key,
+.mobile-settings-about-card,
+.mobile-settings-about-actions,
+.mobile-settings-log-viewer {
+    padding: 0.9rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    border-radius: 1rem;
+    background: var(--fc-color-bg-elevated);
+    box-shadow:
+        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+}
+
+.mobile-settings-api-key__input .fc-input__wrapper,
+.mobile-settings-log-viewer__content {
+    border-radius: 0.9rem;
+}
+
+.mobile-settings-full-button.fc-btn,
+.mobile-settings-api-key__actions .fc-btn,
+.mobile-settings-log-viewer__actions .fc-btn,
+.mobile-settings-exit-button.fc-btn {
+    border-radius: var(--fc-radius-full);
+}

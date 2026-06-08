@@ -2,17 +2,18 @@
 
 .fc-rename-dialog {
     width: min(22rem, 100%);
-    background: var(--fc-color-bg-elevated);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
-    box-shadow: var(--fc-shadow-lg);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
+    border-radius: 1.15rem;
+    box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
     padding: var(--fc-space-lg);
     box-sizing: border-box;
+    backdrop-filter: blur(18px);
 }
 
 .fc-rename-dialog__title {
-    font-size: var(--fc-font-size-md);
-    font-weight: var(--fc-font-weight-semibold);
+    font-size: var(--fc-font-size-lg);
+    font-weight: 720;
     margin-bottom: var(--fc-space-sm);
 }
 
@@ -26,9 +27,20 @@
     width: 100%;
 }
 
+.fc-rename-dialog__input .fc-input__wrapper {
+    min-height: 3rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    border-radius: 1rem;
+    background: var(--fc-color-bg-elevated);
+}
+
 .fc-rename-dialog__actions {
     display: flex;
     justify-content: flex-end;
     gap: var(--fc-space-sm);
     margin-top: var(--fc-space-lg);
+}
+
+.fc-rename-dialog__actions .fc-btn {
+    border-radius: var(--fc-radius-full);
 }
