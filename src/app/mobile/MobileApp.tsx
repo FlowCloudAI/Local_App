@@ -222,6 +222,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         setCategoryDrawerOpen(true)
     }, [categoryDrawerEnabled])
 
+    const refreshCategoryDrawer = useCallback(async () => {
+        if (!categoryDrawerProjectId) return
+        const [categories, stats] = await Promise.all([
+            db_list_categories(categoryDrawerProjectId),
+            db_get_project_stats(categoryDrawerProjectId),
+        ])
+        setCategoryDrawerCategories(categories)
+        setCategoryDrawerStats(stats)
+    }, [categoryDrawerProjectId])
+
     const handleSelectDrawerCategory = useCallback((selection: MobileCategoryDrawerSelection, label: string) => {
         if (!categoryDrawerProjectId) return
         closeCategoryDrawer()
@@ -493,10 +503,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         onClickCapture={handleCategoryDrawerClickCapture}
                     >
                         <MobileCategoryDrawer
+                            projectId={categoryDrawerProjectId!}
                             categories={categoryDrawerCategories}
                             stats={categoryDrawerStats}
                             selected={categoryDrawerSelection}
                             onSelect={handleSelectDrawerCategory}
+                            onChanged={refreshCategoryDrawer}
                         />
                     </div>
                 )}
