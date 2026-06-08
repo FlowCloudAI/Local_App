@@ -52,7 +52,7 @@ interface Props {
 }
 
 type WorldSortMode = 'updated-desc' | 'created-desc' | 'name-asc' | 'size-desc'
-type WorldDisplayMode = 'card' | 'list' | 'compact'
+type WorldDisplayMode = 'card' | 'list'
 export type MobileHomePanel = 'dashboard' | 'worlds'
 
 const PANEL_SWITCH_THRESHOLD = 72
@@ -60,7 +60,6 @@ const PANEL_SWITCH_THRESHOLD = 72
 const WORLD_DISPLAY_OPTIONS: Array<{key: WorldDisplayMode; label: string; desc: string}> = [
     {key: 'card', label: '卡片', desc: '两列封面卡片'},
     {key: 'list', label: '列表', desc: '更适合扫标题'},
-    {key: 'compact', label: '紧凑', desc: '提高屏幕容量'},
 ]
 
 const WORLD_SORT_OPTIONS: Array<{key: WorldSortMode; label: string}> = [
@@ -70,17 +69,88 @@ const WORLD_SORT_OPTIONS: Array<{key: WorldSortMode; label: string}> = [
     {key: 'size-desc', label: '项目体量'},
 ]
 
-const WORLD_DISPLAY_ICONS: Record<WorldDisplayMode, string> = {
-    card: '▦',
-    list: '☰',
-    compact: '▤',
-}
-
 const WORLD_SORT_DETAILS: Record<WorldSortMode, string> = {
     'updated-desc': '最新到最旧',
     'created-desc': '新建到较早',
     'name-asc': 'A 到 Z',
     'size-desc': '词条多到少',
+}
+
+function FilterCheckIcon() {
+    return (
+        <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
+            <path
+                d="M5 12.5 9.2 16.7 19 6.8"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2.35"
+            />
+        </svg>
+    )
+}
+
+function FilterCardIcon() {
+    return (
+        <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
+            <rect x="4" y="4" width="6.2" height="6.2" rx="1.35" fill="none" stroke="currentColor" strokeWidth="2.05"/>
+            <rect x="13.8" y="4" width="6.2" height="6.2" rx="1.35" fill="none" stroke="currentColor" strokeWidth="2.05"/>
+            <rect x="4" y="13.8" width="6.2" height="6.2" rx="1.35" fill="none" stroke="currentColor" strokeWidth="2.05"/>
+            <rect x="13.8" y="13.8" width="6.2" height="6.2" rx="1.35" fill="none" stroke="currentColor" strokeWidth="2.05"/>
+        </svg>
+    )
+}
+
+function FilterListIcon() {
+    return (
+        <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
+            <circle cx="5" cy="6" r="1.25" fill="currentColor"/>
+            <circle cx="5" cy="12" r="1.25" fill="currentColor"/>
+            <circle cx="5" cy="18" r="1.25" fill="currentColor"/>
+            <path d="M9 6h10" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
+            <path d="M9 12h10" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
+            <path d="M9 18h10" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
+        </svg>
+    )
+}
+
+function FilterImportIcon() {
+    return (
+        <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 4v10.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
+            <path d="M7.8 10.4 12 14.6l4.2-4.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"/>
+            <path d="M5.8 18.2h12.4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
+        </svg>
+    )
+}
+
+function FilterRefreshIcon() {
+    return (
+        <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
+            <path
+                d="M18.4 8.1A6.7 6.7 0 0 0 6.5 7"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2.2"
+            />
+            <path d="M18.5 4.9v3.6h-3.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"/>
+            <path
+                d="M5.6 15.9A6.7 6.7 0 0 0 17.5 17"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2.2"
+            />
+            <path d="M5.5 19.1v-3.6h3.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"/>
+        </svg>
+    )
+}
+
+function renderDisplayIcon(mode: WorldDisplayMode) {
+    if (mode === 'card') return <FilterCardIcon/>
+    return <FilterListIcon/>
 }
 
 function parseDateValue(value?: string | null): number {
@@ -665,7 +735,7 @@ export default function MobileHome({
                 title={project.name}
                 description={project.description || '你的世界在等你回来，继续补全新的角色、地点和事件。'}
                 image={image}
-                imageHeight={displayMode === 'compact' ? '5.5rem' : '8.5rem'}
+                imageHeight="8.5rem"
                 extraInfo={<span className="mobile-project-card__meta">{meta}</span>}
                 variant="shadow"
                 hoverable
@@ -861,10 +931,10 @@ export default function MobileHome({
                                         onClick={() => setDisplayMode(option.key)}
                                     >
                                         <span className="mobile-home-filter__check" aria-hidden="true">
-                                            {active ? '✓' : ''}
+                                            {active ? <FilterCheckIcon/> : null}
                                         </span>
                                         <span className="mobile-home-filter__icon" aria-hidden="true">
-                                            {WORLD_DISPLAY_ICONS[option.key]}
+                                            {renderDisplayIcon(option.key)}
                                         </span>
                                         <span className="mobile-home-filter__text">
                                             <span>{option.label}</span>
@@ -888,11 +958,9 @@ export default function MobileHome({
                                         onClick={() => setSortMode(option.key)}
                                     >
                                         <span className="mobile-home-filter__check" aria-hidden="true">
-                                            {active ? '✓' : ''}
+                                            {active ? <FilterCheckIcon/> : null}
                                         </span>
-                                        <span className="mobile-home-filter__icon" aria-hidden="true">
-                                            ↕
-                                        </span>
+                                        <span className="mobile-home-filter__icon mobile-home-filter__icon--empty" aria-hidden="true"/>
                                         <span className="mobile-home-filter__text">
                                             <span>{option.label}</span>
                                             <small>{WORLD_SORT_DETAILS[option.key]}</small>
@@ -914,7 +982,9 @@ export default function MobileHome({
                                 }}
                             >
                                 <span className="mobile-home-filter__check" aria-hidden="true"/>
-                                <span className="mobile-home-filter__icon" aria-hidden="true">⇩</span>
+                                <span className="mobile-home-filter__icon" aria-hidden="true">
+                                    <FilterImportIcon/>
+                                </span>
                                 <span className="mobile-home-filter__text">
                                     <span>{importing ? '导入中…' : '导入世界'}</span>
                                     <small>从 .fcworld 文件导入</small>
@@ -931,7 +1001,9 @@ export default function MobileHome({
                                 }}
                             >
                                 <span className="mobile-home-filter__check" aria-hidden="true"/>
-                                <span className="mobile-home-filter__icon" aria-hidden="true">↻</span>
+                                <span className="mobile-home-filter__icon" aria-hidden="true">
+                                    <FilterRefreshIcon/>
+                                </span>
                                 <span className="mobile-home-filter__text">
                                     <span>刷新列表</span>
                                     <small>重新同步世界观</small>
