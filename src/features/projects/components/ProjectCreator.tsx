@@ -10,9 +10,10 @@ interface ProjectCreatorProps {
     onClose: () => void
     onCreated?: (project: Project) => void
     existingNames?: string[]
+    backdropClassName?: string
 }
 
-export default function ProjectCreator({open, onClose, onCreated, existingNames = []}: ProjectCreatorProps) {
+export default function ProjectCreator({open, onClose, onCreated, existingNames = [], backdropClassName}: ProjectCreatorProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [submitting, setSubmitting] = useState(false)
@@ -67,7 +68,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
 
     return createPortal(
         <div
-            className="project-creator-backdrop"
+            className={['project-creator-backdrop', backdropClassName].filter(Boolean).join(' ')}
             onClick={e => {
                 if (e.target === e.currentTarget && !submitting) onClose()
             }}

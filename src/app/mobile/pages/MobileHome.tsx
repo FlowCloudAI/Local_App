@@ -621,6 +621,7 @@ export default function MobileHome({push, navigateToTab, setAiFocus}: Props) {
                 onClose={() => setCreatorOpen(false)}
                 onCreated={handleOpenProject}
                 existingNames={projects.map(project => project.name)}
+                backdropClassName="project-creator-backdrop--no-blur"
             />
             <ProjectImportConflictDialog
                 open={Boolean(importConflict)}
