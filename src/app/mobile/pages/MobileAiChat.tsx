@@ -7,7 +7,7 @@ import {
     useState,
 } from 'react'
 import {createPortal} from 'react-dom'
-import {Button, MessageBox, Select, useAlert} from 'flowcloudai-ui'
+import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
     CONVERSATION_TEMPERATURE_MAX,
@@ -36,12 +36,7 @@ interface Props {
     onCloseConversationDrawer?: () => void
 }
 
-type SelectValue = string | number | (string | number)[]
 type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
-
-function normalizeSelectValue(value: SelectValue): string {
-    return String(Array.isArray(value) ? value[0] ?? '' : value ?? '')
-}
 
 function formatConversationDate(timestamp: number): string {
     if (!timestamp) return '时间未知'
@@ -74,7 +69,7 @@ const AI_TOOL_ACCESS_DETAILS: Record<AiToolAccessMode, string> = {
 
 const AI_TOOL_ACCESS_OPTIONS: AiToolAccessMode[] = ['reader', 'assistant', 'writer']
 
-function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking' | 'mode'}) {
+function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking'}) {
     if (type === 'menu') {
         return (
             <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
@@ -173,16 +168,6 @@ function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'de
             </svg>
         )
     }
-    if (type === 'mode') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M5 7.5h14"/>
-                <path d="M5 16.5h14"/>
-                <circle cx="9" cy="7.5" r="2"/>
-                <circle cx="15" cy="16.5" r="2"/>
-            </svg>
-        )
-    }
     if (type === 'stop') {
         return (
             <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
@@ -217,7 +202,7 @@ export default function MobileAiChat({
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
-        plugins, pluginsReady, selectedPlugin, selectedModel, setSelectedPlugin, setSelectedModel,
+        plugins, pluginsReady, selectedPlugin, selectedModel,
         webSearchEnabled, toggleWebSearch,
         toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams, updateConversationSettings, focusContext,
     } = controller
@@ -238,10 +223,6 @@ export default function MobileAiChat({
         () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
         [activeConversationId, conversations],
     )
-    const currentPlugin = useMemo(
-        () => plugins.find(plugin => plugin.id === selectedPlugin) ?? null,
-        [plugins, selectedPlugin],
-    )
     const activeLlmPluginId = activeConversation?.pluginId || selectedPlugin
     const activeLlmPluginInfo = useMemo(
         () => plugins.find(plugin => plugin.id === activeLlmPluginId) ?? null,
@@ -253,22 +234,6 @@ export default function MobileAiChat({
     const activeModelLabel = activeModelInfo?.name && activeModelInfo.name !== activeModelId
         ? activeModelInfo.name
         : activeModelId || '未选择模型'
-    const pluginOptions = useMemo(
-        () => plugins.map(plugin => ({value: plugin.id, label: plugin.name || plugin.id})),
-        [plugins],
-    )
-    const modelOptions = useMemo(() => {
-        const modelInfoById = new Map(
-            (currentPlugin?.model_infos ?? []).map(modelInfo => [modelInfo.id, modelInfo]),
-        )
-        return (currentPlugin?.models ?? []).map(model => {
-            const modelInfo = modelInfoById.get(model)
-            const label = modelInfo?.name && modelInfo.name !== model
-                ? `${modelInfo.name} (${model})`
-                : model
-            return {value: model, label}
-        })
-    }, [currentPlugin])
     const toolModeOptions = useMemo(() => AI_TOOL_ACCESS_OPTIONS.map(mode => ({
         mode,
         label: AI_TOOL_ACCESS_LABELS[mode],
@@ -397,17 +362,6 @@ export default function MobileAiChat({
             window.removeEventListener('fc:plugins-changed', refreshApiKeyState)
         }
     }, [activeLlmPluginId])
-
-    const handlePluginChange = useCallback((value: SelectValue) => {
-        const nextPluginId = normalizeSelectValue(value)
-        const nextPlugin = plugins.find(plugin => plugin.id === nextPluginId) ?? null
-        setSelectedPlugin(nextPluginId)
-        setSelectedModel(nextPlugin?.default_model ?? nextPlugin?.models[0] ?? '')
-    }, [plugins, setSelectedModel, setSelectedPlugin])
-
-    const handleModelChange = useCallback((value: SelectValue) => {
-        setSelectedModel(normalizeSelectValue(value))
-    }, [setSelectedModel])
 
     const handleToolModeChange = useCallback(async (mode: AiToolAccessMode) => {
         if (mode === toolAccessMode) return
@@ -563,35 +517,6 @@ export default function MobileAiChat({
             <div className="mobile-ai-settings-card__title">
                 <span>对话属性</span>
                 {activeConversation?.archivedAt ? <small>已归档</small> : null}
-            </div>
-            <div className="mobile-ai-plugin-bar" aria-label="AI 插件与模型">
-                <label className="mobile-ai-plugin-field">
-                    <span className="mobile-ai-plugin-label">插件</span>
-                    <Select
-                        value={selectedPlugin}
-                        onChange={handlePluginChange}
-                        options={pluginOptions}
-                        placeholder={pluginsLoading ? '加载中' : '选择 LLM 插件'}
-                        disabled={pluginsLoading || pluginOptions.length === 0}
-                        className="mobile-ai-plugin-select"
-                    />
-                </label>
-                <label className="mobile-ai-plugin-field">
-                    <span className="mobile-ai-plugin-label">模型</span>
-                    <Select
-                        value={selectedModel}
-                        onChange={handleModelChange}
-                        options={modelOptions}
-                        placeholder={pluginsLoading ? '加载中' : '选择模型'}
-                        disabled={pluginsLoading || modelOptions.length === 0}
-                        className="mobile-ai-plugin-select"
-                    />
-                </label>
-                {(llmUnavailable || llmApiKeyMissing) && (
-                    <Button type="button" size="sm" variant="outline" onClick={() => navigateToTab('settings')}>
-                        {llmApiKeyMissing ? '配置 Key' : '去设置'}
-                    </Button>
-                )}
             </div>
             <div className="mobile-ai-settings-grid">
                 <label className="mobile-ai-setting-field">
@@ -922,10 +847,6 @@ export default function MobileAiChat({
                             <span className="mobile-ai-more-switch__toggle" aria-hidden="true"/>
                         </button>
                         <div className="mobile-ai-more-mode" aria-label="模式切换">
-                            <div className="mobile-ai-more-mode__label">
-                                <MobileAiIcon type="mode"/>
-                                <span>模式切换</span>
-                            </div>
                             <div className="mobile-ai-tool-mode-options">
                                 {toolModeOptions.map(option => (
                                     <button

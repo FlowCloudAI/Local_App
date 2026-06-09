@@ -429,31 +429,6 @@
     font-size: var(--fc-font-size-xs);
 }
 
-.mobile-ai-plugin-bar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: end;
-    gap: 0.75rem;
-}
-
-.mobile-ai-plugin-field {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.mobile-ai-plugin-label {
-    display: block;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-semibold);
-}
-
-.mobile-ai-plugin-select {
-    width: 100%;
-}
-
 .mobile-ai-tool-mode-options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -668,22 +643,7 @@
 .mobile-ai-more-mode {
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
     margin-bottom: 0.9rem;
-}
-
-.mobile-ai-more-mode__label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: 720;
-}
-
-.mobile-ai-more-mode__label .mobile-ai-svg {
-    width: 1.08rem;
-    height: 1.08rem;
 }
 
 .mobile-ai-settings-grid {
