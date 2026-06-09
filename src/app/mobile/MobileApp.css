@@ -17,6 +17,7 @@
     --mobile-surface-glass-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
     --mobile-surface-panel: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
     --mobile-surface-dialog: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+    --mobile-drawer-reveal-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
     --mobile-overlay-scrim-soft: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
     --mobile-divider: color-mix(in srgb, var(--fc-color-border) 62%, transparent);
     --mobile-inset-highlight: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 18%, transparent);
@@ -45,7 +46,6 @@
     --mobile-radius-field: var(--fc-radius-xl);
     --mobile-radius-floating: calc(var(--fc-radius-xl) + var(--fc-space-sm));
     --mobile-radius-sheet: calc(var(--fc-radius-xl) + var(--fc-space-sm));
-    --mobile-drawer-surface-top-radius: max(3.75rem, calc(var(--mobile-radius-sheet) + env(safe-area-inset-top, 0px)));
 }
 
 .mobile-app {
@@ -66,7 +66,7 @@
     flex: 1;
     flex-direction: column;
     overflow: hidden;
-    background: var(--fc-color-bg);
+    background: var(--mobile-drawer-reveal-bg);
 }
 
 .mobile-app-category-shell__drawer {
@@ -100,7 +100,7 @@
 }
 
 .mobile-app-category-shell.is-open .mobile-app-category-shell__surface {
-    border-radius: var(--mobile-drawer-surface-top-radius) 0 0 var(--mobile-radius-sheet);
+    border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
     box-shadow: var(--mobile-shadow-drawer-surface);
 }
 
