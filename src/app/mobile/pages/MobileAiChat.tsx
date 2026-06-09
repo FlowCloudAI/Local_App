@@ -9,6 +9,7 @@ import {
     useState,
 } from 'react'
 import {createPortal} from 'react-dom'
+import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
@@ -18,9 +19,15 @@ import {
     type Conversation,
     type ConversationSettings,
 } from '../../../features/ai-chat/model/AiControllerTypes'
-import {setting_has_api_key} from '../../../api'
+import {
+    ai_export_conversation,
+    type ConversationExportFormat,
+    formatApiError,
+    setting_has_api_key,
+    toApiError,
+} from '../../../api'
 import {logger} from '../../../shared/logger'
-import {RenameDialog} from '../../../shared/ui/overlay'
+import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import {type MobileTab} from '../MobileNav'
 import {
     MobileAnchoredActionMenu,
@@ -39,6 +46,8 @@ interface Props {
 }
 
 type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
+type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
+type AiConversationStatusFilter = 'active' | 'archived'
 type MobileAiMoreSheetStyle = CSSProperties & {'--mobile-ai-more-drag-offset'?: string}
 
 interface MorePanelDragState {
@@ -64,9 +73,9 @@ function formatConversationDate(timestamp: number): string {
 }
 
 function sortConversations(first: Conversation, second: Conversation): number {
-    const firstPin = first.pinnedAt ? 1 : 0
-    const secondPin = second.pinnedAt ? 1 : 0
-    if (firstPin !== secondPin) return secondPin - firstPin
+    const pinnedDiff = Number(Boolean(second.pinnedAt)) - Number(Boolean(first.pinnedAt))
+    if (pinnedDiff !== 0) return pinnedDiff
+    if (first.pinnedAt && second.pinnedAt) return second.pinnedAt.localeCompare(first.pinnedAt)
     return (second.timestamp ?? 0) - (first.timestamp ?? 0)
 }
 
@@ -83,6 +92,47 @@ const AI_TOOL_ACCESS_DETAILS: Record<AiToolAccessMode, string> = {
 }
 
 const AI_TOOL_ACCESS_OPTIONS: AiToolAccessMode[] = ['reader', 'assistant', 'writer']
+
+const AI_CONVERSATION_FILTER_OPTIONS: Array<{key: AiConversationFilter; label: string}> = [
+    {key: 'all', label: '全部'},
+    {key: 'default', label: '通用'},
+    {key: 'character', label: '角色聊天'},
+    {key: 'report', label: '矛盾检测'},
+]
+
+const AI_CONVERSATION_STATUS_OPTIONS: Array<{key: AiConversationStatusFilter; label: string}> = [
+    {key: 'active', label: '当前'},
+    {key: 'archived', label: '归档'},
+]
+
+function matchesConversationFilter(conversation: Conversation, filter: AiConversationFilter): boolean {
+    if (filter === 'all') return true
+    if (filter === 'default') return !conversation.mode || conversation.mode === 'default'
+    if (filter === 'character') return conversation.mode === 'character'
+    if (filter === 'report') return conversation.mode === 'report'
+    return false
+}
+
+function buildConversationSearchText(conversation: Conversation): string {
+    return [
+        conversation.title,
+        conversation.characterName,
+        conversation.reportContext?.projectName,
+        conversation.reportContext?.scopeSummary,
+    ].filter(Boolean).join(' ').toLocaleLowerCase()
+}
+
+function buildConversationExportFileName(conversation: Conversation, format: ConversationExportFormat): string {
+    const extension = format === 'json' ? 'json' : 'md'
+    const safeTitle = conversation.title
+        .split('')
+        .map(char => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 80)
+    return `${safeTitle || 'AI会话'}.${extension}`
+}
 
 function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking'}) {
     if (type === 'menu') {
@@ -226,6 +276,8 @@ export default function MobileAiChat({
     const [apiKeyRefreshTick, setApiKeyRefreshTick] = useState(0)
     const [llmApiKeyAvailability, setLlmApiKeyAvailability] = useState<ApiKeyAvailability>('unknown')
     const [conversationSearch, setConversationSearch] = useState('')
+    const [conversationStatusFilter, setConversationStatusFilter] = useState<AiConversationStatusFilter>('active')
+    const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
     const [drawerRoot, setDrawerRoot] = useState<HTMLElement | null>(null)
     const [topMenuOpen, setTopMenuOpen] = useState(false)
     const [morePanelOpen, setMorePanelOpen] = useState(false)
@@ -233,7 +285,8 @@ export default function MobileAiChat({
     const [morePanelClosing, setMorePanelClosing] = useState(false)
     const [morePanelDragging, setMorePanelDragging] = useState(false)
     const [morePanelDragOffset, setMorePanelDragOffset] = useState(0)
-    const [renameOpen, setRenameOpen] = useState(false)
+    const [renameTarget, setRenameTarget] = useState<Conversation | null>(null)
+    const [conversationActionTarget, setConversationActionTarget] = useState<Conversation | null>(null)
     const [renaming, setRenaming] = useState(false)
     const morePanelCloseTimerRef = useRef<number | null>(null)
     const morePanelDragRef = useRef<MorePanelDragState | null>(null)
@@ -263,13 +316,19 @@ export default function MobileAiChat({
         () => normalizeConversationSettings(activeConversation?.settings),
         [activeConversation?.settings],
     )
-    const normalizedConversationSearch = conversationSearch.trim().toLowerCase()
+    const normalizedConversationSearch = conversationSearch.trim().toLocaleLowerCase()
     const visibleConversations = useMemo(() => {
         return [...conversations]
+            .filter(conversation => {
+                if (conversationStatusFilter === 'active' && conversation.archivedAt) return false
+                if (conversationStatusFilter === 'archived' && !conversation.archivedAt) return false
+                if (!matchesConversationFilter(conversation, conversationFilter)) return false
+                if (!normalizedConversationSearch) return true
+                return buildConversationSearchText(conversation).includes(normalizedConversationSearch)
+            })
             .sort(sortConversations)
-            .filter(conversation => !normalizedConversationSearch
-                || conversation.title.toLowerCase().includes(normalizedConversationSearch))
-    }, [conversations, normalizedConversationSearch])
+    }, [conversationFilter, conversations, conversationStatusFilter, normalizedConversationSearch])
+    const hasConversationSearch = normalizedConversationSearch.length > 0
     const pluginsLoading = !pluginsReady
     const llmUnavailable = pluginsReady && plugins.length === 0
     const pluginSelectionIncomplete = pluginsReady && plugins.length > 0 && (!selectedPlugin || !selectedModel)
@@ -547,12 +606,14 @@ export default function MobileAiChat({
     ])
 
     const handleNewConv = useCallback(async () => {
+        setConversationActionTarget(null)
         await createNewConversation()
         closeMorePanel()
         onCloseConversationDrawer?.()
     }, [closeMorePanel, createNewConversation, onCloseConversationDrawer])
 
     const handleSelectConv = useCallback(async (convId: string) => {
+        setConversationActionTarget(null)
         await switchConversation(convId)
         onCloseConversationDrawer?.()
     }, [onCloseConversationDrawer, switchConversation])
@@ -562,19 +623,50 @@ export default function MobileAiChat({
         const result = await showAlert('确定删除此对话？此操作不可撤销。', 'warning', 'confirm')
         if (result !== 'yes') return
         setTopMenuOpen(false)
+        setConversationActionTarget(null)
         await deleteConversation(convId)
     }, [deleteConversation, showAlert])
 
     const handleRenameConfirm = useCallback(async (title: string) => {
-        if (!activeConversation) return
+        if (!renameTarget) return
         setRenaming(true)
         try {
-            await renameConversation(activeConversation.id, title)
-            setRenameOpen(false)
+            await renameConversation(renameTarget.id, title)
+            setRenameTarget(null)
         } finally {
             setRenaming(false)
         }
-    }, [activeConversation, renameConversation])
+    }, [renameConversation, renameTarget])
+
+    const handleExportConversation = useCallback(async (
+        conversation: Conversation,
+        format: ConversationExportFormat,
+    ) => {
+        setConversationActionTarget(null)
+
+        if (conversation.id.startsWith('conv_')) {
+            await showAlert('这条会话尚未写入历史，发送消息后再导出。', 'warning', 'nonInvasive', 2200)
+            return
+        }
+
+        const isJson = format === 'json'
+        const selectedPath = await saveFileDialog({
+            defaultPath: buildConversationExportFileName(conversation, format),
+            filters: [{
+                name: isJson ? 'JSON' : 'Markdown',
+                extensions: [isJson ? 'json' : 'md'],
+            }],
+        })
+
+        if (!selectedPath) return
+
+        try {
+            await ai_export_conversation(conversation.id, selectedPath, format)
+            await showAlert(`会话已导出为 ${isJson ? 'JSON' : 'Markdown'}。`, 'success', 'nonInvasive', 1000)
+        } catch (error) {
+            await showAlert(`导出会话失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
+        }
+    }, [showAlert])
 
     const handleUnavailableMobileAiTool = useCallback((label: string) => {
         void showAlert(`移动端暂未开放「${label}」入口。`, 'info', 'nonInvasive', 1800)
@@ -600,7 +692,23 @@ export default function MobileAiChat({
             label: '重命名',
             description: '修改当前会话名称',
             icon: <MobileAiIcon type="rename"/>,
-            onSelect: () => setRenameOpen(true),
+            onSelect: () => setRenameTarget(activeConversation),
+        },
+        {
+            key: 'export-markdown',
+            label: '导出 Markdown',
+            description: activeConversation.id.startsWith('conv_') ? '发送消息后可导出' : '保存为 .md 文件',
+            icon: <MobileAiIcon type="file"/>,
+            disabled: activeConversation.id.startsWith('conv_'),
+            onSelect: () => void handleExportConversation(activeConversation, 'markdown'),
+        },
+        {
+            key: 'export-json',
+            label: '导出 JSON',
+            description: activeConversation.id.startsWith('conv_') ? '发送消息后可导出' : '保存为 .json 文件',
+            icon: <MobileAiIcon type="file"/>,
+            disabled: activeConversation.id.startsWith('conv_'),
+            onSelect: () => void handleExportConversation(activeConversation, 'json'),
         },
         {
             key: 'delete',
@@ -609,6 +717,42 @@ export default function MobileAiChat({
             icon: <MobileAiIcon type="delete"/>,
             danger: true,
             onSelect: () => void handleDeleteConv(activeConversation.id),
+        },
+    ] : []
+
+    const conversationActionMenuItems = conversationActionTarget ? [
+        {
+            key: 'pin',
+            label: conversationActionTarget.pinnedAt ? '取消顶置' : '顶置',
+            onSelect: () => toggleConversationPinned(conversationActionTarget.id),
+        },
+        {
+            key: 'archive',
+            label: conversationActionTarget.archivedAt ? '取消归档' : '归档',
+            onSelect: () => toggleConversationArchived(conversationActionTarget.id),
+        },
+        {
+            key: 'rename',
+            label: '重命名',
+            onSelect: () => setRenameTarget(conversationActionTarget),
+        },
+        {
+            key: 'export-markdown',
+            label: '导出 Markdown',
+            disabled: conversationActionTarget.id.startsWith('conv_'),
+            onSelect: () => void handleExportConversation(conversationActionTarget, 'markdown'),
+        },
+        {
+            key: 'export-json',
+            label: '导出 JSON',
+            disabled: conversationActionTarget.id.startsWith('conv_'),
+            onSelect: () => void handleExportConversation(conversationActionTarget, 'json'),
+        },
+        {
+            key: 'delete',
+            label: '删除',
+            danger: true,
+            onSelect: () => void handleDeleteConv(conversationActionTarget.id),
         },
     ] : []
 
@@ -714,7 +858,7 @@ export default function MobileAiChat({
         <aside className="mobile-ai-drawer" aria-label="对话列表">
             <div className="mobile-ai-drawer__header">
                 <span>对话列表</span>
-                <small>{conversations.length} 个会话</small>
+                <small>{visibleConversations.length}/{conversations.length} 个会话</small>
             </div>
             <label className="mobile-ai-drawer__search">
                 <span aria-hidden="true">⌕</span>
@@ -724,10 +868,59 @@ export default function MobileAiChat({
                     placeholder="搜索对话..."
                 />
             </label>
+            <div className="mobile-ai-drawer__filter-groups">
+                <div className="mobile-ai-drawer__filter-group">
+                    <span>状态</span>
+                    <div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话状态">
+                        {AI_CONVERSATION_STATUS_OPTIONS.map(option => (
+                            <button
+                                key={option.key}
+                                type="button"
+                                className={conversationStatusFilter === option.key ? 'active' : ''}
+                                aria-pressed={conversationStatusFilter === option.key}
+                                onClick={() => setConversationStatusFilter(option.key)}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <div className="mobile-ai-drawer__filter-group">
+                    <span>类型</span>
+                    <div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话类型">
+                        {AI_CONVERSATION_FILTER_OPTIONS.map(option => (
+                            <button
+                                key={option.key}
+                                type="button"
+                                className={conversationFilter === option.key ? 'active' : ''}
+                                aria-pressed={conversationFilter === option.key}
+                                onClick={() => setConversationFilter(option.key)}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    className="mobile-ai-drawer__new"
+                    disabled={conversationCreationDisabled}
+                    onClick={() => void handleNewConv()}
+                >
+                    <span aria-hidden="true">+</span>
+                    <span>新对话</span>
+                </button>
+            </div>
             <div className="mobile-ai-drawer__list">
                 {visibleConversations.length === 0 ? (
                     <div className="mobile-ai-drawer__empty">
-                        {conversations.length === 0 ? '暂无历史对话' : '没有匹配的对话'}
+                        {conversations.length === 0
+                            ? '暂无历史对话'
+                            : hasConversationSearch
+                                ? '没有匹配的对话'
+                                : conversationStatusFilter === 'archived'
+                                    ? '暂无归档对话'
+                                    : '当前类型下没有对话'}
                     </div>
                 ) : visibleConversations.map(conversation => {
                     const runtime = conversationRuntime[conversation.id]
@@ -740,20 +933,34 @@ export default function MobileAiChat({
                         conversation.mode === 'report' ? '矛盾检测' : null,
                     ].filter(Boolean).join(' · ')
                     return (
-                        <button
+                        <div
                             key={conversation.id}
-                            type="button"
-                            className={`mobile-ai-drawer__item${conversation.id === activeConversationId ? ' active' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
-                            onClick={() => void handleSelectConv(conversation.id)}
+                            className={`mobile-ai-drawer__item${conversation.id === activeConversationId ? ' active' : ''}${conversation.mode === 'character' ? ' is-character' : ''}${conversation.mode === 'report' ? ' is-report' : ''}${conversation.pinnedAt ? ' is-pinned' : ''}${conversation.archivedAt ? ' is-archived' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
                         >
-                            <span className="mobile-ai-drawer__item-main">
-                                <strong>{conversation.title}</strong>
-                                <small>{tags || `${conversation.messages.length} 条消息`}</small>
-                            </span>
-                            <span className="mobile-ai-drawer__item-meta">
-                                {formatConversationDate(conversation.timestamp)}
-                            </span>
-                        </button>
+                            <button
+                                type="button"
+                                className="mobile-ai-drawer__item-content"
+                                onClick={() => void handleSelectConv(conversation.id)}
+                            >
+                                <span className="mobile-ai-drawer__item-main">
+                                    <strong>{conversation.title}</strong>
+                                    <small>{tags || `${conversation.messages.length} 条消息`}</small>
+                                </span>
+                                <span className="mobile-ai-drawer__item-meta">
+                                    {formatConversationDate(conversation.timestamp)}
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                className="mobile-ai-drawer__item-more"
+                                aria-label={`打开「${conversation.title}」的操作菜单`}
+                                aria-haspopup="menu"
+                                aria-expanded={conversationActionTarget?.id === conversation.id}
+                                onClick={() => setConversationActionTarget(conversation)}
+                            >
+                                <span aria-hidden="true">•••</span>
+                            </button>
+                        </div>
                     )
                 })}
             </div>
@@ -985,13 +1192,21 @@ export default function MobileAiChat({
                 document.body,
             ) : null}
 
+            <ActionMenu
+                open={!!conversationActionTarget}
+                onClose={() => setConversationActionTarget(null)}
+                title={conversationActionTarget?.title}
+                ariaLabel="对话操作菜单"
+                items={conversationActionMenuItems}
+            />
+
             <RenameDialog
-                open={renameOpen}
+                open={!!renameTarget}
                 title="重命名对话"
-                initialValue={activeConversation?.title ?? ''}
+                initialValue={renameTarget?.title ?? ''}
                 placeholder="对话名称"
                 busy={renaming}
-                onClose={() => setRenameOpen(false)}
+                onClose={() => setRenameTarget(null)}
                 onConfirm={(title) => void handleRenameConfirm(title)}
             />
         </div>
