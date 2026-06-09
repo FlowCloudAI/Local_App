@@ -501,6 +501,7 @@
     display: inline-grid;
     width: 2.18rem;
     height: 2.18rem;
+    box-sizing: border-box;
     padding: 0;
     place-items: center;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
@@ -522,9 +523,17 @@
 }
 
 .mobile-ai-composer-card__icon-btn--send {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 36%, transparent);
+    border: 0;
+    border-radius: 50%;
     background: var(--fc-color-primary);
     color: var(--fc-color-text-on-primary);
+    box-shadow: none;
+}
+
+.mobile-ai-composer-card__icon-btn--send .mobile-ai-svg {
+    width: 1.22rem;
+    height: 1.22rem;
+    stroke-width: 2.4;
 }
 
 .mobile-ai-composer-card__icon-btn:disabled {

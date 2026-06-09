@@ -242,8 +242,8 @@ function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'de
     }
     return (
         <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-            <path d="M12 19V5"/>
-            <path d="m6.5 10.5 5.5-5.5 5.5 5.5"/>
+            <path d="M12 20V4"/>
+            <path d="M4.5 11.5L12 4l7.5 7.5"/>
         </svg>
     )
 }
