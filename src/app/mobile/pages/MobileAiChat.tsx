@@ -644,55 +644,59 @@ export default function MobileAiChat({
                     />
                 </label>
             </div>
-            <div className="mobile-ai-setting-toggle-grid">
-                <label className="mobile-ai-setting-toggle">
-                    <span>
-                        <strong>重复惩罚</strong>
-                        <small>降低重复用词</small>
-                    </span>
-                    <input
-                        type="checkbox"
-                        checked={conversationSettings.frequencyPenaltyEnabled}
-                        disabled={!activeConversation}
-                        onChange={event => updateConversationSetting('frequencyPenaltyEnabled', event.currentTarget.checked)}
-                    />
-                </label>
-                <label className="mobile-ai-setting-field mobile-ai-setting-field--inline">
-                    <span>强度</span>
-                    <input
-                        type="number"
-                        min={-2}
-                        max={2}
-                        step={0.1}
-                        value={conversationSettings.frequencyPenalty}
-                        disabled={!activeConversation || !conversationSettings.frequencyPenaltyEnabled}
-                        onChange={event => updateConversationSetting('frequencyPenalty', Number(event.currentTarget.value))}
-                    />
-                </label>
-                <label className="mobile-ai-setting-toggle">
-                    <span>
-                        <strong>存在惩罚</strong>
-                        <small>鼓励引入新内容</small>
-                    </span>
-                    <input
-                        type="checkbox"
-                        checked={conversationSettings.presencePenaltyEnabled}
-                        disabled={!activeConversation}
-                        onChange={event => updateConversationSetting('presencePenaltyEnabled', event.currentTarget.checked)}
-                    />
-                </label>
-                <label className="mobile-ai-setting-field mobile-ai-setting-field--inline">
-                    <span>强度</span>
-                    <input
-                        type="number"
-                        min={-2}
-                        max={2}
-                        step={0.1}
-                        value={conversationSettings.presencePenalty}
-                        disabled={!activeConversation || !conversationSettings.presencePenaltyEnabled}
-                        onChange={event => updateConversationSetting('presencePenalty', Number(event.currentTarget.value))}
-                    />
-                </label>
+            <div className="mobile-ai-setting-penalty-grid">
+                <div className="mobile-ai-setting-penalty-card">
+                    <label className="mobile-ai-setting-toggle">
+                        <span>
+                            <strong>重复惩罚</strong>
+                            <small>降低重复用词</small>
+                        </span>
+                        <input
+                            type="checkbox"
+                            checked={conversationSettings.frequencyPenaltyEnabled}
+                            disabled={!activeConversation}
+                            onChange={event => updateConversationSetting('frequencyPenaltyEnabled', event.currentTarget.checked)}
+                        />
+                    </label>
+                    <label className="mobile-ai-setting-field">
+                        <span>强度</span>
+                        <input
+                            type="number"
+                            min={-2}
+                            max={2}
+                            step={0.1}
+                            value={conversationSettings.frequencyPenalty}
+                            disabled={!activeConversation || !conversationSettings.frequencyPenaltyEnabled}
+                            onChange={event => updateConversationSetting('frequencyPenalty', Number(event.currentTarget.value))}
+                        />
+                    </label>
+                </div>
+                <div className="mobile-ai-setting-penalty-card">
+                    <label className="mobile-ai-setting-toggle">
+                        <span>
+                            <strong>存在惩罚</strong>
+                            <small>鼓励引入新内容</small>
+                        </span>
+                        <input
+                            type="checkbox"
+                            checked={conversationSettings.presencePenaltyEnabled}
+                            disabled={!activeConversation}
+                            onChange={event => updateConversationSetting('presencePenaltyEnabled', event.currentTarget.checked)}
+                        />
+                    </label>
+                    <label className="mobile-ai-setting-field">
+                        <span>强度</span>
+                        <input
+                            type="number"
+                            min={-2}
+                            max={2}
+                            step={0.1}
+                            value={conversationSettings.presencePenalty}
+                            disabled={!activeConversation || !conversationSettings.presencePenaltyEnabled}
+                            onChange={event => updateConversationSetting('presencePenalty', Number(event.currentTarget.value))}
+                        />
+                    </label>
+                </div>
             </div>
             <label className="mobile-ai-setting-prompt">
                 <span>当前对话独有提示词</span>
