@@ -1,5 +1,7 @@
 import {
+    type CSSProperties,
     type MouseEvent as ReactMouseEvent,
+    type PointerEvent as ReactPointerEvent,
     useCallback,
     useEffect,
     useMemo,
@@ -37,6 +39,19 @@ interface Props {
 }
 
 type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
+type MobileAiMoreSheetStyle = CSSProperties & {'--mobile-ai-more-drag-offset'?: string}
+
+interface MorePanelDragState {
+    pointerId: number
+    startX: number
+    startY: number
+    startScrollTop: number
+    lastY: number
+    lastTime: number
+    velocityY: number
+    currentOffset: number
+    tracking: boolean
+}
 
 function formatConversationDate(timestamp: number): string {
     if (!timestamp) return '时间未知'
@@ -194,6 +209,7 @@ export default function MobileAiChat({
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
+    const morePanelSheetRef = useRef<HTMLElement | null>(null)
 
     const controller = useAiController(aiFocus)
     const {
@@ -215,9 +231,12 @@ export default function MobileAiChat({
     const [morePanelOpen, setMorePanelOpen] = useState(false)
     const [morePanelMounted, setMorePanelMounted] = useState(false)
     const [morePanelClosing, setMorePanelClosing] = useState(false)
+    const [morePanelDragging, setMorePanelDragging] = useState(false)
+    const [morePanelDragOffset, setMorePanelDragOffset] = useState(0)
     const [renameOpen, setRenameOpen] = useState(false)
     const [renaming, setRenaming] = useState(false)
     const morePanelCloseTimerRef = useRef<number | null>(null)
+    const morePanelDragRef = useRef<MorePanelDragState | null>(null)
 
     const activeConversation = useMemo(
         () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
@@ -373,6 +392,9 @@ export default function MobileAiChat({
             window.clearTimeout(morePanelCloseTimerRef.current)
             morePanelCloseTimerRef.current = null
         }
+        morePanelDragRef.current = null
+        setMorePanelDragOffset(0)
+        setMorePanelDragging(false)
         setMorePanelMounted(true)
         setMorePanelClosing(false)
         setMorePanelOpen(true)
@@ -388,9 +410,87 @@ export default function MobileAiChat({
         morePanelCloseTimerRef.current = window.setTimeout(() => {
             setMorePanelMounted(false)
             setMorePanelClosing(false)
+            setMorePanelDragging(false)
+            setMorePanelDragOffset(0)
+            morePanelDragRef.current = null
             morePanelCloseTimerRef.current = null
         }, 100)
     }, [morePanelMounted, morePanelOpen])
+
+    const handleMorePanelPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        if (morePanelClosing || !morePanelMounted) return
+        if (event.pointerType === 'mouse' && event.button !== 0) return
+        const sheet = morePanelSheetRef.current
+        if (!sheet) return
+        morePanelDragRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            startScrollTop: sheet.scrollTop,
+            lastY: event.clientY,
+            lastTime: window.performance.now(),
+            velocityY: 0,
+            currentOffset: 0,
+            tracking: false,
+        }
+    }, [morePanelClosing, morePanelMounted])
+
+    const handleMorePanelPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        const dragState = morePanelDragRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+        const sheet = morePanelSheetRef.current
+        if (!sheet) return
+
+        const dx = event.clientX - dragState.startX
+        const dy = event.clientY - dragState.startY
+        const horizontal = Math.abs(dx)
+        const vertical = Math.abs(dy)
+        const now = window.performance.now()
+        const elapsed = Math.max(now - dragState.lastTime, 1)
+        dragState.velocityY = (event.clientY - dragState.lastY) / elapsed
+        dragState.lastY = event.clientY
+        dragState.lastTime = now
+
+        if (!dragState.tracking) {
+            if (horizontal < 6 && vertical < 6) return
+            if (dy <= 0 || horizontal > vertical * 1.1) {
+                morePanelDragRef.current = null
+                return
+            }
+            if (dragState.startScrollTop > 0 || sheet.scrollTop > 0) return
+            dragState.tracking = true
+            setMorePanelDragging(true)
+            event.currentTarget.setPointerCapture?.(event.pointerId)
+        }
+
+        event.preventDefault()
+        const nextOffset = Math.max(0, Math.min(dy, window.innerHeight * 0.45))
+        dragState.currentOffset = nextOffset
+        setMorePanelDragOffset(nextOffset)
+    }, [])
+
+    const handleMorePanelPointerUp = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        const dragState = morePanelDragRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+        morePanelDragRef.current = null
+        setMorePanelDragging(false)
+
+        if (dragState.tracking && (dragState.currentOffset > 68 || dragState.velocityY > 0.45)) {
+            closeMorePanel()
+            return
+        }
+        setMorePanelDragOffset(0)
+    }, [closeMorePanel])
+
+    const handleMorePanelPointerCancel = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+        const dragState = morePanelDragRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+        event.currentTarget.releasePointerCapture?.(event.pointerId)
+        morePanelDragRef.current = null
+        setMorePanelDragging(false)
+        setMorePanelDragOffset(0)
+    }, [])
 
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings>(
         key: K,
@@ -655,6 +755,9 @@ export default function MobileAiChat({
             </div>
         </aside>
     )
+    const morePanelSheetStyle: CSSProperties | undefined = morePanelDragOffset > 0
+        ? ({'--mobile-ai-more-drag-offset': `${morePanelDragOffset}px`} as MobileAiMoreSheetStyle)
+        : undefined
 
     return (
         <div ref={pageRef} className="mobile-ai-chat">
@@ -815,7 +918,16 @@ export default function MobileAiChat({
                         if (event.target === event.currentTarget) closeMorePanel()
                     }}
                 >
-                    <section className="mobile-ai-more-sheet" aria-label="更多对话设置">
+                    <section
+                        ref={morePanelSheetRef}
+                        className={`mobile-ai-more-sheet${morePanelDragging ? ' is-dragging' : ''}`}
+                        style={morePanelSheetStyle}
+                        aria-label="更多对话设置"
+                        onPointerDown={handleMorePanelPointerDown}
+                        onPointerMove={handleMorePanelPointerMove}
+                        onPointerUp={handleMorePanelPointerUp}
+                        onPointerCancel={handleMorePanelPointerCancel}
+                    >
                         <div className="mobile-ai-more-sheet__handle" aria-hidden="true"/>
                         <div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
                             <button type="button" onClick={() => handleUnavailableMobileAiTool('相机')}>

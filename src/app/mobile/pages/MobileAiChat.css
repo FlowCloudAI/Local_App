@@ -493,6 +493,7 @@
 }
 
 .mobile-ai-more-sheet {
+    --mobile-ai-more-drag-offset: 0px;
     width: 100%;
     max-height: min(82vh, 44rem);
     box-sizing: border-box;
@@ -507,8 +508,16 @@
         inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
     backdrop-filter: blur(8px) saturate(150%);
     -webkit-backdrop-filter: blur(8px) saturate(150%);
+    transform: translateY(var(--mobile-ai-more-drag-offset));
+    transition: transform 100ms ease;
     animation: mobile-ai-more-sheet-in 100ms cubic-bezier(0.22, 1, 0.36, 1);
+    overscroll-behavior: contain;
     scrollbar-width: none;
+}
+
+.mobile-ai-more-sheet.is-dragging {
+    transition: none;
+    animation: none;
 }
 
 .mobile-ai-more-layer.is-closing .mobile-ai-more-sheet {
@@ -525,6 +534,7 @@
     margin: 0 auto 0.9rem;
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-text-secondary) 38%, transparent);
+    touch-action: none;
 }
 
 .mobile-ai-more-sheet__quick {
@@ -750,13 +760,13 @@
 }
 
 @keyframes mobile-ai-more-sheet-in {
-    from { transform: translateY(1.25rem); }
-    to { transform: translateY(0); }
+    from { transform: translateY(calc(var(--mobile-ai-more-drag-offset) + 1.25rem)); }
+    to { transform: translateY(var(--mobile-ai-more-drag-offset)); }
 }
 
 @keyframes mobile-ai-more-sheet-out {
-    from { transform: translateY(0); }
-    to { transform: translateY(1.25rem); }
+    from { transform: translateY(var(--mobile-ai-more-drag-offset)); }
+    to { transform: translateY(calc(var(--mobile-ai-more-drag-offset) + 1.25rem)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
