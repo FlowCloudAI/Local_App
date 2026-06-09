@@ -509,7 +509,7 @@ export default function MobileProjectHome({
                 <div className="mobile-project-home__section-head">
                     <h3 className="mobile-project-home__section-title">下一步建议</h3>
                 </div>
-                <div className="mobile-project-home__next-steps">
+                <div className="mobile-project-home__next-steps" data-mobile-horizontal-scroll="true">
                     {nextSteps.map(item => (
                         <button
                             type="button"

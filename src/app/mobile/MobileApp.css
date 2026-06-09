@@ -33,6 +33,7 @@
     --mobile-shadow-floating: 0 1.25rem 3rem color-mix(in srgb, var(--fc-color-text) 18%, transparent), var(--mobile-inset-highlight-strong);
     --mobile-shadow-floating-soft: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
     --mobile-shadow-floating-compact: 0 1rem 2rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    --mobile-shadow-anchored-menu: 0 0.65rem 1.45rem color-mix(in srgb, var(--fc-color-text) 10%, transparent), var(--mobile-inset-highlight-soft);
     --mobile-shadow-dialog: 0 1.15rem 2.6rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
     --mobile-shadow-sheet: 0 -1rem 2.7rem color-mix(in srgb, var(--fc-color-text) 16%, transparent), var(--mobile-inset-highlight-strong);
     --mobile-shadow-drawer-surface: none;
@@ -84,11 +85,13 @@
     position: relative;
     z-index: 1;
     display: flex;
+    box-sizing: border-box;
     min-height: 0;
     flex: 1;
     flex-direction: column;
     overflow: hidden;
     background: var(--fc-color-bg);
+    border-left: solid 1px transparent;
     transform: translate3d(var(--mobile-entry-drawer-shift, 0), 0, 0);
     transition:
         transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -103,6 +106,7 @@
 }
 
 .mobile-app-category-shell.is-open .mobile-app-category-shell__surface {
+    border-left-color: var(--fc-color-border);
     border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
     box-shadow: var(--mobile-shadow-drawer-surface);
 }

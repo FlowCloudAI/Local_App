@@ -11,6 +11,8 @@ import {
 } from 'react'
 import './MobileTopControls.css'
 
+const MOBILE_ANCHORED_MENU_CLOSE_MS = 130
+
 export interface MobileTopIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     icon: ReactNode
 }
@@ -99,6 +101,8 @@ export function MobileAnchoredMenu({
     rightBoundaryGap = 0,
 }: MobileAnchoredMenuProps) {
     const [anchor, setAnchor] = useState<{top: number; left: number; right: number; rightBoundary: number | null} | null>(null)
+    const [rendered, setRendered] = useState(open)
+    const [closing, setClosing] = useState(false)
 
     const updateAnchor = useCallback(() => {
         const containerElement = containerRef.current
@@ -117,12 +121,27 @@ export function MobileAnchoredMenu({
         })
     }, [anchorRef, containerRef, rightBoundaryGap, rightBoundaryRef])
 
+    useEffect(() => {
+        if (open) {
+            setRendered(true)
+            setClosing(false)
+            return undefined
+        }
+        if (!rendered) return undefined
+        setClosing(true)
+        const timer = window.setTimeout(() => {
+            setRendered(false)
+            setClosing(false)
+        }, MOBILE_ANCHORED_MENU_CLOSE_MS)
+        return () => window.clearTimeout(timer)
+    }, [open, rendered])
+
     useLayoutEffect(() => {
-        if (open) updateAnchor()
-    }, [open, updateAnchor])
+        if (open && rendered) updateAnchor()
+    }, [open, rendered, updateAnchor])
 
     useEffect(() => {
-        if (!open) return undefined
+        if (!open || !rendered) return undefined
         updateAnchor()
         const viewport = window.visualViewport
         window.addEventListener('resize', updateAnchor)
@@ -131,20 +150,20 @@ export function MobileAnchoredMenu({
             window.removeEventListener('resize', updateAnchor)
             viewport?.removeEventListener('resize', updateAnchor)
         }
-    }, [open, updateAnchor])
+    }, [open, rendered, updateAnchor])
 
-    if (!open) return null
+    if (!rendered) return null
 
     return (
         <div
-            className="mobile-anchored-menu-layer"
+            className={`mobile-anchored-menu-layer${closing ? ' mobile-anchored-menu-layer--closing' : ''}`}
             role="presentation"
             onPointerDown={event => {
-                if (event.target === event.currentTarget) onClose()
+                if (!closing && event.target === event.currentTarget) onClose()
             }}
         >
             <div
-                className={`mobile-anchored-menu mobile-anchored-menu--${align}${className ? ` ${className}` : ''}`}
+                className={`mobile-anchored-menu mobile-anchored-menu--${align}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
                 role="menu"
                 aria-label={ariaLabel}
                 style={anchor ? {

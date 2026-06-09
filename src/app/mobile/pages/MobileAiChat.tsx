@@ -486,9 +486,9 @@ export default function MobileAiChat({
             await showAlert(`插件「${plugin.name}」没有可用模型。`, 'warning', 'nonInvasive', 1800)
             return
         }
-        closeModelMenu()
         await switchActiveConversationModel(plugin.id, nextModel)
-    }, [closeModelMenu, plugins, showAlert, switchActiveConversationModel])
+        setModelMenuMode('models')
+    }, [plugins, showAlert, switchActiveConversationModel])
 
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings>(
         key: K,
