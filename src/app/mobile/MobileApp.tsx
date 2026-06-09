@@ -122,6 +122,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         ? currentPage?.params?.projectId as string | undefined
         : undefined
     const categoryDrawerEnabled = Boolean(categoryDrawerProjectId)
+    const aiConversationDrawerEnabled = activeTab === 'ai'
+    const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled
+    const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : null
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
         if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'all'}
         if (currentPage.params.uncategorizedOnly) return {kind: 'uncategorized'}
@@ -164,14 +167,14 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [])
 
     useEffect(() => {
-        if (!categoryDrawerEnabled) {
+        if (!mobileSideDrawerEnabled) {
             setCategoryDrawerOpen(false)
             setCategoryDrawerOffset(null)
             setCategoryDrawerDragging(false)
             categoryDrawerDragRef.current = null
             return
         }
-    }, [categoryDrawerEnabled])
+    }, [mobileSideDrawerEnabled])
 
     useEffect(() => {
         if (!categoryDrawerProjectId) {
@@ -221,6 +224,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         setCategoryDrawerOffset(null)
         setCategoryDrawerOpen(true)
     }, [categoryDrawerEnabled])
+
+    const openAiConversationDrawer = useCallback(() => {
+        if (!aiConversationDrawerEnabled) return
+        setCategoryDrawerOffset(null)
+        setCategoryDrawerOpen(true)
+    }, [aiConversationDrawerEnabled])
 
     const refreshCategoryDrawer = useCallback(async () => {
         if (!categoryDrawerProjectId) return
@@ -275,7 +284,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [])
 
     const handleCategoryDrawerPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        if (!categoryDrawerEnabled) return
+        if (!mobileSideDrawerEnabled) return
         if (!event.isPrimary) return
         if (event.pointerType === 'mouse' && event.button !== 0) return
         if (isTextEditingTarget(event.target)) return
@@ -301,7 +310,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
             area: dragElement.className,
         })
-    }, [categoryDrawerEnabled, categoryDrawerOpen, categoryDrawerWidth])
+    }, [categoryDrawerOpen, categoryDrawerWidth, mobileSideDrawerEnabled])
 
     const handleCategoryDrawerPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
         const dragState = categoryDrawerDragRef.current
@@ -486,13 +495,13 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     return (
         <div className="mobile-app">
             <div
-                className={`mobile-app-category-shell${categoryDrawerEnabled ? ' is-enabled' : ''}${categoryDrawerOpen ? ' is-open' : ''}${categoryDrawerDragging ? ' is-dragging' : ''}`}
+                className={`mobile-app-category-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${categoryDrawerOpen ? ' is-open' : ''}${categoryDrawerDragging ? ' is-dragging' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-entry-drawer-shift': `${categoryDrawerSurfaceOffset}px`,
                 } as CSSProperties}
             >
-                {categoryDrawerEnabled && (
+                {mobileSideDrawerEnabled && (
                     <div
                         className="mobile-app-category-shell__drawer"
                         onPointerDown={handleCategoryDrawerPointerDown}
@@ -502,14 +511,18 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         onPointerLeave={finishCategoryDrawerDrag}
                         onClickCapture={handleCategoryDrawerClickCapture}
                     >
-                        <MobileCategoryDrawer
-                            projectId={categoryDrawerProjectId!}
-                            categories={categoryDrawerCategories}
-                            stats={categoryDrawerStats}
-                            selected={categoryDrawerSelection}
-                            onSelect={handleSelectDrawerCategory}
-                            onChanged={refreshCategoryDrawer}
-                        />
+                        {categoryDrawerEnabled ? (
+                            <MobileCategoryDrawer
+                                projectId={categoryDrawerProjectId!}
+                                categories={categoryDrawerCategories}
+                                stats={categoryDrawerStats}
+                                selected={categoryDrawerSelection}
+                                onSelect={handleSelectDrawerCategory}
+                                onChanged={refreshCategoryDrawer}
+                            />
+                        ) : (
+                            <div id="mobile-ai-conversation-drawer-root" className="mobile-app-ai-drawer-root"/>
+                        )}
                     </div>
                 )}
                 <div
@@ -524,7 +537,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     <button
                         type="button"
                         className="mobile-app-category-shell__surface-close"
-                        aria-label="关闭分类树"
+                        aria-label={mobileSideDrawerKind === 'ai' ? '关闭对话列表' : '关闭分类树'}
                         tabIndex={categoryDrawerOpen ? 0 : -1}
                         onClick={closeCategoryDrawer}
                     />
@@ -572,7 +585,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                         {/* AI Tab */}
                         {activeTab === 'ai' && (
-                            <MobileAiChat {...pageProps}/>
+                            <MobileAiChat
+                                {...pageProps}
+                                conversationDrawerOpen={categoryDrawerOpen && aiConversationDrawerEnabled}
+                                onOpenConversationDrawer={openAiConversationDrawer}
+                                onCloseConversationDrawer={closeCategoryDrawer}
+                            />
                         )}
 
                         {/* 灵感 Tab */}

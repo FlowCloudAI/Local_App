@@ -1,15 +1,33 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {
+    type MouseEvent as ReactMouseEvent,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
+import {createPortal} from 'react-dom'
 import {Button, MessageBox, Select, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import type {AiToolAccessMode} from '../../../features/ai-chat/model/AiControllerTypes'
+import type {AiToolAccessMode, Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
 import {setting_has_api_key} from '../../../api'
 import {logger} from '../../../shared/logger'
+import {RenameDialog} from '../../../shared/ui/overlay'
 import {type MobileTab} from '../MobileNav'
+import {
+    MobileAnchoredActionMenu,
+    type MobileAnchoredMenuItem,
+    MobileTopActionPill,
+    MobileTopIconButton,
+} from '../components/MobileTopControls'
 import './MobileAiChat.css'
 
 interface Props {
     aiFocus: AiFocus
     navigateToTab: (tab: MobileTab) => void
+    conversationDrawerOpen?: boolean
+    onOpenConversationDrawer?: () => void
+    onCloseConversationDrawer?: () => void
 }
 
 type SelectValue = string | number | (string | number)[]
@@ -19,9 +37,133 @@ function normalizeSelectValue(value: SelectValue): string {
     return String(Array.isArray(value) ? value[0] ?? '' : value ?? '')
 }
 
-export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
+function formatConversationDate(timestamp: number): string {
+    if (!timestamp) return '时间未知'
+    return new Intl.DateTimeFormat('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).format(new Date(timestamp))
+}
+
+function sortConversations(first: Conversation, second: Conversation): number {
+    const firstPin = first.pinnedAt ? 1 : 0
+    const secondPin = second.pinnedAt ? 1 : 0
+    if (firstPin !== secondPin) return secondPin - firstPin
+    return (second.timestamp ?? 0) - (first.timestamp ?? 0)
+}
+
+function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop'}) {
+    if (type === 'menu') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5 7h14"/>
+                <path d="M5 12h14"/>
+                <path d="M5 17h14"/>
+            </svg>
+        )
+    }
+    if (type === 'pin') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 17v5"/>
+                <path d="M8.5 10.8 6.2 13.1A1.7 1.7 0 0 0 7.4 16h9.2a1.7 1.7 0 0 0 1.2-2.9l-2.3-2.3V6.5l1.5-1.5H7l1.5 1.5Z"/>
+            </svg>
+        )
+    }
+    if (type === 'archive') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5 7.5h14"/>
+                <path d="M7 8.5v10h10v-10"/>
+                <path d="M9.5 12h5"/>
+                <path d="M6.5 4.5h11l1.5 3h-13Z"/>
+            </svg>
+        )
+    }
+    if (type === 'rename') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M4.5 16.5 15.8 5.2a2.1 2.1 0 0 1 3 3L7.5 19.5h-3Z"/>
+                <path d="m14 7 3 3"/>
+            </svg>
+        )
+    }
+    if (type === 'delete') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5.5 7h13"/>
+                <path d="M9 7V5.5h6V7"/>
+                <path d="M8 10v8"/>
+                <path d="M12 10v8"/>
+                <path d="M16 10v8"/>
+                <path d="M7 7.5 8 20h8l1-12.5"/>
+            </svg>
+        )
+    }
+    if (type === 'plugin') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M8.5 4.5h7v5.5h4v6h-4v5.5h-7V16h-4v-6h4Z"/>
+            </svg>
+        )
+    }
+    if (type === 'image') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <rect x="4" y="5" width="16" height="14" rx="2.5"/>
+                <path d="m7 16 3.5-3.5 2.5 2.5 2-2 3 3"/>
+                <path d="M8.5 9.5h.1"/>
+            </svg>
+        )
+    }
+    if (type === 'file') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M7 4.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V6A1.5 1.5 0 0 1 7.5 4.5Z"/>
+                <path d="M14 4.5V9h4"/>
+                <path d="M8.5 13h7"/>
+                <path d="M8.5 16h5"/>
+            </svg>
+        )
+    }
+    if (type === 'web') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <circle cx="12" cy="12" r="8.5"/>
+                <path d="M4.5 12h17"/>
+                <path d="M12 3.5c2.2 2.4 3.2 5.3 3.2 8.5s-1 6.1-3.2 8.5"/>
+                <path d="M12 3.5C9.8 5.9 8.8 8.8 8.8 12s1 6.1 3.2 8.5"/>
+            </svg>
+        )
+    }
+    if (type === 'stop') {
+        return (
+            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+                <rect x="8" y="8" width="8" height="8" rx="1.5"/>
+            </svg>
+        )
+    }
+    return (
+        <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 19V5"/>
+            <path d="m6.5 10.5 5.5-5.5 5.5 5.5"/>
+        </svg>
+    )
+}
+
+export default function MobileAiChat({
+    aiFocus,
+    navigateToTab,
+    conversationDrawerOpen = false,
+    onOpenConversationDrawer,
+    onCloseConversationDrawer,
+}: Props) {
     const {showAlert} = useAlert()
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const pageRef = useRef<HTMLDivElement>(null)
+    const topActionsRef = useRef<HTMLDivElement>(null)
 
     const controller = useAiController(aiFocus)
     const {
@@ -29,13 +171,21 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         messages, sendMessage, stopStreaming,
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
+        renameConversation, toggleConversationPinned, toggleConversationArchived,
         plugins, pluginsReady, selectedPlugin, selectedModel, setSelectedPlugin, setSelectedModel,
-        toolAccessMode, writerModeAvailable, setToolAccessMode, focusContext,
+        webSearchEnabled, toggleWebSearch,
+        toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams, focusContext,
     } = controller
 
-    const [showConvList, setShowConvList] = useState(false)
     const [apiKeyRefreshTick, setApiKeyRefreshTick] = useState(0)
     const [llmApiKeyAvailability, setLlmApiKeyAvailability] = useState<ApiKeyAvailability>('unknown')
+    const [conversationSearch, setConversationSearch] = useState('')
+    const [drawerRoot, setDrawerRoot] = useState<HTMLElement | null>(null)
+    const [topMenuOpen, setTopMenuOpen] = useState(false)
+    const [morePanelOpen, setMorePanelOpen] = useState(false)
+    const [renameOpen, setRenameOpen] = useState(false)
+    const [renaming, setRenaming] = useState(false)
+
     const activeConversation = useMemo(
         () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
         [activeConversationId, conversations],
@@ -50,6 +200,11 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         [activeLlmPluginId, plugins],
     )
     const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 LLM 插件'
+    const activeModelId = activeConversation?.model || selectedModel
+    const activeModelInfo = activeLlmPluginInfo?.model_infos.find(modelInfo => modelInfo.id === activeModelId)
+    const activeModelLabel = activeModelInfo?.name && activeModelInfo.name !== activeModelId
+        ? activeModelInfo.name
+        : activeModelId || '未选择模型'
     const pluginOptions = useMemo(
         () => plugins.map(plugin => ({value: plugin.id, label: plugin.name || plugin.id})),
         [plugins],
@@ -67,10 +222,17 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         })
     }, [currentPlugin])
     const toolModeOptions = useMemo(() => ([
-        {mode: 'reader' as const, label: '读者', disabled: false},
-        {mode: 'assistant' as const, label: '助手', disabled: false},
-        {mode: 'writer' as const, label: '作家', disabled: !writerModeAvailable},
+        {mode: 'reader' as const, label: '只读', description: '仅读取上下文', disabled: false},
+        {mode: 'assistant' as const, label: '助手', description: '可调用工具辅助', disabled: false},
+        {mode: 'writer' as const, label: '写作', description: '可写入世界内容', disabled: !writerModeAvailable},
     ]), [writerModeAvailable])
+    const normalizedConversationSearch = conversationSearch.trim().toLowerCase()
+    const visibleConversations = useMemo(() => {
+        return [...conversations]
+            .sort(sortConversations)
+            .filter(conversation => !normalizedConversationSearch
+                || conversation.title.toLowerCase().includes(normalizedConversationSearch))
+    }, [conversations, normalizedConversationSearch])
     const pluginsLoading = !pluginsReady
     const llmUnavailable = pluginsReady && plugins.length === 0
     const pluginSelectionIncomplete = pluginsReady && plugins.length > 0 && (!selectedPlugin || !selectedModel)
@@ -82,22 +244,34 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         && !llmUnavailable
         && Boolean(activeLlmPluginId)
         && llmApiKeyAvailability === 'missing'
-    const inputDisabled = pluginsLoading
+    const isArchivedConversation = Boolean(activeConversation?.archivedAt)
+    const conversationCreationDisabled = pluginsLoading
         || llmUnavailable
         || pluginSelectionIncomplete
         || llmApiKeyChecking
         || llmApiKeyMissing
-    const inputPlaceholder = pluginsLoading
-        ? '正在加载 LLM 插件…'
-        : llmUnavailable
-            ? '请先配置 LLM 插件'
-            : pluginSelectionIncomplete
-                ? '请选择插件和模型'
-                : llmApiKeyChecking
-                    ? '正在检查 API Key…'
-                    : llmApiKeyMissing
-                        ? '请先配置 API Key'
-                        : '输入消息…'
+    const inputDisabled = !activeConversation
+        || isArchivedConversation
+        || pluginsLoading
+        || llmUnavailable
+        || pluginSelectionIncomplete
+        || llmApiKeyChecking
+        || llmApiKeyMissing
+    const inputPlaceholder = !activeConversation
+        ? '先新建一个对话'
+        : isArchivedConversation
+            ? '已归档对话不可继续发送'
+            : pluginsLoading
+                ? '正在加载 LLM 插件…'
+                : llmUnavailable
+                    ? '请先配置 LLM 插件'
+                    : pluginSelectionIncomplete
+                        ? '请选择插件和模型'
+                        : llmApiKeyChecking
+                            ? '正在检查 API Key…'
+                            : llmApiKeyMissing
+                                ? '请先配置 API Key'
+                                : '发消息或按住说话'
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'})
@@ -108,6 +282,10 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
             setActiveConversationId(conversations[0].id)
         }
     }, [conversations, activeConversationId, setActiveConversationId])
+
+    useEffect(() => {
+        setDrawerRoot(document.getElementById('mobile-ai-conversation-drawer-root'))
+    }, [conversationDrawerOpen])
 
     useEffect(() => {
         if (!pluginsReady || llmUnavailable || !activeLlmPluginId) {
@@ -171,6 +349,14 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
 
     const handleSend = useCallback(async () => {
         if (!inputValue.trim() || isStreaming) return
+        if (!activeConversation) {
+            await showAlert('请先新建对话。', 'warning', 'nonInvasive', 1800)
+            return
+        }
+        if (isArchivedConversation) {
+            await showAlert('已归档对话不可继续发送。', 'warning', 'nonInvasive', 1800)
+            return
+        }
         if (pluginsLoading) {
             await showAlert('AI 插件仍在加载，请稍后再发送。', 'warning', 'nonInvasive', 1800)
             return
@@ -193,8 +379,10 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
         }
         await sendMessage(inputValue)
     }, [
+        activeConversation,
         activeLlmPluginName,
         inputValue,
+        isArchivedConversation,
         isStreaming,
         llmApiKeyChecking,
         llmApiKeyMissing,
@@ -207,25 +395,74 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
 
     const handleNewConv = useCallback(async () => {
         await createNewConversation()
-        setShowConvList(false)
-    }, [createNewConversation])
+        setMorePanelOpen(false)
+        onCloseConversationDrawer?.()
+    }, [createNewConversation, onCloseConversationDrawer])
 
     const handleSelectConv = useCallback(async (convId: string) => {
         await switchConversation(convId)
-        setShowConvList(false)
-    }, [switchConversation])
+        onCloseConversationDrawer?.()
+    }, [onCloseConversationDrawer, switchConversation])
 
-    const handleDeleteConv = useCallback(async (convId: string, e: React.MouseEvent) => {
-        e.stopPropagation()
-        const result = await showAlert('确定删除此对话？', 'warning', 'confirm')
+    const handleDeleteConv = useCallback(async (convId: string, event?: ReactMouseEvent) => {
+        event?.stopPropagation()
+        const result = await showAlert('确定删除此对话？此操作不可撤销。', 'warning', 'confirm')
         if (result !== 'yes') return
+        setTopMenuOpen(false)
         await deleteConversation(convId)
     }, [deleteConversation, showAlert])
 
+    const handleRenameConfirm = useCallback(async (title: string) => {
+        if (!activeConversation) return
+        setRenaming(true)
+        try {
+            await renameConversation(activeConversation.id, title)
+            setRenameOpen(false)
+        } finally {
+            setRenaming(false)
+        }
+    }, [activeConversation, renameConversation])
+
+    const handleUnavailableMobileAiTool = useCallback((label: string) => {
+        void showAlert(`移动端暂未开放「${label}」入口。`, 'info', 'nonInvasive', 1800)
+    }, [showAlert])
+
+    const activeConversationMenuItems: MobileAnchoredMenuItem[] = activeConversation ? [
+        {
+            key: 'pin',
+            label: activeConversation.pinnedAt ? '取消顶置' : '顶置对话',
+            description: activeConversation.pinnedAt ? '恢复到普通排序' : '固定在对话列表顶部',
+            icon: <MobileAiIcon type="pin"/>,
+            onSelect: () => toggleConversationPinned(activeConversation.id),
+        },
+        {
+            key: 'archive',
+            label: activeConversation.archivedAt ? '取消归档' : '归档对话',
+            description: activeConversation.archivedAt ? '恢复继续对话' : '收起但保留历史',
+            icon: <MobileAiIcon type="archive"/>,
+            onSelect: () => toggleConversationArchived(activeConversation.id),
+        },
+        {
+            key: 'rename',
+            label: '重命名',
+            description: '修改当前会话名称',
+            icon: <MobileAiIcon type="rename"/>,
+            onSelect: () => setRenameOpen(true),
+        },
+        {
+            key: 'delete',
+            label: '删除对话',
+            description: '永久删除当前会话',
+            icon: <MobileAiIcon type="delete"/>,
+            danger: true,
+            onSelect: () => void handleDeleteConv(activeConversation.id),
+        },
+    ] : []
+
     const pluginControls = (
-        <div className="mobile-ai-control-panel" aria-label="AI 对话设置">
+        <div className="mobile-ai-settings-card" aria-label="AI 对话设置">
             <div className="mobile-ai-plugin-bar" aria-label="AI 插件与模型">
-                <div className="mobile-ai-plugin-field">
+                <label className="mobile-ai-plugin-field">
                     <span className="mobile-ai-plugin-label">插件</span>
                     <Select
                         value={selectedPlugin}
@@ -235,8 +472,8 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
                         disabled={pluginsLoading || pluginOptions.length === 0}
                         className="mobile-ai-plugin-select"
                     />
-                </div>
-                <div className="mobile-ai-plugin-field">
+                </label>
+                <label className="mobile-ai-plugin-field">
                     <span className="mobile-ai-plugin-label">模型</span>
                     <Select
                         value={selectedModel}
@@ -246,151 +483,154 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
                         disabled={pluginsLoading || modelOptions.length === 0}
                         className="mobile-ai-plugin-select"
                     />
-                </div>
+                </label>
                 {(llmUnavailable || llmApiKeyMissing) && (
                     <Button type="button" size="sm" variant="outline" onClick={() => navigateToTab('settings')}>
                         {llmApiKeyMissing ? '配置 Key' : '去设置'}
                     </Button>
                 )}
             </div>
-            <div className="mobile-ai-tool-mode-bar" aria-label="AI 工具模式">
-                <span className="mobile-ai-tool-mode-label">模式</span>
-                <div className="mobile-ai-tool-mode-options">
-                    {toolModeOptions.map(option => (
-                        <button
-                            key={option.mode}
-                            type="button"
-                            className={`mobile-ai-tool-mode-option${toolAccessMode === option.mode ? ' active' : ''}`}
-                            aria-pressed={toolAccessMode === option.mode}
-                            disabled={option.disabled || isStreaming}
-                            onClick={() => void handleToolModeChange(option.mode)}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
+            <div className="mobile-ai-tool-mode-options" aria-label="AI 工具模式">
+                {toolModeOptions.map(option => (
+                    <button
+                        key={option.mode}
+                        type="button"
+                        className={`mobile-ai-tool-mode-option${toolAccessMode === option.mode ? ' active' : ''}`}
+                        aria-pressed={toolAccessMode === option.mode}
+                        disabled={option.disabled || isStreaming}
+                        onClick={() => void handleToolModeChange(option.mode)}
+                    >
+                        <span>{option.label}</span>
+                        <small>{option.description}</small>
+                    </button>
+                ))}
             </div>
         </div>
     )
 
-    // 无对话时的欢迎页
-    if (conversations.length === 0 && !isStreaming) {
-        return (
-            <div className="mobile-ai-empty">
-                {pluginControls}
-                <div className="mobile-page__empty mobile-ai-empty__body">
-                    <p style={{fontSize: 'var(--fc-font-size-lg)', fontWeight: 600, margin: 0}}>AI 对话</p>
-                    <p style={{color: 'var(--fc-color-text-secondary)', textAlign: 'center', margin: 0}}>
-                        与 AI 讨论你的世界观项目，获取创作建议、检查设定矛盾、或与角色对话
-                    </p>
-                    {llmUnavailable || llmApiKeyMissing ? (
-                        <Button type="button" onClick={() => navigateToTab('settings')}>
-                            {llmApiKeyMissing ? '配置 API Key' : '去设置插件'}
-                        </Button>
-                    ) : (
-                        <Button type="button" onClick={handleNewConv} disabled={inputDisabled}>开始新对话</Button>
-                    )}
-                </div>
+    const conversationDrawer = (
+        <aside className="mobile-ai-drawer" aria-label="对话列表">
+            <div className="mobile-ai-drawer__header">
+                <span>对话列表</span>
+                <small>{conversations.length} 个会话</small>
             </div>
-        )
-    }
-
-    const contextLabel = focusContext.entryId
-        ? `正在讨论：${focusContext.entryTitle ?? '词条'}`
-        : focusContext.projectId ? `正在讨论：${focusContext.projectName ?? '项目'}` : ''
+            <label className="mobile-ai-drawer__search">
+                <span aria-hidden="true">⌕</span>
+                <input
+                    value={conversationSearch}
+                    onChange={event => setConversationSearch(event.currentTarget.value)}
+                    placeholder="搜索对话..."
+                />
+            </label>
+            <div className="mobile-ai-drawer__list">
+                {visibleConversations.length === 0 ? (
+                    <div className="mobile-ai-drawer__empty">
+                        {conversations.length === 0 ? '暂无历史对话' : '没有匹配的对话'}
+                    </div>
+                ) : visibleConversations.map(conversation => {
+                    const runtime = conversationRuntime[conversation.id]
+                    const isConversationStreaming = Boolean(runtime?.isStreaming)
+                    const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
+                    const tags = [
+                        conversation.pinnedAt ? '已顶置' : null,
+                        conversation.archivedAt ? '已归档' : null,
+                        conversation.mode === 'character' ? '角色对话' : null,
+                        conversation.mode === 'report' ? '矛盾检测' : null,
+                    ].filter(Boolean).join(' · ')
+                    return (
+                        <button
+                            key={conversation.id}
+                            type="button"
+                            className={`mobile-ai-drawer__item${conversation.id === activeConversationId ? ' active' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
+                            onClick={() => void handleSelectConv(conversation.id)}
+                        >
+                            <span className="mobile-ai-drawer__item-main">
+                                <strong>{conversation.title}</strong>
+                                <small>{tags || `${conversation.messages.length} 条消息`}</small>
+                            </span>
+                            <span className="mobile-ai-drawer__item-meta">
+                                {formatConversationDate(conversation.timestamp)}
+                            </span>
+                        </button>
+                    )
+                })}
+            </div>
+        </aside>
+    )
 
     return (
-        <div style={{display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden'}}>
-            {/* 顶部工具栏 */}
-            <div style={{
-                padding: '8px 12px', borderBottom: '1px solid var(--fc-color-border)',
-                background: 'var(--fc-color-bg-elevated)', display: 'flex', alignItems: 'center', gap: 8,
-                flexShrink: 0,
-            }}>
-                <button
-                    onClick={() => setShowConvList(v => !v)}
-                    style={{
-                        padding: '4px 8px', fontSize: 'var(--fc-font-size-xs)', borderRadius: 6,
-                        border: '1px solid var(--fc-color-border)', background: 'var(--fc-color-bg)',
-                        color: 'var(--fc-color-text)', cursor: 'pointer', whiteSpace: 'nowrap',
-                        touchAction: 'manipulation',
-                    }}
-                >
-                    对话 {activeConversationId ? `#${conversations.findIndex(c => c.id === activeConversationId) + 1}` : ''} {showConvList ? '▴' : '▾'}
-                </button>
-                {contextLabel && (
-                    <span style={{
-                        fontSize: 'var(--fc-font-size-xs)',
-                        color: 'var(--fc-color-text-secondary)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                    }}>
-                        {contextLabel}
-                    </span>
-                )}
-                <Button type="button" size="sm" variant="ghost" onClick={handleNewConv} style={{marginLeft: 'auto', flexShrink: 0}}>+
-                    新建</Button>
-            </div>
-            {pluginControls}
+        <div ref={pageRef} className="mobile-ai-chat">
+            {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
+            <header className="mobile-ai-chat__topbar">
+                <MobileTopIconButton
+                    type="button"
+                    icon={<MobileAiIcon type="menu"/>}
+                    aria-label="打开对话列表"
+                    aria-expanded={conversationDrawerOpen}
+                    onClick={onOpenConversationDrawer}
+                />
+                <div className="mobile-ai-chat__title">
+                    <strong>{activeConversation?.title || '新对话'}</strong>
+                    <span>{activeModelLabel}</span>
+                </div>
+                <MobileTopActionPill
+                    ref={topActionsRef}
+                    actions={[
+                        {
+                            key: 'new',
+                            label: '新建对话',
+                            icon: '+',
+                            kind: 'add',
+                            disabled: conversationCreationDisabled,
+                            onClick: () => void handleNewConv(),
+                        },
+                        {
+                            key: 'menu',
+                            label: '对话操作',
+                            icon: '…',
+                            kind: 'more',
+                            ariaHasPopup: 'menu',
+                            ariaExpanded: topMenuOpen,
+                            disabled: !activeConversation,
+                            onClick: () => setTopMenuOpen(open => !open),
+                        },
+                    ]}
+                />
+            </header>
 
-            {/* 对话列表：内联展开，撑开布局而非绝对浮层 */}
-            {showConvList && (
-                <div style={{
-                    maxHeight: '40vh', overflowY: 'auto', flexShrink: 0,
-                    background: 'var(--fc-color-bg-elevated)',
-                    borderBottom: '1px solid var(--fc-color-border)',
-                    padding: '4px 8px',
-                }}>
-                    {conversations.map(conv => {
-                        const runtime = conversationRuntime[conv.id]
-                        const isConversationStreaming = Boolean(runtime?.isStreaming)
-                        const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
-                        return (
-                        <div
-                            key={conv.id}
-                            className={`mobile-ai-conversation-item ${conv.id === activeConversationId ? 'active' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
-                            onClick={() => handleSelectConv(conv.id)}
-                            style={{
-                                background: conv.id === activeConversationId ? 'var(--fc-color-bg-secondary)' : 'transparent',
-                            }}
-                        >
-                            {!isConversationStreaming && hasUnreadReply && (
-                                <span className="mobile-ai-conversation-unread-dot" aria-hidden="true"/>
-                            )}
-                            <div style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                                {conv.title}
-                                <div style={{
-                                    fontSize: 'var(--fc-font-size-xs)',
-                                    color: 'var(--fc-color-text-secondary)'
-                                }}>
-                                    {conv.messages.length} 条消息
-                                </div>
-                            </div>
+            <main className="mobile-ai-chat__messages">
+                {messages.length === 0 && !isStreaming && (
+                    <div className="mobile-ai-chat__empty">
+                        <p>使用快速模式开始对话</p>
+                        <div className="mobile-ai-chat__mode-preview" aria-label="对话模式">
                             <button
-                                onClick={(e) => handleDeleteConv(conv.id, e)}
-                                style={{
-                                    padding: '4px 12px', fontSize: 'var(--fc-font-size-xs)',
-                                    border: 'none', background: 'none', color: 'var(--fc-color-error)',
-                                    cursor: 'pointer', touchAction: 'manipulation',
-                                }}
+                                type="button"
+                                className={toolAccessMode === 'assistant' ? 'active' : ''}
+                                disabled={isStreaming}
+                                onClick={() => void handleToolModeChange('assistant')}
                             >
-                                删除
+                                快速模式
+                            </button>
+                            <button
+                                type="button"
+                                className={toolAccessMode === 'writer' ? 'active' : ''}
+                                disabled={isStreaming || !writerModeAvailable}
+                                onClick={() => void handleToolModeChange('writer')}
+                            >
+                                专家模式
                             </button>
                         </div>
-                        )
-                    })}
-                </div>
-            )}
-
-            {/* 消息列表：flex 列布局让 MessageBox 的 user/assistant 自对齐生效；min-height:0 保证可收缩 */}
-            <div style={{
-                flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px',
-                display: 'flex', flexDirection: 'column', gap: 'var(--fc-space-md)',
-            }}>
-                {messages.length === 0 && !isStreaming && (
-                    <div className="mobile-page__empty" style={{height: '100%'}}>
-                        <p>发送消息开始对话</p>
+                        <span>{focusContext.entryId ? '围绕当前词条继续创作。' : '适合日常设定讨论，即时响应。'}</span>
+                        {!activeConversation && (
+                            <Button type="button" onClick={() => void handleNewConv()} disabled={conversationCreationDisabled}>
+                                开始新对话
+                            </Button>
+                        )}
+                        {llmUnavailable || llmApiKeyMissing ? (
+                            <Button type="button" variant="outline" onClick={() => navigateToTab('settings')}>
+                                {llmApiKeyMissing ? '配置 API Key' : '去设置插件'}
+                            </Button>
+                        ) : null}
                     </div>
                 )}
                 {messages.map(message => (
@@ -416,46 +656,121 @@ export default function MobileAiChat({aiFocus, navigateToTab}: Props) {
                     />
                 )}
                 <div ref={messagesEndRef}/>
-            </div>
+            </main>
 
-            {/* 底部输入区 */}
-            <div style={{
-                padding: '8px 12px', borderTop: '1px solid var(--fc-color-border)',
-                background: 'var(--fc-color-bg-elevated)', display: 'flex', gap: 8, alignItems: 'flex-end',
-            }}>
-                <textarea
-                    value={inputValue}
-                    onChange={e => setInputValue(e.target.value)}
-                    onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            void handleSend()
-                        }
+            <footer className="mobile-ai-chat__composer">
+                <div className="mobile-ai-composer-card">
+                    <textarea
+                        value={inputValue}
+                        onChange={event => setInputValue(event.target.value)}
+                        onKeyDown={event => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault()
+                                void handleSend()
+                            }
+                        }}
+                        placeholder={inputPlaceholder}
+                        rows={1}
+                        disabled={inputDisabled && !isStreaming}
+                    />
+                    <div className="mobile-ai-composer-card__bar">
+                        <div className="mobile-ai-composer-card__chips">
+                            <button
+                                type="button"
+                                className={sessionParams.thinking ? 'active' : ''}
+                                disabled={isStreaming}
+                                onClick={() => setSessionParams(current => ({...current, thinking: !current.thinking}))}
+                            >
+                                思考
+                            </button>
+                            <button
+                                type="button"
+                                className={webSearchEnabled ? 'active' : ''}
+                                disabled={isStreaming}
+                                onClick={() => void toggleWebSearch()}
+                            >
+                                搜索
+                            </button>
+                        </div>
+                        <div className="mobile-ai-composer-card__actions">
+                            <button
+                                type="button"
+                                className="mobile-ai-composer-card__icon-btn"
+                                aria-label="更多"
+                                aria-expanded={morePanelOpen}
+                                onClick={() => setMorePanelOpen(open => !open)}
+                            >
+                                +
+                            </button>
+                            <button
+                                type="button"
+                                className="mobile-ai-composer-card__icon-btn mobile-ai-composer-card__icon-btn--send"
+                                aria-label={isStreaming ? '停止生成' : '发送'}
+                                onClick={isStreaming ? stopStreaming : () => void handleSend()}
+                                disabled={!isStreaming && (!inputValue.trim() || inputDisabled)}
+                            >
+                                <MobileAiIcon type={isStreaming ? 'stop' : 'send'}/>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+
+            <MobileAnchoredActionMenu
+                open={topMenuOpen}
+                onClose={() => setTopMenuOpen(false)}
+                anchorRef={topActionsRef}
+                containerRef={pageRef}
+                ariaLabel="对话操作"
+                items={activeConversationMenuItems}
+            />
+
+            {morePanelOpen && (
+                <div
+                    className="mobile-ai-more-layer"
+                    role="presentation"
+                    onPointerDown={event => {
+                        if (event.target === event.currentTarget) setMorePanelOpen(false)
                     }}
-                    placeholder={inputPlaceholder}
-                    rows={1}
-                    disabled={inputDisabled && !isStreaming}
-                    style={{
-                        flex: 1, padding: '8px 12px', borderRadius: 20,
-                        border: '1px solid var(--fc-color-border)',
-                        background: 'var(--fc-color-bg)',
-                        color: 'var(--fc-color-text)',
-                        fontSize: 'var(--fc-font-size-sm)',
-                        resize: 'none', maxHeight: 120,
-                        fontFamily: 'inherit',
-                    }}
-                />
-                <Button type="button"
-                    size="sm"
-                    onClick={isStreaming ? stopStreaming : () => {
-                        void handleSend()
-                    }}
-                    disabled={!isStreaming && (!inputValue.trim() || inputDisabled)}
-                    style={{borderRadius: 20, minWidth: 48}}
                 >
-                    {isStreaming ? '■' : '↑'}
-                </Button>
-            </div>
+                    <section className="mobile-ai-more-sheet" aria-label="更多对话设置">
+                        <div className="mobile-ai-more-sheet__handle" aria-hidden="true"/>
+                        <div className="mobile-ai-more-sheet__quick">
+                            <button type="button" onClick={() => handleUnavailableMobileAiTool('插件')}>
+                                <MobileAiIcon type="plugin"/>
+                                <span>插件</span>
+                            </button>
+                            <button type="button" onClick={() => handleUnavailableMobileAiTool('图库')}>
+                                <MobileAiIcon type="image"/>
+                                <span>图库</span>
+                            </button>
+                            <button type="button" onClick={() => handleUnavailableMobileAiTool('文件')}>
+                                <MobileAiIcon type="file"/>
+                                <span>文件</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={webSearchEnabled ? 'active' : ''}
+                                onClick={() => void toggleWebSearch()}
+                            >
+                                <MobileAiIcon type="web"/>
+                                <span>联网搜索</span>
+                            </button>
+                        </div>
+                        {pluginControls}
+                    </section>
+                </div>
+            )}
+
+            <RenameDialog
+                open={renameOpen}
+                title="重命名对话"
+                initialValue={activeConversation?.title ?? ''}
+                placeholder="对话名称"
+                busy={renaming}
+                onClose={() => setRenameOpen(false)}
+                onConfirm={(title) => void handleRenameConfirm(title)}
+            />
         </div>
     )
 }

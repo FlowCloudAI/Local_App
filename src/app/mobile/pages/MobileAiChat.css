@@ -1,43 +1,456 @@
-.mobile-ai-empty {
+.mobile-ai-chat {
+    position: relative;
     display: flex;
-    flex-direction: column;
-    min-height: 100%;
-    background: var(--fc-color-bg);
-}
-
-.mobile-ai-empty__body {
+    min-height: 0;
+    height: 100%;
     flex: 1;
-    padding: var(--fc-space-xl);
-    gap: var(--fc-space-lg);
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text);
 }
 
-.mobile-ai-control-panel {
+.mobile-ai-svg {
+    display: block;
+    width: 1.45rem;
+    height: 1.45rem;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.25;
+}
+
+.mobile-app-ai-drawer-root {
+    height: 100%;
+}
+
+.mobile-ai-drawer {
+    display: flex;
+    box-sizing: border-box;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    gap: 1rem;
+    padding: calc(env(safe-area-inset-top, 0) + 1.05rem) 1.05rem calc(env(safe-area-inset-bottom, 0) + 1.1rem);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-elevated) 84%, transparent), var(--fc-color-bg) 36%),
+        var(--fc-color-bg);
+}
+
+.mobile-ai-drawer__header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0 0.2rem;
+}
+
+.mobile-ai-drawer__header span {
+    color: var(--fc-color-text);
+    font-size: 1.55rem;
+    font-weight: 760;
+    line-height: 1.1;
+}
+
+.mobile-ai-drawer__header small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.mobile-ai-drawer__search {
+    display: flex;
+    min-height: 3.2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0 1rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
+    box-shadow:
+        0 0.28rem 0.95rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
+}
+
+.mobile-ai-drawer__search span {
+    color: var(--fc-color-text-secondary);
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.mobile-ai-drawer__search input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--fc-color-text);
+    font: inherit;
+    font-size: var(--fc-font-size-md);
+}
+
+.mobile-ai-drawer__search input::placeholder {
+    color: color-mix(in srgb, var(--fc-color-text-secondary) 72%, transparent);
+}
+
+.mobile-ai-drawer__list {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.mobile-ai-drawer__list::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-ai-drawer__empty {
+    padding: 2.5rem 1rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    text-align: center;
+}
+
+.mobile-ai-drawer__item {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    width: 100%;
+    min-height: 4.15rem;
+    padding: 0.72rem 0.78rem 0.72rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 1.05rem;
+    background: transparent;
+    color: var(--fc-color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-ai-drawer__item.active {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 22%, transparent);
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, var(--fc-color-bg-elevated));
+    color: var(--fc-color-primary);
+}
+
+.mobile-ai-drawer__item:active {
+    transform: scale(0.99);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 70%, transparent);
+}
+
+.mobile-ai-drawer__item.is-streaming {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-color-primary) 34%, transparent);
+}
+
+.mobile-ai-drawer__item.has-unread-reply::before {
+    position: absolute;
+    top: 50%;
+    left: 0.36rem;
+    width: 0.44rem;
+    height: 0.44rem;
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-primary);
+    content: "";
+    transform: translateY(-50%);
+}
+
+.mobile-ai-drawer__item-main {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.22rem;
+}
+
+.mobile-ai-drawer__item-main strong {
+    overflow: hidden;
+    color: inherit;
+    font-size: var(--fc-font-size-md);
+    font-weight: 680;
+    line-height: 1.22;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-ai-drawer__item-main small,
+.mobile-ai-drawer__item-meta {
+    overflow: hidden;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-ai-drawer__item-meta {
+    max-width: 5.6rem;
+    text-align: right;
+}
+
+.mobile-ai-chat__topbar {
+    display: grid;
+    grid-template-columns: 2.45rem minmax(0, 1fr) auto;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.9rem clamp(1rem, 4vw, 1.35rem) 0.55rem;
+}
+
+.mobile-ai-chat__title {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.12rem;
+    text-align: center;
+}
+
+.mobile-ai-chat__title strong,
+.mobile-ai-chat__title span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-ai-chat__title strong {
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    font-weight: 720;
+    line-height: 1.2;
+}
+
+.mobile-ai-chat__title span {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+    line-height: 1.2;
+}
+
+.mobile-ai-chat__messages {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--fc-space-md);
+    overflow-y: auto;
+    padding: 0.65rem clamp(1rem, 4vw, 1.35rem) 1rem;
+    scrollbar-width: none;
+}
+
+.mobile-ai-chat__messages::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-ai-chat__empty {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1rem 0 4rem;
+    color: var(--fc-color-text-secondary);
+    text-align: center;
+}
+
+.mobile-ai-chat__empty p {
+    margin: 0;
+    color: var(--fc-color-text);
+    font-size: 1.35rem;
+    font-weight: 720;
+    line-height: 1.25;
+}
+
+.mobile-ai-chat__empty > span {
+    max-width: 17rem;
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.55;
+}
+
+.mobile-ai-chat__mode-preview {
+    display: grid;
+    width: min(19rem, 100%);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0.25rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 82%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 64%, transparent);
+}
+
+.mobile-ai-chat__mode-preview button {
+    min-height: 2.55rem;
+    border: 0;
+    border-radius: var(--fc-radius-full);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font: inherit;
+    font-size: var(--fc-font-size-sm);
+    font-weight: 650;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-ai-chat__mode-preview button.active {
+    background: color-mix(in srgb, var(--fc-color-primary) 14%, var(--fc-color-bg-elevated));
+    color: var(--fc-color-primary);
+    box-shadow:
+        0 0.35rem 0.85rem color-mix(in srgb, var(--fc-color-primary) 14%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
+}
+
+.mobile-ai-chat__mode-preview button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.mobile-ai-chat__composer {
+    flex: 0 0 auto;
+    padding: 0.35rem clamp(0.9rem, 4vw, 1.25rem) calc(0.7rem + env(safe-area-inset-bottom, 0));
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        color-mix(in srgb, var(--fc-color-bg) 72%, transparent) 24%,
+        var(--fc-color-bg) 72%
+    );
+}
+
+.mobile-ai-composer-card {
     display: flex;
     flex-direction: column;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 90%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    box-shadow: 0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 6%, transparent);
-    backdrop-filter: blur(18px);
-    flex-shrink: 0;
+    gap: 0.75rem;
+    padding: 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
+    border-radius: 1.65rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
+    box-shadow:
+        0 0.6rem 1.8rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+}
+
+.mobile-ai-composer-card textarea {
+    display: block;
+    width: 100%;
+    min-height: 2.15rem;
+    max-height: 7.5rem;
+    box-sizing: border-box;
+    padding: 0.2rem 0.15rem;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--fc-color-text);
+    font: inherit;
+    font-size: var(--fc-font-size-md);
+    line-height: 1.45;
+    resize: none;
+}
+
+.mobile-ai-composer-card textarea::placeholder {
+    color: color-mix(in srgb, var(--fc-color-text-secondary) 72%, transparent);
+}
+
+.mobile-ai-composer-card__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.mobile-ai-composer-card__chips,
+.mobile-ai-composer-card__actions {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.mobile-ai-composer-card__chips button {
+    min-height: 2rem;
+    padding: 0 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font: inherit;
+    font-size: var(--fc-font-size-xs);
+    font-weight: 650;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mobile-ai-composer-card__chips button.active {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
+    background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+    color: var(--fc-color-primary);
+}
+
+.mobile-ai-composer-card__chips button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.mobile-ai-composer-card__icon-btn {
+    display: inline-grid;
+    width: 2.55rem;
+    height: 2.55rem;
+    padding: 0;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-text);
+    font: inherit;
+    font-size: 1.85rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    touch-action: manipulation;
+}
+
+.mobile-ai-composer-card__icon-btn--send {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 36%, transparent);
+    background: var(--fc-color-primary);
+    color: var(--fc-color-text-on-primary);
+}
+
+.mobile-ai-composer-card__icon-btn:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.mobile-ai-settings-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
 }
 
 .mobile-ai-plugin-bar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     align-items: end;
-    gap: var(--fc-space-sm);
-    padding: var(--fc-space-sm) clamp(1rem, 4vw, 1.35rem);
+    gap: 0.75rem;
 }
 
 .mobile-ai-plugin-field {
+    display: flex;
     min-width: 0;
+    flex-direction: column;
+    gap: 0.35rem;
 }
 
 .mobile-ai-plugin-label {
     display: block;
-    margin-bottom: var(--fc-space-xs);
-    font-size: var(--fc-font-size-xs);
     color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-semibold);
 }
 
@@ -45,97 +458,123 @@
     width: 100%;
 }
 
-.mobile-ai-tool-mode-bar {
-    display: flex;
-    align-items: center;
-    gap: var(--fc-space-sm);
-    padding: 0 clamp(1rem, 4vw, 1.35rem) var(--fc-space-sm);
-}
-
-.mobile-ai-tool-mode-label {
-    flex: 0 0 auto;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-}
-
 .mobile-ai-tool-mode-options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    flex: 1;
-    min-width: 0;
-    padding: 0.25rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 82%, var(--fc-color-bg-elevated));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 68%, transparent);
+    gap: 0.45rem;
 }
 
 .mobile-ai-tool-mode-option {
-    min-height: 2.35rem;
-    padding: 0 var(--fc-space-sm);
-    border: 0;
-    border-radius: 0.78rem;
-    background: transparent;
+    display: flex;
+    min-height: 3.15rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.14rem;
+    padding: 0.45rem 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 74%, transparent);
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
+    font: inherit;
     cursor: pointer;
     touch-action: manipulation;
+}
+
+.mobile-ai-tool-mode-option span {
+    color: inherit;
+    font-size: var(--fc-font-size-sm);
+    font-weight: 680;
+    line-height: 1.18;
+}
+
+.mobile-ai-tool-mode-option small {
+    overflow: hidden;
+    color: var(--fc-color-text-secondary);
+    font-size: 0.68rem;
+    line-height: 1.18;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .mobile-ai-tool-mode-option.active {
-    background: var(--fc-color-bg-elevated);
+    border-color: color-mix(in srgb, var(--fc-color-primary) 32%, transparent);
+    background: color-mix(in srgb, var(--fc-color-primary) 11%, var(--fc-color-bg-elevated));
     color: var(--fc-color-primary);
-    box-shadow:
-        0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 82%, transparent);
 }
 
 .mobile-ai-tool-mode-option:disabled {
+    cursor: default;
     opacity: 0.5;
-    cursor: not-allowed;
 }
 
-.mobile-ai-conversation-item {
+.mobile-ai-more-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 32;
     display: flex;
+    align-items: flex-end;
+    background: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
+}
+
+.mobile-ai-more-sheet {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0));
+    border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 68%, transparent);
+    border-bottom: 0;
+    border-radius: 1.65rem 1.65rem 0 0;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
+    box-shadow:
+        0 -1rem 2.7rem color-mix(in srgb, var(--fc-color-text) 16%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
+    backdrop-filter: blur(8px) saturate(150%);
+    -webkit-backdrop-filter: blur(8px) saturate(150%);
+}
+
+.mobile-ai-more-sheet__handle {
+    width: 2.65rem;
+    height: 0.25rem;
+    margin: 0 auto 0.9rem;
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-text-secondary) 38%, transparent);
+}
+
+.mobile-ai-more-sheet__quick {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.mobile-ai-more-sheet__quick button {
+    display: flex;
+    min-height: 4.45rem;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 10px 12px;
-    border: 1px solid transparent;
-    border-radius: 0.9rem;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.25rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
+    color: var(--fc-color-text-secondary);
+    font: inherit;
+    font-size: var(--fc-font-size-xs);
+    font-weight: 650;
     cursor: pointer;
-    font-size: var(--fc-font-size-sm);
     touch-action: manipulation;
 }
 
-.mobile-ai-conversation-item.is-streaming {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 52%, var(--fc-color-border));
-    animation: mobile-ai-conversation-streaming-pulse 1.55s ease-in-out infinite;
-}
-
-.mobile-ai-conversation-unread-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: var(--fc-radius-full, 999px);
-    background: var(--fc-color-primary);
-    box-shadow: 0 0 0 0.16rem color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
-    flex-shrink: 0;
-}
-
-@keyframes mobile-ai-conversation-streaming-pulse {
-    0%,
-    100% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--fc-color-primary) 24%, transparent);
-    }
-
-    50% {
-        box-shadow: 0 0 0 0.32rem color-mix(in srgb, var(--fc-color-primary) 0%, transparent);
-    }
+.mobile-ai-more-sheet__quick button.active {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 32%, transparent);
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, var(--fc-color-bg-elevated));
+    color: var(--fc-color-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .mobile-ai-conversation-item.is-streaming {
-        animation: none;
-        box-shadow: 0 0 0 0.12rem color-mix(in srgb, var(--fc-color-primary) 16%, transparent);
+    .mobile-ai-chat__mode-preview button.active,
+    .mobile-ai-drawer__item:active {
+        transition: none;
+        transform: none;
     }
 }
