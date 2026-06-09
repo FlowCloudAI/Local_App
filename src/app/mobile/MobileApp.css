@@ -36,6 +36,7 @@
     --mobile-shadow-anchored-menu: 0 0.65rem 1.45rem color-mix(in srgb, var(--fc-color-text) 10%, transparent), var(--mobile-inset-highlight-soft);
     --mobile-shadow-dialog: 0 1.15rem 2.6rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
     --mobile-shadow-sheet: 0 -1rem 2.7rem color-mix(in srgb, var(--fc-color-text) 16%, transparent), var(--mobile-inset-highlight-strong);
+    --mobile-shadow-bottom-sheet: 0 -0.45rem 1.35rem color-mix(in srgb, var(--fc-color-text) 9%, transparent), var(--mobile-inset-highlight-soft);
     --mobile-shadow-drawer-surface: none;
     --mobile-shadow-primary-action: 0 0.55rem 1.1rem color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
     --mobile-shadow-primary-action-compact: 0 0.35rem 0.8rem color-mix(in srgb, var(--fc-color-primary) 22%, transparent);
