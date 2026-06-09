@@ -4,7 +4,7 @@
     z-index: 90;
     display: flex;
     align-items: flex-end;
-    background: var(--mobile-overlay-scrim-soft);
+    background: transparent;
     animation: mobile-bottom-sheet-layer-in 100ms ease-out;
 }
 
