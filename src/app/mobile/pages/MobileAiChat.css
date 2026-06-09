@@ -401,7 +401,7 @@
 }
 
 .mobile-ai-model-menu {
-    width: min(13.25rem, calc(100% - 2rem));
+    width: min(11.75rem, calc(100% - var(--mobile-anchored-menu-left, 1rem) - 5.75rem));
 }
 
 .mobile-ai-model-menu__row.active {

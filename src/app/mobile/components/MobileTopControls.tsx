@@ -80,6 +80,7 @@ export interface MobileAnchoredMenuProps {
     ariaLabel: string
     children: ReactNode
     className?: string
+    align?: 'left' | 'right'
 }
 
 export function MobileAnchoredMenu({
@@ -90,8 +91,9 @@ export function MobileAnchoredMenu({
     ariaLabel,
     children,
     className,
+    align = 'right',
 }: MobileAnchoredMenuProps) {
-    const [anchor, setAnchor] = useState<{top: number; right: number} | null>(null)
+    const [anchor, setAnchor] = useState<{top: number; left: number; right: number} | null>(null)
 
     const updateAnchor = useCallback(() => {
         const containerElement = containerRef.current
@@ -101,6 +103,7 @@ export function MobileAnchoredMenu({
         const anchorRect = anchorElement.getBoundingClientRect()
         setAnchor({
             top: Math.max(0, anchorRect.top - containerRect.top),
+            left: Math.max(0, anchorRect.left - containerRect.left),
             right: Math.max(0, containerRect.right - anchorRect.right),
         })
     }, [anchorRef, containerRef])
@@ -132,11 +135,12 @@ export function MobileAnchoredMenu({
             }}
         >
             <div
-                className={`mobile-anchored-menu${className ? ` ${className}` : ''}`}
+                className={`mobile-anchored-menu mobile-anchored-menu--${align}${className ? ` ${className}` : ''}`}
                 role="menu"
                 aria-label={ariaLabel}
                 style={anchor ? {
                     '--mobile-anchored-menu-top': `${anchor.top}px`,
+                    '--mobile-anchored-menu-left': `${anchor.left}px`,
                     '--mobile-anchored-menu-right': `${anchor.right}px`,
                 } as CSSProperties : undefined}
                 onPointerDown={event => event.stopPropagation()}

@@ -123,6 +123,13 @@
     scrollbar-width: none;
 }
 
+.mobile-anchored-menu--left {
+    right: auto;
+    left: var(--mobile-anchored-menu-left, 1rem);
+    max-width: calc(100% - var(--mobile-anchored-menu-left, 1rem) - 1rem);
+    transform-origin: top left;
+}
+
 .mobile-anchored-menu::-webkit-scrollbar {
     display: none;
 }
