@@ -6,8 +6,8 @@
     --mobile-border-strong: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
     --mobile-border-emphasis: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
     --mobile-border-bold: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
-    --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 66%, transparent);
-    --mobile-glass-border-strong: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 68%, transparent);
+    --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
+    --mobile-glass-border-strong: 1px solid color-mix(in srgb, var(--fc-color-border) 84%, transparent);
     --mobile-surface-raised: var(--fc-color-bg-elevated);
     --mobile-surface-muted: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
     --mobile-surface-muted-soft: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
@@ -19,9 +19,9 @@
     --mobile-surface-dialog: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
     --mobile-overlay-scrim-soft: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
     --mobile-divider: color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    --mobile-inset-highlight: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
-    --mobile-inset-highlight-soft: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
-    --mobile-inset-highlight-strong: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
+    --mobile-inset-highlight: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 18%, transparent);
+    --mobile-inset-highlight-soft: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 12%, transparent);
+    --mobile-inset-highlight-strong: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 24%, transparent);
     --mobile-shadow-control: 0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent), var(--mobile-inset-highlight);
     --mobile-shadow-control-soft: 0 0.22rem 0.65rem color-mix(in srgb, var(--fc-color-text) 6%, transparent), var(--mobile-inset-highlight-soft);
     --mobile-shadow-card: 0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 9%, transparent), var(--mobile-inset-highlight);
