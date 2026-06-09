@@ -1149,6 +1149,8 @@ export default function MobileAiChat({
                 ariaLabel={modelMenuMode === 'plugins' ? '切换 AI 插件' : '切换 AI 模型'}
                 className="mobile-ai-model-menu"
                 align="left"
+                rightBoundaryRef={topActionsRef}
+                rightBoundaryGap={8}
             >
                 {modelMenuMode === 'models' ? (
                     <div className="mobile-anchored-menu__group">

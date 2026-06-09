@@ -81,6 +81,8 @@ export interface MobileAnchoredMenuProps {
     children: ReactNode
     className?: string
     align?: 'left' | 'right'
+    rightBoundaryRef?: RefObject<HTMLElement | null>
+    rightBoundaryGap?: number
 }
 
 export function MobileAnchoredMenu({
@@ -92,8 +94,10 @@ export function MobileAnchoredMenu({
     children,
     className,
     align = 'right',
+    rightBoundaryRef,
+    rightBoundaryGap = 0,
 }: MobileAnchoredMenuProps) {
-    const [anchor, setAnchor] = useState<{top: number; left: number; right: number} | null>(null)
+    const [anchor, setAnchor] = useState<{top: number; left: number; right: number; rightBoundary: number | null} | null>(null)
 
     const updateAnchor = useCallback(() => {
         const containerElement = containerRef.current
@@ -101,12 +105,16 @@ export function MobileAnchoredMenu({
         if (!containerElement || !anchorElement) return
         const containerRect = containerElement.getBoundingClientRect()
         const anchorRect = anchorElement.getBoundingClientRect()
+        const boundaryRect = rightBoundaryRef?.current?.getBoundingClientRect()
         setAnchor({
             top: Math.max(0, anchorRect.top - containerRect.top),
             left: Math.max(0, anchorRect.left - containerRect.left),
             right: Math.max(0, containerRect.right - anchorRect.right),
+            rightBoundary: boundaryRect
+                ? Math.max(0, boundaryRect.left - containerRect.left - rightBoundaryGap)
+                : null,
         })
-    }, [anchorRef, containerRef])
+    }, [anchorRef, containerRef, rightBoundaryGap, rightBoundaryRef])
 
     useLayoutEffect(() => {
         if (open) updateAnchor()
@@ -142,6 +150,9 @@ export function MobileAnchoredMenu({
                     '--mobile-anchored-menu-top': `${anchor.top}px`,
                     '--mobile-anchored-menu-left': `${anchor.left}px`,
                     '--mobile-anchored-menu-right': `${anchor.right}px`,
+                    ...(anchor.rightBoundary != null
+                        ? {'--mobile-anchored-menu-right-boundary': `${anchor.rightBoundary}px`}
+                        : {}),
                 } as CSSProperties : undefined}
                 onPointerDown={event => event.stopPropagation()}
             >
