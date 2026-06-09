@@ -331,42 +331,101 @@
 }
 
 .mobile-ai-chat__topbar {
-    display: grid;
-    grid-template-columns: 2.45rem minmax(0, 1fr) auto;
+    display: flex;
     flex: 0 0 auto;
     align-items: center;
+    justify-content: space-between;
     gap: 0.8rem;
     padding: 0.9rem clamp(1rem, 4vw, 1.35rem) 0.55rem;
 }
 
-.mobile-ai-chat__title {
+.mobile-ai-chat__left-actions {
     display: flex;
     min-width: 0;
-    flex-direction: column;
+    flex: 1 1 auto;
     align-items: center;
-    gap: 0.12rem;
-    text-align: center;
+    gap: 0.55rem;
 }
 
-.mobile-ai-chat__title strong,
-.mobile-ai-chat__title span {
-    max-width: 100%;
+.mobile-ai-model-pill {
+    display: inline-flex;
+    width: min(11.75rem, 42vw);
+    min-width: 0;
+    height: 2.45rem;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0 0.9rem 0 1rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-bg-elevated);
+    color: var(--fc-color-primary);
+    font: inherit;
+    font-size: var(--fc-font-size-sm);
+    font-weight: 720;
+    box-shadow:
+        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.mobile-ai-model-pill span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.mobile-ai-chat__title strong {
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-md);
-    font-weight: 720;
-    line-height: 1.2;
+.mobile-ai-model-pill svg {
+    display: block;
+    width: 0.75rem;
+    height: 0.75rem;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.1;
 }
 
-.mobile-ai-chat__title span {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.2;
+.mobile-ai-model-pill:active {
+    transform: scale(0.98);
+}
+
+.mobile-ai-model-pill:disabled {
+    cursor: default;
+    opacity: 0.56;
+}
+
+.mobile-ai-model-menu {
+    width: min(13.25rem, calc(100% - 2rem));
+}
+
+.mobile-ai-model-menu__row.active {
+    color: var(--fc-color-primary);
+}
+
+.mobile-ai-model-menu__row.active .mobile-anchored-menu__check::before {
+    color: currentColor;
+    content: "✓";
+    font-size: 1.15rem;
+    font-weight: 760;
+    line-height: 1;
+}
+
+.mobile-ai-model-menu__row .mobile-ai-svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    stroke-width: 2.3;
+}
+
+.mobile-ai-model-menu__divider {
+    height: 1px;
+    margin: 0.35rem 1.15rem;
+    background: color-mix(in srgb, var(--fc-color-border) 68%, transparent);
 }
 
 .mobile-ai-chat__messages {

@@ -29,6 +29,7 @@ import {logger} from '../../../shared/logger'
 import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import {type MobileTab} from '../MobileNav'
 import {
+    MobileAnchoredMenu,
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
     MobileTopActionPill,
@@ -268,7 +269,8 @@ export default function MobileAiChat({
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         plugins, pluginsReady, selectedPlugin, selectedModel,
         webSearchEnabled, toggleWebSearch,
-        toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams, updateConversationSettings, focusContext,
+        toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams,
+        updateConversationSettings, switchActiveConversationModel, focusContext,
     } = controller
 
     const [apiKeyRefreshTick, setApiKeyRefreshTick] = useState(0)
@@ -278,12 +280,15 @@ export default function MobileAiChat({
     const [conversationFilter, setConversationFilter] = useState<AiConversationFilter>('all')
     const [drawerRoot, setDrawerRoot] = useState<HTMLElement | null>(null)
     const [topMenuOpen, setTopMenuOpen] = useState(false)
+    const [modelMenuOpen, setModelMenuOpen] = useState(false)
+    const [modelMenuMode, setModelMenuMode] = useState<'models' | 'plugins'>('models')
     const [morePanelOpen, setMorePanelOpen] = useState(false)
     const [renameTarget, setRenameTarget] = useState<Conversation | null>(null)
     const [conversationActionTarget, setConversationActionTarget] = useState<Conversation | null>(null)
     const [renaming, setRenaming] = useState(false)
     const conversationLongPressRef = useRef<ConversationLongPressState | null>(null)
     const suppressConversationClickRef = useRef(false)
+    const modelMenuRef = useRef<HTMLButtonElement>(null)
 
     const activeConversation = useMemo(
         () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
@@ -300,6 +305,17 @@ export default function MobileAiChat({
     const activeModelLabel = activeModelInfo?.name && activeModelInfo.name !== activeModelId
         ? activeModelInfo.name
         : activeModelId || '未选择模型'
+    const activeModelOptions = useMemo(() => {
+        if (!activeLlmPluginInfo) return []
+        return activeLlmPluginInfo.models.map(modelId => {
+            const modelInfo = activeLlmPluginInfo.model_infos.find(item => item.id === modelId)
+            return {
+                id: modelId,
+                label: modelInfo?.name && modelInfo.name !== modelId ? modelInfo.name : modelId,
+                description: modelInfo?.description || (modelInfo?.name && modelInfo.name !== modelId ? modelId : ''),
+            }
+        })
+    }, [activeLlmPluginInfo])
     const toolModeOptions = useMemo(() => AI_TOOL_ACCESS_OPTIONS.map(mode => ({
         mode,
         label: AI_TOOL_ACCESS_LABELS[mode],
@@ -442,6 +458,37 @@ export default function MobileAiChat({
     const closeMorePanel = useCallback(() => {
         setMorePanelOpen(false)
     }, [])
+
+    const closeModelMenu = useCallback(() => {
+        setModelMenuOpen(false)
+        setModelMenuMode('models')
+    }, [])
+
+    const handleToggleModelMenu = useCallback(() => {
+        setTopMenuOpen(false)
+        setModelMenuOpen(open => !open)
+        setModelMenuMode('models')
+    }, [])
+
+    const handleSelectModel = useCallback(async (modelId: string) => {
+        if (!activeLlmPluginId) return
+        closeModelMenu()
+        await switchActiveConversationModel(activeLlmPluginId, modelId)
+    }, [activeLlmPluginId, closeModelMenu, switchActiveConversationModel])
+
+    const handleSelectPlugin = useCallback(async (pluginId: string) => {
+        const plugin = plugins.find(item => item.id === pluginId)
+        if (!plugin) return
+        const nextModel = plugin.default_model && plugin.models.includes(plugin.default_model)
+            ? plugin.default_model
+            : (plugin.models[0] ?? '')
+        if (!nextModel) {
+            await showAlert(`插件「${plugin.name}」没有可用模型。`, 'warning', 'nonInvasive', 1800)
+            return
+        }
+        closeModelMenu()
+        await switchActiveConversationModel(plugin.id, nextModel)
+    }, [closeModelMenu, plugins, showAlert, switchActiveConversationModel])
 
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings>(
         key: K,
@@ -941,16 +988,28 @@ export default function MobileAiChat({
         <div ref={pageRef} className="mobile-ai-chat">
             {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
             <header className="mobile-ai-chat__topbar">
-                <MobileTopIconButton
-                    type="button"
-                    icon={<MobileAiIcon type="menu"/>}
-                    aria-label="打开对话列表"
-                    aria-expanded={conversationDrawerOpen}
-                    onClick={onOpenConversationDrawer}
-                />
-                <div className="mobile-ai-chat__title">
-                    <strong>{activeConversation?.title || '新对话'}</strong>
-                    <span>{activeModelLabel}</span>
+                <div className="mobile-ai-chat__left-actions">
+                    <MobileTopIconButton
+                        type="button"
+                        icon={<MobileAiIcon type="menu"/>}
+                        aria-label="打开对话列表"
+                        aria-expanded={conversationDrawerOpen}
+                        onClick={onOpenConversationDrawer}
+                    />
+                    <button
+                        ref={modelMenuRef}
+                        type="button"
+                        className="mobile-ai-model-pill"
+                        aria-haspopup="menu"
+                        aria-expanded={modelMenuOpen}
+                        disabled={pluginsLoading}
+                        onClick={handleToggleModelMenu}
+                    >
+                        <span>{pluginsLoading ? '加载模型中' : activeModelLabel}</span>
+                        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                            <path d={modelMenuOpen ? 'M2.5 7.5 6 4l3.5 3.5' : 'M2.5 4.5 6 8l3.5-3.5'}/>
+                        </svg>
+                    </button>
                 </div>
                 <MobileTopActionPill
                     ref={topActionsRef}
@@ -971,7 +1030,10 @@ export default function MobileAiChat({
                             ariaHasPopup: 'menu',
                             ariaExpanded: topMenuOpen,
                             disabled: !activeConversation,
-                            onClick: () => setTopMenuOpen(open => !open),
+                            onClick: () => {
+                                closeModelMenu()
+                                setTopMenuOpen(open => !open)
+                            },
                         },
                     ]}
                 />
@@ -1078,6 +1140,111 @@ export default function MobileAiChat({
                     </div>
                 </div>
             </footer>
+
+            <MobileAnchoredMenu
+                open={modelMenuOpen}
+                onClose={closeModelMenu}
+                anchorRef={modelMenuRef}
+                containerRef={pageRef}
+                ariaLabel={modelMenuMode === 'plugins' ? '切换 AI 插件' : '切换 AI 模型'}
+                className="mobile-ai-model-menu"
+            >
+                {modelMenuMode === 'models' ? (
+                    <div className="mobile-anchored-menu__group">
+                        <button
+                            type="button"
+                            role="menuitem"
+                            className="mobile-anchored-menu__row mobile-ai-model-menu__row"
+                            disabled={plugins.length === 0}
+                            onClick={() => setModelMenuMode('plugins')}
+                        >
+                            <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                            <span className="mobile-anchored-menu__icon" aria-hidden="true">
+                                <MobileAiIcon type="plugin"/>
+                            </span>
+                            <span className="mobile-anchored-menu__text">
+                                <span>切换插件</span>
+                                <small>{activeLlmPluginName}</small>
+                            </span>
+                        </button>
+                        <div className="mobile-ai-model-menu__divider" role="presentation"/>
+                        {activeModelOptions.length === 0 ? (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                className="mobile-anchored-menu__row mobile-ai-model-menu__row"
+                                disabled
+                            >
+                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__text">
+                                    <span>没有可用模型</span>
+                                    <small>请先在设置中配置插件</small>
+                                </span>
+                            </button>
+                        ) : activeModelOptions.map(model => (
+                            <button
+                                key={model.id}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={model.id === activeModelId}
+                                className={`mobile-anchored-menu__row mobile-ai-model-menu__row${model.id === activeModelId ? ' active' : ''}`}
+                                disabled={isStreaming}
+                                onClick={() => void handleSelectModel(model.id)}
+                            >
+                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__text">
+                                    <span>{model.label}</span>
+                                    {model.description ? <small>{model.description}</small> : null}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="mobile-anchored-menu__group">
+                        {plugins.length === 0 ? (
+                            <button
+                                type="button"
+                                role="menuitem"
+                                className="mobile-anchored-menu__row mobile-ai-model-menu__row"
+                                disabled
+                            >
+                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__text">
+                                    <span>没有可用插件</span>
+                                    <small>请先在设置中安装 LLM 插件</small>
+                                </span>
+                            </button>
+                        ) : plugins.map(plugin => {
+                            const nextModel = plugin.default_model && plugin.models.includes(plugin.default_model)
+                                ? plugin.default_model
+                                : (plugin.models[0] ?? '')
+                            return (
+                                <button
+                                    key={plugin.id}
+                                    type="button"
+                                    role="menuitemradio"
+                                    aria-checked={plugin.id === activeLlmPluginId}
+                                    className={`mobile-anchored-menu__row mobile-ai-model-menu__row${plugin.id === activeLlmPluginId ? ' active' : ''}`}
+                                    disabled={isStreaming || !nextModel}
+                                    onClick={() => void handleSelectPlugin(plugin.id)}
+                                >
+                                    <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                    <span className="mobile-anchored-menu__icon" aria-hidden="true">
+                                        <MobileAiIcon type="plugin"/>
+                                    </span>
+                                    <span className="mobile-anchored-menu__text">
+                                        <span>{plugin.name}</span>
+                                        <small>{nextModel || '没有可用模型'}</small>
+                                    </span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+            </MobileAnchoredMenu>
 
             <MobileAnchoredActionMenu
                 open={topMenuOpen}

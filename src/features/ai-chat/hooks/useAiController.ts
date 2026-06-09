@@ -1618,6 +1618,37 @@ export function useAiController(focus: AiFocus): AiContextValue {
         persistConversationSettings(convId, nextSettings)
     }, [persistConversationSettings, resolveContextPayload])
 
+    const switchActiveConversationModel = useCallback(async (pluginId: string, model: string) => {
+        if (!pluginId || !model) return
+        setSelectedPlugin(pluginId)
+        setSelectedModel(model)
+
+        const conv = activeConversationRef.current
+        if (!conv) return
+        if (conv.pluginId === pluginId && conv.model === model) return
+        if (conv.runId && session.isRunStreaming(conv.runId)) return
+
+        if (conv.sessionId) {
+            await session.closeSession(conv.sessionId)
+        }
+        if (conv.sessionId && conv.runId) {
+            delete runtimeConversationRef.current[runtimeConversationKey(conv.sessionId, conv.runId)]
+        }
+
+        setConversations((prev) => prev.map((conversation) =>
+            conversation.id === conv.id
+                ? {
+                    ...conversation,
+                    pluginId,
+                    model,
+                    sessionId: null,
+                    runId: null,
+                }
+                : conversation,
+        ))
+        session.activateSession(null, null)
+    }, [session])
+
     useEffect(() => () => {
         Object.values(conversationSettingsSaveTimersRef.current).forEach((timer) => {
             window.clearTimeout(timer)
@@ -2484,6 +2515,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         startCharacterConversation,
         updateConversationCharacterAutoPlay,
         updateConversationSettings,
+        switchActiveConversationModel,
         switchConversation,
         deleteConversation,
         renameConversation,
@@ -2503,7 +2535,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         toggleWebSearch, setToolAccessMode, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
-        updateConversationSettings,
+        updateConversationSettings, switchActiveConversationModel,
         selectConversation, session.getBranchInfo, session.switchBranch,
     ])
 }
