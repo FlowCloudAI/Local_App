@@ -35,9 +35,7 @@
     gap: 1rem;
     overflow-x: hidden;
     padding: calc(env(safe-area-inset-top, 0) + 1.05rem) 1.05rem calc(env(safe-area-inset-bottom, 0) + 1.1rem);
-    background:
-        linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-elevated) 84%, transparent), var(--fc-color-bg) 36%),
-        var(--fc-color-bg);
+    background: var(--fc-color-bg-secondary);
 }
 
 .mobile-ai-drawer__header {

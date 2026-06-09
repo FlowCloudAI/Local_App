@@ -17,7 +17,7 @@
     --mobile-surface-glass-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
     --mobile-surface-panel: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
     --mobile-surface-dialog: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
-    --mobile-drawer-reveal-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
+    --mobile-drawer-reveal-bg: var(--fc-color-bg-secondary);
     --mobile-overlay-scrim-soft: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
     --mobile-divider: color-mix(in srgb, var(--fc-color-border) 62%, transparent);
     --mobile-inset-highlight: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 18%, transparent);
