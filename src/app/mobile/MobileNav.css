@@ -13,8 +13,8 @@
             color-mix(in srgb, var(--fc-color-bg-elevated) 78%, transparent) 2.1rem,
             color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent) 100%
         );
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: var(--mobile-chrome-filter);
+    -webkit-backdrop-filter: var(--mobile-chrome-filter);
     flex-shrink: 0;
     z-index: 30;
 }
@@ -34,7 +34,7 @@
     font-size: var(--fc-font-size-xs);
     transition: color 0.15s;
     padding: 8px 4px;
-    border-radius: 14px;
+    border-radius: var(--mobile-radius-card);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }

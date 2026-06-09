@@ -1,3 +1,52 @@
+.mobile-app,
+:root {
+    --mobile-border-soft: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
+    --mobile-border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    --mobile-border-medium: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
+    --mobile-border-strong: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    --mobile-border-emphasis: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
+    --mobile-border-bold: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
+    --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 66%, transparent);
+    --mobile-glass-border-strong: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 68%, transparent);
+    --mobile-surface-raised: var(--fc-color-bg-elevated);
+    --mobile-surface-muted: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
+    --mobile-surface-muted-soft: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    --mobile-surface-translucent: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
+    --mobile-surface-translucent-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    --mobile-surface-glass: color-mix(in srgb, var(--fc-color-bg-elevated) 70%, transparent);
+    --mobile-surface-glass-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
+    --mobile-surface-panel: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
+    --mobile-surface-dialog: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+    --mobile-overlay-scrim-soft: color-mix(in srgb, var(--fc-color-text) 10%, transparent);
+    --mobile-divider: color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+    --mobile-inset-highlight: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    --mobile-inset-highlight-soft: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    --mobile-inset-highlight-strong: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
+    --mobile-shadow-control: 0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent), var(--mobile-inset-highlight);
+    --mobile-shadow-control-soft: 0 0.22rem 0.65rem color-mix(in srgb, var(--fc-color-text) 6%, transparent), var(--mobile-inset-highlight-soft);
+    --mobile-shadow-card: 0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 9%, transparent), var(--mobile-inset-highlight);
+    --mobile-shadow-card-hover: 0 0.4rem 1.2rem color-mix(in srgb, var(--fc-color-text) 11%, transparent), var(--mobile-inset-highlight);
+    --mobile-shadow-cover: 0 0.45rem 1.2rem color-mix(in srgb, var(--fc-color-text) 8%, transparent), var(--mobile-inset-highlight);
+    --mobile-shadow-subtle: 0 0.2rem 0.65rem color-mix(in srgb, var(--fc-color-text) 5%, transparent);
+    --mobile-shadow-floating: 0 1.25rem 3rem color-mix(in srgb, var(--fc-color-text) 18%, transparent), var(--mobile-inset-highlight-strong);
+    --mobile-shadow-floating-soft: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    --mobile-shadow-floating-compact: 0 1rem 2rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    --mobile-shadow-dialog: 0 1.15rem 2.6rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    --mobile-shadow-sheet: 0 -1rem 2.7rem color-mix(in srgb, var(--fc-color-text) 16%, transparent), var(--mobile-inset-highlight-strong);
+    --mobile-shadow-drawer-surface: -0.9rem 0 2.4rem color-mix(in srgb, var(--fc-color-text) 18%, transparent), inset 1px 0 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    --mobile-shadow-primary-action: 0 0.55rem 1.1rem color-mix(in srgb, var(--fc-color-primary) 26%, transparent);
+    --mobile-shadow-primary-action-compact: 0 0.35rem 0.8rem color-mix(in srgb, var(--fc-color-primary) 22%, transparent);
+    --mobile-shadow-primary-soft: 0 0.35rem 0.95rem color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+    --mobile-shadow-chip: 0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 14%, transparent);
+    --mobile-glass-filter: blur(8px) saturate(150%);
+    --mobile-chrome-filter: blur(18px);
+    --mobile-chip-filter: blur(10px);
+    --mobile-radius-card: var(--fc-radius-xl);
+    --mobile-radius-field: var(--fc-radius-xl);
+    --mobile-radius-floating: calc(var(--fc-radius-xl) + var(--fc-space-sm));
+    --mobile-radius-sheet: calc(var(--fc-radius-xl) + var(--fc-space-sm));
+}
+
 .mobile-app {
     display: flex;
     flex-direction: column;
@@ -50,10 +99,8 @@
 }
 
 .mobile-app-category-shell.is-open .mobile-app-category-shell__surface {
-    border-radius: 1.75rem 0 0 1.75rem;
-    box-shadow:
-        -0.9rem 0 2.4rem color-mix(in srgb, var(--fc-color-text) 18%, transparent),
-        inset 1px 0 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
+    box-shadow: var(--mobile-shadow-drawer-surface);
 }
 
 .mobile-app-category-shell__surface-close {
@@ -136,16 +183,14 @@
     align-items: stretch;
     gap: 6px;
     padding: 14px 15px;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 14px;
-    background: var(--fc-color-bg-elevated);
+    border: var(--mobile-border-emphasis);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
     cursor: pointer;
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    box-shadow: var(--mobile-shadow-control);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
@@ -232,9 +277,9 @@
     gap: 8px;
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
-    border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    backdrop-filter: blur(18px);
+    background: var(--mobile-surface-translucent-strong);
+    border-top: var(--mobile-border);
+    backdrop-filter: var(--mobile-chrome-filter);
     flex-shrink: 0;
 }
 

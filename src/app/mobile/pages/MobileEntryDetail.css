@@ -460,11 +460,11 @@
     gap: var(--fc-space-sm);
     margin: -0.25rem 0 0.15rem;
     padding: 0.45rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
-    box-shadow: 0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 8%, transparent);
-    backdrop-filter: blur(18px);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent-strong);
+    box-shadow: var(--mobile-shadow-cover);
+    backdrop-filter: var(--mobile-chrome-filter);
 }
 
 .mobile-entry-detail__actions .fc-btn,
@@ -489,10 +489,10 @@
 .mobile-entry-detail__summary-input .fc-input__wrapper,
 .mobile-entry-detail__meta-select .fc-select__trigger,
 .mobile-entry-detail__tag-select .fc-select__trigger {
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-inset-highlight-soft);
 }
 
 .mobile-entry-detail__title-input .fc-input__wrapper {
@@ -531,12 +531,10 @@
 .mobile-entry-detail__relations,
 .mobile-entry-detail__connections {
     padding: 0.9rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    border: var(--mobile-border-medium);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control-soft);
 }
 
 .mobile-entry-detail__images-header,
@@ -559,8 +557,8 @@
 }
 
 .mobile-entry-detail__image-thumb {
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 0.85rem;
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-field);
     background: var(--fc-color-bg-secondary);
 }
 
@@ -571,18 +569,16 @@
 .mobile-entry-detail__content-input {
     min-height: 15rem;
     padding: 0.9rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    border: var(--mobile-border-medium);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control-soft);
 }
 
 .mobile-entry-detail__wiki-panel {
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 1rem;
-    box-shadow: 0 1rem 2rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    border: var(--mobile-border-emphasis);
+    border-radius: var(--mobile-radius-card);
+    box-shadow: var(--mobile-shadow-floating-compact);
 }
 
 .mobile-entry-detail__wiki-option {
@@ -620,9 +616,9 @@
 .mobile-entry-detail__summary {
     margin: 0;
     padding: 0.9rem 1rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 62%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border-medium);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted-soft);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
     font-style: normal;
@@ -644,8 +640,8 @@
 
 .mobile-entry-detail__connection-card {
     padding: 0.8rem 0.9rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 0.9rem;
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-field);
     box-shadow: none;
 }
 

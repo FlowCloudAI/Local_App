@@ -13,13 +13,11 @@
     height: 2.45rem;
     padding: 0;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg-elevated);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-primary);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    box-shadow: var(--mobile-shadow-control);
 }
 
 .mobile-top-icon-button__icon,
@@ -50,12 +48,10 @@
     flex: 0 0 auto;
     gap: 0;
     padding: 0.12rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
+    border: var(--mobile-border-medium);
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control);
     transition: opacity 120ms ease, transform 120ms ease;
 }
 
@@ -116,14 +112,12 @@
     box-sizing: border-box;
     padding: 0.75rem 0;
     overflow-y: auto;
-    border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 66%, transparent);
-    border-radius: 1.55rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 70%, transparent);
-    box-shadow:
-        0 1.25rem 3rem color-mix(in srgb, var(--fc-color-text) 18%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
-    backdrop-filter: blur(8px) saturate(150%);
-    -webkit-backdrop-filter: blur(8px) saturate(150%);
+    border: var(--mobile-glass-border);
+    border-radius: var(--mobile-radius-floating);
+    background: var(--mobile-surface-glass);
+    box-shadow: var(--mobile-shadow-floating);
+    backdrop-filter: var(--mobile-glass-filter);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
     animation: mobile-anchored-menu-pop 160ms cubic-bezier(0.22, 1, 0.36, 1);
     transform-origin: top right;
     scrollbar-width: none;

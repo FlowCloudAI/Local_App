@@ -375,18 +375,16 @@
 .mobile-settings-plugin-list {
     gap: 0;
     overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control-soft);
 }
 
 .mobile-settings-menu-item,
 .mobile-settings-plugin-item {
     padding: 0.9rem 1rem;
-    border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+    border-bottom: var(--mobile-border);
 }
 
 .mobile-settings-menu-item:last-child,
@@ -408,17 +406,15 @@
 .mobile-settings-about-actions,
 .mobile-settings-log-viewer {
     padding: 0.9rem 1rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control-soft);
 }
 
 .mobile-settings-api-key__input .fc-input__wrapper,
 .mobile-settings-log-viewer__content {
-    border-radius: 0.9rem;
+    border-radius: var(--mobile-radius-field);
 }
 
 .mobile-settings-full-button.fc-btn,

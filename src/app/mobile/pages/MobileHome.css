@@ -74,14 +74,12 @@
 .mobile-home__help {
     width: 2.75rem;
     height: 2.75rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    background: var(--fc-color-bg-elevated);
+    border: var(--mobile-border-medium);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-primary);
     font-size: 1.15rem;
     font-weight: 720;
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    box-shadow: var(--mobile-shadow-control);
 }
 
 .mobile-home__help:active,
@@ -101,9 +99,9 @@
 .mobile-home__search .fc-input__wrapper,
 .mobile-home-worlds__search .fc-input__wrapper {
     height: 3.25rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    border: var(--mobile-border-soft);
+    background: var(--mobile-surface-muted);
+    box-shadow: var(--mobile-inset-highlight-soft);
 }
 
 .mobile-home__search .fc-input__field,
@@ -153,17 +151,15 @@
     width: 100%;
     min-height: 8.75rem;
     padding: 1rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
     background:
         linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 10%, transparent), transparent 48%),
-        var(--fc-color-bg-elevated);
+        var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
-    box-shadow:
-        0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    box-shadow: var(--mobile-shadow-card);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -189,9 +185,9 @@
 .mobile-home__muted {
     margin: 0;
     padding: 0.9rem 1rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted-soft);
 }
 
 .mobile-home__recent-list {
@@ -208,13 +204,13 @@
     gap: 0.55rem;
     min-height: 3rem;
     padding: 0.72rem 0.85rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    border-radius: 0.9rem;
-    background: var(--fc-color-bg-elevated);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
-    box-shadow: 0 0.2rem 0.65rem color-mix(in srgb, var(--fc-color-text) 5%, transparent);
+    box-shadow: var(--mobile-shadow-subtle);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -251,25 +247,23 @@
     width: min(10rem, 64%);
     min-height: 2.45rem;
     margin-top: 0.2rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
+    background: var(--mobile-surface-translucent);
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--fc-font-size-sm);
     font-weight: 680;
-    box-shadow:
-        0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
+    box-shadow: var(--mobile-shadow-control-soft);
     cursor: pointer;
     touch-action: manipulation;
 }
 
 .mobile-home__state-panel {
     min-height: 5rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted-soft);
 }
 
 .mobile-home-worlds {
@@ -297,12 +291,10 @@
     flex: 0 0 auto;
     gap: 0;
     padding: 0.12rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
+    border: var(--mobile-border-medium);
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control);
 }
 
 .mobile-home-worlds__icon-btn,
@@ -346,24 +338,20 @@
 
 .mobile-home-world-card {
     aspect-ratio: 3 / 4;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
     overflow: hidden;
 }
 
 .mobile-home-world-card.fc-card {
     min-height: 0;
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.35rem 1.1rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-card);
 }
 
 .mobile-home-world-card.fc-card--hoverable:hover {
     transform: none;
-    box-shadow:
-        0 0.4rem 1.2rem color-mix(in srgb, var(--fc-color-text) 11%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    box-shadow: var(--mobile-shadow-card-hover);
 }
 
 .mobile-home-world-card:active {
@@ -387,7 +375,7 @@
     justify-content: flex-start;
     gap: 0.4rem;
     padding: 0.9rem 1rem 1rem;
-    background: var(--fc-color-bg-elevated);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
 }
 
@@ -443,14 +431,12 @@
     box-sizing: border-box;
     padding: 0.75rem 0;
     overflow-y: auto;
-    border: 1px solid color-mix(in srgb, var(--fc-color-text-on-primary) 66%, transparent);
-    border-radius: 1.55rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
-    box-shadow:
-        0 1.25rem 3rem color-mix(in srgb, var(--fc-color-text) 18%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 78%, transparent);
-    backdrop-filter: blur(8px) saturate(150%);
-    -webkit-backdrop-filter: blur(8px) saturate(150%);
+    border: var(--mobile-glass-border);
+    border-radius: var(--mobile-radius-floating);
+    background: var(--mobile-surface-glass);
+    box-shadow: var(--mobile-shadow-floating);
+    backdrop-filter: var(--mobile-glass-filter);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
     animation: mobile-home-filter-pop 160ms cubic-bezier(0.22, 1, 0.36, 1);
     transform-origin: top right;
     scrollbar-width: none;
@@ -468,7 +454,7 @@
 .mobile-home-filter__divider {
     height: 1px;
     margin: 0.45rem 1.25rem;
-    background: color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+    background: var(--mobile-divider);
 }
 
 .mobile-home-filter__row {

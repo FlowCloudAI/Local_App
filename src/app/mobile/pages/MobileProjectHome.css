@@ -34,12 +34,10 @@
     width: 100%;
     height: clamp(10.5rem, 42vw, 13rem);
     object-fit: cover;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1.25rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg-elevated));
-    box-shadow:
-        0 0.45rem 1.2rem color-mix(in srgb, var(--fc-color-text) 8%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 76%, transparent);
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-floating);
+    background: var(--mobile-surface-muted);
+    box-shadow: var(--mobile-shadow-cover);
 }
 
 .mobile-project-home__cover--empty {
@@ -131,9 +129,9 @@
     gap: 0.3rem;
     min-height: 2rem;
     padding: 0 0.72rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    border: var(--mobile-border-strong);
     border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 64%, var(--fc-color-bg-elevated));
+    background: var(--mobile-surface-muted);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-medium);
@@ -207,15 +205,13 @@
     align-items: flex-start;
     gap: 0.45rem;
     padding: 0.95rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
+    border: var(--mobile-border-medium);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
-    box-shadow:
-        0 0.3rem 0.85rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 76%, transparent);
+    box-shadow: var(--mobile-shadow-control-soft);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -223,19 +219,19 @@
 .mobile-project-home__next-card--primary {
     background:
         linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 12%, transparent), transparent 54%),
-        var(--fc-color-bg-elevated);
+        var(--mobile-surface-raised);
 }
 
 .mobile-project-home__next-card--ai {
     background:
         linear-gradient(135deg, color-mix(in srgb, var(--fc-color-purple, var(--fc-color-info)) 12%, transparent), transparent 54%),
-        var(--fc-color-bg-elevated);
+        var(--mobile-surface-raised);
 }
 
 .mobile-project-home__next-card--structure {
     background:
         linear-gradient(135deg, color-mix(in srgb, var(--fc-color-success) 10%, transparent), transparent 54%),
-        var(--fc-color-bg-elevated);
+        var(--mobile-surface-raised);
 }
 
 .mobile-project-home__next-title {
@@ -273,13 +269,13 @@
     width: 100%;
     min-height: 4.15rem;
     padding: 0.82rem 0.95rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent-strong);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
-    box-shadow: 0 0.22rem 0.65rem color-mix(in srgb, var(--fc-color-text) 5%, transparent);
+    box-shadow: var(--mobile-shadow-subtle);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -332,9 +328,9 @@
     justify-content: space-between;
     gap: 0.45rem;
     padding: 0.8rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted-soft);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
@@ -365,9 +361,9 @@
     box-sizing: border-box;
     min-height: 7.5rem;
     padding: var(--fc-space-sm);
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 0.9rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border-emphasis);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-muted);
     color: var(--fc-color-text);
     font: inherit;
     line-height: var(--fc-line-height-normal);

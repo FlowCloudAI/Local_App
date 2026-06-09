@@ -29,9 +29,9 @@
 
 .mobile-category-manager__empty {
     min-height: 5rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted-soft);
 }
 
 .mobile-category-manager__list {
@@ -47,12 +47,10 @@
     grid-template-columns: minmax(0, 1fr) 2.7rem;
     align-items: stretch;
     min-height: 3.75rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--mobile-shadow-control);
     overflow: hidden;
 }
 
@@ -83,7 +81,7 @@
     flex: 0 0 auto;
     width: 0.55rem;
     height: 0.55rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-primary);
     opacity: 0.78;
 }
@@ -119,7 +117,7 @@
     justify-content: center;
     width: 2.7rem;
     border: none;
-    border-left: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
+    border-left: var(--mobile-border-strong);
     background: transparent;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-lg);
@@ -131,11 +129,11 @@
     width: min(23rem, 100%);
     box-sizing: border-box;
     padding: var(--fc-space-lg);
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 1.15rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
-    box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
-    backdrop-filter: blur(18px);
+    border: var(--mobile-border-emphasis);
+    border-radius: var(--mobile-radius-floating);
+    background: var(--mobile-surface-dialog);
+    box-shadow: var(--mobile-shadow-floating-soft);
+    backdrop-filter: var(--mobile-chrome-filter);
 }
 
 .mobile-category-dialog__title {
@@ -199,9 +197,9 @@
         var(--fc-space-md)
         var(--fc-space-sm)
         calc(var(--fc-space-md) + (var(--mobile-category-depth) * 0.95rem));
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 0.9rem;
-    background: var(--fc-color-bg-elevated);
+    border: var(--mobile-border-emphasis);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
     font-weight: var(--fc-font-weight-medium);

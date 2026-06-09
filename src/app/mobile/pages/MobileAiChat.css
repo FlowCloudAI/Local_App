@@ -70,12 +70,10 @@
     align-items: center;
     gap: 0.7rem;
     padding: 0 1rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
-    box-shadow:
-        0 0.28rem 0.95rem color-mix(in srgb, var(--fc-color-text) 6%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 74%, transparent);
+    background: var(--mobile-surface-translucent);
+    box-shadow: var(--mobile-shadow-control-soft);
 }
 
 .mobile-ai-drawer__search span {
@@ -128,7 +126,7 @@
     grid-auto-flow: column;
     gap: 0.2rem;
     padding: 0.22rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
+    border: var(--mobile-border-soft);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, transparent);
 }
@@ -149,11 +147,9 @@
 }
 
 .mobile-ai-drawer__segmented button.active {
-    background: var(--fc-color-bg-elevated);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-primary);
-    box-shadow:
-        0 0.22rem 0.65rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    box-shadow: var(--mobile-shadow-control-soft);
 }
 
 .mobile-ai-drawer__new {
@@ -235,8 +231,8 @@
 }
 
 .mobile-ai-drawer__item.is-report.active {
-    border-color: color-mix(in srgb, var(--fc-color-warning, #d9822b) 42%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-warning-bg, rgba(217, 130, 43, 0.16)) 68%, transparent);
+    border-color: color-mix(in srgb, var(--fc-color-warning) 42%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-warning-bg) 68%, transparent);
 }
 
 .mobile-ai-drawer__item.is-streaming {
@@ -357,16 +353,14 @@
     justify-content: center;
     gap: 0.4rem;
     padding: 0 0.9rem 0 1rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg-elevated);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--fc-font-size-sm);
     font-weight: 720;
-    box-shadow:
-        0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    box-shadow: var(--mobile-shadow-control);
     cursor: pointer;
     transition: opacity 120ms ease, transform 120ms ease;
     -webkit-tap-highlight-color: transparent;
@@ -453,7 +447,7 @@
 .mobile-ai-model-menu__divider {
     height: 1px;
     margin: 0.35rem 1.15rem;
-    background: color-mix(in srgb, var(--fc-color-border) 68%, transparent);
+    background: var(--mobile-divider);
 }
 
 .mobile-ai-chat__messages {
@@ -513,12 +507,10 @@
     flex-direction: column;
     gap: 0.55rem;
     padding: 0.72rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
-    border-radius: 1.65rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
-    box-shadow:
-        0 0.6rem 1.8rem color-mix(in srgb, var(--fc-color-text) 9%, transparent),
-        inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    border: var(--mobile-border-medium);
+    border-radius: var(--mobile-radius-sheet);
+    background: var(--mobile-surface-panel);
+    box-shadow: var(--mobile-shadow-card);
 }
 
 .mobile-ai-composer-card textarea {
@@ -563,7 +555,7 @@
     align-items: center;
     gap: 0.28rem;
     padding: 0 0.58rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-text-secondary);
@@ -598,15 +590,15 @@
     box-sizing: border-box;
     padding: 0;
     place-items: center;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
+    border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg-elevated);
+    background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
     font-size: 1.48rem;
     line-height: 1;
     cursor: pointer;
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 72%, transparent);
+    box-shadow: var(--mobile-inset-highlight-soft);
     touch-action: manipulation;
 }
 
@@ -672,9 +664,9 @@
     justify-content: center;
     gap: 0.14rem;
     padding: 0.45rem 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 74%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent);
     color: var(--fc-color-text-secondary);
     font: inherit;
     cursor: pointer;
@@ -723,9 +715,9 @@
     justify-content: center;
     gap: 0.35rem;
     padding: 0.55rem 0.25rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent);
     color: var(--fc-color-text-secondary);
     font: inherit;
     font-size: var(--fc-font-size-xs);
@@ -749,9 +741,9 @@
     gap: 1rem;
     margin-bottom: 0.75rem;
     padding: 0.7rem 0.85rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    border-radius: 1.1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent);
     color: var(--fc-color-text);
     font: inherit;
     text-align: left;
@@ -802,8 +794,8 @@
     width: 1.2rem;
     height: 1.2rem;
     border-radius: var(--fc-radius-full);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: 0 0.12rem 0.35rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    background: var(--mobile-surface-raised);
+    box-shadow: var(--fc-shadow-xs);
     content: "";
     transition: transform 100ms ease;
 }
@@ -851,9 +843,9 @@
 .mobile-ai-setting-prompt textarea {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
-    border-radius: 0.9rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 78%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-field);
+    background: var(--mobile-surface-translucent);
     color: var(--fc-color-text);
     font: inherit;
 }
@@ -875,9 +867,9 @@
     flex-direction: column;
     gap: 0.55rem;
     padding: 0.62rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 72%, transparent);
+    border: var(--mobile-border);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-translucent);
 }
 
 .mobile-ai-setting-toggle {

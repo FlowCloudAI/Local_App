@@ -46,7 +46,7 @@
 
 .mobile-type-tag__empty {
     min-height: 5rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
+    border: var(--mobile-border-strong);
+    border-radius: var(--mobile-radius-card);
+    background: var(--mobile-surface-muted-soft);
 }
