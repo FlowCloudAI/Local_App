@@ -6,8 +6,6 @@ import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'
 import {
     type CSSProperties,
-    type MouseEvent as ReactMouseEvent,
-    type PointerEvent as ReactPointerEvent,
     useCallback,
     useEffect,
     useMemo,
@@ -39,6 +37,7 @@ import MobileProjectList from './pages/MobileProjectList'
 import MobileSettings from './pages/MobileSettings'
 import MobileTypeTagManager from './pages/MobileTypeTagManager'
 import {type MobilePage, usePageStack} from './usePageStack'
+import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 
 interface MobileAppProps {
     platformInfo: PlatformInfo
@@ -46,15 +45,6 @@ interface MobileAppProps {
 
 let mobileWindowShown = false
 type MobileBeforeBack = () => boolean | Promise<boolean>
-
-interface CategoryDrawerDragState {
-    pointerId: number
-    startX: number
-    startY: number
-    baseOffset: number
-    latestOffset: number
-    tracking: boolean
-}
 
 type PageProps = {
     push: (page: MobilePage) => void
@@ -64,21 +54,6 @@ type PageProps = {
     setBeforeBack: (handler: MobileBeforeBack | null) => void
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
-}
-
-function clamp(value: number, min: number, max: number): number {
-    return Math.min(max, Math.max(min, value))
-}
-
-function getCategoryDrawerWidth(): number {
-    if (typeof window === 'undefined') return 320
-    const width = window.innerWidth || 360
-    return clamp(width - 54, 260, 360)
-}
-
-function isTextEditingTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) return false
-    return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 }
 
 export default function MobileApp({platformInfo}: MobileAppProps) {
@@ -107,15 +82,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
-    const [categoryDrawerOpen, setCategoryDrawerOpen] = useState(false)
-    const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getCategoryDrawerWidth)
-    const [categoryDrawerOffset, setCategoryDrawerOffset] = useState<number | null>(null)
-    const [categoryDrawerDragging, setCategoryDrawerDragging] = useState(false)
+    const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
     const [categoryDrawerCategories, setCategoryDrawerCategories] = useState<Category[]>([])
     const [categoryDrawerStats, setCategoryDrawerStats] = useState<ProjectStats | null>(null)
-    const categoryDrawerDragRef = useRef<CategoryDrawerDragState | null>(null)
-    const categoryDrawerDragElementRef = useRef<HTMLElement | null>(null)
-    const suppressCategoryDrawerClickRef = useRef(false)
 
     const categoryDrawerProjectId = activeTab === 'home'
         && (pageType === 'projectHome' || pageType === 'entryList')
@@ -125,6 +94,17 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const aiConversationDrawerEnabled = activeTab === 'ai'
     const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled
     const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : null
+    const {
+        open: sideDrawerOpen,
+        dragging: sideDrawerDragging,
+        surfaceOffset: sideDrawerSurfaceOffset,
+        openDrawer: openSideDrawer,
+        closeDrawer: closeSideDrawer,
+        pointerHandlers: sideDrawerPointerHandlers,
+    } = useMobileSideDrawerGesture({
+        enabled: mobileSideDrawerEnabled,
+        width: categoryDrawerWidth,
+    })
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
         if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'all'}
         if (currentPage.params.uncategorizedOnly) return {kind: 'uncategorized'}
@@ -155,7 +135,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     useEffect(() => {
         const updateCategoryDrawerWidth = () => {
-            setCategoryDrawerWidth(getCategoryDrawerWidth())
+            setCategoryDrawerWidth(getMobileSideDrawerWidth())
         }
         updateCategoryDrawerWidth()
         window.addEventListener('resize', updateCategoryDrawerWidth)
@@ -165,16 +145,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             window.visualViewport?.removeEventListener('resize', updateCategoryDrawerWidth)
         }
     }, [])
-
-    useEffect(() => {
-        if (!mobileSideDrawerEnabled) {
-            setCategoryDrawerOpen(false)
-            setCategoryDrawerOffset(null)
-            setCategoryDrawerDragging(false)
-            categoryDrawerDragRef.current = null
-            return
-        }
-    }, [mobileSideDrawerEnabled])
 
     useEffect(() => {
         if (!categoryDrawerProjectId) {
@@ -212,24 +182,18 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }), [activeTab, stacks])
 
     const closeCategoryDrawer = useCallback(() => {
-        setCategoryDrawerOpen(false)
-        setCategoryDrawerOffset(null)
-        setCategoryDrawerDragging(false)
-        categoryDrawerDragRef.current = null
-        categoryDrawerDragElementRef.current = null
-    }, [])
+        closeSideDrawer()
+    }, [closeSideDrawer])
 
     const openCategoryDrawer = useCallback(() => {
         if (!categoryDrawerEnabled) return
-        setCategoryDrawerOffset(null)
-        setCategoryDrawerOpen(true)
-    }, [categoryDrawerEnabled])
+        openSideDrawer()
+    }, [categoryDrawerEnabled, openSideDrawer])
 
     const openAiConversationDrawer = useCallback(() => {
         if (!aiConversationDrawerEnabled) return
-        setCategoryDrawerOffset(null)
-        setCategoryDrawerOpen(true)
-    }, [aiConversationDrawerEnabled])
+        openSideDrawer()
+    }, [aiConversationDrawerEnabled, openSideDrawer])
 
     const refreshCategoryDrawer = useCallback(async () => {
         if (!categoryDrawerProjectId) return
@@ -265,150 +229,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
-    const cancelCategoryDrawerDrag = useCallback((
-        pointerId: number,
-        reason: string,
-        detail?: Record<string, unknown>,
-    ) => {
-        logger.info('[移动端分类抽屉手势] 取消', {
-            pointerId,
-            reason,
-            ...detail,
-        })
-        categoryDrawerDragRef.current = null
-        const dragElement = categoryDrawerDragElementRef.current
-        if (dragElement?.hasPointerCapture(pointerId)) {
-            dragElement.releasePointerCapture(pointerId)
-        }
-        categoryDrawerDragElementRef.current = null
-    }, [])
-
-    const handleCategoryDrawerPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        if (!mobileSideDrawerEnabled) return
-        if (!event.isPrimary) return
-        if (event.pointerType === 'mouse' && event.button !== 0) return
-        if (isTextEditingTarget(event.target)) return
-
-        const dragElement = event.currentTarget
-        categoryDrawerDragElementRef.current = dragElement
-        categoryDrawerDragRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            baseOffset: categoryDrawerOpen ? categoryDrawerWidth : 0,
-            latestOffset: categoryDrawerOpen ? categoryDrawerWidth : 0,
-            tracking: false,
-        }
-        dragElement.setPointerCapture(event.pointerId)
-        logger.info('[移动端分类抽屉手势] 按下', {
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            open: categoryDrawerOpen,
-            drawerWidth: categoryDrawerWidth,
-            startX: Math.round(event.clientX),
-            startY: Math.round(event.clientY),
-            target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
-            area: dragElement.className,
-        })
-    }, [categoryDrawerOpen, categoryDrawerWidth, mobileSideDrawerEnabled])
-
-    const handleCategoryDrawerPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = categoryDrawerDragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-
-        const dx = event.clientX - dragState.startX
-        const dy = event.clientY - dragState.startY
-        const horizontal = Math.abs(dx)
-        const vertical = Math.abs(dy)
-
-        if (!dragState.tracking) {
-            if (vertical > 16 && vertical > horizontal) {
-                cancelCategoryDrawerDrag(event.pointerId, '判定为竖向滚动', {
-                    dx: Math.round(dx),
-                    dy: Math.round(dy),
-                    horizontal: Math.round(horizontal),
-                    vertical: Math.round(vertical),
-                })
-                return
-            }
-            if (horizontal < 8 || horizontal < vertical * 1.25) return
-            if (!categoryDrawerOpen && dx < 0) {
-                cancelCategoryDrawerDrag(event.pointerId, '关闭状态下左滑', {
-                    dx: Math.round(dx),
-                    dy: Math.round(dy),
-                    horizontal: Math.round(horizontal),
-                    vertical: Math.round(vertical),
-                })
-                return
-            }
-            dragState.tracking = true
-            setCategoryDrawerDragging(true)
-            logger.info('[移动端分类抽屉手势] 开始识别', {
-                pointerId: event.pointerId,
-                open: categoryDrawerOpen,
-                dx: Math.round(dx),
-                dy: Math.round(dy),
-                horizontal: Math.round(horizontal),
-                vertical: Math.round(vertical),
-                baseOffset: Math.round(dragState.baseOffset),
-                drawerWidth: Math.round(categoryDrawerWidth),
-            })
-        }
-
-        event.preventDefault()
-        const nextOffset = clamp(dragState.baseOffset + dx, 0, categoryDrawerWidth)
-        dragState.latestOffset = nextOffset
-        setCategoryDrawerOffset(nextOffset)
-    }, [cancelCategoryDrawerDrag, categoryDrawerOpen, categoryDrawerWidth])
-
-    const finishCategoryDrawerDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = categoryDrawerDragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-
-        const currentOffset = dragState.latestOffset
-        const dragDistance = currentOffset - dragState.baseOffset
-        const openDistance = 6
-        const closeDistance = 12
-        const shouldOpen = dragState.tracking
-            ? categoryDrawerOpen
-                ? dragDistance > -closeDistance
-                : dragDistance >= openDistance
-            : categoryDrawerOpen
-        logger.info('[移动端分类抽屉手势] 结算', {
-            pointerId: event.pointerId,
-            tracking: dragState.tracking,
-            openBefore: categoryDrawerOpen,
-            shouldOpen,
-            currentOffset: Math.round(currentOffset),
-            dragDistance: Math.round(dragDistance),
-            openDistance: Math.round(openDistance),
-            closeDistance: Math.round(closeDistance),
-            drawerWidth: Math.round(categoryDrawerWidth),
-        })
-        if (dragState.tracking) {
-            suppressCategoryDrawerClickRef.current = true
-            window.setTimeout(() => {
-                suppressCategoryDrawerClickRef.current = false
-            }, 180)
-        }
-        categoryDrawerDragRef.current = null
-        setCategoryDrawerOffset(null)
-        setCategoryDrawerDragging(false)
-        setCategoryDrawerOpen(shouldOpen)
-
-        const dragElement = categoryDrawerDragElementRef.current
-        if (dragElement?.hasPointerCapture(event.pointerId)) {
-            dragElement.releasePointerCapture(event.pointerId)
-        }
-        categoryDrawerDragElementRef.current = null
-    }, [categoryDrawerOpen, categoryDrawerWidth])
-
-    const handleCategoryDrawerClickCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-        if (!suppressCategoryDrawerClickRef.current) return
-        event.preventDefault()
-        event.stopPropagation()
-    }, [])
-
     const handleTabChange = useCallback((tab: MobileTab) => {
         closeCategoryDrawer()
         setActiveTab(tab)
@@ -421,7 +241,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const handleBack = useCallback(() => {
         // 有浮层打开时，返回优先关闭浮层，而非回退页面/退出应用。
         if (closeTopOverlay()) return
-        if (categoryDrawerOpen) {
+        if (sideDrawerOpen) {
             closeCategoryDrawer()
             return
         }
@@ -447,7 +267,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 }
             }
         })()
-    }, [activeStack, categoryDrawerOpen, closeCategoryDrawer, showAlert])
+    }, [activeStack, closeCategoryDrawer, showAlert, sideDrawerOpen])
 
     useEffect(() => {
         const handleAndroidBack = () => {
@@ -490,26 +310,19 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         )
     }
 
-    const categoryDrawerSurfaceOffset = categoryDrawerOffset ?? (categoryDrawerOpen ? categoryDrawerWidth : 0)
-
     return (
         <div className="mobile-app">
             <div
-                className={`mobile-app-category-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${categoryDrawerOpen ? ' is-open' : ''}${categoryDrawerDragging ? ' is-dragging' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-category-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-dragging' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
-                    '--mobile-entry-drawer-shift': `${categoryDrawerSurfaceOffset}px`,
+                    '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,
                 } as CSSProperties}
             >
                 {mobileSideDrawerEnabled && (
                     <div
                         className="mobile-app-category-shell__drawer"
-                        onPointerDown={handleCategoryDrawerPointerDown}
-                        onPointerMove={handleCategoryDrawerPointerMove}
-                        onPointerUp={finishCategoryDrawerDrag}
-                        onPointerCancel={finishCategoryDrawerDrag}
-                        onPointerLeave={finishCategoryDrawerDrag}
-                        onClickCapture={handleCategoryDrawerClickCapture}
+                        {...sideDrawerPointerHandlers}
                     >
                         {categoryDrawerEnabled ? (
                             <MobileCategoryDrawer
@@ -527,18 +340,13 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 )}
                 <div
                     className="mobile-app-category-shell__surface"
-                    onPointerDown={handleCategoryDrawerPointerDown}
-                    onPointerMove={handleCategoryDrawerPointerMove}
-                    onPointerUp={finishCategoryDrawerDrag}
-                    onPointerCancel={finishCategoryDrawerDrag}
-                    onPointerLeave={finishCategoryDrawerDrag}
-                    onClickCapture={handleCategoryDrawerClickCapture}
+                    {...sideDrawerPointerHandlers}
                 >
                     <button
                         type="button"
                         className="mobile-app-category-shell__surface-close"
                         aria-label={mobileSideDrawerKind === 'ai' ? '关闭对话列表' : '关闭分类树'}
-                        tabIndex={categoryDrawerOpen ? 0 : -1}
+                        tabIndex={sideDrawerOpen ? 0 : -1}
                         onClick={closeCategoryDrawer}
                     />
                     <div className="mobile-app__content">
@@ -559,7 +367,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     <MobileProjectHome
                                         {...pageProps}
                                         params={currentPage.params}
-                                        categoryDrawerOpen={categoryDrawerOpen}
+                                        categoryDrawerOpen={sideDrawerOpen}
                                         onOpenCategoryDrawer={openCategoryDrawer}
                                     />
                                 )}
@@ -567,7 +375,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     <MobileEntryList
                                         {...pageProps}
                                         params={currentPage.params}
-                                        categoryDrawerOpen={categoryDrawerOpen}
+                                        categoryDrawerOpen={sideDrawerOpen}
                                         onOpenCategoryDrawer={openCategoryDrawer}
                                     />
                                 )}
@@ -587,7 +395,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         {activeTab === 'ai' && (
                             <MobileAiChat
                                 {...pageProps}
-                                conversationDrawerOpen={categoryDrawerOpen && aiConversationDrawerEnabled}
+                                conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
                                 onOpenConversationDrawer={openAiConversationDrawer}
                                 onCloseConversationDrawer={closeCategoryDrawer}
                             />
