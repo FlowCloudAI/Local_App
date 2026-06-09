@@ -999,7 +999,7 @@ export default function MobileAiChat({
                     <button
                         ref={modelMenuRef}
                         type="button"
-                        className="mobile-ai-model-pill"
+                        className={`mobile-ai-model-pill${modelMenuOpen ? ' mobile-ai-model-pill--expanded' : ''}`}
                         aria-haspopup="menu"
                         aria-expanded={modelMenuOpen}
                         disabled={pluginsLoading}

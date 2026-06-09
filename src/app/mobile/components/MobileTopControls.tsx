@@ -46,10 +46,11 @@ export interface MobileTopActionPillProps {
 
 export const MobileTopActionPill = forwardRef<HTMLDivElement, MobileTopActionPillProps>(
     function MobileTopActionPill({actions, className}, ref) {
+        const expanded = actions.some(action => action.ariaExpanded)
         return (
             <div
                 ref={ref}
-                className={`mobile-top-action-pill${className ? ` ${className}` : ''}`}
+                className={`mobile-top-action-pill${expanded ? ' mobile-top-action-pill--expanded' : ''}${className ? ` ${className}` : ''}`}
             >
                 {actions.map(action => (
                     <button

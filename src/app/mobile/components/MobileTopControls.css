@@ -56,6 +56,12 @@
     box-shadow:
         0 0.25rem 0.9rem color-mix(in srgb, var(--fc-color-text) 7%, transparent),
         inset 0 1px 0 color-mix(in srgb, var(--fc-color-text-on-primary) 75%, transparent);
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.mobile-top-action-pill--expanded {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .mobile-top-action-pill__button {
