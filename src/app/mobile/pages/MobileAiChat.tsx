@@ -62,6 +62,18 @@ interface MorePanelDragState {
     tracking: boolean
 }
 
+interface ConversationLongPressState {
+    pointerId: number
+    conversation: Conversation
+    startX: number
+    startY: number
+    ready: boolean
+    timerId: number | null
+}
+
+const CONVERSATION_LONG_PRESS_DELAY = 430
+const CONVERSATION_LONG_PRESS_MOVE_TOLERANCE = 12
+
 function formatConversationDate(timestamp: number): string {
     if (!timestamp) return '时间未知'
     return new Intl.DateTimeFormat('zh-CN', {
@@ -290,6 +302,8 @@ export default function MobileAiChat({
     const [renaming, setRenaming] = useState(false)
     const morePanelCloseTimerRef = useRef<number | null>(null)
     const morePanelDragRef = useRef<MorePanelDragState | null>(null)
+    const conversationLongPressRef = useRef<ConversationLongPressState | null>(null)
+    const suppressConversationClickRef = useRef(false)
 
     const activeConversation = useMemo(
         () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
@@ -393,6 +407,10 @@ export default function MobileAiChat({
         return () => {
             if (morePanelCloseTimerRef.current !== null) {
                 window.clearTimeout(morePanelCloseTimerRef.current)
+            }
+            const conversationLongPress = conversationLongPressRef.current
+            if (conversationLongPress?.timerId != null) {
+                window.clearTimeout(conversationLongPress.timerId)
             }
         }
     }, [])
@@ -617,6 +635,79 @@ export default function MobileAiChat({
         await switchConversation(convId)
         onCloseConversationDrawer?.()
     }, [onCloseConversationDrawer, switchConversation])
+
+    const clearConversationLongPress = useCallback(() => {
+        const state = conversationLongPressRef.current
+        if (state?.timerId != null) {
+            window.clearTimeout(state.timerId)
+        }
+        conversationLongPressRef.current = null
+    }, [])
+
+    const handleConversationItemClick = useCallback((convId: string) => {
+        if (suppressConversationClickRef.current) {
+            suppressConversationClickRef.current = false
+            return
+        }
+        void handleSelectConv(convId)
+    }, [handleSelectConv])
+
+    const handleConversationLongPressStart = useCallback((
+        conversation: Conversation,
+        event: ReactPointerEvent<HTMLButtonElement>,
+    ) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return
+        clearConversationLongPress()
+
+        const pointerId = event.pointerId
+        const state: ConversationLongPressState = {
+            pointerId,
+            conversation,
+            startX: event.clientX,
+            startY: event.clientY,
+            ready: false,
+            timerId: null,
+        }
+        state.timerId = window.setTimeout(() => {
+            const current = conversationLongPressRef.current
+            if (!current || current.pointerId !== pointerId) return
+            current.ready = true
+            current.timerId = null
+        }, CONVERSATION_LONG_PRESS_DELAY)
+        conversationLongPressRef.current = state
+        event.currentTarget.setPointerCapture?.(pointerId)
+    }, [clearConversationLongPress])
+
+    const handleConversationLongPressMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+        const state = conversationLongPressRef.current
+        if (!state || state.pointerId !== event.pointerId) return
+        const dx = Math.abs(event.clientX - state.startX)
+        const dy = Math.abs(event.clientY - state.startY)
+        if (dx > CONVERSATION_LONG_PRESS_MOVE_TOLERANCE || dy > CONVERSATION_LONG_PRESS_MOVE_TOLERANCE) {
+            clearConversationLongPress()
+        }
+    }, [clearConversationLongPress])
+
+    const handleConversationLongPressEnd = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+        const state = conversationLongPressRef.current
+        if (!state || state.pointerId !== event.pointerId) return
+        const shouldOpenMenu = state.ready
+        clearConversationLongPress()
+        if (!shouldOpenMenu) return
+        event.preventDefault()
+        event.stopPropagation()
+        suppressConversationClickRef.current = true
+        setConversationActionTarget(state.conversation)
+    }, [clearConversationLongPress])
+
+    const handleConversationContextMenu = useCallback((
+        conversation: Conversation,
+        event: ReactMouseEvent<HTMLButtonElement>,
+    ) => {
+        event.preventDefault()
+        suppressConversationClickRef.current = true
+        setConversationActionTarget(conversation)
+    }, [])
 
     const handleDeleteConv = useCallback(async (convId: string, event?: ReactMouseEvent) => {
         event?.stopPropagation()
@@ -940,11 +1031,16 @@ export default function MobileAiChat({
                             <button
                                 type="button"
                                 className="mobile-ai-drawer__item-content"
-                                onClick={() => void handleSelectConv(conversation.id)}
+                                onClick={() => handleConversationItemClick(conversation.id)}
+                                onPointerDown={event => handleConversationLongPressStart(conversation, event)}
+                                onPointerMove={handleConversationLongPressMove}
+                                onPointerUp={handleConversationLongPressEnd}
+                                onPointerCancel={clearConversationLongPress}
+                                onContextMenu={event => handleConversationContextMenu(conversation, event)}
                             >
                                 <span className="mobile-ai-drawer__item-main">
                                     <strong>{conversation.title}</strong>
-                                    <small>{tags || `${conversation.messages.length} 条消息`}</small>
+                                    {tags ? <small>{tags}</small> : null}
                                 </span>
                                 <span className="mobile-ai-drawer__item-meta">
                                     {formatConversationDate(conversation.timestamp)}
