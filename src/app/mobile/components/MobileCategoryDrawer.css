@@ -9,8 +9,7 @@
         max(1.85rem, calc(0.75rem + env(safe-area-inset-top, 0)))
         0.85rem
         calc(1.25rem + env(safe-area-inset-bottom, 0));
-    background:
-        linear-gradient(90deg, color-mix(in srgb, var(--fc-color-bg-secondary) 88%, var(--fc-color-bg)) 0%, var(--fc-color-bg) 100%);
+    background: var(--fc-color-bg-secondary);
     color: var(--fc-color-text);
 }
 
