@@ -1,5 +1,4 @@
 import {
-    type CSSProperties,
     type MouseEvent as ReactMouseEvent,
     type PointerEvent as ReactPointerEvent,
     useCallback,
@@ -35,6 +34,7 @@ import {
     MobileTopActionPill,
     MobileTopIconButton,
 } from '../components/MobileTopControls'
+import MobileBottomSheet from '../components/MobileBottomSheet'
 import './MobileAiChat.css'
 
 interface Props {
@@ -48,19 +48,6 @@ interface Props {
 type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
 type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
-type MobileAiMoreSheetStyle = CSSProperties & {'--mobile-ai-more-drag-offset'?: string}
-
-interface MorePanelDragState {
-    pointerId: number
-    startX: number
-    startY: number
-    startScrollTop: number
-    lastY: number
-    lastTime: number
-    velocityY: number
-    currentOffset: number
-    tracking: boolean
-}
 
 interface ConversationLongPressState {
     pointerId: number
@@ -271,7 +258,6 @@ export default function MobileAiChat({
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
-    const morePanelSheetRef = useRef<HTMLElement | null>(null)
 
     const controller = useAiController(aiFocus)
     const {
@@ -293,15 +279,9 @@ export default function MobileAiChat({
     const [drawerRoot, setDrawerRoot] = useState<HTMLElement | null>(null)
     const [topMenuOpen, setTopMenuOpen] = useState(false)
     const [morePanelOpen, setMorePanelOpen] = useState(false)
-    const [morePanelMounted, setMorePanelMounted] = useState(false)
-    const [morePanelClosing, setMorePanelClosing] = useState(false)
-    const [morePanelDragging, setMorePanelDragging] = useState(false)
-    const [morePanelDragOffset, setMorePanelDragOffset] = useState(0)
     const [renameTarget, setRenameTarget] = useState<Conversation | null>(null)
     const [conversationActionTarget, setConversationActionTarget] = useState<Conversation | null>(null)
     const [renaming, setRenaming] = useState(false)
-    const morePanelCloseTimerRef = useRef<number | null>(null)
-    const morePanelDragRef = useRef<MorePanelDragState | null>(null)
     const conversationLongPressRef = useRef<ConversationLongPressState | null>(null)
     const suppressConversationClickRef = useRef(false)
 
@@ -398,16 +378,7 @@ export default function MobileAiChat({
     }, [conversationDrawerOpen])
 
     useEffect(() => {
-        if (!morePanelOpen) return
-        setMorePanelMounted(true)
-        setMorePanelClosing(false)
-    }, [morePanelOpen])
-
-    useEffect(() => {
         return () => {
-            if (morePanelCloseTimerRef.current !== null) {
-                window.clearTimeout(morePanelCloseTimerRef.current)
-            }
             const conversationLongPress = conversationLongPressRef.current
             if (conversationLongPress?.timerId != null) {
                 window.clearTimeout(conversationLongPress.timerId)
@@ -465,108 +436,11 @@ export default function MobileAiChat({
     }, [setToolAccessMode, toolAccessMode])
 
     const openMorePanel = useCallback(() => {
-        if (morePanelCloseTimerRef.current !== null) {
-            window.clearTimeout(morePanelCloseTimerRef.current)
-            morePanelCloseTimerRef.current = null
-        }
-        morePanelDragRef.current = null
-        setMorePanelDragOffset(0)
-        setMorePanelDragging(false)
-        setMorePanelMounted(true)
-        setMorePanelClosing(false)
         setMorePanelOpen(true)
     }, [])
 
     const closeMorePanel = useCallback(() => {
-        if (!morePanelOpen && !morePanelMounted) return
-        if (morePanelCloseTimerRef.current !== null) {
-            window.clearTimeout(morePanelCloseTimerRef.current)
-        }
         setMorePanelOpen(false)
-        setMorePanelClosing(true)
-        morePanelCloseTimerRef.current = window.setTimeout(() => {
-            setMorePanelMounted(false)
-            setMorePanelClosing(false)
-            setMorePanelDragging(false)
-            setMorePanelDragOffset(0)
-            morePanelDragRef.current = null
-            morePanelCloseTimerRef.current = null
-        }, 100)
-    }, [morePanelMounted, morePanelOpen])
-
-    const handleMorePanelPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        if (morePanelClosing || !morePanelMounted) return
-        if (event.pointerType === 'mouse' && event.button !== 0) return
-        const sheet = morePanelSheetRef.current
-        if (!sheet) return
-        morePanelDragRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            startScrollTop: sheet.scrollTop,
-            lastY: event.clientY,
-            lastTime: window.performance.now(),
-            velocityY: 0,
-            currentOffset: 0,
-            tracking: false,
-        }
-    }, [morePanelClosing, morePanelMounted])
-
-    const handleMorePanelPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = morePanelDragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        const sheet = morePanelSheetRef.current
-        if (!sheet) return
-
-        const dx = event.clientX - dragState.startX
-        const dy = event.clientY - dragState.startY
-        const horizontal = Math.abs(dx)
-        const vertical = Math.abs(dy)
-        const now = window.performance.now()
-        const elapsed = Math.max(now - dragState.lastTime, 1)
-        dragState.velocityY = (event.clientY - dragState.lastY) / elapsed
-        dragState.lastY = event.clientY
-        dragState.lastTime = now
-
-        if (!dragState.tracking) {
-            if (horizontal < 6 && vertical < 6) return
-            if (dy <= 0 || horizontal > vertical * 1.1) {
-                morePanelDragRef.current = null
-                return
-            }
-            if (dragState.startScrollTop > 0 || sheet.scrollTop > 0) return
-            dragState.tracking = true
-            setMorePanelDragging(true)
-            event.currentTarget.setPointerCapture?.(event.pointerId)
-        }
-
-        event.preventDefault()
-        const nextOffset = Math.max(0, Math.min(dy, window.innerHeight * 0.45))
-        dragState.currentOffset = nextOffset
-        setMorePanelDragOffset(nextOffset)
-    }, [])
-
-    const handleMorePanelPointerUp = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = morePanelDragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        event.currentTarget.releasePointerCapture?.(event.pointerId)
-        morePanelDragRef.current = null
-        setMorePanelDragging(false)
-
-        if (dragState.tracking && (dragState.currentOffset > 68 || dragState.velocityY > 0.45)) {
-            closeMorePanel()
-            return
-        }
-        setMorePanelDragOffset(0)
-    }, [closeMorePanel])
-
-    const handleMorePanelPointerCancel = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = morePanelDragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        event.currentTarget.releasePointerCapture?.(event.pointerId)
-        morePanelDragRef.current = null
-        setMorePanelDragging(false)
-        setMorePanelDragOffset(0)
     }, [])
 
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings>(
@@ -1062,9 +936,6 @@ export default function MobileAiChat({
             </div>
         </aside>
     )
-    const morePanelSheetStyle: CSSProperties | undefined = morePanelDragOffset > 0
-        ? ({'--mobile-ai-more-drag-offset': `${morePanelDragOffset}px`} as MobileAiMoreSheetStyle)
-        : undefined
 
     return (
         <div ref={pageRef} className="mobile-ai-chat">
@@ -1189,8 +1060,8 @@ export default function MobileAiChat({
                                 type="button"
                                 className="mobile-ai-composer-card__icon-btn"
                                 aria-label="更多"
-                                aria-expanded={morePanelMounted}
-                                onClick={morePanelMounted ? closeMorePanel : openMorePanel}
+                                aria-expanded={morePanelOpen}
+                                onClick={morePanelOpen ? closeMorePanel : openMorePanel}
                             >
                                 +
                             </button>
@@ -1217,76 +1088,60 @@ export default function MobileAiChat({
                 items={activeConversationMenuItems}
             />
 
-            {morePanelMounted && typeof document !== 'undefined' ? createPortal(
-                <div
-                    className={`mobile-ai-more-layer${morePanelClosing ? ' is-closing' : ''}`}
-                    role="presentation"
-                    onPointerDown={event => {
-                        if (event.target === event.currentTarget) closeMorePanel()
-                    }}
+            <MobileBottomSheet
+                open={morePanelOpen}
+                onClose={closeMorePanel}
+                ariaLabel="更多对话设置"
+                className="mobile-ai-more-sheet"
+            >
+                <div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
+                    <button type="button" onClick={() => handleUnavailableMobileAiTool('相机')}>
+                        <MobileAiIcon type="camera"/>
+                        <span>相机</span>
+                    </button>
+                    <button type="button" onClick={() => handleUnavailableMobileAiTool('图库')}>
+                        <MobileAiIcon type="image"/>
+                        <span>图库</span>
+                    </button>
+                    <button type="button" onClick={() => handleUnavailableMobileAiTool('文件')}>
+                        <MobileAiIcon type="file"/>
+                        <span>文件</span>
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    className={`mobile-ai-more-switch${webSearchEnabled ? ' active' : ''}`}
+                    aria-pressed={webSearchEnabled}
+                    onClick={() => void toggleWebSearch()}
                 >
-                    <section
-                        ref={morePanelSheetRef}
-                        className={`mobile-ai-more-sheet${morePanelDragging ? ' is-dragging' : ''}`}
-                        style={morePanelSheetStyle}
-                        aria-label="更多对话设置"
-                        onPointerDown={handleMorePanelPointerDown}
-                        onPointerMove={handleMorePanelPointerMove}
-                        onPointerUp={handleMorePanelPointerUp}
-                        onPointerCancel={handleMorePanelPointerCancel}
-                    >
-                        <div className="mobile-ai-more-sheet__handle" aria-hidden="true"/>
-                        <div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
-                            <button type="button" onClick={() => handleUnavailableMobileAiTool('相机')}>
-                                <MobileAiIcon type="camera"/>
-                                <span>相机</span>
+                    <span className="mobile-ai-more-switch__main">
+                        <MobileAiIcon type="web"/>
+                        <span>
+                            <strong>联网搜索</strong>
+                            <small>允许 AI 调用联网搜索工具</small>
+                        </span>
+                    </span>
+                    <span className="mobile-ai-more-switch__toggle" aria-hidden="true"/>
+                </button>
+                <div className="mobile-ai-more-mode" aria-label="模式切换">
+                    <div className="mobile-ai-tool-mode-options">
+                        {toolModeOptions.map(option => (
+                            <button
+                                key={option.mode}
+                                type="button"
+                                className={`mobile-ai-tool-mode-option${toolAccessMode === option.mode ? ' active' : ''}`}
+                                aria-pressed={toolAccessMode === option.mode}
+                                disabled={option.disabled || isStreaming}
+                                onClick={() => void handleToolModeChange(option.mode)}
+                            >
+                                <span>{option.label}</span>
+                                <small>{option.description}</small>
                             </button>
-                            <button type="button" onClick={() => handleUnavailableMobileAiTool('图库')}>
-                                <MobileAiIcon type="image"/>
-                                <span>图库</span>
-                            </button>
-                            <button type="button" onClick={() => handleUnavailableMobileAiTool('文件')}>
-                                <MobileAiIcon type="file"/>
-                                <span>文件</span>
-                            </button>
-                        </div>
-                        <button
-                            type="button"
-                            className={`mobile-ai-more-switch${webSearchEnabled ? ' active' : ''}`}
-                            aria-pressed={webSearchEnabled}
-                            onClick={() => void toggleWebSearch()}
-                        >
-                            <span className="mobile-ai-more-switch__main">
-                                <MobileAiIcon type="web"/>
-                                <span>
-                                    <strong>联网搜索</strong>
-                                    <small>允许 AI 调用联网搜索工具</small>
-                                </span>
-                            </span>
-                            <span className="mobile-ai-more-switch__toggle" aria-hidden="true"/>
-                        </button>
-                        <div className="mobile-ai-more-mode" aria-label="模式切换">
-                            <div className="mobile-ai-tool-mode-options">
-                                {toolModeOptions.map(option => (
-                                    <button
-                                        key={option.mode}
-                                        type="button"
-                                        className={`mobile-ai-tool-mode-option${toolAccessMode === option.mode ? ' active' : ''}`}
-                                        aria-pressed={toolAccessMode === option.mode}
-                                        disabled={option.disabled || isStreaming}
-                                        onClick={() => void handleToolModeChange(option.mode)}
-                                    >
-                                        <span>{option.label}</span>
-                                        <small>{option.description}</small>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        {conversationControls}
-                    </section>
-                </div>,
-                document.body,
-            ) : null}
+                        ))}
+                    </div>
+                </div>
+                {conversationControls}
+            </MobileBottomSheet>
 
             <ActionMenu
                 open={!!conversationActionTarget}
