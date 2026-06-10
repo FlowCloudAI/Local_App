@@ -364,7 +364,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const dragged = categoryById.get(draggedId)
         const targetCategory = categoryById.get(target.targetId)
         if (!dragged || !targetCategory) {
-            logger.warn('[移动端分类拖拽] 放弃移动：分类数据缺失', {
+            logger.info('[移动端分类拖拽] 放弃移动：分类数据缺失', {
                 draggedId,
                 targetId: target.targetId,
                 hasDragged: Boolean(dragged),
@@ -399,7 +399,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 .filter(category => category.id !== draggedId)
             const targetIndex = siblings.findIndex(category => category.id === target.targetId)
             if (targetIndex < 0) {
-                logger.warn('[移动端分类拖拽] 放弃移动：目标不在同级列表中', {
+                logger.info('[移动端分类拖拽] 放弃移动：目标不在同级列表中', {
                     draggedId,
                     targetId: target.targetId,
                     nextParentId,
@@ -416,7 +416,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
         const draggedOrder = orderMap.get(draggedId)
         if (draggedOrder === undefined) {
-            logger.warn('[移动端分类拖拽] 放弃移动：没有计算出拖拽项顺序', {
+            logger.info('[移动端分类拖拽] 放弃移动：没有计算出拖拽项顺序', {
                 draggedId,
                 target,
                 orders: Array.from(orderMap.entries()),
@@ -622,7 +622,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             target: nextTarget,
         })
         if (commit && !nextTarget) {
-            logger.warn('[移动端分类拖拽] 结算但没有有效目标', {
+            logger.info('[移动端分类拖拽] 结算但没有有效目标', {
                 pointerId,
                 draggedId,
                 reason,
