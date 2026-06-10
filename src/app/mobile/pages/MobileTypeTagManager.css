@@ -2,7 +2,7 @@
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-type-tag-header-top: 0.5rem;
     --mobile-type-tag-header-bottom: 0.95rem;
-    --mobile-type-tag-list-fade: 4rem;
+    --mobile-type-tag-list-fade: 3.8rem;
 
     display: flex;
     flex-direction: column;
