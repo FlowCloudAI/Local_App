@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button} from 'flowcloudai-ui'
 import {
     db_list_all_entry_types,
@@ -31,6 +31,9 @@ function tagTypeLabel(type: string): string {
  */
 export default function MobileTypeTagManager({params}: Props) {
     const projectId = params?.projectId as string
+    const initialSection = params?.section === 'tags' ? 'tags' : 'types'
+    const typeSectionRef = useRef<HTMLDivElement | null>(null)
+    const tagSectionRef = useRef<HTMLDivElement | null>(null)
 
     const [customTypes, setCustomTypes] = useState<CustomEntryType[]>([])
     const [allEntryTypes, setAllEntryTypes] = useState<EntryTypeView[]>([])
@@ -62,12 +65,22 @@ export default function MobileTypeTagManager({params}: Props) {
             .finally(() => setLoading(false))
     }, [reloadTypes, reloadTags])
 
+    useEffect(() => {
+        if (loading) return
+        const target = initialSection === 'tags' ? tagSectionRef.current : typeSectionRef.current
+        if (!target) return
+        const frame = window.requestAnimationFrame(() => {
+            target.scrollIntoView({block: 'start'})
+        })
+        return () => window.cancelAnimationFrame(frame)
+    }, [initialSection, loading])
+
     if (loading) return <div className="mobile-page__loading">加载中…</div>
 
     return (
         <div className="mobile-page mobile-type-tag">
             {/* 自定义类型 */}
-            <div className="mobile-type-tag__section-head">
+            <div className="mobile-type-tag__section-head" ref={typeSectionRef}>
                 <h3 className="mobile-type-tag__section-title">自定义类型（{customTypes.length}）</h3>
                 <Button type="button" size="sm" onClick={() => { setEditingType(null); setTypeCreatorOpen(true) }}>
                     + 新建类型
@@ -92,7 +105,7 @@ export default function MobileTypeTagManager({params}: Props) {
             </div>
 
             {/* 标签 */}
-            <div className="mobile-type-tag__section-head mobile-type-tag__section-head--gap">
+            <div className="mobile-type-tag__section-head mobile-type-tag__section-head--gap" ref={tagSectionRef}>
                 <h3 className="mobile-type-tag__section-title">标签（{tagSchemas.length}）</h3>
                 <Button type="button" size="sm" onClick={() => { setEditingTag(null); setTagCreatorOpen(true) }}>
                     + 新建标签

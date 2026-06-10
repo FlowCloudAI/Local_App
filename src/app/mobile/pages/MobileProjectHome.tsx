@@ -520,25 +520,31 @@ export default function MobileProjectHome({
                     <button
                         type="button"
                         className="mobile-project-home__cell"
-                        onClick={() => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}})}
+                        onClick={() => push({
+                            type: 'projectDefs',
+                            params: {projectId, displayName: '类型管理', section: 'types'},
+                        })}
                     >
                         <span>
-                            <strong>类型与标签</strong>
-                            <small>管理词条类型与标签定义</small>
+                            <strong>类型管理</strong>
+                            <small>管理自定义词条类型</small>
                         </span>
-                        <em>{entryTypes.length} / {tagSchemas.length}</em>
+                        <em>{entryTypes.length}</em>
                     </button>
 
                     <button
                         type="button"
                         className="mobile-project-home__cell"
-                        onClick={() => push({type: 'categoryManager', params: {projectId, displayName: '分类管理'}})}
+                        onClick={() => push({
+                            type: 'projectDefs',
+                            params: {projectId, displayName: '标签管理', section: 'tags'},
+                        })}
                     >
                         <span>
-                            <strong>分类管理</strong>
-                            <small>新建、重命名、移动或删除分类</small>
+                            <strong>标签管理</strong>
+                            <small>管理词条标签定义</small>
                         </span>
-                        <em>{formatNumber(categoryCount)}</em>
+                        <em>{tagSchemas.length}</em>
                     </button>
                 </div>
             </section>
