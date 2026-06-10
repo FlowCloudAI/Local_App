@@ -194,7 +194,7 @@ export default function MobileIdea({
                     aria-expanded={ideaDrawerOpen}
                     onClick={onOpenIdeaDrawer}
                 />
-                <div className="mobile-idea__title-pill">
+                <div className="mobile-idea__title-text">
                     <span>{controller.selectedIdea ? '编辑灵感' : '新灵感'}</span>
                     <small>{getSaveStateText(controller)}</small>
                 </div>

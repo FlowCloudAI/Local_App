@@ -31,36 +31,31 @@
     padding: 0.9rem clamp(1rem, 4vw, 1.35rem) 0.6rem;
 }
 
-.mobile-idea__title-pill {
+.mobile-idea__title-text {
     display: flex;
     min-width: 0;
-    height: 2.45rem;
     flex: 1 1 auto;
     flex-direction: column;
     justify-content: center;
     gap: 0.08rem;
-    padding: 0 1rem;
-    border: var(--mobile-border);
-    border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-control-soft);
+    padding: 0 0.25rem;
 }
 
-.mobile-idea__title-pill span,
-.mobile-idea__title-pill small {
+.mobile-idea__title-text span,
+.mobile-idea__title-text small {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.mobile-idea__title-pill span {
+.mobile-idea__title-text span {
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-sm);
     font-weight: 720;
     line-height: 1.1;
 }
 
-.mobile-idea__title-pill small {
+.mobile-idea__title-text small {
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     line-height: 1.1;
