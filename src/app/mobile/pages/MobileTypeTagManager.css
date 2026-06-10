@@ -1,8 +1,8 @@
 .mobile-type-tag {
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-type-tag-header-top: 0.5rem;
-    --mobile-type-tag-header-bottom: 0.95rem;
-    --mobile-type-tag-header-fade: 3.8rem;
+    --mobile-type-tag-header-bottom: 1.6rem;
+    --mobile-type-tag-header-fade: 5rem;
     --mobile-type-tag-scroll-reserve: 12rem;
 
     display: flex;
@@ -16,6 +16,7 @@
     position: sticky;
     z-index: 6;
     top: 0;
+    isolation: isolate;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -23,16 +24,30 @@
     min-height: 2.65rem;
     margin: 0 calc(var(--mobile-type-tag-page-x) * -1);
     padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-bottom);
+    background: transparent;
+    pointer-events: none;
+}
+
+.mobile-type-tag__topbar::before {
+    position: absolute;
+    z-index: 0;
+    top: 0;
+    right: 0;
+    bottom: calc(var(--mobile-type-tag-header-fade) * -1);
+    left: 0;
     background: linear-gradient(
         180deg,
         var(--fc-color-bg) 0%,
         var(--fc-color-bg) calc(100% - var(--mobile-type-tag-header-fade)),
         color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
     );
+    content: "";
     pointer-events: none;
 }
 
 .mobile-type-tag__topbar > * {
+    position: relative;
+    z-index: 1;
     pointer-events: auto;
 }
 
