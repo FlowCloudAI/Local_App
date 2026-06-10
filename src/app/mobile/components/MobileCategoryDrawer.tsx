@@ -8,6 +8,7 @@ import {
     useState,
 } from 'react'
 import {Button, Input, useAlert} from 'flowcloudai-ui'
+import {logger} from '../../../shared/logger'
 import {
     db_cascade_delete_category,
     db_create_category,
@@ -216,6 +217,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const listRef = useRef<HTMLDivElement | null>(null)
     const categoryNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     const dragStateRef = useRef<CategoryDragState | null>(null)
+    const dragElementRef = useRef<HTMLButtonElement | null>(null)
     const dropTargetRef = useRef<CategoryDropTarget | null>(null)
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
     const initialExpanded = useMemo(() => {
@@ -357,6 +359,12 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const dragged = categoryById.get(draggedId)
         const targetCategory = categoryById.get(target.targetId)
         if (!dragged || !targetCategory) return
+        logger.info('[移动端分类拖拽] 准备移动', {
+            draggedId,
+            targetId: target.targetId,
+            position: target.position,
+            oldParentId: dragged.parent_id ?? null,
+        })
 
         let nextParentId: string | null
         let orderMap: Map<string, number>
@@ -402,6 +410,12 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 }
             }
 
+            logger.info('[移动端分类拖拽] 提交移动', {
+                draggedId,
+                nextParentId,
+                updateCount: updates.length,
+                orders: Array.from(orderMap.entries()),
+            })
             if (updates.length === 0) return
             await Promise.all(updates)
             if (target.position === 'into') {
@@ -523,10 +537,42 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
     const clearDragState = useCallback(() => {
         dragStateRef.current = null
+        dragElementRef.current = null
         dropTargetRef.current = null
         setDraggingId(null)
         setDropTarget(null)
     }, [])
+
+    const updateDragTarget = useCallback((pointerY: number, draggedId: string) => {
+        scrollListDuringDrag(pointerY)
+        const nextTarget = getDropTarget(pointerY, draggedId)
+        dropTargetRef.current = nextTarget
+        setDropTarget(nextTarget)
+    }, [getDropTarget, scrollListDuringDrag])
+
+    const finishDrag = useCallback((pointerId: number, commit: boolean, reason: string) => {
+        const dragState = dragStateRef.current
+        if (!dragState || dragState.pointerId !== pointerId) return
+
+        const nextTarget = dropTargetRef.current
+        const draggedId = dragState.categoryId
+        const dragElement = dragElementRef.current
+        clearDragState()
+        if (dragElement?.hasPointerCapture(pointerId)) {
+            dragElement.releasePointerCapture(pointerId)
+        }
+
+        logger.info('[移动端分类拖拽] 结算', {
+            pointerId,
+            draggedId,
+            commit,
+            reason,
+            target: nextTarget,
+        })
+        if (commit && nextTarget) {
+            void handleMoveByDrop(draggedId, nextTarget)
+        }
+    }, [clearDragState, handleMoveByDrop])
 
     const handleDragPointerDown = useCallback((
         event: ReactPointerEvent<HTMLButtonElement>,
@@ -539,6 +585,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         event.preventDefault()
         event.stopPropagation()
         event.currentTarget.setPointerCapture(event.pointerId)
+        dragElementRef.current = event.currentTarget
         dragStateRef.current = {
             pointerId: event.pointerId,
             categoryId: category.id,
@@ -546,6 +593,11 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         setDraggingId(category.id)
         setDropTarget(null)
         dropTargetRef.current = null
+        logger.info('[移动端分类拖拽] 开始', {
+            pointerId: event.pointerId,
+            categoryId: category.id,
+            name: category.name,
+        })
     }, [busy, normalizedSearch])
 
     const handleDragPointerMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -554,11 +606,8 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
         event.preventDefault()
         event.stopPropagation()
-        scrollListDuringDrag(event.clientY)
-        const nextTarget = getDropTarget(event.clientY, dragState.categoryId)
-        dropTargetRef.current = nextTarget
-        setDropTarget(nextTarget)
-    }, [getDropTarget, scrollListDuringDrag])
+        updateDragTarget(event.clientY, dragState.categoryId)
+    }, [updateDragTarget])
 
     const handleDragPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
         const dragState = dragStateRef.current
@@ -566,15 +615,8 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
         event.preventDefault()
         event.stopPropagation()
-        const nextTarget = dropTargetRef.current
-        clearDragState()
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId)
-        }
-        if (nextTarget) {
-            void handleMoveByDrop(dragState.categoryId, nextTarget)
-        }
-    }, [clearDragState, handleMoveByDrop])
+        finishDrag(event.pointerId, true, 'react-pointerup')
+    }, [finishDrag])
 
     const handleDragPointerCancel = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
         const dragState = dragStateRef.current
@@ -582,11 +624,50 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
         event.preventDefault()
         event.stopPropagation()
-        clearDragState()
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId)
+        finishDrag(event.pointerId, false, 'react-pointercancel')
+    }, [finishDrag])
+
+    const handleDragLostPointerCapture = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+        const dragState = dragStateRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        finishDrag(event.pointerId, true, 'react-lostpointercapture')
+    }, [finishDrag])
+
+    useEffect(() => {
+        if (!draggingId) return
+
+        const handleWindowPointerMove = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            if (!dragState || dragState.pointerId !== event.pointerId) return
+
+            event.preventDefault()
+            updateDragTarget(event.clientY, dragState.categoryId)
         }
-    }, [clearDragState])
+        const handleWindowPointerUp = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            if (!dragState || dragState.pointerId !== event.pointerId) return
+            event.preventDefault()
+            finishDrag(event.pointerId, true, 'window-pointerup')
+        }
+        const handleWindowPointerCancel = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            if (!dragState || dragState.pointerId !== event.pointerId) return
+            event.preventDefault()
+            finishDrag(event.pointerId, false, 'window-pointercancel')
+        }
+
+        window.addEventListener('pointermove', handleWindowPointerMove, {passive: false})
+        window.addEventListener('pointerup', handleWindowPointerUp, {passive: false})
+        window.addEventListener('pointercancel', handleWindowPointerCancel, {passive: false})
+        return () => {
+            window.removeEventListener('pointermove', handleWindowPointerMove)
+            window.removeEventListener('pointerup', handleWindowPointerUp)
+            window.removeEventListener('pointercancel', handleWindowPointerCancel)
+        }
+    }, [draggingId, finishDrag, updateDragTarget])
 
     return (
         <aside className="mobile-category-drawer" aria-label="分类树">
@@ -702,6 +783,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 onPointerMove={handleDragPointerMove}
                                 onPointerUp={handleDragPointerUp}
                                 onPointerCancel={handleDragPointerCancel}
+                                onLostPointerCapture={handleDragLostPointerCapture}
                             >
                                 <DragHandleIcon/>
                             </button>
