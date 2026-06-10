@@ -1,4 +1,12 @@
-import {type CSSProperties, useCallback, useEffect, useMemo, useState} from 'react'
+import {
+    type CSSProperties,
+    useCallback,
+    useEffect,
+    useMemo,
+    type PointerEvent as ReactPointerEvent,
+    useRef,
+    useState,
+} from 'react'
 import {Button, Input, useAlert} from 'flowcloudai-ui'
 import {
     db_cascade_delete_category,
@@ -40,6 +48,17 @@ type RenameTarget =
 
 type DeleteMode = 'empty' | 'lift' | 'cascade'
 type SiblingDirection = 'up' | 'down'
+type DragDropPosition = 'before' | 'after' | 'into'
+
+interface CategoryDragState {
+    pointerId: number
+    categoryId: string
+}
+
+interface CategoryDropTarget {
+    targetId: string
+    position: DragDropPosition
+}
 
 function parentKey(parentId: string | null | undefined): string {
     return parentId ?? ROOT_PARENT_KEY
@@ -174,6 +193,16 @@ function FolderIcon() {
     )
 }
 
+function DragHandleIcon() {
+    return (
+        <svg className="mobile-category-drawer__drag-icon" viewBox="0 0 24 24" focusable="false">
+            <path d="M7 8h10"/>
+            <path d="M7 12h10"/>
+            <path d="M7 16h10"/>
+        </svg>
+    )
+}
+
 export default function MobileCategoryDrawer({projectId, categories, stats, selected, onSelect, onChanged}: Props) {
     const {showAlert} = useAlert()
     const [searchText, setSearchText] = useState('')
@@ -182,6 +211,12 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
     const [moveTarget, setMoveTarget] = useState<Category | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
+    const [draggingId, setDraggingId] = useState<string | null>(null)
+    const [dropTarget, setDropTarget] = useState<CategoryDropTarget | null>(null)
+    const listRef = useRef<HTMLDivElement | null>(null)
+    const categoryNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+    const dragStateRef = useRef<CategoryDragState | null>(null)
+    const dropTargetRef = useRef<CategoryDropTarget | null>(null)
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
     const initialExpanded = useMemo(() => {
         const ids = new Set<string>()
@@ -315,6 +350,75 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         }
     }, [categories, notifyChanged, showAlert])
 
+    const handleMoveByDrop = useCallback(async (
+        draggedId: string,
+        target: CategoryDropTarget,
+    ) => {
+        const dragged = categoryById.get(draggedId)
+        const targetCategory = categoryById.get(target.targetId)
+        if (!dragged || !targetCategory) return
+
+        let nextParentId: string | null
+        let orderMap: Map<string, number>
+
+        if (target.position === 'into') {
+            nextParentId = target.targetId
+            const siblings = categories.filter(category =>
+                (category.parent_id ?? null) === nextParentId && category.id !== draggedId
+            )
+            const maxOrder = siblings.length > 0 ? Math.max(...siblings.map(category => category.sort_order)) : -1
+            orderMap = new Map([[draggedId, maxOrder + 1]])
+        } else {
+            nextParentId = targetCategory.parent_id ?? null
+            const siblings = getSortedSiblings(categories, nextParentId)
+                .filter(category => category.id !== draggedId)
+            const targetIndex = siblings.findIndex(category => category.id === target.targetId)
+            if (targetIndex < 0) return
+
+            const reordered = [...siblings]
+            reordered.splice(target.position === 'before' ? targetIndex : targetIndex + 1, 0, dragged)
+            orderMap = new Map<string, number>()
+            reordered.forEach((category, index) => orderMap.set(category.id, index))
+        }
+
+        const draggedOrder = orderMap.get(draggedId)
+        if (draggedOrder === undefined) return
+
+        setBusy(true)
+        try {
+            const parentChanged = (dragged.parent_id ?? null) !== nextParentId
+            const updates: Promise<unknown>[] = []
+            for (const [id, sortOrder] of orderMap) {
+                const original = categoryById.get(id)
+                if (!original) continue
+                if (id === draggedId) {
+                    if (parentChanged || original.sort_order !== sortOrder) {
+                        updates.push(db_update_category({id, parentId: nextParentId, sortOrder}))
+                    }
+                    continue
+                }
+                if (original.sort_order !== sortOrder) {
+                    updates.push(db_update_category({id, sortOrder}))
+                }
+            }
+
+            if (updates.length === 0) return
+            await Promise.all(updates)
+            if (target.position === 'into') {
+                setExpandedIds(current => {
+                    const next = new Set(current)
+                    next.add(target.targetId)
+                    return next
+                })
+            }
+            await notifyChanged()
+        } catch (error) {
+            await showAlert(`移动分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setBusy(false)
+        }
+    }, [categories, categoryById, notifyChanged, showAlert])
+
     const handleDelete = useCallback(async (mode: DeleteMode) => {
         if (!deleteTarget) return
         setBusy(true)
@@ -373,6 +477,117 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const renameInitialValue = renameTarget?.mode === 'rename' ? renameTarget.category.name : ''
     const renameTitle = renameTarget?.mode === 'rename' ? '重命名分类' : '新建分类'
 
+    const getDropTarget = useCallback((pointerY: number, draggedId: string): CategoryDropTarget | null => {
+        const blockedIds = new Set([draggedId, ...collectDescendantIds(draggedId, childrenMap)])
+        const candidates = rows.filter(row => !blockedIds.has(row.category.id))
+        if (candidates.length === 0) return null
+
+        for (const row of candidates) {
+            const element = categoryNodeRefs.current.get(row.category.id)
+            if (!element) continue
+            const rect = element.getBoundingClientRect()
+            if (pointerY < rect.top || pointerY > rect.bottom) continue
+
+            const ratio = (pointerY - rect.top) / rect.height
+            const position: DragDropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'into'
+            return {targetId: row.category.id, position}
+        }
+
+        const firstElement = categoryNodeRefs.current.get(candidates[0].category.id)
+        const lastElement = categoryNodeRefs.current.get(candidates[candidates.length - 1].category.id)
+        if (firstElement && pointerY < firstElement.getBoundingClientRect().top) {
+            return {targetId: candidates[0].category.id, position: 'before'}
+        }
+        if (lastElement && pointerY > lastElement.getBoundingClientRect().bottom) {
+            return {targetId: candidates[candidates.length - 1].category.id, position: 'after'}
+        }
+
+        return null
+    }, [childrenMap, rows])
+
+    const scrollListDuringDrag = useCallback((pointerY: number) => {
+        const list = listRef.current
+        if (!list) return
+
+        const rect = list.getBoundingClientRect()
+        const edgeSize = 58
+        const maxStep = 18
+        if (pointerY < rect.top + edgeSize) {
+            const strength = (rect.top + edgeSize - pointerY) / edgeSize
+            list.scrollTop -= Math.ceil(maxStep * strength)
+        } else if (pointerY > rect.bottom - edgeSize) {
+            const strength = (pointerY - (rect.bottom - edgeSize)) / edgeSize
+            list.scrollTop += Math.ceil(maxStep * strength)
+        }
+    }, [])
+
+    const clearDragState = useCallback(() => {
+        dragStateRef.current = null
+        dropTargetRef.current = null
+        setDraggingId(null)
+        setDropTarget(null)
+    }, [])
+
+    const handleDragPointerDown = useCallback((
+        event: ReactPointerEvent<HTMLButtonElement>,
+        category: Category,
+    ) => {
+        if (busy || normalizedSearch) return
+        if (!event.isPrimary) return
+        if (event.pointerType === 'mouse' && event.button !== 0) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        event.currentTarget.setPointerCapture(event.pointerId)
+        dragStateRef.current = {
+            pointerId: event.pointerId,
+            categoryId: category.id,
+        }
+        setDraggingId(category.id)
+        setDropTarget(null)
+        dropTargetRef.current = null
+    }, [busy, normalizedSearch])
+
+    const handleDragPointerMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+        const dragState = dragStateRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        scrollListDuringDrag(event.clientY)
+        const nextTarget = getDropTarget(event.clientY, dragState.categoryId)
+        dropTargetRef.current = nextTarget
+        setDropTarget(nextTarget)
+    }, [getDropTarget, scrollListDuringDrag])
+
+    const handleDragPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+        const dragState = dragStateRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        const nextTarget = dropTargetRef.current
+        clearDragState()
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+        if (nextTarget) {
+            void handleMoveByDrop(dragState.categoryId, nextTarget)
+        }
+    }, [clearDragState, handleMoveByDrop])
+
+    const handleDragPointerCancel = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+        const dragState = dragStateRef.current
+        if (!dragState || dragState.pointerId !== event.pointerId) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        clearDragState()
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+    }, [clearDragState])
+
     return (
         <aside className="mobile-category-drawer" aria-label="分类树">
             <div className="mobile-category-drawer__toolbar">
@@ -396,7 +611,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 </button>
             </div>
 
-            <div className="mobile-category-drawer__list" role="tree" aria-label="词条分类">
+            <div className="mobile-category-drawer__list" role="tree" aria-label="词条分类" ref={listRef}>
                 {showAllRow && (
                     <button
                         type="button"
@@ -438,7 +653,18 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                     return (
                         <div
                             key={category.id}
-                            className="mobile-category-drawer__node"
+                            ref={(element) => {
+                                if (element) {
+                                    categoryNodeRefs.current.set(category.id, element)
+                                } else {
+                                    categoryNodeRefs.current.delete(category.id)
+                                }
+                            }}
+                            className={[
+                                'mobile-category-drawer__node',
+                                draggingId === category.id ? 'is-dragging-source' : '',
+                                dropTarget?.targetId === category.id ? `is-drop-${dropTarget.position}` : '',
+                            ].filter(Boolean).join(' ')}
                             style={{'--mobile-category-drawer-depth': depth} as CSSProperties}
                             role="none"
                         >
@@ -466,6 +692,18 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                         {entryCountMap.get(category.id) ?? 0} 个词条{childCount > 0 ? ` · ${childCount} 个子分类` : ''}
                                     </small>
                                 </span>
+                            </button>
+                            <button
+                                type="button"
+                                className="mobile-category-drawer__drag"
+                                aria-label={`拖拽移动分类 ${category.name}`}
+                                disabled={busy || Boolean(normalizedSearch)}
+                                onPointerDown={(event) => handleDragPointerDown(event, category)}
+                                onPointerMove={handleDragPointerMove}
+                                onPointerUp={handleDragPointerUp}
+                                onPointerCancel={handleDragPointerCancel}
+                            >
+                                <DragHandleIcon/>
                             </button>
                             <button
                                 type="button"
