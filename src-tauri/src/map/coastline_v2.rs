@@ -12,18 +12,20 @@
 
 use crate::map::constants::{
     COASTLINE_DEDUPLICATE_DISTANCE_SQUARED, COASTLINE_FALLBACK_RELAX_PASSES,
-    COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_CANVAS_RATIO_MAX,
-    COASTLINE_V2_AMPLITUDE_MIN, COASTLINE_V2_AMPLITUDE_PERIMETER_RATIO,
-    COASTLINE_V2_BAND_A_HARMONIC_MAX, COASTLINE_V2_BAND_A_HARMONIC_MIN,
-    COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_HARMONIC_MAX,
-    COASTLINE_V2_BAND_B_HARMONIC_MIN, COASTLINE_V2_BAND_B_WEIGHT,
-    COASTLINE_V2_BAND_C_HARMONIC_MAX, COASTLINE_V2_BAND_C_HARMONIC_MIN,
+    COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_SCALE,
+    COASTLINE_V2_BAND_A_AMPLITUDE, COASTLINE_V2_BAND_A_PERIMETER_RATIO_CAP,
+    COASTLINE_V2_BAND_A_WAVELENGTH_MAX, COASTLINE_V2_BAND_A_WAVELENGTH_MIN,
+    COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_AMPLITUDE,
+    COASTLINE_V2_BAND_B_PERIMETER_RATIO_CAP, COASTLINE_V2_BAND_B_WAVELENGTH_MAX,
+    COASTLINE_V2_BAND_B_WAVELENGTH_MIN, COASTLINE_V2_BAND_B_WEIGHT,
+    COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_PERIMETER_RATIO_CAP,
+    COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
-    COASTLINE_V2_CORNER_WINDOW_PERIMETER_RATIO, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MIN_POINTS,
-    COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
-    COASTLINE_V2_TARGET_POINTS, COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
-    GEOMETRY_EPSILON, HASH_TEXT_OFFSET_BASIS, HASH_TEXT_PRIME, HASH_UNIT_INCREMENT,
-    HASH_UNIT_MULTIPLIER, TAU,
+    COASTLINE_V2_CORNER_WINDOW_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
+    COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, COASTLINE_V2_SMOOTH_PASSES,
+    COASTLINE_V2_SPECTRAL_BETA, COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
+    COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX, GEOMETRY_EPSILON, HASH_TEXT_OFFSET_BASIS,
+    HASH_TEXT_PRIME, HASH_UNIT_INCREMENT, HASH_UNIT_MULTIPLIER, TAU,
 };
 use crate::map::geometry::{find_polygon_self_intersections, is_point_in_polygon};
 use crate::map::types::{
@@ -172,24 +174,16 @@ fn naturalize_arc_length(
         resample_by_arc_length(vertices, &cumulative, perimeter, sample_count);
 
     let canvas_scale = canvas.width.min(canvas.height).max(1.0);
-    let amplitude = (perimeter
-        * param!(
-            params,
-            amplitude_perimeter_ratio,
-            COASTLINE_V2_AMPLITUDE_PERIMETER_RATIO
-        ))
-    .clamp(
-        param!(params, amplitude_min, COASTLINE_V2_AMPLITUDE_MIN),
-        canvas_scale
-            * param!(
-                params,
-                amplitude_canvas_ratio_max,
-                COASTLINE_V2_AMPLITUDE_CANVAS_RATIO_MAX
-            ),
-    ) * amplitude_scale.clamp(0.0, 1.0);
-
     let seed = hash_text(&format!("{}:{}", shape.id, shape.name));
-    let noise_values = build_noise_values(seed, &arc_positions, perimeter, sample_count, params);
+    let (noise_offsets, amplitude) = build_noise_offsets(
+        seed,
+        &arc_positions,
+        perimeter,
+        sample_count,
+        canvas_scale,
+        amplitude_scale.clamp(0.0, 1.0),
+        params,
+    );
     let corner_windows = build_corner_windows(vertices, &cumulative, perimeter, step, params);
     let outward_sign = if signed_area(vertices) >= 0.0 {
         -1.0
@@ -213,7 +207,7 @@ fn naturalize_arc_length(
         let mut y = base_y;
         if tangent_length > f64::EPSILON {
             let attenuation = corner_attenuation(&corner_windows, arc_positions[index], perimeter);
-            let requested_offset = amplitude * attenuation * noise_values[index];
+            let requested_offset = attenuation * noise_offsets[index];
             let max_offset = max_safe_offset(
                 vertices,
                 &cumulative,
@@ -224,7 +218,12 @@ fn naturalize_arc_length(
                 exclusion_window,
                 related_locations,
                 amplitude,
-            );
+            )
+            .min(corner_tent_cap(
+                &corner_windows,
+                arc_positions[index],
+                perimeter,
+            ));
             let offset = requested_offset.clamp(-max_offset, max_offset);
             if offset.abs() + f64::EPSILON < requested_offset.abs() {
                 constrained_offsets += 1;
@@ -261,12 +260,17 @@ fn naturalize_arc_length(
 }
 
 fn sample_count_for_perimeter(perimeter: f64, params: Option<&CoastlineV2Params>) -> usize {
-    let target = param!(params, target_points, COASTLINE_V2_TARGET_POINTS);
-    // 约 1px 一个采样点的密度上限，避免小图形被过度细分。
-    let by_perimeter = (perimeter.floor() as usize).max(COASTLINE_V2_MIN_POINTS);
-    target
-        .min(by_perimeter)
-        .clamp(COASTLINE_V2_MIN_POINTS, COASTLINE_V2_MAX_POINTS)
+    // 采样步长跟随最小波长（每周期 ≥4 个采样点），上限由质量档位控制。
+    let smallest_wavelength = param!(
+        params,
+        band_c_wavelength_min,
+        COASTLINE_V2_BAND_C_WAVELENGTH_MIN
+    )
+    .max(1.0);
+    let desired = (perimeter / (smallest_wavelength / 4.0)).ceil() as usize;
+    let max_points = param!(params, max_points, COASTLINE_V2_MAX_POINTS)
+        .min(COASTLINE_V2_MAX_POINTS_CEILING);
+    desired.clamp(COASTLINE_V2_MIN_POINTS, max_points.max(COASTLINE_V2_MIN_POINTS))
 }
 
 fn cumulative_arc_lengths(vertices: &[MapShapeVertex]) -> (Vec<f64>, f64) {
@@ -355,80 +359,176 @@ fn build_harmonic_band(
     harmonics
 }
 
-/// 计算所有采样点的噪声值，并归一化到峰值 1，使振幅参数即峰值位移。
-fn build_noise_values(
+/// 单个噪声带的世界单位规格：波长区间（px）+ 峰值振幅（px）+ 小图形护栏。
+struct BandSpec {
+    wavelength_min: f64,
+    wavelength_max: f64,
+    amplitude: f64,
+    perimeter_ratio_cap: f64,
+    weight: f64,
+    salt: u64,
+}
+
+/// 把绝对波长区间换算成该周长下的整数谐波区间。
+/// 周长容不下一个最长波长时返回 None（小图形自动跳过宏观带）。
+fn harmonic_range(
+    perimeter: f64,
+    wavelength_min: f64,
+    wavelength_max: f64,
+    harmonic_cap: u32,
+) -> Option<(u32, u32)> {
+    if wavelength_min <= 0.0 || wavelength_max < wavelength_min {
+        return None;
+    }
+    let harmonic_min = ((perimeter / wavelength_max).ceil()).max(1.0) as u32;
+    let harmonic_max = ((perimeter / wavelength_min).floor() as u32).min(harmonic_cap);
+    if harmonic_min > harmonic_max {
+        None
+    } else {
+        Some((harmonic_min, harmonic_max))
+    }
+}
+
+/// 计算所有采样点的位移（px）与合计峰值振幅。
+/// 每带独立按峰值归一后乘以该带绝对振幅再叠加——三层扰动互不挤压，
+/// 且波长/振幅均为世界单位，与图形大小无关。
+fn build_noise_offsets(
     seed: u64,
     arc_positions: &[f64],
     perimeter: f64,
     sample_count: usize,
+    canvas_scale: f64,
+    amplitude_scale: f64,
     params: Option<&CoastlineV2Params>,
-) -> Vec<f64> {
+) -> (Vec<f64>, f64) {
     let spectral_beta = param!(params, spectral_beta, COASTLINE_V2_SPECTRAL_BETA);
-    // 最高频带每周期至少 4 个采样点，杜绝 v1 的欠采样混叠。
+    // 最高频带每周期至少 4 个采样点，杜绝欠采样混叠。
     let harmonic_cap = (sample_count / 4).max(1) as u32;
-    let bands = [
-        (
-            param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
-            build_harmonic_band(
-                seed,
-                COASTLINE_V2_NOISE_SALT_A,
-                param!(params, band_a_harmonic_min, COASTLINE_V2_BAND_A_HARMONIC_MIN),
-                param!(params, band_a_harmonic_max, COASTLINE_V2_BAND_A_HARMONIC_MAX),
-                spectral_beta,
-                harmonic_cap,
+    let global_scale = param!(params, amplitude_scale, COASTLINE_V2_AMPLITUDE_SCALE)
+        .clamp(0.0, 4.0)
+        * amplitude_scale;
+
+    let band_specs = [
+        BandSpec {
+            wavelength_min: param!(
+                params,
+                band_a_wavelength_min,
+                COASTLINE_V2_BAND_A_WAVELENGTH_MIN
             ),
-        ),
-        (
-            param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
-            build_harmonic_band(
-                seed,
-                COASTLINE_V2_NOISE_SALT_B,
-                param!(params, band_b_harmonic_min, COASTLINE_V2_BAND_B_HARMONIC_MIN),
-                param!(params, band_b_harmonic_max, COASTLINE_V2_BAND_B_HARMONIC_MAX),
-                spectral_beta,
-                harmonic_cap,
+            wavelength_max: param!(
+                params,
+                band_a_wavelength_max,
+                COASTLINE_V2_BAND_A_WAVELENGTH_MAX
             ),
-        ),
-        (
-            param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
-            build_harmonic_band(
-                seed,
-                COASTLINE_V2_NOISE_SALT_C,
-                param!(params, band_c_harmonic_min, COASTLINE_V2_BAND_C_HARMONIC_MIN),
-                param!(params, band_c_harmonic_max, COASTLINE_V2_BAND_C_HARMONIC_MAX),
-                spectral_beta,
-                harmonic_cap,
+            amplitude: param!(params, band_a_amplitude, COASTLINE_V2_BAND_A_AMPLITUDE),
+            perimeter_ratio_cap: COASTLINE_V2_BAND_A_PERIMETER_RATIO_CAP,
+            weight: param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
+            salt: COASTLINE_V2_NOISE_SALT_A,
+        },
+        BandSpec {
+            wavelength_min: param!(
+                params,
+                band_b_wavelength_min,
+                COASTLINE_V2_BAND_B_WAVELENGTH_MIN
             ),
-        ),
+            wavelength_max: param!(
+                params,
+                band_b_wavelength_max,
+                COASTLINE_V2_BAND_B_WAVELENGTH_MAX
+            ),
+            amplitude: param!(params, band_b_amplitude, COASTLINE_V2_BAND_B_AMPLITUDE),
+            perimeter_ratio_cap: COASTLINE_V2_BAND_B_PERIMETER_RATIO_CAP,
+            weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
+            salt: COASTLINE_V2_NOISE_SALT_B,
+        },
+        BandSpec {
+            wavelength_min: param!(
+                params,
+                band_c_wavelength_min,
+                COASTLINE_V2_BAND_C_WAVELENGTH_MIN
+            ),
+            wavelength_max: param!(
+                params,
+                band_c_wavelength_max,
+                COASTLINE_V2_BAND_C_WAVELENGTH_MAX
+            ),
+            amplitude: param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE),
+            perimeter_ratio_cap: COASTLINE_V2_BAND_C_PERIMETER_RATIO_CAP,
+            weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
+            salt: COASTLINE_V2_NOISE_SALT_C,
+        },
     ];
 
-    let mut values = Vec::with_capacity(arc_positions.len());
-    for &s in arc_positions {
-        let mut total = 0.0;
-        for (weight, harmonics) in &bands {
-            let mut band_value = 0.0;
-            for harmonic in harmonics {
-                band_value += harmonic.amplitude
+    let mut offsets = vec![0.0f64; arc_positions.len()];
+    let mut total_amplitude = 0.0f64;
+    for spec in &band_specs {
+        let Some((harmonic_min, harmonic_max)) = harmonic_range(
+            perimeter,
+            spec.wavelength_min,
+            spec.wavelength_max,
+            harmonic_cap,
+        ) else {
+            continue;
+        };
+        // 淡入：周长刚够容纳一个最短波长时振幅从 0 平滑爬升到全值（P 达到 1.5 倍波长下限时满幅），
+        // 避免相近大小的岛屿在"带出现阈值"两侧外观突变。
+        let fade_in = ((perimeter / spec.wavelength_min - 1.0) / 0.5).clamp(0.0, 1.0);
+        let fade_in = fade_in * fade_in * (3.0 - 2.0 * fade_in);
+        let effective_amplitude = spec.amplitude.min(spec.perimeter_ratio_cap * perimeter)
+            * spec.weight.clamp(0.0, 4.0)
+            * global_scale
+            * fade_in;
+        if effective_amplitude <= f64::EPSILON {
+            continue;
+        }
+
+        let harmonics = build_harmonic_band(
+            seed,
+            spec.salt,
+            harmonic_min,
+            harmonic_max,
+            spectral_beta,
+            harmonic_cap,
+        );
+        let mut band_values = Vec::with_capacity(arc_positions.len());
+        for &s in arc_positions {
+            let mut value = 0.0;
+            for harmonic in &harmonics {
+                value += harmonic.amplitude
                     * (TAU * harmonic.frequency * s / perimeter + harmonic.phase).sin();
             }
-            total += weight * band_value;
+            band_values.push(value);
         }
-        values.push(total);
+
+        let max_abs = band_values.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
+        if max_abs <= f64::EPSILON {
+            continue;
+        }
+        for (offset, value) in offsets.iter_mut().zip(&band_values) {
+            *offset += effective_amplitude * value / max_abs;
+        }
+        total_amplitude += effective_amplitude;
     }
 
-    let max_abs = values.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
-    if max_abs > f64::EPSILON {
-        for value in &mut values {
-            *value /= max_abs;
+    // 最后一道护栏：三带合计不超过画布短边的固定比例。
+    let canvas_cap = canvas_scale * COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX;
+    if total_amplitude > canvas_cap && total_amplitude > f64::EPSILON {
+        let shrink = canvas_cap / total_amplitude;
+        for offset in &mut offsets {
+            *offset *= shrink;
         }
+        total_amplitude = canvas_cap;
     }
-    values
+
+    (offsets, total_amplitude)
 }
 
 struct CornerWindow {
     arc_position: f64,
     factor: f64,
     radius: f64,
+    /// 帐篷斜率：该角点附近位移 ≤ 弧距 × 斜率，几何上防止角点两侧沿不同法线位移后折叠自交。
+    tent_slope: f64,
 }
 
 fn build_corner_windows(
@@ -438,13 +538,10 @@ fn build_corner_windows(
     step: f64,
     params: Option<&CoastlineV2Params>,
 ) -> Vec<CornerWindow> {
-    let radius = (perimeter
-        * param!(
-            params,
-            corner_window_perimeter_ratio,
-            COASTLINE_V2_CORNER_WINDOW_PERIMETER_RATIO
-        ))
-    .max(2.0 * step);
+    // 窗口半径用绝对像素，另以 0.02×周长封顶——顶点多的图形不能全周长都泡在衰减区里。
+    let radius = param!(params, corner_window_px, COASTLINE_V2_CORNER_WINDOW_PX)
+        .min(perimeter * 0.02)
+        .max(2.0 * step);
     let concave_factor = param!(
         params,
         concave_corner_factor,
@@ -454,28 +551,46 @@ fn build_corner_windows(
 
     let mut windows = Vec::new();
     for index in 0..vertices.len() {
-        let factor = vertex_corner_factor(vertices, index, area_sign, concave_factor);
+        let Some((angle, is_concave)) = corner_geometry(vertices, index, area_sign) else {
+            continue;
+        };
+        let sharp_factor =
+            (angle / std::f64::consts::PI).clamp(COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, 1.0);
+        let factor = if is_concave {
+            sharp_factor * concave_factor
+        } else {
+            sharp_factor
+        };
         if factor >= 0.999 {
             continue;
+        }
+
+        // 位移与弧距碰撞条件近似为 offset ≈ d·tan(内角/2)，取 0.8 安全系数；凹角再压一档。
+        let mut tent_slope = (0.8 * (angle * 0.5).tan()).clamp(0.15, 4.0);
+        if is_concave {
+            tent_slope *= concave_factor;
         }
         windows.push(CornerWindow {
             arc_position: cumulative[index],
             factor,
             radius,
+            tent_slope,
         });
     }
     windows
 }
 
-fn vertex_corner_factor(
+/// 角点几何：返回（内角弧度，是否凹角）；共线顶点返回 None。
+/// 共线必须显式判定，否则浮点噪声会让 signum 随机判凹，
+/// 破坏"插入共线顶点输出不变"的不变性。
+fn corner_geometry(
     vertices: &[MapShapeVertex],
     vertex_index: usize,
     area_sign: f64,
-    concave_factor: f64,
-) -> f64 {
+) -> Option<(f64, bool)> {
     let total = vertices.len();
     if total < 3 {
-        return 1.0;
+        return None;
     }
 
     let previous = &vertices[(vertex_index + total - 1) % total];
@@ -488,28 +603,50 @@ fn vertex_corner_factor(
     let in_length = (in_x * in_x + in_y * in_y).sqrt();
     let out_length = (out_x * out_x + out_y * out_y).sqrt();
     if in_length <= f64::EPSILON || out_length <= f64::EPSILON {
-        return COASTLINE_V2_SHARP_CORNER_FACTOR_MIN;
+        return Some((0.0, false));
     }
 
     let turn_cross = (current.x - previous.x) * (next.y - current.y)
         - (current.y - previous.y) * (next.x - current.x);
-    // 共线顶点不是角点：必须显式判定，否则浮点噪声会让 signum 随机判凹，
-    // 破坏"插入共线顶点输出不变"的不变性。
     if turn_cross.abs() <= GEOMETRY_EPSILON * in_length * out_length {
-        return 1.0;
+        return None;
     }
 
     let dot = ((in_x * out_x + in_y * out_y) / (in_length * out_length)).clamp(-1.0, 1.0);
     let angle = dot.acos();
-    let sharp_factor =
-        (angle / std::f64::consts::PI).clamp(COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, 1.0);
+    Some((angle, turn_cross.signum() != area_sign.signum()))
+}
 
-    let is_concave = turn_cross.signum() != area_sign.signum();
-    if is_concave {
-        sharp_factor * concave_factor
-    } else {
-        sharp_factor
+/// 测试辅助：把 corner_geometry 的结果折算成单一衰减系数（与窗口构建逻辑一致）。
+#[cfg(test)]
+fn vertex_corner_factor(
+    vertices: &[MapShapeVertex],
+    vertex_index: usize,
+    area_sign: f64,
+    concave_factor: f64,
+) -> f64 {
+    match corner_geometry(vertices, vertex_index, area_sign) {
+        None => 1.0,
+        Some((angle, is_concave)) => {
+            let sharp_factor =
+                (angle / std::f64::consts::PI).clamp(COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, 1.0);
+            if is_concave {
+                sharp_factor * concave_factor
+            } else {
+                sharp_factor
+            }
+        }
     }
+}
+
+/// 所有角点帐篷上限的最小值：离角点越近允许的位移越小，杜绝角点折叠。
+fn corner_tent_cap(windows: &[CornerWindow], arc_position: f64, perimeter: f64) -> f64 {
+    let mut cap = f64::INFINITY;
+    for window in windows {
+        let distance = circular_distance(arc_position, window.arc_position, perimeter);
+        cap = cap.min(distance * window.tent_slope);
+    }
+    cap
 }
 
 fn corner_attenuation(windows: &[CornerWindow], arc_position: f64, perimeter: f64) -> f64 {
@@ -960,5 +1097,17 @@ mod tests {
 
         let clipped = build_harmonic_band(7, COASTLINE_V2_NOISE_SALT_B, 9, 18, 1.8, 12);
         assert_eq!(clipped.len(), 4);
+    }
+
+    #[test]
+    fn v2_wavelength_bands_are_absolute() {
+        // 小图形（周长 300px）容不下 360~900px 的宏观波长 → 跳过 A 带。
+        assert!(harmonic_range(300.0, 360.0, 900.0, 80).is_none());
+        // 同一小图形的中尺度带换算为 k=2..3。
+        assert_eq!(harmonic_range(300.0, 90.0, 220.0, 80), Some((2, 3)));
+        // 大图形（周长 3000px）的宏观带换算为 k=4..8。
+        assert_eq!(harmonic_range(3000.0, 360.0, 900.0, 80), Some((4, 8)));
+        // 细节带波长 22~55px 在大图形上受采样上限截断。
+        assert_eq!(harmonic_range(3000.0, 22.0, 55.0, 80), Some((55, 80)));
     }
 }

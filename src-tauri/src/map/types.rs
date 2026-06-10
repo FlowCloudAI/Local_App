@@ -154,19 +154,25 @@ pub struct CoastlineParams {
 #[serde(rename_all = "camelCase")]
 pub struct CoastlineV2Params {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_points: Option<usize>,
+    pub max_points: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_a_harmonic_min: Option<u32>,
+    pub band_a_wavelength_min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_a_harmonic_max: Option<u32>,
+    pub band_a_wavelength_max: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_b_harmonic_min: Option<u32>,
+    pub band_b_wavelength_min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_b_harmonic_max: Option<u32>,
+    pub band_b_wavelength_max: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_c_harmonic_min: Option<u32>,
+    pub band_c_wavelength_min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_c_harmonic_max: Option<u32>,
+    pub band_c_wavelength_max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_a_amplitude: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_b_amplitude: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_c_amplitude: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_a_weight: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -174,15 +180,11 @@ pub struct CoastlineV2Params {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_c_weight: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amplitude_scale: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spectral_beta: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amplitude_perimeter_ratio: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amplitude_min: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amplitude_canvas_ratio_max: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub corner_window_perimeter_ratio: Option<f64>,
+    pub corner_window_px: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub concave_corner_factor: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
