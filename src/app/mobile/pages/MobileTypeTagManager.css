@@ -3,6 +3,7 @@
     --mobile-type-tag-header-top: 0.5rem;
     --mobile-type-tag-header-bottom: 0.95rem;
     --mobile-type-tag-header-fade: 3.8rem;
+    --mobile-type-tag-scroll-reserve: 12rem;
 
     display: flex;
     flex-direction: column;
@@ -64,6 +65,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
+    min-height: calc(100% + var(--mobile-type-tag-scroll-reserve));
 }
 
 .mobile-type-tag__section-label {
