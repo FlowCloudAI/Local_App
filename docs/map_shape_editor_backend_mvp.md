@@ -70,7 +70,12 @@
   负责 `fill / stroke` 十六进制颜色转 deck RGBA，以及关键地点类型颜色映射。
 
 - [coastline.rs](../src-tauri/src/map/coastline.rs)
-  负责“自然海岸线 MVP”生成。
+  负责“自然海岸线 MVP”生成（v1，默认算法）。
+
+- [coastline_v2.rs](../src-tauri/src/map/coastline_v2.rs)
+  v2 海岸线算法：全周长弧长参数化 + 整数谐波周期噪声，
+  由 `request.meta.ext.coastlineAlgorithm == "v2"` 显式选择。
+  设计与问题分析见 [coastline_algorithm_redesign.md](./coastline_algorithm_redesign.md)。
 
 - [constants.rs](../src-tauri/src/map/constants.rs)
   负责集中管理当前可调参数，方便后续迭代。
