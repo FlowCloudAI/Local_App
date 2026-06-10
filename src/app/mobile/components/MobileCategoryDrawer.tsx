@@ -61,6 +61,10 @@ interface CategoryDropTarget {
     position: DragDropPosition
 }
 
+function dropTargetSignature(target: CategoryDropTarget | null): string {
+    return target ? `${target.targetId}:${target.position}` : 'none'
+}
+
 function parentKey(parentId: string | null | undefined): string {
     return parentId ?? ROOT_PARENT_KEY
 }
@@ -219,6 +223,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const dragStateRef = useRef<CategoryDragState | null>(null)
     const dragElementRef = useRef<HTMLButtonElement | null>(null)
     const dropTargetRef = useRef<CategoryDropTarget | null>(null)
+    const loggedDropTargetRef = useRef<string>('none')
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
     const initialExpanded = useMemo(() => {
         const ids = new Set<string>()
@@ -358,12 +363,24 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     ) => {
         const dragged = categoryById.get(draggedId)
         const targetCategory = categoryById.get(target.targetId)
-        if (!dragged || !targetCategory) return
+        if (!dragged || !targetCategory) {
+            logger.warn('[移动端分类拖拽] 放弃移动：分类数据缺失', {
+                draggedId,
+                targetId: target.targetId,
+                hasDragged: Boolean(dragged),
+                hasTarget: Boolean(targetCategory),
+                categoryCount: categories.length,
+            })
+            return
+        }
         logger.info('[移动端分类拖拽] 准备移动', {
             draggedId,
+            draggedName: dragged.name,
             targetId: target.targetId,
+            targetName: targetCategory.name,
             position: target.position,
             oldParentId: dragged.parent_id ?? null,
+            oldSortOrder: dragged.sort_order,
         })
 
         let nextParentId: string | null
@@ -381,7 +398,15 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             const siblings = getSortedSiblings(categories, nextParentId)
                 .filter(category => category.id !== draggedId)
             const targetIndex = siblings.findIndex(category => category.id === target.targetId)
-            if (targetIndex < 0) return
+            if (targetIndex < 0) {
+                logger.warn('[移动端分类拖拽] 放弃移动：目标不在同级列表中', {
+                    draggedId,
+                    targetId: target.targetId,
+                    nextParentId,
+                    siblingIds: siblings.map(category => category.id),
+                })
+                return
+            }
 
             const reordered = [...siblings]
             reordered.splice(target.position === 'before' ? targetIndex : targetIndex + 1, 0, dragged)
@@ -390,34 +415,46 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         }
 
         const draggedOrder = orderMap.get(draggedId)
-        if (draggedOrder === undefined) return
+        if (draggedOrder === undefined) {
+            logger.warn('[移动端分类拖拽] 放弃移动：没有计算出拖拽项顺序', {
+                draggedId,
+                target,
+                orders: Array.from(orderMap.entries()),
+            })
+            return
+        }
 
         setBusy(true)
         try {
             const parentChanged = (dragged.parent_id ?? null) !== nextParentId
-            const updates: Promise<unknown>[] = []
+            const updateInputs: Array<{id: string; parentId?: string | null; sortOrder?: number}> = []
             for (const [id, sortOrder] of orderMap) {
                 const original = categoryById.get(id)
                 if (!original) continue
                 if (id === draggedId) {
                     if (parentChanged || original.sort_order !== sortOrder) {
-                        updates.push(db_update_category({id, parentId: nextParentId, sortOrder}))
+                        updateInputs.push({id, parentId: nextParentId, sortOrder})
                     }
                     continue
                 }
                 if (original.sort_order !== sortOrder) {
-                    updates.push(db_update_category({id, sortOrder}))
+                    updateInputs.push({id, sortOrder})
                 }
             }
 
             logger.info('[移动端分类拖拽] 提交移动', {
                 draggedId,
                 nextParentId,
-                updateCount: updates.length,
+                updateCount: updateInputs.length,
+                updates: updateInputs,
                 orders: Array.from(orderMap.entries()),
             })
-            if (updates.length === 0) return
-            await Promise.all(updates)
+            if (updateInputs.length === 0) return
+            await Promise.all(updateInputs.map(input => db_update_category(input)))
+            logger.info('[移动端分类拖拽] 后端更新成功', {
+                draggedId,
+                updateCount: updateInputs.length,
+            })
             if (target.position === 'into') {
                 setExpandedIds(current => {
                     const next = new Set(current)
@@ -426,7 +463,9 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 })
             }
             await notifyChanged()
+            logger.info('[移动端分类拖拽] 刷新回调完成', {draggedId})
         } catch (error) {
+            logger.error('[移动端分类拖拽] 移动失败', error)
             await showAlert(`移动分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setBusy(false)
@@ -539,16 +578,29 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         dragStateRef.current = null
         dragElementRef.current = null
         dropTargetRef.current = null
+        loggedDropTargetRef.current = 'none'
         setDraggingId(null)
         setDropTarget(null)
     }, [])
 
-    const updateDragTarget = useCallback((pointerY: number, draggedId: string) => {
+    const updateDragTarget = useCallback((pointerX: number, pointerY: number, draggedId: string, source: string) => {
         scrollListDuringDrag(pointerY)
         const nextTarget = getDropTarget(pointerY, draggedId)
         dropTargetRef.current = nextTarget
         setDropTarget(nextTarget)
-    }, [getDropTarget, scrollListDuringDrag])
+        const signature = dropTargetSignature(nextTarget)
+        if (loggedDropTargetRef.current !== signature) {
+            loggedDropTargetRef.current = signature
+            logger.info('[移动端分类拖拽] 目标变化', {
+                source,
+                draggedId,
+                pointerX: Math.round(pointerX),
+                pointerY: Math.round(pointerY),
+                target: nextTarget,
+                targetName: nextTarget ? categoryById.get(nextTarget.targetId)?.name ?? null : null,
+            })
+        }
+    }, [categoryById, getDropTarget, scrollListDuringDrag])
 
     const finishDrag = useCallback((pointerId: number, commit: boolean, reason: string) => {
         const dragState = dragStateRef.current
@@ -569,6 +621,13 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             reason,
             target: nextTarget,
         })
+        if (commit && !nextTarget) {
+            logger.warn('[移动端分类拖拽] 结算但没有有效目标', {
+                pointerId,
+                draggedId,
+                reason,
+            })
+        }
         if (commit && nextTarget) {
             void handleMoveByDrop(draggedId, nextTarget)
         }
@@ -578,9 +637,31 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         event: ReactPointerEvent<HTMLButtonElement>,
         category: Category,
     ) => {
-        if (busy || normalizedSearch) return
-        if (!event.isPrimary) return
-        if (event.pointerType === 'mouse' && event.button !== 0) return
+        if (busy || normalizedSearch) {
+            logger.info('[移动端分类拖拽] 忽略按下', {
+                reason: busy ? 'busy' : 'searching',
+                categoryId: category.id,
+                normalizedSearch,
+            })
+            return
+        }
+        if (!event.isPrimary) {
+            logger.info('[移动端分类拖拽] 忽略按下', {
+                reason: 'not-primary',
+                pointerId: event.pointerId,
+                categoryId: category.id,
+            })
+            return
+        }
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+            logger.info('[移动端分类拖拽] 忽略按下', {
+                reason: 'non-left-mouse',
+                pointerId: event.pointerId,
+                button: event.button,
+                categoryId: category.id,
+            })
+            return
+        }
 
         event.preventDefault()
         event.stopPropagation()
@@ -595,8 +676,11 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         dropTargetRef.current = null
         logger.info('[移动端分类拖拽] 开始', {
             pointerId: event.pointerId,
+            pointerType: event.pointerType,
             categoryId: category.id,
             name: category.name,
+            startX: Math.round(event.clientX),
+            startY: Math.round(event.clientY),
         })
     }, [busy, normalizedSearch])
 
@@ -606,7 +690,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
         event.preventDefault()
         event.stopPropagation()
-        updateDragTarget(event.clientY, dragState.categoryId)
+        updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'react-pointermove')
     }, [updateDragTarget])
 
     const handleDragPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -638,13 +722,14 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
     useEffect(() => {
         if (!draggingId) return
+        logger.info('[移动端分类拖拽] 挂载全局监听', {draggingId})
 
         const handleWindowPointerMove = (event: PointerEvent) => {
             const dragState = dragStateRef.current
             if (!dragState || dragState.pointerId !== event.pointerId) return
 
             event.preventDefault()
-            updateDragTarget(event.clientY, dragState.categoryId)
+            updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'window-pointermove')
         }
         const handleWindowPointerUp = (event: PointerEvent) => {
             const dragState = dragStateRef.current
@@ -658,14 +743,40 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             event.preventDefault()
             finishDrag(event.pointerId, false, 'window-pointercancel')
         }
+        const handleDocumentPointerMove = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            if (!dragState || dragState.pointerId !== event.pointerId) return
+
+            event.preventDefault()
+            updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'document-pointermove')
+        }
+        const handleDocumentPointerUp = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            if (!dragState || dragState.pointerId !== event.pointerId) return
+            event.preventDefault()
+            finishDrag(event.pointerId, true, 'document-pointerup')
+        }
+        const handleDocumentPointerCancel = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            if (!dragState || dragState.pointerId !== event.pointerId) return
+            event.preventDefault()
+            finishDrag(event.pointerId, false, 'document-pointercancel')
+        }
 
         window.addEventListener('pointermove', handleWindowPointerMove, {passive: false})
         window.addEventListener('pointerup', handleWindowPointerUp, {passive: false})
         window.addEventListener('pointercancel', handleWindowPointerCancel, {passive: false})
+        document.addEventListener('pointermove', handleDocumentPointerMove, {passive: false})
+        document.addEventListener('pointerup', handleDocumentPointerUp, {passive: false})
+        document.addEventListener('pointercancel', handleDocumentPointerCancel, {passive: false})
         return () => {
+            logger.info('[移动端分类拖拽] 卸载全局监听', {draggingId})
             window.removeEventListener('pointermove', handleWindowPointerMove)
             window.removeEventListener('pointerup', handleWindowPointerUp)
             window.removeEventListener('pointercancel', handleWindowPointerCancel)
+            document.removeEventListener('pointermove', handleDocumentPointerMove)
+            document.removeEventListener('pointerup', handleDocumentPointerUp)
+            document.removeEventListener('pointercancel', handleDocumentPointerCancel)
         }
     }, [draggingId, finishDrag, updateDragTarget])
 
