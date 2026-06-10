@@ -12,8 +12,37 @@ type MapShapeKind = 'coastline'
 type MapProtocolVersion = 'map_shape_mvp_v1'
 type MapScenario = 'coastline_mvp'
 
+/** v2 海岸线算法（全周长弧长参数化）参数，未提供字段走后端 COASTLINE_V2_* 默认值。 */
+export interface CoastlineV2ParamsPayload {
+    targetPoints?: number
+    bandAHarmonicMin?: number
+    bandAHarmonicMax?: number
+    bandBHarmonicMin?: number
+    bandBHarmonicMax?: number
+    bandCHarmonicMin?: number
+    bandCHarmonicMax?: number
+    bandAWeight?: number
+    bandBWeight?: number
+    bandCWeight?: number
+    spectralBeta?: number
+    amplitudePerimeterRatio?: number
+    amplitudeMin?: number
+    amplitudeCanvasRatioMax?: number
+    cornerWindowPerimeterRatio?: number
+    concaveCornerFactor?: number
+    smoothPasses?: number
+    taubinLambda?: number
+    taubinMu?: number
+}
+
+export type CoastlineAlgorithm = 'v1' | 'v2'
+
 export interface CoastlineParamsPayload {
     uiMode?: 'simple' | 'advanced'
+    /** 海岸线算法选择：v1 逐边扰动（默认）/ v2 全周长噪声（实验）。 */
+    algorithm?: CoastlineAlgorithm
+    /** algorithm 为 v2 时生效的参数覆盖。 */
+    v2?: CoastlineV2ParamsPayload
     qualityPreset?: 'preview' | 'rough' | 'balanced' | 'fine' | 'print'
     scaleFactor?: number
     macroNoise?: number
@@ -61,6 +90,8 @@ interface MapSaveMetaPayload {
     requestId: string
     ext?: {
         coastlineParams?: CoastlineParamsPayload
+        coastlineAlgorithm?: CoastlineAlgorithm
+        coastlineV2Params?: CoastlineV2ParamsPayload
     }
 }
 
@@ -88,7 +119,14 @@ const normalizeMapSaveRequest = (
         protocolVersion: 'map_shape_mvp_v1',
         scenario: 'coastline_mvp',
         requestId: createRequestId(),
-        ext: coastlineParams ? {coastlineParams} : undefined,
+        ext: coastlineParams
+            ? {
+                coastlineParams,
+                ...(coastlineParams.algorithm === 'v2'
+                    ? {coastlineAlgorithm: 'v2' as const, coastlineV2Params: coastlineParams.v2}
+                    : {}),
+            }
+            : undefined,
     },
 })
 

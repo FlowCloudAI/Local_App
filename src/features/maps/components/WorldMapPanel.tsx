@@ -101,7 +101,10 @@ interface CoastlineQualityDefinition {
     >
 }
 
+type CoastlineAlgorithmChoice = NonNullable<CoastlineParamsPayload['algorithm']>
+
 interface CoastlineSimpleConfig {
+    algorithm: CoastlineAlgorithmChoice
     qualityPreset: CoastlineQualityPreset
     scaleFactor: number
     macroNoise: number
@@ -156,11 +159,44 @@ const COASTLINE_BASE_PARAMS: Required<Pick<CoastlineParamsPayload,
 }
 
 const COASTLINE_DEFAULT_SIMPLE_CONFIG: CoastlineSimpleConfig = {
+    algorithm: 'v1',
     qualityPreset: 'balanced',
     scaleFactor: 1,
     macroNoise: 1,
     midNoise: 1,
     microNoise: 1,
+}
+
+const COASTLINE_ALGORITHM_LABELS: Record<CoastlineAlgorithmChoice, string> = {
+    v1: '经典 v1',
+    v2: '实验 v2',
+}
+
+const COASTLINE_ALGORITHM_HINTS: Record<CoastlineAlgorithmChoice, string> = {
+    v1: '逐边扰动：成熟稳定，但效果受原始边长影响。',
+    v2: '全周长噪声：起伏与原始边长无关，海湾可跨越顶点（实验中）。',
+}
+
+/** v2 算法按质量档位映射的等弧长采样点数。 */
+const COASTLINE_V2_QUALITY_TARGET_POINTS: Record<CoastlineQualityPreset, number> = {
+    preview: 96,
+    rough: 160,
+    balanced: 320,
+    fine: 512,
+    print: 768,
+}
+
+/** 把简单模式的旋钮（档位/尺度/三层扰动）换算成 v2 参数；其余字段走后端默认值。 */
+function buildCoastlineV2Params(config: CoastlineSimpleConfig): NonNullable<CoastlineParamsPayload['v2']> {
+    const scaleFactor = clampNumber(config.scaleFactor, 0.2, 3)
+    return {
+        targetPoints: COASTLINE_V2_QUALITY_TARGET_POINTS[config.qualityPreset],
+        amplitudePerimeterRatio: 0.02 * scaleFactor,
+        amplitudeCanvasRatioMax: 0.025 * scaleFactor,
+        bandAWeight: 0.5 * clampNumber(config.macroNoise, 0, 2),
+        bandBWeight: 0.3 * clampNumber(config.midNoise, 0, 2),
+        bandCWeight: 0.2 * clampNumber(config.microNoise, 0, 2),
+    }
 }
 
 const COASTLINE_QUALITY_PRESETS: Record<CoastlineQualityPreset, CoastlineQualityDefinition> = {
@@ -261,6 +297,7 @@ function readCoastlineSimpleConfig(params: CoastlineParamsPayload): CoastlineSim
         : COASTLINE_DEFAULT_SIMPLE_CONFIG.qualityPreset
 
     return {
+        algorithm: params.algorithm === 'v2' ? 'v2' : 'v1',
         qualityPreset,
         scaleFactor: clampNumber(
             readNumber(params.scaleFactor, COASTLINE_DEFAULT_SIMPLE_CONFIG.scaleFactor),
@@ -294,6 +331,8 @@ function buildSimpleCoastlineParams(config: CoastlineSimpleConfig): CoastlinePar
 
     return {
         uiMode: 'simple',
+        algorithm: config.algorithm,
+        v2: config.algorithm === 'v2' ? buildCoastlineV2Params(config) : undefined,
         qualityPreset: config.qualityPreset,
         scaleFactor,
         macroNoise,
@@ -1058,6 +1097,25 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         markMapUnsaved()
     }, [markMapUnsaved])
 
+    const updateCoastlineAlgorithm = useCallback((algorithm: CoastlineAlgorithmChoice) => {
+        setCoastlineParams(current => {
+            const nextConfig = {
+                ...readCoastlineSimpleConfig(current),
+                algorithm,
+            }
+            if (current.uiMode === 'advanced') {
+                // 高级模式只补丁算法字段，避免把高级覆盖值重置回档位默认。
+                return {
+                    ...current,
+                    algorithm,
+                    v2: algorithm === 'v2' ? buildCoastlineV2Params(nextConfig) : undefined,
+                }
+            }
+            return buildSimpleCoastlineParams(nextConfig)
+        })
+        markMapUnsaved()
+    }, [markMapUnsaved])
+
     // ── 添加图形/地点 ──────────────────────────────────────────────────
 
     const handleAddShape = useCallback(() => {
@@ -1320,6 +1378,22 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
                         </button>
                     ))}
                 </div>
+            </div>
+            <div className="wm-field">
+                <label>算法引擎</label>
+                <div className="wm-segmented">
+                    {(['v1', 'v2'] as CoastlineAlgorithmChoice[]).map(algorithm => (
+                        <button
+                            key={algorithm}
+                            type="button"
+                            className={`wm-segmented__item${coastlineSimpleConfig.algorithm === algorithm ? ' is-active' : ''}`}
+                            onClick={() => updateCoastlineAlgorithm(algorithm)}
+                        >
+                            {COASTLINE_ALGORITHM_LABELS[algorithm]}
+                        </button>
+                    ))}
+                </div>
+                <div className="wm-sidebar-hint">{COASTLINE_ALGORITHM_HINTS[coastlineSimpleConfig.algorithm]}</div>
             </div>
             {coastlineMode === 'simple' ? (
                 <>
