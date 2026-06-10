@@ -1,5 +1,6 @@
 import {
     type CSSProperties,
+    type MouseEvent as ReactMouseEvent,
     useCallback,
     useEffect,
     useMemo,
@@ -50,10 +51,18 @@ type RenameTarget =
 type DeleteMode = 'empty' | 'lift' | 'cascade'
 type SiblingDirection = 'up' | 'down'
 type DragDropPosition = 'before' | 'after' | 'into'
+type CategoryDragSource = 'row' | 'handle'
+
+const ROW_DRAG_START_DISTANCE = 10
+const ROW_DRAG_VERTICAL_DOMINANCE = 1.12
 
 interface CategoryDragState {
     pointerId: number
     categoryId: string
+    startX: number
+    startY: number
+    source: CategoryDragSource
+    active: boolean
 }
 
 interface CategoryDropTarget {
@@ -224,6 +233,8 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const dragElementRef = useRef<HTMLButtonElement | null>(null)
     const dropTargetRef = useRef<CategoryDropTarget | null>(null)
     const loggedDropTargetRef = useRef<string>('none')
+    const suppressCategoryClickRef = useRef<string | null>(null)
+    const suppressCategoryClickTimerRef = useRef<number | null>(null)
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
     const initialExpanded = useMemo(() => {
         const ids = new Set<string>()
@@ -583,6 +594,42 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         setDropTarget(null)
     }, [])
 
+    const suppressNextCategoryClick = useCallback((categoryId: string) => {
+        suppressCategoryClickRef.current = categoryId
+        if (suppressCategoryClickTimerRef.current !== null) {
+            window.clearTimeout(suppressCategoryClickTimerRef.current)
+        }
+        suppressCategoryClickTimerRef.current = window.setTimeout(() => {
+            if (suppressCategoryClickRef.current === categoryId) {
+                suppressCategoryClickRef.current = null
+            }
+            suppressCategoryClickTimerRef.current = null
+        }, 350)
+    }, [])
+
+    useEffect(() => {
+        return () => {
+            if (suppressCategoryClickTimerRef.current !== null) {
+                window.clearTimeout(suppressCategoryClickTimerRef.current)
+            }
+        }
+    }, [])
+
+    const activateDrag = useCallback((dragState: CategoryDragState, pointerX: number, pointerY: number, reason: string) => {
+        if (!dragState.active) {
+            dragState.active = true
+            setDraggingId(dragState.categoryId)
+            logger.info('[移动端分类拖拽] 进入拖拽', {
+                pointerId: dragState.pointerId,
+                categoryId: dragState.categoryId,
+                source: dragState.source,
+                reason,
+                pointerX: Math.round(pointerX),
+                pointerY: Math.round(pointerY),
+            })
+        }
+    }, [])
+
     const updateDragTarget = useCallback((pointerX: number, pointerY: number, draggedId: string, source: string) => {
         scrollListDuringDrag(pointerY)
         const nextTarget = getDropTarget(pointerY, draggedId)
@@ -606,6 +653,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const dragState = dragStateRef.current
         if (!dragState || dragState.pointerId !== pointerId) return
 
+        const wasActive = dragState.active
         const nextTarget = dropTargetRef.current
         const draggedId = dragState.categoryId
         const dragElement = dragElementRef.current
@@ -619,8 +667,18 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             draggedId,
             commit,
             reason,
+            active: wasActive,
             target: nextTarget,
         })
+        if (!wasActive) {
+            logger.info('[移动端分类拖拽] 结束但未进入拖拽', {
+                pointerId,
+                draggedId,
+                reason,
+            })
+            return
+        }
+        suppressNextCategoryClick(draggedId)
         if (commit && !nextTarget) {
             logger.info('[移动端分类拖拽] 结算但没有有效目标', {
                 pointerId,
@@ -631,11 +689,12 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         if (commit && nextTarget) {
             void handleMoveByDrop(draggedId, nextTarget)
         }
-    }, [clearDragState, handleMoveByDrop])
+    }, [clearDragState, handleMoveByDrop, suppressNextCategoryClick])
 
     const handleDragPointerDown = useCallback((
         event: ReactPointerEvent<HTMLButtonElement>,
         category: Category,
+        source: CategoryDragSource,
     ) => {
         if (busy || normalizedSearch) {
             logger.info('[移动端分类拖拽] 忽略按下', {
@@ -663,22 +722,31 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             return
         }
 
-        event.preventDefault()
+        if (source === 'handle') {
+            event.preventDefault()
+        }
         event.stopPropagation()
         event.currentTarget.setPointerCapture(event.pointerId)
         dragElementRef.current = event.currentTarget
         dragStateRef.current = {
             pointerId: event.pointerId,
             categoryId: category.id,
+            startX: event.clientX,
+            startY: event.clientY,
+            source,
+            active: source === 'handle',
         }
-        setDraggingId(category.id)
+        if (source === 'handle') {
+            setDraggingId(category.id)
+        }
         setDropTarget(null)
         dropTargetRef.current = null
-        logger.info('[移动端分类拖拽] 开始', {
+        logger.info('[移动端分类拖拽] 按下', {
             pointerId: event.pointerId,
             pointerType: event.pointerType,
             categoryId: category.id,
             name: category.name,
+            source,
             startX: Math.round(event.clientX),
             startY: Math.round(event.clientY),
         })
@@ -688,17 +756,32 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const dragState = dragStateRef.current
         if (!dragState || dragState.pointerId !== event.pointerId) return
 
-        event.preventDefault()
         event.stopPropagation()
+        if (!dragState.active) {
+            const dx = event.clientX - dragState.startX
+            const dy = event.clientY - dragState.startY
+            const horizontal = Math.abs(dx)
+            const vertical = Math.abs(dy)
+            if (
+                vertical < ROW_DRAG_START_DISTANCE
+                || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
+            ) {
+                return
+            }
+            activateDrag(dragState, event.clientX, event.clientY, 'row-vertical-drag')
+        }
+        event.preventDefault()
         updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'react-pointermove')
-    }, [updateDragTarget])
+    }, [activateDrag, updateDragTarget])
 
     const handleDragPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
         const dragState = dragStateRef.current
         if (!dragState || dragState.pointerId !== event.pointerId) return
 
-        event.preventDefault()
         event.stopPropagation()
+        if (dragState.active) {
+            event.preventDefault()
+        }
         finishDrag(event.pointerId, true, 'react-pointerup')
     }, [finishDrag])
 
@@ -706,8 +789,10 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const dragState = dragStateRef.current
         if (!dragState || dragState.pointerId !== event.pointerId) return
 
-        event.preventDefault()
         event.stopPropagation()
+        if (dragState.active) {
+            event.preventDefault()
+        }
         finishDrag(event.pointerId, false, 'react-pointercancel')
     }, [finishDrag])
 
@@ -715,8 +800,10 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         const dragState = dragStateRef.current
         if (!dragState || dragState.pointerId !== event.pointerId) return
 
-        event.preventDefault()
         event.stopPropagation()
+        if (dragState.active) {
+            event.preventDefault()
+        }
         finishDrag(event.pointerId, true, 'react-lostpointercapture')
     }, [finishDrag])
 
@@ -728,6 +815,19 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             const dragState = dragStateRef.current
             if (!dragState || dragState.pointerId !== event.pointerId) return
 
+            if (!dragState.active) {
+                const dx = event.clientX - dragState.startX
+                const dy = event.clientY - dragState.startY
+                const horizontal = Math.abs(dx)
+                const vertical = Math.abs(dy)
+                if (
+                    vertical < ROW_DRAG_START_DISTANCE
+                    || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
+                ) {
+                    return
+                }
+                activateDrag(dragState, event.clientX, event.clientY, 'window-row-vertical-drag')
+            }
             event.preventDefault()
             updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'window-pointermove')
         }
@@ -747,6 +847,19 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             const dragState = dragStateRef.current
             if (!dragState || dragState.pointerId !== event.pointerId) return
 
+            if (!dragState.active) {
+                const dx = event.clientX - dragState.startX
+                const dy = event.clientY - dragState.startY
+                const horizontal = Math.abs(dx)
+                const vertical = Math.abs(dy)
+                if (
+                    vertical < ROW_DRAG_START_DISTANCE
+                    || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
+                ) {
+                    return
+                }
+                activateDrag(dragState, event.clientX, event.clientY, 'document-row-vertical-drag')
+            }
             event.preventDefault()
             updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'document-pointermove')
         }
@@ -778,7 +891,24 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             document.removeEventListener('pointerup', handleDocumentPointerUp)
             document.removeEventListener('pointercancel', handleDocumentPointerCancel)
         }
-    }, [draggingId, finishDrag, updateDragTarget])
+    }, [activateDrag, draggingId, finishDrag, updateDragTarget])
+
+    const handleCategoryRowClick = useCallback((
+        event: ReactMouseEvent<HTMLButtonElement>,
+        category: Category,
+    ) => {
+        if (suppressCategoryClickRef.current === category.id) {
+            suppressCategoryClickRef.current = null
+            event.preventDefault()
+            event.stopPropagation()
+            logger.info('[移动端分类拖拽] 抑制拖拽后的点击', {
+                categoryId: category.id,
+                name: category.name,
+            })
+            return
+        }
+        onSelect({kind: 'category', categoryId: category.id}, category.name)
+    }, [onSelect])
 
     return (
         <aside className="mobile-category-drawer" aria-label="分类树">
@@ -859,6 +989,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                             ].filter(Boolean).join(' ')}
                             style={{'--mobile-category-drawer-depth': depth} as CSSProperties}
                             role="none"
+                            data-mobile-side-drawer-gesture-ignore="true"
                         >
                             <button
                                 type="button"
@@ -875,7 +1006,12 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 aria-selected={active}
                                 aria-expanded={childCount > 0 ? expanded : undefined}
                                 className={`mobile-category-drawer__row mobile-category-drawer__row--category${active ? ' is-active' : ''}`}
-                                onClick={() => onSelect({kind: 'category', categoryId: category.id}, category.name)}
+                                onPointerDown={(event) => handleDragPointerDown(event, category, 'row')}
+                                onPointerMove={handleDragPointerMove}
+                                onPointerUp={handleDragPointerUp}
+                                onPointerCancel={handleDragPointerCancel}
+                                onLostPointerCapture={handleDragLostPointerCapture}
+                                onClick={(event) => handleCategoryRowClick(event, category)}
                             >
                                 <FolderIcon/>
                                 <span className="mobile-category-drawer__text">
@@ -890,11 +1026,16 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 className="mobile-category-drawer__drag"
                                 aria-label={`拖拽移动分类 ${category.name}`}
                                 disabled={busy || Boolean(normalizedSearch)}
-                                onPointerDown={(event) => handleDragPointerDown(event, category)}
+                                data-mobile-side-drawer-gesture-ignore="true"
+                                onPointerDown={(event) => handleDragPointerDown(event, category, 'handle')}
                                 onPointerMove={handleDragPointerMove}
                                 onPointerUp={handleDragPointerUp}
                                 onPointerCancel={handleDragPointerCancel}
                                 onLostPointerCapture={handleDragLostPointerCapture}
+                                onClick={(event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                }}
                             >
                                 <DragHandleIcon/>
                             </button>

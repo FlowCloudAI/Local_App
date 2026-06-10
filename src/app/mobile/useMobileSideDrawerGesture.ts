@@ -131,6 +131,11 @@ function isHorizontalScrollGestureTarget(target: EventTarget | null): boolean {
     return Boolean(target.closest('[data-mobile-horizontal-scroll="true"]'))
 }
 
+function isInternalGestureTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    return Boolean(target.closest('[data-mobile-side-drawer-gesture-ignore="true"]'))
+}
+
 function getElementClassName(element: HTMLElement): string {
     return typeof element.className === 'string' ? element.className : String(element.className)
 }
@@ -204,6 +209,14 @@ export function useMobileSideDrawerGesture({
         if (!event.isPrimary) return
         if (event.pointerType === 'mouse' && event.button !== 0) return
         if (!allowTextEditingTargetGestures && isTextEditingTarget(event.target)) return
+        if (isInternalGestureTarget(event.target)) {
+            logger.info(`${logLabel} 忽略`, {
+                pointerId: event.pointerId,
+                reason: '内部手势区域',
+                target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
+            })
+            return
+        }
         if (isHorizontalScrollGestureTarget(event.target)) {
             logger.info(`${logLabel} 忽略`, {
                 pointerId: event.pointerId,
