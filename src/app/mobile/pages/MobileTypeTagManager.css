@@ -1,7 +1,7 @@
 .mobile-type-tag {
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-type-tag-header-bottom: 0.95rem;
-    --mobile-type-tag-header-fade: 2.5rem;
+    --mobile-type-tag-header-fade: 4rem;
 
     display: flex;
     flex-direction: column;
