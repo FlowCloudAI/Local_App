@@ -24,6 +24,7 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
     const [loading, setLoading] = useState(true)
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [editingType, setEditingType] = useState<CustomEntryType | null>(null)
+    const [builtinExpanded, setBuiltinExpanded] = useState(true)
 
     const reloadTypes = useCallback(async () => {
         const [custom, all] = await Promise.all([
@@ -77,8 +78,24 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                 <div className="mobile-page__loading">加载中…</div>
             ) : (
                 <div className="mobile-type-tag__list">
-                    <div className="mobile-type-tag__section-label">内置类型</div>
-                    {builtinTypes.map(type => (
+                    <button
+                        type="button"
+                        className="mobile-type-tag__section-toggle"
+                        aria-expanded={builtinExpanded}
+                        onClick={() => setBuiltinExpanded(expanded => !expanded)}
+                    >
+                        <span>内置类型</span>
+                        <span className="mobile-type-tag__section-toggle-meta">{builtinTypes.length}</span>
+                        <svg
+                            className={`mobile-type-tag__section-toggle-icon${builtinExpanded ? ' is-expanded' : ''}`}
+                            viewBox="0 0 20 20"
+                            focusable="false"
+                            aria-hidden="true"
+                        >
+                            <path d="M6 8 10 12l4-4"/>
+                        </svg>
+                    </button>
+                    {builtinExpanded && builtinTypes.map(type => (
                         <div
                             className="mobile-list-card mobile-type-tag__type-card mobile-type-tag__type-card--readonly"
                             key={type.key}
