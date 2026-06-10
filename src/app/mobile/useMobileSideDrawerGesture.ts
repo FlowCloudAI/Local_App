@@ -21,6 +21,11 @@ interface UseMobileSideDrawerGestureOptions {
     enabled: boolean
     width: number
     logLabel?: string
+    /**
+     * 是否允许从 input / textarea / contenteditable 等文本编辑区域开始识别抽屉手势。
+     * 默认关闭，避免普通表单页误触；灵感便签这种编辑器优先页面可以开启，让右划更容易呼出抽屉。
+     */
+    allowTextEditingTargetGestures?: boolean
 }
 
 export interface MobileSideDrawerGesture {
@@ -134,6 +139,7 @@ export function useMobileSideDrawerGesture({
     enabled,
     width,
     logLabel = '[移动端侧边抽屉手势]',
+    allowTextEditingTargetGestures = false,
 }: UseMobileSideDrawerGestureOptions): MobileSideDrawerGesture {
     const [open, setOpen] = useState(false)
     const [offset, setOffset] = useState<number | null>(null)
@@ -197,7 +203,7 @@ export function useMobileSideDrawerGesture({
         if (!enabled) return
         if (!event.isPrimary) return
         if (event.pointerType === 'mouse' && event.button !== 0) return
-        if (isTextEditingTarget(event.target)) return
+        if (!allowTextEditingTargetGestures && isTextEditingTarget(event.target)) return
         if (isHorizontalScrollGestureTarget(event.target)) {
             logger.info(`${logLabel} 忽略`, {
                 pointerId: event.pointerId,
@@ -228,7 +234,7 @@ export function useMobileSideDrawerGesture({
             target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
             area: getElementClassName(dragElement),
         })
-    }, [enabled, logLabel, open, width])
+    }, [allowTextEditingTargetGestures, enabled, logLabel, open, width])
 
     const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
         const dragState = dragRef.current

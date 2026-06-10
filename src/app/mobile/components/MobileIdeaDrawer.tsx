@@ -1,3 +1,4 @@
+import {Select} from 'flowcloudai-ui'
 import {
     formatMobileIdeaDate,
     getMobileIdeaPreview,
@@ -52,6 +53,11 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
     const handleProjectFilterChange = (value: string) => {
         setProjectFilter(value as MobileIdeaProjectFilter)
     }
+    const projectFilterOptions = [
+        {value: 'all', label: '全部灵感'},
+        {value: 'global', label: '全局灵感'},
+        ...projects.map(project => ({value: project.id, label: project.name})),
+    ]
 
     return (
         <aside className="mobile-idea-drawer" aria-label="灵感列表">
@@ -88,17 +94,15 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
                 </div>
                 <div className="mobile-idea-drawer__filter-group">
                     <span>范围</span>
-                    <select
+                    <Select
                         value={projectFilter}
-                        onChange={event => handleProjectFilterChange(event.target.value)}
-                        aria-label="筛选灵感所属项目"
-                    >
-                        <option value="all">全部灵感</option>
-                        <option value="global">全局灵感</option>
-                        {projects.map(project => (
-                            <option key={project.id} value={project.id}>{project.name}</option>
-                        ))}
-                    </select>
+                        onChange={value => handleProjectFilterChange(String(value ?? 'all'))}
+                        options={projectFilterOptions}
+                        placeholder="筛选范围"
+                        searchable={projectFilterOptions.length > 6}
+                        radius="xl"
+                        className="mobile-idea-drawer__select"
+                    />
                 </div>
             </div>
 

@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {Select} from 'flowcloudai-ui'
 import {
     formatMobileIdeaDate,
     MOBILE_IDEA_STATUS_LABELS,
@@ -168,6 +169,15 @@ export default function MobileIdea({
     }, [ideaDrawerOpen])
 
     const menuItems = buildIdeaMenuItems(controller)
+    const projectOptions = [
+        {value: '', label: '全局灵感'},
+        ...controller.projects.map(project => ({value: project.id, label: project.name})),
+    ]
+    const statusOptions = [
+        {value: 'inbox', label: '待整理'},
+        {value: 'processed', label: '已处理'},
+        {value: 'archived', label: '归档'},
+    ]
 
     return (
         <div ref={pageRef} className="mobile-idea">
@@ -226,26 +236,26 @@ export default function MobileIdea({
                     <div className="mobile-idea__select-row">
                         <label>
                             <span>项目</span>
-                            <select
+                            <Select
                                 value={controller.draftProjectId}
-                                onChange={event => controller.setDraftProjectId(event.target.value)}
-                            >
-                                <option value="">全局灵感</option>
-                                {controller.projects.map(project => (
-                                    <option key={project.id} value={project.id}>{project.name}</option>
-                                ))}
-                            </select>
+                                onChange={value => controller.setDraftProjectId(String(value ?? ''))}
+                                options={projectOptions}
+                                placeholder="所属项目"
+                                searchable={projectOptions.length > 6}
+                                radius="xl"
+                                className="mobile-idea__select"
+                            />
                         </label>
                         <label>
                             <span>状态</span>
-                            <select
+                            <Select
                                 value={controller.draftStatus}
-                                onChange={event => controller.setDraftStatus(event.target.value as typeof controller.draftStatus)}
-                            >
-                                <option value="inbox">待整理</option>
-                                <option value="processed">已处理</option>
-                                <option value="archived">归档</option>
-                            </select>
+                                onChange={value => controller.setDraftStatus(String(value ?? 'inbox') as typeof controller.draftStatus)}
+                                options={statusOptions}
+                                placeholder="状态"
+                                radius="xl"
+                                className="mobile-idea__select"
+                            />
                         </label>
                     </div>
                     <div className="mobile-idea__summary">

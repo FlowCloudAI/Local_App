@@ -105,6 +105,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     } = useMobileSideDrawerGesture({
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
+        allowTextEditingTargetGestures: ideaDrawerEnabled,
     })
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
         if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'all'}
