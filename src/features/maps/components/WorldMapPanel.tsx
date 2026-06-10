@@ -177,25 +177,23 @@ const COASTLINE_ALGORITHM_HINTS: Record<CoastlineAlgorithmChoice, string> = {
     v2: '全周长噪声：起伏与原始边长无关，海湾可跨越顶点（实验中）。',
 }
 
-/** v2 算法按质量档位映射的等弧长采样点数。 */
-const COASTLINE_V2_QUALITY_TARGET_POINTS: Record<CoastlineQualityPreset, number> = {
-    preview: 96,
-    rough: 160,
-    balanced: 320,
-    fine: 512,
-    print: 768,
+/** v2 算法按质量档位映射的采样点数上限（采样步长由后端按最小波长推导）。 */
+const COASTLINE_V2_QUALITY_MAX_POINTS: Record<CoastlineQualityPreset, number> = {
+    preview: 256,
+    rough: 384,
+    balanced: 768,
+    fine: 1280,
+    print: 2048,
 }
 
-/** 把简单模式的旋钮（档位/尺度/三层扰动）换算成 v2 参数；其余字段走后端默认值。 */
+/** 把简单模式的旋钮（档位/尺度/三层扰动）换算成 v2 参数；波长与基础振幅走后端绝对像素默认值。 */
 function buildCoastlineV2Params(config: CoastlineSimpleConfig): NonNullable<CoastlineParamsPayload['v2']> {
-    const scaleFactor = clampNumber(config.scaleFactor, 0.2, 3)
     return {
-        targetPoints: COASTLINE_V2_QUALITY_TARGET_POINTS[config.qualityPreset],
-        amplitudePerimeterRatio: 0.02 * scaleFactor,
-        amplitudeCanvasRatioMax: 0.025 * scaleFactor,
-        bandAWeight: 0.5 * clampNumber(config.macroNoise, 0, 2),
-        bandBWeight: 0.3 * clampNumber(config.midNoise, 0, 2),
-        bandCWeight: 0.2 * clampNumber(config.microNoise, 0, 2),
+        maxPoints: COASTLINE_V2_QUALITY_MAX_POINTS[config.qualityPreset],
+        amplitudeScale: clampNumber(config.scaleFactor, 0.2, 3),
+        bandAWeight: clampNumber(config.macroNoise, 0, 2),
+        bandBWeight: clampNumber(config.midNoise, 0, 2),
+        bandCWeight: clampNumber(config.microNoise, 0, 2),
     }
 }
 
