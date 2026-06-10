@@ -14,10 +14,12 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
 import './MobileEntryList.css'
 
 interface Props {
     push: (page: MobilePage) => void
+    pop: () => void
     setAiFocus: (focus: AiFocus) => void
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
@@ -45,7 +47,17 @@ function toEntryCoverSrc(cover?: string | null): string | undefined {
     return convertFileSrc(String(cover), 'fcimg')
 }
 
-export default function MobileEntryList({push, setAiFocus, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
+function CategoryDrawerIcon() {
+    return (
+        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M5 7h14"/>
+            <path d="M5 12h14"/>
+            <path d="M5 17h14"/>
+        </svg>
+    )
+}
+
+export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
     const projectId = params?.projectId as string
     const uncategorizedOnly = Boolean(params?.uncategorizedOnly)
     const categoryId = (params?.categoryId as string) || null
@@ -121,31 +133,40 @@ export default function MobileEntryList({push, setAiFocus, categoryDrawerOpen = 
     return (
         <div className="mobile-page mobile-entry-list">
             <div className="mobile-entry-list__hero">
-                <button
-                    type="button"
-                    className="mobile-entry-list__drawer-toggle"
-                    aria-label="打开分类树"
-                    aria-expanded={categoryDrawerOpen}
-                    onClick={onOpenCategoryDrawer}
-                >
-                    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                        <path d="M5 7h14"/>
-                        <path d="M5 12h14"/>
-                        <path d="M5 17h14"/>
-                    </svg>
-                </button>
+                <MobileTopActionPill
+                    className="mobile-entry-list__hero-nav"
+                    actions={[
+                        {
+                            key: 'back',
+                            label: '返回项目主页',
+                            icon: <MobileBackIcon/>,
+                            onClick: pop,
+                        },
+                        {
+                            key: 'categories',
+                            label: '打开分类树',
+                            icon: <CategoryDrawerIcon/>,
+                            ariaExpanded: categoryDrawerOpen,
+                            onClick: () => onOpenCategoryDrawer?.(),
+                        },
+                    ]}
+                />
                 <div className="mobile-entry-list__hero-copy">
                     <span className="mobile-entry-list__eyebrow">{loading ? '正在同步' : `${entries.length} 个词条`}</span>
                     <h2 className="mobile-entry-list__title">{listTitle}</h2>
                 </div>
-                <button
-                    type="button"
+                <MobileTopActionPill
                     className="mobile-entry-list__create"
-                    onClick={handleCreateEntry}
-                    aria-label="新建词条"
-                >
-                    +
-                </button>
+                    actions={[
+                        {
+                            key: 'create',
+                            label: '新建词条',
+                            icon: '+',
+                            kind: 'add',
+                            onClick: () => void handleCreateEntry(),
+                        },
+                    ]}
+                />
             </div>
 
             <div className="mobile-entry-list__toolbar">
