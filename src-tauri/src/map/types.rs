@@ -156,18 +156,6 @@ pub struct CoastlineV2Params {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_points: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_a_wavelength_min: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_a_wavelength_max: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_b_wavelength_min: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_b_wavelength_max: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_c_wavelength_min: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub band_c_wavelength_max: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_a_amplitude: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_b_amplitude: Option<f64>,
@@ -184,7 +172,7 @@ pub struct CoastlineV2Params {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spectral_beta: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub corner_window_px: Option<f64>,
+    pub corner_rounding_px: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub concave_corner_factor: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

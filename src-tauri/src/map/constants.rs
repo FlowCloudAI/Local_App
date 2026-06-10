@@ -149,42 +149,55 @@ pub const COASTLINE_V2_MAX_POINTS: usize = 768;
 /// v2 海岸线采样点数硬上限，防止参数覆盖导致顶点数失控。
 pub const COASTLINE_V2_MAX_POINTS_CEILING: usize = 2048;
 
-/// v2 噪声 A 带（宏观：模拟海岸线整体位移）波长下限，单位 px。
-/// 所有波长/振幅均为绝对世界单位，与图形大小无关——这是全图质感一致的关键。
-pub const COASTLINE_V2_BAND_A_WAVELENGTH_MIN: f64 = 360.0;
+/// v2 噪声 A 带（宏观：模拟海岸线整体位移）波长 = 周长/divisor。
+/// 波长随图形等比缩放（分形自相似），小岛获得与大陆相同的"视觉性格"。
+pub const COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX: f64 = 7.0;
 
-/// v2 噪声 A 带波长上限（px）。周长容不下一个完整波长的小图形自动跳过该带。
-pub const COASTLINE_V2_BAND_A_WAVELENGTH_MAX: f64 = 900.0;
+/// v2 噪声 A 带最长波长 = 周长/该值。调小：出现更大尺度的湾/岬。
+pub const COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN: f64 = 2.5;
 
-/// v2 噪声 B 带（中尺度：模拟波动）波长下限（px）。
-pub const COASTLINE_V2_BAND_B_WAVELENGTH_MIN: f64 = 90.0;
+/// v2 噪声 B 带（中尺度：模拟波动）波长 = clamp(周长/divisor, 下限floor)。
+pub const COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX: f64 = 18.0;
 
-/// v2 噪声 B 带波长上限（px）。
-pub const COASTLINE_V2_BAND_B_WAVELENGTH_MAX: f64 = 220.0;
+/// v2 噪声 B 带最长波长分母。
+pub const COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN: f64 = 7.5;
 
-/// v2 噪声 C 带（小尺度：模拟细节）波长下限（px）。采样步长 = 该值 / 4。
-pub const COASTLINE_V2_BAND_C_WAVELENGTH_MIN: f64 = 22.0;
+/// v2 噪声 B 带波长绝对下限（px），防止小图形的波动带塌缩成锯齿。
+pub const COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN: f64 = 40.0;
 
-/// v2 噪声 C 带波长上限（px）。
-pub const COASTLINE_V2_BAND_C_WAVELENGTH_MAX: f64 = 55.0;
+/// v2 噪声 B 带最长波长绝对下限（px）。
+pub const COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX: f64 = 90.0;
 
-/// v2 噪声 A 带峰值振幅（px）。每带独立峰值归一，该值即该层最大位移。
-pub const COASTLINE_V2_BAND_A_AMPLITUDE: f64 = 28.0;
+/// v2 噪声 C 带（小尺度：模拟细节）波长分母。
+pub const COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX: f64 = 50.0;
 
-/// v2 噪声 B 带峰值振幅（px）。
-pub const COASTLINE_V2_BAND_B_AMPLITUDE: f64 = 9.0;
+/// v2 噪声 C 带最长波长分母。
+pub const COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MIN: f64 = 22.0;
 
-/// v2 噪声 C 带峰值振幅（px）。
-pub const COASTLINE_V2_BAND_C_AMPLITUDE: f64 = 3.0;
+/// v2 噪声 C 带波长绝对下限（px），杜绝亚像素级锯齿。
+pub const COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN: f64 = 16.0;
 
-/// v2 噪声 A 带振幅相对周长的护栏比例（防止小图形被绝对振幅撑爆）。
-pub const COASTLINE_V2_BAND_A_PERIMETER_RATIO_CAP: f64 = 0.045;
+/// v2 噪声 C 带最长波长绝对下限（px）。
+pub const COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MAX: f64 = 36.0;
 
-/// v2 噪声 B 带振幅护栏比例。
-pub const COASTLINE_V2_BAND_B_PERIMETER_RATIO_CAP: f64 = 0.018;
+/// v2 噪声 A 带振幅 = 周长 × 该比例（再被绝对上限封顶）。
+/// 调大：海湾/半岛更深，海岸线感更强。
+pub const COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO: f64 = 0.03;
 
-/// v2 噪声 C 带振幅护栏比例。
-pub const COASTLINE_V2_BAND_C_PERIMETER_RATIO_CAP: f64 = 0.008;
+/// v2 噪声 B 带振幅比例。
+pub const COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO: f64 = 0.012;
+
+/// v2 噪声 C 带振幅比例。
+pub const COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO: f64 = 0.005;
+
+/// v2 噪声 A 带峰值振幅绝对上限（px），大图形不至于无限狂野。
+pub const COASTLINE_V2_BAND_A_AMPLITUDE: f64 = 50.0;
+
+/// v2 噪声 B 带峰值振幅绝对上限（px）。
+pub const COASTLINE_V2_BAND_B_AMPLITUDE: f64 = 16.0;
+
+/// v2 噪声 C 带峰值振幅绝对上限（px）。
+pub const COASTLINE_V2_BAND_C_AMPLITUDE: f64 = 6.0;
 
 /// v2 噪声 A 带强度乘子（前端"大尺度扰动"滑杆，默认 1）。
 pub const COASTLINE_V2_BAND_A_WEIGHT: f64 = 1.0;
@@ -198,16 +211,17 @@ pub const COASTLINE_V2_BAND_C_WEIGHT: f64 = 1.0;
 /// v2 全带振幅整体缩放（前端"尺度系数"滑杆，默认 1）。
 pub const COASTLINE_V2_AMPLITUDE_SCALE: f64 = 1.0;
 
-/// v2 三带合计振幅相对画布短边的上限（最后一道护栏）。
-pub const COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX: f64 = 0.05;
+/// v2 三带合计振幅相对画布短边的上限（最后一道护栏，纯防失控，不参与审美）。
+pub const COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX: f64 = 0.12;
 
 /// v2 谐波谱斜率 β（带内振幅 ∝ k^(-β/2)），分形海岸线典型取值 1.6~2.0。
 /// 调大：带内高频衰减更快、更平滑；调小：带内高频更强、更粗糙。
 pub const COASTLINE_V2_SPECTRAL_BETA: f64 = 1.8;
 
-/// v2 角点衰减窗口半径（px，绝对单位；另被 0.02×周长封顶，避免顶点多的图形全周长被衰减）。
-/// 调大：角点附近压得更宽；调小：噪声更靠近角点，但自交风险略升。
-pub const COASTLINE_V2_CORNER_WINDOW_PX: f64 = 60.0;
+/// v2 角点圆化半径（px，绝对单位；另被 0.06×周长封顶）。
+/// 加噪声前先把手绘多边形的角磨圆——自然地形没有精确尖角，
+/// 也避免噪声在被钉死的尖点两侧形成针刺。调大：角更圆润；调小：保留更多原始棱角。
+pub const COASTLINE_V2_CORNER_ROUNDING_PX: f64 = 22.0;
 
 /// v2 凹角的额外衰减系数（凹角内大位移最易自交）。
 pub const COASTLINE_V2_CONCAVE_CORNER_FACTOR: f64 = 0.45;

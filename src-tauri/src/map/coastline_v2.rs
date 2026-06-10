@@ -13,17 +13,19 @@
 use crate::map::constants::{
     COASTLINE_DEDUPLICATE_DISTANCE_SQUARED, COASTLINE_FALLBACK_RELAX_PASSES,
     COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_SCALE,
-    COASTLINE_V2_BAND_A_AMPLITUDE, COASTLINE_V2_BAND_A_PERIMETER_RATIO_CAP,
-    COASTLINE_V2_BAND_A_WAVELENGTH_MAX, COASTLINE_V2_BAND_A_WAVELENGTH_MIN,
+    COASTLINE_V2_BAND_A_AMPLITUDE, COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO,
+    COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
     COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_AMPLITUDE,
-    COASTLINE_V2_BAND_B_PERIMETER_RATIO_CAP, COASTLINE_V2_BAND_B_WAVELENGTH_MAX,
-    COASTLINE_V2_BAND_B_WAVELENGTH_MIN, COASTLINE_V2_BAND_B_WEIGHT,
-    COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_PERIMETER_RATIO_CAP,
-    COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
+    COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX,
+    COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX,
+    COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN, COASTLINE_V2_BAND_B_WEIGHT,
+    COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO,
+    COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MIN,
+    COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
-    COASTLINE_V2_CORNER_WINDOW_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
-    COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, COASTLINE_V2_SMOOTH_PASSES,
-    COASTLINE_V2_SPECTRAL_BETA, COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
+    COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
+    COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
+    COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
     COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX, GEOMETRY_EPSILON, HASH_TEXT_OFFSET_BASIS,
     HASH_TEXT_PRIME, HASH_UNIT_INCREMENT, HASH_UNIT_MULTIPLIER, TAU,
 };
@@ -37,9 +39,10 @@ use std::time::Instant;
 const COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR: f64 = 0.38;
 /// 关键地点的安全位移比例（防地点出界）。
 const COASTLINE_V2_LOCATION_SAFE_FACTOR: f64 = 0.50;
-/// 弧长排除窗口 = 该系数 × 振幅。需满足 系数 × NEAR_EDGE_SAFE_FACTOR > 1，
-/// 否则共线相邻轮廓段会把自身位移预算压到振幅以下，破坏顶点细分不变性。
-const COASTLINE_V2_ARC_EXCLUSION_AMPLITUDE_FACTOR: f64 = 3.0;
+/// 折叠几何判定：对面轮廓的空间距离 < 弧长距离 × 该比例时才视为窄缝/尖角/细颈并限幅；
+/// 否则视为轮廓的自然延伸（含共线细分边，其空间距离 ≈ 弧长距离），跳过。
+/// 该判据同时天然保证顶点细分不变性，并自动保护尖角（楔形两侧 d ≈ 弧距 × sin(角度)）。
+const COASTLINE_V2_ARC_FLAT_RATIO: f64 = 0.5;
 /// 安全降扰重试的振幅缩放序列（与 v1 一致）。
 const COASTLINE_V2_SAFETY_RETRY_SCALES: [f64; 3] = [0.75, 0.55, 0.40];
 /// 三个谐波带的盐值，仅区分带间随机模式。
@@ -173,6 +176,13 @@ fn naturalize_arc_length(
     let (base_points, arc_positions) =
         resample_by_arc_length(vertices, &cumulative, perimeter, sample_count);
 
+    // 加噪声前先把手绘角磨圆：自然地形没有精确尖角，
+    // 也避免噪声在尖点两侧沿突变法线位移形成针刺。
+    let rounding_radius = param!(params, corner_rounding_px, COASTLINE_V2_CORNER_ROUNDING_PX)
+        .min(perimeter * 0.06)
+        .max(0.0);
+    let base_points = round_corners(base_points, rounding_radius, step);
+
     let canvas_scale = canvas.width.min(canvas.height).max(1.0);
     let seed = hash_text(&format!("{}:{}", shape.id, shape.name));
     let (noise_offsets, amplitude) = build_noise_offsets(
@@ -184,14 +194,13 @@ fn naturalize_arc_length(
         amplitude_scale.clamp(0.0, 1.0),
         params,
     );
-    let corner_windows = build_corner_windows(vertices, &cumulative, perimeter, step, params);
+    let corner_windows =
+        build_corner_windows(vertices, &cumulative, step, rounding_radius, params);
     let outward_sign = if signed_area(vertices) >= 0.0 {
         -1.0
     } else {
         1.0
     };
-    let exclusion_window =
-        (COASTLINE_V2_ARC_EXCLUSION_AMPLITUDE_FACTOR * amplitude).max(2.0 * step);
 
     let mut refined = Vec::with_capacity(sample_count);
     let mut constrained_offsets = 0usize;
@@ -215,15 +224,10 @@ fn naturalize_arc_length(
                 arc_positions[index],
                 base_x,
                 base_y,
-                exclusion_window,
+                step,
                 related_locations,
                 amplitude,
-            )
-            .min(corner_tent_cap(
-                &corner_windows,
-                arc_positions[index],
-                perimeter,
-            ));
+            );
             let offset = requested_offset.clamp(-max_offset, max_offset);
             if offset.abs() + f64::EPSILON < requested_offset.abs() {
                 constrained_offsets += 1;
@@ -261,16 +265,41 @@ fn naturalize_arc_length(
 
 fn sample_count_for_perimeter(perimeter: f64, params: Option<&CoastlineV2Params>) -> usize {
     // 采样步长跟随最小波长（每周期 ≥4 个采样点），上限由质量档位控制。
-    let smallest_wavelength = param!(
-        params,
-        band_c_wavelength_min,
-        COASTLINE_V2_BAND_C_WAVELENGTH_MIN
-    )
-    .max(1.0);
-    let desired = (perimeter / (smallest_wavelength / 4.0)).ceil() as usize;
+    let smallest_wavelength = (perimeter / COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX)
+        .max(COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN);
+    let step = (smallest_wavelength / 4.0).clamp(2.0, 8.0);
+    let desired = (perimeter / step).ceil() as usize;
     let max_points = param!(params, max_points, COASTLINE_V2_MAX_POINTS)
         .min(COASTLINE_V2_MAX_POINTS_CEILING);
     desired.clamp(COASTLINE_V2_MIN_POINTS, max_points.max(COASTLINE_V2_MIN_POINTS))
+}
+
+/// 角点圆化：对等弧长重采样后的基线做若干轮 Laplacian 扩散。
+/// 直线段上的点等于邻居平均、位置不动，只有有曲率处（原始角点）被磨圆，
+/// 圆化范围 ≈ 步长 × √轮数。在重采样域操作，天然满足顶点细分不变性。
+fn round_corners(points: Vec<(f64, f64)>, radius: f64, step: f64) -> Vec<(f64, f64)> {
+    if points.len() < 3 || radius <= f64::EPSILON || step <= f64::EPSILON {
+        return points;
+    }
+
+    let passes = ((radius / step).powi(2)).ceil().clamp(2.0, 96.0) as usize;
+    let total = points.len();
+    let mut current = points;
+    let mut next = Vec::with_capacity(total);
+    for _ in 0..passes {
+        next.clear();
+        for index in 0..total {
+            let previous = current[(index + total - 1) % total];
+            let point = current[index];
+            let following = current[(index + 1) % total];
+            next.push((
+                point.0 + 0.5 * ((previous.0 + following.0) * 0.5 - point.0),
+                point.1 + 0.5 * ((previous.1 + following.1) * 0.5 - point.1),
+            ));
+        }
+        std::mem::swap(&mut current, &mut next);
+    }
+    current
 }
 
 fn cumulative_arc_lengths(vertices: &[MapShapeVertex]) -> (Vec<f64>, f64) {
@@ -359,12 +388,11 @@ fn build_harmonic_band(
     harmonics
 }
 
-/// 单个噪声带的世界单位规格：波长区间（px）+ 峰值振幅（px）+ 小图形护栏。
+/// 单个噪声带规格：波长区间与峰值振幅（均已折算为该形状下的 px 值）。
 struct BandSpec {
     wavelength_min: f64,
     wavelength_max: f64,
     amplitude: f64,
-    perimeter_ratio_cap: f64,
     weight: f64,
     salt: u64,
 }
@@ -408,52 +436,34 @@ fn build_noise_offsets(
         .clamp(0.0, 4.0)
         * amplitude_scale;
 
+    // 波长随周长等比缩放（分形自相似），B/C 带另设绝对下限防止小图形塌缩成锯齿；
+    // 振幅 = 周长比例，封顶于绝对上限（可由参数覆盖）。
     let band_specs = [
         BandSpec {
-            wavelength_min: param!(
-                params,
-                band_a_wavelength_min,
-                COASTLINE_V2_BAND_A_WAVELENGTH_MIN
-            ),
-            wavelength_max: param!(
-                params,
-                band_a_wavelength_max,
-                COASTLINE_V2_BAND_A_WAVELENGTH_MAX
-            ),
-            amplitude: param!(params, band_a_amplitude, COASTLINE_V2_BAND_A_AMPLITUDE),
-            perimeter_ratio_cap: COASTLINE_V2_BAND_A_PERIMETER_RATIO_CAP,
+            wavelength_min: perimeter / COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX,
+            wavelength_max: perimeter / COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
+            amplitude: (perimeter * COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO)
+                .min(param!(params, band_a_amplitude, COASTLINE_V2_BAND_A_AMPLITUDE)),
             weight: param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_A,
         },
         BandSpec {
-            wavelength_min: param!(
-                params,
-                band_b_wavelength_min,
-                COASTLINE_V2_BAND_B_WAVELENGTH_MIN
-            ),
-            wavelength_max: param!(
-                params,
-                band_b_wavelength_max,
-                COASTLINE_V2_BAND_B_WAVELENGTH_MAX
-            ),
-            amplitude: param!(params, band_b_amplitude, COASTLINE_V2_BAND_B_AMPLITUDE),
-            perimeter_ratio_cap: COASTLINE_V2_BAND_B_PERIMETER_RATIO_CAP,
+            wavelength_min: (perimeter / COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX)
+                .max(COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN),
+            wavelength_max: (perimeter / COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN)
+                .max(COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX),
+            amplitude: (perimeter * COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO)
+                .min(param!(params, band_b_amplitude, COASTLINE_V2_BAND_B_AMPLITUDE)),
             weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_B,
         },
         BandSpec {
-            wavelength_min: param!(
-                params,
-                band_c_wavelength_min,
-                COASTLINE_V2_BAND_C_WAVELENGTH_MIN
-            ),
-            wavelength_max: param!(
-                params,
-                band_c_wavelength_max,
-                COASTLINE_V2_BAND_C_WAVELENGTH_MAX
-            ),
-            amplitude: param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE),
-            perimeter_ratio_cap: COASTLINE_V2_BAND_C_PERIMETER_RATIO_CAP,
+            wavelength_min: (perimeter / COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX)
+                .max(COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN),
+            wavelength_max: (perimeter / COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MIN)
+                .max(COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MAX),
+            amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO)
+                .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE)),
             weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_C,
         },
@@ -474,10 +484,8 @@ fn build_noise_offsets(
         // 避免相近大小的岛屿在"带出现阈值"两侧外观突变。
         let fade_in = ((perimeter / spec.wavelength_min - 1.0) / 0.5).clamp(0.0, 1.0);
         let fade_in = fade_in * fade_in * (3.0 - 2.0 * fade_in);
-        let effective_amplitude = spec.amplitude.min(spec.perimeter_ratio_cap * perimeter)
-            * spec.weight.clamp(0.0, 4.0)
-            * global_scale
-            * fade_in;
+        let effective_amplitude =
+            spec.amplitude * spec.weight.clamp(0.0, 4.0) * global_scale * fade_in;
         if effective_amplitude <= f64::EPSILON {
             continue;
         }
@@ -527,21 +535,18 @@ struct CornerWindow {
     arc_position: f64,
     factor: f64,
     radius: f64,
-    /// 帐篷斜率：该角点附近位移 ≤ 弧距 × 斜率，几何上防止角点两侧沿不同法线位移后折叠自交。
-    tent_slope: f64,
 }
 
+/// 只对凹角做温和衰减（凹角内的大位移最容易跨缝自交）；
+/// 凸角不衰减——岬角/半岛获得完整噪声，配合角点圆化保持自然。
 fn build_corner_windows(
     vertices: &[MapShapeVertex],
     cumulative: &[f64],
-    perimeter: f64,
     step: f64,
+    rounding_radius: f64,
     params: Option<&CoastlineV2Params>,
 ) -> Vec<CornerWindow> {
-    // 窗口半径用绝对像素，另以 0.02×周长封顶——顶点多的图形不能全周长都泡在衰减区里。
-    let radius = param!(params, corner_window_px, COASTLINE_V2_CORNER_WINDOW_PX)
-        .min(perimeter * 0.02)
-        .max(2.0 * step);
+    let radius = (rounding_radius * 2.0).max(4.0 * step);
     let concave_factor = param!(
         params,
         concave_corner_factor,
@@ -551,30 +556,16 @@ fn build_corner_windows(
 
     let mut windows = Vec::new();
     for index in 0..vertices.len() {
-        let Some((angle, is_concave)) = corner_geometry(vertices, index, area_sign) else {
+        let Some((_, is_concave)) = corner_geometry(vertices, index, area_sign) else {
             continue;
         };
-        let sharp_factor =
-            (angle / std::f64::consts::PI).clamp(COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, 1.0);
-        let factor = if is_concave {
-            sharp_factor * concave_factor
-        } else {
-            sharp_factor
-        };
-        if factor >= 0.999 {
+        if !is_concave {
             continue;
-        }
-
-        // 位移与弧距碰撞条件近似为 offset ≈ d·tan(内角/2)，取 0.8 安全系数；凹角再压一档。
-        let mut tent_slope = (0.8 * (angle * 0.5).tan()).clamp(0.15, 4.0);
-        if is_concave {
-            tent_slope *= concave_factor;
         }
         windows.push(CornerWindow {
             arc_position: cumulative[index],
-            factor,
+            factor: concave_factor,
             radius,
-            tent_slope,
         });
     }
     windows
@@ -617,7 +608,7 @@ fn corner_geometry(
     Some((angle, turn_cross.signum() != area_sign.signum()))
 }
 
-/// 测试辅助：把 corner_geometry 的结果折算成单一衰减系数（与窗口构建逻辑一致）。
+/// 测试辅助：把 corner_geometry 的结果折算成单一衰减系数（与窗口构建逻辑一致：仅凹角衰减）。
 #[cfg(test)]
 fn vertex_corner_factor(
     vertices: &[MapShapeVertex],
@@ -626,27 +617,9 @@ fn vertex_corner_factor(
     concave_factor: f64,
 ) -> f64 {
     match corner_geometry(vertices, vertex_index, area_sign) {
-        None => 1.0,
-        Some((angle, is_concave)) => {
-            let sharp_factor =
-                (angle / std::f64::consts::PI).clamp(COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, 1.0);
-            if is_concave {
-                sharp_factor * concave_factor
-            } else {
-                sharp_factor
-            }
-        }
+        Some((_, true)) => concave_factor,
+        _ => 1.0,
     }
-}
-
-/// 所有角点帐篷上限的最小值：离角点越近允许的位移越小，杜绝角点折叠。
-fn corner_tent_cap(windows: &[CornerWindow], arc_position: f64, perimeter: f64) -> f64 {
-    let mut cap = f64::INFINITY;
-    for window in windows {
-        let distance = circular_distance(arc_position, window.arc_position, perimeter);
-        cap = cap.min(distance * window.tent_slope);
-    }
-    cap
 }
 
 fn corner_attenuation(windows: &[CornerWindow], arc_position: f64, perimeter: f64) -> f64 {
@@ -671,7 +644,7 @@ fn max_safe_offset(
     arc_position: f64,
     x: f64,
     y: f64,
-    exclusion_window: f64,
+    step: f64,
     related_locations: &[MapKeyLocationDraft],
     amplitude: f64,
 ) -> f64 {
@@ -684,11 +657,15 @@ fn max_safe_offset(
             cumulative[index + 1],
             perimeter,
         );
-        if arc_distance < exclusion_window {
+        if arc_distance <= step {
             continue;
         }
         let distance =
             point_to_segment_distance(x, y, &vertices[index], &vertices[(index + 1) % total]);
+        // 空间距离接近弧长距离 → 这是轮廓的自然延伸（含共线细分边），不构成窄缝。
+        if distance >= arc_distance * COASTLINE_V2_ARC_FLAT_RATIO {
+            continue;
+        }
         max_offset = max_offset.min(distance * COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR);
     }
 
@@ -1038,16 +1015,17 @@ mod tests {
     }
 
     #[test]
-    fn v2_collinear_vertex_is_not_a_corner() {
-        let shape = subdivided_square_shape();
-        let area_sign = signed_area(&shape.vertices);
+    fn v2_corner_damping_only_applies_to_concave() {
+        let square = subdivided_square_shape();
+        let square_sign = signed_area(&square.vertices);
+        // 索引 1 是插入的共线中点，索引 2 是原始凸直角——都不衰减。
+        assert_eq!(vertex_corner_factor(&square.vertices, 1, square_sign, 0.45), 1.0);
+        assert_eq!(vertex_corner_factor(&square.vertices, 2, square_sign, 0.45), 1.0);
 
-        // 索引 1 是插入的共线中点，索引 2 是原始直角。
-        let straight = vertex_corner_factor(&shape.vertices, 1, area_sign, 0.45);
-        let corner = vertex_corner_factor(&shape.vertices, 2, area_sign, 0.45);
-
-        assert_eq!(straight, 1.0);
-        assert!(corner < 1.0);
+        // 窄湾形状的凹角（索引 3）衰减到 concave_factor。
+        let narrow = narrow_shape();
+        let narrow_sign = signed_area(&narrow.vertices);
+        assert_eq!(vertex_corner_factor(&narrow.vertices, 3, narrow_sign, 0.45), 0.45);
     }
 
     #[test]
