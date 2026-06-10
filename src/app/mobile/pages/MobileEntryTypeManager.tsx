@@ -45,6 +45,7 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
         setEditingType(type)
         setCreatorOpen(true)
     }
+    const builtinTypes = allEntryTypes.filter((type): type is Extract<EntryTypeView, {kind: 'builtin'}> => type.kind === 'builtin')
 
     return (
         <div className="mobile-page mobile-type-tag">
@@ -58,7 +59,7 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                     }]}
                 />
                 <div className="mobile-type-tag__heading">
-                    <span className="mobile-type-tag__eyebrow">{loading ? '正在同步' : `${customTypes.length} 个自定义类型`}</span>
+                    <span className="mobile-type-tag__eyebrow">{loading ? '正在同步' : `${allEntryTypes.length} 个类型`}</span>
                     <h2 className="mobile-type-tag__title">类型管理</h2>
                 </div>
                 <MobileTopActionPill
@@ -76,6 +77,25 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                 <div className="mobile-page__loading">加载中…</div>
             ) : (
                 <div className="mobile-type-tag__list">
+                    <div className="mobile-type-tag__section-label">内置类型</div>
+                    {builtinTypes.map(type => (
+                        <div
+                            className="mobile-list-card mobile-type-tag__type-card mobile-type-tag__type-card--readonly"
+                            key={type.key}
+                        >
+                            <span className="mobile-list-card__row">
+                                <span className="mobile-list-card__main">
+                                    <span className="mobile-list-card__title mobile-type-tag__type-title">
+                                        <EntryTypeIcon entryType={type} className=""/> {type.name}
+                                    </span>
+                                    <span className="mobile-list-card__description">{type.description}</span>
+                                </span>
+                                <span className="mobile-list-card__tag mobile-type-tag__value-tag">内置</span>
+                            </span>
+                        </div>
+                    ))}
+
+                    <div className="mobile-type-tag__section-label">自定义类型</div>
                     {customTypes.length === 0 ? (
                         <div className="mobile-page__empty mobile-type-tag__empty">还没有自定义类型（内置类型始终可用）</div>
                     ) : customTypes.map(type => (
@@ -85,10 +105,15 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                             key={type.id}
                             onClick={() => openCreator(type)}
                         >
-                            <span className="mobile-list-card__title mobile-type-tag__type-title">
-                                <EntryTypeIcon entryType={{kind: 'custom', ...type}} className=""/> {type.name}
+                            <span className="mobile-list-card__row">
+                                <span className="mobile-list-card__main">
+                                    <span className="mobile-list-card__title mobile-type-tag__type-title">
+                                        <EntryTypeIcon entryType={{kind: 'custom', ...type}} className=""/> {type.name}
+                                    </span>
+                                    {type.description && <span className="mobile-list-card__description">{type.description}</span>}
+                                </span>
+                                <span className="mobile-list-card__tag mobile-type-tag__value-tag">自定义</span>
                             </span>
-                            {type.description && <span className="mobile-list-card__description">{type.description}</span>}
                         </button>
                     ))}
                 </div>

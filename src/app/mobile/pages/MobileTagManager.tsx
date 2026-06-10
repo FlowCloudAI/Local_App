@@ -91,9 +91,16 @@ export default function MobileTagManager({pop, params}: Props) {
                             key={schema.id}
                             onClick={() => openCreator(schema)}
                         >
-                            <span className="mobile-list-card__title">{schema.name}</span>
-                            <span className="mobile-list-card__description">
-                                {tagTypeLabel(schema.type)}{schema.description ? ` · ${schema.description}` : ''}
+                            <span className="mobile-list-card__row">
+                                <span className="mobile-list-card__main">
+                                    <span className="mobile-list-card__title">{schema.name}</span>
+                                    {schema.description && (
+                                        <span className="mobile-list-card__description">{schema.description}</span>
+                                    )}
+                                </span>
+                                <span className="mobile-list-card__tag mobile-type-tag__value-tag">
+                                    {tagTypeLabel(schema.type)}
+                                </span>
                             </span>
                         </button>
                     ))}

@@ -42,6 +42,23 @@
     letter-spacing: 0.01em;
 }
 
+.tag-creator-close.app-dialog-close {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 86%, transparent);
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
+    color: var(--fc-color-text-secondary);
+    box-shadow: var(--fc-shadow-xs);
+}
+
+.tag-creator-close.app-dialog-close:hover:not(:disabled),
+.tag-creator-close.app-dialog-close:focus-visible {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 44%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-primary) 8%, var(--fc-color-bg-elevated));
+    color: var(--fc-color-text);
+}
+
 /* ── 内容区 ──────────────────────────────────────────────────────────────────── */
 
 .tag-creator-body {
