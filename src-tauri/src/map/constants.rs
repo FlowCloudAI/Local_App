@@ -139,6 +139,77 @@ pub const COASTLINE_NOISE_SALT_B: u64 = 0xC2B2_AE3D_27D4_EB4F;
 /// 修改：会改变该层细碎纹理的随机模式，影响海岸表面粗糙感。
 pub const COASTLINE_NOISE_SALT_C: u64 = 0x1656_67B1_9E37_79F9;
 
+/// v2 海岸线等弧长重采样的目标采样点数。
+/// 调大：轮廓细节更丰富、最高频带更完整；调小：更快但细节减少。
+pub const COASTLINE_V2_TARGET_POINTS: usize = 320;
+
+/// v2 海岸线采样点数下限，保证小图形仍有基本细分。
+pub const COASTLINE_V2_MIN_POINTS: usize = 32;
+
+/// v2 海岸线采样点数上限，避免超大轮廓的顶点数失控。
+pub const COASTLINE_V2_MAX_POINTS: usize = 2048;
+
+/// v2 噪声 A 带（宏观海湾/半岛）最低谐波数（整周周期数）。
+/// 调大：宏观起伏更碎；调小：出现更大尺度的湾/岬。
+pub const COASTLINE_V2_BAND_A_HARMONIC_MIN: u32 = 2;
+
+/// v2 噪声 A 带最高谐波数。
+pub const COASTLINE_V2_BAND_A_HARMONIC_MAX: u32 = 6;
+
+/// v2 噪声 B 带（中尺度）最低谐波数。
+pub const COASTLINE_V2_BAND_B_HARMONIC_MIN: u32 = 9;
+
+/// v2 噪声 B 带最高谐波数。
+pub const COASTLINE_V2_BAND_B_HARMONIC_MAX: u32 = 18;
+
+/// v2 噪声 C 带（细碎纹理）最低谐波数。
+pub const COASTLINE_V2_BAND_C_HARMONIC_MIN: u32 = 28;
+
+/// v2 噪声 C 带最高谐波数（实际还会被采样密度上限截断，保证每周期 ≥4 个采样点）。
+pub const COASTLINE_V2_BAND_C_HARMONIC_MAX: u32 = 56;
+
+/// v2 噪声 A 带权重。调大：宏观形态起伏更显著。
+pub const COASTLINE_V2_BAND_A_WEIGHT: f64 = 0.5;
+
+/// v2 噪声 B 带权重。调大：中尺度细节更突出。
+pub const COASTLINE_V2_BAND_B_WEIGHT: f64 = 0.3;
+
+/// v2 噪声 C 带权重。调大：海岸表面更粗糙。
+pub const COASTLINE_V2_BAND_C_WEIGHT: f64 = 0.2;
+
+/// v2 谐波谱斜率 β（振幅 ∝ k^(-β/2)），分形海岸线典型取值 1.6~2.0。
+/// 调大：高频成分衰减更快、轮廓更平滑；调小：高频更强、更粗糙。
+pub const COASTLINE_V2_SPECTRAL_BETA: f64 = 1.8;
+
+/// v2 位移振幅相对周长的比例。
+/// 调大：起伏更明显；调小：更贴近原始草稿。
+pub const COASTLINE_V2_AMPLITUDE_PERIMETER_RATIO: f64 = 0.02;
+
+/// v2 振幅最小值，保证小图形仍有可见细节。
+pub const COASTLINE_V2_AMPLITUDE_MIN: f64 = 2.0;
+
+/// v2 振幅相对画布短边的上限。
+pub const COASTLINE_V2_AMPLITUDE_CANVAS_RATIO_MAX: f64 = 0.025;
+
+/// v2 角点衰减窗口相对周长的比例（仅在凹角/尖角附近的弧长窗口内衰减振幅）。
+/// 调大：角点附近压得更宽；调小：噪声更靠近角点，但自交风险略升。
+pub const COASTLINE_V2_CORNER_WINDOW_PERIMETER_RATIO: f64 = 0.04;
+
+/// v2 凹角的额外衰减系数（凹角内大位移最易自交）。
+pub const COASTLINE_V2_CONCAVE_CORNER_FACTOR: f64 = 0.45;
+
+/// v2 尖角衰减系数下限（角度越尖衰减越强，但不低于此值）。
+pub const COASTLINE_V2_SHARP_CORNER_FACTOR_MIN: f64 = 0.35;
+
+/// v2 Taubin 平滑的轮数（一轮 = λ 收缩 + μ 回胀，整体无收缩）。
+pub const COASTLINE_V2_SMOOTH_PASSES: usize = 1;
+
+/// v2 Taubin 平滑收缩步长 λ。
+pub const COASTLINE_V2_TAUBIN_LAMBDA: f64 = 0.33;
+
+/// v2 Taubin 平滑回胀步长 μ（须为负且 |μ| 略大于 λ）。
+pub const COASTLINE_V2_TAUBIN_MU: f64 = -0.34;
+
 /// 文本哈希的初始偏移量。
 /// 修改：会改变文本哈希结果，影响基于文本的确定性随机（如颜色、形状等）。
 pub const HASH_TEXT_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;

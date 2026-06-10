@@ -1,0 +1,964 @@
+//! 海岸线自然化算法 v2：全周长弧长参数化 + 整数谐波周期噪声。
+//!
+//! 与 v1（coastline.rs，保持不动）的本质区别：
+//! - 噪声以整条轮廓的弧长 s ∈ [0, P) 统一参数化，整数谐波保证闭合无缝，
+//!   不再逐边参数化，因此不需要 sin(πt) 包络，原始顶点也不再被钉死；
+//! - 频率/振幅/采样密度全部以世界单位（周长比例、像素）定义，与原始边长无关；
+//! - 角点保护从"全边包络"收窄为"凹角/尖角附近的弧长窗口衰减"；
+//! - 平滑使用 Taubin（λ/μ 双步），避免 Laplacian 的收缩效应。
+//!
+//! 设计文档：docs/coastline_algorithm_redesign.md。
+//! 由 request.meta.ext.coastlineAlgorithm == "v2" 显式选择本实现，默认仍走 v1。
+
+use crate::map::constants::{
+    COASTLINE_DEDUPLICATE_DISTANCE_SQUARED, COASTLINE_FALLBACK_RELAX_PASSES,
+    COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_CANVAS_RATIO_MAX,
+    COASTLINE_V2_AMPLITUDE_MIN, COASTLINE_V2_AMPLITUDE_PERIMETER_RATIO,
+    COASTLINE_V2_BAND_A_HARMONIC_MAX, COASTLINE_V2_BAND_A_HARMONIC_MIN,
+    COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_HARMONIC_MAX,
+    COASTLINE_V2_BAND_B_HARMONIC_MIN, COASTLINE_V2_BAND_B_WEIGHT,
+    COASTLINE_V2_BAND_C_HARMONIC_MAX, COASTLINE_V2_BAND_C_HARMONIC_MIN,
+    COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
+    COASTLINE_V2_CORNER_WINDOW_PERIMETER_RATIO, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MIN_POINTS,
+    COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
+    COASTLINE_V2_TARGET_POINTS, COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
+    GEOMETRY_EPSILON, HASH_TEXT_OFFSET_BASIS, HASH_TEXT_PRIME, HASH_UNIT_INCREMENT,
+    HASH_UNIT_MULTIPLIER, TAU,
+};
+use crate::map::geometry::{find_polygon_self_intersections, is_point_in_polygon};
+use crate::map::types::{
+    CoastlineV2Params, MapEditorCanvas, MapKeyLocationDraft, MapShapeDraft, MapShapeVertex,
+};
+use std::time::Instant;
+
+/// 最近非邻近轮廓的安全位移比例（防窄缝自交）。
+const COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR: f64 = 0.38;
+/// 关键地点的安全位移比例（防地点出界）。
+const COASTLINE_V2_LOCATION_SAFE_FACTOR: f64 = 0.50;
+/// 弧长排除窗口 = 该系数 × 振幅。需满足 系数 × NEAR_EDGE_SAFE_FACTOR > 1，
+/// 否则共线相邻轮廓段会把自身位移预算压到振幅以下，破坏顶点细分不变性。
+const COASTLINE_V2_ARC_EXCLUSION_AMPLITUDE_FACTOR: f64 = 3.0;
+/// 安全降扰重试的振幅缩放序列（与 v1 一致）。
+const COASTLINE_V2_SAFETY_RETRY_SCALES: [f64; 3] = [0.75, 0.55, 0.40];
+/// 三个谐波带的盐值，仅区分带间随机模式。
+const COASTLINE_V2_NOISE_SALT_A: u64 = 0xD6E8_FEB8_6659_FD93;
+const COASTLINE_V2_NOISE_SALT_B: u64 = 0xA0761_D649_5B19_0C5 ^ 0x735A_2D97;
+const COASTLINE_V2_NOISE_SALT_C: u64 = 0x8EBC_6AF0_9C88_C6E3;
+
+macro_rules! param {
+    ($params:expr, $field:ident, $default:expr) => {
+        $params.and_then(|p| p.$field).unwrap_or($default)
+    };
+}
+
+pub fn build_natural_coastline_polygon_v2(
+    canvas: &MapEditorCanvas,
+    shape: &MapShapeDraft,
+    related_locations: &[MapKeyLocationDraft],
+    params: Option<&CoastlineV2Params>,
+) -> Vec<[f64; 2]> {
+    let started_at = Instant::now();
+    log::info!(
+        "开始海岸线v2计算：shape_id={}，name={}，原始顶点数={}，关联关键地点数={}",
+        shape.id,
+        shape.name,
+        shape.vertices.len(),
+        related_locations.len()
+    );
+
+    if shape.vertices.len() < 3 {
+        log::warn!(
+            "海岸线v2计算直接返回原始轮廓：shape_id={}，原因=顶点数不足，顶点数={}",
+            shape.id,
+            shape.vertices.len()
+        );
+        return to_polygon(&shape.vertices);
+    }
+
+    let naturalized = naturalize_arc_length(canvas, shape, related_locations, params, 1.0);
+    if coastline_is_usable(&naturalized, related_locations) {
+        log::info!(
+            "海岸线v2计算成功：shape_id={}，分支=自然化，输出顶点数={}，耗时={}ms",
+            shape.id,
+            naturalized.len(),
+            started_at.elapsed().as_millis()
+        );
+        return to_polygon(&naturalized);
+    }
+
+    let naturalized_intersections = find_polygon_self_intersections(&naturalized);
+    if !naturalized_intersections.is_empty() {
+        log::warn!(
+            "海岸线v2自然化结果不可用：shape_id={}，原因=自交，交叉数={}，输出顶点数={}",
+            shape.id,
+            naturalized_intersections.len(),
+            naturalized.len()
+        );
+    } else {
+        let outside_count = related_locations
+            .iter()
+            .filter(|location| {
+                let point = MapShapeVertex {
+                    id: location.id.clone(),
+                    x: location.x,
+                    y: location.y,
+                };
+                !is_point_in_polygon(&point, &naturalized)
+            })
+            .count();
+        if outside_count > 0 {
+            log::warn!(
+                "海岸线v2自然化结果不可用：shape_id={}，原因=关键地点落到轮廓外，数量={}",
+                shape.id,
+                outside_count
+            );
+        }
+    }
+
+    for scale in COASTLINE_V2_SAFETY_RETRY_SCALES {
+        let retried = naturalize_arc_length(canvas, shape, related_locations, params, scale);
+        if coastline_is_usable(&retried, related_locations) {
+            log::info!(
+                "海岸线v2计算成功：shape_id={}，分支=安全降扰，降扰系数={}，输出顶点数={}，耗时={}ms",
+                shape.id,
+                scale,
+                retried.len(),
+                started_at.elapsed().as_millis()
+            );
+            return to_polygon(&retried);
+        }
+    }
+
+    let smoothed = relax_polygon(
+        &shape.vertices,
+        COASTLINE_FALLBACK_RELAX_PASSES,
+        COASTLINE_FALLBACK_RELAX_WEIGHT,
+    );
+    if coastline_is_usable(&smoothed, related_locations) {
+        log::info!(
+            "海岸线v2计算成功：shape_id={}，分支=回退平滑，输出顶点数={}，耗时={}ms",
+            shape.id,
+            smoothed.len(),
+            started_at.elapsed().as_millis()
+        );
+        return to_polygon(&smoothed);
+    }
+
+    log::warn!(
+        "海岸线v2计算失败并返回原始轮廓：shape_id={}，原始顶点数={}，耗时={}ms",
+        shape.id,
+        shape.vertices.len(),
+        started_at.elapsed().as_millis()
+    );
+    to_polygon(&shape.vertices)
+}
+
+fn naturalize_arc_length(
+    canvas: &MapEditorCanvas,
+    shape: &MapShapeDraft,
+    related_locations: &[MapKeyLocationDraft],
+    params: Option<&CoastlineV2Params>,
+    amplitude_scale: f64,
+) -> Vec<MapShapeVertex> {
+    let vertices = &shape.vertices;
+    let (cumulative, perimeter) = cumulative_arc_lengths(vertices);
+    if perimeter <= f64::EPSILON {
+        return vertices.to_vec();
+    }
+
+    let sample_count = sample_count_for_perimeter(perimeter, params);
+    let step = perimeter / sample_count as f64;
+    let (base_points, arc_positions) =
+        resample_by_arc_length(vertices, &cumulative, perimeter, sample_count);
+
+    let canvas_scale = canvas.width.min(canvas.height).max(1.0);
+    let amplitude = (perimeter
+        * param!(
+            params,
+            amplitude_perimeter_ratio,
+            COASTLINE_V2_AMPLITUDE_PERIMETER_RATIO
+        ))
+    .clamp(
+        param!(params, amplitude_min, COASTLINE_V2_AMPLITUDE_MIN),
+        canvas_scale
+            * param!(
+                params,
+                amplitude_canvas_ratio_max,
+                COASTLINE_V2_AMPLITUDE_CANVAS_RATIO_MAX
+            ),
+    ) * amplitude_scale.clamp(0.0, 1.0);
+
+    let seed = hash_text(&format!("{}:{}", shape.id, shape.name));
+    let noise_values = build_noise_values(seed, &arc_positions, perimeter, sample_count, params);
+    let corner_windows = build_corner_windows(vertices, &cumulative, perimeter, step, params);
+    let outward_sign = if signed_area(vertices) >= 0.0 {
+        -1.0
+    } else {
+        1.0
+    };
+    let exclusion_window =
+        (COASTLINE_V2_ARC_EXCLUSION_AMPLITUDE_FACTOR * amplitude).max(2.0 * step);
+
+    let mut refined = Vec::with_capacity(sample_count);
+    let mut constrained_offsets = 0usize;
+    for index in 0..sample_count {
+        let (base_x, base_y) = base_points[index];
+        let previous = base_points[(index + sample_count - 1) % sample_count];
+        let next = base_points[(index + 1) % sample_count];
+        let tangent_x = next.0 - previous.0;
+        let tangent_y = next.1 - previous.1;
+        let tangent_length = (tangent_x * tangent_x + tangent_y * tangent_y).sqrt();
+
+        let mut x = base_x;
+        let mut y = base_y;
+        if tangent_length > f64::EPSILON {
+            let attenuation = corner_attenuation(&corner_windows, arc_positions[index], perimeter);
+            let requested_offset = amplitude * attenuation * noise_values[index];
+            let max_offset = max_safe_offset(
+                vertices,
+                &cumulative,
+                perimeter,
+                arc_positions[index],
+                base_x,
+                base_y,
+                exclusion_window,
+                related_locations,
+                amplitude,
+            );
+            let offset = requested_offset.clamp(-max_offset, max_offset);
+            if offset.abs() + f64::EPSILON < requested_offset.abs() {
+                constrained_offsets += 1;
+            }
+            x += outward_sign * tangent_y / tangent_length * offset;
+            y += outward_sign * -tangent_x / tangent_length * offset;
+        }
+
+        refined.push(MapShapeVertex {
+            id: format!("{}-coast2-{}", shape.id, index),
+            x,
+            y,
+        });
+    }
+
+    let raw_refined_len = refined.len();
+    let refined = dedupe_adjacent_vertices(refined, COASTLINE_DEDUPLICATE_DISTANCE_SQUARED);
+    let smoothed = taubin_smooth(
+        refined,
+        param!(params, smooth_passes, COASTLINE_V2_SMOOTH_PASSES),
+        param!(params, taubin_lambda, COASTLINE_V2_TAUBIN_LAMBDA),
+        param!(params, taubin_mu, COASTLINE_V2_TAUBIN_MU),
+    );
+    log::info!(
+        "v2自然化细节：shape_id={}，原始顶点数={}，采样点数={}，去重后顶点数={}，振幅={:.2}，受限位移点数={}",
+        shape.id,
+        vertices.len(),
+        raw_refined_len,
+        smoothed.len(),
+        amplitude,
+        constrained_offsets
+    );
+    smoothed
+}
+
+fn sample_count_for_perimeter(perimeter: f64, params: Option<&CoastlineV2Params>) -> usize {
+    let target = param!(params, target_points, COASTLINE_V2_TARGET_POINTS);
+    // 约 1px 一个采样点的密度上限，避免小图形被过度细分。
+    let by_perimeter = (perimeter.floor() as usize).max(COASTLINE_V2_MIN_POINTS);
+    target
+        .min(by_perimeter)
+        .clamp(COASTLINE_V2_MIN_POINTS, COASTLINE_V2_MAX_POINTS)
+}
+
+fn cumulative_arc_lengths(vertices: &[MapShapeVertex]) -> (Vec<f64>, f64) {
+    let mut cumulative = Vec::with_capacity(vertices.len() + 1);
+    cumulative.push(0.0);
+    let mut total = 0.0;
+    for index in 0..vertices.len() {
+        let start = &vertices[index];
+        let end = &vertices[(index + 1) % vertices.len()];
+        let dx = end.x - start.x;
+        let dy = end.y - start.y;
+        total += (dx * dx + dy * dy).sqrt();
+        cumulative.push(total);
+    }
+    (cumulative, total)
+}
+
+fn resample_by_arc_length(
+    vertices: &[MapShapeVertex],
+    cumulative: &[f64],
+    perimeter: f64,
+    sample_count: usize,
+) -> (Vec<(f64, f64)>, Vec<f64>) {
+    let total = vertices.len();
+    let step = perimeter / sample_count as f64;
+    let mut points = Vec::with_capacity(sample_count);
+    let mut arc_positions = Vec::with_capacity(sample_count);
+    let mut edge = 0usize;
+    for index in 0..sample_count {
+        let s = index as f64 * step;
+        while edge + 1 < total && cumulative[edge + 1] <= s {
+            edge += 1;
+        }
+        let edge_length = (cumulative[edge + 1] - cumulative[edge]).max(f64::EPSILON);
+        let t = ((s - cumulative[edge]) / edge_length).clamp(0.0, 1.0);
+        let start = &vertices[edge];
+        let end = &vertices[(edge + 1) % total];
+        points.push((start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t));
+        arc_positions.push(s);
+    }
+    (points, arc_positions)
+}
+
+struct Harmonic {
+    frequency: f64,
+    amplitude: f64,
+    phase: f64,
+}
+
+/// 在 [k_min, k_max] 整数谐波上做谱合成，带内做 RMS 归一。
+/// 整数频率保证 f(0) == f(P)，闭合轮廓天然无缝。
+fn build_harmonic_band(
+    seed: u64,
+    salt: u64,
+    harmonic_min: u32,
+    harmonic_max: u32,
+    spectral_beta: f64,
+    harmonic_cap: u32,
+) -> Vec<Harmonic> {
+    let harmonic_max = harmonic_max.min(harmonic_cap);
+    if harmonic_min > harmonic_max {
+        return Vec::new();
+    }
+
+    let mut harmonics = Vec::with_capacity((harmonic_max - harmonic_min + 1) as usize);
+    let mut power = 0.0;
+    for k in harmonic_min..=harmonic_max {
+        let amplitude_random =
+            0.5 + 0.5 * hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(k) + 1));
+        let amplitude = amplitude_random * f64::from(k).powf(-spectral_beta / 2.0);
+        let phase = hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(k) + 2)) * TAU;
+        power += amplitude * amplitude * 0.5;
+        harmonics.push(Harmonic {
+            frequency: f64::from(k),
+            amplitude,
+            phase,
+        });
+    }
+
+    let rms = power.sqrt();
+    if rms > f64::EPSILON {
+        for harmonic in &mut harmonics {
+            harmonic.amplitude /= rms;
+        }
+    }
+    harmonics
+}
+
+/// 计算所有采样点的噪声值，并归一化到峰值 1，使振幅参数即峰值位移。
+fn build_noise_values(
+    seed: u64,
+    arc_positions: &[f64],
+    perimeter: f64,
+    sample_count: usize,
+    params: Option<&CoastlineV2Params>,
+) -> Vec<f64> {
+    let spectral_beta = param!(params, spectral_beta, COASTLINE_V2_SPECTRAL_BETA);
+    // 最高频带每周期至少 4 个采样点，杜绝 v1 的欠采样混叠。
+    let harmonic_cap = (sample_count / 4).max(1) as u32;
+    let bands = [
+        (
+            param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
+            build_harmonic_band(
+                seed,
+                COASTLINE_V2_NOISE_SALT_A,
+                param!(params, band_a_harmonic_min, COASTLINE_V2_BAND_A_HARMONIC_MIN),
+                param!(params, band_a_harmonic_max, COASTLINE_V2_BAND_A_HARMONIC_MAX),
+                spectral_beta,
+                harmonic_cap,
+            ),
+        ),
+        (
+            param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
+            build_harmonic_band(
+                seed,
+                COASTLINE_V2_NOISE_SALT_B,
+                param!(params, band_b_harmonic_min, COASTLINE_V2_BAND_B_HARMONIC_MIN),
+                param!(params, band_b_harmonic_max, COASTLINE_V2_BAND_B_HARMONIC_MAX),
+                spectral_beta,
+                harmonic_cap,
+            ),
+        ),
+        (
+            param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
+            build_harmonic_band(
+                seed,
+                COASTLINE_V2_NOISE_SALT_C,
+                param!(params, band_c_harmonic_min, COASTLINE_V2_BAND_C_HARMONIC_MIN),
+                param!(params, band_c_harmonic_max, COASTLINE_V2_BAND_C_HARMONIC_MAX),
+                spectral_beta,
+                harmonic_cap,
+            ),
+        ),
+    ];
+
+    let mut values = Vec::with_capacity(arc_positions.len());
+    for &s in arc_positions {
+        let mut total = 0.0;
+        for (weight, harmonics) in &bands {
+            let mut band_value = 0.0;
+            for harmonic in harmonics {
+                band_value += harmonic.amplitude
+                    * (TAU * harmonic.frequency * s / perimeter + harmonic.phase).sin();
+            }
+            total += weight * band_value;
+        }
+        values.push(total);
+    }
+
+    let max_abs = values.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
+    if max_abs > f64::EPSILON {
+        for value in &mut values {
+            *value /= max_abs;
+        }
+    }
+    values
+}
+
+struct CornerWindow {
+    arc_position: f64,
+    factor: f64,
+    radius: f64,
+}
+
+fn build_corner_windows(
+    vertices: &[MapShapeVertex],
+    cumulative: &[f64],
+    perimeter: f64,
+    step: f64,
+    params: Option<&CoastlineV2Params>,
+) -> Vec<CornerWindow> {
+    let radius = (perimeter
+        * param!(
+            params,
+            corner_window_perimeter_ratio,
+            COASTLINE_V2_CORNER_WINDOW_PERIMETER_RATIO
+        ))
+    .max(2.0 * step);
+    let concave_factor = param!(
+        params,
+        concave_corner_factor,
+        COASTLINE_V2_CONCAVE_CORNER_FACTOR
+    );
+    let area_sign = signed_area(vertices);
+
+    let mut windows = Vec::new();
+    for index in 0..vertices.len() {
+        let factor = vertex_corner_factor(vertices, index, area_sign, concave_factor);
+        if factor >= 0.999 {
+            continue;
+        }
+        windows.push(CornerWindow {
+            arc_position: cumulative[index],
+            factor,
+            radius,
+        });
+    }
+    windows
+}
+
+fn vertex_corner_factor(
+    vertices: &[MapShapeVertex],
+    vertex_index: usize,
+    area_sign: f64,
+    concave_factor: f64,
+) -> f64 {
+    let total = vertices.len();
+    if total < 3 {
+        return 1.0;
+    }
+
+    let previous = &vertices[(vertex_index + total - 1) % total];
+    let current = &vertices[vertex_index];
+    let next = &vertices[(vertex_index + 1) % total];
+    let in_x = previous.x - current.x;
+    let in_y = previous.y - current.y;
+    let out_x = next.x - current.x;
+    let out_y = next.y - current.y;
+    let in_length = (in_x * in_x + in_y * in_y).sqrt();
+    let out_length = (out_x * out_x + out_y * out_y).sqrt();
+    if in_length <= f64::EPSILON || out_length <= f64::EPSILON {
+        return COASTLINE_V2_SHARP_CORNER_FACTOR_MIN;
+    }
+
+    let turn_cross = (current.x - previous.x) * (next.y - current.y)
+        - (current.y - previous.y) * (next.x - current.x);
+    // 共线顶点不是角点：必须显式判定，否则浮点噪声会让 signum 随机判凹，
+    // 破坏"插入共线顶点输出不变"的不变性。
+    if turn_cross.abs() <= GEOMETRY_EPSILON * in_length * out_length {
+        return 1.0;
+    }
+
+    let dot = ((in_x * out_x + in_y * out_y) / (in_length * out_length)).clamp(-1.0, 1.0);
+    let angle = dot.acos();
+    let sharp_factor =
+        (angle / std::f64::consts::PI).clamp(COASTLINE_V2_SHARP_CORNER_FACTOR_MIN, 1.0);
+
+    let is_concave = turn_cross.signum() != area_sign.signum();
+    if is_concave {
+        sharp_factor * concave_factor
+    } else {
+        sharp_factor
+    }
+}
+
+fn corner_attenuation(windows: &[CornerWindow], arc_position: f64, perimeter: f64) -> f64 {
+    let mut attenuation = 1.0f64;
+    for window in windows {
+        let distance = circular_distance(arc_position, window.arc_position, perimeter);
+        if distance >= window.radius {
+            continue;
+        }
+        let t = distance / window.radius;
+        let smooth = t * t * (3.0 - 2.0 * t);
+        attenuation = attenuation.min(window.factor + (1.0 - window.factor) * smooth);
+    }
+    attenuation
+}
+
+#[allow(clippy::too_many_arguments)]
+fn max_safe_offset(
+    vertices: &[MapShapeVertex],
+    cumulative: &[f64],
+    perimeter: f64,
+    arc_position: f64,
+    x: f64,
+    y: f64,
+    exclusion_window: f64,
+    related_locations: &[MapKeyLocationDraft],
+    amplitude: f64,
+) -> f64 {
+    let mut max_offset = amplitude;
+    let total = vertices.len();
+    for index in 0..total {
+        let arc_distance = arc_distance_to_range(
+            arc_position,
+            cumulative[index],
+            cumulative[index + 1],
+            perimeter,
+        );
+        if arc_distance < exclusion_window {
+            continue;
+        }
+        let distance =
+            point_to_segment_distance(x, y, &vertices[index], &vertices[(index + 1) % total]);
+        max_offset = max_offset.min(distance * COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR);
+    }
+
+    for location in related_locations {
+        let dx = location.x - x;
+        let dy = location.y - y;
+        let distance = (dx * dx + dy * dy).sqrt();
+        max_offset = max_offset.min(distance * COASTLINE_V2_LOCATION_SAFE_FACTOR);
+    }
+
+    max_offset.max(0.0)
+}
+
+fn circular_distance(a: f64, b: f64, period: f64) -> f64 {
+    let mut distance = (a - b).abs();
+    if distance > period {
+        distance %= period;
+    }
+    distance.min(period - distance)
+}
+
+fn arc_distance_to_range(s: f64, start: f64, end: f64, period: f64) -> f64 {
+    if s >= start && s <= end {
+        return 0.0;
+    }
+    circular_distance(s, start, period).min(circular_distance(s, end, period))
+}
+
+fn point_to_segment_distance(x: f64, y: f64, start: &MapShapeVertex, end: &MapShapeVertex) -> f64 {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let length_squared = dx * dx + dy * dy;
+    if length_squared <= f64::EPSILON {
+        let px = x - start.x;
+        let py = y - start.y;
+        return (px * px + py * py).sqrt();
+    }
+
+    let t = (((x - start.x) * dx + (y - start.y) * dy) / length_squared).clamp(0.0, 1.0);
+    let projected_x = start.x + dx * t;
+    let projected_y = start.y + dy * t;
+    let px = x - projected_x;
+    let py = y - projected_y;
+    (px * px + py * py).sqrt()
+}
+
+fn coastline_is_usable(
+    vertices: &[MapShapeVertex],
+    related_locations: &[MapKeyLocationDraft],
+) -> bool {
+    if vertices.len() < 3 {
+        return false;
+    }
+
+    let intersections = find_polygon_self_intersections(vertices);
+    if !intersections.is_empty() {
+        return false;
+    }
+
+    related_locations.iter().all(|location| {
+        let point = MapShapeVertex {
+            id: location.id.clone(),
+            x: location.x,
+            y: location.y,
+        };
+        is_point_in_polygon(&point, vertices)
+    })
+}
+
+/// Taubin 平滑：一轮 = λ 收缩步 + μ 回胀步，去高频毛刺且整体无收缩。
+fn taubin_smooth(
+    vertices: Vec<MapShapeVertex>,
+    passes: usize,
+    lambda: f64,
+    mu: f64,
+) -> Vec<MapShapeVertex> {
+    if vertices.len() < 3 || passes == 0 {
+        return vertices;
+    }
+
+    let mut current = vertices;
+    for _ in 0..passes {
+        current = laplacian_step(&current, lambda);
+        current = laplacian_step(&current, mu);
+    }
+    current
+}
+
+fn laplacian_step(vertices: &[MapShapeVertex], factor: f64) -> Vec<MapShapeVertex> {
+    let total = vertices.len();
+    let mut result = Vec::with_capacity(total);
+    for index in 0..total {
+        let previous = &vertices[(index + total - 1) % total];
+        let current = &vertices[index];
+        let following = &vertices[(index + 1) % total];
+        result.push(MapShapeVertex {
+            id: current.id.clone(),
+            x: current.x + factor * ((previous.x + following.x) * 0.5 - current.x),
+            y: current.y + factor * ((previous.y + following.y) * 0.5 - current.y),
+        });
+    }
+    result
+}
+
+fn relax_polygon(vertices: &[MapShapeVertex], passes: usize, weight: f64) -> Vec<MapShapeVertex> {
+    if vertices.len() < 3 || passes == 0 {
+        return vertices.to_vec();
+    }
+
+    let total = vertices.len();
+    let mut a = vertices.to_vec();
+    let mut b = Vec::with_capacity(total);
+    let w2 = weight * 2.0;
+
+    for _ in 0..passes {
+        let source = &a;
+        b.clear();
+        for index in 0..total {
+            let previous = &source[(index + total - 1) % total];
+            let current_vertex = &source[index];
+            let following = &source[(index + 1) % total];
+            b.push(MapShapeVertex {
+                id: current_vertex.id.clone(),
+                x: current_vertex.x * (1.0 - w2) + previous.x * weight + following.x * weight,
+                y: current_vertex.y * (1.0 - w2) + previous.y * weight + following.y * weight,
+            });
+        }
+        std::mem::swap(&mut a, &mut b);
+    }
+    a
+}
+
+fn dedupe_adjacent_vertices(
+    vertices: Vec<MapShapeVertex>,
+    distance_squared: f64,
+) -> Vec<MapShapeVertex> {
+    if vertices.len() < 3 {
+        return vertices;
+    }
+
+    let mut deduped = Vec::new();
+    for vertex in &vertices {
+        let should_push = deduped.last().is_none_or(|previous: &MapShapeVertex| {
+            let dx = previous.x - vertex.x;
+            let dy = previous.y - vertex.y;
+            dx * dx + dy * dy > distance_squared
+        });
+        if should_push {
+            deduped.push(vertex.clone());
+        }
+    }
+
+    if deduped.len() > 1 {
+        let first = deduped.first().cloned();
+        let last = deduped.last().cloned();
+        if let (Some(first), Some(last)) = (first, last) {
+            let dx = first.x - last.x;
+            let dy = first.y - last.y;
+            if dx * dx + dy * dy <= distance_squared {
+                deduped.pop();
+            }
+        }
+    }
+
+    if deduped.len() < 3 {
+        return vertices;
+    }
+    deduped
+}
+
+fn signed_area(vertices: &[MapShapeVertex]) -> f64 {
+    let mut area = 0.0;
+    for index in 0..vertices.len() {
+        let current = &vertices[index];
+        let next = &vertices[(index + 1) % vertices.len()];
+        area += current.x * next.y - next.x * current.y;
+    }
+    area * 0.5
+}
+
+fn to_polygon(vertices: &[MapShapeVertex]) -> Vec<[f64; 2]> {
+    vertices.iter().map(|vertex| [vertex.x, vertex.y]).collect()
+}
+
+fn hash_text(value: &str) -> u64 {
+    let mut hash = HASH_TEXT_OFFSET_BASIS;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(HASH_TEXT_PRIME);
+    }
+    hash
+}
+
+fn hash_unit(seed: u64) -> f64 {
+    let mixed = seed
+        .wrapping_mul(HASH_UNIT_MULTIPLIER)
+        .rotate_left(17)
+        .wrapping_add(HASH_UNIT_INCREMENT);
+    (mixed as f64) / (u64::MAX as f64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::map::types::MapShapeKind;
+
+    fn vertex(id: &str, x: f64, y: f64) -> MapShapeVertex {
+        MapShapeVertex {
+            id: id.to_string(),
+            x,
+            y,
+        }
+    }
+
+    fn shape_with_vertices(vertices: Vec<MapShapeVertex>) -> MapShapeDraft {
+        MapShapeDraft {
+            id: "shape-v2".to_string(),
+            name: "大陆".to_string(),
+            vertices,
+            fill: None,
+            stroke: None,
+            biz_id: None,
+            kind: Some(MapShapeKind::Coastline),
+            ext: None,
+        }
+    }
+
+    fn square_shape() -> MapShapeDraft {
+        shape_with_vertices(vec![
+            vertex("v1", 100.0, 100.0),
+            vertex("v2", 500.0, 100.0),
+            vertex("v3", 500.0, 500.0),
+            vertex("v4", 100.0, 500.0),
+        ])
+    }
+
+    /// 与 square_shape 同一轮廓，但每条边插入了共线中点。
+    fn subdivided_square_shape() -> MapShapeDraft {
+        shape_with_vertices(vec![
+            vertex("v1", 100.0, 100.0),
+            vertex("m1", 300.0, 100.0),
+            vertex("v2", 500.0, 100.0),
+            vertex("m2", 500.0, 300.0),
+            vertex("v3", 500.0, 500.0),
+            vertex("m3", 300.0, 500.0),
+            vertex("v4", 100.0, 500.0),
+            vertex("m4", 100.0, 300.0),
+        ])
+    }
+
+    fn narrow_shape() -> MapShapeDraft {
+        shape_with_vertices(vec![
+            vertex("n1", 100.0, 100.0),
+            vertex("n2", 420.0, 100.0),
+            vertex("n3", 420.0, 210.0),
+            vertex("n4", 260.0, 210.0),
+            vertex("n5", 260.0, 270.0),
+            vertex("n6", 420.0, 270.0),
+            vertex("n7", 420.0, 420.0),
+            vertex("n8", 100.0, 420.0),
+        ])
+    }
+
+    fn canvas() -> MapEditorCanvas {
+        MapEditorCanvas {
+            width: 1000.0,
+            height: 640.0,
+        }
+    }
+
+    fn to_vertices(polygon: &[[f64; 2]]) -> Vec<MapShapeVertex> {
+        polygon
+            .iter()
+            .enumerate()
+            .map(|(index, point)| MapShapeVertex {
+                id: format!("g-{index}"),
+                x: point[0],
+                y: point[1],
+            })
+            .collect()
+    }
+
+    fn directed_hausdorff(from: &[MapShapeVertex], to: &[MapShapeVertex]) -> f64 {
+        let total = to.len();
+        from.iter()
+            .map(|point| {
+                (0..total)
+                    .map(|index| {
+                        point_to_segment_distance(
+                            point.x,
+                            point.y,
+                            &to[index],
+                            &to[(index + 1) % total],
+                        )
+                    })
+                    .fold(f64::INFINITY, f64::min)
+            })
+            .fold(0.0f64, f64::max)
+    }
+
+    fn symmetric_hausdorff(a: &[MapShapeVertex], b: &[MapShapeVertex]) -> f64 {
+        directed_hausdorff(a, b).max(directed_hausdorff(b, a))
+    }
+
+    #[test]
+    fn v2_adds_points_and_stays_valid() {
+        let polygon = build_natural_coastline_polygon_v2(&canvas(), &square_shape(), &[], None);
+
+        assert!(polygon.len() > 4);
+        assert!(find_polygon_self_intersections(&to_vertices(&polygon)).is_empty());
+    }
+
+    #[test]
+    fn v2_is_deterministic() {
+        let first = build_natural_coastline_polygon_v2(&canvas(), &square_shape(), &[], None);
+        let second = build_natural_coastline_polygon_v2(&canvas(), &square_shape(), &[], None);
+
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn v2_noise_field_is_periodic() {
+        let perimeter = 1600.0;
+        let band = build_harmonic_band(42, COASTLINE_V2_NOISE_SALT_A, 2, 6, 1.8, 80);
+        let evaluate = |s: f64| -> f64 {
+            band.iter()
+                .map(|h| h.amplitude * (TAU * h.frequency * s / perimeter + h.phase).sin())
+                .sum()
+        };
+
+        assert!((evaluate(0.0) - evaluate(perimeter)).abs() < 1e-9);
+    }
+
+    /// 核心回归判据：插入共线顶点（形状不变）不得改变输出。
+    /// v1 的逐边参数化在此必然大幅失败；v2 的弧长参数化应通过。
+    #[test]
+    fn v2_vertex_insertion_invariance() {
+        let coarse = build_natural_coastline_polygon_v2(&canvas(), &square_shape(), &[], None);
+        let dense =
+            build_natural_coastline_polygon_v2(&canvas(), &subdivided_square_shape(), &[], None);
+
+        let distance = symmetric_hausdorff(&to_vertices(&coarse), &to_vertices(&dense));
+        assert!(
+            distance < 0.5,
+            "顶点细分不变性被破坏：Hausdorff 距离 = {distance}"
+        );
+    }
+
+    #[test]
+    fn v2_collinear_vertex_is_not_a_corner() {
+        let shape = subdivided_square_shape();
+        let area_sign = signed_area(&shape.vertices);
+
+        // 索引 1 是插入的共线中点，索引 2 是原始直角。
+        let straight = vertex_corner_factor(&shape.vertices, 1, area_sign, 0.45);
+        let corner = vertex_corner_factor(&shape.vertices, 2, area_sign, 0.45);
+
+        assert_eq!(straight, 1.0);
+        assert!(corner < 1.0);
+    }
+
+    #[test]
+    fn v2_keeps_key_location_inside() {
+        let location = MapKeyLocationDraft {
+            id: "loc-1".to_string(),
+            name: "主入口".to_string(),
+            r#type: "入口".to_string(),
+            x: 200.0,
+            y: 180.0,
+            shape_id: Some("shape-v2".to_string()),
+            biz_id: None,
+            ext: None,
+        };
+        let polygon = build_natural_coastline_polygon_v2(
+            &canvas(),
+            &square_shape(),
+            std::slice::from_ref(&location),
+            None,
+        );
+        let vertices = to_vertices(&polygon);
+
+        assert!(find_polygon_self_intersections(&vertices).is_empty());
+        assert!(is_point_in_polygon(
+            &MapShapeVertex {
+                id: "loc-1".to_string(),
+                x: 200.0,
+                y: 180.0,
+            },
+            &vertices
+        ));
+    }
+
+    #[test]
+    fn v2_narrow_shape_stays_safe() {
+        let polygon = build_natural_coastline_polygon_v2(&canvas(), &narrow_shape(), &[], None);
+
+        assert!(polygon.len() > 8);
+        assert!(find_polygon_self_intersections(&to_vertices(&polygon)).is_empty());
+    }
+
+    #[test]
+    fn v2_band_respects_sampling_cap() {
+        // 谐波上限被采样密度截断：cap=10 时 28..56 的 C 带应为空。
+        let band = build_harmonic_band(7, COASTLINE_V2_NOISE_SALT_C, 28, 56, 1.8, 10);
+        assert!(band.is_empty());
+
+        let clipped = build_harmonic_band(7, COASTLINE_V2_NOISE_SALT_B, 9, 18, 1.8, 12);
+        assert_eq!(clipped.len(), 4);
+    }
+}

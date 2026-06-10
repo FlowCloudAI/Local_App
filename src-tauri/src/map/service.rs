@@ -1,4 +1,5 @@
 use crate::map::coastline::build_natural_coastline_polygon;
+use crate::map::coastline_v2::build_natural_coastline_polygon_v2;
 use crate::map::color::{location_color, shape_fill_color, shape_line_color};
 use crate::map::constants::{
     DUPLICATE_VERTEX_DISTANCE, MIN_SHAPE_VERTEX_COUNT, MIN_VERTEX_DISTANCE,
@@ -7,10 +8,10 @@ use crate::map::geometry::{
     find_polygon_self_intersections, get_distance_squared, is_point_in_polygon,
 };
 use crate::map::types::{
-    CoastlineParams, MapEditorCanvas, MapKeyLocationDraft, MapPreviewKeyLocation, MapPreviewScene,
-    MapPreviewShape, MapProtocolVersion, MapSaveMeta, MapScenario, MapShapeDraft,
-    MapShapeFieldError, MapShapeKind, MapShapeSaveErrorResponse, MapShapeSaveRequest,
-    MapShapeSaveResponse, MapShapeVertex,
+    CoastlineParams, CoastlineV2Params, MapEditorCanvas, MapKeyLocationDraft,
+    MapPreviewKeyLocation, MapPreviewScene, MapPreviewShape, MapProtocolVersion, MapSaveMeta,
+    MapScenario, MapShapeDraft, MapShapeFieldError, MapShapeKind, MapShapeSaveErrorResponse,
+    MapShapeSaveRequest, MapShapeSaveResponse, MapShapeVertex,
 };
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
@@ -41,6 +42,18 @@ pub fn save_map_shape_scene(
         .as_ref()
         .and_then(|ext| ext.get("coastlineParams").cloned())
         .and_then(|v| serde_json::from_value(v).ok());
+    let use_coastline_v2 = meta_ext
+        .as_ref()
+        .and_then(|ext| ext.get("coastlineAlgorithm"))
+        .and_then(|value| value.as_str())
+        == Some("v2");
+    let coastline_v2_params: Option<CoastlineV2Params> = meta_ext
+        .as_ref()
+        .and_then(|ext| ext.get("coastlineV2Params").cloned())
+        .and_then(|v| serde_json::from_value(v).ok());
+    if use_coastline_v2 {
+        log::info!("本次请求选择海岸线v2算法：request_id={}", request_id);
+    }
 
     let scene = MapPreviewScene {
         canvas: request.canvas.clone(),
@@ -49,6 +62,8 @@ pub fn save_map_shape_scene(
             &request.shapes,
             &request.key_locations,
             coastline_params.as_ref(),
+            use_coastline_v2,
+            coastline_v2_params.as_ref(),
         ),
         key_locations: build_preview_key_locations(&request.key_locations),
         ext: None,
@@ -382,6 +397,8 @@ fn build_preview_shapes(
     shapes: &[MapShapeDraft],
     key_locations: &[MapKeyLocationDraft],
     params: Option<&CoastlineParams>,
+    use_v2: bool,
+    v2_params: Option<&CoastlineV2Params>,
 ) -> Vec<MapPreviewShape> {
     shapes
         .iter()
@@ -400,10 +417,15 @@ fn build_preview_shapes(
                 .cloned()
                 .collect::<Vec<_>>();
 
+            let polygon = if use_v2 {
+                build_natural_coastline_polygon_v2(canvas, shape, &related_locations, v2_params)
+            } else {
+                build_natural_coastline_polygon(canvas, shape, &related_locations, params)
+            };
             let preview_shape = MapPreviewShape {
                 id: shape.id.clone(),
                 name: shape.name.clone(),
-                polygon: build_natural_coastline_polygon(canvas, shape, &related_locations, params),
+                polygon,
                 fill_color: shape_fill_color(index, shape.fill.as_deref()),
                 line_color: shape_line_color(index, shape.stroke.as_deref()),
                 biz_id: shape.biz_id.clone(),

@@ -147,6 +147,52 @@ pub struct CoastlineParams {
     pub hash_unit_increment: Option<u64>,
 }
 
+/// v2 海岸线（全周长弧长参数化算法）生成参数覆盖。
+/// 前端通过 request.meta.ext.coastlineV2Params 传入，并以 meta.ext.coastlineAlgorithm == "v2" 选择 v2 算法；
+/// 未提供的字段使用 constants.rs 中的 COASTLINE_V2_* 默认值。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CoastlineV2Params {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_points: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_a_harmonic_min: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_a_harmonic_max: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_b_harmonic_min: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_b_harmonic_max: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_c_harmonic_min: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_c_harmonic_max: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_a_weight: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_b_weight: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band_c_weight: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spectral_beta: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amplitude_perimeter_ratio: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amplitude_min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amplitude_canvas_ratio_max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corner_window_perimeter_ratio: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub concave_corner_factor: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smooth_passes: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taubin_lambda: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taubin_mu: Option<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MapEditorCanvas {
