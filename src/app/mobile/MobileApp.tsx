@@ -108,10 +108,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         allowTextEditingTargetGestures: ideaDrawerEnabled,
     })
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
-        if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'all'}
+        if (pageType === 'projectHome') return {kind: 'projectHome'}
+        if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'projectHome'}
         if (currentPage.params.uncategorizedOnly) return {kind: 'uncategorized'}
         const categoryId = (currentPage.params.categoryId as string | undefined) || ''
-        return categoryId ? {kind: 'category', categoryId} : {kind: 'all'}
+        return categoryId ? {kind: 'category', categoryId} : {kind: 'allEntries'}
     }, [currentPage?.params, pageType])
 
     useEffect(() => {
@@ -215,7 +216,25 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const handleSelectDrawerCategory = useCallback((selection: MobileCategoryDrawerSelection, label: string) => {
         if (!categoryDrawerProjectId) return
         closeCategoryDrawer()
-        const nextPage: MobilePage = selection.kind === 'all'
+        if (selection.kind === 'projectHome') {
+            if (pageType === 'projectHome') return
+            const nextPage: MobilePage = {type: 'projectHome', params: {projectId: categoryDrawerProjectId}}
+            const previousPage = activeStack.stack[activeStack.stack.length - 2]
+            if (
+                pageType === 'entryList'
+                && previousPage?.type === 'projectHome'
+                && previousPage.params?.projectId === categoryDrawerProjectId
+            ) {
+                activeStack.pop()
+            } else if (pageType === 'entryList') {
+                navigation.replace(nextPage)
+            } else {
+                navigation.push(nextPage)
+            }
+            return
+        }
+
+        const nextPage: MobilePage = selection.kind === 'allEntries'
             ? {type: 'entryList', params: {projectId: categoryDrawerProjectId, categoryId: '', displayName: label}}
             : selection.kind === 'uncategorized'
                 ? {
@@ -234,7 +253,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         } else {
             navigation.push(nextPage)
         }
-    }, [categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
+    }, [activeStack, categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
     const handleTabChange = useCallback((tab: MobileTab) => {
         closeCategoryDrawer()

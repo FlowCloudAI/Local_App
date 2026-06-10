@@ -26,7 +26,8 @@ import './MobileCategoryDrawer.css'
 const ROOT_PARENT_KEY = '__root__'
 
 export type MobileCategoryDrawerSelection =
-    | {kind: 'all'}
+    | {kind: 'projectHome'}
+    | {kind: 'allEntries'}
     | {kind: 'uncategorized'}
     | {kind: 'category'; categoryId: string}
 
@@ -265,7 +266,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories])
     const entryCountMap = useMemo(() => getEntryCountMap(stats), [stats])
     const normalizedSearch = searchText.trim().toLocaleLowerCase('zh-CN')
-    const showAllRow = !normalizedSearch || '全部词条'.includes(normalizedSearch)
+    const showProjectHomeRow = !normalizedSearch || '项目首页'.includes(normalizedSearch)
     const showDefaultRow = !normalizedSearch || '默认分类'.includes(normalizedSearch)
 
     const notifyChanged = useCallback(async () => {
@@ -934,19 +935,19 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             </div>
 
             <div className="mobile-category-drawer__list" role="tree" aria-label="词条分类" ref={listRef}>
-                {showAllRow && (
+                {showProjectHomeRow && (
                     <button
                         type="button"
                         role="treeitem"
-                        aria-selected={selected.kind === 'all'}
-                        className={`mobile-category-drawer__row${selected.kind === 'all' ? ' is-active' : ''}`}
-                        onClick={() => onSelect({kind: 'all'}, '全部词条')}
+                        aria-selected={selected.kind === 'projectHome'}
+                        className={`mobile-category-drawer__row${selected.kind === 'projectHome' ? ' is-active' : ''}`}
+                        onClick={() => onSelect({kind: 'projectHome'}, '项目首页')}
                     >
                         <span className="mobile-category-drawer__toggle-placeholder"/>
                         <FolderIcon/>
                         <span className="mobile-category-drawer__text">
-                            <strong>全部词条</strong>
-                            <small>{stats?.entryCount ?? 0} 个词条</small>
+                            <strong>项目首页</strong>
+                            <small>项目概览</small>
                         </span>
                     </button>
                 )}
@@ -1051,7 +1052,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                     )
                 })}
 
-                {normalizedSearch && rows.length === 0 && !showAllRow && !showDefaultRow ? (
+                {normalizedSearch && rows.length === 0 && !showProjectHomeRow && !showDefaultRow ? (
                     <div className="mobile-category-drawer__empty">没有匹配的分类</div>
                 ) : null}
             </div>

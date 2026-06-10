@@ -254,8 +254,7 @@
     font-weight: 720;
 }
 
-.mobile-project-home__list,
-.mobile-project-home__category-list {
+.mobile-project-home__list {
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
