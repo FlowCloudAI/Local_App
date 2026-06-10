@@ -92,8 +92,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         : undefined
     const categoryDrawerEnabled = Boolean(categoryDrawerProjectId)
     const aiConversationDrawerEnabled = activeTab === 'ai'
-    const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled
-    const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : null
+    const ideaDrawerEnabled = activeTab === 'ideas'
+    const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled || ideaDrawerEnabled
+    const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : ideaDrawerEnabled ? 'idea' : null
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -194,6 +195,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         if (!aiConversationDrawerEnabled) return
         openSideDrawer()
     }, [aiConversationDrawerEnabled, openSideDrawer])
+
+    const openIdeaDrawer = useCallback(() => {
+        if (!ideaDrawerEnabled) return
+        openSideDrawer()
+    }, [ideaDrawerEnabled, openSideDrawer])
 
     const refreshCategoryDrawer = useCallback(async () => {
         if (!categoryDrawerProjectId) return
@@ -333,8 +339,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 onSelect={handleSelectDrawerCategory}
                                 onChanged={refreshCategoryDrawer}
                             />
-                        ) : (
+                        ) : aiConversationDrawerEnabled ? (
                             <div id="mobile-ai-conversation-drawer-root" className="mobile-app-ai-drawer-root"/>
+                        ) : (
+                            <div id="mobile-idea-drawer-root" className="mobile-app-idea-drawer-root"/>
                         )}
                     </div>
                 )}
@@ -345,7 +353,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     <button
                         type="button"
                         className="mobile-app-category-shell__surface-close"
-                        aria-label={mobileSideDrawerKind === 'ai' ? '关闭对话列表' : '关闭分类树'}
+                        aria-label={mobileSideDrawerKind === 'ai' ? '关闭对话列表' : mobileSideDrawerKind === 'idea' ? '关闭灵感列表' : '关闭分类树'}
                         tabIndex={sideDrawerOpen ? 0 : -1}
                         onClick={closeCategoryDrawer}
                     />
@@ -403,7 +411,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
                         {/* 灵感 Tab */}
                         {activeTab === 'ideas' && (
-                            <MobileIdea {...pageProps}/>
+                            <MobileIdea
+                                {...pageProps}
+                                ideaDrawerOpen={sideDrawerOpen && ideaDrawerEnabled}
+                                onOpenIdeaDrawer={openIdeaDrawer}
+                                onCloseIdeaDrawer={closeCategoryDrawer}
+                            />
                         )}
 
                         {/* 设置 Tab */}

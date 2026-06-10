@@ -1,334 +1,277 @@
-import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useState} from 'react'
-import {Button, Select, useAlert} from 'flowcloudai-ui'
+import {useEffect, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {
-    db_create_idea_note,
-    db_delete_idea_note,
-    db_list_idea_notes,
-    db_list_projects,
-    db_update_idea_note,
-    type IdeaNote,
-    type Project,
-} from '../../../api'
+    formatMobileIdeaDate,
+    MOBILE_IDEA_STATUS_LABELS,
+    type MobileIdeaController,
+    useMobileIdeaController,
+} from '../hooks/useMobileIdeaController'
+import MobileIdeaDrawer from '../components/MobileIdeaDrawer'
+import {
+    MobileAnchoredActionMenu,
+    type MobileAnchoredMenuItem,
+    MobileTopActionPill,
+    MobileTopIconButton,
+} from '../components/MobileTopControls'
 import {type MobilePage} from '../usePageStack'
+import './MobileIdea.css'
 
 interface Props {
     push: (page: MobilePage) => void
-    setAiFocus: (f: { projectId: string | null; entryId: string | null }) => void
+    setAiFocus: (f: {projectId: string | null; entryId: string | null}) => void
+    ideaDrawerOpen?: boolean
+    onOpenIdeaDrawer?: () => void
+    onCloseIdeaDrawer?: () => void
 }
 
-type StatusFilter = 'all' | 'inbox' | 'processed' | 'archived'
-
-const VIEW_OPTIONS: Array<{ key: StatusFilter; label: string }> = [
-    {key: 'all', label: '全部'},
-    {key: 'inbox', label: '待整理'},
-    {key: 'processed', label: '已处理'},
-    {key: 'archived', label: '已归档'},
-]
-
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-    {value: 'inbox', label: '待整理'},
-    {value: 'processed', label: '已处理'},
-    {value: 'archived', label: '已归档'},
-]
-
-function formatDate(s: string): string {
-    const d = new Date(s)
-    return d.toLocaleDateString('zh-CN', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})
+function MobileIdeaIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'delete' | 'status' | 'refresh'}) {
+    if (type === 'menu') {
+        return (
+            <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5 7h14"/>
+                <path d="M5 12h14"/>
+                <path d="M5 17h14"/>
+            </svg>
+        )
+    }
+    if (type === 'pin') {
+        return (
+            <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 17v5"/>
+                <path d="M8.5 10.8 6.2 13.1A1.7 1.7 0 0 0 7.4 16h9.2a1.7 1.7 0 0 0 1.2-2.9l-2.3-2.3V6.5l1.5-1.5H7l1.5 1.5Z"/>
+            </svg>
+        )
+    }
+    if (type === 'archive') {
+        return (
+            <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5.5 7.5h13"/>
+                <path d="M7 8.5v10h10v-10"/>
+                <path d="M9.5 12h5"/>
+                <path d="M6.5 4.5h11l1.5 3h-13Z"/>
+            </svg>
+        )
+    }
+    if (type === 'delete') {
+        return (
+            <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5.5 7h13"/>
+                <path d="M9 7V5.5h6V7"/>
+                <path d="M8 10v8"/>
+                <path d="M12 10v8"/>
+                <path d="M16 10v8"/>
+                <path d="M7 7.5 8 20h8l1-12.5"/>
+            </svg>
+        )
+    }
+    if (type === 'refresh') {
+        return (
+            <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M19 9a7 7 0 0 0-12.2-3.3L5 7.5"/>
+                <path d="M5 4.5v3h3"/>
+                <path d="M5 15a7 7 0 0 0 12.2 3.3L19 16.5"/>
+                <path d="M19 19.5v-3h-3"/>
+            </svg>
+        )
+    }
+    return (
+        <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M5 12h14"/>
+            <path d="M12 5v14"/>
+        </svg>
+    )
 }
 
-export default function MobileIdea(_props: Props) {
-    void _props
-    const {showAlert} = useAlert()
-    const [ideas, setIdeas] = useState<IdeaNote[]>([])
-    const [projects, setProjects] = useState<Project[]>([])
-    const [loading, setLoading] = useState(false)
-    const [viewMode, setViewMode] = useState<StatusFilter>('all')
-    const [editingId, setEditingId] = useState<string | null>(null)
-    const [editContent, setEditContent] = useState('')
-    const [editProjectId, setEditProjectId] = useState<string>('')
-    // 新建草稿：null 表示未开启，'' 或有内容表示正在草拟
-    const [draftContent, setDraftContent] = useState<string | null>(null)
-    const [draftProjectId, setDraftProjectId] = useState<string>('')
+function buildIdeaMenuItems(controller: MobileIdeaController): MobileAnchoredMenuItem[] {
+    const {
+        selectedIdea,
+        draftStatus,
+        draftPinned,
+        setDraftPinned,
+        setDraftStatus,
+        deleteSelectedIdea,
+        loadIdeas,
+    } = controller
 
-    const load = useCallback(async () => {
-        setLoading(true)
-        try {
-            const [notes, projs] = await Promise.all([
-                db_list_idea_notes({limit: 100, offset: 0, status: viewMode === 'all' ? undefined : viewMode}),
-                db_list_projects(),
-            ])
-            setIdeas(notes)
-            setProjects(projs)
-        } catch (e) {
-            logger.error('加载灵感失败', e)
-        } finally {
-            setLoading(false)
-        }
-    }, [viewMode])
+    return [
+        {
+            key: 'pin',
+            label: draftPinned ? '取消置顶' : '置顶灵感',
+            description: selectedIdea ? '自动保存到当前便签' : '新建后保存置顶状态',
+            icon: <MobileIdeaIcon type="pin"/>,
+            onSelect: () => setDraftPinned(!draftPinned),
+        },
+        {
+            key: 'inbox',
+            label: '标记为待整理',
+            description: MOBILE_IDEA_STATUS_LABELS.inbox,
+            icon: <MobileIdeaIcon type="status"/>,
+            disabled: draftStatus === 'inbox',
+            onSelect: () => setDraftStatus('inbox'),
+        },
+        {
+            key: 'processed',
+            label: '标记为已处理',
+            description: MOBILE_IDEA_STATUS_LABELS.processed,
+            icon: <MobileIdeaIcon type="status"/>,
+            disabled: draftStatus === 'processed',
+            onSelect: () => setDraftStatus('processed'),
+        },
+        {
+            key: 'archive',
+            label: '归档灵感',
+            description: MOBILE_IDEA_STATUS_LABELS.archived,
+            icon: <MobileIdeaIcon type="archive"/>,
+            disabled: draftStatus === 'archived',
+            onSelect: () => setDraftStatus('archived'),
+        },
+        {
+            key: 'refresh',
+            label: '刷新列表',
+            description: '重新同步灵感便签',
+            icon: <MobileIdeaIcon type="refresh"/>,
+            onSelect: () => void loadIdeas(),
+        },
+        {
+            key: 'delete',
+            label: '删除灵感',
+            description: selectedIdea ? '删除当前便签' : '当前没有已保存便签',
+            icon: <MobileIdeaIcon type="delete"/>,
+            danger: true,
+            disabled: !selectedIdea,
+            onSelect: () => void deleteSelectedIdea(),
+        },
+    ]
+}
+
+function getSaveStateText(controller: MobileIdeaController): string {
+    if (controller.saveState === 'saving') return '保存中…'
+    if (controller.saveState === 'error') return '保存失败，继续编辑会重试'
+    if (controller.lastSavedAt) return `已保存 ${formatMobileIdeaDate(controller.lastSavedAt)}`
+    return '输入后自动保存'
+}
+
+export default function MobileIdea({
+    ideaDrawerOpen = false,
+    onOpenIdeaDrawer,
+    onCloseIdeaDrawer,
+}: Props) {
+    const controller = useMobileIdeaController()
+    const pageRef = useRef<HTMLDivElement>(null)
+    const topActionsRef = useRef<HTMLDivElement>(null)
+    const contentRef = useRef<HTMLTextAreaElement>(null)
+    const [drawerRoot, setDrawerRoot] = useState<HTMLElement | null>(null)
+    const [menuOpen, setMenuOpen] = useState(false)
 
     useEffect(() => {
-        void load()
-    }, [load])
+        setDrawerRoot(document.getElementById('mobile-idea-drawer-root'))
+    }, [ideaDrawerOpen])
 
-    const handleCreate = () => {
-        setDraftContent('')
-        setDraftProjectId('')
-    }
-
-    const handleConfirmDraft = async () => {
-        if (!draftContent?.trim()) {
-            setDraftContent(null)
-            return
-        }
-        try {
-            const created = await db_create_idea_note({
-                content: draftContent.trim(),
-                projectId: draftProjectId || null,
-            })
-            setIdeas(prev => [created, ...prev])
-            setDraftContent(null)
-            setDraftProjectId('')
-        } catch {
-            await showAlert('创建失败', 'error', 'nonInvasive', 2000)
-        }
-    }
-
-    const handleCancelDraft = () => {
-        setDraftContent(null)
-        setDraftProjectId('')
-    }
-
-    const handleSave = async (id: string) => {
-        if (!editContent.trim()) return
-        try {
-            await db_update_idea_note({id, content: editContent.trim(), projectId: editProjectId || null})
-            setIdeas(prev => prev.map(i => i.id === id ? {
-                ...i,
-                content: editContent.trim(),
-                project_id: editProjectId || null
-            } : i))
-            setEditingId(null)
-        } catch {
-            await showAlert('保存失败', 'error', 'nonInvasive', 2000)
-        }
-    }
-
-    const handleDelete = async (id: string) => {
-        const result = await showAlert('确定删除此条灵感？', 'warning', 'confirm')
-        if (result !== 'yes') return
-        try {
-            await db_delete_idea_note(id)
-            setIdeas(prev => prev.filter(i => i.id !== id))
-        } catch {
-            await showAlert('删除失败', 'error', 'nonInvasive', 2000)
-        }
-    }
-
-    const handleStatusChange = async (id: string, status: string) => {
-        try {
-            await db_update_idea_note({id, status: status as IdeaNote['status']})
-            setIdeas(prev => prev.map(i => i.id === id ? {...i, status: status as IdeaNote['status']} : i))
-        } catch (e) {
-            logger.error('更新状态失败', e)
-        }
-    }
+    const menuItems = buildIdeaMenuItems(controller)
 
     return (
-        <div className="mobile-page" style={{padding: '12px 16px'}}>
-            {/* 草稿内联输入区 */}
-            {draftContent !== null ? (
-                <div style={{
-                    padding: 12, marginBottom: 12,
-                    borderRadius: 'var(--fc-radius-sm)',
-                    background: 'var(--fc-color-bg-elevated)',
-                    border: '1px solid var(--fc-color-primary)',
-                }}>
-                    <textarea
-                        autoFocus
-                        value={draftContent}
-                        onChange={e => setDraftContent(e.target.value)}
-                        onKeyDown={e => {
-                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                e.preventDefault()
-                                void handleConfirmDraft()
-                            }
-                        }}
-                        placeholder="记录灵感…"
-                        rows={3}
-                        style={{
-                            width: '100%', padding: 8, borderRadius: 6,
-                            border: '1px solid var(--fc-color-border)',
-                            background: 'var(--fc-color-bg)', color: 'var(--fc-color-text)',
-                            fontSize: 'var(--fc-font-size-sm)', resize: 'vertical',
-                            fontFamily: 'inherit', boxSizing: 'border-box',
-                        }}
+        <div ref={pageRef} className="mobile-idea">
+            {drawerRoot ? createPortal(
+                <MobileIdeaDrawer controller={controller} onClose={onCloseIdeaDrawer}/>,
+                drawerRoot,
+            ) : null}
+
+            <header className="mobile-idea__topbar">
+                <MobileTopIconButton
+                    type="button"
+                    icon={<MobileIdeaIcon type="menu"/>}
+                    aria-label="打开灵感列表"
+                    aria-expanded={ideaDrawerOpen}
+                    onClick={onOpenIdeaDrawer}
+                />
+                <div className="mobile-idea__title-pill">
+                    <span>{controller.selectedIdea ? '编辑灵感' : '新灵感'}</span>
+                    <small>{getSaveStateText(controller)}</small>
+                </div>
+                <MobileTopActionPill
+                    ref={topActionsRef}
+                    actions={[
+                        {
+                            key: 'new',
+                            label: '新建灵感',
+                            icon: '+',
+                            kind: 'add',
+                            onClick: () => {
+                                setMenuOpen(false)
+                                controller.startNewIdea()
+                                requestAnimationFrame(() => contentRef.current?.focus())
+                            },
+                        },
+                        {
+                            key: 'menu',
+                            label: '灵感操作',
+                            icon: '…',
+                            kind: 'more',
+                            ariaHasPopup: 'menu',
+                            ariaExpanded: menuOpen,
+                            onClick: () => setMenuOpen(open => !open),
+                        },
+                    ]}
+                />
+            </header>
+
+            <main className="mobile-idea__editor">
+                <section className="mobile-idea__meta">
+                    <input
+                        className="mobile-idea__title-input"
+                        value={controller.draftTitle}
+                        onChange={event => controller.setDraftTitle(event.target.value)}
+                        placeholder="标题（可选）"
                     />
-                    <Select
-                        value={draftProjectId}
-                        onChange={v => setDraftProjectId(String(v ?? ''))}
-                        options={[
-                            {value: '', label: '无关联项目'},
-                            ...projects.map(p => ({value: p.id, label: p.name})),
-                        ]}
-                        placeholder="关联项目（可选）"
-                        style={{marginTop: 8}}
-                    />
-                    <div style={{display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end'}}>
-                        <Button type="button" size="sm" variant="ghost" onClick={handleCancelDraft}>取消</Button>
-                        <Button type="button" size="sm" onClick={handleConfirmDraft} disabled={!draftContent.trim()}>保存</Button>
+                    <div className="mobile-idea__select-row">
+                        <label>
+                            <span>项目</span>
+                            <select
+                                value={controller.draftProjectId}
+                                onChange={event => controller.setDraftProjectId(event.target.value)}
+                            >
+                                <option value="">全局灵感</option>
+                                {controller.projects.map(project => (
+                                    <option key={project.id} value={project.id}>{project.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label>
+                            <span>状态</span>
+                            <select
+                                value={controller.draftStatus}
+                                onChange={event => controller.setDraftStatus(event.target.value as typeof controller.draftStatus)}
+                            >
+                                <option value="inbox">待整理</option>
+                                <option value="processed">已处理</option>
+                                <option value="archived">归档</option>
+                            </select>
+                        </label>
                     </div>
-                </div>
-            ) : (
-                <div style={{display: 'flex', gap: 8, marginBottom: 12}}>
-                    <Button type="button" size="sm" onClick={handleCreate}>+ 新建</Button>
-                    <Button type="button" size="sm" variant="outline" onClick={load} disabled={loading}>刷新</Button>
-                </div>
-            )}
+                    <div className="mobile-idea__summary">
+                        <span>{controller.selectedProjectName}</span>
+                        {controller.draftPinned ? <span>已置顶</span> : null}
+                    </div>
+                </section>
 
-            <div style={{display: 'flex', gap: 6, marginBottom: 12}}>
-                {VIEW_OPTIONS.map(opt => (
-                    <button
-                        key={opt.key}
-                        onClick={() => setViewMode(opt.key)}
-                        style={{
-                            padding: '4px 10px', borderRadius: 999, fontSize: 'var(--fc-font-size-xs)',
-                            border: '1px solid var(--fc-color-border)',
-                            background: viewMode === opt.key ? 'var(--fc-color-primary)' : undefined,
-                            color: viewMode === opt.key ? '#fff' : 'var(--fc-color-text-secondary)',
-                            cursor: 'pointer',
-                        }}
-                    >
-                        {opt.label}
-                    </button>
-                ))}
-            </div>
+                <textarea
+                    ref={contentRef}
+                    className="mobile-idea__content"
+                    value={controller.draftContent}
+                    onChange={event => controller.setDraftContent(event.target.value)}
+                    placeholder="写下一个灵感、片段、设定疑问或待整理素材…"
+                    autoFocus
+                />
+            </main>
 
-            {loading ? (
-                <div className="mobile-page__loading">加载中…</div>
-            ) : ideas.length === 0 ? (
-                <div className="mobile-page__empty">
-                    <p>暂无灵感笔记</p>
-                    <Button type="button" size="sm" onClick={handleCreate}>记一笔</Button>
-                </div>
-            ) : (
-                <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
-                    {ideas.map(idea => (
-                        <div
-                            key={idea.id}
-                            style={{
-                                padding: 10, borderRadius: 'var(--fc-radius-sm)',
-                                background: 'var(--fc-color-bg-elevated)',
-                                border: '1px solid var(--fc-color-border)',
-                            }}
-                        >
-                            {editingId === idea.id ? (
-                                <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
-                                    <textarea
-                                        value={editContent}
-                                        onChange={e => setEditContent(e.target.value)}
-                                        placeholder="记录灵感…"
-                                        rows={3}
-                                        style={{
-                                            padding: 8, borderRadius: 6,
-                                            border: '1px solid var(--fc-color-border)',
-                                            background: 'var(--fc-color-bg)',
-                                            color: 'var(--fc-color-text)',
-                                            fontSize: 'var(--fc-font-size-sm)',
-                                            resize: 'vertical',
-                                            fontFamily: 'inherit',
-                                        }}
-                                    />
-                                    <Select
-                                        value={editProjectId}
-                                        onChange={v => setEditProjectId(String(v ?? ''))}
-                                        options={[
-                                            {value: '', label: '无关联项目'},
-                                            ...projects.map(p => ({value: p.id, label: p.name})),
-                                        ]}
-                                        placeholder="关联项目"
-                                    />
-                                    <div style={{display: 'flex', gap: 6, justifyContent: 'flex-end'}}>
-                                        <Button type="button" size="sm" variant="ghost"
-                                                onClick={() => setEditingId(null)}>取消</Button>
-                                        <Button type="button" size="sm" onClick={() => handleSave(idea.id)}>保存</Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <div style={{
-                                        fontSize: 'var(--fc-font-size-sm)',
-                                        marginBottom: 6,
-                                        whiteSpace: 'pre-wrap',
-                                        wordBreak: 'break-word',
-                                    }}>
-                                        {idea.content || '(空内容)'}
-                                    </div>
-                                    <div style={{
-                                        display: 'flex', gap: 4, alignItems: 'center',
-                                        fontSize: 'var(--fc-font-size-xs)', color: 'var(--fc-color-text-secondary)',
-                                        flexWrap: 'wrap',
-                                    }}>
-                                        <span>{formatDate(idea.created_at)}</span>
-                                        <span>·</span>
-                                        <select
-                                            value={idea.status}
-                                            onChange={e => handleStatusChange(idea.id, e.target.value)}
-                                            style={{
-                                                fontSize: 'var(--fc-font-size-xs)', padding: '2px 4px',
-                                                border: '1px solid var(--fc-color-border)', borderRadius: 4,
-                                                background: 'var(--fc-color-bg)', color: 'var(--fc-color-text)',
-                                            }}
-                                        >
-                                            {STATUS_OPTIONS.map(o => (
-                                                <option key={o.value} value={o.value}>{o.label}</option>
-                                            ))}
-                                        </select>
-                                        {idea.project_id && (
-                                            <>
-                                                <span>·</span>
-                                                <span>{projects.find(p => p.id === idea.project_id)?.name ?? idea.project_id}</span>
-                                            </>
-                                        )}
-                                        <div style={{marginLeft: 'auto', display: 'flex', gap: 4}}>
-                                            <button
-                                                onClick={() => {
-                                                    setEditingId(idea.id);
-                                                    setEditContent(idea.content);
-                                                    setEditProjectId(idea.project_id ?? '')
-                                                }}
-                                                style={{
-                                                    fontSize: 'var(--fc-font-size-xs)',
-                                                    border: 'none',
-                                                    background: 'none',
-                                                    color: 'var(--fc-color-primary)',
-                                                    cursor: 'pointer',
-                                                    padding: '2px 6px',
-                                                }}
-                                            >
-                                                编辑
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(idea.id)}
-                                                style={{
-                                                    fontSize: 'var(--fc-font-size-xs)',
-                                                    border: 'none',
-                                                    background: 'none',
-                                                    color: 'var(--fc-color-error)',
-                                                    cursor: 'pointer',
-                                                    padding: '2px 6px',
-                                                }}
-                                            >
-                                                删除
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+            <MobileAnchoredActionMenu
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                anchorRef={topActionsRef}
+                containerRef={pageRef}
+                ariaLabel="灵感操作"
+                items={menuItems}
+            />
         </div>
     )
 }
