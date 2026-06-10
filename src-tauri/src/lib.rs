@@ -4,7 +4,9 @@ mod apis;
 mod auto_backup;
 mod document_context;
 mod layout;
-mod map;
+/// `#[doc(hidden)]` 仅为让集成测试（`tests/coastline_v2.rs`）访问 map 模块；非稳定公开 API。
+#[doc(hidden)]
+pub mod map;
 mod reports;
 mod senses;
 mod settings;
