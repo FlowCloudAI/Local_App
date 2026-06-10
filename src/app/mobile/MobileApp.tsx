@@ -28,6 +28,7 @@ import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from './compon
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
 import MobileCategoryManager from './pages/MobileCategoryManager'
+import MobileEntryTypeManager from './pages/MobileEntryTypeManager'
 import MobileEntryDetail from './pages/MobileEntryDetail'
 import MobileEntryList from './pages/MobileEntryList'
 import MobileHome, {type MobileHomePanel} from './pages/MobileHome'
@@ -35,7 +36,7 @@ import MobileIdea from './pages/MobileIdea'
 import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileSettings from './pages/MobileSettings'
-import MobileTypeTagManager from './pages/MobileTypeTagManager'
+import MobileTagManager from './pages/MobileTagManager'
 import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 
@@ -410,8 +411,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 {pageType === 'entryDetail' && currentPage && (
                                     <MobileEntryDetail {...pageProps} params={currentPage.params}/>
                                 )}
-                                {pageType === 'projectDefs' && currentPage && (
-                                    <MobileTypeTagManager params={currentPage.params}/>
+                                {pageType === 'typeManager' && currentPage && (
+                                    <MobileEntryTypeManager {...pageProps} params={currentPage.params}/>
+                                )}
+                                {pageType === 'tagManager' && currentPage && (
+                                    <MobileTagManager {...pageProps} params={currentPage.params}/>
                                 )}
                                 {pageType === 'categoryManager' && currentPage && (
                                     <MobileCategoryManager {...pageProps} params={currentPage.params}/>

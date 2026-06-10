@@ -313,6 +313,7 @@ export default function MobileProjectHome({
     const relationCount = stats?.relationCount ?? 0
     const internalLinkCount = stats?.internalLinkCount ?? 0
     const categoryCount = categories.length
+    const customTypeCount = entryTypes.filter(type => type.kind === 'custom').length
     const statItems = [
         {key: 'entries', label: '词条', value: formatNumber(entryCount)},
         {key: 'categories', label: '分类', value: formatNumber(categoryCount)},
@@ -342,9 +343,9 @@ export default function MobileProjectHome({
             key: 'structure',
             title: categoryCount > 0 && tagSchemas.length > 0 ? '完善资料结构' : '建立资料规则',
             description: categoryCount > 0 && tagSchemas.length > 0 ? '继续补齐类型、标签和分类规则。' : '为词条准备清晰的分类和标签。',
-            action: '类型与标签',
+            action: '类型管理',
             tone: 'structure',
-            onClick: () => push({type: 'projectDefs', params: {projectId, displayName: '类型与标签'}}),
+            onClick: () => push({type: 'typeManager', params: {projectId, displayName: '类型管理'}}),
         },
     ]
     const advancedTools = [
@@ -521,23 +522,23 @@ export default function MobileProjectHome({
                         type="button"
                         className="mobile-project-home__cell"
                         onClick={() => push({
-                            type: 'projectDefs',
-                            params: {projectId, displayName: '类型管理', section: 'types'},
+                            type: 'typeManager',
+                            params: {projectId, displayName: '类型管理'},
                         })}
                     >
                         <span>
                             <strong>类型管理</strong>
                             <small>管理自定义词条类型</small>
                         </span>
-                        <em>{entryTypes.length}</em>
+                        <em>{customTypeCount}</em>
                     </button>
 
                     <button
                         type="button"
                         className="mobile-project-home__cell"
                         onClick={() => push({
-                            type: 'projectDefs',
-                            params: {projectId, displayName: '标签管理', section: 'tags'},
+                            type: 'tagManager',
+                            params: {projectId, displayName: '标签管理'},
                         })}
                     >
                         <span>
