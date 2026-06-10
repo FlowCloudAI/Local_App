@@ -13,15 +13,9 @@ type MapProtocolVersion = 'map_shape_mvp_v1'
 type MapScenario = 'coastline_mvp'
 
 /** v2 海岸线算法（全周长弧长参数化）参数，未提供字段走后端 COASTLINE_V2_* 默认值。
- * 波长/振幅均为绝对像素单位，与图形大小无关。 */
+ * 波长/振幅随图形周长等比缩放并封顶于绝对上限；振幅字段为绝对上限覆盖（px）。 */
 export interface CoastlineV2ParamsPayload {
     maxPoints?: number
-    bandAWavelengthMin?: number
-    bandAWavelengthMax?: number
-    bandBWavelengthMin?: number
-    bandBWavelengthMax?: number
-    bandCWavelengthMin?: number
-    bandCWavelengthMax?: number
     bandAAmplitude?: number
     bandBAmplitude?: number
     bandCAmplitude?: number
@@ -30,7 +24,7 @@ export interface CoastlineV2ParamsPayload {
     bandCWeight?: number
     amplitudeScale?: number
     spectralBeta?: number
-    cornerWindowPx?: number
+    cornerRoundingPx?: number
     concaveCornerFactor?: number
     smoothPasses?: number
     taubinLambda?: number
