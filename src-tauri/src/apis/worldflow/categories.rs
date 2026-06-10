@@ -64,16 +64,26 @@ pub async fn db_update_category(
     state: State<'_, Arc<AppState>>,
     id: String,
     parent_id: Option<Option<String>>,
+    parent_id_set: Option<bool>,
     name: Option<String>,
     sort_order: Option<i64>,
 ) -> Result<Category, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let parent_id = parent_id
-        .map(|opt| {
-            opt.map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
-                .transpose()
-        })
-        .transpose()?;
+    let parent_id = if parent_id_set.unwrap_or(false) {
+        Some(
+            parent_id
+                .flatten()
+                .map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
+                .transpose()?,
+        )
+    } else {
+        parent_id
+            .map(|opt| {
+                opt.map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
+                    .transpose()
+            })
+            .transpose()?
+    };
     let db = state.inner().sqlite_db.lock().await;
     let category = db
         .update_category(

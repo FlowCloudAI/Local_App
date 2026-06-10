@@ -480,9 +480,9 @@ export const db_list_categories = (projectId: string) =>
 export const db_update_category = ({id, parentId, name, sortOrder}: UpdateCategoryInput) =>
     command<Category>('db_update_category', {
         id,
-        parentId,
-        name,
-        sortOrder,
+        ...(parentId !== undefined ? {parentId, parentIdSet: true} : {}),
+        ...(name !== undefined ? {name} : {}),
+        ...(sortOrder !== undefined ? {sortOrder} : {}),
     })
 
 export const db_delete_category = (id: string) =>
