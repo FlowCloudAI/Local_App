@@ -1,7 +1,20 @@
 .mobile-page-topbar {
+    /*
+     * 顶栏背景渐变调试区：
+     * 1. bg-stop-*：从顶栏顶部到顶栏底部的关键点位置，0% 在最上，100% 在最下。
+     * 2. bg-visible-*：该关键点处页面背景色的可见度，100% 为完全实色，0% 为完全透明。
+     * 调整 stop 会改变渐变发生的位置；调整 visible 会改变该位置背景遮住内容的强弱。
+     */
     --mobile-page-topbar-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-page-topbar-body: 2.55rem;
-    --mobile-page-topbar-fade: 1.35rem;
+    --mobile-page-topbar-bg-stop-1: 0%;
+    --mobile-page-topbar-bg-visible-1: 100%;
+    --mobile-page-topbar-bg-stop-2: 44%;
+    --mobile-page-topbar-bg-visible-2: 100%;
+    --mobile-page-topbar-bg-stop-3: 78%;
+    --mobile-page-topbar-bg-visible-3: 58%;
+    --mobile-page-topbar-bg-stop-4: 100%;
+    --mobile-page-topbar-bg-visible-4: 0%;
 
     position: relative;
     z-index: 8;
@@ -15,9 +28,10 @@
     padding: 0.9rem var(--mobile-page-topbar-x) 0.6rem;
     background: linear-gradient(
         180deg,
-        var(--fc-color-bg) 0%,
-        var(--fc-color-bg) calc(100% - var(--mobile-page-topbar-fade)),
-        color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-1), transparent) var(--mobile-page-topbar-bg-stop-1),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-2), transparent) var(--mobile-page-topbar-bg-stop-2),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-3), transparent) var(--mobile-page-topbar-bg-stop-3),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-4), transparent) var(--mobile-page-topbar-bg-stop-4)
     );
 }
 
