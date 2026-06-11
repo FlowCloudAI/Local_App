@@ -25,7 +25,9 @@ use crate::map::constants::{
     COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO,
     COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
-    COASTLINE_V2_DETAIL_WAVELENGTH_SCALE, COASTLINE_V2_MAX_HARMONICS_PER_BAND,
+    COASTLINE_V2_DETAIL_WAVELENGTH_SCALE, COASTLINE_V2_HARMONIC_RANDOM_FLOOR,
+    COASTLINE_V2_MAX_HARMONICS_PER_BAND, COASTLINE_V2_ROUGHNESS_MODULATION_B,
+    COASTLINE_V2_ROUGHNESS_MODULATION_C,
     COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
     COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
     COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
@@ -55,6 +57,8 @@ const COASTLINE_V2_SAFETY_RETRY_SCALES: [f64; 3] = [0.75, 0.55, 0.40];
 const COASTLINE_V2_NOISE_SALT_A: u64 = 0xD6E8_FEB8_6659_FD93;
 const COASTLINE_V2_NOISE_SALT_B: u64 = 0xA0761_D649_5B19_0C5 ^ 0x735A_2D97;
 const COASTLINE_V2_NOISE_SALT_C: u64 = 0x8EBC_6AF0_9C88_C6E3;
+/// 粗糙度调制包络的盐值（与三带独立）。
+const COASTLINE_V2_NOISE_SALT_ROUGHNESS: u64 = 0x589E_C77B_3C99_45A1;
 
 macro_rules! param {
     ($params:expr, $field:ident, $default:expr) => {
@@ -405,8 +409,9 @@ fn build_harmonic_band(
         let jitter = hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(slot) + 5));
         let k = (harmonic_min + ((f64::from(slot) + jitter) * stratum).floor() as u32)
             .min(harmonic_max);
-        let amplitude_random =
-            0.5 + 0.5 * hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(k) + 1));
+        let amplitude_random = COASTLINE_V2_HARMONIC_RANDOM_FLOOR
+            + (1.0 - COASTLINE_V2_HARMONIC_RANDOM_FLOOR)
+                * hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(k) + 1));
         let amplitude = amplitude_random * f64::from(k).powf(-spectral_beta / 2.0);
         let phase = hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(k) + 2)) * TAU;
         power += amplitude * amplitude * 0.5;
@@ -434,6 +439,8 @@ struct BandSpec {
     feature_ratio: f64,
     weight: f64,
     salt: u64,
+    /// 粗糙度调制深度：该带振幅沿轮廓被低频包络调制的比例（0 = 不调制）。
+    roughness_modulation: f64,
 }
 
 /// 单带计算结果：峰值归一的采样值 + 有效振幅 + 特征尺寸比例。
@@ -495,6 +502,7 @@ fn build_noise_bands(
             feature_ratio: COASTLINE_V2_BAND_A_FEATURE_RATIO,
             weight: param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_A,
+            roughness_modulation: 0.0,
         },
         BandSpec {
             // 半相对：跟随图形大小，但被绝对窗口夹住。
@@ -511,19 +519,28 @@ fn build_noise_bands(
             feature_ratio: COASTLINE_V2_BAND_B_FEATURE_RATIO,
             weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_B,
+            roughness_modulation: COASTLINE_V2_ROUGHNESS_MODULATION_B,
         },
         BandSpec {
             // 绝对像素：细节质感不随图形大小变化，长直边与小岛同样粗糙。
             // 质量档位通过 detail_wavelength_scale 控制精细度（印刷 0.5 → 波长砍半）。
             wavelength_min: COASTLINE_V2_BAND_C_WAVELENGTH_MIN * detail_wavelength_scale(params),
             wavelength_max: COASTLINE_V2_BAND_C_WAVELENGTH_MAX * detail_wavelength_scale(params),
+            // 振幅随波长等比缩放（分形自相似）：印刷档波长砍半、振幅同步减半，
+            // 否则坡度翻倍呈现机械毛刺。放粗（>1）时不放大振幅。
             amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO)
-                .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE)),
+                .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE))
+                * detail_wavelength_scale(params).min(1.0),
             feature_ratio: COASTLINE_V2_BAND_C_FEATURE_RATIO,
             weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_C,
+            roughness_modulation: COASTLINE_V2_ROUGHNESS_MODULATION_C,
         },
     ];
+
+    // 粗糙度包络：低频（波长 P/8~P/2）随机场归一到 [0,1]，调制 B/C 带振幅，
+    // 形成"礁石段粗糙、滩涂段平静"的间歇感，消除全轮廓均匀抖动的机械毛刺。
+    let roughness_envelope = build_roughness_envelope(seed, arc_positions, perimeter);
 
     let mut bands = Vec::with_capacity(band_specs.len());
     let mut total_amplitude = 0.0f64;
@@ -571,6 +588,11 @@ fn build_noise_bands(
         for value in &mut band_values {
             *value /= max_abs;
         }
+        if spec.roughness_modulation > f64::EPSILON {
+            for (value, envelope) in band_values.iter_mut().zip(&roughness_envelope) {
+                *value *= 1.0 - spec.roughness_modulation * (1.0 - envelope);
+            }
+        }
         bands.push(BandField {
             amplitude: effective_amplitude,
             feature_ratio: spec.feature_ratio,
@@ -590,6 +612,30 @@ fn build_noise_bands(
     }
 
     (bands, total_amplitude)
+}
+
+/// 粗糙度包络：低频随机场归一到 [0,1]。1 = 全粗糙，0 = 最平静。
+fn build_roughness_envelope(seed: u64, arc_positions: &[f64], perimeter: f64) -> Vec<f64> {
+    let harmonics = build_harmonic_band(seed, COASTLINE_V2_NOISE_SALT_ROUGHNESS, 2, 8, 1.0, 8);
+    let mut values = Vec::with_capacity(arc_positions.len());
+    for &s in arc_positions {
+        let mut value = 0.0;
+        for harmonic in &harmonics {
+            value += harmonic.amplitude
+                * (TAU * harmonic.frequency * s / perimeter + harmonic.phase).sin();
+        }
+        values.push(value);
+    }
+
+    let max_abs = values.iter().fold(0.0f64, |acc, v| acc.max(v.abs()));
+    if max_abs > f64::EPSILON {
+        for value in &mut values {
+            *value = (*value / max_abs + 1.0) * 0.5;
+        }
+    } else {
+        values.fill(1.0);
+    }
+    values
 }
 
 struct CornerWindow {

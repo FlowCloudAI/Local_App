@@ -157,6 +157,17 @@ pub const COASTLINE_V2_DETAIL_WAVELENGTH_SCALE: f64 = 1.0;
 /// 全量求和是 O(谐波×采样点) 的性能黑洞；超限时分层抽样（每层取一条，保持确定性与闭合性）。
 pub const COASTLINE_V2_MAX_HARMONICS_PER_BAND: u32 = 96;
 
+/// v2 谐波振幅随机抖动下限（在 [下限, 1] 区间取随机）。
+/// 调低：带内谱线强弱差异更大、纹理更不规则；接近 1 趋于均匀梳状谱（机械感）。
+pub const COASTLINE_V2_HARMONIC_RANDOM_FLOOR: f64 = 0.25;
+
+/// v2 粗糙度调制深度——C 带（细节）。细节振幅沿轮廓被低频包络（波长 P/8~P/2）调制：
+/// 礁石段粗糙、滩涂段平静。0 = 处处均匀（机械毛刺感）；越大疏密对比越强。
+pub const COASTLINE_V2_ROUGHNESS_MODULATION_C: f64 = 0.7;
+
+/// v2 粗糙度调制深度——B 带（波动），比 C 带温和。
+pub const COASTLINE_V2_ROUGHNESS_MODULATION_B: f64 = 0.35;
+
 /// v2 噪声 A 带（宏观：模拟海岸线整体位移）波长 = 周长/divisor。
 /// 波长随图形等比缩放（分形自相似），小岛获得与大陆相同的"视觉性格"。
 pub const COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX: f64 = 7.0;
