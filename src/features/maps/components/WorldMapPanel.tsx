@@ -179,17 +179,27 @@ const COASTLINE_ALGORITHM_HINTS: Record<CoastlineAlgorithmChoice, string> = {
 
 /** v2 算法按质量档位映射的采样点数上限（采样步长由后端按最小波长推导）。 */
 const COASTLINE_V2_QUALITY_MAX_POINTS: Record<CoastlineQualityPreset, number> = {
-    preview: 256,
-    rough: 384,
-    balanced: 768,
-    fine: 1280,
-    print: 2048,
+    preview: 512,
+    rough: 1024,
+    balanced: 2048,
+    fine: 4096,
+    print: 10240,
+}
+
+/** v2 算法按质量档位映射的细节波长缩放：越小细节越精细、点数越多。 */
+const COASTLINE_V2_QUALITY_DETAIL_SCALE: Record<CoastlineQualityPreset, number> = {
+    preview: 1.5,
+    rough: 1.2,
+    balanced: 1.0,
+    fine: 0.7,
+    print: 0.5,
 }
 
 /** 把简单模式的旋钮（档位/尺度/三层扰动）换算成 v2 参数；波长与基础振幅走后端绝对像素默认值。 */
 function buildCoastlineV2Params(config: CoastlineSimpleConfig): NonNullable<CoastlineParamsPayload['v2']> {
     return {
         maxPoints: COASTLINE_V2_QUALITY_MAX_POINTS[config.qualityPreset],
+        detailWavelengthScale: COASTLINE_V2_QUALITY_DETAIL_SCALE[config.qualityPreset],
         amplitudeScale: clampNumber(config.scaleFactor, 0.2, 3),
         bandAWeight: clampNumber(config.macroNoise, 0, 2),
         bandBWeight: clampNumber(config.midNoise, 0, 2),

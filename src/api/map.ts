@@ -16,6 +16,8 @@ type MapScenario = 'coastline_mvp'
  * 波长/振幅随图形周长等比缩放并封顶于绝对上限；振幅字段为绝对上限覆盖（px）。 */
 export interface CoastlineV2ParamsPayload {
     maxPoints?: number
+    /** 细节波长缩放：印刷 0.5 → 细节带波长砍半、采样密度翻倍。 */
+    detailWavelengthScale?: number
     bandAAmplitude?: number
     bandBAmplitude?: number
     bandCAmplitude?: number
