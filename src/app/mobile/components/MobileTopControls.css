@@ -5,7 +5,6 @@
 
     position: relative;
     z-index: 8;
-    isolation: isolate;
     display: flex;
     flex: 0 0 auto;
     align-items: center;
@@ -14,26 +13,12 @@
     min-height: var(--mobile-page-topbar-body);
     box-sizing: border-box;
     padding: 0.9rem var(--mobile-page-topbar-x) 0.6rem;
-    background: var(--fc-color-bg);
-}
-
-.mobile-page-topbar::after {
-    position: absolute;
-    inset: 0 0 calc(-1 * var(--mobile-page-topbar-fade));
-    z-index: 0;
-    content: "";
     background: linear-gradient(
         180deg,
         var(--fc-color-bg) 0%,
         var(--fc-color-bg) calc(100% - var(--mobile-page-topbar-fade)),
         color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
     );
-    pointer-events: none;
-}
-
-.mobile-page-topbar > * {
-    position: relative;
-    z-index: 1;
 }
 
 .mobile-page-topbar--sticky {
