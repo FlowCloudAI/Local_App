@@ -1275,6 +1275,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     <div className="mobile-entry-detail__immersive" role="dialog" aria-label="沉浸正文编辑">
                         <MobilePageTopBar
                             className="mobile-entry-detail__immersive-topbar"
+                            edgeToEdge
                             ariaLabel="沉浸正文编辑操作"
                             left={<MobileTopActionPill
                                 actions={[{

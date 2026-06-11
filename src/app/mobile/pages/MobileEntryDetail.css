@@ -699,6 +699,8 @@
     flex-direction: column;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0);
 }
 
 .mobile-entry-detail__immersive-topbar {
