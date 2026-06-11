@@ -156,6 +156,8 @@ pub struct CoastlineV2Params {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_points: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail_wavelength_scale: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_a_amplitude: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub band_b_amplitude: Option<f64>,

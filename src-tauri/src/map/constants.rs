@@ -144,10 +144,18 @@ pub const COASTLINE_V2_MIN_POINTS: usize = 32;
 
 /// v2 海岸线采样点数默认上限（质量档位可覆盖）。
 /// 调大：超大轮廓的细碎纹理更完整；调小：更快但大轮廓高频细节被截断。
-pub const COASTLINE_V2_MAX_POINTS: usize = 768;
+pub const COASTLINE_V2_MAX_POINTS: usize = 2048;
 
 /// v2 海岸线采样点数硬上限，防止参数覆盖导致顶点数失控。
-pub const COASTLINE_V2_MAX_POINTS_CEILING: usize = 2048;
+pub const COASTLINE_V2_MAX_POINTS_CEILING: usize = 12288;
+
+/// v2 细节波长缩放（质量档位驱动：印刷 0.5 → 细节带波长砍半、采样密度翻倍）。
+/// 调小：细节更精细、点数更多；调大：更粗略更快。
+pub const COASTLINE_V2_DETAIL_WAVELENGTH_SCALE: f64 = 1.0;
+
+/// v2 单带谐波数上限。波长精细 + 周长大时整数谐波可达数千，
+/// 全量求和是 O(谐波×采样点) 的性能黑洞；超限时分层抽样（每层取一条，保持确定性与闭合性）。
+pub const COASTLINE_V2_MAX_HARMONICS_PER_BAND: u32 = 96;
 
 /// v2 噪声 A 带（宏观：模拟海岸线整体位移）波长 = 周长/divisor。
 /// 波长随图形等比缩放（分形自相似），小岛获得与大陆相同的"视觉性格"。

@@ -25,6 +25,7 @@ use crate::map::constants::{
     COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO,
     COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
+    COASTLINE_V2_DETAIL_WAVELENGTH_SCALE, COASTLINE_V2_MAX_HARMONICS_PER_BAND,
     COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
     COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
     COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
@@ -281,10 +282,21 @@ fn naturalize_arc_length(
     smoothed
 }
 
+/// 细节波长缩放（质量档位驱动），同时决定采样密度与 C 带波长。
+fn detail_wavelength_scale(params: Option<&CoastlineV2Params>) -> f64 {
+    param!(
+        params,
+        detail_wavelength_scale,
+        COASTLINE_V2_DETAIL_WAVELENGTH_SCALE
+    )
+    .clamp(0.25, 2.0)
+}
+
 fn sample_count_for_perimeter(perimeter: f64, params: Option<&CoastlineV2Params>) -> usize {
     // 采样步长跟随最小波长（每周期 ≥4 个采样点），上限由质量档位控制。
     // C 带波长是绝对像素，因此采样密度（点/px）全图一致。
-    let step = (COASTLINE_V2_BAND_C_WAVELENGTH_MIN / 4.0).clamp(2.0, 8.0);
+    let smallest_wavelength = COASTLINE_V2_BAND_C_WAVELENGTH_MIN * detail_wavelength_scale(params);
+    let step = (smallest_wavelength / 4.0).clamp(1.0, 8.0);
     let desired = (perimeter / step).ceil() as usize;
     let max_points = param!(params, max_points, COASTLINE_V2_MAX_POINTS)
         .min(COASTLINE_V2_MAX_POINTS_CEILING);
@@ -368,6 +380,8 @@ struct Harmonic {
 
 /// 在 [k_min, k_max] 整数谐波上做谱合成，带内做 RMS 归一。
 /// 整数频率保证 f(0) == f(P)，闭合轮廓天然无缝。
+/// 谐波数超限时分层抽样（每层取一条，hash 抖动选位）：求和成本封顶为
+/// O(上限 × 采样点)，谱形与确定性保持。
 fn build_harmonic_band(
     seed: u64,
     salt: u64,
@@ -381,9 +395,16 @@ fn build_harmonic_band(
         return Vec::new();
     }
 
-    let mut harmonics = Vec::with_capacity((harmonic_max - harmonic_min + 1) as usize);
+    let count = harmonic_max - harmonic_min + 1;
+    let take = count.min(COASTLINE_V2_MAX_HARMONICS_PER_BAND);
+    let stratum = f64::from(count) / f64::from(take);
+
+    let mut harmonics = Vec::with_capacity(take as usize);
     let mut power = 0.0;
-    for k in harmonic_min..=harmonic_max {
+    for slot in 0..take {
+        let jitter = hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(slot) + 5));
+        let k = (harmonic_min + ((f64::from(slot) + jitter) * stratum).floor() as u32)
+            .min(harmonic_max);
         let amplitude_random =
             0.5 + 0.5 * hash_unit(seed ^ salt.wrapping_mul(2 * u64::from(k) + 1));
         let amplitude = amplitude_random * f64::from(k).powf(-spectral_beta / 2.0);
@@ -493,8 +514,9 @@ fn build_noise_bands(
         },
         BandSpec {
             // 绝对像素：细节质感不随图形大小变化，长直边与小岛同样粗糙。
-            wavelength_min: COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
-            wavelength_max: COASTLINE_V2_BAND_C_WAVELENGTH_MAX,
+            // 质量档位通过 detail_wavelength_scale 控制精细度（印刷 0.5 → 波长砍半）。
+            wavelength_min: COASTLINE_V2_BAND_C_WAVELENGTH_MIN * detail_wavelength_scale(params),
+            wavelength_max: COASTLINE_V2_BAND_C_WAVELENGTH_MAX * detail_wavelength_scale(params),
             amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO)
                 .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE)),
             feature_ratio: COASTLINE_V2_BAND_C_FEATURE_RATIO,
