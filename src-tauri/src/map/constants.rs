@@ -202,6 +202,16 @@ pub const COASTLINE_V2_BAND_B_AMPLITUDE: f64 = 28.0;
 /// v2 噪声 C 带峰值振幅绝对上限（px，"硬朗"档烘焙值）。配合绝对波长，全图细节质感统一。
 pub const COASTLINE_V2_BAND_C_AMPLITUDE: f64 = 8.0;
 
+/// v2 噪声 A 带位移相对局部特征尺寸（肢体宽度）的上限比例。
+/// 宏观海湾需要大空间才施展：细窄肢体上自动熄火，避免把画好的形状扭走；宽阔腹地不受限。
+pub const COASTLINE_V2_BAND_A_FEATURE_RATIO: f64 = 0.2;
+
+/// v2 噪声 B 带的特征尺寸比例（中尺度波动所需空间较小）。
+pub const COASTLINE_V2_BAND_B_FEATURE_RATIO: f64 = 0.32;
+
+/// v2 噪声 C 带的特征尺寸比例（细节纹理在细窄肢体上也几乎保持全振幅）。
+pub const COASTLINE_V2_BAND_C_FEATURE_RATIO: f64 = 0.5;
+
 /// v2 噪声 A 带强度乘子（前端"大尺度扰动"滑杆，默认 1）。
 pub const COASTLINE_V2_BAND_A_WEIGHT: f64 = 1.0;
 

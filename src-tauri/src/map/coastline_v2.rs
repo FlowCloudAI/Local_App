@@ -14,8 +14,10 @@ use crate::map::constants::{
     COASTLINE_DEDUPLICATE_DISTANCE_SQUARED, COASTLINE_FALLBACK_RELAX_PASSES,
     COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_SCALE,
     COASTLINE_V2_BAND_A_AMPLITUDE, COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO,
-    COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
-    COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_AMPLITUDE,
+    COASTLINE_V2_BAND_A_FEATURE_RATIO, COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX,
+    COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN, COASTLINE_V2_BAND_A_WEIGHT,
+    COASTLINE_V2_BAND_B_AMPLITUDE, COASTLINE_V2_BAND_B_FEATURE_RATIO,
+    COASTLINE_V2_BAND_C_FEATURE_RATIO,
     COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MAX,
     COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX,
     COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX,
@@ -188,7 +190,7 @@ fn naturalize_arc_length(
 
     let canvas_scale = canvas.width.min(canvas.height).max(1.0);
     let seed = hash_text(&format!("{}:{}", shape.id, shape.name));
-    let (noise_offsets, amplitude) = build_noise_offsets(
+    let (noise_bands, amplitude) = build_noise_bands(
         seed,
         &arc_positions,
         perimeter,
@@ -219,8 +221,9 @@ fn naturalize_arc_length(
         let mut y = base_y;
         if tangent_length > f64::EPSILON {
             let attenuation = corner_attenuation(&corner_windows, arc_positions[index], perimeter);
-            let requested_offset = attenuation * noise_offsets[index];
-            let max_offset = max_safe_offset(
+            // 局部特征尺寸（肢体宽度）：宏观带在细窄处熄火，细节带几乎不受限——
+            // 细肢体跟随草稿、保留质感；宽阔腹地照常起大湾。
+            let feature_size = local_feature_size(
                 vertices,
                 &cumulative,
                 perimeter,
@@ -228,9 +231,21 @@ fn naturalize_arc_length(
                 base_x,
                 base_y,
                 step,
-                related_locations,
-                amplitude,
             );
+            let mut requested_offset = 0.0;
+            for band in &noise_bands {
+                let local_amplitude = band.amplitude.min(band.feature_ratio * feature_size);
+                requested_offset += local_amplitude * band.values[index];
+            }
+            requested_offset *= attenuation;
+
+            let mut max_offset = amplitude;
+            if feature_size.is_finite() {
+                max_offset = max_offset.min(feature_size * COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR);
+            }
+            max_offset = max_offset
+                .min(location_safe_cap(related_locations, base_x, base_y))
+                .max(0.0);
             let offset = soft_limit_offset(requested_offset, max_offset);
             if offset.abs() + f64::EPSILON < requested_offset.abs() {
                 constrained_offsets += 1;
@@ -395,8 +410,18 @@ struct BandSpec {
     wavelength_min: f64,
     wavelength_max: f64,
     amplitude: f64,
+    feature_ratio: f64,
     weight: f64,
     salt: u64,
+}
+
+/// 单带计算结果：峰值归一的采样值 + 有效振幅 + 特征尺寸比例。
+/// 分带保留是为了"局部特征尺寸限幅"——细窄肢体上宏观带熄火、细节带保持全振幅，
+/// 比对合成结果做整体限幅更能保住质感。
+struct BandField {
+    amplitude: f64,
+    feature_ratio: f64,
+    values: Vec<f64>,
 }
 
 /// 把绝对波长区间换算成该周长下的整数谐波区间。
@@ -419,10 +444,10 @@ fn harmonic_range(
     }
 }
 
-/// 计算所有采样点的位移（px）与合计峰值振幅。
-/// 每带独立按峰值归一后乘以该带绝对振幅再叠加——三层扰动互不挤压，
-/// 且波长/振幅均为世界单位，与图形大小无关。
-fn build_noise_offsets(
+/// 计算三个噪声带在所有采样点的归一值与有效振幅。
+/// 每带独立按峰值归一——三层扰动互不挤压；逐带返回（而非合成）以便
+/// 主循环按局部特征尺寸对各带分别限幅。
+fn build_noise_bands(
     seed: u64,
     arc_positions: &[f64],
     perimeter: f64,
@@ -430,7 +455,7 @@ fn build_noise_offsets(
     canvas_scale: f64,
     amplitude_scale: f64,
     params: Option<&CoastlineV2Params>,
-) -> (Vec<f64>, f64) {
+) -> (Vec<BandField>, f64) {
     let spectral_beta = param!(params, spectral_beta, COASTLINE_V2_SPECTRAL_BETA);
     // 最高频带每周期至少 4 个采样点，杜绝欠采样混叠。
     let harmonic_cap = (sample_count / 4).max(1) as u32;
@@ -446,6 +471,7 @@ fn build_noise_offsets(
             wavelength_max: perimeter / COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
             amplitude: (perimeter * COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO)
                 .min(param!(params, band_a_amplitude, COASTLINE_V2_BAND_A_AMPLITUDE)),
+            feature_ratio: COASTLINE_V2_BAND_A_FEATURE_RATIO,
             weight: param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_A,
         },
@@ -461,6 +487,7 @@ fn build_noise_offsets(
             ),
             amplitude: (perimeter * COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO)
                 .min(param!(params, band_b_amplitude, COASTLINE_V2_BAND_B_AMPLITUDE)),
+            feature_ratio: COASTLINE_V2_BAND_B_FEATURE_RATIO,
             weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_B,
         },
@@ -470,12 +497,13 @@ fn build_noise_offsets(
             wavelength_max: COASTLINE_V2_BAND_C_WAVELENGTH_MAX,
             amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO)
                 .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE)),
+            feature_ratio: COASTLINE_V2_BAND_C_FEATURE_RATIO,
             weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_C,
         },
     ];
 
-    let mut offsets = vec![0.0f64; arc_positions.len()];
+    let mut bands = Vec::with_capacity(band_specs.len());
     let mut total_amplitude = 0.0f64;
     for spec in &band_specs {
         let Some((harmonic_min, harmonic_max)) = harmonic_range(
@@ -518,9 +546,14 @@ fn build_noise_offsets(
         if max_abs <= f64::EPSILON {
             continue;
         }
-        for (offset, value) in offsets.iter_mut().zip(&band_values) {
-            *offset += effective_amplitude * value / max_abs;
+        for value in &mut band_values {
+            *value /= max_abs;
         }
+        bands.push(BandField {
+            amplitude: effective_amplitude,
+            feature_ratio: spec.feature_ratio,
+            values: band_values,
+        });
         total_amplitude += effective_amplitude;
     }
 
@@ -528,13 +561,13 @@ fn build_noise_offsets(
     let canvas_cap = canvas_scale * COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX;
     if total_amplitude > canvas_cap && total_amplitude > f64::EPSILON {
         let shrink = canvas_cap / total_amplitude;
-        for offset in &mut offsets {
-            *offset *= shrink;
+        for band in &mut bands {
+            band.amplitude *= shrink;
         }
         total_amplitude = canvas_cap;
     }
 
-    (offsets, total_amplitude)
+    (bands, total_amplitude)
 }
 
 struct CornerWindow {
@@ -642,8 +675,11 @@ fn corner_attenuation(windows: &[CornerWindow], arc_position: f64, perimeter: f6
     attenuation
 }
 
-#[allow(clippy::too_many_arguments)]
-fn max_safe_offset(
+/// 局部特征尺寸：到"折叠几何"对面轮廓的最近距离（≈ 该处肢体宽度）。
+/// 宽阔腹地无对面轮廓时返回 INFINITY。
+/// 判据：空间距离接近弧长距离的是轮廓自然延伸（含共线细分边），跳过——
+/// 该判据天然保证顶点细分不变性，并自动覆盖尖角（楔形两侧 d ≈ 弧距 × sin 角度）。
+fn local_feature_size(
     vertices: &[MapShapeVertex],
     cumulative: &[f64],
     perimeter: f64,
@@ -651,10 +687,8 @@ fn max_safe_offset(
     x: f64,
     y: f64,
     step: f64,
-    related_locations: &[MapKeyLocationDraft],
-    amplitude: f64,
 ) -> f64 {
-    let mut max_offset = amplitude;
+    let mut feature = f64::INFINITY;
     let total = vertices.len();
     for index in 0..total {
         let arc_distance = arc_distance_to_range(
@@ -668,21 +702,24 @@ fn max_safe_offset(
         }
         let distance =
             point_to_segment_distance(x, y, &vertices[index], &vertices[(index + 1) % total]);
-        // 空间距离接近弧长距离 → 这是轮廓的自然延伸（含共线细分边），不构成窄缝。
         if distance >= arc_distance * COASTLINE_V2_ARC_FLAT_RATIO {
             continue;
         }
-        max_offset = max_offset.min(distance * COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR);
+        feature = feature.min(distance);
     }
+    feature
+}
 
+/// 关键地点的安全位移上限（无关联地点时为 INFINITY）。
+fn location_safe_cap(related_locations: &[MapKeyLocationDraft], x: f64, y: f64) -> f64 {
+    let mut cap = f64::INFINITY;
     for location in related_locations {
         let dx = location.x - x;
         let dy = location.y - y;
         let distance = (dx * dx + dy * dy).sqrt();
-        max_offset = max_offset.min(distance * COASTLINE_V2_LOCATION_SAFE_FACTOR);
+        cap = cap.min(distance * COASTLINE_V2_LOCATION_SAFE_FACTOR);
     }
-
-    max_offset.max(0.0)
+    cap
 }
 
 /// 软饱和限幅：|位移| ≤ 上限 × 拐点比例时原样通过，超过后用 tanh 平滑渐近逼近上限。

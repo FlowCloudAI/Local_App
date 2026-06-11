@@ -189,3 +189,53 @@ fn v2_narrow_shape_stays_safe() {
     assert!(polygon.len() > 8);
     assert!(find_polygon_self_intersections(&to_vertices(&polygon)).is_empty());
 }
+
+fn max_deviation_from_draft(shape: &MapShapeDraft) -> f64 {
+    let polygon = build_natural_coastline_polygon_v2(&canvas(), shape, &[], None);
+    let original = &shape.vertices;
+    polygon
+        .iter()
+        .map(|point| {
+            (0..original.len())
+                .map(|index| {
+                    point_to_segment_distance(
+                        point[0],
+                        point[1],
+                        &original[index],
+                        &original[(index + 1) % original.len()],
+                    )
+                })
+                .fold(f64::INFINITY, f64::min)
+        })
+        .fold(0.0f64, f64::max)
+}
+
+/// 局部特征尺寸保形：同周长（1760）下，细长条（80px 宽）上宏观带自动熄火、
+/// 偏离受限；宽阔方块腹地允许大湾——证明限幅跟随局部肢体宽度而非全局一刀切。
+#[test]
+fn v2_thin_limb_keeps_identity_while_wide_body_stays_bold() {
+    let thin = shape_with_vertices(vec![
+        vertex("l1", 100.0, 300.0),
+        vertex("l2", 900.0, 300.0),
+        vertex("l3", 900.0, 380.0),
+        vertex("l4", 100.0, 380.0),
+    ]);
+    let square = shape_with_vertices(vec![
+        vertex("s1", 100.0, 100.0),
+        vertex("s2", 540.0, 100.0),
+        vertex("s3", 540.0, 540.0),
+        vertex("s4", 100.0, 540.0),
+    ]);
+
+    let thin_deviation = max_deviation_from_draft(&thin);
+    let square_deviation = max_deviation_from_draft(&square);
+
+    assert!(
+        thin_deviation < 40.0,
+        "细长条偏离草稿过大：{thin_deviation}"
+    );
+    assert!(
+        square_deviation > thin_deviation + 15.0,
+        "宽阔形状应保留更大宏观自由度：square={square_deviation} thin={thin_deviation}"
+    );
+}
