@@ -56,7 +56,7 @@
 }
 
 .mobile-category-drawer__search .fc-input__field {
-    font-size: var(--fc-font-size-base);
+    font-size: var(--fc-font-size-body);
     font-weight: var(--fc-font-weight-medium);
 }
 
@@ -217,7 +217,7 @@
 
 .mobile-category-drawer__text strong {
     color: inherit;
-    font-size: var(--fc-font-size-base);
+    font-size: var(--fc-font-size-body);
     font-weight: 720;
     line-height: 1.2;
 }

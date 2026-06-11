@@ -398,8 +398,11 @@
 }
 
 .mobile-ai-model-menu {
-    width: calc(var(--mobile-anchored-menu-right-boundary, 100%) - var(--mobile-anchored-menu-left, 1rem));
-    max-width: calc(100% - var(--mobile-anchored-menu-left, 1rem) - 1rem);
+    --mobile-anchored-menu-left: 1rem;
+    --mobile-anchored-menu-right-boundary: 100%;
+
+    width: calc(var(--mobile-anchored-menu-right-boundary) - var(--mobile-anchored-menu-left));
+    max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
 }
 
 .mobile-ai-model-menu__row {

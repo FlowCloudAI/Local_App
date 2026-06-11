@@ -519,7 +519,7 @@
 .mobile-home-filter__text > span {
     overflow: hidden;
     color: inherit;
-    font-size: var(--fc-font-size-base);
+    font-size: var(--fc-font-size-body);
     font-weight: var(--fc-font-weight-semibold);
     line-height: 1.2;
     text-overflow: ellipsis;

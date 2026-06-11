@@ -6,15 +6,17 @@
      * 调整 stop 会改变渐变发生的位置；调整 visible 会改变该位置背景遮住内容的强弱。
      */
     --mobile-page-topbar-x: clamp(1rem, 4vw, 1.35rem);
-    --mobile-page-topbar-body: 2.55rem;
+    --mobile-page-topbar-body: 3rem;
     --mobile-page-topbar-bg-stop-1: 0%;
     --mobile-page-topbar-bg-visible-1: 100%;
-    --mobile-page-topbar-bg-stop-2: 44%;
-    --mobile-page-topbar-bg-visible-2: 100%;
-    --mobile-page-topbar-bg-stop-3: 78%;
-    --mobile-page-topbar-bg-visible-3: 58%;
-    --mobile-page-topbar-bg-stop-4: 100%;
-    --mobile-page-topbar-bg-visible-4: 0%;
+    --mobile-page-topbar-bg-stop-2: 25%;
+    --mobile-page-topbar-bg-visible-2: 95%;
+    --mobile-page-topbar-bg-stop-3: 60%;
+    --mobile-page-topbar-bg-visible-3: 70%;
+    --mobile-page-topbar-bg-stop-4: 80%;
+    --mobile-page-topbar-bg-visible-4: 40%;
+    --mobile-page-topbar-bg-stop-5: 100%;
+    --mobile-page-topbar-bg-visible-5: 0%;
 
     position: relative;
     z-index: 8;
@@ -25,13 +27,14 @@
     gap: 0.7rem;
     min-height: var(--mobile-page-topbar-body);
     box-sizing: border-box;
-    padding: 0.9rem var(--mobile-page-topbar-x) 0.6rem;
+    padding: 0 var(--mobile-page-topbar-x) 0.6rem;
     background: linear-gradient(
         180deg,
         color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-1), transparent) var(--mobile-page-topbar-bg-stop-1),
         color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-2), transparent) var(--mobile-page-topbar-bg-stop-2),
         color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-3), transparent) var(--mobile-page-topbar-bg-stop-3),
-        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-4), transparent) var(--mobile-page-topbar-bg-stop-4)
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-4), transparent) var(--mobile-page-topbar-bg-stop-4),
+        color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-5), transparent) var(--mobile-page-topbar-bg-stop-5)
     );
 }
 
@@ -43,7 +46,7 @@
 .mobile-page-topbar--edge-to-edge {
     margin-right: calc(var(--mobile-page-topbar-x) * -1);
     margin-left: calc(var(--mobile-page-topbar-x) * -1);
-    padding: 0.85rem var(--mobile-page-topbar-x) 0.55rem;
+    padding: 0 var(--mobile-page-topbar-x) 0.55rem;
 }
 
 .mobile-page-topbar__side,
@@ -179,11 +182,15 @@
 }
 
 .mobile-anchored-menu {
+    --mobile-anchored-menu-top: 2.25rem;
+    --mobile-anchored-menu-right: 1rem;
+    --mobile-anchored-menu-left: 1rem;
+
     position: absolute;
-    top: var(--mobile-anchored-menu-top, 2.25rem);
-    right: var(--mobile-anchored-menu-right, 1rem);
+    top: var(--mobile-anchored-menu-top);
+    right: var(--mobile-anchored-menu-right);
     width: min(15.75rem, calc(100% - 2rem));
-    max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-top, 2.25rem) - 1rem));
+    max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-top) - 1rem));
     box-sizing: border-box;
     padding: 0.75rem 0;
     overflow-y: auto;
@@ -204,8 +211,8 @@
 
 .mobile-anchored-menu--left {
     right: auto;
-    left: var(--mobile-anchored-menu-left, 1rem);
-    max-width: calc(100% - var(--mobile-anchored-menu-left, 1rem) - 1rem);
+    left: var(--mobile-anchored-menu-left);
+    max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
     transform-origin: top left;
 }
 
@@ -266,7 +273,7 @@
 .mobile-anchored-menu__text > span {
     overflow: hidden;
     color: inherit;
-    font-size: var(--fc-font-size-base);
+    font-size: var(--fc-font-size-body);
     font-weight: var(--fc-font-weight-semibold);
     line-height: 1.2;
     text-overflow: ellipsis;
