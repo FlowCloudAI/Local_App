@@ -452,6 +452,19 @@
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0));
 }
 
+.mobile-entry-detail__action-svg {
+    display: block;
+    width: 1.45rem;
+    height: 1.45rem;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.3;
+}
+
+.mobile-entry-detail__view-topbar,
 .mobile-entry-detail__edit-topbar {
     position: sticky;
     z-index: 8;
@@ -462,12 +475,11 @@
     gap: 0.7rem;
     margin: -1rem calc(-1 * clamp(1rem, 4vw, 1.35rem)) 0;
     padding: 0.9rem clamp(1rem, 4vw, 1.35rem) 0.7rem;
-    background: linear-gradient(
-        180deg,
-        var(--fc-color-bg) 0%,
-        var(--fc-color-bg) 74%,
-        color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
-    );
+    background: var(--fc-color-bg);
+}
+
+.mobile-entry-detail__view-topbar {
+    margin-bottom: 0.35rem;
 }
 
 .mobile-entry-detail__edit-heading {

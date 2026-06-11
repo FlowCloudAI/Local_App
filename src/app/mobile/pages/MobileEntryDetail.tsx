@@ -161,6 +161,38 @@ function buildExcerpt(value?: string | null, maxLength = 64): string {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
 }
 
+function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' }) {
+    if (type === 'ai') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 3.5c1.8 4.4 3.4 6 8 8-4.6 2-6.2 3.6-8 8-1.8-4.4-3.4-6-8-8 4.6-2 6.2-3.6 8-8Z"/>
+            </svg>
+        )
+    }
+    if (type === 'edit') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5 19h4.1L18.7 9.4a2.2 2.2 0 0 0-3.1-3.1L6 15.9 5 19Z"/>
+                <path d="m14.5 7.5 2 2"/>
+            </svg>
+        )
+    }
+    if (type === 'check') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="m5.5 12.5 4.1 4.1 8.9-9.2"/>
+            </svg>
+        )
+    }
+    return (
+        <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+            <path d="M6.5 12h.01"/>
+            <path d="M12 12h.01"/>
+            <path d="M17.5 12h.01"/>
+        </svg>
+    )
+}
+
 /**
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
  * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
@@ -779,7 +811,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                         actions={[{
                             key: 'save',
                             label: saving ? '保存中' : '保存词条',
-                            icon: saving ? '…' : '✓',
+                            icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="check"/>,
                             kind: 'add',
                             disabled: saving,
                             onClick: () => void handleSave(),
@@ -1075,6 +1107,43 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     return (
         <div className="mobile-page mobile-entry-detail">
+            <header className="mobile-entry-detail__view-topbar">
+                <MobileTopActionPill
+                    actions={[{
+                        key: 'back',
+                        label: '返回',
+                        icon: <MobileBackIcon/>,
+                        onClick: pop,
+                    }]}
+                />
+                <MobileTopActionPill
+                    actions={[
+                        {
+                            key: 'ai',
+                            label: 'AI 讨论',
+                            icon: <MobileEntryDetailActionIcon type="ai"/>,
+                            onClick: handleAiDiscuss,
+                        },
+                        {
+                            key: 'edit',
+                            label: '编辑词条',
+                            icon: <MobileEntryDetailActionIcon type="edit"/>,
+                            kind: 'add',
+                            onClick: enterEdit,
+                        },
+                        {
+                            key: 'menu',
+                            label: '更多操作',
+                            icon: <MobileEntryDetailActionIcon type="more"/>,
+                            kind: 'more',
+                            ariaHasPopup: 'menu',
+                            ariaExpanded: menuOpen,
+                            onClick: () => setMenuOpen(true),
+                        },
+                    ]}
+                />
+            </header>
+
             <h1 className="mobile-entry-detail__title">
                 {entry.title}
             </h1>
@@ -1229,12 +1298,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     暂无正文内容
                 </div>
             )}
-
-            <div className="mobile-bottom-bar mobile-entry-detail__bottom-bar">
-                <Button type="button" variant="outline" onClick={handleAiDiscuss}>AI 讨论</Button>
-                <Button type="button" onClick={enterEdit}>编辑</Button>
-                <Button type="button" variant="ghost" onClick={() => setMenuOpen(true)} aria-label="更多操作">⋯</Button>
-            </div>
 
             <ActionMenu
                 open={menuOpen}
