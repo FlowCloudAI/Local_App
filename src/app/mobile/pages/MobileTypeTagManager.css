@@ -1,26 +1,20 @@
 .mobile-type-tag {
-    /* ── 页面水平边距 ── */
-    --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
-
     /*
-     * ── 顶栏 sticky 遮罩几何（从上到下） ──
+     * ── 顶栏渐隐调试区 ──
      *
-     *   header-top            实色，标题上方空隙
-     *   标题内容区（min-height 2.65rem）  实色，标题本体
-     *   solid-extra           标题下方额外实色保护区，防止内容压到标题底部
-     *   header-fade           顶栏下方渐变过渡区（实色 → 透明）
-     *   ───────────── 顶栏底边 ─────────────
-     *   列表内容从此可见
-     *
-     * topbar 本体直接绘制背景：先实色覆盖标题区，再在底部做渐隐。
-     * header-bottom = solid-extra + header-fade，控制标题下方总遮罩空间。
+     * 结构从上到下：
+     * 1. header-top：标题上方的实色留白。
+     * 2. header-title-height：标题/返回/添加按钮所在的实色主体高度。
+     * 3. header-solid-extra：标题下方额外实色保护区；调大可避免滚动内容贴到标题底部。
+     * 4. header-fade：从实色到透明的渐隐长度；调大可让内容消失得更柔和。
+     * 5. scroll-reserve：列表底部额外可滚空间；调大可减少折叠后滚动位置被浏览器夹回。
      */
-    --mobile-type-tag-header-top: 0.5rem;          /* 标题上方空隙 */
-    --mobile-type-tag-header-solid-extra: 1.35rem; /* 标题下方额外实色保护区 */
-    --mobile-type-tag-header-fade: 5rem;           /* 渐变过渡段长度 */
+    --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
+    --mobile-type-tag-header-top: 0.5rem;
+    --mobile-type-tag-header-title-height: 2.65rem;
+    --mobile-type-tag-header-solid-extra: 1.35rem;
+    --mobile-type-tag-header-fade: 5rem;
     --mobile-type-tag-header-bottom: calc(var(--mobile-type-tag-header-solid-extra) + var(--mobile-type-tag-header-fade));
-
-    /* 列表底部额外可滚空间，保证最后几条卡片能滚到可视区 */
     --mobile-type-tag-scroll-reserve: 12rem;
 
     display: flex;
@@ -39,7 +33,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
-    min-height: 2.65rem;
+    min-height: var(--mobile-type-tag-header-title-height);
     margin: 0 calc(var(--mobile-type-tag-page-x) * -1);
     padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-bottom);
     background: linear-gradient(
