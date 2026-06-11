@@ -16,12 +16,12 @@ use crate::map::constants::{
     COASTLINE_V2_BAND_A_AMPLITUDE, COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO,
     COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
     COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_AMPLITUDE,
-    COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX,
+    COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MAX,
+    COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX,
     COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX,
     COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN, COASTLINE_V2_BAND_B_WEIGHT,
     COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO,
-    COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MIN,
-    COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN,
+    COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
     COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
     COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
@@ -265,9 +265,8 @@ fn naturalize_arc_length(
 
 fn sample_count_for_perimeter(perimeter: f64, params: Option<&CoastlineV2Params>) -> usize {
     // 采样步长跟随最小波长（每周期 ≥4 个采样点），上限由质量档位控制。
-    let smallest_wavelength = (perimeter / COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX)
-        .max(COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN);
-    let step = (smallest_wavelength / 4.0).clamp(2.0, 8.0);
+    // C 带波长是绝对像素，因此采样密度（点/px）全图一致。
+    let step = (COASTLINE_V2_BAND_C_WAVELENGTH_MIN / 4.0).clamp(2.0, 8.0);
     let desired = (perimeter / step).ceil() as usize;
     let max_points = param!(params, max_points, COASTLINE_V2_MAX_POINTS)
         .min(COASTLINE_V2_MAX_POINTS_CEILING);
@@ -448,20 +447,24 @@ fn build_noise_offsets(
             salt: COASTLINE_V2_NOISE_SALT_A,
         },
         BandSpec {
-            wavelength_min: (perimeter / COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX)
-                .max(COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN),
-            wavelength_max: (perimeter / COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN)
-                .max(COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX),
+            // 半相对：跟随图形大小，但被绝对窗口夹住。
+            wavelength_min: (perimeter / COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX).clamp(
+                COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN,
+                COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MIN,
+            ),
+            wavelength_max: (perimeter / COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN).clamp(
+                COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX,
+                COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MAX,
+            ),
             amplitude: (perimeter * COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO)
                 .min(param!(params, band_b_amplitude, COASTLINE_V2_BAND_B_AMPLITUDE)),
             weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_B,
         },
         BandSpec {
-            wavelength_min: (perimeter / COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX)
-                .max(COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN),
-            wavelength_max: (perimeter / COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MIN)
-                .max(COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MAX),
+            // 绝对像素：细节质感不随图形大小变化，长直边与小岛同样粗糙。
+            wavelength_min: COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
+            wavelength_max: COASTLINE_V2_BAND_C_WAVELENGTH_MAX,
             amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO)
                 .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE)),
             weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
