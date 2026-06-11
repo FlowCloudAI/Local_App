@@ -1,8 +1,26 @@
 .mobile-type-tag {
+    /* ── 页面水平边距 ── */
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
-    --mobile-type-tag-header-top: 0.5rem;
-    --mobile-type-tag-header-bottom: 1.6rem;
-    --mobile-type-tag-header-fade: 5rem;
+
+    /*
+     * ── 顶栏 sticky 遮罩几何（从上到下） ──
+     *
+     *   header-top            实色，标题上方空隙
+     *   标题内容区（min-height 2.65rem）  实色，标题本体
+     *   header-bottom         顶栏下方渐变过渡区（实色 → 透明）
+     *   ───────────── 顶栏底边 ─────────────
+     *   列表内容从此可见
+     *
+     * ::before 只负责标题所在的实色遮罩区。
+     * ::after 从标题内容区下面开始，负责渐变过渡，不再从页面顶端绘制。
+     * header-bottom 控制顶栏下 padding（决定渐变区的物理空间），header-fade 控制渐变过渡段长度。
+     * 两者通常设为相同值；想渐变比间距更短/更长时可以分开调。
+     */
+    --mobile-type-tag-header-top: 0.5rem;     /* 标题上方空隙 */
+    --mobile-type-tag-header-bottom: 4.5rem;  /* 标题下方渐变空间（同时也是 padding-bottom） */
+    --mobile-type-tag-header-fade: 4.5rem;    /* 渐变过渡段长度，须 ≤ header-bottom */
+
+    /* 列表底部额外可滚空间，保证最后几条卡片能滚到可视区 */
     --mobile-type-tag-scroll-reserve: 12rem;
 
     display: flex;
@@ -28,21 +46,30 @@
     pointer-events: none;
 }
 
-.mobile-type-tag__topbar::before {
+.mobile-type-tag__topbar::before,
+.mobile-type-tag__topbar::after {
     position: absolute;
     z-index: 0;
-    top: 0;
     right: 0;
-    bottom: calc(var(--mobile-type-tag-header-fade) * -1);
     left: 0;
+    content: "";
+    pointer-events: none;
+}
+
+.mobile-type-tag__topbar::before {
+    top: 0;
+    bottom: var(--mobile-type-tag-header-bottom);
+    background: var(--fc-color-bg);
+}
+
+.mobile-type-tag__topbar::after {
+    top: calc(100% - var(--mobile-type-tag-header-bottom));
+    height: var(--mobile-type-tag-header-fade);
     background: linear-gradient(
         180deg,
         var(--fc-color-bg) 0%,
-        var(--fc-color-bg) calc(100% - var(--mobile-type-tag-header-fade)),
         color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
     );
-    content: "";
-    pointer-events: none;
 }
 
 .mobile-type-tag__topbar > * {
