@@ -48,6 +48,7 @@ import EntryTypeCreator from '../../../features/entries/components/EntryTypeCrea
 import TagCreator from '../../../features/entries/components/TagCreator'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
+import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
     buildTagValueMap,
@@ -760,53 +761,148 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const editTagSchemas = entryTags.visibleTagSchemas
         return (
             <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
-                <div className="mobile-entry-detail__actions">
-                    <Button type="button" size="sm" variant="outline" onClick={() => void handleCancel()} disabled={saving}>取消</Button>
-                    <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving}>
-                        {saving ? '保存中…' : '保存'}
-                    </Button>
-                </div>
-
-                <Input
-                    placeholder="词条标题"
-                    value={title}
-                    onValueChange={setTitle}
-                    className="mobile-entry-detail__title-input"
-                />
-
-                <div className="mobile-entry-detail__meta-row">
-                    <Select
-                        value={entryType ?? ''}
-                        onChange={v => setEntryType(v ? String(v) : null)}
-                        options={typeOptions}
-                        placeholder="类型"
-                        className="mobile-entry-detail__meta-select"
+                <header className="mobile-entry-detail__edit-topbar">
+                    <MobileTopActionPill
+                        actions={[{
+                            key: 'cancel',
+                            label: '取消编辑',
+                            icon: <MobileBackIcon/>,
+                            disabled: saving,
+                            onClick: () => void handleCancel(),
+                        }]}
                     />
-                    <Select
-                        value={categoryId ?? ''}
-                        onChange={v => setCategoryId(v ? String(v) : null)}
-                        options={categoryOptions}
-                        placeholder="分类"
-                        className="mobile-entry-detail__meta-select"
+                    <div className="mobile-entry-detail__edit-heading">
+                        <span>编辑词条</span>
+                        <small>{saving ? '保存中…' : isDirty ? '有未保存修改' : '已同步'}</small>
+                    </div>
+                    <MobileTopActionPill
+                        actions={[{
+                            key: 'save',
+                            label: saving ? '保存中' : '保存词条',
+                            icon: saving ? '…' : '✓',
+                            kind: 'add',
+                            disabled: saving,
+                            onClick: () => void handleSave(),
+                        }]}
                     />
-                </div>
+                </header>
 
-                <button
-                    type="button"
-                    className="mobile-entry-detail__add-type"
-                    onClick={() => setTypeCreatorOpen(true)}
-                >
-                    + 新建类型
-                </button>
+                <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--identity">
+                    <div className="mobile-entry-detail__section-header">
+                        <span>基础信息</span>
+                    </div>
+                    <Input
+                        placeholder="词条标题"
+                        value={title}
+                        onValueChange={setTitle}
+                        className="mobile-entry-detail__title-input"
+                    />
 
-                <Input
-                    placeholder="摘要（可选）"
-                    value={summary}
-                    onValueChange={setSummary}
-                    className="mobile-entry-detail__summary-input"
-                />
+                    <div className="mobile-entry-detail__meta-row">
+                        <label className="mobile-entry-detail__field">
+                            <span>类型</span>
+                            <Select
+                                value={entryType ?? ''}
+                                onChange={v => setEntryType(v ? String(v) : null)}
+                                options={typeOptions}
+                                placeholder="类型"
+                                className="mobile-entry-detail__meta-select"
+                            />
+                        </label>
+                        <label className="mobile-entry-detail__field">
+                            <span>分类</span>
+                            <Select
+                                value={categoryId ?? ''}
+                                onChange={v => setCategoryId(v ? String(v) : null)}
+                                options={categoryOptions}
+                                placeholder="分类"
+                                className="mobile-entry-detail__meta-select"
+                            />
+                        </label>
+                    </div>
 
-                <div className="mobile-entry-detail__images">
+                    <button
+                        type="button"
+                        className="mobile-entry-detail__add-type"
+                        onClick={() => setTypeCreatorOpen(true)}
+                    >
+                        + 新建类型
+                    </button>
+
+                    <Input
+                        placeholder="摘要（可选）"
+                        value={summary}
+                        onValueChange={setSummary}
+                        className="mobile-entry-detail__summary-input"
+                    />
+                </section>
+
+                <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
+                    <div className="mobile-entry-detail__section-header">
+                        <span>正文</span>
+                    </div>
+                    <div className="mobile-entry-detail__content-field">
+                        <textarea
+                            ref={contentInputRef}
+                            placeholder="正文内容…"
+                            value={content}
+                            onChange={handleContentChange}
+                            onKeyDown={handleContentKeyDown}
+                            onKeyUp={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
+                            onClick={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
+                            onSelect={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
+                            onFocus={handleContentFocus}
+                            onBlur={handleContentBlur}
+                            className="mobile-entry-detail__content-input"
+                        />
+                        {wikiDraft && (
+                            <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
+                                <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
+                                {wikiLinkOptions.length > 0 ? (
+                                    <div className="mobile-entry-detail__wiki-options">
+                                        {wikiLinkOptions.map((option, index) => {
+                                            const active = index === activeWikiOptionIndex
+                                            const isCreatingOption = option.kind === 'create'
+                                            const optionKey = option.kind === 'entry'
+                                                ? `entry-${option.id}`
+                                                : `create-${option.title}`
+                                            const categoryName = option.kind === 'entry' && option.categoryId
+                                                ? categoryNameById.get(option.categoryId)
+                                                : null
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={optionKey}
+                                                    role="option"
+                                                    aria-selected={active}
+                                                    className={`mobile-entry-detail__wiki-option${active ? ' is-active' : ''}${isCreatingOption ? ' mobile-entry-detail__wiki-option--create' : ''}`}
+                                                    disabled={isCreatingOption && creatingLinkedEntry}
+                                                    onMouseDown={(event) => event.preventDefault()}
+                                                    onMouseEnter={() => setActiveWikiOptionIndex(index)}
+                                                    onFocus={() => setActiveWikiOptionIndex(index)}
+                                                    onClick={() => handleWikiOptionCommit(option)}
+                                                >
+                                                    <span className="mobile-entry-detail__wiki-option-title">
+                                                        {option.kind === 'entry' ? option.title : `创建「${option.title}」`}
+                                                    </span>
+                                                    <span className="mobile-entry-detail__wiki-option-meta">
+                                                        {option.kind === 'entry'
+                                                            ? (categoryName ?? '未分类')
+                                                            : (creatingLinkedEntry ? '创建中…' : '新词条')}
+                                                    </span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="mobile-entry-detail__wiki-empty">没有匹配词条</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                <section className="mobile-entry-detail__images mobile-entry-detail__form-section">
                     <div className="mobile-entry-detail__images-header">
                         <div className="mobile-entry-detail__images-label">图片</div>
                         <Button type="button" size="sm" variant="outline" onClick={() => setImageAddModalOpen(true)}>
@@ -842,69 +938,9 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             还没有图片
                         </div>
                     )}
-                </div>
+                </section>
 
-                <div className="mobile-entry-detail__content-field">
-                    <textarea
-                        ref={contentInputRef}
-                        placeholder="正文内容…"
-                        value={content}
-                        onChange={handleContentChange}
-                        onKeyDown={handleContentKeyDown}
-                        onKeyUp={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
-                        onClick={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
-                        onSelect={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
-                        onFocus={handleContentFocus}
-                        onBlur={handleContentBlur}
-                        className="mobile-entry-detail__content-input"
-                    />
-                    {wikiDraft && (
-                        <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
-                            <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
-                            {wikiLinkOptions.length > 0 ? (
-                                <div className="mobile-entry-detail__wiki-options">
-                                    {wikiLinkOptions.map((option, index) => {
-                                        const active = index === activeWikiOptionIndex
-                                        const isCreatingOption = option.kind === 'create'
-                                        const optionKey = option.kind === 'entry'
-                                            ? `entry-${option.id}`
-                                            : `create-${option.title}`
-                                        const categoryName = option.kind === 'entry' && option.categoryId
-                                            ? categoryNameById.get(option.categoryId)
-                                            : null
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={optionKey}
-                                                role="option"
-                                                aria-selected={active}
-                                                className={`mobile-entry-detail__wiki-option${active ? ' is-active' : ''}${isCreatingOption ? ' mobile-entry-detail__wiki-option--create' : ''}`}
-                                                disabled={isCreatingOption && creatingLinkedEntry}
-                                                onMouseDown={(event) => event.preventDefault()}
-                                                onMouseEnter={() => setActiveWikiOptionIndex(index)}
-                                                onFocus={() => setActiveWikiOptionIndex(index)}
-                                                onClick={() => handleWikiOptionCommit(option)}
-                                            >
-                                                <span className="mobile-entry-detail__wiki-option-title">
-                                                    {option.kind === 'entry' ? option.title : `创建「${option.title}」`}
-                                                </span>
-                                                <span className="mobile-entry-detail__wiki-option-meta">
-                                                    {option.kind === 'entry'
-                                                        ? (categoryName ?? '未分类')
-                                                        : (creatingLinkedEntry ? '创建中…' : '新词条')}
-                                                </span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="mobile-entry-detail__wiki-empty">没有匹配词条</div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                <div className="mobile-entry-detail__tags">
+                <section className="mobile-entry-detail__tags mobile-entry-detail__form-section">
                     <div className="mobile-entry-detail__tags-header">
                         <div className="mobile-entry-detail__tags-label">标签</div>
                         <div className="mobile-entry-detail__tags-actions">
@@ -947,9 +983,9 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     ) : (
                         <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前词条还没有已添加标签</div>
                     )}
-                </div>
+                </section>
 
-                <div className="mobile-entry-detail__relations">
+                <section className="mobile-entry-detail__relations mobile-entry-detail__form-section">
                     <div className="mobile-entry-detail__relations-header">
                         <div className="mobile-entry-detail__relations-label">关系</div>
                     </div>
@@ -967,7 +1003,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             })()
                         }}
                     />
-                </div>
+                </section>
 
                 <EntryTypeCreator
                     open={typeCreatorOpen}
