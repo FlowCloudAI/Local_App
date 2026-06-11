@@ -51,6 +51,7 @@ import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
     MobileBackIcon,
+    MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -811,8 +812,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const editTagSchemas = entryTags.visibleTagSchemas
         return (
             <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
-                <header className="mobile-entry-detail__edit-topbar">
-                    <MobileTopActionPill
+                <MobilePageTopBar
+                    className="mobile-entry-detail__edit-topbar"
+                    sticky
+                    edgeToEdge
+                    ariaLabel="词条编辑操作"
+                    left={<MobileTopActionPill
                         actions={[{
                             key: 'cancel',
                             label: '取消编辑',
@@ -820,12 +825,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             disabled: saving,
                             onClick: () => void handleCancel(),
                         }]}
-                    />
-                    <div className="mobile-entry-detail__edit-heading">
+                    />}
+                    center={<div className="mobile-entry-detail__edit-heading">
                         <span>编辑词条</span>
                         <small>{saving ? '保存中…' : isDirty ? '有未保存修改' : '已同步'}</small>
-                    </div>
-                    <MobileTopActionPill
+                    </div>}
+                    right={<MobileTopActionPill
                         actions={[{
                             key: 'save',
                             label: saving ? '保存中' : '保存词条',
@@ -834,8 +839,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             disabled: saving,
                             onClick: () => void handleSave(),
                         }]}
-                    />
-                </header>
+                    />}
+                />
 
                 <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--identity">
                     <div className="mobile-entry-detail__section-header">
@@ -1128,16 +1133,20 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     return (
         <div ref={pageRef} className="mobile-page mobile-entry-detail">
-            <header className="mobile-entry-detail__view-topbar">
-                <MobileTopActionPill
+            <MobilePageTopBar
+                className="mobile-entry-detail__view-topbar"
+                sticky
+                edgeToEdge
+                ariaLabel="词条查看操作"
+                left={<MobileTopActionPill
                     actions={[{
                         key: 'back',
                         label: '返回',
                         icon: <MobileBackIcon/>,
                         onClick: pop,
                     }]}
-                />
-                <MobileTopActionPill
+                />}
+                right={<MobileTopActionPill
                     ref={topActionsRef}
                     actions={[
                         {
@@ -1163,8 +1172,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             onClick: () => setMenuOpen(open => !open),
                         },
                     ]}
-                />
-            </header>
+                />}
+            />
 
             <h1 className="mobile-entry-detail__title">
                 {entry.title}

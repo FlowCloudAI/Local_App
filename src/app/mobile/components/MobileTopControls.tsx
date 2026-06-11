@@ -13,6 +13,47 @@ import './MobileTopControls.css'
 
 const MOBILE_ANCHORED_MENU_CLOSE_MS = 130
 
+export interface MobilePageTopBarProps {
+    left?: ReactNode
+    center?: ReactNode
+    right?: ReactNode
+    className?: string
+    sticky?: boolean
+    edgeToEdge?: boolean
+    ariaLabel?: string
+}
+
+/**
+ * 移动端页面顶栏外框：只统一高度、贴顶方式、背景和三段插槽。
+ * 具体按钮、标题内容和菜单锚点仍由页面传入，避免把页面业务塞进通用组件。
+ */
+export function MobilePageTopBar({
+    left,
+    center,
+    right,
+    className,
+    sticky = false,
+    edgeToEdge = false,
+    ariaLabel,
+}: MobilePageTopBarProps) {
+    return (
+        <header
+            className={`mobile-page-topbar${sticky ? ' mobile-page-topbar--sticky' : ''}${edgeToEdge ? ' mobile-page-topbar--edge-to-edge' : ''}${className ? ` ${className}` : ''}`}
+            aria-label={ariaLabel}
+        >
+            <div className="mobile-page-topbar__side mobile-page-topbar__side--left">
+                {left}
+            </div>
+            <div className="mobile-page-topbar__center">
+                {center}
+            </div>
+            <div className="mobile-page-topbar__side mobile-page-topbar__side--right">
+                {right}
+            </div>
+        </header>
+    )
+}
+
 export interface MobileTopIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     icon: ReactNode
 }

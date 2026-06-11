@@ -456,22 +456,6 @@
     stroke-width: 2.3;
 }
 
-.mobile-entry-detail__view-topbar,
-.mobile-entry-detail__edit-topbar {
-    position: sticky;
-    z-index: 8;
-    top: 0;
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.7rem;
-    min-height: 2.55rem;
-    margin: 0 calc(var(--mobile-entry-detail-x) * -1);
-    padding: 0.85rem var(--mobile-entry-detail-x) 0.55rem;
-    background: var(--fc-color-bg);
-}
-
 .mobile-entry-detail__view-topbar {
     margin-bottom: 0.35rem;
 }

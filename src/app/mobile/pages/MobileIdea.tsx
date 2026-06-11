@@ -11,6 +11,7 @@ import MobileIdeaDrawer from '../components/MobileIdeaDrawer'
 import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
+    MobilePageTopBar,
     MobileTopActionPill,
     MobileTopIconButton,
 } from '../components/MobileTopControls'
@@ -186,19 +187,21 @@ export default function MobileIdea({
                 drawerRoot,
             ) : null}
 
-            <header className="mobile-idea__topbar">
-                <MobileTopIconButton
+            <MobilePageTopBar
+                className="mobile-idea__topbar"
+                ariaLabel="灵感操作"
+                left={<MobileTopIconButton
                     type="button"
                     icon={<MobileIdeaIcon type="menu"/>}
                     aria-label="打开灵感列表"
                     aria-expanded={ideaDrawerOpen}
                     onClick={onOpenIdeaDrawer}
-                />
-                <div className="mobile-idea__title-text">
+                />}
+                center={<div className="mobile-idea__title-text">
                     <span>{controller.selectedIdea ? '编辑灵感' : '新灵感'}</span>
                     <small>{getSaveStateText(controller)}</small>
-                </div>
-                <MobileTopActionPill
+                </div>}
+                right={<MobileTopActionPill
                     ref={topActionsRef}
                     actions={[
                         {
@@ -222,8 +225,8 @@ export default function MobileIdea({
                             onClick: () => setMenuOpen(open => !open),
                         },
                     ]}
-                />
-            </header>
+                />}
+            />
 
             <main className="mobile-idea__editor">
                 <section className="mobile-idea__meta">

@@ -22,15 +22,6 @@
     stroke-width: 2.25;
 }
 
-.mobile-idea__topbar {
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.7rem;
-    padding: 0.9rem clamp(1rem, 4vw, 1.35rem) 0.6rem;
-}
-
 .mobile-idea__title-text {
     display: flex;
     min-width: 0;
