@@ -43,6 +43,9 @@ const COASTLINE_V2_LOCATION_SAFE_FACTOR: f64 = 0.50;
 /// 否则视为轮廓的自然延伸（含共线细分边，其空间距离 ≈ 弧长距离），跳过。
 /// 该判据同时天然保证顶点细分不变性，并自动保护尖角（楔形两侧 d ≈ 弧距 × sin(角度)）。
 const COASTLINE_V2_ARC_FLAT_RATIO: f64 = 0.5;
+/// 软饱和限幅的拐点：位移在安全上限的该比例以内不干预，超过后平滑渐近逼近上限。
+/// 硬截断会让细长地形两侧同时贴在限幅墙上形成平行壁/细针，软饱和消除该伪影。
+const COASTLINE_V2_SOFT_LIMIT_KNEE: f64 = 0.6;
 /// 安全降扰重试的振幅缩放序列（与 v1 一致）。
 const COASTLINE_V2_SAFETY_RETRY_SCALES: [f64; 3] = [0.75, 0.55, 0.40];
 /// 三个谐波带的盐值，仅区分带间随机模式。
@@ -228,7 +231,7 @@ fn naturalize_arc_length(
                 related_locations,
                 amplitude,
             );
-            let offset = requested_offset.clamp(-max_offset, max_offset);
+            let offset = soft_limit_offset(requested_offset, max_offset);
             if offset.abs() + f64::EPSILON < requested_offset.abs() {
                 constrained_offsets += 1;
             }
@@ -682,6 +685,22 @@ fn max_safe_offset(
     max_offset.max(0.0)
 }
 
+/// 软饱和限幅：|位移| ≤ 上限 × 拐点比例时原样通过，超过后用 tanh 平滑渐近逼近上限。
+/// 输出严格 < 上限，安全语义与硬截断一致；区别是受限区轮廓平滑减速而非贴墙。
+fn soft_limit_offset(requested: f64, cap: f64) -> f64 {
+    if cap <= f64::EPSILON {
+        return 0.0;
+    }
+    let ratio = requested.abs() / cap;
+    if ratio <= COASTLINE_V2_SOFT_LIMIT_KNEE {
+        return requested;
+    }
+    let span = 1.0 - COASTLINE_V2_SOFT_LIMIT_KNEE;
+    let saturated =
+        COASTLINE_V2_SOFT_LIMIT_KNEE + span * ((ratio - COASTLINE_V2_SOFT_LIMIT_KNEE) / span).tanh();
+    requested.signum() * cap * saturated
+}
+
 fn circular_distance(a: f64, b: f64, period: f64) -> f64 {
     let mut distance = (a - b).abs();
     if distance > period {
@@ -1068,6 +1087,20 @@ mod tests {
 
         assert!(polygon.len() > 8);
         assert!(find_polygon_self_intersections(&to_vertices(&polygon)).is_empty());
+    }
+
+    #[test]
+    fn v2_soft_limit_passes_small_and_saturates_large() {
+        // 拐点以内原样通过
+        assert_eq!(soft_limit_offset(3.0, 10.0), 3.0);
+        assert_eq!(soft_limit_offset(-3.0, 10.0), -3.0);
+        // 超限请求渐近逼近但严格小于上限
+        let saturated = soft_limit_offset(30.0, 10.0);
+        assert!(saturated > 8.0 && saturated < 10.0);
+        let negative = soft_limit_offset(-30.0, 10.0);
+        assert!(negative < -8.0 && negative > -10.0);
+        // 上限为零时不位移
+        assert_eq!(soft_limit_offset(5.0, 0.0), 0.0);
     }
 
     #[test]
