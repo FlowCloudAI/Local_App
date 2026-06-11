@@ -9,7 +9,7 @@
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-type-tag-header-top: 0.5rem;
     --mobile-type-tag-header-body: 3.15rem;
-    --mobile-type-tag-header-fade: 5.5rem;
+    --mobile-type-tag-header-fade: 5rem;
 
     display: flex;
     flex-direction: column;
@@ -32,7 +32,7 @@
     padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-fade);
     background: linear-gradient(
         180deg,
-        var(--fc-color-bg) 0%,
+        var(--fc-color-bg) 10%,
         var(--fc-color-bg) var(--mobile-type-tag-header-body),
         color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
     );

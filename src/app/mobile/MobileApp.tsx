@@ -1,6 +1,6 @@
 import {logger} from '../../shared/logger'
 import {isBrowserPreview} from '../../shared/devPreview'
-import {closeTopOverlay} from '../../shared/ui/overlay/overlayStack'
+import {closeTopOverlay} from '../../shared/ui/overlay'
 import AiConfirmModal from '../../features/ai-chat/components/AiConfirmModal'
 import './MobileApp.css'
 import {useAlert} from 'flowcloudai-ui'

@@ -219,8 +219,9 @@ function findExecutable(name) {
         .forEach(addPath)
 
     for (const dir of candidates) {
-        for (const ext of exts) {
-            const full = path.join(dir, isWin && !path.extname(name) ? `${name}${ext}` : name)
+        const names = isWin && !path.extname(name) ? exts.map((ext) => `${name}${ext}`) : [name]
+        for (const candidate of names) {
+            const full = path.join(dir, candidate)
             if (existsFile(full)) {
                 return full
             }
@@ -299,7 +300,61 @@ function getUnixListeningProcesses(ports) {
     return items
 }
 
-function getListeningProcesses(ports) {
+function getWindowsCommandLines(pids) {
+    const filter = pids.map((pid) => `ProcessId=${pid}`).join(' OR ')
+    const command =
+        '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; ' +
+        `Get-CimInstance Win32_Process -Filter "${filter}" | ` +
+        'ForEach-Object { "$($_.ProcessId)||$($_.CommandLine)" }'
+    const map = new Map()
+
+    try {
+        const output = runCapture('powershell.exe', ['-NoProfile', '-Command', command])
+        for (const line of output.split(/\r?\n/)) {
+            const idx = line.indexOf('||')
+            if (idx === -1) {
+                continue
+            }
+
+            const pid = Number(line.slice(0, idx).trim())
+            if (Number.isFinite(pid)) {
+                map.set(pid, line.slice(idx + 2).trim())
+            }
+        }
+    } catch {
+        // 查询失败时返回空表，调用方按“无法识别”处理（不会误杀其他进程）。
+    }
+
+    return map
+}
+
+function getUnixCommandLines(pids) {
+    const map = new Map()
+
+    try {
+        const output = runCapture('ps', ['-o', 'pid=,command=', '-p', pids.join(',')])
+        for (const line of output.split(/\r?\n/)) {
+            const match = line.trim().match(/^(\d+)\s+(.*)$/)
+            if (match) {
+                map.set(Number(match[1]), match[2].trim())
+            }
+        }
+    } catch {
+        // 同上：取不到命令行就按未知处理，避免单次查询失败拖垮整个流程。
+    }
+
+    return map
+}
+
+function getCommandLines(pids) {
+    if (!pids.length) {
+        return new Map()
+    }
+
+    return process.platform === 'win32' ? getWindowsCommandLines(pids) : getUnixCommandLines(pids)
+}
+
+function collectListeningPids(ports) {
     const rawItems = process.platform === 'win32' ? getWindowsListeningProcesses(ports) : getUnixListeningProcesses(ports)
     const byPid = new Map()
 
@@ -313,27 +368,22 @@ function getListeningProcesses(ports) {
         byPid.set(item.pid, existing)
     }
 
+    return byPid
+}
+
+function isAnyPortListening(ports) {
+    return collectListeningPids(ports).size > 0
+}
+
+function getListeningProcesses(ports) {
+    const byPid = collectListeningPids(ports)
+    const commandLines = getCommandLines([...byPid.keys()])
+
     return [...byPid.values()].map((item) => ({
         pid: item.pid,
         ports: [...item.ports].sort((a, b) => a - b),
-        commandLine: getProcessCommandLine(item.pid),
+        commandLine: commandLines.get(item.pid) || '',
     }))
-}
-
-function getProcessCommandLine(pid) {
-    try {
-        if (process.platform === 'win32') {
-            return runCapture('powershell.exe', [
-                '-NoProfile',
-                '-Command',
-                `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; (Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`,
-            ]).trim()
-        }
-
-        return runCapture('ps', ['-p', String(pid), '-o', 'command=']).trim()
-    } catch {
-        return ''
-    }
 }
 
 function isCurrentProjectViteProcess(commandLine) {
@@ -353,7 +403,7 @@ async function waitForPortsReleased(ports, timeoutMs = PORT_RELEASE_TIMEOUT_MS) 
     const start = Date.now()
 
     while (Date.now() - start < timeoutMs) {
-        if (!getListeningProcesses(ports).length) {
+        if (!isAnyPortListening(ports)) {
             return true
         }
 
@@ -362,7 +412,39 @@ async function waitForPortsReleased(ports, timeoutMs = PORT_RELEASE_TIMEOUT_MS) 
         })
     }
 
-    return !getListeningProcesses(ports).length
+    return !isAnyPortListening(ports)
+}
+
+function killProcessTree(pid) {
+    if (process.platform === 'win32') {
+        // /T 连带结束子进程树（vite 会拉起 esbuild 等子进程），/F 强制结束。
+        const result = cp.spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+            stdio: 'ignore',
+            windowsHide: true,
+        })
+        if (result.error) {
+            throw result.error
+        }
+        // 128 表示进程已不存在，等价于已关闭，视为成功。
+        if (result.status !== 0 && result.status !== 128) {
+            throw new Error(`taskkill 关闭 PID ${pid} 失败，退出码 ${result.status}`)
+        }
+        return
+    }
+
+    try {
+        // 负 PID 结束整个进程组，回收 vite 拉起的子进程；失败则退回只杀主进程。
+        try {
+            process.kill(-pid)
+            return
+        } catch {
+            process.kill(pid)
+        }
+    } catch (error) {
+        if (error.code !== 'ESRCH') {
+            throw error
+        }
+    }
 }
 
 async function prepareDevServerPorts() {
@@ -390,13 +472,7 @@ async function prepareDevServerPorts() {
     )
 
     for (const item of staleViteProcesses) {
-        try {
-            process.kill(item.pid)
-        } catch (error) {
-            if (error.code !== 'ESRCH') {
-                throw error
-            }
-        }
+        killProcessTree(item.pid)
     }
 
     if (!(await waitForPortsReleased(DEV_SERVER_PORTS))) {
@@ -479,11 +555,55 @@ function startServerIfNeeded(adbPath) {
     }
 }
 
+function adbReverseReset(adbPath, serial, port) {
+    try {
+        runCapture(adbPath, ['-s', serial, 'reverse', '--remove', `tcp:${port}`])
+    } catch {
+        // 该端口本来没有 reverse 映射时 --remove 会报错，忽略即可。
+    }
+
+    runCapture(adbPath, ['-s', serial, 'reverse', `tcp:${port}`, `tcp:${port}`])
+}
+
+async function waitForBoot(adbPath, serial, timeoutMs = ADB_WAIT_TIMEOUT_MS) {
+    const start = Date.now()
+    let warned = false
+
+    while (Date.now() - start < timeoutMs) {
+        try {
+            const output = runCapture(adbPath, ['-s', serial, 'shell', 'getprop', 'sys.boot_completed']).trim()
+            if (output === '1') {
+                return true
+            }
+        } catch {
+            // 冷启动早期 adb shell 可能尚不可用，稍后重试。
+        }
+
+        if (!warned) {
+            console.log('设备已连接，等待系统启动完成（sys.boot_completed=1）……')
+            warned = true
+        }
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, CHECK_INTERVAL_MS)
+        })
+    }
+
+    return false
+}
+
 async function main() {
     const adbPath = findExecutable('adb')
     if (!adbPath) {
         throw new Error('未找到 adb，请先确认 Android SDK platform-tools 已加入 PATH 或设置 ANDROID_HOME/ANDROID_SDK_ROOT。')
     }
+
+    // 先校验编译环境：缺 NDK 时尽早失败，避免白白杀掉端口进程、改动设备 reverse。
+    const runEnv = configureAndroidNdkBuildEnv({
+        ...process.env,
+        CARGO_PROFILE_DEV_DEBUG: '0',
+        CARGO_PROFILE_DEV_STRIP: 'debuginfo',
+    })
 
     await prepareDevServerPorts()
 
@@ -523,15 +643,16 @@ async function main() {
 
     console.log(`检测到设备就绪: ${serial}`)
 
-    runCapture(adbPath, ['-s', serial, 'reverse', '--remove-all'])
-    runCapture(adbPath, ['-s', serial, 'reverse', 'tcp:5175', 'tcp:5175'])
-    runCapture(adbPath, ['-s', serial, 'reverse', 'tcp:1421', 'tcp:1421'])
+    // adb 报 device 只代表 adbd 连上，framework 可能还没起来；等 boot_completed 再装包，避免安装失败。
+    if (!(await waitForBoot(adbPath, serial))) {
+        throw new Error(
+            `设备 ${serial} 在 ${ADB_WAIT_TIMEOUT_SECONDS}s 内未完成系统启动（sys.boot_completed）。请检查模拟器/设备状态。`
+        )
+    }
 
-    const runEnv = configureAndroidNdkBuildEnv({
-        ...process.env,
-        CARGO_PROFILE_DEV_DEBUG: '0',
-        CARGO_PROFILE_DEV_STRIP: 'debuginfo',
-    })
+    for (const port of DEV_SERVER_PORTS) {
+        adbReverseReset(adbPath, serial, port)
+    }
 
     const npmArgs = ['run', 'tauri', '--', 'android', 'dev', '--host', '127.0.0.1']
     const result =
@@ -539,11 +660,13 @@ async function main() {
             ? cp.spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'npm', ...npmArgs], {
                 stdio: 'inherit',
                 windowsHide: true,
+                cwd: PROJECT_ROOT,
                 env: runEnv,
             })
             : cp.spawnSync('npm', npmArgs, {
                 stdio: 'inherit',
                 windowsHide: true,
+                cwd: PROJECT_ROOT,
                 env: runEnv,
             })
 
