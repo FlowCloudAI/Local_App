@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
+import {useCallback, useEffect, useState} from 'react'
 import {
     db_list_all_entry_types,
     db_list_custom_entry_types,
@@ -25,9 +25,6 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [editingType, setEditingType] = useState<CustomEntryType | null>(null)
     const [builtinExpanded, setBuiltinExpanded] = useState(true)
-    const pageRef = useRef<HTMLDivElement | null>(null)
-    const builtinToggleRef = useRef<HTMLButtonElement | null>(null)
-    const pendingBuiltinTopRef = useRef<number | null>(null)
 
     const reloadTypes = useCallback(async () => {
         const [custom, all] = await Promise.all([
@@ -49,25 +46,10 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
         setEditingType(type)
         setCreatorOpen(true)
     }
-    const toggleBuiltinTypes = () => {
-        pendingBuiltinTopRef.current = builtinToggleRef.current?.getBoundingClientRect().top ?? null
-        setBuiltinExpanded(expanded => !expanded)
-    }
     const builtinTypes = allEntryTypes.filter((type): type is Extract<EntryTypeView, {kind: 'builtin'}> => type.kind === 'builtin')
 
-    useLayoutEffect(() => {
-        const previousTop = pendingBuiltinTopRef.current
-        const page = pageRef.current
-        const toggle = builtinToggleRef.current
-        if (previousTop == null || !page || !toggle) return
-
-        const nextTop = toggle.getBoundingClientRect().top
-        page.scrollTop += nextTop - previousTop
-        pendingBuiltinTopRef.current = null
-    }, [builtinExpanded])
-
     return (
-        <div className="mobile-page mobile-type-tag" ref={pageRef}>
+        <div className="mobile-page mobile-type-tag">
             <div className="mobile-type-tag__topbar">
                 <MobileTopActionPill
                     actions={[{
@@ -98,10 +80,9 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                 <div className="mobile-type-tag__list">
                     <button
                         type="button"
-                        ref={builtinToggleRef}
                         className="mobile-type-tag__section-toggle"
                         aria-expanded={builtinExpanded}
-                        onClick={toggleBuiltinTypes}
+                        onClick={() => setBuiltinExpanded(expanded => !expanded)}
                     >
                         <span>内置类型</span>
                         <span className="mobile-type-tag__section-toggle-meta">{builtinTypes.length}</span>

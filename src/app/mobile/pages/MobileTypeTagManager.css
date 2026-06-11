@@ -1,21 +1,15 @@
 .mobile-type-tag {
     /*
-     * ── 顶栏渐隐调试区 ──
+     * ── 顶栏渐变调试区 ──
      *
-     * 结构从上到下：
-     * 1. header-top：标题上方的实色留白。
-     * 2. header-title-height：标题/返回/添加按钮所在的实色主体高度。
-     * 3. header-solid-extra：标题下方额外实色保护区；调大可避免滚动内容贴到标题底部。
-     * 4. header-fade：从实色到透明的渐隐长度；调大可让内容消失得更柔和。
-     * 5. scroll-reserve：列表底部额外可滚空间；调大可减少折叠后滚动位置被浏览器夹回。
+     * 1. header-top：标题上方留白；调大后标题整体下移。
+     * 2. header-body：返回/添加按钮和标题主体高度；调大后顶栏实色区更高。
+     * 3. header-fade：顶栏背景从实色到透明的渐变高度；调大后滚动内容淡出更长。
      */
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-type-tag-header-top: 0.5rem;
-    --mobile-type-tag-header-title-height: 2.65rem;
-    --mobile-type-tag-header-solid-extra: 1.35rem;
-    --mobile-type-tag-header-fade: 5rem;
-    --mobile-type-tag-header-bottom: calc(var(--mobile-type-tag-header-solid-extra) + var(--mobile-type-tag-header-fade));
-    --mobile-type-tag-scroll-reserve: 12rem;
+    --mobile-type-tag-header-body: 3.15rem;
+    --mobile-type-tag-header-fade: 5.5rem;
 
     display: flex;
     flex-direction: column;
@@ -33,13 +27,13 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.75rem;
-    min-height: var(--mobile-type-tag-header-title-height);
+    min-height: var(--mobile-type-tag-header-body);
     margin: 0 calc(var(--mobile-type-tag-page-x) * -1);
-    padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-bottom);
+    padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-fade);
     background: linear-gradient(
         180deg,
         var(--fc-color-bg) 0%,
-        var(--fc-color-bg) calc(100% - var(--mobile-type-tag-header-fade)),
+        var(--fc-color-bg) var(--mobile-type-tag-header-body),
         color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
     );
     pointer-events: none;
@@ -80,7 +74,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.55rem;
-    min-height: calc(100% + var(--mobile-type-tag-scroll-reserve));
 }
 
 .mobile-type-tag__section-label {
