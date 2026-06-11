@@ -8,13 +8,6 @@
     min-height: 0;
 }
 
-.mobile-entry-detail__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--fc-space-sm);
-    margin-bottom: var(--fc-space-md);
-}
-
 .mobile-entry-detail__title-input,
 .mobile-entry-detail__summary-input,
 .mobile-entry-detail__meta-row {
@@ -434,16 +427,15 @@
     margin-top: var(--fc-space-xl);
 }
 
-.mobile-entry-detail__bottom-bar {
-    margin-top: var(--fc-space-xl);
-}
-
 /* Native iOS direction overrides */
 .mobile-entry-detail {
+    --mobile-entry-detail-x: clamp(1rem, 4vw, 1.35rem);
+
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
-    padding: 1rem clamp(1rem, 4vw, 1.35rem) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: 0 var(--mobile-entry-detail-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
 }
 
@@ -470,11 +462,13 @@
     z-index: 8;
     top: 0;
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
     gap: 0.7rem;
-    margin: -1rem calc(-1 * clamp(1rem, 4vw, 1.35rem)) 0;
-    padding: 0.9rem clamp(1rem, 4vw, 1.35rem) 0.7rem;
+    min-height: 2.55rem;
+    margin: 0 calc(var(--mobile-entry-detail-x) * -1);
+    padding: 0.85rem var(--mobile-entry-detail-x) 0.55rem;
     background: var(--fc-color-bg);
 }
 
@@ -512,10 +506,8 @@
     line-height: 1.1;
 }
 
-.mobile-entry-detail__actions .fc-btn,
 .mobile-entry-detail__images-header .fc-btn,
-.mobile-entry-detail__tags-actions .fc-btn,
-.mobile-entry-detail__bottom-bar .fc-btn {
+.mobile-entry-detail__tags-actions .fc-btn {
     border-radius: var(--fc-radius-full);
 }
 
@@ -741,20 +733,6 @@
 
 .mobile-entry-detail__markdown-preview {
     line-height: 1.65;
-}
-
-.mobile-entry-detail__bottom-bar {
-    position: sticky;
-    bottom: 0;
-    z-index: 7;
-    gap: 0.55rem;
-    margin: 0.4rem calc(-1 * clamp(1rem, 4vw, 1.35rem)) calc(-1.5rem - env(safe-area-inset-bottom, 0));
-    padding: 0.7rem clamp(1rem, 4vw, 1.35rem);
-    padding-bottom: calc(0.7rem + env(safe-area-inset-bottom, 0));
-}
-
-.mobile-entry-detail__bottom-bar .fc-btn {
-    min-height: 2.75rem;
 }
 
 @media (min-width: 34rem) {

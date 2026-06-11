@@ -43,12 +43,16 @@ import {
     type TagSchema,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
-import {ActionMenu} from '../../../shared/ui/overlay'
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import TagCreator from '../../../features/entries/components/TagCreator'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
-import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
+import {
+    MobileAnchoredActionMenu,
+    type MobileAnchoredMenuItem,
+    MobileBackIcon,
+    MobileTopActionPill,
+} from '../components/MobileTopControls'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
     buildTagValueMap,
@@ -161,7 +165,7 @@ function buildExcerpt(value?: string | null, maxLength = 64): string {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
 }
 
-function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' }) {
+function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' | 'delete' }) {
     if (type === 'ai') {
         return (
             <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
@@ -184,6 +188,18 @@ function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'c
             </svg>
         )
     }
+    if (type === 'delete') {
+        return (
+            <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M5.5 7h13"/>
+                <path d="M9 7V5.5h6V7"/>
+                <path d="M8 10v8"/>
+                <path d="M12 10v8"/>
+                <path d="M16 10v8"/>
+                <path d="M7 7.5 8 20h8l1-12.5"/>
+            </svg>
+        )
+    }
     return (
         <svg className="mobile-entry-detail__action-svg" viewBox="0 0 24 24" focusable="false">
             <path d="M6.5 12h.01"/>
@@ -202,6 +218,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const entryId = params?.entryId as string
     const {showAlert} = useAlert()
     const {theme} = useTheme()
+    const pageRef = useRef<HTMLDivElement>(null)
+    const topActionsRef = useRef<HTMLDivElement>(null)
     const contentInputRef = useRef<HTMLTextAreaElement | null>(null)
     const wikiDraftRetainTimerRef = useRef<number | null>(null)
 
@@ -1104,9 +1122,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         .map(relation => buildRelationDraft(entryId, relation))
         .filter(relation => relation.otherEntryId)
     const hasConnections = viewRelationDrafts.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
+    const entryMenuItems: MobileAnchoredMenuItem[] = [
+        {key: 'delete', label: '删除词条', description: '永久删除当前词条', icon: <MobileEntryDetailActionIcon type="delete"/>, danger: true, onSelect: () => void handleDelete()},
+    ]
 
     return (
-        <div className="mobile-page mobile-entry-detail">
+        <div ref={pageRef} className="mobile-page mobile-entry-detail">
             <header className="mobile-entry-detail__view-topbar">
                 <MobileTopActionPill
                     actions={[{
@@ -1117,6 +1138,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     }]}
                 />
                 <MobileTopActionPill
+                    ref={topActionsRef}
                     actions={[
                         {
                             key: 'ai',
@@ -1138,7 +1160,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             kind: 'more',
                             ariaHasPopup: 'menu',
                             ariaExpanded: menuOpen,
-                            onClick: () => setMenuOpen(true),
+                            onClick: () => setMenuOpen(open => !open),
                         },
                     ]}
                 />
@@ -1299,13 +1321,13 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 </div>
             )}
 
-            <ActionMenu
+            <MobileAnchoredActionMenu
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                title={entry.title}
-                items={[
-                    {key: 'delete', label: '删除词条', danger: true, onSelect: () => void handleDelete()},
-                ]}
+                anchorRef={topActionsRef}
+                containerRef={pageRef}
+                ariaLabel="词条操作"
+                items={entryMenuItems}
             />
         </div>
     )
