@@ -187,20 +187,20 @@ pub const COASTLINE_V2_BAND_C_WAVELENGTH_MAX: f64 = 45.0;
 /// 调大：海湾/半岛更深，海岸线感更强。
 pub const COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO: f64 = 0.03;
 
-/// v2 噪声 B 带振幅比例。
-pub const COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO: f64 = 0.013;
+/// v2 噪声 B 带振幅比例（"硬朗"档烘焙值 = 原 0.013 × 1.4）。
+pub const COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO: f64 = 0.018;
 
-/// v2 噪声 C 带振幅比例（小图形护栏，很快到达绝对上限）。
-pub const COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO: f64 = 0.012;
+/// v2 噪声 C 带振幅比例（"硬朗"档烘焙值 = 原 0.012 × 2，小图形护栏，很快到达绝对上限）。
+pub const COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO: f64 = 0.024;
 
 /// v2 噪声 A 带峰值振幅绝对上限（px），大图形不至于无限狂野。
 pub const COASTLINE_V2_BAND_A_AMPLITUDE: f64 = 55.0;
 
-/// v2 噪声 B 带峰值振幅绝对上限（px）。
-pub const COASTLINE_V2_BAND_B_AMPLITUDE: f64 = 20.0;
+/// v2 噪声 B 带峰值振幅绝对上限（px，"硬朗"档烘焙值）。
+pub const COASTLINE_V2_BAND_B_AMPLITUDE: f64 = 28.0;
 
-/// v2 噪声 C 带峰值振幅绝对上限（px）。配合绝对波长，全图细节质感统一。
-pub const COASTLINE_V2_BAND_C_AMPLITUDE: f64 = 4.0;
+/// v2 噪声 C 带峰值振幅绝对上限（px，"硬朗"档烘焙值）。配合绝对波长，全图细节质感统一。
+pub const COASTLINE_V2_BAND_C_AMPLITUDE: f64 = 8.0;
 
 /// v2 噪声 A 带强度乘子（前端"大尺度扰动"滑杆，默认 1）。
 pub const COASTLINE_V2_BAND_A_WEIGHT: f64 = 1.0;
