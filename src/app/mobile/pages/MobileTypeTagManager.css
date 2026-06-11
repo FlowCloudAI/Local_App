@@ -7,18 +7,18 @@
      *
      *   header-top            实色，标题上方空隙
      *   标题内容区（min-height 2.65rem）  实色，标题本体
-     *   header-bottom         顶栏下方渐变过渡区（实色 → 透明）
+     *   solid-extra           标题下方额外实色保护区，防止内容压到标题底部
+     *   header-fade           顶栏下方渐变过渡区（实色 → 透明）
      *   ───────────── 顶栏底边 ─────────────
      *   列表内容从此可见
      *
-     * ::before 只负责标题所在的实色遮罩区。
-     * ::after 从标题内容区下面开始，负责渐变过渡，不再从页面顶端绘制。
-     * header-bottom 控制顶栏下 padding（决定渐变区的物理空间），header-fade 控制渐变过渡段长度。
-     * 两者通常设为相同值；想渐变比间距更短/更长时可以分开调。
+     * topbar 本体直接绘制背景：先实色覆盖标题区，再在底部做渐隐。
+     * header-bottom = solid-extra + header-fade，控制标题下方总遮罩空间。
      */
-    --mobile-type-tag-header-top: 0.5rem;     /* 标题上方空隙 */
-    --mobile-type-tag-header-bottom: 4.5rem;  /* 标题下方渐变空间（同时也是 padding-bottom） */
-    --mobile-type-tag-header-fade: 4.5rem;    /* 渐变过渡段长度，须 ≤ header-bottom */
+    --mobile-type-tag-header-top: 0.5rem;          /* 标题上方空隙 */
+    --mobile-type-tag-header-solid-extra: 1.35rem; /* 标题下方额外实色保护区 */
+    --mobile-type-tag-header-fade: 5rem;           /* 渐变过渡段长度 */
+    --mobile-type-tag-header-bottom: calc(var(--mobile-type-tag-header-solid-extra) + var(--mobile-type-tag-header-fade));
 
     /* 列表底部额外可滚空间，保证最后几条卡片能滚到可视区 */
     --mobile-type-tag-scroll-reserve: 12rem;
@@ -42,34 +42,13 @@
     min-height: 2.65rem;
     margin: 0 calc(var(--mobile-type-tag-page-x) * -1);
     padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-bottom);
-    background: transparent;
-    pointer-events: none;
-}
-
-.mobile-type-tag__topbar::before,
-.mobile-type-tag__topbar::after {
-    position: absolute;
-    z-index: 0;
-    right: 0;
-    left: 0;
-    content: "";
-    pointer-events: none;
-}
-
-.mobile-type-tag__topbar::before {
-    top: 0;
-    bottom: var(--mobile-type-tag-header-bottom);
-    background: var(--fc-color-bg);
-}
-
-.mobile-type-tag__topbar::after {
-    top: calc(100% - var(--mobile-type-tag-header-bottom));
-    height: var(--mobile-type-tag-header-fade);
     background: linear-gradient(
         180deg,
         var(--fc-color-bg) 0%,
+        var(--fc-color-bg) calc(100% - var(--mobile-type-tag-header-fade)),
         color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
     );
+    pointer-events: none;
 }
 
 .mobile-type-tag__topbar > * {
