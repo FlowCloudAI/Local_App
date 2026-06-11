@@ -4,17 +4,17 @@ import {listen} from '@tauri-apps/api/event'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {openUrl} from '@tauri-apps/plugin-opener'
 import {
-    type ChangeEvent as ReactChangeEvent,
     type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
+    type SyntheticEvent as ReactSyntheticEvent,
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
 } from 'react'
-import {Button, Input, Select, TagItem, useAlert, useTheme} from 'flowcloudai-ui'
+import {Button, Input, MarkdownEditor, type MarkdownEditorRef, Select, TagItem, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -105,9 +105,27 @@ interface Props {
 type Mode = 'view' | 'edit'
 type TagValueMap = Record<string, EntryTagRuntimeValue>
 type MobileWikiDraft = { start: number; end: number; query: string }
+type MobileMarkdownTool = 'heading' | 'bold' | 'italic' | 'quote' | 'list' | 'link' | 'wiki' | 'image'
 type MobileWikiOption =
     | { kind: 'entry'; id: string; title: string; categoryId: string | null }
     | { kind: 'create'; title: string }
+
+interface MarkdownTransformResult {
+    value: string
+    selectionStart: number
+    selectionEnd: number
+}
+
+const MOBILE_MARKDOWN_TOOLS: Array<{ tool: MobileMarkdownTool; label: string }> = [
+    {tool: 'heading', label: '标题'},
+    {tool: 'bold', label: '加粗'},
+    {tool: 'italic', label: '斜体'},
+    {tool: 'quote', label: '引用'},
+    {tool: 'list', label: '列表'},
+    {tool: 'link', label: '链接'},
+    {tool: 'wiki', label: '双链'},
+    {tool: 'image', label: '图片'},
+]
 
 /** 保留 schema 标签和桌面端使用的额外标签（如角色语音配置），避免移动端保存时丢字段。 */
 function buildTagDraft(e: Entry): TagValueMap {
@@ -166,6 +184,81 @@ function buildExcerpt(value?: string | null, maxLength = 64): string {
     return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
 }
 
+function replaceSelection(
+    value: string,
+    start: number,
+    end: number,
+    nextValue: string,
+    nextSelectionStart: number,
+    nextSelectionEnd = nextSelectionStart,
+): MarkdownTransformResult {
+    return {
+        value: `${value.slice(0, start)}${nextValue}${value.slice(end)}`,
+        selectionStart: nextSelectionStart,
+        selectionEnd: nextSelectionEnd,
+    }
+}
+
+function transformInlineMarkdown(
+    value: string,
+    start: number,
+    end: number,
+    before: string,
+    after: string,
+    placeholder: string,
+): MarkdownTransformResult {
+    const selected = value.slice(start, end) || placeholder
+    const nextValue = `${before}${selected}${after}`
+    const selectionStart = start + before.length
+    return replaceSelection(value, start, end, nextValue, selectionStart, selectionStart + selected.length)
+}
+
+function transformMarkdownLines(
+    value: string,
+    start: number,
+    end: number,
+    lineMapper: (line: string) => string,
+): MarkdownTransformResult {
+    const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1
+    const nextLineBreak = value.indexOf('\n', end)
+    const lineEnd = nextLineBreak === -1 ? value.length : nextLineBreak
+    const target = value.slice(lineStart, lineEnd)
+    const mapped = target.split('\n').map(lineMapper).join('\n')
+    return replaceSelection(value, lineStart, lineEnd, mapped, lineStart, lineStart + mapped.length)
+}
+
+function transformMarkdownContent(
+    tool: Exclude<MobileMarkdownTool, 'image'>,
+    value: string,
+    start: number,
+    end: number,
+): MarkdownTransformResult {
+    switch (tool) {
+        case 'heading':
+            return transformMarkdownLines(value, start, end, line => line.replace(/^#{1,6}\s+/, '').replace(/^/, '## '))
+        case 'bold':
+            return transformInlineMarkdown(value, start, end, '**', '**', '加粗文字')
+        case 'italic':
+            return transformInlineMarkdown(value, start, end, '*', '*', '斜体文字')
+        case 'quote':
+            return transformMarkdownLines(value, start, end, line => line.startsWith('> ') ? line : `> ${line}`)
+        case 'list':
+            return transformMarkdownLines(value, start, end, line => /^[-*]\s+/.test(line) ? line : `- ${line}`)
+        case 'link': {
+            const selected = value.slice(start, end) || '链接文本'
+            const nextValue = `[${selected}]()`
+            const cursor = start + nextValue.length - 1
+            return replaceSelection(value, start, end, nextValue, cursor)
+        }
+        case 'wiki': {
+            const selected = value.slice(start, end)
+            const nextValue = selected ? `[[${selected}]]` : '[['
+            const cursor = start + nextValue.length
+            return replaceSelection(value, start, end, nextValue, cursor)
+        }
+    }
+}
+
 function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'check' | 'delete' }) {
     if (type === 'ai') {
         return (
@@ -210,6 +303,51 @@ function MobileEntryDetailActionIcon({type}: { type: 'ai' | 'edit' | 'more' | 'c
     )
 }
 
+function MobileMarkdownToolIcon({tool}: { tool: MobileMarkdownTool }) {
+    if (tool === 'heading') return <span className="mobile-entry-detail__markdown-tool-text">H</span>
+    if (tool === 'bold') return <span className="mobile-entry-detail__markdown-tool-text">B</span>
+    if (tool === 'italic') return <span className="mobile-entry-detail__markdown-tool-text">I</span>
+    if (tool === 'quote') {
+        return (
+            <svg className="mobile-entry-detail__markdown-tool-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M8 7H5.8C4.8 8.4 4.3 9.8 4.3 11.8v4.4H10v-5.7H7.1c.1-1 .4-2 1-3.5Z"/>
+                <path d="M18 7h-2.2c-1 1.4-1.5 2.8-1.5 4.8v4.4H20v-5.7h-2.9c.1-1 .4-2 1-3.5Z"/>
+            </svg>
+        )
+    }
+    if (tool === 'list') {
+        return (
+            <svg className="mobile-entry-detail__markdown-tool-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M8 7h11"/>
+                <path d="M8 12h11"/>
+                <path d="M8 17h11"/>
+                <path d="M4.5 7h.01"/>
+                <path d="M4.5 12h.01"/>
+                <path d="M4.5 17h.01"/>
+            </svg>
+        )
+    }
+    if (tool === 'link') {
+        return (
+            <svg className="mobile-entry-detail__markdown-tool-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M9.5 14.5 14.5 9.5"/>
+                <path d="M10.5 7.5 12 6a4 4 0 0 1 5.7 5.7l-1.5 1.5"/>
+                <path d="M13.5 16.5 12 18a4 4 0 0 1-5.7-5.7l1.5-1.5"/>
+            </svg>
+        )
+    }
+    if (tool === 'image') {
+        return (
+            <svg className="mobile-entry-detail__markdown-tool-svg" viewBox="0 0 24 24" focusable="false">
+                <rect x="4" y="5" width="16" height="14" rx="2"/>
+                <path d="m7 16 3.2-3.2 2.3 2.3 2.7-3.1L19 16"/>
+                <path d="M8.5 8.8h.01"/>
+            </svg>
+        )
+    }
+    return <span className="mobile-entry-detail__markdown-tool-text">[[</span>
+}
+
 /**
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
  * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
@@ -221,7 +359,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const {theme} = useTheme()
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
-    const contentInputRef = useRef<HTMLTextAreaElement | null>(null)
+    const contentEditorRef = useRef<MarkdownEditorRef>(null)
+    const immersiveContentEditorRef = useRef<MarkdownEditorRef>(null)
     const wikiDraftRetainTimerRef = useRef<number | null>(null)
 
     const [entry, setEntry] = useState<Entry | null>(null)
@@ -251,6 +390,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
     const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
+    const [immersiveEditorOpen, setImmersiveEditorOpen] = useState(false)
     const [wikiDraft, setWikiDraft] = useState<MobileWikiDraft | null>(null)
     const [activeWikiOptionIndex, setActiveWikiOptionIndex] = useState(0)
     const [creatingLinkedEntry, setCreatingLinkedEntry] = useState(false)
@@ -344,9 +484,15 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setBeforeBack(null)
             return
         }
-        setBeforeBack(confirmDiscard)
+        setBeforeBack(async () => {
+            if (immersiveEditorOpen) {
+                setImmersiveEditorOpen(false)
+                return false
+            }
+            return confirmDiscard()
+        })
         return () => setBeforeBack(null)
-    }, [confirmDiscard, mode, setBeforeBack])
+    }, [confirmDiscard, immersiveEditorOpen, mode, setBeforeBack])
 
     useEffect(() => {
         const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
@@ -392,6 +538,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         if (entry) {
             syncForm(entry)
             setRelationDrafts(initialRelationDrafts)
+            setImmersiveEditorOpen(false)
             setMode('view')
         } else {
             pop()
@@ -487,6 +634,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setAiFocus({projectId, entryId})
             // 同步页面标题（顶部标题取自 params.displayName）。
             replace({type: 'entryDetail', params: {...(params ?? {}), projectId, entryId, displayName: title.trim(), mode: 'view'}})
+            setImmersiveEditorOpen(false)
             setMode('view')
         } catch (e) {
             await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
@@ -585,6 +733,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         }
     }, [])
 
+    const getContentTextarea = useCallback(() => (
+        immersiveEditorOpen
+            ? immersiveContentEditorRef.current?.getTextareaElement() ?? contentEditorRef.current?.getTextareaElement() ?? null
+            : contentEditorRef.current?.getTextareaElement() ?? immersiveContentEditorRef.current?.getTextareaElement() ?? null
+    ), [immersiveEditorOpen])
+
     const syncWikiDraftFromTextarea = useCallback((textarea: HTMLTextAreaElement | null, nextContent: string = content) => {
         if (!textarea) {
             setWikiDraft(null)
@@ -611,10 +765,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setContent(nextContent)
         setWikiDraft(null)
         window.requestAnimationFrame(() => {
-            contentInputRef.current?.focus()
-            contentInputRef.current?.setSelectionRange(nextCursor, nextCursor)
+            const textarea = getContentTextarea()
+            textarea?.focus()
+            textarea?.setSelectionRange(nextCursor, nextCursor)
         })
-    }, [content, wikiDraft])
+    }, [content, getContentTextarea, wikiDraft])
 
     const handleCreateLinkedEntry = useCallback(async () => {
         const draft = wikiDraft
@@ -671,11 +826,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         void handleCreateLinkedEntry()
     }, [applyWikiLink, handleCreateLinkedEntry])
 
-    const handleContentChange = useCallback((event: ReactChangeEvent<HTMLTextAreaElement>) => {
-        const nextContent = event.currentTarget.value
+    const handleContentChange = useCallback((nextContent: string) => {
         setContent(nextContent)
-        syncWikiDraftFromTextarea(event.currentTarget, nextContent)
-    }, [syncWikiDraftFromTextarea])
+        window.requestAnimationFrame(() => {
+            syncWikiDraftFromTextarea(getContentTextarea(), nextContent)
+        })
+    }, [getContentTextarea, syncWikiDraftFromTextarea])
 
     const handleContentKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (!wikiDraft || wikiLinkOptions.length <= 0) return
@@ -720,8 +876,35 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             window.clearTimeout(wikiDraftRetainTimerRef.current)
             wikiDraftRetainTimerRef.current = null
         }
-        syncWikiDraftFromTextarea(contentInputRef.current)
-    }, [syncWikiDraftFromTextarea])
+        syncWikiDraftFromTextarea(getContentTextarea())
+    }, [getContentTextarea, syncWikiDraftFromTextarea])
+
+    const handleMarkdownTool = useCallback((tool: MobileMarkdownTool) => {
+        if (tool === 'image') {
+            setImageAddModalOpen(true)
+            return
+        }
+        const textarea = getContentTextarea()
+        const start = textarea?.selectionStart ?? content.length
+        const end = textarea?.selectionEnd ?? start
+        const result = transformMarkdownContent(tool, content, start, end)
+        setContent(result.value)
+        window.requestAnimationFrame(() => {
+            const nextTextarea = getContentTextarea()
+            nextTextarea?.focus()
+            nextTextarea?.setSelectionRange(result.selectionStart, result.selectionEnd)
+            syncWikiDraftFromTextarea(nextTextarea ?? null, result.value)
+        })
+    }, [content, getContentTextarea, syncWikiDraftFromTextarea])
+
+    useEffect(() => {
+        if (!immersiveEditorOpen) return
+        window.requestAnimationFrame(() => {
+            const textarea = immersiveContentEditorRef.current?.getTextareaElement()
+            textarea?.focus()
+            syncWikiDraftFromTextarea(textarea ?? null)
+        })
+    }, [immersiveEditorOpen, syncWikiDraftFromTextarea])
 
     const handleUploadImages = useCallback(async (): Promise<EntryImage[]> => {
         try {
@@ -777,7 +960,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
             return
         }
-        const textarea = contentInputRef.current
+        const textarea = getContentTextarea()
         const fallbackAlt = getImageLabel(image, targetIndex) || title || entry?.title || `图片 ${targetIndex + 1}`
         const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
         const start = textarea?.selectionStart ?? content.length
@@ -791,10 +974,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setContent(nextContent)
         setLightboxOpen(false)
         window.requestAnimationFrame(() => {
-            contentInputRef.current?.focus()
-            contentInputRef.current?.setSelectionRange(nextCursor, nextCursor)
+            const nextTextarea = getContentTextarea()
+            nextTextarea?.focus()
+            nextTextarea?.setSelectionRange(nextCursor, nextCursor)
         })
-    }, [content, entry?.title, images, showAlert, title])
+    }, [content, entry?.title, getContentTextarea, images, showAlert, title])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
@@ -810,6 +994,58 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             ...entryTypes.map(et => ({value: entryTypeKey(et), label: et.name})),
         ]
         const editTagSchemas = entryTags.visibleTagSchemas
+        const wikiPanel = wikiDraft ? (
+            <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
+                <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
+                {wikiLinkOptions.length > 0 ? (
+                    <div className="mobile-entry-detail__wiki-options">
+                        {wikiLinkOptions.map((option, index) => {
+                            const active = index === activeWikiOptionIndex
+                            const isCreatingOption = option.kind === 'create'
+                            const optionKey = option.kind === 'entry'
+                                ? `entry-${option.id}`
+                                : `create-${option.title}`
+                            const categoryName = option.kind === 'entry' && option.categoryId
+                                ? categoryNameById.get(option.categoryId)
+                                : null
+                            return (
+                                <button
+                                    type="button"
+                                    key={optionKey}
+                                    role="option"
+                                    aria-selected={active}
+                                    className={`mobile-entry-detail__wiki-option${active ? ' is-active' : ''}${isCreatingOption ? ' mobile-entry-detail__wiki-option--create' : ''}`}
+                                    disabled={isCreatingOption && creatingLinkedEntry}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onMouseEnter={() => setActiveWikiOptionIndex(index)}
+                                    onFocus={() => setActiveWikiOptionIndex(index)}
+                                    onClick={() => handleWikiOptionCommit(option)}
+                                >
+                                    <span className="mobile-entry-detail__wiki-option-title">
+                                        {option.kind === 'entry' ? option.title : `创建「${option.title}」`}
+                                    </span>
+                                    <span className="mobile-entry-detail__wiki-option-meta">
+                                        {option.kind === 'entry'
+                                            ? (categoryName ?? '未分类')
+                                            : (creatingLinkedEntry ? '创建中…' : '新词条')}
+                                    </span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                ) : (
+                    <div className="mobile-entry-detail__wiki-empty">没有匹配词条</div>
+                )}
+            </div>
+        ) : null
+        const markdownTextareaProps = {
+            onKeyDown: handleContentKeyDown,
+            onKeyUp: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
+            onClick: (event: ReactMouseEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
+            onSelect: (event: ReactSyntheticEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
+            onFocus: handleContentFocus,
+            onBlur: handleContentBlur,
+        }
         return (
             <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
                 <MobilePageTopBar
@@ -895,65 +1131,40 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
                     <div className="mobile-entry-detail__section-header">
                         <span>正文</span>
+                        <button
+                            type="button"
+                            className="mobile-entry-detail__section-action"
+                            onClick={() => setImmersiveEditorOpen(true)}
+                        >
+                            沉浸
+                        </button>
                     </div>
                     <div className="mobile-entry-detail__content-field">
-                        <textarea
-                            ref={contentInputRef}
-                            placeholder="正文内容…"
+                        <MarkdownEditor
+                            ref={contentEditorRef}
                             value={content}
-                            onChange={handleContentChange}
-                            onKeyDown={handleContentKeyDown}
-                            onKeyUp={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
-                            onClick={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
-                            onSelect={(event) => syncWikiDraftFromTextarea(event.currentTarget)}
-                            onFocus={handleContentFocus}
-                            onBlur={handleContentBlur}
+                            onValueChange={handleContentChange}
+                            placeholder="正文内容…输入 [[ 插入词条双链"
+                            minHeight={260}
+                            maxHeight={560}
+                            showSplitToggle={false}
+                            showAiButton={false}
+                            hideFullscreen
+                            toolbarCommands={[]}
+                            extraCommands={[]}
+                            textareaProps={markdownTextareaProps}
+                            tokens={{
+                                background: 'transparent',
+                                toolbarBackground: 'transparent',
+                                borderColor: 'transparent',
+                                editorTextBackground: 'transparent',
+                                previewBackground: 'transparent',
+                                textColor: 'var(--fc-color-text)',
+                                mutedTextColor: 'var(--fc-color-text-secondary)',
+                            }}
                             className="mobile-entry-detail__content-input"
                         />
-                        {wikiDraft && (
-                            <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
-                                <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
-                                {wikiLinkOptions.length > 0 ? (
-                                    <div className="mobile-entry-detail__wiki-options">
-                                        {wikiLinkOptions.map((option, index) => {
-                                            const active = index === activeWikiOptionIndex
-                                            const isCreatingOption = option.kind === 'create'
-                                            const optionKey = option.kind === 'entry'
-                                                ? `entry-${option.id}`
-                                                : `create-${option.title}`
-                                            const categoryName = option.kind === 'entry' && option.categoryId
-                                                ? categoryNameById.get(option.categoryId)
-                                                : null
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    key={optionKey}
-                                                    role="option"
-                                                    aria-selected={active}
-                                                    className={`mobile-entry-detail__wiki-option${active ? ' is-active' : ''}${isCreatingOption ? ' mobile-entry-detail__wiki-option--create' : ''}`}
-                                                    disabled={isCreatingOption && creatingLinkedEntry}
-                                                    onMouseDown={(event) => event.preventDefault()}
-                                                    onMouseEnter={() => setActiveWikiOptionIndex(index)}
-                                                    onFocus={() => setActiveWikiOptionIndex(index)}
-                                                    onClick={() => handleWikiOptionCommit(option)}
-                                                >
-                                                    <span className="mobile-entry-detail__wiki-option-title">
-                                                        {option.kind === 'entry' ? option.title : `创建「${option.title}」`}
-                                                    </span>
-                                                    <span className="mobile-entry-detail__wiki-option-meta">
-                                                        {option.kind === 'entry'
-                                                            ? (categoryName ?? '未分类')
-                                                            : (creatingLinkedEntry ? '创建中…' : '新词条')}
-                                                    </span>
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="mobile-entry-detail__wiki-empty">没有匹配词条</div>
-                                )}
-                            </div>
-                        )}
+                        {!immersiveEditorOpen && wikiPanel}
                     </div>
                 </section>
 
@@ -1059,6 +1270,80 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                         }}
                     />
                 </section>
+
+                {immersiveEditorOpen && (
+                    <div className="mobile-entry-detail__immersive" role="dialog" aria-label="沉浸正文编辑">
+                        <MobilePageTopBar
+                            className="mobile-entry-detail__immersive-topbar"
+                            ariaLabel="沉浸正文编辑操作"
+                            left={<MobileTopActionPill
+                                actions={[{
+                                    key: 'close',
+                                    label: '退出沉浸编辑',
+                                    icon: <MobileBackIcon/>,
+                                    onClick: () => setImmersiveEditorOpen(false),
+                                }]}
+                            />}
+                            center={<div className="mobile-entry-detail__edit-heading">
+                                <span>正文编辑</span>
+                                <small>{isDirty ? '有未保存修改' : '已同步'}</small>
+                            </div>}
+                            right={<MobileTopActionPill
+                                actions={[{
+                                    key: 'save',
+                                    label: saving ? '保存中' : '保存词条',
+                                    icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="check"/>,
+                                    kind: 'add',
+                                    disabled: saving,
+                                    onClick: () => void handleSave(),
+                                }]}
+                            />}
+                        />
+                        <div className="mobile-entry-detail__immersive-body">
+                            <MarkdownEditor
+                                ref={immersiveContentEditorRef}
+                                value={content}
+                                onValueChange={handleContentChange}
+                                placeholder="正文内容…输入 [[ 插入词条双链"
+                                autoHeight={false}
+                                height="100%"
+                                minHeight={420}
+                                showSplitToggle={false}
+                                showAiButton={false}
+                                hideFullscreen
+                                toolbarCommands={[]}
+                                extraCommands={[]}
+                                textareaProps={markdownTextareaProps}
+                                tokens={{
+                                    background: 'transparent',
+                                    toolbarBackground: 'transparent',
+                                    borderColor: 'transparent',
+                                    editorTextBackground: 'transparent',
+                                    previewBackground: 'transparent',
+                                    textColor: 'var(--fc-color-text)',
+                                    mutedTextColor: 'var(--fc-color-text-secondary)',
+                                }}
+                                className="mobile-entry-detail__immersive-editor"
+                            />
+                            {wikiPanel}
+                        </div>
+                        <div className="mobile-entry-detail__markdown-toolbar" role="toolbar" aria-label="Markdown 常用工具">
+                            {MOBILE_MARKDOWN_TOOLS.map(item => (
+                                <button
+                                    key={item.tool}
+                                    type="button"
+                                    className="mobile-entry-detail__markdown-tool"
+                                    aria-label={item.label}
+                                    title={item.label}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => handleMarkdownTool(item.tool)}
+                                >
+                                    <MobileMarkdownToolIcon tool={item.tool}/>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <EntryTypeCreator
                     open={typeCreatorOpen}
