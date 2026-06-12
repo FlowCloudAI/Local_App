@@ -31,7 +31,7 @@ import {
     setting_get_settings,
     type TagSchema,
 } from '../../../api'
-import {openUrl} from '@tauri-apps/plugin-opener'
+import {openUrl} from '../../../api/opener'
 import EntryEditorSidebar from './EntryEditorSidebar'
 import EntryImageLightbox from './EntryImageLightbox'
 import TagCreator from './TagCreator'

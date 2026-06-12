@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import {listen} from '../../../api/events'
 import {openFileDialog} from '../../../api/dialog'
-import {openUrl} from '@tauri-apps/plugin-opener'
+import {openUrl} from '../../../api/opener'
 import {
     type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,

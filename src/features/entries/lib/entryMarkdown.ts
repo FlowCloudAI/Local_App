@@ -1,4 +1,4 @@
-import {openUrl} from '@tauri-apps/plugin-opener'
+import {openUrl} from '../../../api/opener'
 import type {FCImage} from '../../../api'
 import {resolveEntryImageByFcimgRef, toEntryImageSrc} from './entryImage'
 

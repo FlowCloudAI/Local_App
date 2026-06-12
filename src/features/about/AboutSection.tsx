@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState, type ReactNode} from 'react'
 import {getVersion} from '@tauri-apps/api/app'
-import {openUrl} from '@tauri-apps/plugin-opener'
+import {openUrl} from '../../api/opener'
 import {relaunch} from '@tauri-apps/plugin-process'
 import {check, type DownloadEvent, type Update} from '@tauri-apps/plugin-updater'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
