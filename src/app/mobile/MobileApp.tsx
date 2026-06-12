@@ -88,8 +88,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const [categoryDrawerStats, setCategoryDrawerStats] = useState<ProjectStats | null>(null)
 
     const categoryDrawerProjectId = activeTab === 'home'
-        && (pageType === 'projectHome' || pageType === 'entryList')
-        ? currentPage?.params?.projectId as string | undefined
+        && currentPage
+        && (currentPage.type === 'projectHome' || currentPage.type === 'entryList')
+        ? currentPage.params.projectId
         : undefined
     const categoryDrawerEnabled = Boolean(categoryDrawerProjectId)
     const aiConversationDrawerEnabled = activeTab === 'ai'
@@ -134,12 +135,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         onEdgeBackGesture: runBackNavigation,
     })
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
-        if (pageType === 'projectHome') return {kind: 'projectHome'}
-        if (pageType !== 'entryList' || !currentPage?.params) return {kind: 'projectHome'}
+        if (currentPage?.type === 'projectHome') return {kind: 'projectHome'}
+        if (currentPage?.type !== 'entryList') return {kind: 'projectHome'}
         if (currentPage.params.uncategorizedOnly) return {kind: 'uncategorized'}
-        const categoryId = (currentPage.params.categoryId as string | undefined) || ''
+        const categoryId = currentPage.params.categoryId || ''
         return categoryId ? {kind: 'category', categoryId} : {kind: 'allEntries'}
-    }, [currentPage?.params, pageType])
+    }, [currentPage])
 
     useEffect(() => {
         // 浏览器预览无后端信号，跳过监听（backendReady 初始已为 true）。
@@ -393,10 +394,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                         onActivePanelChange={setHomePanel}
                                     />
                                 )}
-                                {pageType === 'projectList' && currentPage && (
+                                {currentPage?.type === 'projectList' && (
                                     <MobileProjectList {...pageProps}/>
                                 )}
-                                {pageType === 'projectHome' && currentPage && (
+                                {currentPage?.type === 'projectHome' && (
                                     <MobileProjectHome
                                         {...pageProps}
                                         params={currentPage.params}
@@ -404,7 +405,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                         onOpenCategoryDrawer={openCategoryDrawer}
                                     />
                                 )}
-                                {pageType === 'entryList' && currentPage && (
+                                {currentPage?.type === 'entryList' && (
                                     <MobileEntryList
                                         {...pageProps}
                                         params={currentPage.params}
@@ -412,16 +413,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                         onOpenCategoryDrawer={openCategoryDrawer}
                                     />
                                 )}
-                                {pageType === 'entryDetail' && currentPage && (
+                                {currentPage?.type === 'entryDetail' && (
                                     <MobileEntryDetail {...pageProps} params={currentPage.params}/>
                                 )}
-                                {pageType === 'typeManager' && currentPage && (
+                                {currentPage?.type === 'typeManager' && (
                                     <MobileEntryTypeManager {...pageProps} params={currentPage.params}/>
                                 )}
-                                {pageType === 'tagManager' && currentPage && (
+                                {currentPage?.type === 'tagManager' && (
                                     <MobileTagManager {...pageProps} params={currentPage.params}/>
                                 )}
-                                {pageType === 'categoryManager' && currentPage && (
+                                {currentPage?.type === 'categoryManager' && (
                                     <MobileCategoryManager {...pageProps} params={currentPage.params}/>
                                 )}
                             </>

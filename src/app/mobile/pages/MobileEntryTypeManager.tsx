@@ -9,15 +9,16 @@ import {
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
+import {type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileTypeTagManager.css'
 
 interface Props {
     pop: () => void
-    params?: Record<string, unknown>
+    params: MobileProjectScopedPageParams
 }
 
 export default function MobileEntryTypeManager({pop, params}: Props) {
-    const projectId = params?.projectId as string
+    const projectId = params.projectId
 
     const [customTypes, setCustomTypes] = useState<CustomEntryType[]>([])
     const [allEntryTypes, setAllEntryTypes] = useState<EntryTypeView[]>([])

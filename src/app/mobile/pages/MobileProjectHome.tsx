@@ -19,7 +19,7 @@ import {
     type ProjectStats,
     type TagSchema,
 } from '../../../api'
-import {type MobilePage} from '../usePageStack'
+import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
@@ -43,7 +43,7 @@ interface Props {
     setAiFocus: (focus: AiFocus) => void
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
-    params?: Record<string, unknown>
+    params: MobileProjectPageParams
 }
 
 function toProjectImageSrc(coverPath?: string | null): string | undefined {
@@ -153,7 +153,7 @@ export default function MobileProjectHome({
     onOpenCategoryDrawer,
     params,
 }: Props) {
-    const projectId = params?.projectId as string
+    const projectId = params.projectId
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
     const {showAlert} = useAlert()

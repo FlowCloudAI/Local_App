@@ -23,7 +23,7 @@ import {
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
 import {open} from '@tauri-apps/plugin-dialog'
-import {type MobilePage} from '../usePageStack'
+import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import './MobileSettings.css'
 
 interface Props {
@@ -532,7 +532,7 @@ export default function MobileSettings({push, page}: Props) {
         }
     }, [logSnapshot, showAlert])
 
-    const openSettingsPage = useCallback((type: string) => {
+    const openSettingsPage = useCallback((type: MobileSettingsPageType) => {
         push?.({type})
     }, [push])
 

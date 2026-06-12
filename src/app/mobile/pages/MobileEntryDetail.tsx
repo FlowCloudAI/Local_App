@@ -45,7 +45,7 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import TagCreator from '../../../features/entries/components/TagCreator'
-import {type MobilePage} from '../usePageStack'
+import {type MobileEntryDetailPageParams, type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {
     MobileAnchoredActionMenu,
@@ -99,7 +99,7 @@ interface Props {
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
     setAiFocus: (focus: AiFocus) => void
-    params?: Record<string, unknown>
+    params: MobileEntryDetailPageParams
 }
 
 type Mode = 'view' | 'edit'
@@ -353,8 +353,8 @@ function MobileMarkdownToolIcon({tool}: { tool: MobileMarkdownTool }) {
  * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
  */
 export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeBack, setAiFocus, params}: Props) {
-    const projectId = params?.projectId as string
-    const entryId = params?.entryId as string
+    const projectId = params.projectId
+    const entryId = params.entryId ?? ''
     const {showAlert} = useAlert()
     const {theme} = useTheme()
     const pageRef = useRef<HTMLDivElement>(null)
@@ -367,7 +367,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
-    const [mode, setMode] = useState<Mode>(params?.mode === 'edit' ? 'edit' : 'view')
+    const [mode, setMode] = useState<Mode>(params.mode === 'edit' ? 'edit' : 'view')
 
     // 编辑表单字段
     const [title, setTitle] = useState('')
@@ -506,7 +506,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     replace({
                         type: 'entryDetail',
                         params: {
-                            ...(params ?? {}),
+                            ...params,
                             projectId,
                             entryId,
                             displayName: updatedEntry.title,
@@ -633,7 +633,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setRelationDrafts(savedBundle.relations.map(relation => buildRelationDraft(entryId, relation)))
             setAiFocus({projectId, entryId})
             // 同步页面标题（顶部标题取自 params.displayName）。
-            replace({type: 'entryDetail', params: {...(params ?? {}), projectId, entryId, displayName: title.trim(), mode: 'view'}})
+            replace({type: 'entryDetail', params: {...params, projectId, entryId, displayName: title.trim(), mode: 'view'}})
             setImmersiveEditorOpen(false)
             setMode('view')
         } catch (e) {

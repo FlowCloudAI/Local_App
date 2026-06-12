@@ -14,12 +14,12 @@ import {
     type ProjectStats,
 } from '../../../api'
 import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
-import {type MobilePage} from '../usePageStack'
+import {type MobilePage, type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileCategoryManager.css'
 
 interface Props {
     push: (page: MobilePage) => void
-    params?: Record<string, unknown>
+    params: MobileProjectScopedPageParams
 }
 
 interface CategoryRow {
@@ -95,7 +95,7 @@ function getEntryCountMap(stats: ProjectStats | null): Map<string, number> {
 }
 
 export default function MobileCategoryManager({push, params}: Props) {
-    const projectId = params?.projectId as string
+    const projectId = params.projectId
     const {showAlert} = useAlert()
 
     const [categories, setCategories] = useState<Category[]>([])

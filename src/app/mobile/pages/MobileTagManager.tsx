@@ -8,11 +8,12 @@ import {
 } from '../../../api'
 import TagCreator from '../../../features/entries/components/TagCreator'
 import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
+import {type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileTypeTagManager.css'
 
 interface Props {
     pop: () => void
-    params?: Record<string, unknown>
+    params: MobileProjectScopedPageParams
 }
 
 function tagTypeLabel(type: string): string {
@@ -23,7 +24,7 @@ function tagTypeLabel(type: string): string {
 }
 
 export default function MobileTagManager({pop, params}: Props) {
-    const projectId = params?.projectId as string
+    const projectId = params.projectId
 
     const [allEntryTypes, setAllEntryTypes] = useState<EntryTypeView[]>([])
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])

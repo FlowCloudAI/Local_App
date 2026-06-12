@@ -1,9 +1,51 @@
 import {useCallback, useRef, useState} from 'react'
 
-export interface MobilePage {
-    type: string
-    params?: Record<string, unknown>
+export interface MobileProjectPageParams {
+    projectId: string
+    displayName?: string
 }
+
+export interface MobileEntryListPageParams extends MobileProjectPageParams {
+    categoryId?: string
+    uncategorizedOnly?: boolean
+}
+
+export interface MobileEntryDetailPageParams extends MobileProjectPageParams {
+    entryId?: string
+    mode?: 'view' | 'edit'
+}
+
+export type MobileProjectScopedPageParams = MobileProjectPageParams
+
+export interface MobilePageParamsMap {
+    projectList: undefined
+    projectHome: MobileProjectPageParams
+    entryList: MobileEntryListPageParams
+    entryDetail: MobileEntryDetailPageParams
+    typeManager: MobileProjectScopedPageParams
+    tagManager: MobileProjectScopedPageParams
+    categoryManager: MobileProjectScopedPageParams
+    settingsAi: undefined
+    settingsPlugins: undefined
+    settingsAppearance: undefined
+    settingsAbout: undefined
+}
+
+export type MobilePageType = keyof MobilePageParamsMap
+
+export type MobileSettingsPageType =
+    | 'settingsAi'
+    | 'settingsPlugins'
+    | 'settingsAppearance'
+    | 'settingsAbout'
+
+export type MobilePageOf<T extends MobilePageType = MobilePageType> = {
+    [K in T]: MobilePageParamsMap[K] extends undefined
+        ? {type: K; params?: undefined}
+        : {type: K; params: MobilePageParamsMap[K]}
+}[T]
+
+export type MobilePage = MobilePageOf
 
 export interface PageStack {
     push: (page: MobilePage) => void
@@ -60,6 +102,10 @@ export function usePageStack(): PageStack {
     }
 }
 
-export function createPage(type: string, params?: Record<string, unknown>): MobilePage {
-    return {type, params}
+export function createPage<T extends MobilePageType>(
+    type: T,
+    ...args: MobilePageParamsMap[T] extends undefined ? [] : [params: MobilePageParamsMap[T]]
+): MobilePageOf<T> {
+    const params = args[0]
+    return (params === undefined ? {type} : {type, params}) as MobilePageOf<T>
 }

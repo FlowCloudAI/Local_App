@@ -12,7 +12,7 @@ import {
     type EntryTypeView,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
-import {type MobilePage} from '../usePageStack'
+import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
 import './MobileEntryList.css'
@@ -23,7 +23,7 @@ interface Props {
     setAiFocus: (focus: AiFocus) => void
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
-    params?: Record<string, unknown>
+    params: MobileEntryListPageParams
 }
 
 function formatDate(s?: string | null): string {
@@ -58,10 +58,10 @@ function CategoryDrawerIcon() {
 }
 
 export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
-    const projectId = params?.projectId as string
-    const uncategorizedOnly = Boolean(params?.uncategorizedOnly)
-    const categoryId = (params?.categoryId as string) || null
-    const listTitle = (params?.displayName as string | undefined) || '全部词条'
+    const projectId = params.projectId
+    const uncategorizedOnly = Boolean(params.uncategorizedOnly)
+    const categoryId = params.categoryId || null
+    const listTitle = params.displayName || '全部词条'
 
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
