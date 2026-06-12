@@ -86,14 +86,8 @@ import EntryImageAddModal from '../../../features/entries/components/EntryImageA
 import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
 import EntryRelationCreator, {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
-import {
-    MOBILE_MARKDOWN_TOOLS,
-    type MobileMarkdownTool,
-} from './MobileEntryMarkdownToolModel'
+import {type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
 import {transformMarkdownContent} from './MobileEntryMarkdownTransforms'
-import {
-    MobileMarkdownToolIcon,
-} from './MobileEntryMarkdownTools'
 import {
     appendImages,
     areImagesEqual,
@@ -103,6 +97,7 @@ import {
     type TagValueMap,
 } from './MobileEntryDetailUtils'
 import {MobileEntryDetailView} from './MobileEntryDetailView'
+import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -1045,77 +1040,18 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 </section>
 
                 {immersiveEditorOpen && (
-                    <div className="mobile-entry-detail__immersive" role="dialog" aria-label="沉浸正文编辑">
-                        <MobilePageTopBar
-                            className="mobile-entry-detail__immersive-topbar"
-                            ariaLabel="沉浸正文编辑操作"
-                            left={<MobileTopActionPill
-                                actions={[{
-                                    key: 'close',
-                                    label: '退出沉浸编辑',
-                                    icon: <MobileBackIcon/>,
-                                    onClick: () => setImmersiveEditorOpen(false),
-                                }]}
-                            />}
-                            center={<div className="mobile-entry-detail__edit-heading">
-                                <span>正文编辑</span>
-                                <small>{isDirty ? '有未保存修改' : '已同步'}</small>
-                            </div>}
-                            right={<MobileTopActionPill
-                                actions={[{
-                                    key: 'save',
-                                    label: saving ? '保存中' : '保存词条',
-                                    icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="check"/>,
-                                    kind: 'add',
-                                    disabled: saving,
-                                    onClick: () => void handleSave(),
-                                }]}
-                            />}
-                        />
-                        <div className="mobile-entry-detail__immersive-body">
-                            <MarkdownEditor
-                                ref={immersiveContentEditorRef}
-                                value={content}
-                                onValueChange={handleContentChange}
-                                placeholder="正文内容…输入 [[ 插入词条双链"
-                                autoHeight={false}
-                                height="100%"
-                                minHeight={420}
-                                showSplitToggle={false}
-                                showAiButton={false}
-                                hideFullscreen
-                                toolbarCommands={[]}
-                                extraCommands={[]}
-                                textareaProps={markdownTextareaProps}
-                                tokens={{
-                                    background: 'transparent',
-                                    toolbarBackground: 'transparent',
-                                    borderColor: 'transparent',
-                                    editorTextBackground: 'transparent',
-                                    previewBackground: 'transparent',
-                                    textColor: 'var(--fc-color-text)',
-                                    mutedTextColor: 'var(--fc-color-text-secondary)',
-                                }}
-                                className="mobile-entry-detail__immersive-editor"
-                            />
-                            {wikiPanel}
-                        </div>
-                        <div className="mobile-entry-detail__markdown-toolbar" role="toolbar" aria-label="Markdown 常用工具">
-                            {MOBILE_MARKDOWN_TOOLS.map(item => (
-                                <button
-                                    key={item.tool}
-                                    type="button"
-                                    className="mobile-entry-detail__markdown-tool"
-                                    aria-label={item.label}
-                                    title={item.label}
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onClick={() => handleMarkdownTool(item.tool)}
-                                >
-                                    <MobileMarkdownToolIcon tool={item.tool}/>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    <MobileEntryImmersiveEditor
+                        editorRef={immersiveContentEditorRef}
+                        content={content}
+                        textareaProps={markdownTextareaProps}
+                        wikiPanel={wikiPanel}
+                        isDirty={isDirty}
+                        saving={saving}
+                        onContentChange={handleContentChange}
+                        onClose={() => setImmersiveEditorOpen(false)}
+                        onSave={() => void handleSave()}
+                        onMarkdownTool={handleMarkdownTool}
+                    />
                 )}
 
                 <EntryTypeCreator
