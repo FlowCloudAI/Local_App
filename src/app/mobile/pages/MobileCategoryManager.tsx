@@ -1,18 +1,16 @@
-import {logger} from '../../../shared/logger'
-import {type CSSProperties, useCallback, useEffect, useMemo, useState} from 'react'
+import {type CSSProperties, useCallback, useMemo, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {
     db_cascade_delete_category,
     db_create_category,
     db_delete_category,
     db_delete_category_move_to_parent,
-    db_get_project_stats,
-    db_list_categories,
     db_update_category,
     type Category,
     type CategoryCascadeDeleteResult,
     type ProjectStats,
 } from '../../../api'
+import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
 import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
 import {type MobilePage, type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileCategoryManager.css'
@@ -98,29 +96,14 @@ export default function MobileCategoryManager({push, params}: Props) {
     const projectId = params.projectId
     const {showAlert} = useAlert()
 
-    const [categories, setCategories] = useState<Category[]>([])
-    const [stats, setStats] = useState<ProjectStats | null>(null)
-    const [loading, setLoading] = useState(true)
+    const projectContext = useProjectContextStore(projectId)
+    const categories = projectContext.categories
+    const stats = projectContext.stats
     const [busy, setBusy] = useState(false)
     const [menuTarget, setMenuTarget] = useState<Category | null>(null)
     const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
     const [moveTarget, setMoveTarget] = useState<Category | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
-
-    const reload = useCallback(async () => {
-        const [nextCategories, nextStats] = await Promise.all([
-            db_list_categories(projectId),
-            db_get_project_stats(projectId),
-        ])
-        setCategories(nextCategories)
-        setStats(nextStats)
-    }, [projectId])
-
-    useEffect(() => {
-        if (!projectId) return
-        setLoading(true)
-        reload().catch(logger.error).finally(() => setLoading(false))
-    }, [projectId, reload])
 
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
     const rows = useMemo(() => buildRows(childrenMap), [childrenMap])
@@ -154,13 +137,13 @@ export default function MobileCategoryManager({push, params}: Props) {
                 await db_update_category({id: renameTarget.category.id, name})
             }
             setRenameTarget(null)
-            await reload()
+            await invalidateProjectContext(projectId)
         } catch (error) {
             await showAlert(`保存分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setBusy(false)
         }
-    }, [categories, projectId, reload, renameTarget, showAlert])
+    }, [categories, projectId, renameTarget, showAlert])
 
     const handleMoveToParent = useCallback(async (parentId: string | null) => {
         if (!moveTarget) return
@@ -181,13 +164,13 @@ export default function MobileCategoryManager({push, params}: Props) {
                 sortOrder: maxOrder + 1,
             })
             setMoveTarget(null)
-            await reload()
+            await invalidateProjectContext(projectId)
         } catch (error) {
             await showAlert(`移动分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setBusy(false)
         }
-    }, [categories, moveTarget, reload, showAlert])
+    }, [categories, moveTarget, projectId, showAlert])
 
     const handleDelete = useCallback(async (mode: DeleteMode) => {
         if (!deleteTarget) return
@@ -202,7 +185,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                 result = await db_cascade_delete_category(deleteTarget.id)
             }
             setDeleteTarget(null)
-            await reload()
+            await invalidateProjectContext(projectId)
             if (result) {
                 await showAlert(
                     `已删除 ${result.deletedCategories} 个分类、${result.deletedEntries} 个词条。`,
@@ -216,7 +199,7 @@ export default function MobileCategoryManager({push, params}: Props) {
         } finally {
             setBusy(false)
         }
-    }, [deleteTarget, reload, showAlert])
+    }, [deleteTarget, projectId, showAlert])
 
     const moveCandidates = useMemo(() => {
         if (!moveTarget) return rows
@@ -237,7 +220,7 @@ export default function MobileCategoryManager({push, params}: Props) {
     const renameInitialValue = renameTarget?.mode === 'rename' ? renameTarget.category.name : ''
     const renameTitle = renameTarget?.mode === 'rename' ? '重命名分类' : '新建分类'
 
-    if (loading) return <div className="mobile-page__loading">加载中…</div>
+    if (!projectContext.hasLoaded) return <div className="mobile-page__loading">加载中…</div>
 
     return (
         <div className="mobile-page mobile-category-manager">
