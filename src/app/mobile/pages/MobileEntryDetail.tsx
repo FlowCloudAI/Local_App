@@ -13,7 +13,7 @@ import {
     useRef,
     useState,
 } from 'react'
-import {Button, Input, MarkdownEditor, type MarkdownEditorRef, Select, TagItem, useAlert, useTheme} from 'flowcloudai-ui'
+import {Input, MarkdownEditor, type MarkdownEditorRef, Select, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -64,11 +64,7 @@ import {
     parseInternalEntryHref,
     resolveMarkdownAnchor,
 } from '../../../features/entries/lib/entryMarkdown'
-import {
-    areTagMapsEqual,
-    getComparableTagValue,
-    normalizeComparableTagValue,
-} from '../../../features/entries/lib/entryTag'
+import {areTagMapsEqual} from '../../../features/entries/lib/entryTag'
 import {
     buildEntryImageMarkdownRef,
     type EntryImage,
@@ -100,6 +96,7 @@ import {MobileEntryDetailView} from './MobileEntryDetailView'
 import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
 import {MobileEntryImagesSection} from './MobileEntryImagesSection'
 import {MobileEntryRelationsSection} from './MobileEntryRelationsSection'
+import {MobileEntryTagsSection} from './MobileEntryTagsSection'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -947,50 +944,16 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     }}
                 />
 
-                <section className="mobile-entry-detail__tags mobile-entry-detail__form-section">
-                    <div className="mobile-entry-detail__tags-header">
-                        <div className="mobile-entry-detail__tags-label">标签</div>
-                        <div className="mobile-entry-detail__tags-actions">
-                            {entryTags.availableTagSchemaOptions.length > 0 && (
-                                <Select
-                                    value={entryTags.tagSchemaPickerValue}
-                                    onChange={(value) => {
-                                        if (typeof value !== 'string') return
-                                        entryTags.handleAddVisibleTagSchema(value)
-                                    }}
-                                    options={entryTags.availableTagSchemaOptions}
-                                    placeholder="添加已有标签"
-                                    searchable
-                                    className="mobile-entry-detail__tag-select"
-                                />
-                            )}
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setTagCreatorOpen(true)}>
-                                + 新建标签
-                            </Button>
-                        </div>
-                    </div>
-                    {entryTags.localTagSchemas.length === 0 ? (
-                        <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前项目还没有标签定义</div>
-                    ) : editTagSchemas.length > 0 ? (
-                        <div className="mobile-entry-detail__tags-list">
-                            {editTagSchemas.map(s => (
-                                <TagItem
-                                    key={s.id}
-                                    schema={{id: s.id, name: s.name, type: s.type as 'number' | 'string' | 'boolean', range_min: s.range_min ?? null, range_max: s.range_max ?? null}}
-                                    value={tagDraft[s.id] ?? tagDraft[s.name] ?? undefined}
-                                    mode="edit"
-                                    onChange={(v) => setTagDraft(prev => {
-                                        const nextValue = normalizeComparableTagValue(v)
-                                        if (getComparableTagValue(prev, s) === nextValue) return prev
-                                        return {...prev, [s.id]: nextValue}
-                                    })}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="mobile-page__empty mobile-entry-detail__tags-empty">当前词条还没有已添加标签</div>
-                    )}
-                </section>
+                <MobileEntryTagsSection
+                    hasTagDefinitions={entryTags.localTagSchemas.length > 0}
+                    availableTagSchemaOptions={entryTags.availableTagSchemaOptions}
+                    tagSchemaPickerValue={entryTags.tagSchemaPickerValue}
+                    editTagSchemas={editTagSchemas}
+                    tagDraft={tagDraft}
+                    onAddVisibleTagSchema={entryTags.handleAddVisibleTagSchema}
+                    onTagDraftChange={setTagDraft}
+                    onOpenTagCreator={() => setTagCreatorOpen(true)}
+                />
 
                 <MobileEntryRelationsSection
                     relationDrafts={relationDrafts}
