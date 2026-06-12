@@ -14,7 +14,7 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import './MobileEntryList.css'
 
 interface Props {
@@ -132,9 +132,12 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
 
     return (
         <div className="mobile-page mobile-entry-list">
-            <div className="mobile-entry-list__hero">
-                <MobileTopActionPill
-                    className="mobile-entry-list__hero-nav"
+            <MobilePageTopBar
+                className="mobile-entry-list__topbar"
+                sticky
+                edgeToEdge
+                ariaLabel="词条列表操作"
+                left={<MobileTopActionPill
                     actions={[
                         {
                             key: 'back',
@@ -150,13 +153,8 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                             onClick: () => onOpenCategoryDrawer?.(),
                         },
                     ]}
-                />
-                <div className="mobile-entry-list__hero-copy">
-                    <span className="mobile-entry-list__eyebrow">{loading ? '正在同步' : `${entries.length} 个词条`}</span>
-                    <h2 className="mobile-entry-list__title">{listTitle}</h2>
-                </div>
-                <MobileTopActionPill
-                    className="mobile-entry-list__create"
+                />}
+                right={<MobileTopActionPill
                     actions={[
                         {
                             key: 'create',
@@ -166,7 +164,12 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                             onClick: () => void handleCreateEntry(),
                         },
                     ]}
-                />
+                />}
+            />
+
+            <div className="mobile-entry-list__hero">
+                <span className="mobile-entry-list__eyebrow">{loading ? '正在同步' : `${entries.length} 个词条`}</span>
+                <h2 className="mobile-entry-list__title">{listTitle}</h2>
             </div>
 
             <div className="mobile-entry-list__toolbar">
