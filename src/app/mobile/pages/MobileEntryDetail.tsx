@@ -1,5 +1,4 @@
 import {logger} from '../../../shared/logger'
-import MarkdownPreview from '@uiw/react-markdown-preview'
 import {listen} from '@tauri-apps/api/event'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {openUrl} from '@tauri-apps/plugin-opener'
@@ -42,14 +41,11 @@ import {
     entryTypeKey,
     type TagSchema,
 } from '../../../api'
-import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import TagCreator from '../../../features/entries/components/TagCreator'
 import {type MobileEntryDetailPageParams, type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {
-    MobileAnchoredActionMenu,
-    type MobileAnchoredMenuItem,
     MobileBackIcon,
     MobilePageTopBar,
     MobileTopActionPill,
@@ -101,12 +97,12 @@ import {
 import {
     appendImages,
     areImagesEqual,
-    buildExcerpt,
     buildTagDraft,
     escapeMarkdownImageAlt,
     getImageLabel,
     type TagValueMap,
 } from './MobileEntryDetailUtils'
+import {MobileEntryDetailView} from './MobileEntryDetailView'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -1173,7 +1169,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     }
 
     // ---------- 查看态 ----------
-    const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
+    const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) ?? null : null
     const typeBadgeStyle = et?.color
         ? {
             '--mobile-entry-type-bg': `${et.color}22`,
@@ -1189,217 +1185,32 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         .map(relation => buildRelationDraft(entryId, relation))
         .filter(relation => relation.otherEntryId)
     const hasConnections = viewRelationDrafts.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
-    const entryMenuItems: MobileAnchoredMenuItem[] = [
-        {key: 'delete', label: '删除词条', description: '永久删除当前词条', icon: <MobileEntryDetailActionIcon type="delete"/>, danger: true, onSelect: () => void handleDelete()},
-    ]
 
     return (
-        <div ref={pageRef} className="mobile-page mobile-entry-detail">
-            <MobilePageTopBar
-                className="mobile-entry-detail__view-topbar"
-                sticky
-                edgeToEdge
-                ariaLabel="词条查看操作"
-                left={<MobileTopActionPill
-                    actions={[{
-                        key: 'back',
-                        label: '返回',
-                        icon: <MobileBackIcon/>,
-                        onClick: pop,
-                    }]}
-                />}
-                right={<MobileTopActionPill
-                    ref={topActionsRef}
-                    actions={[
-                        {
-                            key: 'ai',
-                            label: 'AI 讨论',
-                            icon: <MobileEntryDetailActionIcon type="ai"/>,
-                            onClick: handleAiDiscuss,
-                        },
-                        {
-                            key: 'edit',
-                            label: '编辑词条',
-                            icon: <MobileEntryDetailActionIcon type="edit"/>,
-                            kind: 'add',
-                            onClick: enterEdit,
-                        },
-                        {
-                            key: 'menu',
-                            label: '更多操作',
-                            icon: <MobileEntryDetailActionIcon type="more"/>,
-                            kind: 'more',
-                            ariaHasPopup: 'menu',
-                            ariaExpanded: menuOpen,
-                            onClick: () => setMenuOpen(open => !open),
-                        },
-                    ]}
-                />}
-            />
-
-            <h1 className="mobile-entry-detail__title">
-                {entry.title}
-            </h1>
-
-            {et && (
-                <div className="mobile-entry-detail__type">
-                    <span className="mobile-entry-detail__type-badge" style={typeBadgeStyle}>
-                        <EntryTypeIcon entryType={et} className=""/> {et.name}
-                    </span>
-                </div>
-            )}
-
-            {viewTagSchemas.length > 0 && (
-                <div className="mobile-entry-detail__tags mobile-entry-detail__tags--view">
-                    {viewTagSchemas.map(s => (
-                        <TagItem
-                            key={s.id}
-                            schema={{id: s.id, name: s.name, type: s.type as 'number' | 'string' | 'boolean', range_min: s.range_min ?? null, range_max: s.range_max ?? null}}
-                            value={getComparableTagValue(viewTagMap, s) ?? undefined}
-                            mode="show"
-                        />
-                    ))}
-                </div>
-            )}
-
-            {entry.summary && (
-                <p className="mobile-entry-detail__summary">
-                    {entry.summary}
-                </p>
-            )}
-
-            {viewImages.length > 0 && (
-                <div className="mobile-entry-detail__images mobile-entry-detail__images--view">
-                    <div className="mobile-entry-detail__image-grid">
-                        {viewImages.map((image, index) => {
-                            const src = toEntryImageSrc(image)
-                            return (
-                                <div className="mobile-entry-detail__image-thumb mobile-entry-detail__image-thumb--static" key={`${image.path ?? image.url ?? index}-${index}`}>
-                                    {src ? (
-                                        <img src={src} alt={getImageLabel(image, index)}/>
-                                    ) : (
-                                        <span>无预览</span>
-                                    )}
-                                    {image.is_cover && <span className="mobile-entry-detail__image-badge">主图</span>}
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {hasConnections && (
-                <div className="mobile-entry-detail__connections">
-                    <h3 className="mobile-entry-detail__section-title">关联</h3>
-                    {viewRelationDrafts.length > 0 && (
-                        <div className="mobile-entry-detail__connection-group">
-                            <div className="mobile-entry-detail__connection-label">结构化关系</div>
-                            {viewRelationDrafts.map((relation, index) => {
-                                const target = relation.otherEntryId ? entryBriefById.get(relation.otherEntryId) : null
-                                const directionLabel = relation.direction === 'two_way'
-                                    ? '双向'
-                                    : relation.direction === 'incoming' ? '来自对方' : '指向对方'
-                                return (
-                                    <button
-                                        type="button"
-                                        className="mobile-entry-detail__connection-card"
-                                        key={relation.id ?? `relation-${index}`}
-                                        disabled={!target}
-                                        onClick={() => relation.otherEntryId && handleOpenLinkedEntry(relation.otherEntryId)}
-                                    >
-                                        <span className="mobile-entry-detail__connection-title">
-                                            {target?.title ?? '词条不存在或已删除'}
-                                        </span>
-                                        <span className="mobile-entry-detail__connection-meta">
-                                            {directionLabel}{relation.content ? ` · ${relation.content}` : ''}
-                                        </span>
-                                        {target?.summary && (
-                                            <span className="mobile-entry-detail__connection-excerpt">
-                                                {buildExcerpt(target.summary)}
-                                            </span>
-                                        )}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-                    {outgoingLinks.length > 0 && (
-                        <div className="mobile-entry-detail__connection-group">
-                            <div className="mobile-entry-detail__connection-label">正文提到</div>
-                            {outgoingLinks.map(link => {
-                                const target = entryBriefById.get(link.b_id)
-                                return (
-                                    <button
-                                        type="button"
-                                        className="mobile-entry-detail__connection-card"
-                                        key={link.id}
-                                        disabled={!target}
-                                        onClick={() => handleOpenLinkedEntry(link.b_id)}
-                                    >
-                                        <span className="mobile-entry-detail__connection-title">
-                                            {target?.title ?? '词条不存在或已删除'}
-                                        </span>
-                                        {target?.summary && (
-                                            <span className="mobile-entry-detail__connection-excerpt">
-                                                {buildExcerpt(target.summary)}
-                                            </span>
-                                        )}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-                    {incomingLinks.length > 0 && (
-                        <div className="mobile-entry-detail__connection-group">
-                            <div className="mobile-entry-detail__connection-label">被这些词条提到</div>
-                            {incomingLinks.map(link => {
-                                const source = entryBriefById.get(link.a_id)
-                                return (
-                                    <button
-                                        type="button"
-                                        className="mobile-entry-detail__connection-card"
-                                        key={link.id}
-                                        disabled={!source}
-                                        onClick={() => handleOpenLinkedEntry(link.a_id)}
-                                    >
-                                        <span className="mobile-entry-detail__connection-title">
-                                            {source?.title ?? '词条不存在或已删除'}
-                                        </span>
-                                        {source?.summary && (
-                                            <span className="mobile-entry-detail__connection-excerpt">
-                                                {buildExcerpt(source.summary)}
-                                            </span>
-                                        )}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {entry.content ? (
-                <div className="mobile-entry-detail__markdown" data-color-mode={colorMode} onClick={handleMarkdownClick}>
-                    <MarkdownPreview
-                        source={viewMarkdownSource}
-                        className="mobile-entry-detail__markdown-preview"
-                        wrapperElement={{'data-color-mode': colorMode}}
-                    />
-                </div>
-            ) : (
-                <div className="mobile-page__empty mobile-entry-detail__empty">
-                    暂无正文内容
-                </div>
-            )}
-
-            <MobileAnchoredActionMenu
-                open={menuOpen}
-                onClose={() => setMenuOpen(false)}
-                anchorRef={topActionsRef}
-                containerRef={pageRef}
-                ariaLabel="词条操作"
-                items={entryMenuItems}
-            />
-        </div>
+        <MobileEntryDetailView
+            pageRef={pageRef}
+            topActionsRef={topActionsRef}
+            entry={entry}
+            entryType={et}
+            typeBadgeStyle={typeBadgeStyle}
+            viewTagSchemas={viewTagSchemas}
+            viewTagMap={viewTagMap}
+            viewImages={viewImages}
+            viewMarkdownSource={viewMarkdownSource}
+            viewRelationDrafts={viewRelationDrafts}
+            hasConnections={hasConnections}
+            outgoingLinks={outgoingLinks}
+            incomingLinks={incomingLinks}
+            entryBriefById={entryBriefById}
+            colorMode={colorMode}
+            menuOpen={menuOpen}
+            setMenuOpen={setMenuOpen}
+            onBack={pop}
+            onAiDiscuss={handleAiDiscuss}
+            onEdit={enterEdit}
+            onDelete={handleDelete}
+            onOpenLinkedEntry={handleOpenLinkedEntry}
+            onMarkdownClick={handleMarkdownClick}
+        />
     )
 }
