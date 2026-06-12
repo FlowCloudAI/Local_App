@@ -96,6 +96,30 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const ideaDrawerEnabled = activeTab === 'ideas'
     const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled || ideaDrawerEnabled
     const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : ideaDrawerEnabled ? 'idea' : null
+    const runBackNavigation = useCallback(() => {
+        void (async () => {
+            const beforeBack = beforeBackRef.current
+            if (beforeBack) {
+                const allowed = await beforeBack()
+                if (!allowed) return
+            }
+            if (activeStack.canGoBack) {
+                activeStack.pop()
+            } else {
+                const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
+                if (result === 'yes') {
+                    if (closingRef.current) return
+                    closingRef.current = true
+                    try {
+                        await exit_app()
+                    } catch (error) {
+                        closingRef.current = false
+                        logger.error('关闭移动端窗口失败', error)
+                    }
+                }
+            }
+        })()
+    }, [activeStack, showAlert])
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -107,6 +131,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         enabled: mobileSideDrawerEnabled,
         width: categoryDrawerWidth,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
+        onEdgeBackGesture: runBackNavigation,
     })
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
         if (pageType === 'projectHome') return {kind: 'projectHome'}
@@ -272,29 +297,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             closeCategoryDrawer()
             return
         }
-        void (async () => {
-            const beforeBack = beforeBackRef.current
-            if (beforeBack) {
-                const allowed = await beforeBack()
-                if (!allowed) return
-            }
-            if (activeStack.canGoBack) {
-                activeStack.pop()
-            } else {
-                const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
-                if (result === 'yes') {
-                    if (closingRef.current) return
-                    closingRef.current = true
-                    try {
-                        await exit_app()
-                    } catch (error) {
-                        closingRef.current = false
-                        logger.error('关闭移动端窗口失败', error)
-                    }
-                }
-            }
-        })()
-    }, [activeStack, closeCategoryDrawer, showAlert, sideDrawerOpen])
+        runBackNavigation()
+    }, [closeCategoryDrawer, runBackNavigation, sideDrawerOpen])
 
     useEffect(() => {
         const handleAndroidBack = () => {

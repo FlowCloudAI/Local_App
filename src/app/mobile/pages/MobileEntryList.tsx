@@ -183,7 +183,7 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
 
             {/* 类型筛选 */}
             {entryTypes.length > 0 && (
-                <div className="mobile-entry-list__filters">
+                <div className="mobile-entry-list__filters" data-mobile-horizontal-scroll="true">
                     <button
                         type="button"
                         className={`mobile-entry-list__filter${typeFilter === null ? ' active' : ''}`}

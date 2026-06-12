@@ -15,6 +15,7 @@ interface MobileSideDrawerDragState {
     baseOffset: number
     latestOffset: number
     tracking: boolean
+    edgeBackCandidate: boolean
 }
 
 interface UseMobileSideDrawerGestureOptions {
@@ -26,6 +27,11 @@ interface UseMobileSideDrawerGestureOptions {
      * 默认关闭，避免普通表单页误触；灵感便签这种编辑器优先页面可以开启，让右划更容易呼出抽屉。
      */
     allowTextEditingTargetGestures?: boolean
+    /**
+     * 从屏幕左边缘向右滑时触发返回，而不是打开侧边抽屉。
+     * 不传则保留纯抽屉行为，适合没有页面返回语义的嵌入场景。
+     */
+    onEdgeBackGesture?: () => void
 }
 
 export interface MobileSideDrawerGesture {
@@ -105,6 +111,18 @@ export const MOBILE_SIDE_DRAWER_GESTURE_TUNING = {
      * 调大后更能避免“滑完误点按钮”；调小后滑动结束后的点击响应恢复更快。
      */
     suppressClickMs: 180,
+
+    /**
+     * 左边缘返回手势允许起手的屏幕宽度。
+     * 调大后更容易从左侧触发返回，但也更可能抢占内容区横滑；调小后需要更贴边。
+     */
+    edgeBackStartWidth: 24,
+
+    /**
+     * 左边缘返回手势触发返回所需的右滑距离。
+     * 调大后更不容易误返回；调小后短促右滑也会直接返回。
+     */
+    edgeBackTriggerDistance: 34,
 } as const
 
 function clamp(value: number, min: number, max: number): number {
@@ -145,6 +163,7 @@ export function useMobileSideDrawerGesture({
     width,
     logLabel = '[移动端侧边抽屉手势]',
     allowTextEditingTargetGestures = false,
+    onEdgeBackGesture,
 }: UseMobileSideDrawerGestureOptions): MobileSideDrawerGesture {
     const [open, setOpen] = useState(false)
     const [offset, setOffset] = useState<number | null>(null)
@@ -159,6 +178,15 @@ export function useMobileSideDrawerGesture({
         window.clearTimeout(suppressClickTimerRef.current)
         suppressClickTimerRef.current = null
     }, [])
+
+    const suppressNextClick = useCallback(() => {
+        suppressClickRef.current = true
+        clearSuppressClickTimer()
+        suppressClickTimerRef.current = window.setTimeout(() => {
+            suppressClickRef.current = false
+            suppressClickTimerRef.current = null
+        }, MOBILE_SIDE_DRAWER_GESTURE_TUNING.suppressClickMs)
+    }, [clearSuppressClickTimer])
 
     const closeDrawer = useCallback(() => {
         setOpen(false)
@@ -217,7 +245,13 @@ export function useMobileSideDrawerGesture({
             })
             return
         }
-        if (isHorizontalScrollGestureTarget(event.target)) {
+        const edgeBackCandidate = Boolean(
+            !open
+            && onEdgeBackGesture
+            && event.clientX <= MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackStartWidth,
+        )
+
+        if (!edgeBackCandidate && isHorizontalScrollGestureTarget(event.target)) {
             logger.info(`${logLabel} 忽略`, {
                 pointerId: event.pointerId,
                 reason: '横向滚动区域',
@@ -235,6 +269,7 @@ export function useMobileSideDrawerGesture({
             baseOffset: open ? width : 0,
             latestOffset: open ? width : 0,
             tracking: false,
+            edgeBackCandidate,
         }
         dragElement.setPointerCapture(event.pointerId)
         logger.info(`${logLabel} 按下`, {
@@ -244,10 +279,11 @@ export function useMobileSideDrawerGesture({
             drawerWidth: width,
             startX: Math.round(event.clientX),
             startY: Math.round(event.clientY),
+            edgeBackCandidate,
             target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
             area: getElementClassName(dragElement),
         })
-    }, [allowTextEditingTargetGestures, enabled, logLabel, open, width])
+    }, [allowTextEditingTargetGestures, enabled, logLabel, onEdgeBackGesture, open, width])
 
     const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
         const dragState = dragRef.current
@@ -275,6 +311,38 @@ export function useMobileSideDrawerGesture({
                 horizontal < MOBILE_SIDE_DRAWER_GESTURE_TUNING.horizontalStartDistance
                 || horizontal < vertical * MOBILE_SIDE_DRAWER_GESTURE_TUNING.horizontalDominanceRatio
             ) return
+            if (dragState.edgeBackCandidate) {
+                if (dx < 0) {
+                    cancelDrag(event.pointerId, '左边缘区域左滑', {
+                        dx: Math.round(dx),
+                        dy: Math.round(dy),
+                        horizontal: Math.round(horizontal),
+                        vertical: Math.round(vertical),
+                    })
+                    return
+                }
+                if (dx < MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackTriggerDistance) return
+
+                event.preventDefault()
+                suppressNextClick()
+                logger.info(`${logLabel} 左边缘返回`, {
+                    pointerId: event.pointerId,
+                    dx: Math.round(dx),
+                    dy: Math.round(dy),
+                    horizontal: Math.round(horizontal),
+                    triggerDistance: MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackTriggerDistance,
+                })
+                dragRef.current = null
+                setOffset(null)
+                setDragging(false)
+                const dragElement = dragElementRef.current
+                if (dragElement?.hasPointerCapture(event.pointerId)) {
+                    dragElement.releasePointerCapture(event.pointerId)
+                }
+                dragElementRef.current = null
+                onEdgeBackGesture?.()
+                return
+            }
             if (!open && dx < 0) {
                 cancelDrag(event.pointerId, '关闭状态下左滑', {
                     dx: Math.round(dx),
@@ -302,7 +370,7 @@ export function useMobileSideDrawerGesture({
         const nextOffset = clamp(dragState.baseOffset + dx, 0, width)
         dragState.latestOffset = nextOffset
         setOffset(nextOffset)
-    }, [cancelDrag, logLabel, open, width])
+    }, [cancelDrag, logLabel, onEdgeBackGesture, open, suppressNextClick, width])
 
     const finishDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
         const dragState = dragRef.current
@@ -329,12 +397,7 @@ export function useMobileSideDrawerGesture({
             drawerWidth: Math.round(width),
         })
         if (dragState.tracking) {
-            suppressClickRef.current = true
-            clearSuppressClickTimer()
-            suppressClickTimerRef.current = window.setTimeout(() => {
-                suppressClickRef.current = false
-                suppressClickTimerRef.current = null
-            }, MOBILE_SIDE_DRAWER_GESTURE_TUNING.suppressClickMs)
+            suppressNextClick()
         }
         dragRef.current = null
         setOffset(null)
@@ -346,7 +409,7 @@ export function useMobileSideDrawerGesture({
             dragElement.releasePointerCapture(event.pointerId)
         }
         dragElementRef.current = null
-    }, [clearSuppressClickTimer, logLabel, open, width])
+    }, [logLabel, open, suppressNextClick, width])
 
     const handleClickCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
         if (!suppressClickRef.current) return
