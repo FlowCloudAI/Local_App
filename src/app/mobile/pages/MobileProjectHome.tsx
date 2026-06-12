@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import {saveFileDialog} from '../../../api/dialog'
 import {
     db_create_entry,

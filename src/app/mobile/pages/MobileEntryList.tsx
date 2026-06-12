@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import {type CSSProperties, useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Card, Input} from 'flowcloudai-ui'
 import {

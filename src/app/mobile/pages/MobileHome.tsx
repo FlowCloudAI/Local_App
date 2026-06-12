@@ -9,7 +9,7 @@ import {
     type WheelEvent as ReactWheelEvent,
 } from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import {openFileDialog} from '../../../api/dialog'
 import {
     db_count_entries,

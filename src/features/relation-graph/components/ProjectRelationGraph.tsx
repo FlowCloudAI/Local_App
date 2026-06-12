@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import {Button, ButtonGroup, ButtonToolbar, Input, Slider} from 'flowcloudai-ui'
 import {RelationGraph} from './RelationGraph/RelationGraph'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'

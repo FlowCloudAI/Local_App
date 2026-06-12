@@ -1,4 +1,4 @@
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import {useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import type {Project} from '../../../api'

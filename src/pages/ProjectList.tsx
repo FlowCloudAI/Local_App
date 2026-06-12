@@ -1,5 +1,5 @@
 import {type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../api/assets'
 import {openFileDialog} from '../api/dialog'
 import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
 import {

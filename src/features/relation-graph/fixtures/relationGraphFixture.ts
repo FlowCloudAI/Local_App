@@ -1,4 +1,4 @@
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import type {RelationEdgeInput, RelationNodeInput} from '../components/RelationGraph/types'
 import type {EntryBrief, EntryRelation, RelationDirection} from '../../../api'
 

@@ -1,5 +1,5 @@
 import {Button} from 'flowcloudai-ui'
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../api/assets'
 import type {LocalPluginInfo, RemotePluginInfo} from '../../api'
 import './PluginCard.css'
 

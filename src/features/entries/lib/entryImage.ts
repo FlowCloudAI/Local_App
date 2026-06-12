@@ -1,4 +1,4 @@
-import {convertFileSrc} from '@tauri-apps/api/core'
+import {convertFileSrc} from '../../../api/assets'
 import type {FCImage} from '../../../api'
 
 export type EntryImage = FCImage & {
