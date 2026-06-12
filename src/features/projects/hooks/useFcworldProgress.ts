@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {
     FCWORLD_PROGRESS_EVENT,
     type FcworldProgressEvent,

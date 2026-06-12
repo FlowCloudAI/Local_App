@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {
     AI_WRITE_REQUEST,
     CATEGORY_CASCADE_DELETE_REQUEST,

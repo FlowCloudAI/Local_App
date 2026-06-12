@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {
     ai_build_character_project_snapshot,
     ai_compact_conversation,

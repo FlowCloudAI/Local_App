@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {type MessageBoxBlock, type ToolCallInfo} from 'flowcloudai-ui'
 import {
     ai_cancel_session,

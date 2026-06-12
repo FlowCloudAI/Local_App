@@ -17,7 +17,7 @@ import {
     type WorldCheckReport,
     type WorldCheckReportHistoryItem,
 } from '../../../api'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'

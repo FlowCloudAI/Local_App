@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
 import {openUrl} from '@tauri-apps/plugin-opener'
 import {

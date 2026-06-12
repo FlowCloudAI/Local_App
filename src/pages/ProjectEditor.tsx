@@ -9,7 +9,7 @@ import {
     type TreeViewportRowsPayload,
     useAlert
 } from 'flowcloudai-ui'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../api/events'
 import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
 import {
     ai_list_contradiction_reports,

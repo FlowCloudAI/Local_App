@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {confirm_entry_edit, ENTRY_EDIT_REQUEST, type EntryEditRequestEvent,} from '../../../api'
 import './EntryEditModal.css'
 

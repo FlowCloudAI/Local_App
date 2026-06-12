@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../../../api/events'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {commands, type ICommand} from '@uiw/react-md-editor'
 import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'

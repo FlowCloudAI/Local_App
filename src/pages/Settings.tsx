@@ -17,7 +17,7 @@ import {
 } from 'flowcloudai-ui'
 import {open} from '@tauri-apps/plugin-dialog'
 import {appConfigDir} from '@tauri-apps/api/path'
-import {listen} from '@tauri-apps/api/event'
+import {listen} from '../api/events'
 import AboutSection from '../features/about/AboutSection'
 import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
