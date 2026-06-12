@@ -84,7 +84,7 @@ import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
-import EntryRelationCreator, {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
+import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
 import {transformMarkdownContent} from './MobileEntryMarkdownTransforms'
@@ -98,6 +98,8 @@ import {
 } from './MobileEntryDetailUtils'
 import {MobileEntryDetailView} from './MobileEntryDetailView'
 import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
+import {MobileEntryImagesSection} from './MobileEntryImagesSection'
+import {MobileEntryRelationsSection} from './MobileEntryRelationsSection'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -936,43 +938,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     </div>
                 </section>
 
-                <section className="mobile-entry-detail__images mobile-entry-detail__form-section">
-                    <div className="mobile-entry-detail__images-header">
-                        <div className="mobile-entry-detail__images-label">图片</div>
-                        <Button type="button" size="sm" variant="outline" onClick={() => setImageAddModalOpen(true)}>
-                            + 添加图片
-                        </Button>
-                    </div>
-                    {images.length > 0 ? (
-                        <div className="mobile-entry-detail__image-grid">
-                            {images.map((image, index) => {
-                                const src = toEntryImageSrc(image)
-                                return (
-                                    <button
-                                        type="button"
-                                        className="mobile-entry-detail__image-thumb"
-                                        key={`${image.path ?? image.url ?? index}-${index}`}
-                                        onClick={() => {
-                                            setLightboxIndex(index)
-                                            setLightboxOpen(true)
-                                        }}
-                                    >
-                                        {src ? (
-                                            <img src={src} alt={getImageLabel(image, index)}/>
-                                        ) : (
-                                            <span>无预览</span>
-                                        )}
-                                        {image.is_cover && <span className="mobile-entry-detail__image-badge">主图</span>}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="mobile-page__empty mobile-entry-detail__images-empty">
-                            还没有图片
-                        </div>
-                    )}
-                </section>
+                <MobileEntryImagesSection
+                    images={images}
+                    onAddImage={() => setImageAddModalOpen(true)}
+                    onOpenImage={(index) => {
+                        setLightboxIndex(index)
+                        setLightboxOpen(true)
+                    }}
+                />
 
                 <section className="mobile-entry-detail__tags mobile-entry-detail__form-section">
                     <div className="mobile-entry-detail__tags-header">
@@ -1019,25 +992,20 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     )}
                 </section>
 
-                <section className="mobile-entry-detail__relations mobile-entry-detail__form-section">
-                    <div className="mobile-entry-detail__relations-header">
-                        <div className="mobile-entry-detail__relations-label">关系</div>
-                    </div>
-                    <EntryRelationCreator
-                        drafts={relationDrafts}
-                        entries={projectEntries}
-                        categories={categories}
-                        currentEntryId={entryId}
-                        disabled={saving}
-                        onChange={setRelationDrafts}
-                        onOpenEntry={(target) => {
-                            void (async () => {
-                                if (!await confirmDiscard()) return
-                                handleOpenLinkedEntry(target.id)
-                            })()
-                        }}
-                    />
-                </section>
+                <MobileEntryRelationsSection
+                    relationDrafts={relationDrafts}
+                    entries={projectEntries}
+                    categories={categories}
+                    currentEntryId={entryId}
+                    disabled={saving}
+                    onChange={setRelationDrafts}
+                    onOpenEntry={(target) => {
+                        void (async () => {
+                            if (!await confirmDiscard()) return
+                            handleOpenLinkedEntry(target.id)
+                        })()
+                    }}
+                />
 
                 {immersiveEditorOpen && (
                     <MobileEntryImmersiveEditor
