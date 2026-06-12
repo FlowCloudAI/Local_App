@@ -754,9 +754,13 @@
 }
 
 .mobile-entry-detail__markdown-toolbar {
+    --mobile-entry-markdown-tool-gap: 0.45rem;
+    --mobile-entry-markdown-visible-gap-width: 2.25rem;
+    --mobile-entry-markdown-tool-width: calc((100% - var(--mobile-entry-markdown-visible-gap-width)) / 5.5);
+
     display: flex;
     flex: 0 0 auto;
-    gap: 0.45rem;
+    gap: var(--mobile-entry-markdown-tool-gap);
     padding: 0.55rem var(--mobile-entry-detail-x) calc(0.55rem + env(safe-area-inset-bottom, 0));
     overflow-x: auto;
     border-top: var(--mobile-border-soft);
@@ -770,9 +774,9 @@
 
 .mobile-entry-detail__markdown-tool {
     display: inline-grid;
-    width: 2.45rem;
+    width: var(--mobile-entry-markdown-tool-width);
     height: 2.35rem;
-    flex: 0 0 auto;
+    flex: 0 0 var(--mobile-entry-markdown-tool-width);
     padding: 0;
     place-items: center;
     border: var(--mobile-border);
