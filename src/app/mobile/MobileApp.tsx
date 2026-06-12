@@ -14,15 +14,12 @@ import {
 } from 'react'
 import {listen} from '@tauri-apps/api/event'
 import {
-    type Category,
-    db_get_project_stats,
-    db_list_categories,
     exit_app,
-    type ProjectStats,
     setting_is_backend_ready,
     showWindow,
     type PlatformInfo,
 } from '../../api'
+import {useProjectContextStore} from '../../features/projects/projectContextStore'
 import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
 import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from './components/MobileCategoryDrawer'
 import MobileNav, {type MobileTab} from './MobileNav'
@@ -84,8 +81,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
-    const [categoryDrawerCategories, setCategoryDrawerCategories] = useState<Category[]>([])
-    const [categoryDrawerStats, setCategoryDrawerStats] = useState<ProjectStats | null>(null)
 
     const categoryDrawerProjectId = activeTab === 'home'
         && currentPage
@@ -93,6 +88,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         ? currentPage.params.projectId
         : undefined
     const categoryDrawerEnabled = Boolean(categoryDrawerProjectId)
+    const categoryDrawerContext = useProjectContextStore(categoryDrawerProjectId)
     const aiConversationDrawerEnabled = activeTab === 'ai'
     const ideaDrawerEnabled = activeTab === 'ideas'
     const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled || ideaDrawerEnabled
@@ -176,29 +172,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [])
 
-    useEffect(() => {
-        if (!categoryDrawerProjectId) {
-            setCategoryDrawerCategories([])
-            setCategoryDrawerStats(null)
-            return
-        }
-        let disposed = false
-        Promise.all([
-            db_list_categories(categoryDrawerProjectId),
-            db_get_project_stats(categoryDrawerProjectId),
-        ]).then(([categories, stats]) => {
-            if (disposed) return
-            setCategoryDrawerCategories(categories)
-            setCategoryDrawerStats(stats)
-        }).catch(error => {
-            if (disposed) return
-            logger.error('加载移动端分类抽屉失败', error)
-        })
-        return () => {
-            disposed = true
-        }
-    }, [categoryDrawerProjectId])
-
     const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeBack'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
@@ -231,14 +204,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [ideaDrawerEnabled, openSideDrawer])
 
     const refreshCategoryDrawer = useCallback(async () => {
-        if (!categoryDrawerProjectId) return
-        const [categories, stats] = await Promise.all([
-            db_list_categories(categoryDrawerProjectId),
-            db_get_project_stats(categoryDrawerProjectId),
-        ])
-        setCategoryDrawerCategories(categories)
-        setCategoryDrawerStats(stats)
-    }, [categoryDrawerProjectId])
+        await categoryDrawerContext.refresh()
+    }, [categoryDrawerContext])
 
     const handleSelectDrawerCategory = useCallback((selection: MobileCategoryDrawerSelection, label: string) => {
         if (!categoryDrawerProjectId) return
@@ -359,8 +326,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         {categoryDrawerEnabled ? (
                             <MobileCategoryDrawer
                                 projectId={categoryDrawerProjectId!}
-                                categories={categoryDrawerCategories}
-                                stats={categoryDrawerStats}
+                                categories={categoryDrawerContext.categories}
+                                stats={categoryDrawerContext.stats}
                                 selected={categoryDrawerSelection}
                                 onSelect={handleSelectDrawerCategory}
                                 onChanged={refreshCategoryDrawer}

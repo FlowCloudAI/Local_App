@@ -8,15 +8,11 @@ import {
     db_delete_project,
     db_export_project_fcworld,
     db_get_project,
-    db_get_project_stats,
     db_list_all_entry_types,
-    db_list_categories,
     db_list_tag_schemas,
     db_update_project,
-    type Category,
     type EntryTypeView,
     type Project,
-    type ProjectStats,
     type TagSchema,
 } from '../../../api'
 import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
@@ -30,6 +26,7 @@ import {
     MobileTopActionPill,
 } from '../components/MobileTopControls'
 import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
+import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
@@ -159,10 +156,8 @@ export default function MobileProjectHome({
     const {showAlert} = useAlert()
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
     const [project, setProject] = useState<Project | null>(null)
-    const [categories, setCategories] = useState<Category[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
-    const [stats, setStats] = useState<ProjectStats | null>(null)
     const [loading, setLoading] = useState(true)
     const [menuOpen, setMenuOpen] = useState(false)
     const [renameOpen, setRenameOpen] = useState(false)
@@ -172,20 +167,19 @@ export default function MobileProjectHome({
     const [descriptionDraft, setDescriptionDraft] = useState('')
     const [descriptionSaving, setDescriptionSaving] = useState(false)
     const [exporting, setExporting] = useState(false)
+    const projectContext = useProjectContextStore(projectId)
+    const categories = projectContext.categories
+    const stats = projectContext.stats
 
     useEffect(() => {
         if (!projectId) return
         setLoading(true)
         Promise.all([
             db_get_project(projectId),
-            db_list_categories(projectId),
-            db_get_project_stats(projectId),
             db_list_all_entry_types(projectId),
             db_list_tag_schemas(projectId),
-        ]).then(([p, cats, s, types, tags]) => {
+        ]).then(([p, types, tags]) => {
             setProject(p)
-            setCategories(cats)
-            setStats(s)
             setEntryTypes(types)
             setTagSchemas(tags)
         }).catch(logger.error).finally(() => setLoading(false))
@@ -198,6 +192,7 @@ export default function MobileProjectHome({
                 categoryId,
                 title: '未命名词条',
             })
+            void invalidateProjectContext(projectId)
             setAiFocus({projectId, entryId: created.id})
             push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit'}})
         } catch (e) {
@@ -303,7 +298,7 @@ export default function MobileProjectHome({
         }
     }, [project, projectId, pop, showAlert])
 
-    if (loading) return <div className="mobile-page__loading">加载中…</div>
+    if (loading || (projectContext.loading && !projectContext.hasLoaded)) return <div className="mobile-page__loading">加载中…</div>
     if (!project) return <div className="mobile-page__error">项目不存在</div>
 
     const image = toProjectImageSrc(project.cover_path)
