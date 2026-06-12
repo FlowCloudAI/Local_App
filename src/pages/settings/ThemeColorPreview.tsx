@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties} from 'react'
 import {Button} from 'flowcloudai-ui'
-import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {saveFileDialog} from '../../api/dialog'
 import {setting_export_theme_config, type ThemeColorConfig} from '../../api'
 import {logger} from '../../shared/logger'
 import {

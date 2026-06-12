@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {open as openFileDialog, save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {

@@ -15,7 +15,7 @@ import {
     useAlert,
     useTheme
 } from 'flowcloudai-ui'
-import {open} from '@tauri-apps/plugin-dialog'
+import {openFileDialog} from '../api/dialog'
 import {appConfigDir} from '@tauri-apps/api/path'
 import {listen} from '../api/events'
 import AboutSection from '../features/about/AboutSection'
@@ -687,7 +687,7 @@ export default function Settings({
 
     // 选择媒体目录
     const handleSelectMediaDir = async () => {
-        const selected = await open({
+        const selected = await openFileDialog({
             directory: true,
             multiple: false,
             title: '选择媒体文件根目录'
@@ -702,7 +702,7 @@ export default function Settings({
 
     // 选择数据库目录
     const handleSelectDbPath = async () => {
-        const selected = await open({
+        const selected = await openFileDialog({
             directory: true,
             multiple: false,
             title: '选择数据库存储目录'
@@ -717,7 +717,7 @@ export default function Settings({
 
     // 选择插件目录
     const handleSelectPluginsPath = async () => {
-        const selected = await open({
+        const selected = await openFileDialog({
             directory: true,
             multiple: false,
             title: '选择插件存储目录'
@@ -732,7 +732,7 @@ export default function Settings({
 
     // 选择 CSV 自动备份目录
     const handleSelectBackupDir = async () => {
-        const selected = await open({
+        const selected = await openFileDialog({
             directory: true,
             multiple: false,
             title: '选择 CSV 自动备份目录'
@@ -892,7 +892,7 @@ export default function Settings({
     }
 
     const handleInstallFromFile = async () => {
-        const selected = await open({
+        const selected = await openFileDialog({
             multiple: false,
             directory: false,
             title: '选择本地插件包',

@@ -1,4 +1,4 @@
-import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {openFileDialog} from '../../../api/dialog'
 import {createPortal} from 'react-dom'
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'

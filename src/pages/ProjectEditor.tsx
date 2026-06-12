@@ -10,7 +10,7 @@ import {
     useAlert
 } from 'flowcloudai-ui'
 import {listen} from '../api/events'
-import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {saveFileDialog} from '../api/dialog'
 import {
     ai_list_contradiction_reports,
     type Category,

@@ -10,7 +10,7 @@ import {
 } from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '@tauri-apps/api/core'
-import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {openFileDialog} from '../../../api/dialog'
 import {
     db_count_entries,
     db_get_entry,

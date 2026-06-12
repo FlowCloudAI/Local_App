@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {listen} from '../../../api/events'
-import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {openFileDialog} from '../../../api/dialog'
 import {openUrl} from '@tauri-apps/plugin-opener'
 import {
     type CSSProperties,

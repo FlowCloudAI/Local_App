@@ -22,7 +22,7 @@ import {
     type RemotePluginInfo,
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
-import {open} from '@tauri-apps/plugin-dialog'
+import {openFileDialog} from '../../../api/dialog'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import './MobileSettings.css'
 
@@ -422,7 +422,7 @@ export default function MobileSettings({push, page}: Props) {
     }, [selectedPlugin, showAlert])
 
     const handleInstallFromFile = useCallback(async () => {
-        const selected = await open({
+        const selected = await openFileDialog({
             multiple: false,
             directory: false,
             title: '选择本地插件包',

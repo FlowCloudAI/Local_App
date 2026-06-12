@@ -1,5 +1,5 @@
 import {logger} from '../../../shared/logger'
-import {open as openFileDialog} from '@tauri-apps/plugin-dialog'
+import {openFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {commands, type ICommand} from '@uiw/react-md-editor'

@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {open as openDialog} from '@tauri-apps/plugin-dialog'
+import {openFileDialog as openDialog} from '../../api/dialog'
 import {Button, Input, useAlert} from 'flowcloudai-ui'
 import {plugin_market_upload} from '../../api'
 import './UploadPlugin.css'

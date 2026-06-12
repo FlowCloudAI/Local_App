@@ -8,7 +8,7 @@ import {
     useState,
 } from 'react'
 import {createPortal} from 'react-dom'
-import {save as saveFileDialog} from '@tauri-apps/plugin-dialog'
+import {saveFileDialog} from '../../../api/dialog'
 import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
