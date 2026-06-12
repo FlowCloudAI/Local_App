@@ -219,7 +219,7 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                 </div>
             ) : (
                 <div className="mobile-entry-list__grid">
-                    {entries
+                    {[...entries]
                         .sort((a, b) => {
                             const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
                             const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
