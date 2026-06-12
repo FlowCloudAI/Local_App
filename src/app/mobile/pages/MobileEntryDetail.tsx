@@ -56,7 +56,6 @@ import {
 } from '../components/MobileTopControls'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
-    buildTagValueMap,
     findCategoryDuplicatedEntry,
     normalizeEntryLookupTitle,
     replaceRange,
@@ -86,7 +85,7 @@ import {
     hasInvalidRelationDraft,
 } from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
-import {buildEntryTagsPayload, type EntryTagRuntimeValue} from '../../../features/entries/components/entryTagUtils'
+import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
 import EntryRelationCreator, {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
@@ -99,6 +98,15 @@ import {transformMarkdownContent} from './MobileEntryMarkdownTransforms'
 import {
     MobileMarkdownToolIcon,
 } from './MobileEntryMarkdownTools'
+import {
+    appendImages,
+    areImagesEqual,
+    buildExcerpt,
+    buildTagDraft,
+    escapeMarkdownImageAlt,
+    getImageLabel,
+    type TagValueMap,
+} from './MobileEntryDetailUtils'
 import './MobileEntryDetail.css'
 
 interface Props {
@@ -112,68 +120,10 @@ interface Props {
 }
 
 type Mode = 'view' | 'edit'
-type TagValueMap = Record<string, EntryTagRuntimeValue>
 type MobileWikiDraft = { start: number; end: number; query: string }
 type MobileWikiOption =
     | { kind: 'entry'; id: string; title: string; categoryId: string | null }
     | { kind: 'create'; title: string }
-
-/** 保留 schema 标签和桌面端使用的额外标签（如角色语音配置），避免移动端保存时丢字段。 */
-function buildTagDraft(e: Entry): TagValueMap {
-    return buildTagValueMap(e)
-}
-
-function areImagesEqual(left: EntryImage[], right: EntryImage[]): boolean {
-    if (left.length !== right.length) return false
-    return left.every((image, index) => {
-        const target = right[index]
-        return image.path === target.path
-            && image.url === target.url
-            && image.alt === target.alt
-            && image.caption === target.caption
-            && Boolean(image.is_cover) === Boolean(target.is_cover)
-    })
-}
-
-function escapeMarkdownImageAlt(value: string): string {
-    return value.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function getImageLabel(image: EntryImage, index: number): string {
-    if (image.alt) return image.alt
-    if (image.caption) return image.caption
-    const raw = image.path ?? image.url ?? ''
-    const fileName = String(raw).split(/[\\/]/).pop()
-    return fileName || `图片 ${index + 1}`
-}
-
-function appendImages(current: EntryImage[], incoming: EntryImage[]): EntryImage[] {
-    const nextImages = [...current]
-    incoming.forEach((image, index) => {
-        nextImages.push({
-            ...image,
-            is_cover: nextImages.length === 0 && index === 0,
-        })
-    })
-    return nextImages
-}
-
-function stripMarkdown(value: string): string {
-    return value
-        .replace(/```[\s\S]*?```/g, ' ')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/!\[[^\]]*]\([^)]+\)/g, ' ')
-        .replace(/\[([^\]]+)]\([^)]+\)/g, '$1')
-        .replace(/[#>*_~-]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-}
-
-function buildExcerpt(value?: string | null, maxLength = 64): string {
-    const normalized = stripMarkdown(value ?? '')
-    if (!normalized) return ''
-    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}…` : normalized
-}
 
 /**
  * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
@@ -284,7 +234,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         || summary !== (entry.summary ?? '')
         || entryType !== (entry.type ?? null)
         || categoryId !== (entry.category_id ?? null)
-        || !areTagMapsEqual(tagDraft, buildTagValueMap(entry), tagSchemas)
+        || !areTagMapsEqual(tagDraft, buildTagDraft(entry), tagSchemas)
         || !areImagesEqual(images, normalizeEntryImages(entry.images))
         || !areRelationDraftsEqual(relationDrafts, initialRelationDrafts)
     )
