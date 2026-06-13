@@ -41,6 +41,7 @@ use apis::feedback::*;
 use apis::layout::*;
 use apis::map::*;
 use apis::map_persistence::*;
+use apis::ocr::*;
 use apis::plugins::local::*;
 use apis::plugins::market::*;
 use apis::plugins::remote::*;
@@ -574,6 +575,7 @@ pub fn run() {
             map_save_map_entry,
             map_delete_map_entry,
             compute_layout,
+            ocr_recognize_image,
             // 快照
             db_snapshot,
             db_snapshot_with_message,

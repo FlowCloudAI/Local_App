@@ -9,6 +9,7 @@ pub mod feedback;
 pub mod layout;
 pub mod map;
 pub mod map_persistence;
+pub mod ocr;
 pub mod plugins;
 pub mod templates;
 pub mod webview_control;
