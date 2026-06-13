@@ -851,11 +851,7 @@ export default function MobileAiChat({
     ] : []
 
     const conversationControls = (
-        <div className="mobile-ai-settings-card" aria-label="对话属性设置">
-            <div className="mobile-ai-settings-card__title">
-                <span>对话属性</span>
-                {activeConversation?.archivedAt ? <small>已归档</small> : null}
-            </div>
+        <div className="mobile-ai-settings-card" aria-label="对话设置">
             <div className="mobile-ai-settings-grid">
                 <label className="mobile-ai-setting-field">
                     <span>温度</span>
@@ -1382,22 +1378,16 @@ export default function MobileAiChat({
                         <MobileAiIcon type="file"/>
                         <span>文件</span>
                     </button>
-                </div>
-                <button
-                    type="button"
-                    className={`mobile-ai-more-switch${webSearchEnabled ? ' active' : ''}`}
-                    aria-pressed={webSearchEnabled}
-                    onClick={() => void toggleWebSearch()}
-                >
-                    <span className="mobile-ai-more-switch__main">
+                    <button
+                        type="button"
+                        className={webSearchEnabled ? 'active' : ''}
+                        aria-pressed={webSearchEnabled}
+                        onClick={() => void toggleWebSearch()}
+                    >
                         <MobileAiIcon type="web"/>
-                        <span>
-                            <strong>联网搜索</strong>
-                            <small>允许 AI 调用联网搜索工具</small>
-                        </span>
-                    </span>
-                    <span className="mobile-ai-more-switch__toggle" aria-hidden="true"/>
-                </button>
+                        <span>联网搜索</span>
+                    </button>
+                </div>
                 {conversationControls}
             </MobileBottomSheet>
 

@@ -666,34 +666,16 @@
     gap: 0.8rem;
 }
 
-.mobile-ai-settings-card__title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.mobile-ai-settings-card__title span {
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: 720;
-}
-
-.mobile-ai-settings-card__title small {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-}
-
 .mobile-ai-more-sheet__quick {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.6rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem;
     margin-bottom: 0.75rem;
 }
 
 .mobile-ai-more-sheet__quick button {
     display: flex;
-    min-height: 4.45rem;
+    min-height: 4.1rem;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -714,87 +696,6 @@
     border-color: color-mix(in srgb, var(--fc-color-primary) 32%, transparent);
     background: color-mix(in srgb, var(--fc-color-primary) 10%, var(--fc-color-bg-elevated));
     color: var(--fc-color-primary);
-}
-
-.mobile-ai-more-switch {
-    display: flex;
-    width: 100%;
-    min-height: 3.8rem;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
-    padding: 0.7rem 0.85rem;
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-card);
-    background: var(--mobile-surface-translucent);
-    color: var(--fc-color-text);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-    touch-action: manipulation;
-}
-
-.mobile-ai-more-switch__main {
-    display: inline-flex;
-    min-width: 0;
-    align-items: center;
-    gap: 0.7rem;
-}
-
-.mobile-ai-more-switch__main > span {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 0.12rem;
-}
-
-.mobile-ai-more-switch strong {
-    font-size: var(--fc-font-size-sm);
-    font-weight: 700;
-    line-height: 1.18;
-}
-
-.mobile-ai-more-switch small {
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.18;
-}
-
-.mobile-ai-more-switch__toggle {
-    position: relative;
-    width: 2.7rem;
-    height: 1.55rem;
-    flex: 0 0 auto;
-    border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-text-secondary) 28%, transparent);
-    transition: background-color 100ms ease;
-}
-
-.mobile-ai-more-switch__toggle::after {
-    position: absolute;
-    top: 0.17rem;
-    left: 0.18rem;
-    width: 1.2rem;
-    height: 1.2rem;
-    border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
-    box-shadow: var(--fc-shadow-xs);
-    content: "";
-    transition: transform 100ms ease;
-}
-
-.mobile-ai-more-switch.active {
-    border-color: color-mix(in srgb, var(--fc-color-primary) 32%, transparent);
-    color: var(--fc-color-primary);
-}
-
-.mobile-ai-more-switch.active .mobile-ai-more-switch__toggle {
-    background: var(--fc-color-primary);
-}
-
-.mobile-ai-more-switch.active .mobile-ai-more-switch__toggle::after {
-    transform: translateX(1.14rem);
 }
 
 .mobile-ai-settings-grid {
@@ -844,10 +745,7 @@
     min-width: 0;
     flex-direction: column;
     gap: 0.42rem;
-    padding: 0.52rem;
-    border: var(--mobile-border);
-    border-radius: var(--mobile-radius-field);
-    background: var(--mobile-surface-translucent);
+    padding: 0;
 }
 
 .mobile-ai-setting-penalty-field > span {
@@ -885,7 +783,7 @@
 }
 
 .mobile-ai-setting-prompt textarea {
-    min-height: 4.7rem;
+    min-height: 7rem;
     padding: 0.68rem 0.75rem;
     line-height: 1.45;
     resize: vertical;
