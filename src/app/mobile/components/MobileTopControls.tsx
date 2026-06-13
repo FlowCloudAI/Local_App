@@ -125,6 +125,7 @@ export interface MobileAnchoredMenuProps {
     children: ReactNode
     className?: string
     align?: 'left' | 'right'
+    placement?: 'bottom' | 'top'
     rightBoundaryRef?: RefObject<HTMLElement | null>
     rightBoundaryGap?: number
 }
@@ -138,10 +139,11 @@ export function MobileAnchoredMenu({
     children,
     className,
     align = 'right',
+    placement = 'bottom',
     rightBoundaryRef,
     rightBoundaryGap = 0,
 }: MobileAnchoredMenuProps) {
-    const [anchor, setAnchor] = useState<{top: number; left: number; right: number; rightBoundary: number | null} | null>(null)
+    const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; rightBoundary: number | null} | null>(null)
     const [rendered, setRendered] = useState(open)
     const [closing, setClosing] = useState(false)
 
@@ -154,6 +156,7 @@ export function MobileAnchoredMenu({
         const boundaryRect = rightBoundaryRef?.current?.getBoundingClientRect()
         setAnchor({
             top: Math.max(0, anchorRect.top - containerRect.top),
+            bottom: Math.max(0, containerRect.bottom - anchorRect.bottom),
             left: Math.max(0, anchorRect.left - containerRect.left),
             right: Math.max(0, containerRect.right - anchorRect.right),
             rightBoundary: boundaryRect
@@ -204,11 +207,12 @@ export function MobileAnchoredMenu({
             }}
         >
             <div
-                className={`mobile-anchored-menu mobile-anchored-menu--${align}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
+                className={`mobile-anchored-menu mobile-anchored-menu--${align} mobile-anchored-menu--placement-${placement}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
                 role="menu"
                 aria-label={ariaLabel}
                 style={anchor ? {
                     '--mobile-anchored-menu-top': `${anchor.top}px`,
+                    '--mobile-anchored-menu-bottom': `${anchor.bottom}px`,
                     '--mobile-anchored-menu-left': `${anchor.left}px`,
                     '--mobile-anchored-menu-right': `${anchor.right}px`,
                     ...(anchor.rightBoundary != null

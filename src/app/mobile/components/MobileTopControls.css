@@ -9,12 +9,12 @@
     --mobile-page-topbar-body: 3rem;
     --mobile-page-topbar-bg-stop-1: 0%;
     --mobile-page-topbar-bg-visible-1: 100%;
-    --mobile-page-topbar-bg-stop-2: 25%;
-    --mobile-page-topbar-bg-visible-2: 95%;
-    --mobile-page-topbar-bg-stop-3: 60%;
-    --mobile-page-topbar-bg-visible-3: 70%;
-    --mobile-page-topbar-bg-stop-4: 80%;
-    --mobile-page-topbar-bg-visible-4: 40%;
+    --mobile-page-topbar-bg-stop-2: 30%;
+    --mobile-page-topbar-bg-visible-2: 90%;
+    --mobile-page-topbar-bg-stop-3: 70%;
+    --mobile-page-topbar-bg-visible-3: 80%;
+    --mobile-page-topbar-bg-stop-4: 85%;
+    --mobile-page-topbar-bg-visible-4: 60%;
     --mobile-page-topbar-bg-stop-5: 100%;
     --mobile-page-topbar-bg-visible-5: 0%;
 
@@ -46,7 +46,7 @@
 .mobile-page-topbar--edge-to-edge {
     margin-right: calc(var(--mobile-page-topbar-x) * -1);
     margin-left: calc(var(--mobile-page-topbar-x) * -1);
-    padding: 0 var(--mobile-page-topbar-x) 0.55rem;
+    padding: 0 var(--mobile-page-topbar-x) 1rem;
 }
 
 .mobile-page-topbar__side,
@@ -183,6 +183,7 @@
 
 .mobile-anchored-menu {
     --mobile-anchored-menu-top: 2.25rem;
+    --mobile-anchored-menu-bottom: 1rem;
     --mobile-anchored-menu-right: 1rem;
     --mobile-anchored-menu-left: 1rem;
 
@@ -214,6 +215,22 @@
     left: var(--mobile-anchored-menu-left);
     max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
     transform-origin: top left;
+}
+
+.mobile-anchored-menu--placement-top {
+    top: auto;
+    bottom: var(--mobile-anchored-menu-bottom);
+    max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-bottom) - 1rem));
+    transform-origin: bottom right;
+    animation-name: mobile-anchored-menu-enter-up;
+}
+
+.mobile-anchored-menu--placement-top.mobile-anchored-menu--left {
+    transform-origin: bottom left;
+}
+
+.mobile-anchored-menu--placement-top.mobile-anchored-menu--closing {
+    animation-name: mobile-anchored-menu-exit-up;
 }
 
 .mobile-anchored-menu::-webkit-scrollbar {
@@ -314,6 +331,30 @@
     to {
         opacity: 0;
         transform: scale(0.97) translateY(-0.18rem);
+    }
+}
+
+@keyframes mobile-anchored-menu-enter-up {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(0.25rem);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes mobile-anchored-menu-exit-up {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(0.97) translateY(0.18rem);
     }
 }
 
