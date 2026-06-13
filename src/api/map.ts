@@ -25,6 +25,8 @@ export interface CoastlineV2ParamsPayload {
     bandBWeight?: number
     bandCWeight?: number
     amplitudeScale?: number
+    /** 结构层（宏观+中尺度）相对草稿的最大偏离（px，软封顶）。越小越贴合草稿。 */
+    maxDeviation?: number
     spectralBeta?: number
     cornerRoundingPx?: number
     concaveCornerFactor?: number

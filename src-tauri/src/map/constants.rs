@@ -243,6 +243,16 @@ pub const COASTLINE_V2_BAND_C_WEIGHT: f64 = 1.0;
 /// v2 全带振幅整体缩放（前端"尺度系数"滑杆，默认 1）。
 pub const COASTLINE_V2_AMPLITUDE_SCALE: f64 = 1.0;
 
+/// v2 结构层（宏观 A + 中尺度 B）相对草稿的最大偏离（px，软封顶，非硬截断）。
+/// 控制"整体轮廓离用户草稿多远"——只压低频结构偏离，细节层 C 不受此限，
+/// 故封顶区仍有起伏、不出平直边。调小：结果更贴草稿；调大：轮廓更自由狂野。
+/// （此为绝对像素，未来可由"比例尺"驱动：比例尺越大此值越小。）
+pub const COASTLINE_V2_MAX_DEVIATION: f64 = 50.0;
+
+/// v2 结构层偏离相对局部特征尺寸（肢体宽度）的上限比例，与绝对 D_max 取小。
+/// 让中等宽度肢体的偏离也按比例收敛，避免 D_max 在窄处仍显过大。
+pub const COASTLINE_V2_STRUCTURAL_FEATURE_RATIO: f64 = 0.3;
+
 /// v2 三带合计振幅相对画布短边的上限（最后一道护栏，纯防失控，不参与审美）。
 pub const COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX: f64 = 0.12;
 

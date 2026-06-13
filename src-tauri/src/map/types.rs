@@ -172,6 +172,8 @@ pub struct CoastlineV2Params {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amplitude_scale: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_deviation: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spectral_beta: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corner_rounding_px: Option<f64>,

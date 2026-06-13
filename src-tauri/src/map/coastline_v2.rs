@@ -26,11 +26,11 @@ use crate::map::constants::{
     COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
     COASTLINE_V2_DETAIL_WAVELENGTH_SCALE, COASTLINE_V2_HARMONIC_RANDOM_FLOOR,
-    COASTLINE_V2_MAX_HARMONICS_PER_BAND, COASTLINE_V2_ROUGHNESS_MODULATION_B,
-    COASTLINE_V2_ROUGHNESS_MODULATION_C,
+    COASTLINE_V2_MAX_DEVIATION, COASTLINE_V2_MAX_HARMONICS_PER_BAND,
+    COASTLINE_V2_ROUGHNESS_MODULATION_B, COASTLINE_V2_ROUGHNESS_MODULATION_C,
     COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
     COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
-    COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
+    COASTLINE_V2_STRUCTURAL_FEATURE_RATIO, COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
     COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX, GEOMETRY_EPSILON, HASH_TEXT_OFFSET_BASIS,
     HASH_TEXT_PRIME, HASH_UNIT_INCREMENT, HASH_UNIT_MULTIPLIER, TAU,
 };
@@ -206,6 +206,7 @@ fn naturalize_arc_length(
     );
     let corner_windows =
         build_corner_windows(vertices, &cumulative, step, rounding_radius, params);
+    let max_deviation = param!(params, max_deviation, COASTLINE_V2_MAX_DEVIATION).max(0.0);
     let outward_sign = if signed_area(vertices) >= 0.0 {
         -1.0
     } else {
@@ -237,13 +238,26 @@ fn naturalize_arc_length(
                 base_y,
                 step,
             );
-            let mut requested_offset = 0.0;
+            // 结构层（宏观 A + 中尺度 B）与细节层（C）分离：
+            // 只对结构层合计软封顶到 D_max（叠加导致的偏离过远在此被压回），
+            // 细节层始终全振幅叠加 → 封顶区仍有细碎起伏，不出平直边。
+            let mut structural = 0.0;
+            let mut detail = 0.0;
             for band in &noise_bands {
                 let local_amplitude = band.amplitude.min(band.feature_ratio * feature_size);
-                requested_offset += local_amplitude * band.values[index];
+                let contribution = local_amplitude * band.values[index];
+                if band.is_structural {
+                    structural += contribution;
+                } else {
+                    detail += contribution;
+                }
             }
-            requested_offset *= attenuation;
+            let deviation_cap =
+                max_deviation.min(COASTLINE_V2_STRUCTURAL_FEATURE_RATIO * feature_size);
+            let structural = soft_limit_offset(structural, deviation_cap);
+            let requested_offset = (structural + detail) * attenuation;
 
+            // 末端安全限幅：防自交（特征尺寸）/ 关键点出界，与贴合度的 D_max 各司其职。
             let mut max_offset = amplitude;
             if feature_size.is_finite() {
                 max_offset = max_offset.min(feature_size * COASTLINE_V2_NEAR_EDGE_SAFE_FACTOR);
@@ -441,6 +455,9 @@ struct BandSpec {
     salt: u64,
     /// 粗糙度调制深度：该带振幅沿轮廓被低频包络调制的比例（0 = 不调制）。
     roughness_modulation: f64,
+    /// 是否属于"结构层"（A/B）：结构层合计受 D_max 软封顶以控制贴合度；
+    /// 细节层（C）不受此限，故封顶区仍有起伏、不出平直边。
+    is_structural: bool,
 }
 
 /// 单带计算结果：峰值归一的采样值 + 有效振幅 + 特征尺寸比例。
@@ -449,6 +466,7 @@ struct BandSpec {
 struct BandField {
     amplitude: f64,
     feature_ratio: f64,
+    is_structural: bool,
     values: Vec<f64>,
 }
 
@@ -503,6 +521,7 @@ fn build_noise_bands(
             weight: param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_A,
             roughness_modulation: 0.0,
+            is_structural: true,
         },
         BandSpec {
             // 半相对：跟随图形大小，但被绝对窗口夹住。
@@ -520,6 +539,7 @@ fn build_noise_bands(
             weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_B,
             roughness_modulation: COASTLINE_V2_ROUGHNESS_MODULATION_B,
+            is_structural: true,
         },
         BandSpec {
             // 绝对像素：细节质感不随图形大小变化，长直边与小岛同样粗糙。
@@ -535,6 +555,7 @@ fn build_noise_bands(
             weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_C,
             roughness_modulation: COASTLINE_V2_ROUGHNESS_MODULATION_C,
+            is_structural: false,
         },
     ];
 
@@ -596,6 +617,7 @@ fn build_noise_bands(
         bands.push(BandField {
             amplitude: effective_amplitude,
             feature_ratio: spec.feature_ratio,
+            is_structural: spec.is_structural,
             values: band_values,
         });
         total_amplitude += effective_amplitude;

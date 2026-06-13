@@ -8,7 +8,8 @@
 use app_lib::map::coastline_v2::build_natural_coastline_polygon_v2;
 use app_lib::map::geometry::{find_polygon_self_intersections, is_point_in_polygon};
 use app_lib::map::types::{
-    MapEditorCanvas, MapKeyLocationDraft, MapShapeDraft, MapShapeKind, MapShapeVertex,
+    CoastlineV2Params, MapEditorCanvas, MapKeyLocationDraft, MapShapeDraft, MapShapeKind,
+    MapShapeVertex,
 };
 
 fn vertex(id: &str, x: f64, y: f64) -> MapShapeVertex {
@@ -238,4 +239,64 @@ fn v2_thin_limb_keeps_identity_while_wide_body_stays_bold() {
         square_deviation > thin_deviation + 15.0,
         "宽阔形状应保留更大宏观自由度：square={square_deviation} thin={thin_deviation}"
     );
+}
+
+fn open_continent() -> MapShapeDraft {
+    shape_with_vertices(vec![
+        vertex("c1", 180.0, 120.0),
+        vertex("c2", 760.0, 90.0),
+        vertex("c3", 900.0, 380.0),
+        vertex("c4", 820.0, 700.0),
+        vertex("c5", 420.0, 760.0),
+        vertex("c6", 140.0, 480.0),
+    ])
+}
+
+fn max_deviation_with_cap(shape: &MapShapeDraft, max_deviation: f64) -> f64 {
+    let params = CoastlineV2Params {
+        max_deviation: Some(max_deviation),
+        ..Default::default()
+    };
+    let polygon = build_natural_coastline_polygon_v2(&canvas(), shape, &[], Some(&params));
+    let original = &shape.vertices;
+    polygon
+        .iter()
+        .map(|point| {
+            (0..original.len())
+                .map(|index| {
+                    point_to_segment_distance(
+                        point[0],
+                        point[1],
+                        &original[index],
+                        &original[(index + 1) % original.len()],
+                    )
+                })
+                .fold(f64::INFINITY, f64::min)
+        })
+        .fold(0.0f64, f64::max)
+}
+
+/// 结构层软封顶（压限）：开阔大陆上收紧 D_max 应显著降低最大偏离，
+/// 但点数与连通性不变（细节层不受封顶、不出平直边），且无自交。
+#[test]
+fn v2_structural_cap_trims_deviation_without_breaking_shape() {
+    let shape = open_continent();
+
+    let loose = max_deviation_with_cap(&shape, 1000.0);
+    let tight = max_deviation_with_cap(&shape, 30.0);
+
+    assert!(
+        tight + 15.0 < loose,
+        "压限未能削减偏离：tight={tight} loose={loose}"
+    );
+    // 收紧后整体偏离仍受控在 D_max + 细节余量内（细节层 ~8px + 圆化基线）。
+    assert!(tight < 45.0, "压限后最大偏离仍过大：{tight}");
+
+    let params = CoastlineV2Params {
+        max_deviation: Some(30.0),
+        ..Default::default()
+    };
+    let polygon = build_natural_coastline_polygon_v2(&canvas(), &shape, &[], Some(&params));
+    assert!(polygon.len() > 100, "压限不应坍缩点数：{}", polygon.len());
+    assert!(find_polygon_self_intersections(&to_vertices(&polygon)).is_empty());
 }
