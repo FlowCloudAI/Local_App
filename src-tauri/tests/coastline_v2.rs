@@ -110,7 +110,12 @@ fn directed_hausdorff(from: &[MapShapeVertex], to: &[MapShapeVertex]) -> f64 {
         .map(|point| {
             (0..total)
                 .map(|index| {
-                    point_to_segment_distance(point.x, point.y, &to[index], &to[(index + 1) % total])
+                    point_to_segment_distance(
+                        point.x,
+                        point.y,
+                        &to[index],
+                        &to[(index + 1) % total],
+                    )
                 })
                 .fold(f64::INFINITY, f64::min)
         })
@@ -191,26 +196,6 @@ fn v2_narrow_shape_stays_safe() {
     assert!(find_polygon_self_intersections(&to_vertices(&polygon)).is_empty());
 }
 
-fn max_deviation_from_draft(shape: &MapShapeDraft) -> f64 {
-    let polygon = build_natural_coastline_polygon_v2(&canvas(), shape, &[], None);
-    let original = &shape.vertices;
-    polygon
-        .iter()
-        .map(|point| {
-            (0..original.len())
-                .map(|index| {
-                    point_to_segment_distance(
-                        point[0],
-                        point[1],
-                        &original[index],
-                        &original[(index + 1) % original.len()],
-                    )
-                })
-                .fold(f64::INFINITY, f64::min)
-        })
-        .fold(0.0f64, f64::max)
-}
-
 /// 局部特征尺寸保形：同周长（1760）下，细长条（80px 宽）上宏观带自动熄火、
 /// 偏离受限；宽阔方块腹地允许大湾——证明限幅跟随局部肢体宽度而非全局一刀切。
 #[test]
@@ -228,8 +213,9 @@ fn v2_thin_limb_keeps_identity_while_wide_body_stays_bold() {
         vertex("s4", 100.0, 540.0),
     ]);
 
-    let thin_deviation = max_deviation_from_draft(&thin);
-    let square_deviation = max_deviation_from_draft(&square);
+    // 用大 D_max 隔离全局压限，单独验证"特征尺寸局部限幅"这一机制。
+    let thin_deviation = max_deviation_with_cap(&thin, 1000.0);
+    let square_deviation = max_deviation_with_cap(&square, 1000.0);
 
     assert!(
         thin_deviation < 40.0,
@@ -283,17 +269,17 @@ fn v2_structural_cap_trims_deviation_without_breaking_shape() {
     let shape = open_continent();
 
     let loose = max_deviation_with_cap(&shape, 1000.0);
-    let tight = max_deviation_with_cap(&shape, 30.0);
+    let tight = max_deviation_with_cap(&shape, 15.0);
 
     assert!(
         tight + 15.0 < loose,
         "压限未能削减偏离：tight={tight} loose={loose}"
     );
     // 收紧后整体偏离仍受控在 D_max + 细节余量内（细节层 ~8px + 圆化基线）。
-    assert!(tight < 45.0, "压限后最大偏离仍过大：{tight}");
+    assert!(tight < 30.0, "压限后最大偏离仍过大：{tight}");
 
     let params = CoastlineV2Params {
-        max_deviation: Some(30.0),
+        max_deviation: Some(15.0),
         ..Default::default()
     };
     let polygon = build_natural_coastline_polygon_v2(&canvas(), &shape, &[], Some(&params));

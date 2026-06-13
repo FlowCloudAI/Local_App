@@ -247,7 +247,7 @@ pub const COASTLINE_V2_AMPLITUDE_SCALE: f64 = 1.0;
 /// 控制"整体轮廓离用户草稿多远"——只压低频结构偏离，细节层 C 不受此限，
 /// 故封顶区仍有起伏、不出平直边。调小：结果更贴草稿；调大：轮廓更自由狂野。
 /// （此为绝对像素，未来可由"比例尺"驱动：比例尺越大此值越小。）
-pub const COASTLINE_V2_MAX_DEVIATION: f64 = 50.0;
+pub const COASTLINE_V2_MAX_DEVIATION: f64 = 35.0;
 
 /// v2 结构层偏离相对局部特征尺寸（肢体宽度）的上限比例，与绝对 D_max 取小。
 /// 让中等宽度肢体的偏离也按比例收敛，避免 D_max 在窄处仍显过大。
@@ -317,7 +317,6 @@ pub const SHAPE_LINE_PALETTE: [DeckColor; 4] = [
 /// 未命中类型映射时的关键地点默认颜色。
 /// 修改：改变默认地点标记的颜色，需与前端设计规范保持一致。
 pub const DEFAULT_LOCATION_COLOR: DeckColor = [212, 48, 106, 255];
-
 
 /// 因为Claude额度耗尽，如下变量的存在只为通过编译
 pub const COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX: f64 = 0.0;
