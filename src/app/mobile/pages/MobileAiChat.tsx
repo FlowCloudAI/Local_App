@@ -32,6 +32,7 @@ import {
     MobileAnchoredMenu,
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
+    MobilePageTopBar,
     MobileTopActionPill,
     MobileTopIconButton,
 } from '../components/MobileTopControls'
@@ -1042,31 +1043,31 @@ export default function MobileAiChat({
     return (
         <div ref={pageRef} className="mobile-ai-chat">
             {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
-            <header className="mobile-ai-chat__topbar">
-                <div className="mobile-ai-chat__left-actions">
-                    <MobileTopIconButton
-                        type="button"
-                        icon={<MobileAiIcon type="menu"/>}
-                        aria-label="打开对话列表"
-                        aria-expanded={conversationDrawerOpen}
-                        onClick={onOpenConversationDrawer}
-                    />
-                    <button
-                        ref={modelMenuRef}
-                        type="button"
-                        className={`mobile-ai-model-pill${modelMenuOpen ? ' mobile-ai-model-pill--expanded' : ''}`}
-                        aria-haspopup="menu"
-                        aria-expanded={modelMenuOpen}
-                        disabled={pluginsLoading}
-                        onClick={handleToggleModelMenu}
-                    >
-                        <span>{pluginsLoading ? '加载模型中' : activeModelLabel}</span>
-                        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                            <path d={modelMenuOpen ? 'M2.5 7.5 6 4l3.5 3.5' : 'M2.5 4.5 6 8l3.5-3.5'}/>
-                        </svg>
-                    </button>
-                </div>
-                <MobileTopActionPill
+            <MobilePageTopBar
+                className="mobile-ai-chat__topbar"
+                ariaLabel="AI 对话操作"
+                left={<MobileTopIconButton
+                    type="button"
+                    icon={<MobileAiIcon type="menu"/>}
+                    aria-label="打开对话列表"
+                    aria-expanded={conversationDrawerOpen}
+                    onClick={onOpenConversationDrawer}
+                />}
+                center={<button
+                    ref={modelMenuRef}
+                    type="button"
+                    className={`mobile-ai-model-pill${modelMenuOpen ? ' mobile-ai-model-pill--expanded' : ''}`}
+                    aria-haspopup="menu"
+                    aria-expanded={modelMenuOpen}
+                    disabled={pluginsLoading}
+                    onClick={handleToggleModelMenu}
+                >
+                    <span>{pluginsLoading ? '加载模型中' : activeModelLabel}</span>
+                    <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                        <path d={modelMenuOpen ? 'M2.5 7.5 6 4l3.5 3.5' : 'M2.5 4.5 6 8l3.5-3.5'}/>
+                    </svg>
+                </button>}
+                right={<MobileTopActionPill
                     ref={topActionsRef}
                     actions={[
                         {
@@ -1092,8 +1093,8 @@ export default function MobileAiChat({
                             },
                         },
                     ]}
-                />
-            </header>
+                />}
+            />
 
             <main className="mobile-ai-chat__messages">
                 {messages.length === 0 && !isStreaming && (
