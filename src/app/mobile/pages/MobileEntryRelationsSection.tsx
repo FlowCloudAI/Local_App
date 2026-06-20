@@ -22,18 +22,21 @@ export function MobileEntryRelationsSection({
 }: MobileEntryRelationsSectionProps) {
     return (
         <section className="mobile-entry-detail__relations mobile-entry-detail__form-section">
-            <div className="mobile-entry-detail__relations-header">
-                <div className="mobile-entry-detail__relations-label">关系</div>
-            </div>
-            <EntryRelationCreator
-                drafts={relationDrafts}
-                entries={entries}
-                categories={categories}
-                currentEntryId={currentEntryId}
-                disabled={disabled}
-                onChange={onChange}
-                onOpenEntry={onOpenEntry}
-            />
+            <details className="mobile-entry-detail__relations-disclosure">
+                <summary className="mobile-entry-detail__relations-summary">
+                    <span className="mobile-entry-detail__relations-label">关系</span>
+                    <span className="mobile-entry-detail__relations-count">{relationDrafts.length}</span>
+                </summary>
+                <EntryRelationCreator
+                    drafts={relationDrafts}
+                    entries={entries}
+                    categories={categories}
+                    currentEntryId={currentEntryId}
+                    disabled={disabled}
+                    onChange={onChange}
+                    onOpenEntry={onOpenEntry}
+                />
+            </details>
         </section>
     )
 }

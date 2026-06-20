@@ -31,8 +31,8 @@ function transformInlineMarkdown(
 ): MarkdownTransformResult {
     const selected = value.slice(start, end) || placeholder
     const nextValue = `${before}${selected}${after}`
-    const selectionStart = start + before.length
-    return replaceSelection(value, start, end, nextValue, selectionStart, selectionStart + selected.length)
+    const cursor = start + nextValue.length
+    return replaceSelection(value, start, end, nextValue, cursor)
 }
 
 function transformMarkdownLines(
@@ -46,7 +46,8 @@ function transformMarkdownLines(
     const lineEnd = nextLineBreak === -1 ? value.length : nextLineBreak
     const target = value.slice(lineStart, lineEnd)
     const mapped = target.split('\n').map(lineMapper).join('\n')
-    return replaceSelection(value, lineStart, lineEnd, mapped, lineStart, lineStart + mapped.length)
+    const cursor = lineStart + mapped.length
+    return replaceSelection(value, lineStart, lineEnd, mapped, cursor)
 }
 
 export function transformMarkdownContent(

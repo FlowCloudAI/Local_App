@@ -132,6 +132,12 @@ export function MobileEntryDetailView({
                 {entry.title}
             </h1>
 
+            {entry.summary && (
+                <p className="mobile-entry-detail__summary">
+                    {entry.summary}
+                </p>
+            )}
+
             {entryType && (
                 <div className="mobile-entry-detail__type">
                     <span className="mobile-entry-detail__type-badge" style={typeBadgeStyle}>
@@ -153,12 +159,6 @@ export function MobileEntryDetailView({
                 </div>
             )}
 
-            {entry.summary && (
-                <p className="mobile-entry-detail__summary">
-                    {entry.summary}
-                </p>
-            )}
-
             {viewImages.length > 0 && (
                 <div className="mobile-entry-detail__images mobile-entry-detail__images--view">
                     <div className="mobile-entry-detail__image-grid">
@@ -176,6 +176,20 @@ export function MobileEntryDetailView({
                             )
                         })}
                     </div>
+                </div>
+            )}
+
+            {entry.content ? (
+                <div className="mobile-entry-detail__markdown" data-color-mode={colorMode} onClick={onMarkdownClick}>
+                    <MarkdownPreview
+                        source={viewMarkdownSource}
+                        className="mobile-entry-detail__markdown-preview"
+                        wrapperElement={{'data-color-mode': colorMode}}
+                    />
+                </div>
+            ) : (
+                <div className="mobile-page__empty mobile-entry-detail__empty">
+                    暂无正文内容
                 </div>
             )}
 
@@ -266,20 +280,6 @@ export function MobileEntryDetailView({
                             })}
                         </div>
                     )}
-                </div>
-            )}
-
-            {entry.content ? (
-                <div className="mobile-entry-detail__markdown" data-color-mode={colorMode} onClick={onMarkdownClick}>
-                    <MarkdownPreview
-                        source={viewMarkdownSource}
-                        className="mobile-entry-detail__markdown-preview"
-                        wrapperElement={{'data-color-mode': colorMode}}
-                    />
-                </div>
-            ) : (
-                <div className="mobile-page__empty mobile-entry-detail__empty">
-                    暂无正文内容
                 </div>
             )}
 

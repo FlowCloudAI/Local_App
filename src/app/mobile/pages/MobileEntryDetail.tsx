@@ -856,6 +856,14 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                         className="mobile-entry-detail__title-input"
                     />
 
+                    <textarea
+                        placeholder="摘要（可选）"
+                        value={summary}
+                        onChange={event => setSummary(event.target.value)}
+                        className="mobile-entry-detail__summary-input"
+                        rows={3}
+                    />
+
                     <div className="mobile-entry-detail__meta-row">
                         <label className="mobile-entry-detail__field">
                             <span>类型</span>
@@ -886,13 +894,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                     >
                         + 新建类型
                     </button>
-
-                    <Input
-                        placeholder="摘要（可选）"
-                        value={summary}
-                        onValueChange={setSummary}
-                        className="mobile-entry-detail__summary-input"
-                    />
                 </section>
 
                 <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
