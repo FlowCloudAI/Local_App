@@ -734,8 +734,7 @@
     background: transparent !important;
 }
 
-.mobile-entry-detail__content-input .w-md-editor-text-pre,
-.mobile-entry-detail__content-input .w-md-editor-text-input {
+.mobile-entry-detail__content-input .w-md-editor-text {
     min-height: 15rem !important;
     padding: 0.9rem !important;
     color: var(--fc-color-text) !important;
@@ -747,6 +746,17 @@
     white-space: pre-wrap !important;
     overflow-wrap: break-word;
     word-break: normal;
+}
+
+.mobile-entry-detail__content-input .w-md-editor-text-pre,
+.mobile-entry-detail__content-input .w-md-editor-text-input {
+    color: inherit !important;
+    font: inherit !important;
+    letter-spacing: 0 !important;
+    tab-size: 4;
+    white-space: inherit !important;
+    overflow-wrap: inherit;
+    word-break: inherit;
 }
 
 .mobile-entry-detail__content-input .w-md-editor-text-pre code {
@@ -813,8 +823,7 @@
     min-height: 0 !important;
 }
 
-.mobile-entry-detail__immersive-editor .w-md-editor-text-pre,
-.mobile-entry-detail__immersive-editor .w-md-editor-text-input {
+.mobile-entry-detail__immersive-editor .w-md-editor-text {
     padding: 0.35rem 0 1rem !important;
     color: var(--fc-color-text) !important;
     font-family: var(--fc-font-family) !important;
@@ -825,6 +834,17 @@
     white-space: pre-wrap !important;
     overflow-wrap: break-word;
     word-break: normal;
+}
+
+.mobile-entry-detail__immersive-editor .w-md-editor-text-pre,
+.mobile-entry-detail__immersive-editor .w-md-editor-text-input {
+    color: inherit !important;
+    font: inherit !important;
+    letter-spacing: 0 !important;
+    tab-size: 4;
+    white-space: inherit !important;
+    overflow-wrap: inherit;
+    word-break: inherit;
 }
 
 .mobile-entry-detail__immersive-editor .w-md-editor-text-pre code {
