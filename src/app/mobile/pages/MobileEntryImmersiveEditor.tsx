@@ -60,7 +60,7 @@ export function MobileEntryImmersiveEditor({
                     actions={[{
                         key: 'save',
                         label: saving ? '保存中' : '保存词条',
-                        icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="check"/>,
+                        icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="save"/>,
                         kind: 'add',
                         disabled: saving,
                         onClick: onSave,

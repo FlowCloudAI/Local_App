@@ -399,10 +399,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setEntryRelations(savedBundle.relations)
             setRelationDrafts(savedBundle.relations.map(relation => buildRelationDraft(entryId, relation)))
             setAiFocus({projectId, entryId})
-            // 同步页面标题（顶部标题取自 params.displayName）。
-            replace({type: 'entryDetail', params: {...params, projectId, entryId, displayName: title.trim(), mode: 'view'}})
-            setImmersiveEditorOpen(false)
-            setMode('view')
+            // 同步页面标题（顶部标题取自 params.displayName），保存后继续停留在编辑态。
+            replace({type: 'entryDetail', params: {...params, projectId, entryId, displayName: title.trim(), mode: 'edit'}})
         } catch (e) {
             await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         } finally {
@@ -837,7 +835,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                         actions={[{
                             key: 'save',
                             label: saving ? '保存中' : '保存词条',
-                            icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="check"/>,
+                            icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="save"/>,
                             kind: 'add',
                             disabled: saving,
                             onClick: () => void handleSave(),
