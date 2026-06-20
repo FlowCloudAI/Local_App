@@ -138,16 +138,13 @@ export function MobileEntryDetailView({
                 </p>
             )}
 
-            {entryType && (
-                <div className="mobile-entry-detail__type">
-                    <span className="mobile-entry-detail__type-badge" style={typeBadgeStyle}>
-                        <EntryTypeIcon entryType={entryType} className=""/> {entryType.name}
-                    </span>
-                </div>
-            )}
-
-            {viewTagSchemas.length > 0 && (
-                <div className="mobile-entry-detail__tags mobile-entry-detail__tags--view">
+            {(entryType || viewTagSchemas.length > 0) && (
+                <div className="mobile-entry-detail__meta-chips">
+                    {entryType && (
+                        <span className="mobile-entry-detail__type-badge" style={typeBadgeStyle}>
+                            <EntryTypeIcon entryType={entryType} className=""/> {entryType.name}
+                        </span>
+                    )}
                     {viewTagSchemas.map(s => (
                         <TagItem
                             key={s.id}
