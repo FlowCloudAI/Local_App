@@ -1,31 +1,40 @@
 import {
     type CSSProperties,
-    type PointerEvent as ReactPointerEvent,
     type ReactNode,
     useCallback,
     useEffect,
     useRef,
     useState,
 } from 'react'
+import {useDrag} from '@use-gesture/react'
 import {createPortal} from 'react-dom'
 import {pushOverlay, removeOverlay} from '../../../shared/ui/overlay/overlayStack'
 import './MobileBottomSheet.css'
 
 const EXIT_DURATION_MS = 100
 
-interface BottomSheetDragState {
-    pointerId: number
-    startX: number
-    startY: number
+interface BottomSheetDragRuntime {
     startScrollTop: number
-    lastY: number
-    lastTime: number
-    velocityY: number
-    currentOffset: number
-    tracking: boolean
+    started: boolean
 }
 
 type MobileBottomSheetStyle = CSSProperties & {'--mobile-bottom-sheet-drag-offset'?: string}
+
+function shouldSkipBottomSheetDrag(target: EventTarget | null, sheet: HTMLElement): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    if (target.closest('input, textarea, select, [contenteditable="true"], [data-mobile-bottom-sheet-drag-lock="true"]')) {
+        return true
+    }
+
+    let element: HTMLElement | null = target
+    while (element && element !== sheet) {
+        const style = window.getComputedStyle(element)
+        const scrollableY = style.overflowY === 'auto' || style.overflowY === 'scroll'
+        if (scrollableY && element.scrollHeight > element.clientHeight) return true
+        element = element.parentElement
+    }
+    return false
+}
 
 export interface MobileBottomSheetProps {
     open: boolean
@@ -50,7 +59,7 @@ export default function MobileBottomSheet({
     const [dragOffset, setDragOffset] = useState(0)
     const sheetRef = useRef<HTMLElement | null>(null)
     const closeTimerRef = useRef<number | null>(null)
-    const dragRef = useRef<BottomSheetDragState | null>(null)
+    const dragRef = useRef<BottomSheetDragRuntime | null>(null)
     const onCloseRef = useRef(onClose)
     const dismissibleRef = useRef(dismissible)
 
@@ -118,84 +127,75 @@ export default function MobileBottomSheet({
         }
     }, [closing, mounted])
 
-    const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        if (closing || !mounted || !dismissible) return
-        if (event.pointerType === 'mouse' && event.button !== 0) return
-        const sheet = sheetRef.current
-        if (!sheet) return
-        dragRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            startScrollTop: sheet.scrollTop,
-            lastY: event.clientY,
-            lastTime: window.performance.now(),
-            velocityY: 0,
-            currentOffset: 0,
-            tracking: false,
-        }
-    }, [closing, dismissible, mounted])
-
-    const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = dragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        const sheet = sheetRef.current
-        if (!sheet) return
-
-        const dx = event.clientX - dragState.startX
-        const dy = event.clientY - dragState.startY
-        const horizontal = Math.abs(dx)
-        const vertical = Math.abs(dy)
-        const now = window.performance.now()
-        const elapsed = Math.max(now - dragState.lastTime, 1)
-        dragState.velocityY = (event.clientY - dragState.lastY) / elapsed
-        dragState.lastY = event.clientY
-        dragState.lastTime = now
-
-        if (!dragState.tracking) {
-            if (horizontal < 6 && vertical < 6) return
-            if (dy <= 0 || horizontal > vertical * 1.1) {
-                dragRef.current = null
-                return
-            }
-            if (dragState.startScrollTop > 0 || sheet.scrollTop > 0) return
-            dragState.tracking = true
-            setDragging(true)
-            event.currentTarget.setPointerCapture?.(event.pointerId)
-        }
-
-        event.preventDefault()
-        const nextOffset = Math.max(0, Math.min(dy, window.innerHeight * 0.45))
-        dragState.currentOffset = nextOffset
-        setDragOffset(nextOffset)
-    }, [])
-
-    const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = dragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId)
-        }
+    const resetDrag = useCallback(() => {
         dragRef.current = null
         setDragging(false)
+        setDragOffset(0)
+    }, [])
 
-        if (dragState.tracking && (dragState.currentOffset > 68 || dragState.velocityY > 0.45)) {
+    const bindSheetDrag = useDrag(({
+        cancel,
+        event,
+        first,
+        last,
+        movement: [moveX, moveY],
+        velocity: [, velocityY],
+    }) => {
+        if (closing || !mounted || !dismissible) return
+        const sheet = sheetRef.current
+        if (!sheet) return
+
+        if (first) {
+            if (shouldSkipBottomSheetDrag(event.target, sheet)) {
+                dragRef.current = null
+                cancel()
+                return
+            }
+            dragRef.current = {
+                startScrollTop: sheet.scrollTop,
+                started: false,
+            }
+        }
+
+        const dragState = dragRef.current
+        if (!dragState) return
+        const horizontal = Math.abs(moveX)
+        const vertical = Math.abs(moveY)
+
+        if (!dragState.started) {
+            if (horizontal < 6 && vertical < 6) return
+            if (moveY <= 0 || horizontal > vertical * 1.1) {
+                resetDrag()
+                cancel()
+                return
+            }
+            if (dragState.startScrollTop > 0 || sheet.scrollTop > 0) {
+                if (last) dragRef.current = null
+                return
+            }
+            dragState.started = true
+            setDragging(true)
+        }
+
+        if (event.cancelable) event.preventDefault()
+        const nextOffset = Math.max(0, Math.min(moveY, window.innerHeight * 0.45))
+        setDragOffset(nextOffset)
+
+        if (!last) return
+        dragRef.current = null
+        setDragging(false)
+        if (dragState.started && (nextOffset > 68 || velocityY > 0.45)) {
             onCloseRef.current()
             return
         }
         setDragOffset(0)
-    }, [])
-
-    const handlePointerCancel = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = dragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-            event.currentTarget.releasePointerCapture(event.pointerId)
-        }
-        dragRef.current = null
-        setDragging(false)
-        setDragOffset(0)
-    }, [])
+    }, {
+        axis: 'y',
+        enabled: mounted && !closing && dismissible,
+        filterTaps: true,
+        pointer: {capture: false, keys: false, touch: true},
+        threshold: 6,
+    })
 
     if (!mounted || typeof document === 'undefined') return null
 
@@ -218,10 +218,7 @@ export default function MobileBottomSheet({
                 aria-label={ariaLabel}
                 role="dialog"
                 aria-modal="true"
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
+                {...bindSheetDrag()}
             >
                 <div className="mobile-bottom-sheet__handle" aria-hidden="true"/>
                 {children}

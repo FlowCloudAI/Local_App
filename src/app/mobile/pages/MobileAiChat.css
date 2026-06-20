@@ -441,7 +441,7 @@
 }
 
 .mobile-ai-tool-mode-menu__row {
-    grid-template-columns: 1.6rem minmax(0, 1fr);
+    grid-template-columns: 2.05rem minmax(0, 1fr);
     min-height: 2.8rem;
     padding: 0.42rem 0.68rem;
     border-radius: var(--fc-radius-xl);
@@ -459,9 +459,9 @@
 }
 
 .mobile-ai-tool-mode-menu__row .mobile-ai-svg {
-    width: 1.22rem;
-    height: 1.22rem;
-    stroke-width: 2.2;
+    width: 1.8rem;
+    height: 1.8rem;
+    stroke-width: 1.8;
 }
 
 .mobile-ai-model-menu__divider {
@@ -783,10 +783,31 @@
 }
 
 .mobile-ai-setting-prompt textarea {
-    min-height: 7rem;
-    padding: 0.68rem 0.75rem;
+    height: 8.4rem;
+    min-height: 8.4rem;
+    padding: 0.5rem 0.38rem 0.5rem 0.75rem;
     line-height: 1.45;
+    overflow-y: auto;
     resize: vertical;
+    overscroll-behavior: contain;
+    scrollbar-color: color-mix(in srgb, var(--fc-color-text-secondary) 42%, transparent) transparent;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    touch-action: pan-y;
+}
+
+.mobile-ai-setting-prompt textarea::-webkit-scrollbar {
+    width: 0.42rem;
+}
+
+.mobile-ai-setting-prompt textarea::-webkit-scrollbar-track {
+    border-radius: var(--fc-radius-full);
+    background: transparent;
+}
+
+.mobile-ai-setting-prompt textarea::-webkit-scrollbar-thumb {
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-text-secondary) 38%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -12,24 +12,23 @@
 
 use crate::map::constants::{
     COASTLINE_DEDUPLICATE_DISTANCE_SQUARED, COASTLINE_FALLBACK_RELAX_PASSES,
-    COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_SCALE,
-    COASTLINE_V2_BAND_A_AMPLITUDE, COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO,
-    COASTLINE_V2_BAND_A_FEATURE_RATIO, COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX,
-    COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN, COASTLINE_V2_BAND_A_WEIGHT,
-    COASTLINE_V2_BAND_B_AMPLITUDE, COASTLINE_V2_BAND_B_FEATURE_RATIO,
-    COASTLINE_V2_BAND_C_FEATURE_RATIO,
-    COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MAX,
-    COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX,
-    COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN, COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX,
-    COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN, COASTLINE_V2_BAND_B_WEIGHT,
-    COASTLINE_V2_BAND_C_AMPLITUDE, COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO,
+    COASTLINE_FALLBACK_RELAX_WEIGHT, COASTLINE_V2_AMPLITUDE_SCALE, COASTLINE_V2_BAND_A_AMPLITUDE,
+    COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_A_FEATURE_RATIO,
+    COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
+    COASTLINE_V2_BAND_A_WEIGHT, COASTLINE_V2_BAND_B_AMPLITUDE,
+    COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_B_FEATURE_RATIO,
+    COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MAX, COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MIN,
+    COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MAX, COASTLINE_V2_BAND_B_WAVELENGTH_DIVISOR_MIN,
+    COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX, COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MIN,
+    COASTLINE_V2_BAND_B_WEIGHT, COASTLINE_V2_BAND_C_AMPLITUDE,
+    COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO, COASTLINE_V2_BAND_C_FEATURE_RATIO,
     COASTLINE_V2_BAND_C_WAVELENGTH_MAX, COASTLINE_V2_BAND_C_WAVELENGTH_MIN,
     COASTLINE_V2_BAND_C_WEIGHT, COASTLINE_V2_CONCAVE_CORNER_FACTOR,
-    COASTLINE_V2_DETAIL_WAVELENGTH_SCALE, COASTLINE_V2_HARMONIC_RANDOM_FLOOR,
-    COASTLINE_V2_MAX_DEVIATION, COASTLINE_V2_MAX_HARMONICS_PER_BAND,
-    COASTLINE_V2_ROUGHNESS_MODULATION_B, COASTLINE_V2_ROUGHNESS_MODULATION_C,
-    COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
-    COASTLINE_V2_MIN_POINTS, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
+    COASTLINE_V2_CORNER_ROUNDING_PX, COASTLINE_V2_DETAIL_WAVELENGTH_SCALE,
+    COASTLINE_V2_HARMONIC_RANDOM_FLOOR, COASTLINE_V2_MAX_DEVIATION,
+    COASTLINE_V2_MAX_HARMONICS_PER_BAND, COASTLINE_V2_MAX_POINTS, COASTLINE_V2_MAX_POINTS_CEILING,
+    COASTLINE_V2_MIN_POINTS, COASTLINE_V2_ROUGHNESS_MODULATION_B,
+    COASTLINE_V2_ROUGHNESS_MODULATION_C, COASTLINE_V2_SMOOTH_PASSES, COASTLINE_V2_SPECTRAL_BETA,
     COASTLINE_V2_STRUCTURAL_FEATURE_RATIO, COASTLINE_V2_TAUBIN_LAMBDA, COASTLINE_V2_TAUBIN_MU,
     COASTLINE_V2_TOTAL_AMPLITUDE_CANVAS_RATIO_MAX, GEOMETRY_EPSILON, HASH_TEXT_OFFSET_BASIS,
     HASH_TEXT_PRIME, HASH_UNIT_INCREMENT, HASH_UNIT_MULTIPLIER, TAU,
@@ -204,8 +203,7 @@ fn naturalize_arc_length(
         amplitude_scale.clamp(0.0, 1.0),
         params,
     );
-    let corner_windows =
-        build_corner_windows(vertices, &cumulative, step, rounding_radius, params);
+    let corner_windows = build_corner_windows(vertices, &cumulative, step, rounding_radius, params);
     let max_deviation = param!(params, max_deviation, COASTLINE_V2_MAX_DEVIATION).max(0.0);
     let outward_sign = if signed_area(vertices) >= 0.0 {
         -1.0
@@ -316,9 +314,12 @@ fn sample_count_for_perimeter(perimeter: f64, params: Option<&CoastlineV2Params>
     let smallest_wavelength = COASTLINE_V2_BAND_C_WAVELENGTH_MIN * detail_wavelength_scale(params);
     let step = (smallest_wavelength / 4.0).clamp(1.0, 8.0);
     let desired = (perimeter / step).ceil() as usize;
-    let max_points = param!(params, max_points, COASTLINE_V2_MAX_POINTS)
-        .min(COASTLINE_V2_MAX_POINTS_CEILING);
-    desired.clamp(COASTLINE_V2_MIN_POINTS, max_points.max(COASTLINE_V2_MIN_POINTS))
+    let max_points =
+        param!(params, max_points, COASTLINE_V2_MAX_POINTS).min(COASTLINE_V2_MAX_POINTS_CEILING);
+    desired.clamp(
+        COASTLINE_V2_MIN_POINTS,
+        max_points.max(COASTLINE_V2_MIN_POINTS),
+    )
 }
 
 /// 角点圆化：对等弧长重采样后的基线做若干轮 Laplacian 扩散。
@@ -384,7 +385,10 @@ fn resample_by_arc_length(
         let t = ((s - cumulative[edge]) / edge_length).clamp(0.0, 1.0);
         let start = &vertices[edge];
         let end = &vertices[(edge + 1) % total];
-        points.push((start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t));
+        points.push((
+            start.x + (end.x - start.x) * t,
+            start.y + (end.y - start.y) * t,
+        ));
         arc_positions.push(s);
     }
     (points, arc_positions)
@@ -515,8 +519,11 @@ fn build_noise_bands(
         BandSpec {
             wavelength_min: perimeter / COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MAX,
             wavelength_max: perimeter / COASTLINE_V2_BAND_A_WAVELENGTH_DIVISOR_MIN,
-            amplitude: (perimeter * COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO)
-                .min(param!(params, band_a_amplitude, COASTLINE_V2_BAND_A_AMPLITUDE)),
+            amplitude: (perimeter * COASTLINE_V2_BAND_A_AMPLITUDE_PERIMETER_RATIO).min(param!(
+                params,
+                band_a_amplitude,
+                COASTLINE_V2_BAND_A_AMPLITUDE
+            )),
             feature_ratio: COASTLINE_V2_BAND_A_FEATURE_RATIO,
             weight: param!(params, band_a_weight, COASTLINE_V2_BAND_A_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_A,
@@ -533,8 +540,11 @@ fn build_noise_bands(
                 COASTLINE_V2_BAND_B_WAVELENGTH_FLOOR_MAX,
                 COASTLINE_V2_BAND_B_WAVELENGTH_CEIL_MAX,
             ),
-            amplitude: (perimeter * COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO)
-                .min(param!(params, band_b_amplitude, COASTLINE_V2_BAND_B_AMPLITUDE)),
+            amplitude: (perimeter * COASTLINE_V2_BAND_B_AMPLITUDE_PERIMETER_RATIO).min(param!(
+                params,
+                band_b_amplitude,
+                COASTLINE_V2_BAND_B_AMPLITUDE
+            )),
             feature_ratio: COASTLINE_V2_BAND_B_FEATURE_RATIO,
             weight: param!(params, band_b_weight, COASTLINE_V2_BAND_B_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_B,
@@ -548,9 +558,11 @@ fn build_noise_bands(
             wavelength_max: COASTLINE_V2_BAND_C_WAVELENGTH_MAX * detail_wavelength_scale(params),
             // 振幅随波长等比缩放（分形自相似）：印刷档波长砍半、振幅同步减半，
             // 否则坡度翻倍呈现机械毛刺。放粗（>1）时不放大振幅。
-            amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO)
-                .min(param!(params, band_c_amplitude, COASTLINE_V2_BAND_C_AMPLITUDE))
-                * detail_wavelength_scale(params).min(1.0),
+            amplitude: (perimeter * COASTLINE_V2_BAND_C_AMPLITUDE_PERIMETER_RATIO).min(param!(
+                params,
+                band_c_amplitude,
+                COASTLINE_V2_BAND_C_AMPLITUDE
+            )) * detail_wavelength_scale(params).min(1.0),
             feature_ratio: COASTLINE_V2_BAND_C_FEATURE_RATIO,
             weight: param!(params, band_c_weight, COASTLINE_V2_BAND_C_WEIGHT),
             salt: COASTLINE_V2_NOISE_SALT_C,
@@ -823,8 +835,8 @@ fn soft_limit_offset(requested: f64, cap: f64) -> f64 {
         return requested;
     }
     let span = 1.0 - COASTLINE_V2_SOFT_LIMIT_KNEE;
-    let saturated =
-        COASTLINE_V2_SOFT_LIMIT_KNEE + span * ((ratio - COASTLINE_V2_SOFT_LIMIT_KNEE) / span).tanh();
+    let saturated = COASTLINE_V2_SOFT_LIMIT_KNEE
+        + span * ((ratio - COASTLINE_V2_SOFT_LIMIT_KNEE) / span).tanh();
     requested.signum() * cap * saturated
 }
 
@@ -1168,13 +1180,22 @@ mod tests {
         let square = subdivided_square_shape();
         let square_sign = signed_area(&square.vertices);
         // 索引 1 是插入的共线中点，索引 2 是原始凸直角——都不衰减。
-        assert_eq!(vertex_corner_factor(&square.vertices, 1, square_sign, 0.45), 1.0);
-        assert_eq!(vertex_corner_factor(&square.vertices, 2, square_sign, 0.45), 1.0);
+        assert_eq!(
+            vertex_corner_factor(&square.vertices, 1, square_sign, 0.45),
+            1.0
+        );
+        assert_eq!(
+            vertex_corner_factor(&square.vertices, 2, square_sign, 0.45),
+            1.0
+        );
 
         // 窄湾形状的凹角（索引 3）衰减到 concave_factor。
         let narrow = narrow_shape();
         let narrow_sign = signed_area(&narrow.vertices);
-        assert_eq!(vertex_corner_factor(&narrow.vertices, 3, narrow_sign, 0.45), 0.45);
+        assert_eq!(
+            vertex_corner_factor(&narrow.vertices, 3, narrow_sign, 0.45),
+            0.45
+        );
     }
 
     #[test]

@@ -1,13 +1,12 @@
 import {
     type CSSProperties,
-    type TouchEvent as ReactTouchEvent,
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
-    type WheelEvent as ReactWheelEvent,
 } from 'react'
+import {useDrag, useWheel} from '@use-gesture/react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {convertFileSrc} from '../../../api/assets'
 import {openFileDialog} from '../../../api/dialog'
@@ -247,7 +246,6 @@ export default function MobileHome({
     const homeRef = useRef<HTMLDivElement | null>(null)
     const worldPanelRef = useRef<HTMLElement | null>(null)
     const worldActionsRef = useRef<HTMLDivElement | null>(null)
-    const touchStartYRef = useRef<number | null>(null)
     const touchWorldScrollTopRef = useRef(0)
 
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
@@ -663,18 +661,7 @@ export default function MobileHome({
         void showAlert('首页展示桌面端同一套继续创作和最近内容；向上滑动即可进入世界观列表。', 'info', 'nonInvasive', 2800)
     }, [showAlert])
 
-    const handlePagerTouchStart = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-        touchStartYRef.current = event.touches[0]?.clientY ?? null
-        touchWorldScrollTopRef.current = worldPanelRef.current?.scrollTop ?? 0
-    }, [])
-
-    const handlePagerTouchEnd = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-        const startY = touchStartYRef.current
-        touchStartYRef.current = null
-        if (startY == null) return
-
-        const endY = event.changedTouches[0]?.clientY ?? startY
-        const deltaY = endY - startY
+    const settlePagerDrag = useCallback((deltaY: number, worldStartScrollTop: number) => {
         if (Math.abs(deltaY) < PANEL_SWITCH_THRESHOLD) return
 
         if (activePanel === 'dashboard' && deltaY < 0) {
@@ -682,12 +669,29 @@ export default function MobileHome({
             return
         }
 
-        if (activePanel === 'worlds' && deltaY > 0 && touchWorldScrollTopRef.current <= 4) {
+        if (activePanel === 'worlds' && deltaY > 0 && worldStartScrollTop <= 4) {
             onActivePanelChange('dashboard')
         }
     }, [activePanel, onActivePanelChange])
 
-    const handlePagerWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    const bindPagerDrag = useDrag(({
+        first,
+        last,
+        movement: [, deltaY],
+    }) => {
+        if (first) {
+            touchWorldScrollTopRef.current = worldPanelRef.current?.scrollTop ?? 0
+        }
+        if (!last) return
+        settlePagerDrag(deltaY, touchWorldScrollTopRef.current)
+    }, {
+        axis: 'y',
+        filterTaps: true,
+        pointer: {keys: false, touch: true},
+        threshold: 8,
+    })
+
+    const bindPagerWheel = useWheel(({event}) => {
         if (Math.abs(event.deltaY) < 32) return
         if (activePanel === 'dashboard' && event.deltaY > 0) {
             onActivePanelChange('worlds')
@@ -696,7 +700,7 @@ export default function MobileHome({
         if (activePanel === 'worlds' && event.deltaY < 0 && (worldPanelRef.current?.scrollTop ?? 0) <= 4) {
             onActivePanelChange('dashboard')
         }
-    }, [activePanel, onActivePanelChange])
+    })
 
     const renderRecentItem = (item: HomeActivityRecord) => (
         <button
@@ -749,9 +753,8 @@ export default function MobileHome({
         <div
             ref={homeRef}
             className={`mobile-page mobile-home mobile-home--${activePanel}`}
-            onTouchStart={handlePagerTouchStart}
-            onTouchEnd={handlePagerTouchEnd}
-            onWheel={handlePagerWheel}
+            {...bindPagerDrag()}
+            {...bindPagerWheel()}
         >
             <ProjectCreator
                 open={creatorOpen}

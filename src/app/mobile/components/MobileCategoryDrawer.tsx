@@ -4,10 +4,10 @@ import {
     useCallback,
     useEffect,
     useMemo,
-    type PointerEvent as ReactPointerEvent,
     useRef,
     useState,
 } from 'react'
+import {useDrag} from '@use-gesture/react'
 import {Button, Input, useAlert} from 'flowcloudai-ui'
 import {logger} from '../../../shared/logger'
 import {
@@ -58,10 +58,8 @@ const ROW_DRAG_START_DISTANCE = 10
 const ROW_DRAG_VERTICAL_DOMINANCE = 1.12
 
 interface CategoryDragState {
-    pointerId: number
+    pointerId: number | string
     categoryId: string
-    startX: number
-    startY: number
     source: CategoryDragSource
     active: boolean
 }
@@ -73,6 +71,14 @@ interface CategoryDropTarget {
 
 function dropTargetSignature(target: CategoryDropTarget | null): string {
     return target ? `${target.targetId}:${target.position}` : 'none'
+}
+
+function getGesturePointerId(event: Event): number | string {
+    return 'pointerId' in event && typeof event.pointerId === 'number' ? event.pointerId : 'gesture'
+}
+
+function getGesturePointerType(event: Event): string {
+    return 'pointerType' in event && typeof event.pointerType === 'string' ? event.pointerType : event.type
 }
 
 function parentKey(parentId: string | null | undefined): string {
@@ -200,10 +206,21 @@ function TreeIcon({expanded}: {expanded: boolean}) {
     )
 }
 
-function FolderIcon() {
+function SearchIcon() {
     return (
-        <svg className="mobile-category-drawer__row-icon" viewBox="0 0 24 24" focusable="false">
-            <path d="M4 7.5a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+        <svg className="mobile-category-drawer__search-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="5.8"/>
+            <path d="m15 15 4.5 4.5"/>
+        </svg>
+    )
+}
+
+function HomeIcon() {
+    return (
+        <svg className="mobile-category-drawer__row-icon mobile-category-drawer__home-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M4.5 11.2 12 5l7.5 6.2"/>
+            <path d="M6.5 10.5v8h11v-8"/>
+            <path d="M10 18.5v-4h4v4"/>
         </svg>
     )
 }
@@ -231,7 +248,6 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const listRef = useRef<HTMLDivElement | null>(null)
     const categoryNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     const dragStateRef = useRef<CategoryDragState | null>(null)
-    const dragElementRef = useRef<HTMLButtonElement | null>(null)
     const dropTargetRef = useRef<CategoryDropTarget | null>(null)
     const loggedDropTargetRef = useRef<string>('none')
     const suppressCategoryClickRef = useRef<string | null>(null)
@@ -588,7 +604,6 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
 
     const clearDragState = useCallback(() => {
         dragStateRef.current = null
-        dragElementRef.current = null
         dropTargetRef.current = null
         loggedDropTargetRef.current = 'none'
         setDraggingId(null)
@@ -650,18 +665,14 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         }
     }, [categoryById, getDropTarget, scrollListDuringDrag])
 
-    const finishDrag = useCallback((pointerId: number, commit: boolean, reason: string) => {
+    const finishDrag = useCallback((pointerId: number | string, commit: boolean, reason: string) => {
         const dragState = dragStateRef.current
         if (!dragState || dragState.pointerId !== pointerId) return
 
         const wasActive = dragState.active
         const nextTarget = dropTargetRef.current
         const draggedId = dragState.categoryId
-        const dragElement = dragElementRef.current
         clearDragState()
-        if (dragElement?.hasPointerCapture(pointerId)) {
-            dragElement.releasePointerCapture(pointerId)
-        }
 
         logger.info('[移动端分类拖拽] 结算', {
             pointerId,
@@ -692,207 +703,81 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         }
     }, [clearDragState, handleMoveByDrop, suppressNextCategoryClick])
 
-    const handleDragPointerDown = useCallback((
-        event: ReactPointerEvent<HTMLButtonElement>,
-        category: Category,
-        source: CategoryDragSource,
-    ) => {
-        if (busy || normalizedSearch) {
-            logger.info('[移动端分类拖拽] 忽略按下', {
-                reason: busy ? 'busy' : 'searching',
-                categoryId: category.id,
-                normalizedSearch,
+    const bindCategoryDrag = useDrag(({
+        args: [category, source],
+        cancel,
+        event,
+        first,
+        last,
+        movement: [moveX, moveY],
+        xy: [pointerX, pointerY],
+    }) => {
+        const targetCategory = category as Category | undefined
+        const dragSource = source as CategoryDragSource | undefined
+        if (!targetCategory || !dragSource) return
+
+        const pointerId = getGesturePointerId(event)
+        if (first) {
+            if (busy || normalizedSearch) {
+                logger.info('[移动端分类拖拽] 忽略按下', {
+                    reason: busy ? 'busy' : 'searching',
+                    categoryId: targetCategory.id,
+                    normalizedSearch,
+                })
+                cancel()
+                return
+            }
+
+            if (dragSource === 'handle' && event.cancelable) {
+                event.preventDefault()
+            }
+            event.stopPropagation()
+            dragStateRef.current = {
+                pointerId,
+                categoryId: targetCategory.id,
+                source: dragSource,
+                active: dragSource === 'handle',
+            }
+            if (dragSource === 'handle') {
+                setDraggingId(targetCategory.id)
+            }
+            setDropTarget(null)
+            dropTargetRef.current = null
+            logger.info('[移动端分类拖拽] 按下', {
+                pointerId,
+                pointerType: getGesturePointerType(event),
+                categoryId: targetCategory.id,
+                name: targetCategory.name,
+                source: dragSource,
+                startX: Math.round(pointerX),
+                startY: Math.round(pointerY),
             })
-            return
-        }
-        if (!event.isPrimary) {
-            logger.info('[移动端分类拖拽] 忽略按下', {
-                reason: 'not-primary',
-                pointerId: event.pointerId,
-                categoryId: category.id,
-            })
-            return
-        }
-        if (event.pointerType === 'mouse' && event.button !== 0) {
-            logger.info('[移动端分类拖拽] 忽略按下', {
-                reason: 'non-left-mouse',
-                pointerId: event.pointerId,
-                button: event.button,
-                categoryId: category.id,
-            })
-            return
         }
 
-        if (source === 'handle') {
-            event.preventDefault()
-        }
-        event.stopPropagation()
-        event.currentTarget.setPointerCapture(event.pointerId)
-        dragElementRef.current = event.currentTarget
-        dragStateRef.current = {
-            pointerId: event.pointerId,
-            categoryId: category.id,
-            startX: event.clientX,
-            startY: event.clientY,
-            source,
-            active: source === 'handle',
-        }
-        if (source === 'handle') {
-            setDraggingId(category.id)
-        }
-        setDropTarget(null)
-        dropTargetRef.current = null
-        logger.info('[移动端分类拖拽] 按下', {
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            categoryId: category.id,
-            name: category.name,
-            source,
-            startX: Math.round(event.clientX),
-            startY: Math.round(event.clientY),
-        })
-    }, [busy, normalizedSearch])
-
-    const handleDragPointerMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
         const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
+        if (!dragState || dragState.pointerId !== pointerId) return
 
         event.stopPropagation()
         if (!dragState.active) {
-            const dx = event.clientX - dragState.startX
-            const dy = event.clientY - dragState.startY
-            const horizontal = Math.abs(dx)
-            const vertical = Math.abs(dy)
+            const horizontal = Math.abs(moveX)
+            const vertical = Math.abs(moveY)
             if (
                 vertical < ROW_DRAG_START_DISTANCE
                 || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
             ) {
+                if (last) finishDrag(pointerId, true, 'use-drag-tap')
                 return
             }
-            activateDrag(dragState, event.clientX, event.clientY, 'row-vertical-drag')
-        }
-        event.preventDefault()
-        updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'react-pointermove')
-    }, [activateDrag, updateDragTarget])
-
-    const handleDragPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-
-        event.stopPropagation()
-        if (dragState.active) {
-            event.preventDefault()
-        }
-        finishDrag(event.pointerId, true, 'react-pointerup')
-    }, [finishDrag])
-
-    const handleDragPointerCancel = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-
-        event.stopPropagation()
-        if (dragState.active) {
-            event.preventDefault()
-        }
-        finishDrag(event.pointerId, false, 'react-pointercancel')
-    }, [finishDrag])
-
-    const handleDragLostPointerCapture = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-
-        event.stopPropagation()
-        if (dragState.active) {
-            event.preventDefault()
-        }
-        finishDrag(event.pointerId, true, 'react-lostpointercapture')
-    }, [finishDrag])
-
-    useEffect(() => {
-        if (!draggingId) return
-        logger.info('[移动端分类拖拽] 挂载全局监听', {draggingId})
-
-        const handleWindowPointerMove = (event: PointerEvent) => {
-            const dragState = dragStateRef.current
-            if (!dragState || dragState.pointerId !== event.pointerId) return
-
-            if (!dragState.active) {
-                const dx = event.clientX - dragState.startX
-                const dy = event.clientY - dragState.startY
-                const horizontal = Math.abs(dx)
-                const vertical = Math.abs(dy)
-                if (
-                    vertical < ROW_DRAG_START_DISTANCE
-                    || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
-                ) {
-                    return
-                }
-                activateDrag(dragState, event.clientX, event.clientY, 'window-row-vertical-drag')
-            }
-            event.preventDefault()
-            updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'window-pointermove')
-        }
-        const handleWindowPointerUp = (event: PointerEvent) => {
-            const dragState = dragStateRef.current
-            if (!dragState || dragState.pointerId !== event.pointerId) return
-            event.preventDefault()
-            finishDrag(event.pointerId, true, 'window-pointerup')
-        }
-        const handleWindowPointerCancel = (event: PointerEvent) => {
-            const dragState = dragStateRef.current
-            if (!dragState || dragState.pointerId !== event.pointerId) return
-            event.preventDefault()
-            finishDrag(event.pointerId, false, 'window-pointercancel')
-        }
-        const handleDocumentPointerMove = (event: PointerEvent) => {
-            const dragState = dragStateRef.current
-            if (!dragState || dragState.pointerId !== event.pointerId) return
-
-            if (!dragState.active) {
-                const dx = event.clientX - dragState.startX
-                const dy = event.clientY - dragState.startY
-                const horizontal = Math.abs(dx)
-                const vertical = Math.abs(dy)
-                if (
-                    vertical < ROW_DRAG_START_DISTANCE
-                    || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
-                ) {
-                    return
-                }
-                activateDrag(dragState, event.clientX, event.clientY, 'document-row-vertical-drag')
-            }
-            event.preventDefault()
-            updateDragTarget(event.clientX, event.clientY, dragState.categoryId, 'document-pointermove')
-        }
-        const handleDocumentPointerUp = (event: PointerEvent) => {
-            const dragState = dragStateRef.current
-            if (!dragState || dragState.pointerId !== event.pointerId) return
-            event.preventDefault()
-            finishDrag(event.pointerId, true, 'document-pointerup')
-        }
-        const handleDocumentPointerCancel = (event: PointerEvent) => {
-            const dragState = dragStateRef.current
-            if (!dragState || dragState.pointerId !== event.pointerId) return
-            event.preventDefault()
-            finishDrag(event.pointerId, false, 'document-pointercancel')
+            activateDrag(dragState, pointerX, pointerY, 'row-vertical-drag')
         }
 
-        window.addEventListener('pointermove', handleWindowPointerMove, {passive: false})
-        window.addEventListener('pointerup', handleWindowPointerUp, {passive: false})
-        window.addEventListener('pointercancel', handleWindowPointerCancel, {passive: false})
-        document.addEventListener('pointermove', handleDocumentPointerMove, {passive: false})
-        document.addEventListener('pointerup', handleDocumentPointerUp, {passive: false})
-        document.addEventListener('pointercancel', handleDocumentPointerCancel, {passive: false})
-        return () => {
-            logger.info('[移动端分类拖拽] 卸载全局监听', {draggingId})
-            window.removeEventListener('pointermove', handleWindowPointerMove)
-            window.removeEventListener('pointerup', handleWindowPointerUp)
-            window.removeEventListener('pointercancel', handleWindowPointerCancel)
-            document.removeEventListener('pointermove', handleDocumentPointerMove)
-            document.removeEventListener('pointerup', handleDocumentPointerUp)
-            document.removeEventListener('pointercancel', handleDocumentPointerCancel)
-        }
-    }, [activateDrag, draggingId, finishDrag, updateDragTarget])
+        if (event.cancelable) event.preventDefault()
+        updateDragTarget(pointerX, pointerY, dragState.categoryId, 'use-drag')
+        if (last) finishDrag(pointerId, true, 'use-drag-end')
+    }, {
+        filterTaps: false,
+        pointer: {capture: false, keys: false, touch: true},
+    })
 
     const handleCategoryRowClick = useCallback((
         event: ReactMouseEvent<HTMLButtonElement>,
@@ -919,6 +804,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         placeholder="搜索分类…"
                         value={searchText}
                         onValueChange={setSearchText}
+                        prefix={<SearchIcon/>}
                         radius="full"
                         size="lg"
                         allowClear
@@ -940,11 +826,11 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         type="button"
                         role="treeitem"
                         aria-selected={selected.kind === 'projectHome'}
-                        className={`mobile-category-drawer__row${selected.kind === 'projectHome' ? ' is-active' : ''}`}
+                        className={`mobile-category-drawer__row mobile-category-drawer__row--home${selected.kind === 'projectHome' ? ' is-active' : ''}`}
                         onClick={() => onSelect({kind: 'projectHome'}, '项目首页')}
                     >
                         <span className="mobile-category-drawer__toggle-placeholder"/>
-                        <FolderIcon/>
+                        <HomeIcon/>
                         <span className="mobile-category-drawer__text">
                             <strong>项目首页</strong>
                             <small>项目概览</small>
@@ -957,11 +843,10 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         type="button"
                         role="treeitem"
                         aria-selected={selected.kind === 'uncategorized'}
-                        className={`mobile-category-drawer__row${selected.kind === 'uncategorized' ? ' is-active' : ''}`}
+                        className={`mobile-category-drawer__row mobile-category-drawer__row--default${selected.kind === 'uncategorized' ? ' is-active' : ''}`}
                         onClick={() => onSelect({kind: 'uncategorized'}, '默认分类')}
                     >
                         <span className="mobile-category-drawer__toggle-placeholder"/>
-                        <FolderIcon/>
                         <span className="mobile-category-drawer__text">
                             <strong>默认分类</strong>
                             <small>{stats?.uncategorizedEntryCount ?? 0} 个词条</small>
@@ -1007,14 +892,9 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 aria-selected={active}
                                 aria-expanded={childCount > 0 ? expanded : undefined}
                                 className={`mobile-category-drawer__row mobile-category-drawer__row--category${active ? ' is-active' : ''}`}
-                                onPointerDown={(event) => handleDragPointerDown(event, category, 'row')}
-                                onPointerMove={handleDragPointerMove}
-                                onPointerUp={handleDragPointerUp}
-                                onPointerCancel={handleDragPointerCancel}
-                                onLostPointerCapture={handleDragLostPointerCapture}
+                                {...bindCategoryDrag(category, 'row')}
                                 onClick={(event) => handleCategoryRowClick(event, category)}
                             >
-                                <FolderIcon/>
                                 <span className="mobile-category-drawer__text">
                                     <strong>{category.name}</strong>
                                     <small>
@@ -1028,11 +908,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 aria-label={`拖拽移动分类 ${category.name}`}
                                 disabled={busy || Boolean(normalizedSearch)}
                                 data-mobile-side-drawer-gesture-ignore="true"
-                                onPointerDown={(event) => handleDragPointerDown(event, category, 'handle')}
-                                onPointerMove={handleDragPointerMove}
-                                onPointerUp={handleDragPointerUp}
-                                onPointerCancel={handleDragPointerCancel}
-                                onLostPointerCapture={handleDragLostPointerCapture}
+                                {...bindCategoryDrag(category, 'handle')}
                                 onClick={(event) => {
                                     event.preventDefault()
                                     event.stopPropagation()

@@ -1,22 +1,13 @@
+import {useDrag} from '@use-gesture/react'
 import {
+    type HTMLAttributes,
     type MouseEvent as ReactMouseEvent,
-    type PointerEvent as ReactPointerEvent,
     useCallback,
     useEffect,
     useRef,
     useState,
 } from 'react'
 import {logger} from '../../shared/logger'
-
-interface MobileSideDrawerDragState {
-    pointerId: number
-    startX: number
-    startY: number
-    baseOffset: number
-    latestOffset: number
-    tracking: boolean
-    edgeBackCandidate: boolean
-}
 
 interface UseMobileSideDrawerGestureOptions {
     enabled: boolean
@@ -34,6 +25,12 @@ interface UseMobileSideDrawerGestureOptions {
     onEdgeBackGesture?: () => void
 }
 
+interface MobileSideDrawerDragRuntime {
+    edgeBackCandidate: boolean
+    openBefore: boolean
+    started: boolean
+}
+
 export interface MobileSideDrawerGesture {
     open: boolean
     dragging: boolean
@@ -41,14 +38,7 @@ export interface MobileSideDrawerGesture {
     surfaceOffset: number
     openDrawer: () => void
     closeDrawer: () => void
-    pointerHandlers: {
-        onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void
-        onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void
-        onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void
-        onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void
-        onPointerLeave: (event: ReactPointerEvent<HTMLElement>) => void
-        onClickCapture: (event: ReactMouseEvent<HTMLElement>) => void
-    }
+    pointerHandlers: HTMLAttributes<HTMLElement>
 }
 
 export const MOBILE_SIDE_DRAWER_GESTURE_TUNING = {
@@ -77,22 +67,10 @@ export const MOBILE_SIDE_DRAWER_GESTURE_TUNING = {
     maxWidth: 360,
 
     /**
-     * 手势尚未被识别为横滑前，允许竖向滚动优先生效的距离。
-     * 调大后轻微上下抖动更不容易取消横滑；调小后页面滚动会更早抢回手势。
-     */
-    verticalCancelDistance: 16,
-
-    /**
      * 开始横滑识别前，手指至少要横向移动的距离。
      * 调小后更容易触发抽屉，误触概率会上升；调大后需要更明确的横滑动作。
      */
     horizontalStartDistance: 8,
-
-    /**
-     * 横向位移相对竖向位移的优势倍数。
-     * 调大后必须更“水平”才会识别为抽屉手势；调小后斜向滑动也更容易触发。
-     */
-    horizontalDominanceRatio: 1.25,
 
     /**
      * 关闭状态下，结算为打开所需的最小右滑距离。
@@ -123,6 +101,12 @@ export const MOBILE_SIDE_DRAWER_GESTURE_TUNING = {
      * 调大后更不容易误返回；调小后短促右滑也会直接返回。
      */
     edgeBackTriggerDistance: 34,
+
+    /**
+     * 快速滑动直接结算为打开/关闭的速度阈值，单位约为 px/ms。
+     * 调小后轻扫更容易生效；调大后主要依赖拖动距离结算。
+     */
+    flingVelocity: 0.25,
 } as const
 
 function clamp(value: number, min: number, max: number): number {
@@ -154,8 +138,21 @@ function isInternalGestureTarget(target: EventTarget | null): boolean {
     return Boolean(target.closest('[data-mobile-side-drawer-gesture-ignore="true"]'))
 }
 
-function getElementClassName(element: HTMLElement): string {
-    return typeof element.className === 'string' ? element.className : String(element.className)
+function getElementClassName(target: EventTarget): string {
+    if (!(target instanceof HTMLElement)) return 'unknown'
+    return typeof target.className === 'string' ? target.className : String(target.className)
+}
+
+function getPointerId(event: Event): number | string {
+    return 'pointerId' in event && typeof event.pointerId === 'number' ? event.pointerId : 'gesture'
+}
+
+function getPointerType(event: Event): string {
+    return 'pointerType' in event && typeof event.pointerType === 'string' ? event.pointerType : event.type
+}
+
+function getTagName(target: EventTarget | null): string {
+    return target instanceof HTMLElement ? target.tagName : 'unknown'
 }
 
 export function useMobileSideDrawerGesture({
@@ -168,8 +165,7 @@ export function useMobileSideDrawerGesture({
     const [open, setOpen] = useState(false)
     const [offset, setOffset] = useState<number | null>(null)
     const [dragging, setDragging] = useState(false)
-    const dragRef = useRef<MobileSideDrawerDragState | null>(null)
-    const dragElementRef = useRef<HTMLElement | null>(null)
+    const dragRuntimeRef = useRef<MobileSideDrawerDragRuntime | null>(null)
     const suppressClickRef = useRef(false)
     const suppressClickTimerRef = useRef<number | null>(null)
 
@@ -188,24 +184,25 @@ export function useMobileSideDrawerGesture({
         }, MOBILE_SIDE_DRAWER_GESTURE_TUNING.suppressClickMs)
     }, [clearSuppressClickTimer])
 
-    const closeDrawer = useCallback(() => {
-        setOpen(false)
+    const resetDrag = useCallback(() => {
+        dragRuntimeRef.current = null
         setOffset(null)
         setDragging(false)
-        dragRef.current = null
-        dragElementRef.current = null
     }, [])
+
+    const closeDrawer = useCallback(() => {
+        setOpen(false)
+        resetDrag()
+    }, [resetDrag])
 
     const openDrawer = useCallback(() => {
         if (!enabled) return
-        setOffset(null)
+        resetDrag()
         setOpen(true)
-    }, [enabled])
+    }, [enabled, resetDrag])
 
     useEffect(() => {
-        if (!enabled) {
-            closeDrawer()
-        }
+        if (!enabled) closeDrawer()
     }, [closeDrawer, enabled])
 
     useEffect(() => {
@@ -214,202 +211,164 @@ export function useMobileSideDrawerGesture({
         }
     }, [clearSuppressClickTimer])
 
-    const cancelDrag = useCallback((
-        pointerId: number,
-        reason: string,
-        detail?: Record<string, unknown>,
-    ) => {
-        logger.info(`${logLabel} 取消`, {
-            pointerId,
-            reason,
-            ...detail,
-        })
-        dragRef.current = null
-        const dragElement = dragElementRef.current
-        if (dragElement?.hasPointerCapture(pointerId)) {
-            dragElement.releasePointerCapture(pointerId)
-        }
-        dragElementRef.current = null
-    }, [logLabel])
-
-    const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    const bindDrag = useDrag(({
+        cancel,
+        currentTarget,
+        direction: [directionX],
+        event,
+        first,
+        initial: [startX, startY],
+        last,
+        movement: [moveX, moveY],
+        offset: [nextOffset],
+        velocity: [velocityX],
+    }) => {
         if (!enabled) return
-        if (!event.isPrimary) return
-        if (event.pointerType === 'mouse' && event.button !== 0) return
-        if (!allowTextEditingTargetGestures && isTextEditingTarget(event.target)) return
-        if (isInternalGestureTarget(event.target)) {
-            logger.info(`${logLabel} 忽略`, {
-                pointerId: event.pointerId,
-                reason: '内部手势区域',
-                target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
-            })
-            return
-        }
-        const edgeBackCandidate = Boolean(
-            !open
-            && onEdgeBackGesture
-            && event.clientX <= MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackStartWidth,
-        )
 
-        if (!edgeBackCandidate && isHorizontalScrollGestureTarget(event.target)) {
-            logger.info(`${logLabel} 忽略`, {
-                pointerId: event.pointerId,
-                reason: '横向滚动区域',
-                target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
-            })
-            return
-        }
+        const pointerId = getPointerId(event)
+        if (first) {
+            const edgeBackCandidate = Boolean(
+                !open
+                && onEdgeBackGesture
+                && startX <= MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackStartWidth,
+            )
 
-        const dragElement = event.currentTarget
-        dragElementRef.current = dragElement
-        dragRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            baseOffset: open ? width : 0,
-            latestOffset: open ? width : 0,
-            tracking: false,
-            edgeBackCandidate,
-        }
-        dragElement.setPointerCapture(event.pointerId)
-        logger.info(`${logLabel} 按下`, {
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            open,
-            drawerWidth: width,
-            startX: Math.round(event.clientX),
-            startY: Math.round(event.clientY),
-            edgeBackCandidate,
-            target: event.target instanceof HTMLElement ? event.target.tagName : 'unknown',
-            area: getElementClassName(dragElement),
-        })
-    }, [allowTextEditingTargetGestures, enabled, logLabel, onEdgeBackGesture, open, width])
+            const ignoredReason = !allowTextEditingTargetGestures && isTextEditingTarget(event.target)
+                ? '文本编辑区域'
+                : isInternalGestureTarget(event.target)
+                    ? '内部手势区域'
+                    : !edgeBackCandidate && isHorizontalScrollGestureTarget(event.target)
+                        ? '横向滚动区域'
+                        : ''
 
-    const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = dragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-
-        const dx = event.clientX - dragState.startX
-        const dy = event.clientY - dragState.startY
-        const horizontal = Math.abs(dx)
-        const vertical = Math.abs(dy)
-
-        if (!dragState.tracking) {
-            if (
-                vertical > MOBILE_SIDE_DRAWER_GESTURE_TUNING.verticalCancelDistance
-                && vertical > horizontal
-            ) {
-                cancelDrag(event.pointerId, '判定为竖向滚动', {
-                    dx: Math.round(dx),
-                    dy: Math.round(dy),
-                    horizontal: Math.round(horizontal),
-                    vertical: Math.round(vertical),
+            if (ignoredReason) {
+                logger.info(`${logLabel} 忽略`, {
+                    pointerId,
+                    reason: ignoredReason,
+                    target: getTagName(event.target),
                 })
+                dragRuntimeRef.current = null
+                cancel()
                 return
             }
-            if (
-                horizontal < MOBILE_SIDE_DRAWER_GESTURE_TUNING.horizontalStartDistance
-                || horizontal < vertical * MOBILE_SIDE_DRAWER_GESTURE_TUNING.horizontalDominanceRatio
-            ) return
-            if (dragState.edgeBackCandidate) {
-                if (dx < 0) {
-                    cancelDrag(event.pointerId, '左边缘区域左滑', {
-                        dx: Math.round(dx),
-                        dy: Math.round(dy),
-                        horizontal: Math.round(horizontal),
-                        vertical: Math.round(vertical),
-                    })
-                    return
-                }
-                if (dx < MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackTriggerDistance) return
 
-                event.preventDefault()
+            dragRuntimeRef.current = {
+                edgeBackCandidate,
+                openBefore: open,
+                started: false,
+            }
+            logger.info(`${logLabel} 按下`, {
+                pointerId,
+                pointerType: getPointerType(event),
+                open,
+                drawerWidth: width,
+                startX: Math.round(startX),
+                startY: Math.round(startY),
+                edgeBackCandidate,
+                target: getTagName(event.target),
+                area: getElementClassName(currentTarget),
+            })
+        }
+
+        const runtime = dragRuntimeRef.current
+        if (!runtime) return
+
+        if (runtime.edgeBackCandidate) {
+            if (moveX < 0) {
+                logger.info(`${logLabel} 取消`, {
+                    pointerId,
+                    reason: '左边缘区域左滑',
+                    dx: Math.round(moveX),
+                    dy: Math.round(moveY),
+                })
+                resetDrag()
+                cancel()
+                return
+            }
+
+            if (moveX >= MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackTriggerDistance) {
+                if (event.cancelable) event.preventDefault()
                 suppressNextClick()
                 logger.info(`${logLabel} 左边缘返回`, {
-                    pointerId: event.pointerId,
-                    dx: Math.round(dx),
-                    dy: Math.round(dy),
-                    horizontal: Math.round(horizontal),
+                    pointerId,
+                    dx: Math.round(moveX),
+                    dy: Math.round(moveY),
                     triggerDistance: MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackTriggerDistance,
                 })
-                dragRef.current = null
-                setOffset(null)
-                setDragging(false)
-                const dragElement = dragElementRef.current
-                if (dragElement?.hasPointerCapture(event.pointerId)) {
-                    dragElement.releasePointerCapture(event.pointerId)
-                }
-                dragElementRef.current = null
+                resetDrag()
+                cancel()
                 onEdgeBackGesture?.()
                 return
             }
-            if (!open && dx < 0) {
-                cancelDrag(event.pointerId, '关闭状态下左滑', {
-                    dx: Math.round(dx),
-                    dy: Math.round(dy),
-                    horizontal: Math.round(horizontal),
-                    vertical: Math.round(vertical),
-                })
-                return
-            }
-            dragState.tracking = true
+
+            if (last) resetDrag()
+            return
+        }
+
+        if (!runtime.openBefore && moveX < 0) {
+            logger.info(`${logLabel} 取消`, {
+                pointerId,
+                reason: '关闭状态下左滑',
+                dx: Math.round(moveX),
+                dy: Math.round(moveY),
+            })
+            resetDrag()
+            cancel()
+            return
+        }
+
+        if (!runtime.started) {
+            runtime.started = true
             setDragging(true)
             logger.info(`${logLabel} 开始识别`, {
-                pointerId: event.pointerId,
-                open,
-                dx: Math.round(dx),
-                dy: Math.round(dy),
-                horizontal: Math.round(horizontal),
-                vertical: Math.round(vertical),
-                baseOffset: Math.round(dragState.baseOffset),
+                pointerId,
+                open: runtime.openBefore,
+                dx: Math.round(moveX),
+                dy: Math.round(moveY),
+                baseOffset: runtime.openBefore ? Math.round(width) : 0,
                 drawerWidth: Math.round(width),
             })
         }
 
-        event.preventDefault()
-        const nextOffset = clamp(dragState.baseOffset + dx, 0, width)
-        dragState.latestOffset = nextOffset
-        setOffset(nextOffset)
-    }, [cancelDrag, logLabel, onEdgeBackGesture, open, suppressNextClick, width])
+        if (event.cancelable) event.preventDefault()
+        const currentOffset = clamp(nextOffset, 0, width)
+        setOffset(currentOffset)
 
-    const finishDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-        const dragState = dragRef.current
-        if (!dragState || dragState.pointerId !== event.pointerId) return
+        if (!last) return
 
-        const currentOffset = dragState.latestOffset
-        const dragDistance = currentOffset - dragState.baseOffset
-        const openDistance = MOBILE_SIDE_DRAWER_GESTURE_TUNING.openSettleDistance
-        const closeDistance = MOBILE_SIDE_DRAWER_GESTURE_TUNING.closeSettleDistance
-        const shouldOpen = dragState.tracking
-            ? open
-                ? dragDistance > -closeDistance
-                : dragDistance >= openDistance
-            : open
+        const dragDistance = currentOffset - (runtime.openBefore ? width : 0)
+        const fastOpen = directionX > 0 && velocityX >= MOBILE_SIDE_DRAWER_GESTURE_TUNING.flingVelocity
+        const fastClose = directionX < 0 && velocityX >= MOBILE_SIDE_DRAWER_GESTURE_TUNING.flingVelocity
+        const shouldOpen = runtime.openBefore
+            ? !fastClose && dragDistance > -MOBILE_SIDE_DRAWER_GESTURE_TUNING.closeSettleDistance
+            : fastOpen || dragDistance >= MOBILE_SIDE_DRAWER_GESTURE_TUNING.openSettleDistance
+
         logger.info(`${logLabel} 结算`, {
-            pointerId: event.pointerId,
-            tracking: dragState.tracking,
-            openBefore: open,
+            pointerId,
+            tracking: runtime.started,
+            openBefore: runtime.openBefore,
             shouldOpen,
             currentOffset: Math.round(currentOffset),
             dragDistance: Math.round(dragDistance),
-            openDistance: Math.round(openDistance),
-            closeDistance: Math.round(closeDistance),
+            openDistance: MOBILE_SIDE_DRAWER_GESTURE_TUNING.openSettleDistance,
+            closeDistance: MOBILE_SIDE_DRAWER_GESTURE_TUNING.closeSettleDistance,
+            velocityX: Number(velocityX.toFixed(3)),
             drawerWidth: Math.round(width),
         })
-        if (dragState.tracking) {
-            suppressNextClick()
-        }
-        dragRef.current = null
-        setOffset(null)
-        setDragging(false)
-        setOpen(shouldOpen)
 
-        const dragElement = dragElementRef.current
-        if (dragElement?.hasPointerCapture(event.pointerId)) {
-            dragElement.releasePointerCapture(event.pointerId)
-        }
-        dragElementRef.current = null
-    }, [logLabel, open, suppressNextClick, width])
+        if (runtime.started) suppressNextClick()
+        resetDrag()
+        setOpen(shouldOpen)
+    }, {
+        axis: 'x',
+        bounds: {left: 0, right: width},
+        enabled,
+        filterTaps: true,
+        from: () => [open ? width : 0, 0],
+        pointer: {capture: false, keys: false, touch: true},
+        rubberband: false,
+        threshold: MOBILE_SIDE_DRAWER_GESTURE_TUNING.horizontalStartDistance,
+    })
 
     const handleClickCapture = useCallback((event: ReactMouseEvent<HTMLElement>) => {
         if (!suppressClickRef.current) return
@@ -425,11 +384,7 @@ export function useMobileSideDrawerGesture({
         openDrawer,
         closeDrawer,
         pointerHandlers: {
-            onPointerDown: handlePointerDown,
-            onPointerMove: handlePointerMove,
-            onPointerUp: finishDrag,
-            onPointerCancel: finishDrag,
-            onPointerLeave: finishDrag,
+            ...bindDrag(),
             onClickCapture: handleClickCapture,
         },
     }

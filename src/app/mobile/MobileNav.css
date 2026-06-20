@@ -7,6 +7,9 @@
     background: transparent;
     flex-shrink: 0;
     z-index: 30;
+    /* Android WebView 高 DPR 下打开浮层时可能把底部栏错误光栅化，单独成层可规避。 */
+    transform: translateZ(0);
+    contain: paint;
 }
 
 .mobile-nav__item {
@@ -27,6 +30,7 @@
     border-radius: var(--mobile-radius-card);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    transform: translateZ(0);
 }
 
 .mobile-nav__item.active {
@@ -39,6 +43,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transform: translateZ(0);
 }
 
 .mobile-nav__icon svg {
@@ -50,4 +55,5 @@
     font-size: 0.68rem;
     font-weight: var(--fc-font-weight-medium);
     line-height: 1;
+    transform: translateZ(0);
 }

@@ -1,6 +1,8 @@
 package cn.flowcloudai.www
 
 import android.os.Bundle
+import android.util.Log
+import android.view.View
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
@@ -34,5 +36,10 @@ class MainActivity : TauriActivity() {
   override fun onWebViewCreate(webView: WebView) {
     super.onWebViewCreate(webView)
     this.webView = webView
+    if (AndroidRuntimeWorkarounds.isX86_64_16KbPageEnvironment) {
+      // Android 16KB x86_64 模拟器上的 WebView/GPU 组合可能只渲染黑屏，改用软件层绘制。
+      webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+      Log.w("MainActivity", "use software layer for WebView on x86_64 16KB environment")
+    }
   }
 }

@@ -1,12 +1,12 @@
 import {
     type MouseEvent as ReactMouseEvent,
-    type PointerEvent as ReactPointerEvent,
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
 } from 'react'
+import {useDrag} from '@use-gesture/react'
 import {createPortal} from 'react-dom'
 import {saveFileDialog} from '../../../api/dialog'
 import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
@@ -51,10 +51,7 @@ type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
 type AiConversationStatusFilter = 'active' | 'archived'
 
 interface ConversationLongPressState {
-    pointerId: number
     conversation: Conversation
-    startX: number
-    startY: number
     ready: boolean
     timerId: number | null
 }
@@ -252,8 +249,6 @@ function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'de
                 <path d="M11.7 12h.6"/>
                 <path d="M5.2 11.2 4 9.6"/>
                 <path d="m18.8 11.2 1.2-1.6"/>
-                <path d="M8.45 8.75v6.5"/>
-                <path d="M15.55 8.75v6.5"/>
             </svg>
         )
     }
@@ -661,54 +656,6 @@ export default function MobileAiChat({
         void handleSelectConv(convId)
     }, [handleSelectConv])
 
-    const handleConversationLongPressStart = useCallback((
-        conversation: Conversation,
-        event: ReactPointerEvent<HTMLButtonElement>,
-    ) => {
-        if (event.pointerType === 'mouse' && event.button !== 0) return
-        clearConversationLongPress()
-
-        const pointerId = event.pointerId
-        const state: ConversationLongPressState = {
-            pointerId,
-            conversation,
-            startX: event.clientX,
-            startY: event.clientY,
-            ready: false,
-            timerId: null,
-        }
-        state.timerId = window.setTimeout(() => {
-            const current = conversationLongPressRef.current
-            if (!current || current.pointerId !== pointerId) return
-            current.ready = true
-            current.timerId = null
-        }, CONVERSATION_LONG_PRESS_DELAY)
-        conversationLongPressRef.current = state
-        event.currentTarget.setPointerCapture?.(pointerId)
-    }, [clearConversationLongPress])
-
-    const handleConversationLongPressMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-        const state = conversationLongPressRef.current
-        if (!state || state.pointerId !== event.pointerId) return
-        const dx = Math.abs(event.clientX - state.startX)
-        const dy = Math.abs(event.clientY - state.startY)
-        if (dx > CONVERSATION_LONG_PRESS_MOVE_TOLERANCE || dy > CONVERSATION_LONG_PRESS_MOVE_TOLERANCE) {
-            clearConversationLongPress()
-        }
-    }, [clearConversationLongPress])
-
-    const handleConversationLongPressEnd = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-        const state = conversationLongPressRef.current
-        if (!state || state.pointerId !== event.pointerId) return
-        const shouldOpenMenu = state.ready
-        clearConversationLongPress()
-        if (!shouldOpenMenu) return
-        event.preventDefault()
-        event.stopPropagation()
-        suppressConversationClickRef.current = true
-        setConversationActionTarget(state.conversation)
-    }, [clearConversationLongPress])
-
     const handleConversationContextMenu = useCallback((
         conversation: Conversation,
         event: ReactMouseEvent<HTMLButtonElement>,
@@ -717,6 +664,55 @@ export default function MobileAiChat({
         suppressConversationClickRef.current = true
         setConversationActionTarget(conversation)
     }, [])
+
+    const bindConversationLongPress = useDrag(({
+        args: [conversation],
+        cancel,
+        event,
+        first,
+        last,
+        movement: [moveX, moveY],
+    }) => {
+        const targetConversation = conversation as Conversation | undefined
+        if (!targetConversation) return
+
+        if (first) {
+            clearConversationLongPress()
+            const state: ConversationLongPressState = {
+                conversation: targetConversation,
+                ready: false,
+                timerId: null,
+            }
+            state.timerId = window.setTimeout(() => {
+                if (conversationLongPressRef.current !== state) return
+                state.ready = true
+                state.timerId = null
+            }, CONVERSATION_LONG_PRESS_DELAY)
+            conversationLongPressRef.current = state
+        }
+
+        if (
+            Math.abs(moveX) > CONVERSATION_LONG_PRESS_MOVE_TOLERANCE
+            || Math.abs(moveY) > CONVERSATION_LONG_PRESS_MOVE_TOLERANCE
+        ) {
+            clearConversationLongPress()
+            cancel()
+            return
+        }
+
+        if (!last) return
+        const state = conversationLongPressRef.current
+        const shouldOpenMenu = state?.ready
+        clearConversationLongPress()
+        if (!state || !shouldOpenMenu) return
+        if (event.cancelable) event.preventDefault()
+        event.stopPropagation()
+        suppressConversationClickRef.current = true
+        setConversationActionTarget(state.conversation)
+    }, {
+        filterTaps: false,
+        pointer: {keys: false, touch: true},
+    })
 
     const handleDeleteConv = useCallback(async (convId: string, event?: ReactMouseEvent) => {
         event?.stopPropagation()
@@ -1014,11 +1010,8 @@ export default function MobileAiChat({
                             <button
                                 type="button"
                                 className="mobile-ai-drawer__item-content"
+                                {...bindConversationLongPress(conversation)}
                                 onClick={() => handleConversationItemClick(conversation.id)}
-                                onPointerDown={event => handleConversationLongPressStart(conversation, event)}
-                                onPointerMove={handleConversationLongPressMove}
-                                onPointerUp={handleConversationLongPressEnd}
-                                onPointerCancel={clearConversationLongPress}
                                 onContextMenu={event => handleConversationContextMenu(conversation, event)}
                             >
                                 <span className="mobile-ai-drawer__item-main">
