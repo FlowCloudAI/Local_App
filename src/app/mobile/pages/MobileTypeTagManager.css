@@ -1,15 +1,5 @@
 .mobile-type-tag {
-    /*
-     * ── 顶栏渐变调试区 ──
-     *
-     * 1. header-top：标题上方留白；调大后标题整体下移。
-     * 2. header-body：返回/添加按钮和标题主体高度；调大后顶栏实色区更高。
-     * 3. header-fade：顶栏背景从实色到透明的渐变高度；调大后滚动内容淡出更长。
-     */
     --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
-    --mobile-type-tag-header-top: 0.5rem;
-    --mobile-type-tag-header-body: 3.15rem;
-    --mobile-type-tag-header-fade: 5rem;
 
     display: flex;
     flex-direction: column;
@@ -19,30 +9,7 @@
 }
 
 .mobile-type-tag__topbar {
-    position: sticky;
-    z-index: 6;
-    top: 0;
-    isolation: isolate;
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-    min-height: var(--mobile-type-tag-header-body);
-    margin: 0 calc(var(--mobile-type-tag-page-x) * -1);
-    padding: var(--mobile-type-tag-header-top) var(--mobile-type-tag-page-x) var(--mobile-type-tag-header-fade);
-    background: linear-gradient(
-        180deg,
-        var(--fc-color-bg) 10%,
-        var(--fc-color-bg) var(--mobile-type-tag-header-body),
-        color-mix(in srgb, var(--fc-color-bg) 0%, transparent) 100%
-    );
-    pointer-events: none;
-}
-
-.mobile-type-tag__topbar > * {
-    position: relative;
-    z-index: 1;
-    pointer-events: auto;
+    margin-bottom: 0.55rem;
 }
 
 .mobile-type-tag__heading {

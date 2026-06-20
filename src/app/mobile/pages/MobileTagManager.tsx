@@ -7,7 +7,7 @@ import {
     type TagSchema,
 } from '../../../api'
 import TagCreator from '../../../features/entries/components/TagCreator'
-import {MobileBackIcon, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileTypeTagManager.css'
 
@@ -55,20 +55,24 @@ export default function MobileTagManager({pop, params}: Props) {
 
     return (
         <div className="mobile-page mobile-type-tag">
-            <div className="mobile-type-tag__topbar">
-                <MobileTopActionPill
+            <MobilePageTopBar
+                className="mobile-type-tag__topbar"
+                sticky
+                edgeToEdge
+                ariaLabel="标签管理操作"
+                left={<MobileTopActionPill
                     actions={[{
                         key: 'back',
                         label: '返回',
                         icon: <MobileBackIcon/>,
                         onClick: pop,
                     }]}
-                />
-                <div className="mobile-type-tag__heading">
+                />}
+                center={<div className="mobile-type-tag__heading">
                     <span className="mobile-type-tag__eyebrow">{loading ? '正在同步' : `${tagSchemas.length} 个标签`}</span>
                     <h2 className="mobile-type-tag__title">标签管理</h2>
-                </div>
-                <MobileTopActionPill
+                </div>}
+                right={<MobileTopActionPill
                     actions={[{
                         key: 'create',
                         label: '新建标签',
@@ -76,8 +80,8 @@ export default function MobileTagManager({pop, params}: Props) {
                         kind: 'add',
                         onClick: () => openCreator(null),
                     }]}
-                />
-            </div>
+                />}
+            />
 
             {loading ? (
                 <div className="mobile-page__loading">加载中…</div>
