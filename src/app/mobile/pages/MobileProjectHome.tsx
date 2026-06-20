@@ -23,6 +23,7 @@ import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
     MobileBackIcon,
+    MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
 import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
@@ -391,8 +392,12 @@ export default function MobileProjectHome({
 
     return (
         <div ref={pageRef} className="mobile-page mobile-project-home">
-            <div className="mobile-project-home__topbar">
-                <MobileTopActionPill
+            <MobilePageTopBar
+                className="mobile-project-home__topbar"
+                sticky
+                edgeToEdge
+                ariaLabel="项目总览操作"
+                left={<MobileTopActionPill
                     actions={[
                         {
                             key: 'back',
@@ -408,8 +413,8 @@ export default function MobileProjectHome({
                             onClick: () => onOpenCategoryDrawer?.(),
                         },
                     ]}
-                />
-                <MobileTopActionPill
+                />}
+                right={<MobileTopActionPill
                     ref={topActionsRef}
                     actions={[
                         {
@@ -429,8 +434,8 @@ export default function MobileProjectHome({
                             onClick: () => setMenuOpen(open => !open),
                         },
                     ]}
-                />
-            </div>
+                />}
+            />
 
             <section className="mobile-project-home__hero">
                 {image ? (
