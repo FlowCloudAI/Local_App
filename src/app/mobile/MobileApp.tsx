@@ -312,7 +312,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     return (
         <div className="mobile-app">
             <div
-                className={`mobile-app-category-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-dragging' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
+                className={`mobile-app-side-drawer-shell${mobileSideDrawerEnabled ? ' is-enabled' : ''}${sideDrawerOpen ? ' is-open' : ''}${sideDrawerDragging ? ' is-dragging' : ''}${mobileSideDrawerKind ? ` is-${mobileSideDrawerKind}` : ''}`}
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,
@@ -320,7 +320,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             >
                 {mobileSideDrawerEnabled && (
                     <div
-                        className="mobile-app-category-shell__drawer"
+                        className="mobile-app-side-drawer-shell__drawer"
                         {...sideDrawerPointerHandlers}
                     >
                         {categoryDrawerEnabled ? (
@@ -340,12 +340,12 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                     </div>
                 )}
                 <div
-                    className="mobile-app-category-shell__surface"
+                    className="mobile-app-side-drawer-shell__surface"
                     {...sideDrawerPointerHandlers}
                 >
                     <button
                         type="button"
-                        className="mobile-app-category-shell__surface-close"
+                        className="mobile-app-side-drawer-shell__surface-close"
                         aria-label={mobileSideDrawerKind === 'ai' ? '关闭对话列表' : mobileSideDrawerKind === 'idea' ? '关闭灵感列表' : '关闭分类树'}
                         tabIndex={sideDrawerOpen ? 0 : -1}
                         onClick={closeCategoryDrawer}
