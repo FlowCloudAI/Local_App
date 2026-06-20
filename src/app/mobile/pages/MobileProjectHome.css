@@ -4,17 +4,9 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0;
-    padding: 0.85rem var(--mobile-project-home-x) calc(1.75rem + env(safe-area-inset-bottom, 0));
+    gap: 1.05rem;
+    padding: 0 var(--mobile-project-home-x) calc(1.75rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
-}
-
-.mobile-project-home > * + * {
-    margin-top: 1.05rem;
-}
-
-.mobile-project-home__topbar + * {
-    margin-top: 0;
 }
 
 .mobile-project-home__topbar {
