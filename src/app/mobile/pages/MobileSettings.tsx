@@ -27,10 +27,11 @@ import {
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
+import {openUrl} from '../../../api/opener'
 import {MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
+import MobileSettingsAboutSection from './MobileSettingsAboutSection'
 import {
-    MobileSettingsAboutSection,
     MobileSettingsAiSection,
     MobileSettingsAppearanceSection,
     MobileSettingsMenuSection,
@@ -48,6 +49,10 @@ interface Props {
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
 type SettingsSection = 'menu' | 'ai' | 'plugins' | 'appearance' | 'usage' | 'about'
 type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
+
+const OFFICIAL_SITE_URL = 'https://www.flowcloudai.cn'
+const OFFICIAL_GITHUB_URL = 'https://github.com/FlowCloudAI/Local_App'
+const OFFICIAL_EMAIL = 'flowcloudai@163.com'
 
 function getApiKeyStatusLabel(status: ApiKeyStatus): string {
     if (status === 'checking') return '检查中'
@@ -517,6 +522,23 @@ export default function MobileSettings({push, pop, page}: Props) {
         }
     }, [logSnapshot, showAlert])
 
+    const handleOpenOfficialUrl = useCallback((url: string) => {
+        void openUrl(url).catch(error => {
+            logger.error('[MobileSettings] 打开官方链接失败', error)
+            void showAlert(`打开链接失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+        })
+    }, [showAlert])
+
+    const handleCopyOfficialEmail = useCallback(async () => {
+        try {
+            await navigator.clipboard.writeText(OFFICIAL_EMAIL)
+            await showAlert('邮箱已复制', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            logger.error('[MobileSettings] 复制官方邮箱失败', error)
+            await showAlert(`复制邮箱失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [showAlert])
+
     const openSettingsPage = useCallback((type: MobileSettingsPageType) => {
         push?.({type})
     }, [push])
@@ -681,6 +703,11 @@ export default function MobileSettings({push, pop, page}: Props) {
                     onOpenLogViewer={handleOpenLogViewer}
                     onLoadAppLog={loadAppLog}
                     onCopyLog={handleCopyLog}
+                    officialSiteUrl={OFFICIAL_SITE_URL}
+                    officialGithubUrl={OFFICIAL_GITHUB_URL}
+                    officialEmail={OFFICIAL_EMAIL}
+                    onOpenOfficialUrl={handleOpenOfficialUrl}
+                    onCopyOfficialEmail={handleCopyOfficialEmail}
                     onExit={handleExit}
                 />
             )}

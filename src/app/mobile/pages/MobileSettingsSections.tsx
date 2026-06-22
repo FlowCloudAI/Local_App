@@ -2,10 +2,10 @@ import {Button, Input, Select, Slider} from 'flowcloudai-ui'
 import {
     type ApiUsageByModel,
     type ApiUsageSummary,
-    type AppLogSnapshot,
     type LocalPluginInfo,
     type RemotePluginInfo,
 } from '../../../api'
+import {convertFileSrc} from '../../../api/assets'
 import {type MobileSettingsPageType} from '../usePageStack'
 
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
@@ -84,22 +84,55 @@ interface UsageSectionProps {
     onRefresh: () => void | Promise<void>
 }
 
-interface AboutSectionProps {
-    version: string
-    logViewerOpen: boolean
-    logSnapshot: AppLogSnapshot | null
-    logLoading: boolean
-    logError: string
-    onOpenLogViewer: () => void
-    onLoadAppLog: () => void | Promise<void>
-    onCopyLog: () => void | Promise<void>
-    onExit: () => void | Promise<void>
-}
-
 function getPluginKindLabel(kind: string): string {
     if (kind.includes('image')) return 'IMAGE'
     if (kind.includes('tts')) return 'TTS'
     return 'LLM'
+}
+
+function PluginKindIcon({kind}: {kind: string}) {
+    if (kind.includes('image')) {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+            </svg>
+        )
+    }
+    if (kind.includes('tts')) {
+        return (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+        )
+    }
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    )
+}
+
+function PluginIcon({kind, iconUrl, local}: {kind: string; iconUrl?: string; local?: boolean}) {
+    const src = iconUrl ? (local ? convertFileSrc(iconUrl, 'fcimg') : iconUrl) : ''
+    return (
+        <div className="mobile-settings-plugin-icon">
+            {src ? (
+                <img
+                    src={src}
+                    alt=""
+                    className="mobile-settings-plugin-icon__image"
+                    onError={event => {
+                        event.currentTarget.style.display = 'none'
+                    }}
+                />
+            ) : (
+                <PluginKindIcon kind={kind}/>
+            )}
+        </div>
+    )
 }
 
 function getUsageModalityLabel(modality: string): string {
@@ -140,67 +173,6 @@ function SearchIcon() {
         <svg className="mobile-settings-plugin-search__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
             <circle cx="10.5" cy="10.5" r="5.8"/>
             <path d="m15 15 4.5 4.5"/>
-        </svg>
-    )
-}
-
-function LogIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
-            <path
-                d="M7 4h7l4 4v12H7z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M14 4v4h4M10 12h5M10 16h5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
-}
-
-function RefreshIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
-            <path
-                d="M20 12a8 8 0 0 1-13.66 5.66M4 12A8 8 0 0 1 17.66 6.34"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M20 5v6h-6M4 19v-6h6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
-}
-
-function CopyIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
-            <path
-                d="M8 8h10v10H8zM6 14H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
         </svg>
     )
 }
@@ -456,11 +428,14 @@ export function MobileSettingsPluginsSection({
                 ) : (
                     localPlugins.map(plugin => (
                         <div className="mobile-settings-installed-plugin-item" key={plugin.id}>
-                            <div className="mobile-settings-plugin-item__title">{plugin.name}</div>
-                            <div className="mobile-settings-plugin-item__meta">
-                                <span>{getPluginKindLabel(plugin.kind)}</span>
-                                <span>v{plugin.version}</span>
-                                <span>{plugin.author}</span>
+                            <PluginIcon kind={plugin.kind} iconUrl={plugin.icon_url} local/>
+                            <div className="mobile-settings-plugin-item__body">
+                                <div className="mobile-settings-plugin-item__title">{plugin.name}</div>
+                                <div className="mobile-settings-plugin-item__meta">
+                                    <span>{getPluginKindLabel(plugin.kind)}</span>
+                                    <span>v{plugin.version}</span>
+                                    <span>{plugin.author}</span>
+                                </div>
                             </div>
                         </div>
                     ))
@@ -487,6 +462,7 @@ export function MobileSettingsPluginsSection({
 
                         return (
                             <div className="mobile-settings-plugin-item" key={plugin.id}>
+                                <PluginIcon kind={plugin.kind} iconUrl={plugin.icon_url}/>
                                 <div className="mobile-settings-plugin-item__body">
                                     <div className="mobile-settings-plugin-item__title">{plugin.name}</div>
                                     <div className="mobile-settings-plugin-item__meta">
@@ -652,108 +628,6 @@ export function MobileSettingsUsageSection({
                     </div>
                 ))}
             </div>
-        </div>
-    )
-}
-
-export function MobileSettingsAboutSection({
-    version,
-    logViewerOpen,
-    logSnapshot,
-    logLoading,
-    logError,
-    onOpenLogViewer,
-    onLoadAppLog,
-    onCopyLog,
-    onExit,
-}: AboutSectionProps) {
-    return (
-        <div className="mobile-settings-section">
-            <div className="mobile-settings-about-card">
-                <div className="mobile-settings-about-card__title">FlowCloudAI 移动端</div>
-                {version && <div>版本 {version}</div>}
-            </div>
-            <div className="mobile-settings-about-actions">
-                <div className="mobile-settings-about-action">
-                    <div className="mobile-settings-about-action__copy">
-                        <span className="mobile-settings-about-action__title">应用日志</span>
-                        <span className="mobile-settings-about-action__desc">
-                            查看最近 app.log 内容，用于排查插件安装等运行问题。
-                        </span>
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onOpenLogViewer}
-                    >
-                        <span className="mobile-settings-button-content">
-                            <LogIcon/>
-                            查看日志
-                        </span>
-                    </Button>
-                </div>
-            </div>
-            {logViewerOpen && (
-                <div className="mobile-settings-log-viewer">
-                    <div className="mobile-settings-log-viewer__header">
-                        <div className="mobile-settings-log-viewer__copy">
-                            <div className="mobile-settings-log-viewer__title">最近日志</div>
-                            <div className="mobile-settings-log-viewer__path">
-                                {logSnapshot?.path || '正在读取日志路径…'}
-                            </div>
-                        </div>
-                        <div className="mobile-settings-log-viewer__actions">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void onLoadAppLog()}
-                                disabled={logLoading}
-                            >
-                                <span className="mobile-settings-button-content">
-                                    <RefreshIcon/>
-                                    {logLoading ? '读取中…' : '刷新'}
-                                </span>
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => void onCopyLog()}
-                                disabled={!logSnapshot?.content}
-                            >
-                                <span className="mobile-settings-button-content">
-                                    <CopyIcon/>
-                                    复制
-                                </span>
-                            </Button>
-                        </div>
-                    </div>
-                    {logSnapshot?.truncated && (
-                        <div className="mobile-settings-log-viewer__notice">
-                            日志较大，仅显示最近 256KB。
-                        </div>
-                    )}
-                    {logError ? (
-                        <div className="mobile-settings-log-viewer__error">
-                            读取失败：{logError}
-                        </div>
-                    ) : (
-                        <pre className="mobile-settings-log-viewer__content">{logLoading && !logSnapshot
-                            ? '正在读取日志…'
-                            : logSnapshot?.content || '暂无日志内容'}</pre>
-                    )}
-                </div>
-            )}
-            <Button
-                type="button"
-                variant="ghost"
-                onClick={onExit}
-                className="mobile-settings-exit-button"
-            >
-                退出应用
-            </Button>
         </div>
     )
 }

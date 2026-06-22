@@ -319,6 +319,10 @@
 }
 
 .mobile-settings-installed-plugin-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--fc-space-sm);
     padding: var(--fc-space-md);
     border-bottom: 1px solid var(--fc-color-border);
 }
@@ -329,11 +333,40 @@
 
 .mobile-settings-plugin-item {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--fc-space-sm);
     padding: var(--fc-space-md) 0;
     border-bottom: 1px solid var(--fc-color-border);
+}
+
+.mobile-settings-plugin-icon {
+    display: inline-grid;
+    width: 2.35rem;
+    height: 2.35rem;
+    flex: 0 0 auto;
+    overflow: hidden;
+    place-items: center;
+    border: var(--mobile-border);
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, var(--mobile-surface-raised));
+    color: var(--fc-color-primary);
+}
+
+.mobile-settings-plugin-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mobile-settings-plugin-icon__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .mobile-settings-plugin-item__body {
@@ -446,11 +479,55 @@
     line-height: 1.45;
 }
 
+.mobile-settings-about-brand {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--fc-space-md);
+}
+
+.mobile-settings-about-brand__icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.9rem;
+}
+
 .mobile-settings-about-card__title {
     margin-bottom: var(--fc-space-xs);
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
     font-weight: 600;
+}
+
+.mobile-settings-about-meta {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--fc-space-sm);
+    margin-top: var(--fc-space-md);
+}
+
+.mobile-settings-about-meta div {
+    min-width: 0;
+}
+
+.mobile-settings-about-meta span,
+.mobile-settings-about-meta strong {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-settings-about-meta span {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.mobile-settings-about-meta strong {
+    margin-top: var(--fc-space-xs);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-xs);
 }
 
 .mobile-settings-about-actions {
