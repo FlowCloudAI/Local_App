@@ -3,6 +3,8 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_close_all_sessions,
+    ai_get_usage_by_model,
+    ai_get_usage_summary,
     ai_list_plugins,
     exit_app,
     plugin_install_from_file,
@@ -17,6 +19,8 @@ import {
     setting_update_settings,
     type AppLogSnapshot,
     type AppSettings,
+    type ApiUsageByModel,
+    type ApiUsageSummary,
     type LocalPluginInfo,
     type PluginInfo,
     type RemotePluginInfo,
@@ -30,6 +34,7 @@ import {
     MobileSettingsAppearanceSection,
     MobileSettingsMenuSection,
     MobileSettingsPluginsSection,
+    MobileSettingsUsageSection,
 } from './MobileSettingsSections'
 import './MobileSettings.css'
 
@@ -40,7 +45,8 @@ interface Props {
 }
 
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
-type SettingsSection = 'menu' | 'ai' | 'plugins' | 'appearance' | 'about'
+type SettingsSection = 'menu' | 'ai' | 'plugins' | 'appearance' | 'usage' | 'about'
+type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 function getApiKeyStatusLabel(status: ApiKeyStatus): string {
     if (status === 'checking') return '检查中'
@@ -52,6 +58,17 @@ function getApiKeyStatusLabel(status: ApiKeyStatus): string {
 
 function normalizePluginKey(value: string): string {
     return value.trim().toLowerCase()
+}
+
+function getPluginKindFilterValue(kind: string): PluginKindFilter {
+    if (kind.includes('image')) return 'image'
+    if (kind.includes('tts')) return 'tts'
+    return 'llm'
+}
+
+function clampEditorFontSize(value: number): number {
+    if (!Number.isFinite(value)) return 14
+    return Math.min(24, Math.max(10, Math.round(value)))
 }
 
 function formatUnknownError(error: unknown): string {
@@ -71,6 +88,7 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
         case 'settingsAi': return 'ai'
         case 'settingsPlugins': return 'plugins'
         case 'settingsAppearance': return 'appearance'
+        case 'settingsUsage': return 'usage'
         case 'settingsAbout': return 'about'
         default: return 'menu'
     }
@@ -80,6 +98,7 @@ function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'ai') return 'AI 设置'
     if (section === 'plugins') return '插件安装'
     if (section === 'appearance') return '外观'
+    if (section === 'usage') return '用量统计'
     if (section === 'about') return '关于'
     return '设置'
 }
@@ -95,6 +114,8 @@ export default function MobileSettings({push, pop, page}: Props) {
     const [apiKeyBusy, setApiKeyBusy] = useState(false)
     const [localPlugins, setLocalPlugins] = useState<LocalPluginInfo[]>([])
     const [marketPlugins, setMarketPlugins] = useState<RemotePluginInfo[]>([])
+    const [pluginSearch, setPluginSearch] = useState('')
+    const [pluginKindFilter, setPluginKindFilter] = useState<PluginKindFilter>('all')
     const [localPluginError, setLocalPluginError] = useState<string | null>(null)
     const [marketPluginError, setMarketPluginError] = useState<string | null>(null)
     const [loadingLocalPlugins, setLoadingLocalPlugins] = useState(false)
@@ -108,6 +129,10 @@ export default function MobileSettings({push, pop, page}: Props) {
     const [logSnapshot, setLogSnapshot] = useState<AppLogSnapshot | null>(null)
     const [logLoading, setLogLoading] = useState(false)
     const [logError, setLogError] = useState('')
+    const [usageSummary, setUsageSummary] = useState<ApiUsageSummary | null>(null)
+    const [usageByModel, setUsageByModel] = useState<ApiUsageByModel[]>([])
+    const [usageLoading, setUsageLoading] = useState(false)
+    const [usageError, setUsageError] = useState('')
     const marketLoadSeqRef = useRef(0)
     const pluginRefreshSeqRef = useRef(0)
     const pluginRefreshInFlightRef = useRef(false)
@@ -410,6 +435,10 @@ export default function MobileSettings({push, pop, page}: Props) {
         return new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
     }, [localPlugins])
 
+    const sortedLocalPlugins = useMemo(() => {
+        return [...localPlugins].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    }, [localPlugins])
+
     const sortedMarketPlugins = useMemo(() => {
         return [...marketPlugins].sort((a, b) => {
             const aInstalled = installedPluginMap.has(normalizePluginKey(a.id))
@@ -418,6 +447,19 @@ export default function MobileSettings({push, pop, page}: Props) {
             return a.name.localeCompare(b.name, 'zh-CN')
         })
     }, [installedPluginMap, marketPlugins])
+
+    const filteredMarketPlugins = useMemo(() => {
+        const keyword = pluginSearch.trim().toLocaleLowerCase('zh-CN')
+        return sortedMarketPlugins.filter(plugin => {
+            const matchesKind = pluginKindFilter === 'all' || getPluginKindFilterValue(plugin.kind) === pluginKindFilter
+            if (!matchesKind) return false
+            if (!keyword) return true
+            return [plugin.name, plugin.id, plugin.author, plugin.kind]
+                .join(' ')
+                .toLocaleLowerCase('zh-CN')
+                .includes(keyword)
+        })
+    }, [pluginKindFilter, pluginSearch, sortedMarketPlugins])
 
     const getInstalledPlugin = useCallback((pluginId: string) => {
         return installedPluginMap.get(normalizePluginKey(pluginId))
@@ -470,9 +512,38 @@ export default function MobileSettings({push, pop, page}: Props) {
         push?.({type})
     }, [push])
 
-    if (loading) return <div className="mobile-page__loading">加载中…</div>
+    const updateSettingsDraft = useCallback((patch: Partial<AppSettings>) => {
+        setSettings(current => current ? {...current, ...patch} : current)
+    }, [])
+
+    const loadUsageStats = useCallback(async () => {
+        setUsageLoading(true)
+        setUsageError('')
+        try {
+            const [summary, byModel] = await Promise.all([
+                ai_get_usage_summary(),
+                ai_get_usage_by_model(),
+            ])
+            setUsageSummary(summary)
+            setUsageByModel(byModel)
+        } catch (error) {
+            const message = formatUnknownError(error)
+            logger.error('[MobileSettings] 加载用量统计失败', error)
+            setUsageError(message)
+        } finally {
+            setUsageLoading(false)
+        }
+    }, [])
 
     const section = getSettingsSection(page)
+
+    useEffect(() => {
+        if (section !== 'usage') return
+        void loadUsageStats()
+    }, [loadUsageStats, section])
+
+    if (loading) return <div className="mobile-page__loading">加载中…</div>
+
     const pluginOptions = plugins.map(p => ({value: p.id, label: p.name}))
     const currentPlugin = plugins.find(p => p.id === selectedPlugin)
     const modelOptions = (currentPlugin?.models ?? []).map(m => ({value: m, label: m}))
@@ -485,6 +556,10 @@ export default function MobileSettings({push, pop, page}: Props) {
         {value: 'system', label: '跟随系统'},
         {value: 'light', label: '浅色'},
         {value: 'dark', label: '深色'},
+    ]
+    const languageOptions = [
+        {value: 'zh-CN', label: '简体中文'},
+        {value: 'en-US', label: 'English'},
     ]
 
     if (section === 'menu') {
@@ -543,11 +618,16 @@ export default function MobileSettings({push, pop, page}: Props) {
                     localPluginCount={localPlugins.length}
                     pluginSourcesRefreshing={pluginSourcesRefreshing}
                     installingLocalFile={installingLocalFile}
+                    pluginSearch={pluginSearch}
+                    pluginKindFilter={pluginKindFilter}
                     localPluginError={localPluginError}
                     marketPluginError={marketPluginError}
                     loadingMarketPlugins={loadingMarketPlugins}
-                    marketPlugins={sortedMarketPlugins}
+                    localPlugins={sortedLocalPlugins}
+                    marketPlugins={filteredMarketPlugins}
                     installingPluginIds={installingPluginIds}
+                    onPluginSearchChange={setPluginSearch}
+                    onPluginKindFilterChange={setPluginKindFilter}
                     getInstalledPlugin={getInstalledPlugin}
                     onRefreshPluginSources={refreshPluginInstallSources}
                     onInstallFromFile={handleInstallFromFile}
@@ -559,8 +639,23 @@ export default function MobileSettings({push, pop, page}: Props) {
                 <MobileSettingsAppearanceSection
                     theme={theme}
                     themeOptions={themeOptions}
+                    language={settings?.language ?? 'zh-CN'}
+                    languageOptions={languageOptions}
+                    editorFontSize={settings?.editor_font_size ?? 14}
                     onThemeChange={setTheme}
+                    onLanguageChange={language => updateSettingsDraft({language})}
+                    onEditorFontSizeChange={fontSize => updateSettingsDraft({editor_font_size: clampEditorFontSize(fontSize)})}
                     onSaveSettings={handleSave}
+                />
+            )}
+
+            {section === 'usage' && (
+                <MobileSettingsUsageSection
+                    summary={usageSummary}
+                    byModel={usageByModel}
+                    loading={usageLoading}
+                    error={usageError}
+                    onRefresh={loadUsageStats}
                 />
             )}
 

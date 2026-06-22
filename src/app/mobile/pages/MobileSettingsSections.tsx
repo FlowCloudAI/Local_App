@@ -1,5 +1,7 @@
 import {Button, Input, Select} from 'flowcloudai-ui'
 import {
+    type ApiUsageByModel,
+    type ApiUsageSummary,
     type AppLogSnapshot,
     type LocalPluginInfo,
     type RemotePluginInfo,
@@ -7,6 +9,7 @@ import {
 import {type MobileSettingsPageType} from '../usePageStack'
 
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
+type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 
 interface SelectOption {
     value: string
@@ -45,11 +48,16 @@ interface PluginsSectionProps {
     localPluginCount: number
     pluginSourcesRefreshing: boolean
     installingLocalFile: boolean
+    pluginSearch: string
+    pluginKindFilter: PluginKindFilter
     localPluginError: string | null
     marketPluginError: string | null
     loadingMarketPlugins: boolean
+    localPlugins: LocalPluginInfo[]
     marketPlugins: RemotePluginInfo[]
     installingPluginIds: Set<string>
+    onPluginSearchChange: (value: string) => void
+    onPluginKindFilterChange: (value: PluginKindFilter) => void
     getInstalledPlugin: (pluginId: string) => LocalPluginInfo | undefined
     onRefreshPluginSources: () => void | Promise<void>
     onInstallFromFile: () => void | Promise<void>
@@ -59,8 +67,21 @@ interface PluginsSectionProps {
 interface AppearanceSectionProps {
     theme: string
     themeOptions: SelectOption[]
+    language: string
+    languageOptions: SelectOption[]
+    editorFontSize: number
     onThemeChange: (value: 'system' | 'light' | 'dark') => void
+    onLanguageChange: (value: string) => void
+    onEditorFontSizeChange: (value: number) => void
     onSaveSettings: () => void | Promise<void>
+}
+
+interface UsageSectionProps {
+    summary: ApiUsageSummary | null
+    byModel: ApiUsageByModel[]
+    loading: boolean
+    error: string
+    onRefresh: () => void | Promise<void>
 }
 
 interface AboutSectionProps {
@@ -79,6 +100,16 @@ function getPluginKindLabel(kind: string): string {
     if (kind.includes('image')) return 'IMAGE'
     if (kind.includes('tts')) return 'TTS'
     return 'LLM'
+}
+
+function getUsageModalityLabel(modality: string): string {
+    if (modality === 'image') return '图片'
+    if (modality === 'tts') return '语音'
+    return '对话'
+}
+
+function formatUsageNumber(value: number): string {
+    return value.toLocaleString('zh-CN')
 }
 
 function ChevronRightIcon() {
@@ -212,6 +243,17 @@ export function MobileSettingsMenuSection({
             <button
                 type="button"
                 className="mobile-settings-menu-item"
+                onClick={() => onOpenPage('settingsUsage')}
+            >
+                <span className="mobile-settings-menu-item__content">
+                    <span className="mobile-settings-menu-item__label">用量统计</span>
+                    <span className="mobile-settings-menu-item__summary">API 调用与 Token 消耗</span>
+                </span>
+                <ChevronRightIcon/>
+            </button>
+            <button
+                type="button"
+                className="mobile-settings-menu-item"
                 onClick={() => onOpenPage('settingsAbout')}
             >
                 <span className="mobile-settings-menu-item__content">
@@ -317,11 +359,16 @@ export function MobileSettingsPluginsSection({
     localPluginCount,
     pluginSourcesRefreshing,
     installingLocalFile,
+    pluginSearch,
+    pluginKindFilter,
     localPluginError,
     marketPluginError,
     loadingMarketPlugins,
+    localPlugins,
     marketPlugins,
     installingPluginIds,
+    onPluginSearchChange,
+    onPluginKindFilterChange,
     getInstalledPlugin,
     onRefreshPluginSources,
     onInstallFromFile,
@@ -352,12 +399,55 @@ export function MobileSettingsPluginsSection({
                     {installingLocalFile ? '安装中…' : '安装本地插件'}
                 </Button>
             </div>
+            <div className="mobile-settings-plugin-filter">
+                <Input
+                    value={pluginSearch}
+                    onValueChange={onPluginSearchChange}
+                    placeholder="搜索插件..."
+                    className="mobile-settings-plugin-filter__search"
+                />
+                <div className="mobile-settings-plugin-filter__segments" role="group" aria-label="插件类型筛选">
+                    {[
+                        ['all', '全部'],
+                        ['llm', '对话'],
+                        ['image', '图片'],
+                        ['tts', '语音'],
+                    ].map(([value, label]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            className={`mobile-settings-plugin-filter__segment${pluginKindFilter === value ? ' is-active' : ''}`}
+                            onClick={() => onPluginKindFilterChange(value as PluginKindFilter)}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
             {localPluginError && (
                 <div className="mobile-settings-plugin-error">本地插件加载失败：{localPluginError}</div>
             )}
             {marketPluginError && (
                 <div className="mobile-settings-plugin-error">插件库加载失败：{marketPluginError}</div>
             )}
+            <div className="mobile-settings-installed-plugin-list">
+                <div className="mobile-settings-subtitle">已安装插件</div>
+                {localPlugins.length === 0 ? (
+                    <div className="mobile-settings-plugin-empty">暂无已安装插件</div>
+                ) : (
+                    localPlugins.map(plugin => (
+                        <div className="mobile-settings-installed-plugin-item" key={plugin.id}>
+                            <div className="mobile-settings-plugin-item__title">{plugin.name}</div>
+                            <div className="mobile-settings-plugin-item__meta">
+                                <span>{getPluginKindLabel(plugin.kind)}</span>
+                                <span>v{plugin.version}</span>
+                                <span>{plugin.author}</span>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+            <div className="mobile-settings-subtitle">插件库</div>
             <div className="mobile-settings-plugin-list">
                 {loadingMarketPlugins ? (
                     <div className="mobile-settings-plugin-empty">正在加载插件库…</div>
@@ -414,7 +504,12 @@ export function MobileSettingsPluginsSection({
 export function MobileSettingsAppearanceSection({
     theme,
     themeOptions,
+    language,
+    languageOptions,
+    editorFontSize,
     onThemeChange,
+    onLanguageChange,
+    onEditorFontSizeChange,
     onSaveSettings,
 }: AppearanceSectionProps) {
     return (
@@ -429,9 +524,114 @@ export function MobileSettingsAppearanceSection({
                         placeholder="选择主题"
                     />
                 </div>
+                <div>
+                    <div className="mobile-settings-field-label">语言</div>
+                    <Select
+                        value={language}
+                        onChange={v => onLanguageChange(String(v ?? 'zh-CN'))}
+                        options={languageOptions}
+                        placeholder="选择语言"
+                    />
+                </div>
+                <div>
+                    <div className="mobile-settings-field-label">编辑器字号</div>
+                    <div className="mobile-settings-font-size-control">
+                        <input
+                            type="range"
+                            min="10"
+                            max="24"
+                            step="1"
+                            value={editorFontSize}
+                            onChange={event => onEditorFontSizeChange(Number(event.currentTarget.value))}
+                        />
+                        <span>{editorFontSize}px</span>
+                        {editorFontSize !== 14 && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onEditorFontSizeChange(14)}
+                            >
+                                默认
+                            </Button>
+                        )}
+                    </div>
+                </div>
                 <Button type="button" onClick={onSaveSettings} className="mobile-settings-full-button">
                     保存设置
                 </Button>
+            </div>
+        </div>
+    )
+}
+
+export function MobileSettingsUsageSection({
+    summary,
+    byModel,
+    loading,
+    error,
+    onRefresh,
+}: UsageSectionProps) {
+    if (loading && !summary) {
+        return <div className="mobile-settings-plugin-empty">正在加载用量统计…</div>
+    }
+
+    if (error) {
+        return (
+            <div className="mobile-settings-section">
+                <div className="mobile-settings-plugin-error">加载失败：{error}</div>
+                <Button type="button" size="sm" variant="outline" onClick={() => void onRefresh()}>
+                    重试
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="mobile-settings-section">
+            <div className="mobile-settings-section__header">
+                <div className="mobile-settings-plugin-count">查看 API 调用次数与 Token 消耗</div>
+                <Button type="button" size="sm" variant="outline" onClick={() => void onRefresh()} disabled={loading}>
+                    {loading ? '刷新中…' : '刷新'}
+                </Button>
+            </div>
+            {summary && (
+                <div className="mobile-settings-usage-grid">
+                    <div className="mobile-settings-usage-card">
+                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.call_count)}</div>
+                        <div className="mobile-settings-usage-card__label">API 调用</div>
+                    </div>
+                    <div className="mobile-settings-usage-card">
+                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_tokens)}</div>
+                        <div className="mobile-settings-usage-card__label">总 Token</div>
+                    </div>
+                    <div className="mobile-settings-usage-card">
+                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_prompt_tokens)}</div>
+                        <div className="mobile-settings-usage-card__label">Prompt</div>
+                    </div>
+                    <div className="mobile-settings-usage-card">
+                        <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_completion_tokens)}</div>
+                        <div className="mobile-settings-usage-card__label">Completion</div>
+                    </div>
+                </div>
+            )}
+            <div className="mobile-settings-subtitle">按模型统计</div>
+            <div className="mobile-settings-usage-model-list">
+                {byModel.length === 0 ? (
+                    <div className="mobile-settings-plugin-empty">暂无记录。使用 AI 对话后将自动统计。</div>
+                ) : byModel.map((row, index) => (
+                    <div className="mobile-settings-usage-model-item" key={`${row.provider}-${row.model}-${index}`}>
+                        <div className="mobile-settings-usage-model-item__header">
+                            <div className="mobile-settings-plugin-item__title">{row.model}</div>
+                            <span className="mobile-settings-usage-badge">{getUsageModalityLabel(row.modality)}</span>
+                        </div>
+                        <div className="mobile-settings-plugin-item__meta">
+                            <span>{row.provider}</span>
+                            <span>{formatUsageNumber(row.call_count)} 次</span>
+                            <span>{formatUsageNumber(row.total_tokens)} tokens</span>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     )

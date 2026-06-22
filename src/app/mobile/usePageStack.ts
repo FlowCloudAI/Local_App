@@ -28,6 +28,7 @@ export interface MobilePageParamsMap {
     settingsAi: undefined
     settingsPlugins: undefined
     settingsAppearance: undefined
+    settingsUsage: undefined
     settingsAbout: undefined
 }
 
@@ -37,6 +38,7 @@ export type MobileSettingsPageType =
     | 'settingsAi'
     | 'settingsPlugins'
     | 'settingsAppearance'
+    | 'settingsUsage'
     | 'settingsAbout'
 
 export type MobilePageOf<T extends MobilePageType = MobilePageType> = {
