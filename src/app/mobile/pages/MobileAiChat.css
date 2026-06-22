@@ -1,4 +1,6 @@
 .mobile-ai-chat {
+    --mobile-ai-topbar-space: 4.25rem;
+    --mobile-ai-composer-space: 8.25rem;
     position: relative;
     display: flex;
     min-height: 0;
@@ -8,6 +10,14 @@
     overflow: hidden;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
+}
+
+.mobile-ai-chat__topbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 20;
 }
 
 .mobile-ai-svg {
@@ -464,8 +474,15 @@
     flex-direction: column;
     gap: var(--fc-space-md);
     overflow-y: auto;
-    padding: 0.65rem clamp(1rem, 4vw, 1.35rem) 1rem;
+    padding: var(--mobile-ai-topbar-space) clamp(1rem, 4vw, 1.35rem) var(--mobile-ai-composer-space);
+    background: var(--fc-color-bg);
     scrollbar-width: none;
+    scroll-padding-top: var(--mobile-ai-topbar-space);
+    scroll-padding-bottom: var(--mobile-ai-composer-space);
+    contain: layout paint;
+    isolation: isolate;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
@@ -499,8 +516,13 @@
 }
 
 .mobile-ai-chat__composer {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
     flex: 0 0 auto;
-    padding: 0.2rem clamp(0.9rem, 4vw, 1.25rem) 0.18rem;
+    padding: 0.2rem clamp(0.65rem, 2.5vw, 1.1rem) 0.18rem;
     background: linear-gradient(
         180deg,
         transparent 0%,
@@ -517,7 +539,7 @@
     border: var(--mobile-border-medium);
     border-radius: var(--mobile-radius-sheet);
     background: var(--mobile-surface-panel);
-    box-shadow: var(--mobile-shadow-card);
+    backdrop-filter: blur(2px);
 }
 
 .mobile-ai-composer-card textarea {

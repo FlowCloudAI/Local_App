@@ -5,11 +5,9 @@
     display: flex;
     align-items: flex-end;
     background: transparent;
-    animation: mobile-bottom-sheet-layer-in 100ms ease-out;
 }
 
 .mobile-bottom-sheet-layer.is-closing {
-    animation: mobile-bottom-sheet-layer-out 100ms ease-in forwards;
     pointer-events: none;
 }
 
@@ -56,24 +54,14 @@
     touch-action: none;
 }
 
-@keyframes mobile-bottom-sheet-layer-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes mobile-bottom-sheet-layer-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
-
 @keyframes mobile-bottom-sheet-in {
-    from { transform: translateY(calc(var(--mobile-bottom-sheet-drag-offset) + 1.25rem)); }
+    from { transform: translateY(calc(100% + var(--mobile-bottom-sheet-drag-offset))); }
     to { transform: translateY(var(--mobile-bottom-sheet-drag-offset)); }
 }
 
 @keyframes mobile-bottom-sheet-out {
     from { transform: translateY(var(--mobile-bottom-sheet-drag-offset)); }
-    to { transform: translateY(calc(var(--mobile-bottom-sheet-drag-offset) + 1.25rem)); }
+    to { transform: translateY(calc(100% + var(--mobile-bottom-sheet-drag-offset))); }
 }
 
 @media (prefers-reduced-motion: reduce) {
