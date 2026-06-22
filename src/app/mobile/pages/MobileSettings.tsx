@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {Button, Input, Select, useAlert, useTheme} from 'flowcloudai-ui'
+import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_close_all_sessions,
     ai_list_plugins,
@@ -24,6 +24,13 @@ import {
 import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
+import {
+    MobileSettingsAboutSection,
+    MobileSettingsAiSection,
+    MobileSettingsAppearanceSection,
+    MobileSettingsMenuSection,
+    MobileSettingsPluginsSection,
+} from './MobileSettingsSections'
 import './MobileSettings.css'
 
 interface Props {
@@ -46,12 +53,6 @@ function normalizePluginKey(value: string): string {
     return value.trim().toLowerCase()
 }
 
-function getPluginKindLabel(kind: string): string {
-    if (kind.includes('image')) return 'IMAGE'
-    if (kind.includes('tts')) return 'TTS'
-    return 'LLM'
-}
-
 function formatUnknownError(error: unknown): string {
     if (error instanceof Error) return error.message || error.name
     if (typeof error === 'string') return error
@@ -72,86 +73,6 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
         case 'settingsAbout': return 'about'
         default: return 'menu'
     }
-}
-
-function ChevronRightIcon() {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            className="mobile-settings-menu-item__icon"
-        >
-            <path
-                d="M9 6l6 6-6 6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
-}
-
-function LogIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
-            <path
-                d="M7 4h7l4 4v12H7z"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M14 4v4h4M10 12h5M10 16h5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
-}
-
-function RefreshIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
-            <path
-                d="M20 12a8 8 0 0 1-13.66 5.66M4 12A8 8 0 0 1 17.66 6.34"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M20 5v6h-6M4 19v-6h6"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
-}
-
-function CopyIcon() {
-    return (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="mobile-settings-button-icon">
-            <path
-                d="M8 8h10v10H8zM6 14H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-        </svg>
-    )
 }
 
 export default function MobileSettings({push, page}: Props) {
@@ -489,6 +410,10 @@ export default function MobileSettings({push, page}: Props) {
         })
     }, [installedPluginMap, marketPlugins])
 
+    const getInstalledPlugin = useCallback((pluginId: string) => {
+        return installedPluginMap.get(normalizePluginKey(pluginId))
+    }, [installedPluginMap])
+
     const pluginSourcesRefreshing = loadingLocalPlugins || loadingMarketPlugins
 
     const handleExit = useCallback(async () => {
@@ -558,58 +483,15 @@ export default function MobileSettings({push, page}: Props) {
         const marketSummary = loadingMarketPlugins ? '插件库加载中' : `插件库 ${marketPlugins.length} 个`
         return (
             <div className="mobile-page mobile-settings-page">
-                <div className="mobile-settings-menu">
-                    <button
-                        type="button"
-                        className="mobile-settings-menu-item"
-                        onClick={() => openSettingsPage('settingsAi')}
-                    >
-                        <span className="mobile-settings-menu-item__content">
-                            <span className="mobile-settings-menu-item__label">AI 设置</span>
-                            <span className="mobile-settings-menu-item__summary">
-                                {currentPlugin?.name ?? '未选择插件'} · {apiKeyStatusLabel}
-                            </span>
-                        </span>
-                        <ChevronRightIcon/>
-                    </button>
-                    <button
-                        type="button"
-                        className="mobile-settings-menu-item"
-                        onClick={() => openSettingsPage('settingsPlugins')}
-                    >
-                        <span className="mobile-settings-menu-item__content">
-                            <span className="mobile-settings-menu-item__label">插件安装</span>
-                            <span className="mobile-settings-menu-item__summary">
-                                已安装 {localPlugins.length} 个 · {marketSummary}
-                            </span>
-                        </span>
-                        <ChevronRightIcon/>
-                    </button>
-                    <button
-                        type="button"
-                        className="mobile-settings-menu-item"
-                        onClick={() => openSettingsPage('settingsAppearance')}
-                    >
-                        <span className="mobile-settings-menu-item__content">
-                            <span className="mobile-settings-menu-item__label">外观</span>
-                            <span className="mobile-settings-menu-item__summary">{themeLabel}</span>
-                        </span>
-                        <ChevronRightIcon/>
-                    </button>
-                    <button
-                        type="button"
-                        className="mobile-settings-menu-item"
-                        onClick={() => openSettingsPage('settingsAbout')}
-                    >
-                        <span className="mobile-settings-menu-item__content">
-                            <span className="mobile-settings-menu-item__label">关于</span>
-                            <span className="mobile-settings-menu-item__summary">
-                                FlowCloudAI 移动端{version ? ` · ${version}` : ''}
-                            </span>
-                        </span>
-                        <ChevronRightIcon/>
-                    </button>
-                </div>
+                <MobileSettingsMenuSection
+                    themeLabel={themeLabel}
+                    marketSummary={marketSummary}
+                    localPluginCount={localPlugins.length}
+                    currentPluginName={currentPlugin?.name}
+                    apiKeyStatusLabel={apiKeyStatusLabel}
+                    version={version}
+                    onOpenPage={openSettingsPage}
+                />
             </div>
         )
     }
@@ -617,264 +499,63 @@ export default function MobileSettings({push, page}: Props) {
     return (
         <div className="mobile-page mobile-settings-page">
             {section === 'ai' && (
-                <div className="mobile-settings-section">
-                    <div className="mobile-settings-form-stack">
-                        <div>
-                            <div className="mobile-settings-field-label">插件</div>
-                            <Select
-                                value={selectedPlugin}
-                                onChange={v => setSelectedPlugin(String(v ?? ''))}
-                                options={pluginOptions}
-                                placeholder="选择插件"
-                            />
-                        </div>
-                        <div>
-                            <div className="mobile-settings-field-label">模型</div>
-                            <Select
-                                value={selectedModel}
-                                onChange={v => setSelectedModel(String(v ?? ''))}
-                                options={modelOptions}
-                                placeholder="选择模型"
-                            />
-                        </div>
-                        <div className="mobile-settings-api-key">
-                            <div className="mobile-settings-api-key__header">
-                                <div>
-                                    <div className="mobile-settings-field-label">API Key</div>
-                                    <div className="mobile-settings-api-key__desc">
-                                        仅保存到系统密钥链，不在设置文件中写入明文
-                                    </div>
-                                </div>
-                                <span className={`mobile-settings-api-key__status mobile-settings-api-key__status--${apiKeyStatus}`}>
-                                    {apiKeyStatusLabel}
-                                </span>
-                            </div>
-                            <Input
-                                type="password"
-                                value={apiKeyDraft}
-                                onValueChange={setApiKeyDraft}
-                                placeholder={apiKeyPlaceholder}
-                                disabled={!selectedPlugin || apiKeyBusy}
-                                autoComplete="off"
-                                className="mobile-settings-api-key__input"
-                            />
-                            <div className="mobile-settings-api-key__actions">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => void handleSaveApiKey()}
-                                    disabled={!selectedPlugin || apiKeyBusy || !apiKeyDraft.trim()}
-                                >
-                                    {apiKeyBusy ? '处理中…' : '保存 API Key'}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => void handleDeleteApiKey()}
-                                    disabled={!selectedPlugin || apiKeyBusy || apiKeyStatus !== 'configured'}
-                                >
-                                    删除
-                                </Button>
-                            </div>
-                        </div>
-                        <Button type="button" onClick={handleSave} className="mobile-settings-full-button">
-                            保存设置
-                        </Button>
-                    </div>
-                </div>
+                <MobileSettingsAiSection
+                    selectedPlugin={selectedPlugin}
+                    selectedModel={selectedModel}
+                    pluginOptions={pluginOptions}
+                    modelOptions={modelOptions}
+                    apiKeyStatus={apiKeyStatus}
+                    apiKeyStatusLabel={apiKeyStatusLabel}
+                    apiKeyDraft={apiKeyDraft}
+                    apiKeyBusy={apiKeyBusy}
+                    apiKeyPlaceholder={apiKeyPlaceholder}
+                    onSelectedPluginChange={setSelectedPlugin}
+                    onSelectedModelChange={setSelectedModel}
+                    onApiKeyDraftChange={setApiKeyDraft}
+                    onSaveSettings={handleSave}
+                    onSaveApiKey={handleSaveApiKey}
+                    onDeleteApiKey={handleDeleteApiKey}
+                />
             )}
 
             {section === 'plugins' && (
-                <div className="mobile-settings-section">
-                    <div className="mobile-settings-section__header">
-                        <div className="mobile-settings-plugin-count">已安装 {localPlugins.length} 个</div>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void refreshPluginInstallSources()}
-                            disabled={pluginSourcesRefreshing}
-                        >
-                            {pluginSourcesRefreshing ? '刷新中…' : '刷新'}
-                        </Button>
-                    </div>
-                    <div className="mobile-settings-plugin-actions">
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void handleInstallFromFile()}
-                            disabled={installingLocalFile}
-                        >
-                            {installingLocalFile ? '安装中…' : '安装本地插件'}
-                        </Button>
-                    </div>
-                    {localPluginError && (
-                        <div className="mobile-settings-plugin-error">本地插件加载失败：{localPluginError}</div>
-                    )}
-                    {marketPluginError && (
-                        <div className="mobile-settings-plugin-error">插件库加载失败：{marketPluginError}</div>
-                    )}
-                    <div className="mobile-settings-plugin-list">
-                        {loadingMarketPlugins ? (
-                            <div className="mobile-settings-plugin-empty">正在加载插件库…</div>
-                        ) : sortedMarketPlugins.length === 0 ? (
-                            <div className="mobile-settings-plugin-empty">暂无可安装插件</div>
-                        ) : (
-                            sortedMarketPlugins.map(plugin => {
-                                const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
-                                const installed = Boolean(installedPlugin)
-                                const hasUpdate = installedPlugin ? installedPlugin.version !== plugin.version : false
-                                const installing = installingPluginIds.has(plugin.id)
-                                const actionDisabled = installing || (installed && !hasUpdate)
-                                const actionLabel = installed
-                                    ? hasUpdate
-                                        ? installing ? '更新中…' : '更新'
-                                        : '已安装'
-                                    : installing ? '安装中…' : '安装'
-
-                                return (
-                                    <div className="mobile-settings-plugin-item" key={plugin.id}>
-                                        <div className="mobile-settings-plugin-item__body">
-                                            <div className="mobile-settings-plugin-item__title">{plugin.name}</div>
-                                            <div className="mobile-settings-plugin-item__meta">
-                                                <span>{getPluginKindLabel(plugin.kind)}</span>
-                                                <span>v{plugin.version}</span>
-                                                <span>{plugin.author}</span>
-                                            </div>
-                                            {installedPlugin && (
-                                                <div className={`mobile-settings-plugin-item__status${hasUpdate ? ' is-update' : ''}`}>
-                                                    {hasUpdate
-                                                        ? `已安装 v${installedPlugin.version}，可更新`
-                                                        : `已安装 v${installedPlugin.version}`}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant={installed && !hasUpdate ? 'outline' : 'primary'}
-                                            disabled={actionDisabled}
-                                            onClick={() => void handleInstallMarketPlugin(plugin.id)}
-                                        >
-                                            {actionLabel}
-                                        </Button>
-                                    </div>
-                                )
-                            })
-                        )}
-                    </div>
-                </div>
+                <MobileSettingsPluginsSection
+                    localPluginCount={localPlugins.length}
+                    pluginSourcesRefreshing={pluginSourcesRefreshing}
+                    installingLocalFile={installingLocalFile}
+                    localPluginError={localPluginError}
+                    marketPluginError={marketPluginError}
+                    loadingMarketPlugins={loadingMarketPlugins}
+                    marketPlugins={sortedMarketPlugins}
+                    installingPluginIds={installingPluginIds}
+                    getInstalledPlugin={getInstalledPlugin}
+                    onRefreshPluginSources={refreshPluginInstallSources}
+                    onInstallFromFile={handleInstallFromFile}
+                    onInstallMarketPlugin={handleInstallMarketPlugin}
+                />
             )}
 
             {section === 'appearance' && (
-                <div className="mobile-settings-section">
-                    <div className="mobile-settings-form-stack">
-                        <div>
-                            <div className="mobile-settings-field-label">主题</div>
-                            <Select
-                                value={theme}
-                                onChange={v => setTheme(String(v ?? 'system') as 'system' | 'light' | 'dark')}
-                                options={themeOptions}
-                                placeholder="选择主题"
-                            />
-                        </div>
-                        <Button type="button" onClick={handleSave} className="mobile-settings-full-button">
-                            保存设置
-                        </Button>
-                    </div>
-                </div>
+                <MobileSettingsAppearanceSection
+                    theme={theme}
+                    themeOptions={themeOptions}
+                    onThemeChange={setTheme}
+                    onSaveSettings={handleSave}
+                />
             )}
 
             {section === 'about' && (
-                <div className="mobile-settings-section">
-                    <div className="mobile-settings-about-card">
-                        <div className="mobile-settings-about-card__title">FlowCloudAI 移动端</div>
-                        {version && <div>版本 {version}</div>}
-                    </div>
-                    <div className="mobile-settings-about-actions">
-                        <div className="mobile-settings-about-action">
-                            <div className="mobile-settings-about-action__copy">
-                                <span className="mobile-settings-about-action__title">应用日志</span>
-                                <span className="mobile-settings-about-action__desc">
-                                    查看最近 app.log 内容，用于排查插件安装等运行问题。
-                                </span>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleOpenLogViewer}
-                            >
-                                <span className="mobile-settings-button-content">
-                                    <LogIcon/>
-                                    查看日志
-                                </span>
-                            </Button>
-                        </div>
-                    </div>
-                    {logViewerOpen && (
-                        <div className="mobile-settings-log-viewer">
-                            <div className="mobile-settings-log-viewer__header">
-                                <div className="mobile-settings-log-viewer__copy">
-                                    <div className="mobile-settings-log-viewer__title">最近日志</div>
-                                    <div className="mobile-settings-log-viewer__path">
-                                        {logSnapshot?.path || '正在读取日志路径…'}
-                                    </div>
-                                </div>
-                                <div className="mobile-settings-log-viewer__actions">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => void loadAppLog()}
-                                        disabled={logLoading}
-                                    >
-                                        <span className="mobile-settings-button-content">
-                                            <RefreshIcon/>
-                                            {logLoading ? '读取中…' : '刷新'}
-                                        </span>
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => void handleCopyLog()}
-                                        disabled={!logSnapshot?.content}
-                                    >
-                                        <span className="mobile-settings-button-content">
-                                            <CopyIcon/>
-                                            复制
-                                        </span>
-                                    </Button>
-                                </div>
-                            </div>
-                            {logSnapshot?.truncated && (
-                                <div className="mobile-settings-log-viewer__notice">
-                                    日志较大，仅显示最近 256KB。
-                                </div>
-                            )}
-                            {logError ? (
-                                <div className="mobile-settings-log-viewer__error">
-                                    读取失败：{logError}
-                                </div>
-                            ) : (
-                                <pre className="mobile-settings-log-viewer__content">{logLoading && !logSnapshot
-                                    ? '正在读取日志…'
-                                    : logSnapshot?.content || '暂无日志内容'}</pre>
-                            )}
-                        </div>
-                    )}
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={handleExit}
-                        className="mobile-settings-exit-button"
-                    >
-                        退出应用
-                    </Button>
-                </div>
+                <MobileSettingsAboutSection
+                    version={version}
+                    logViewerOpen={logViewerOpen}
+                    logSnapshot={logSnapshot}
+                    logLoading={logLoading}
+                    logError={logError}
+                    onOpenLogViewer={handleOpenLogViewer}
+                    onLoadAppLog={loadAppLog}
+                    onCopyLog={handleCopyLog}
+                    onExit={handleExit}
+                />
             )}
         </div>
     )
