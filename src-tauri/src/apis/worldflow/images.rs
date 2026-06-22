@@ -4,6 +4,9 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::BufWriter;
 
+#[cfg(target_os = "android")]
+use crate::android_file_import::{copy_android_file_uri_to_dir, is_android_file_uri};
+
 const COVER_THUMB_MAX_EDGE: u32 = 640;
 const COVER_THUMB_JPEG_QUALITY: u8 = 82;
 
@@ -395,17 +398,32 @@ pub fn import_entry_images(
     file_paths: Vec<String>,
 ) -> Result<Vec<FCImage>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "android")]
+    let android_target_dir = {
+        let target_dir = build_entry_images_dir(paths.inner(), &project_id)?;
+        std::fs::create_dir_all(&target_dir)
+            .map_err(|e| format!("创建图片目录失败 {:?}: {}", target_dir, e))?;
+        target_dir
+    };
     let images = file_paths
         .into_iter()
         .map(|path| {
+            #[cfg(target_os = "android")]
+            let path_buf = if is_android_file_uri(&path) {
+                copy_android_file_uri_to_dir(&path, &android_target_dir)?
+            } else {
+                PathBuf::from(&path)
+            };
+            #[cfg(not(target_os = "android"))]
             let path_buf = PathBuf::from(&path);
-            FCImage {
+
+            Ok(FCImage {
                 path: path_buf,
                 is_cover: false,
                 caption: None,
-            }
+            })
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, String>>()?;
 
     Ok(copy_entry_images(paths.inner(), &project_id, Some(images))?.unwrap_or_default())
 }

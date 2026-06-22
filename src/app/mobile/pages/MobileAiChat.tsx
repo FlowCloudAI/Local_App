@@ -8,7 +8,7 @@ import {
 } from 'react'
 import {useDrag} from '@use-gesture/react'
 import {createPortal} from 'react-dom'
-import {saveFileDialog} from '../../../api/dialog'
+import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
@@ -59,6 +59,27 @@ interface ConversationLongPressState {
 
 const CONVERSATION_LONG_PRESS_DELAY = 430
 const CONVERSATION_LONG_PRESS_MOVE_TOLERANCE = 12
+const AI_DOCUMENT_CONTEXT_EXTENSIONS = [
+    'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml',
+    'ini', 'log', 'js', 'ts', 'jsx', 'tsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h',
+    'hpp', 'cs', 'php', 'rb', 'swift', 'kt', 'sql', 'html', 'htm', 'css', 'scss', 'less',
+    'sh', 'bat', 'ps1', 'env', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf',
+]
+const AI_DOCUMENT_CONTEXT_EXTENSION_SET = new Set(AI_DOCUMENT_CONTEXT_EXTENSIONS)
+
+function getSelectedFileExtension(path: string): string {
+    const decoded = (() => {
+        try {
+            return decodeURIComponent(path)
+        } catch {
+            return path
+        }
+    })()
+    const cleanPath = decoded.split(/[?#]/, 1)[0]
+    const fileName = cleanPath.split(/[\\/]/).pop() ?? cleanPath
+    const dotIndex = fileName.lastIndexOf('.')
+    return dotIndex >= 0 ? fileName.slice(dotIndex + 1).toLocaleLowerCase() : ''
+}
 
 function formatConversationDate(timestamp: number): string {
     if (!timestamp) return '时间未知'
@@ -318,6 +339,7 @@ export default function MobileAiChat({
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
+        addDocumentContextFiles,
         plugins, pluginsReady, selectedPlugin, selectedModel,
         webSearchEnabled, toggleWebSearch,
         toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams,
@@ -768,6 +790,48 @@ export default function MobileAiChat({
     const handleUnavailableMobileAiTool = useCallback((label: string) => {
         void showAlert(`移动端暂未开放「${label}」入口。`, 'info', 'nonInvasive', 1800)
     }, [showAlert])
+
+    const handleAttachDocuments = useCallback(async () => {
+        if (!activeConversation || isArchivedConversation) return
+        try {
+            closeMorePanel()
+            const selected = await openFileDialog({
+                multiple: true,
+                filters: [{
+                    name: '文档与文本',
+                    extensions: AI_DOCUMENT_CONTEXT_EXTENSIONS,
+                }],
+            })
+            const paths = Array.isArray(selected)
+                ? selected
+                : selected
+                    ? [selected]
+                    : []
+            if (paths.length === 0) return
+
+            const supportedPaths = paths.filter(path =>
+                AI_DOCUMENT_CONTEXT_EXTENSION_SET.has(getSelectedFileExtension(path)),
+            )
+            const unsupportedCount = paths.length - supportedPaths.length
+            if (supportedPaths.length === 0) {
+                await showAlert('仅支持文档与文本格式，不支持图片或音视频。', 'warning', 'nonInvasive', 2200)
+                return
+            }
+
+            await addDocumentContextFiles(supportedPaths)
+            await showAlert(
+                unsupportedCount > 0
+                    ? `已添加 ${supportedPaths.length} 个文件，跳过 ${unsupportedCount} 个不支持的文件。`
+                    : `已添加 ${supportedPaths.length} 个文件。`,
+                'success',
+                'nonInvasive',
+                1600,
+            )
+        } catch (error) {
+            logger.warn('[MobileAiChat] 添加文档上下文失败', error)
+            await showAlert(`添加文档失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2600)
+        }
+    }, [activeConversation, addDocumentContextFiles, closeMorePanel, isArchivedConversation, showAlert])
 
     const activeConversationMenuItems: MobileAnchoredMenuItem[] = activeConversation ? [
         {
@@ -1370,11 +1434,14 @@ export default function MobileAiChat({
                         <MobileAiIcon type="camera"/>
                         <span>相机</span>
                     </button>
-                    <button type="button" onClick={() => handleUnavailableMobileAiTool('图库')}>
+                    <button
+                        type="button"
+                        onClick={() => void showAlert('当前 AI 对话还不支持图片作为模型输入。', 'info', 'nonInvasive', 1800)}
+                    >
                         <MobileAiIcon type="image"/>
                         <span>图库</span>
                     </button>
-                    <button type="button" onClick={() => handleUnavailableMobileAiTool('文件')}>
+                    <button type="button" onClick={() => void handleAttachDocuments()}>
                         <MobileAiIcon type="file"/>
                         <span>文件</span>
                     </button>

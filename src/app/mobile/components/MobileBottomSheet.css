@@ -20,10 +20,10 @@
     box-sizing: border-box;
     padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom, 0));
     overflow-y: auto;
-    border: var(--mobile-glass-border-strong);
+    border: var(--mobile-glass-border);
     border-bottom: 0;
     border-radius: var(--mobile-radius-sheet) var(--mobile-radius-sheet) 0 0;
-    background: var(--mobile-surface-glass-strong);
+    background: var(--mobile-surface-glass);
     box-shadow: var(--mobile-shadow-bottom-sheet);
     backdrop-filter: var(--mobile-glass-filter);
     -webkit-backdrop-filter: var(--mobile-glass-filter);

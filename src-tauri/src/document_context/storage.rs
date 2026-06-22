@@ -15,6 +15,7 @@ use super::model::{
     DocumentChunk, DocumentContextBuildResult, DocumentContextItem, DocumentContextSource,
     DocumentContextStatus, ParsedDocument,
 };
+use super::parser::default_parser_registry;
 
 const INDEX_FILE: &str = "index.json";
 const DEFAULT_CONTEXT_CHAR_BUDGET: usize = 24_000;
@@ -50,6 +51,7 @@ pub fn create_pending_items(
     let root = context_root_dir(paths)?;
     fs::create_dir_all(files_dir(&root))?;
     let mut index = read_index(&root)?;
+    let supported_extensions = default_parser_registry().supported_extensions();
     let mut created = Vec::new();
 
     for raw_path in file_paths {
@@ -68,6 +70,17 @@ pub fn create_pending_items(
             .and_then(|value| value.to_str())
             .unwrap_or_default()
             .to_ascii_lowercase();
+        if !supported_extensions
+            .iter()
+            .any(|supported| supported.eq_ignore_ascii_case(&extension))
+        {
+            let extension_label = if extension.is_empty() {
+                "无扩展名".to_string()
+            } else {
+                format!(".{}", extension)
+            };
+            return Err(anyhow!("当前不支持解析 {} 文件", extension_label));
+        }
         let sha256 = sha256_file(&source_path)?;
         let now = Utc::now().to_rfc3339();
         let cached = read_cached_parse_output(&root, &sha256).ok();

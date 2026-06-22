@@ -466,8 +466,6 @@
     overflow-y: auto;
     padding: 0.65rem clamp(1rem, 4vw, 1.35rem) 1rem;
     scrollbar-width: none;
-    /* 独立合成层:规避 Android WebView 滚动容器光栅化 bug(同 MobileApp.css 的 data-mobile-horizontal-scroll 规则) */
-    transform: translateZ(0);
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
@@ -776,7 +774,6 @@
     line-height: 1.45;
     overflow-y: auto;
     resize: vertical;
-    overscroll-behavior: contain;
     scrollbar-color: color-mix(in srgb, var(--fc-color-text-secondary) 42%, transparent) transparent;
     scrollbar-gutter: stable;
     scrollbar-width: thin;

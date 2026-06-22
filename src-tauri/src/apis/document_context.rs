@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
+#[cfg(target_os = "android")]
+use crate::android_file_import::{copy_android_file_uri_to_dir, is_android_file_uri};
 use crate::document_context::{
     DocumentContextBuildResult, DocumentContextItem, ParseInput, build_context_markdown,
     create_pending_items, default_parser_registry, get_item, list_items, mark_item_parsing,
@@ -41,6 +43,8 @@ pub fn docctx_add_files(
     conversation_id: Option<String>,
     file_paths: Vec<String>,
 ) -> Result<Vec<DocumentContextItem>, ApiError> {
+    #[cfg(target_os = "android")]
+    let file_paths = prepare_android_file_paths(paths.inner(), file_paths)?;
     let items = create_pending_items(paths.inner(), conversation_id, file_paths)?;
     for item in items.clone() {
         if item.status == crate::document_context::DocumentContextStatus::Ready {
@@ -50,6 +54,30 @@ pub fn docctx_add_files(
         spawn_parse_item(app.clone(), clone_paths(paths.inner()), item);
     }
     Ok(items)
+}
+
+#[cfg(target_os = "android")]
+fn prepare_android_file_paths(
+    paths: &PathsState,
+    file_paths: Vec<String>,
+) -> Result<Vec<String>, ApiError> {
+    let target_dir = crate::document_context::storage::context_root_dir(paths)
+        .map_err(ApiError::from)?
+        .join("files");
+    std::fs::create_dir_all(&target_dir).map_err(ApiError::from)?;
+
+    file_paths
+        .into_iter()
+        .map(|path| {
+            if is_android_file_uri(&path) {
+                copy_android_file_uri_to_dir(&path, &target_dir)
+                    .map(|path| path.to_string_lossy().to_string())
+                    .map_err(ApiError::internal)
+            } else {
+                Ok(path)
+            }
+        })
+        .collect()
 }
 
 #[tauri::command]

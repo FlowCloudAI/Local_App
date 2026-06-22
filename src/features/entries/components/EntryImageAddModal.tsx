@@ -237,11 +237,17 @@ export default function EntryImageAddModal({
     }
 
     const handleLocalUpload = async () => {
-        const uploadedImages = await onUploadLocal()
-        if (insertMode && Array.isArray(uploadedImages) && uploadedImages[0]) {
-            onInsertImage?.(uploadedImages[0])
+        try {
+            const uploadedImages = await onUploadLocal()
+            if (insertMode && Array.isArray(uploadedImages) && uploadedImages[0]) {
+                onInsertImage?.(uploadedImages[0])
+            }
+            onClose()
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            setErrorMessage(`上传图片失败: ${msg}`)
+            void showAlert(msg, 'error', 'nonInvasive', 3000)
         }
-        onClose()
     }
 
     const handleInsertExisting = (image: EntryImage) => {

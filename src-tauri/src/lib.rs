@@ -1,4 +1,6 @@
 mod ai_services;
+#[cfg(target_os = "android")]
+mod android_file_import;
 mod api_error;
 mod apis;
 mod auto_backup;
@@ -86,6 +88,7 @@ pub extern "system" fn Java_cn_flowcloudai_www_MainActivity_initRustlsPlatformVe
     activity: jni::objects::JObject<'local>,
 ) {
     let outcome = env.with_env(|env| -> jni::errors::Result<()> {
+        crate::android_file_import::init_android_file_import(env, &activity)?;
         rustls_platform_verifier::android::init_with_env(env, activity)
     });
 
