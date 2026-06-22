@@ -1,4 +1,4 @@
-import {Button, Input, Select} from 'flowcloudai-ui'
+import {Button, Input, Select, Slider} from 'flowcloudai-ui'
 import {
     type ApiUsageByModel,
     type ApiUsageSummary,
@@ -112,6 +112,10 @@ function formatUsageNumber(value: number): string {
     return value.toLocaleString('zh-CN')
 }
 
+function readSliderNumber(value: number | [number, number]): number {
+    return Array.isArray(value) ? value[0] : value
+}
+
 function ChevronRightIcon() {
     return (
         <svg
@@ -127,6 +131,15 @@ function ChevronRightIcon() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
+        </svg>
+    )
+}
+
+function SearchIcon() {
+    return (
+        <svg className="mobile-settings-plugin-search__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="5.8"/>
+            <path d="m15 15 4.5 4.5"/>
         </svg>
     )
 }
@@ -376,11 +389,20 @@ export function MobileSettingsPluginsSection({
 }: PluginsSectionProps) {
     return (
         <div className="mobile-settings-section">
-            <div className="mobile-settings-section__header">
-                <div className="mobile-settings-plugin-count">已安装 {localPluginCount} 个</div>
+            <div className="mobile-settings-plugin-search-row">
+                <Input
+                    value={pluginSearch}
+                    onValueChange={onPluginSearchChange}
+                    placeholder="搜索插件…"
+                    prefix={<SearchIcon/>}
+                    radius="full"
+                    size="lg"
+                    allowClear
+                    className="mobile-settings-plugin-search"
+                />
                 <Button
                     type="button"
-                    size="sm"
+                    size="md"
                     variant="outline"
                     onClick={() => void onRefreshPluginSources()}
                     disabled={pluginSourcesRefreshing}
@@ -388,24 +410,7 @@ export function MobileSettingsPluginsSection({
                     {pluginSourcesRefreshing ? '刷新中…' : '刷新'}
                 </Button>
             </div>
-            <div className="mobile-settings-plugin-actions">
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void onInstallFromFile()}
-                    disabled={installingLocalFile}
-                >
-                    {installingLocalFile ? '安装中…' : '安装本地插件'}
-                </Button>
-            </div>
             <div className="mobile-settings-plugin-filter">
-                <Input
-                    value={pluginSearch}
-                    onValueChange={onPluginSearchChange}
-                    placeholder="搜索插件..."
-                    className="mobile-settings-plugin-filter__search"
-                />
                 <div className="mobile-settings-plugin-filter__segments" role="group" aria-label="插件类型筛选">
                     {[
                         ['all', '全部'],
@@ -431,7 +436,21 @@ export function MobileSettingsPluginsSection({
                 <div className="mobile-settings-plugin-error">插件库加载失败：{marketPluginError}</div>
             )}
             <div className="mobile-settings-installed-plugin-list">
-                <div className="mobile-settings-subtitle">已安装插件</div>
+                <div className="mobile-settings-installed-plugin-list__header">
+                    <div>
+                        <div className="mobile-settings-installed-plugin-list__title">已安装插件</div>
+                        <div className="mobile-settings-plugin-count">已安装 {localPluginCount} 个</div>
+                    </div>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void onInstallFromFile()}
+                        disabled={installingLocalFile}
+                    >
+                        {installingLocalFile ? '安装中…' : '安装本地插件'}
+                    </Button>
+                </div>
                 {localPlugins.length === 0 ? (
                     <div className="mobile-settings-plugin-empty">暂无已安装插件</div>
                 ) : (
@@ -536,13 +555,13 @@ export function MobileSettingsAppearanceSection({
                 <div>
                     <div className="mobile-settings-field-label">编辑器字号</div>
                     <div className="mobile-settings-font-size-control">
-                        <input
-                            type="range"
-                            min="10"
-                            max="24"
-                            step="1"
+                        <Slider
+                            min={10}
+                            max={24}
+                            step={1}
                             value={editorFontSize}
-                            onChange={event => onEditorFontSizeChange(Number(event.currentTarget.value))}
+                            tooltip
+                            onChange={value => onEditorFontSizeChange(readSliderNumber(value))}
                         />
                         <span>{editorFontSize}px</span>
                         {editorFontSize !== 14 && (

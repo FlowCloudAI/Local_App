@@ -27,6 +27,7 @@ import {
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
+import {MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import {
     MobileSettingsAboutSection,
@@ -101,6 +102,14 @@ function getSettingsSectionTitle(section: SettingsSection): string {
     if (section === 'usage') return '用量统计'
     if (section === 'about') return '关于'
     return '设置'
+}
+
+function BackIcon() {
+    return (
+        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M15 18 9 12l6-6"/>
+        </svg>
+    )
 }
 
 export default function MobileSettings({push, pop, page}: Props) {
@@ -561,12 +570,25 @@ export default function MobileSettings({push, pop, page}: Props) {
         {value: 'zh-CN', label: '简体中文'},
         {value: 'en-US', label: 'English'},
     ]
+    const topBar = (
+        <MobilePageTopBar
+            sticky
+            edgeToEdge
+            ariaLabel="设置页顶栏"
+            left={section === 'menu'
+                ? <span className="mobile-settings-topbar-spacer" aria-hidden="true"/>
+                : <MobileTopIconButton aria-label="返回设置" icon={<BackIcon/>} onClick={pop}/>}
+            center={<h1 className="mobile-settings-topbar-title">{getSettingsSectionTitle(section)}</h1>}
+            right={<span className="mobile-settings-topbar-spacer" aria-hidden="true"/>}
+        />
+    )
 
     if (section === 'menu') {
         const themeLabel = themeOptions.find(option => option.value === theme)?.label ?? '跟随系统'
         const marketSummary = loadingMarketPlugins ? '插件库加载中' : `插件库 ${marketPlugins.length} 个`
         return (
             <div className="mobile-page mobile-settings-page">
+                {topBar}
                 <MobileSettingsMenuSection
                     themeLabel={themeLabel}
                     marketSummary={marketSummary}
@@ -582,17 +604,7 @@ export default function MobileSettings({push, pop, page}: Props) {
 
     return (
         <div className="mobile-page mobile-settings-page">
-            <div className="mobile-settings-detail-header">
-                <button
-                    type="button"
-                    className="mobile-settings-back-button"
-                    aria-label="返回设置"
-                    onClick={pop}
-                >
-                    <span aria-hidden="true">‹</span>
-                </button>
-                <h1 className="mobile-settings-detail-title">{getSettingsSectionTitle(section)}</h1>
-            </div>
+            {topBar}
             {section === 'ai' && (
                 <MobileSettingsAiSection
                     selectedPlugin={selectedPlugin}
