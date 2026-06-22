@@ -27,7 +27,6 @@ import {
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
-import {openUrl} from '../../../api/opener'
 import {MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import MobileSettingsAboutSection from './MobileSettingsAboutSection'
@@ -523,10 +522,28 @@ export default function MobileSettings({push, pop, page}: Props) {
     }, [logSnapshot, showAlert])
 
     const handleOpenOfficialUrl = useCallback((url: string) => {
-        void openUrl(url).catch(error => {
+        const target = url.trim()
+        if (!target) return
+
+        try {
+            const opened = window.open(target, '_blank', 'noopener,noreferrer')
+            if (opened) return
+        } catch (error) {
             logger.error('[MobileSettings] 打开官方链接失败', error)
-            void showAlert(`打开链接失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
-        })
+        }
+
+        const writeText = navigator.clipboard?.writeText
+        if (!writeText) {
+            void showAlert('无法直接打开浏览器，请手动复制链接', 'warning', 'nonInvasive', 3000)
+            return
+        }
+
+        void writeText.call(navigator.clipboard, target)
+            .then(() => showAlert('无法直接打开浏览器，链接已复制', 'warning', 'nonInvasive', 2200))
+            .catch(error => {
+                logger.error('[MobileSettings] 复制官方链接失败', error)
+                void showAlert(`打开链接失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            })
     }, [showAlert])
 
     const handleCopyOfficialEmail = useCallback(async () => {
