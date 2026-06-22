@@ -8,6 +8,44 @@
     padding: var(--fc-space-md) var(--fc-space-lg);
 }
 
+.mobile-settings-detail-header {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem;
+    align-items: center;
+    min-height: 2.5rem;
+    margin-bottom: var(--fc-space-md);
+}
+
+.mobile-settings-back-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: var(--mobile-border);
+    border-radius: var(--fc-radius-full);
+    background: var(--mobile-surface-raised);
+    color: var(--fc-color-text);
+    font: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-settings-detail-title {
+    margin: 0;
+    overflow: hidden;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-md);
+    font-weight: 700;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .mobile-settings-menu {
     display: flex;
     flex-direction: column;

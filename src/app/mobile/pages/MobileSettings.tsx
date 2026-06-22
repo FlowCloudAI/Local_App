@@ -35,6 +35,7 @@ import './MobileSettings.css'
 
 interface Props {
     push?: (page: MobilePage) => void
+    pop?: () => void
     page?: MobilePage | null
 }
 
@@ -75,7 +76,15 @@ function getSettingsSection(page?: MobilePage | null): SettingsSection {
     }
 }
 
-export default function MobileSettings({push, page}: Props) {
+function getSettingsSectionTitle(section: SettingsSection): string {
+    if (section === 'ai') return 'AI 设置'
+    if (section === 'plugins') return '插件安装'
+    if (section === 'appearance') return '外观'
+    if (section === 'about') return '关于'
+    return '设置'
+}
+
+export default function MobileSettings({push, pop, page}: Props) {
     const {showAlert} = useAlert()
     const {theme, setTheme} = useTheme()
     const [plugins, setPlugins] = useState<PluginInfo[]>([])
@@ -498,6 +507,17 @@ export default function MobileSettings({push, page}: Props) {
 
     return (
         <div className="mobile-page mobile-settings-page">
+            <div className="mobile-settings-detail-header">
+                <button
+                    type="button"
+                    className="mobile-settings-back-button"
+                    aria-label="返回设置"
+                    onClick={pop}
+                >
+                    <span aria-hidden="true">‹</span>
+                </button>
+                <h1 className="mobile-settings-detail-title">{getSettingsSectionTitle(section)}</h1>
+            </div>
             {section === 'ai' && (
                 <MobileSettingsAiSection
                     selectedPlugin={selectedPlugin}
