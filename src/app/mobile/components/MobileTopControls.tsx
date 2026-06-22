@@ -150,17 +150,18 @@ export function MobileAnchoredMenu({
     const updateAnchor = useCallback(() => {
         const containerElement = containerRef.current
         const anchorElement = anchorRef.current
-        if (!containerElement || !anchorElement) return
-        const containerRect = containerElement.getBoundingClientRect()
+        if (!anchorElement) return
+        const viewportWidth = window.innerWidth || containerElement?.clientWidth || 0
+        const viewportHeight = window.innerHeight || containerElement?.clientHeight || 0
         const anchorRect = anchorElement.getBoundingClientRect()
         const boundaryRect = rightBoundaryRef?.current?.getBoundingClientRect()
         setAnchor({
-            top: Math.max(0, anchorRect.top - containerRect.top),
-            bottom: Math.max(0, containerRect.bottom - anchorRect.bottom),
-            left: Math.max(0, anchorRect.left - containerRect.left),
-            right: Math.max(0, containerRect.right - anchorRect.right),
+            top: Math.max(0, anchorRect.top),
+            bottom: Math.max(0, viewportHeight - anchorRect.bottom),
+            left: Math.max(0, anchorRect.left),
+            right: Math.max(0, viewportWidth - anchorRect.right),
             rightBoundary: boundaryRect
-                ? Math.max(0, boundaryRect.left - containerRect.left - rightBoundaryGap)
+                ? Math.max(0, boundaryRect.left - rightBoundaryGap)
                 : null,
         })
     }, [anchorRef, containerRef, rightBoundaryGap, rightBoundaryRef])
