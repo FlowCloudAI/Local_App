@@ -42,7 +42,7 @@
     --mobile-shadow-primary-action-compact: 0 0.35rem 0.8rem color-mix(in srgb, var(--fc-color-primary) 22%, transparent);
     --mobile-shadow-primary-soft: 0 0.35rem 0.95rem color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     --mobile-shadow-chip: 0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 14%, transparent);
-    --mobile-glass-filter: blur(16px) saturate(1.3);
+    --mobile-glass-filter: blur(8px) saturate(1.3);
     --mobile-chrome-filter: blur(18px);
     --mobile-chip-filter: blur(10px);
     --mobile-radius-card: var(--fc-radius-xl);

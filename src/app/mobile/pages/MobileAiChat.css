@@ -339,16 +339,16 @@
     padding: 0 0.9rem 0 1rem;
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
+    background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--fc-font-size-sm);
     font-weight: 720;
-    box-shadow: var(--mobile-shadow-control);
     cursor: pointer;
     transition: opacity 120ms ease, transform 120ms ease;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    backdrop-filter: blur(2px);
 }
 
 .mobile-ai-model-pill span {

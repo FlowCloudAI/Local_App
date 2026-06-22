@@ -89,9 +89,8 @@
     place-items: center;
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
+    background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     color: var(--fc-color-primary);
-    box-shadow: var(--mobile-shadow-control);
 }
 
 .mobile-top-icon-button__icon,
@@ -124,9 +123,9 @@
     padding: 0.12rem;
     border: var(--mobile-border-medium);
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-control);
+    background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     transition: opacity 120ms ease, transform 120ms ease;
+    backdrop-filter: blur(2px);
 }
 
 .mobile-top-action-pill--expanded {
@@ -199,9 +198,8 @@
     overflow-y: auto;
     border: var(--mobile-glass-border);
     border-radius: var(--mobile-radius-floating);
-    background: var(--mobile-surface-glass);
-    box-shadow: var(--mobile-shadow-anchored-menu);
-    backdrop-filter: var(--mobile-glass-filter);
+    background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
+    backdrop-filter: blur(3px);
     -webkit-backdrop-filter: var(--mobile-glass-filter);
     animation: mobile-anchored-menu-enter 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
     transform-origin: top right;
