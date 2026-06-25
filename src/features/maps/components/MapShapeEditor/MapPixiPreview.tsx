@@ -60,7 +60,7 @@ const DEFAULT_LABEL_COLOR: MapRgbaColor = [38, 43, 56, 255];
 const DEFAULT_LABEL_FONT_FAMILY = '"Microsoft YaHei UI", sans-serif';
 const DEFAULT_ICON_SIZE = 28;
 const PAN_DRAG_THRESHOLD = 3;
-const MAX_PIXI_RESOLUTION = 2;
+const MAX_PIXI_RESOLUTION = 1;
 
 interface ElementSize {
     width: number;
