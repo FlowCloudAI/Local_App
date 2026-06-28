@@ -602,8 +602,16 @@ function getPaddedTargetRect(rect: TourTargetRect): CSSProperties {
 }
 
 function getScrimStyles(rect: TourTargetRect | null): CSSProperties[] {
+    const overlayTop = getTourOverlayTop()
+    const viewportHeight = window.innerHeight
+
     if (!rect) {
-        return [{inset: 0}]
+        return [{
+            top: overlayTop,
+            left: 0,
+            width: '100vw',
+            height: Math.max(0, viewportHeight - overlayTop),
+        }]
     }
 
     const hole = getPaddedTargetRect(rect)
@@ -614,34 +622,42 @@ function getScrimStyles(rect: TourTargetRect | null): CSSProperties[] {
     const right = left + width
     const bottom = top + height
     const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
+    const sideTop = Math.max(top, overlayTop)
+    const sideBottom = Math.max(bottom, overlayTop)
 
     return [
         {
-            top: 0,
+            top: overlayTop,
             left: 0,
             width: '100vw',
-            height: top,
+            height: Math.max(0, top - overlayTop),
         },
         {
-            top: bottom,
+            top: sideBottom,
             left: 0,
             width: '100vw',
-            height: Math.max(0, viewportHeight - bottom),
+            height: Math.max(0, viewportHeight - sideBottom),
         },
         {
-            top,
+            top: sideTop,
             left: 0,
             width: left,
-            height,
+            height: Math.max(0, sideBottom - sideTop),
         },
         {
-            top,
+            top: sideTop,
             left: right,
             width: Math.max(0, viewportWidth - right),
-            height,
+            height: Math.max(0, sideBottom - sideTop),
         },
     ]
+}
+
+function getTourOverlayTop(): number {
+    const titleBar = document.querySelector('.top-bar')
+    if (!titleBar) return 0
+
+    return Math.max(0, titleBar.getBoundingClientRect().bottom)
 }
 
 function getPopoverLayout(
