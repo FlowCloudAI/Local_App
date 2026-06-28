@@ -74,7 +74,7 @@ function ProjectConfigOverview({
     const entryTypeNameMap = useMemo(() => getEntryTypeNameMap(entryTypes), [entryTypes])
 
     return (
-        <div className="pe-config-grid">
+        <div className="pe-config-grid" data-tour-id="project-overview-config">
             <section className="pe-config-section">
                 <div className="pe-config-section__header">
                     <div>

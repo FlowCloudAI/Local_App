@@ -292,6 +292,11 @@ export function TourProvider({children}: TourProviderProps) {
                 return
             }
 
+            if (scrollTourTargetIntoView(element)) {
+                await waitForAnimationFrame()
+                await waitForAnimationFrame()
+                if (disposed) return
+            }
             syncTargetRect(true)
 
             if (currentStep.advanceOnTargetClick) {
@@ -574,6 +579,31 @@ function resolveTourTarget(target: TourStepTarget): Element | null {
         return target
     }
     return target()
+}
+
+function waitForAnimationFrame(): Promise<void> {
+    return new Promise(resolve => {
+        window.requestAnimationFrame(() => resolve())
+    })
+}
+
+function scrollTourTargetIntoView(element: Element): boolean {
+    const rect = element.getBoundingClientRect()
+    const topLimit = getTourOverlayTop() + VIEWPORT_MARGIN
+    const bottomLimit = window.innerHeight - VIEWPORT_MARGIN
+    const outsideViewport = rect.top < topLimit
+        || rect.bottom > bottomLimit
+        || rect.left < VIEWPORT_MARGIN
+        || rect.right > window.innerWidth - VIEWPORT_MARGIN
+
+    if (!outsideViewport) return false
+
+    element.scrollIntoView({
+        block: 'center',
+        inline: 'nearest',
+        behavior: 'auto',
+    })
+    return true
 }
 
 function toTourTargetRect(rect: DOMRect): TourTargetRect {

@@ -124,7 +124,7 @@ function ProjectOverview({
             />
 
             {children && (
-                <div className="pe-overview-entries">
+                <div className="pe-overview-entries" data-tour-id="project-overview-entries">
                     {childrenWithScrollElement}
                 </div>
             )}
@@ -199,7 +199,7 @@ function ProjectNextSteps({
     ]
 
     return (
-        <section className="pe-next-steps">
+        <section className="pe-next-steps" data-tour-id="project-overview-next-steps">
             <div className="pe-next-steps__header">
                 <div>
                     <h2>下一步建议</h2>

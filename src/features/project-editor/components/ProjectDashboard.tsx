@@ -23,7 +23,7 @@ function ProjectDashboard(props: ProjectDashboardProps) {
     const assetTotal = dashboard.effectiveEntryCount + dashboard.safeImageCount + dashboard.relationCount
 
     return (
-        <section className="pe-dashboard-section">
+        <section className="pe-dashboard-section" data-tour-id="project-overview-dashboard">
             <div className="pe-dashboard-section__header">
                 <div>
                     <h2 className="pe-feature-section__title">项目总览</h2>

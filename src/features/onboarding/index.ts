@@ -1,5 +1,5 @@
 export {TourProvider} from './TourProvider'
-export {HOME_ONBOARDING_TOUR_ID, useTour} from './tourContext'
+export {HOME_ONBOARDING_TOUR_ID, PROJECT_EDITOR_TOUR_ID, useTour} from './tourContext'
 export type {
     StartTourOptions,
     TourContextValue,

@@ -163,8 +163,8 @@ function ProjectOverviewHeader({
 
     return (
         <>
-            <section className="pe-overview-hero">
-                <div className="pe-project-cover-card">
+            <section className="pe-overview-hero" data-tour-id="project-overview-hero">
+                <div className="pe-project-cover-card" data-tour-id="project-overview-cover">
                     <button
                         type="button"
                         className={`pe-project-cover${coverSrc ? ' has-image' : ''}`}
@@ -197,7 +197,7 @@ function ProjectOverviewHeader({
                 </div>
 
                 {actionItems.length > 0 && (
-                    <div className="pe-overview-hero__actions">
+                    <div className="pe-overview-hero__actions" data-tour-id="project-overview-edit">
                         <Button type="button" variant="outline" size="sm" onClick={() => setMenuOpen(true)}>
                             编辑
                         </Button>
@@ -237,7 +237,7 @@ function ProjectOverviewHeader({
                     )}
                 </div>
 
-                <div className="pe-overview-hero__content pe-overview-hero__secondary">
+                <div className="pe-overview-hero__content pe-overview-hero__secondary" data-tour-id="project-overview-stats">
                     <div className="pe-overview-meta">
                         <span>创建于 {formatDate(project.created_at)}</span>
                         <span className="pe-meta-sep">·</span>

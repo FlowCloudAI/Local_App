@@ -131,7 +131,7 @@ function ProjectQuickActions(props: ProjectQuickActionInput) {
         icon: QUICK_ACTION_ICONS[item.key],
     }))
     return (
-        <section className="pe-quick-actions">
+        <section className="pe-quick-actions" data-tour-id="project-overview-tools">
             <article className="pe-dashboard-panel">
                 <div className="pe-dashboard-panel__header">
                     <h3>高级工具</h3>

@@ -7,6 +7,7 @@ export type TourStepTarget = string | Element | (() => Element | null)
 export type TourTargetStatus = 'none' | 'waiting' | 'ready' | 'missing'
 
 export const HOME_ONBOARDING_TOUR_ID = 'desktop-home-first-world'
+export const PROJECT_EDITOR_TOUR_ID = 'desktop-project-editor-overview'
 
 export interface TourStepLifecycleContext {
     tourId: string

@@ -64,6 +64,7 @@ import ProjectRelationGraph from '../features/relation-graph/components/ProjectR
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
+import {PROJECT_EDITOR_TOUR_ID, type TourDefinition, useTour} from '../features/onboarding'
 import './ProjectEditor.css'
 
 const TREE_MIN_WIDTH = '15rem'
@@ -203,6 +204,7 @@ function ProjectEditorInner({
     const [coverUpdating, setCoverUpdating] = useState(false)
     const [exporting, setExporting] = useState(false)
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
+    const {registerTour} = useTour()
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
     const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
@@ -864,6 +866,91 @@ function ProjectEditorInner({
         handleOpenProjectPanel(activeToolPanel)
     }, [activeToolPanel, handleOpenProjectPanel])
 
+    const showProjectOverviewForTour = useCallback(async () => {
+        expandTree()
+        setSelectedKey(ROOT_ID)
+        setSelection({kind: 'project'})
+        if (activeEntryId || activeToolPanel) {
+            void onBackToProject?.(projectId)
+        }
+        await new Promise<void>(resolve => {
+            window.requestAnimationFrame(() => resolve())
+        })
+    }, [activeEntryId, activeToolPanel, expandTree, onBackToProject, projectId])
+
+    const projectEditorTour = useMemo<TourDefinition>(() => ({
+        id: PROJECT_EDITOR_TOUR_ID,
+        version: 1,
+        steps: [
+            {
+                id: 'tree',
+                target: '[data-tour-id="project-editor-tree"]',
+                title: '左侧是项目结构',
+                content: '这里管理项目主页和分类树。选中项目主页会回到总览，选中分类会进入对应分类下的词条列表。',
+                placement: 'right',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'breadcrumb',
+                target: '[data-tour-id="project-editor-breadcrumb"]',
+                title: '这里显示当前位置',
+                content: '打开词条、分类或高级工具后，可以通过面包屑确认当前所在位置，并快速回到项目主页。',
+                placement: 'bottom',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'hero',
+                target: '[data-tour-id="project-overview-hero"]',
+                title: '项目主页展示核心信息',
+                content: '这里包含封面、项目名称、描述、创建时间和统计数据。右上角编辑菜单用于重命名、编辑描述、导出或删除世界。',
+                placement: 'bottom',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'next-steps',
+                target: '[data-tour-id="project-overview-next-steps"]',
+                title: '下一步建议',
+                content: '这些卡片会根据当前项目状态给出最直接的入口：补词条、让 AI 梳理，或处理结构问题。',
+                placement: 'top',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'tools',
+                target: '[data-tour-id="project-overview-tools"]',
+                title: '高级工具',
+                content: '关系图谱、时间线、世界地图和 AI 质检都从这里进入，用来检查设定结构和风险。',
+                placement: 'top',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'dashboard',
+                target: '[data-tour-id="project-overview-dashboard"]',
+                title: '项目总览',
+                content: '这里汇总资料规模、分类分布、标签字段、内容厚度和待处理问题，适合阶段性复盘。',
+                placement: 'top',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'config',
+                target: '[data-tour-id="project-overview-config"]',
+                title: '词条类型与标签',
+                content: '这里维护资料规则。词条类型决定资料对象，标签用于横向筛选和给 AI 提供稳定上下文。',
+                placement: 'top',
+                beforeEnter: showProjectOverviewForTour,
+            },
+            {
+                id: 'entries',
+                target: '[data-tour-id="project-overview-entries"]',
+                title: '全部词条',
+                content: '这里展示当前项目的全部词条，可搜索、筛选、排序，也可以直接新建词条继续补充世界资料。',
+                placement: 'top',
+                beforeEnter: showProjectOverviewForTour,
+            },
+        ],
+    }), [showProjectOverviewForTour])
+
+    useEffect(() => registerTour(projectEditorTour), [projectEditorTour, registerTour])
+
     const selectedCategoryPathItems = useMemo(() => {
         if (selection.kind !== 'category') return [] as Array<{ id: string; name: string }>
 
@@ -964,7 +1051,7 @@ function ProjectEditorInner({
             style={{'--pe-tree-width': `${treeCollapsed ? 0 : treeWidth}px`} as React.CSSProperties}
         >
             <FcworldProgressDialog progress={fcworldProgress} />
-            <div className="pe-tree-panel">
+            <div className="pe-tree-panel" data-tour-id="project-editor-tree">
                 <div className="pe-tree-panel__header">
                     <button
                         type="button"
@@ -1029,7 +1116,7 @@ function ProjectEditorInner({
 
             <div className="pe-content">
                 <div className="pe-content__rail">
-                    <nav className="pe-breadcrumb" aria-label="当前位置">
+                    <nav className="pe-breadcrumb" aria-label="当前位置" data-tour-id="project-editor-breadcrumb">
                         {breadcrumbItems.map((item, index) => (
                             <React.Fragment key={item.key}>
                                 {index > 0 && <span className="pe-breadcrumb__sep">/</span>}

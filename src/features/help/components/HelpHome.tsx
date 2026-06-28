@@ -1,11 +1,12 @@
 import type {RefObject} from 'react'
+import {useAlert} from 'flowcloudai-ui'
 import {
     HELP_HOME_LINKS,
     type HelpModuleKey,
     type HelpTopicGroup,
     type HelpTopicKey,
 } from '../../../shared/help/helpCatalog'
-import {HOME_ONBOARDING_TOUR_ID, useTour} from '../../onboarding'
+import {HOME_ONBOARDING_TOUR_ID, PROJECT_EDITOR_TOUR_ID, useTour} from '../../onboarding'
 import './HelpHome.css'
 
 interface HelpHomeProps {
@@ -22,7 +23,14 @@ export default function HelpHome({
     onSelectTopic,
 }: HelpHomeProps) {
     const {startRegisteredTour} = useTour()
+    const {showAlert} = useAlert()
     const topicCount = groups.reduce((total, group) => total + group.topics.length, 0)
+    const handleStartProjectTour = () => {
+        const started = startRegisteredTour(PROJECT_EDITOR_TOUR_ID, {force: true, markCompletedOnSkip: true})
+        if (!started) {
+            void showAlert('请先打开一个项目，再从帮助中心启动项目页引导。', 'warning', 'nonInvasive', 2200)
+        }
+    }
 
     return (
         <div className="help-main__body" ref={bodyRef}>
@@ -47,6 +55,14 @@ export default function HelpHome({
                         >
                             <strong>新手引导</strong>
                             <span>重新播放首页和新建第一个世界观的操作指引。</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="help-index__quick-item"
+                            onClick={handleStartProjectTour}
+                        >
+                            <strong>项目页引导</strong>
+                            <span>介绍项目编辑器、项目概览、结构配置和全部词条区域。</span>
                         </button>
                         {HELP_HOME_LINKS.map(link => (
                             <button
