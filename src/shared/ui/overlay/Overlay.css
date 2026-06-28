@@ -52,12 +52,12 @@
 }
 
 .fc-overlay__panel--floating {
-    background: var(--mobile-surface-glass, var(--fc-color-bg-elevated));
-    border: var(--mobile-glass-border, 1px solid var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+    border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
     box-sizing: border-box;
-    backdrop-filter: var(--mobile-glass-filter, none);
-    -webkit-backdrop-filter: var(--mobile-glass-filter, none);
+    backdrop-filter: blur(var(--fc-space-xs));
+    -webkit-backdrop-filter: blur(var(--fc-space-xs));
 }
 
 /* 进场：浮动轻微放大淡入；上滑从底部滑入。 */
