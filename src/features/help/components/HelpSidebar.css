@@ -1,3 +1,7 @@
+.help-side {
+    --dock-panel-sidebar-width: 18rem;
+}
+
 .help-side__topbar {
     justify-content: space-between;
     height: auto;
