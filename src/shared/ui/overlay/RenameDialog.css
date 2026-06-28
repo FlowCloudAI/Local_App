@@ -2,13 +2,12 @@
 
 .fc-rename-dialog {
     width: min(22rem, 100%);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 1.15rem;
-    box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--fc-color-text) 18%, transparent);
+    background: var(--fc-color-bg-elevated);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    box-shadow: var(--fc-shadow-lg);
     padding: var(--fc-space-lg);
     box-sizing: border-box;
-    backdrop-filter: blur(18px);
 }
 
 .fc-rename-dialog__title {
