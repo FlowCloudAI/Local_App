@@ -687,9 +687,7 @@
     padding: var(--fc-space-lg);
     border: 1px solid color-mix(in srgb, var(--pe-next-step-accent) 22%, var(--fc-color-border));
     border-radius: var(--fc-radius-lg);
-    background:
-        linear-gradient(145deg, color-mix(in srgb, var(--pe-next-step-bg) 54%, transparent), transparent 58%),
-        color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg));
+    background: color-mix(in srgb, var(--pe-next-step-bg) 18%, var(--fc-color-bg-secondary));
     color: inherit;
     text-align: left;
     cursor: pointer;
@@ -702,9 +700,7 @@
 .pe-next-step-card:hover:not(:disabled) {
     transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--pe-next-step-accent) 54%, var(--fc-color-border));
-    background:
-        linear-gradient(145deg, color-mix(in srgb, var(--pe-next-step-bg) 78%, transparent), transparent 62%),
-        color-mix(in srgb, var(--pe-next-step-accent) 6%, var(--fc-color-bg));
+    background: color-mix(in srgb, var(--pe-next-step-bg) 28%, var(--fc-color-bg-secondary));
 }
 
 .pe-next-step-card:disabled {
