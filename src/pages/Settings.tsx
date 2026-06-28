@@ -1520,10 +1520,13 @@ export default function Settings({
                                         <input
                                             type="checkbox"
                                             checked={settings.shell_acrylic_enabled}
-                                            onChange={(event) => setSettings(prev => prev ? {
-                                                ...prev,
-                                                shell_acrylic_enabled: event.currentTarget.checked
-                                            } : null)}
+                                            onChange={(event) => {
+                                                const checked = event.currentTarget.checked
+                                                setSettings(prev => prev ? {
+                                                    ...prev,
+                                                    shell_acrylic_enabled: checked
+                                                } : null)
+                                            }}
                                         />
                                         <span>启用透明毛玻璃背景</span>
                                     </label>
