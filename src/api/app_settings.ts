@@ -75,6 +75,7 @@ export interface AppSettings {
   language: string
   editor_font_size: number
   theme_color_config: ThemeColorConfig | null
+  shell_acrylic_enabled: boolean
   auto_save_secs: number
   auto_backup_secs: number
   backup_dir: string | null

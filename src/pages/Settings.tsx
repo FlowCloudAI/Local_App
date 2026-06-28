@@ -637,6 +637,7 @@ export default function Settings({
             language: 'zh-CN',
             editor_font_size: 14,
             theme_color_config: null,
+            shell_acrylic_enabled: true,
             auto_save_secs: 0,
             auto_backup_secs: 300,
             backup_dir: null,
@@ -1512,6 +1513,20 @@ export default function Settings({
                                         onChange={handleThemeChange}
                                         style={{flex: 1}}
                                     />
+                                </div>
+                                <div className="settings-field">
+                                    <label className="settings-label">外壳亚克力</label>
+                                    <label className="settings-checkbox-field">
+                                        <input
+                                            type="checkbox"
+                                            checked={settings.shell_acrylic_enabled}
+                                            onChange={(event) => setSettings(prev => prev ? {
+                                                ...prev,
+                                                shell_acrylic_enabled: event.currentTarget.checked
+                                            } : null)}
+                                        />
+                                        <span>启用透明毛玻璃背景</span>
+                                    </label>
                                 </div>
                                 <ThemeColorPreview
                                     value={settings.theme_color_config}

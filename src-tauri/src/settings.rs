@@ -28,6 +28,8 @@ pub struct AppSettings {
     pub editor_font_size: u8,
     /// 颜色主题配置。None = 使用默认流云配色。
     pub theme_color_config: Option<serde_json::Value>,
+    /// 是否启用桌面窗口亚克力外壳效果
+    pub shell_acrylic_enabled: bool,
 
     // ── 备份行为 ───────────────────────────
     /// 历史兼容字段：旧版本词条自动保存间隔。当前不再用于编辑器自动保存。
@@ -63,6 +65,7 @@ impl Default for AppSettings {
             language: "zh-CN".to_string(),
             editor_font_size: 14,
             theme_color_config: None,
+            shell_acrylic_enabled: true,
             auto_save_secs: 0,
             auto_backup_secs: 300,
             backup_dir: None,

@@ -4,8 +4,12 @@
     padding: 0;
 }
 
+:root {
+    --app-shell-bg: var(--fc-color-bg-secondary);
+}
+
 body {
-    background: var(--fc-color-bg-secondary);
+    background: var(--app-shell-bg);
     color: var(--fc-color-text);
     font-family: "Microsoft YaHei UI", var(--fc-font-family), sans-serif;
 }
@@ -71,7 +75,7 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    background: var(--fc-color-bg-secondary);
+    background: var(--app-shell-bg);
     color: var(--fc-color-text);
 }
 
@@ -83,7 +87,7 @@ body {
     gap: var(--fc-space-sm);
     padding: var(--fc-space-xs);
     height: 3rem;
-    background: var(--fc-color-bg-secondary);
+    background: var(--app-shell-bg);
     border-bottom: none;
     flex-shrink: 0;
     user-select: none;
@@ -190,7 +194,7 @@ body {
     padding-left: var(--app-drag-handle-width);
     padding-bottom: var(--app-drag-handle-width);
     overflow: hidden;
-    background: var(--fc-color-bg-secondary);
+    background: var(--app-shell-bg);
 }
 
 .workspace-content {
@@ -200,7 +204,7 @@ body {
     display: flex;
     overflow: hidden;
     position: relative;
-    background: var(--fc-color-bg-secondary);
+    background: var(--app-shell-bg);
 }
 
 .page-container {
@@ -339,7 +343,7 @@ body {
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-backdrop="acrylic"] {
     /* 外层画布磨砂底色：占比越高越实、越低越透出桌面，可按需调整 */
-    --fc-backdrop-canvas: color-mix(in srgb, var(--fc-color-bg-secondary) 90%, transparent);
+    --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 90%, transparent);
 }
 
 [data-backdrop="acrylic"] body {
@@ -348,7 +352,7 @@ body {
 
 /* 统一磨砂层：仅 .app-layout 铺一层半透明底色，其余 chrome 透明，避免叠加加深 */
 [data-backdrop="acrylic"] .app-layout {
-    background: var(--fc-backdrop-canvas);
+    background: var(--app-shell-bg);
 }
 
 [data-backdrop="acrylic"] .top-bar,

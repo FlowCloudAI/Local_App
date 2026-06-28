@@ -273,6 +273,11 @@ pub fn run() {
                 .join("settings.json");
 
             let settings = AppSettings::load(&settings_path);
+            if let Err(error) =
+                apply_shell_acrylic_setting(&app_handle, settings.shell_acrylic_enabled)
+            {
+                log::warn!("应用窗口亚克力效果失败: {}", error);
+            }
 
             // 解析用户自定义路径（在 settings 移入 manage 之前读取）
             let data_root = default_data_root(&app_handle);

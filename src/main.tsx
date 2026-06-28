@@ -3,7 +3,7 @@ import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
 import AppShell from './app/index/AppShell'
-import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
+import {get_platform_info, type AppSettings, type PlatformInfo, setting_get_settings} from './api'
 import {getFormFactorOverride, isTauriRuntime} from './shared/devPreview'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
@@ -34,10 +34,24 @@ function getFallbackPlatformInfo(): PlatformInfo {
     }
 }
 
+function syncShellBackdrop(platformInfo: PlatformInfo, shellAcrylicEnabled: boolean) {
+    const enabled = isTauriRuntime()
+        && platformInfo.os === 'windows'
+        && platformInfo.formFactor === 'desktop'
+        && shellAcrylicEnabled
+
+    if (enabled) {
+        document.documentElement.setAttribute('data-backdrop', 'acrylic')
+    } else {
+        document.documentElement.removeAttribute('data-backdrop')
+    }
+}
+
 // 异步初始化主题
 const initApp = async () => {
     let initialTheme = 'system'
     let platformInfo = getFallbackPlatformInfo()
+    let shellAcrylicEnabled = true
 
     // 并行发起两个 IPC，节省一个往返延迟
     const [settingsResult, platformResult] = await Promise.allSettled([
@@ -46,6 +60,7 @@ const initApp = async () => {
     ])
     if (settingsResult.status === 'fulfilled' && settingsResult.value.theme) {
         initialTheme = settingsResult.value.theme
+        shellAcrylicEnabled = settingsResult.value.shell_acrylic_enabled
         const colorThemeApplied = applyPersistedThemeColorConfig(settingsResult.value.theme_color_config)
         logger.info('[Bootstrap] 启动时应用颜色主题配置', {
             recipeId: settingsResult.value.theme_color_config?.recipeId ?? null,
@@ -72,12 +87,12 @@ const initApp = async () => {
         document.body.classList.add('is-tauri')
     }
 
-    // 亚克力毛玻璃：仅 Windows 桌面端透明窗启用（windowEffects 的 acrylic 只在 Windows 生效）。
-    // 命中后外层 chrome 透出磨砂桌面，颜色统一由 CSS 半透明层控制——
-    // Win11 上 windowEffects 的 color 字段无效，故着色不走原生而走 CSS。
-    if (isTauriRuntime() && platformInfo.os === 'windows' && platformInfo.formFactor === 'desktop') {
-        document.documentElement.setAttribute('data-backdrop', 'acrylic')
-    }
+    syncShellBackdrop(platformInfo, shellAcrylicEnabled)
+    window.addEventListener('fc:settings-updated', (event) => {
+        const nextSettings = (event as CustomEvent<AppSettings>).detail
+        if (!nextSettings) return
+        syncShellBackdrop(platformInfo, nextSettings.shell_acrylic_enabled)
+    })
 
     // 在 React 渲染前同步写入 data-theme，避免首帧闪白
     const resolvedTheme = initialTheme === 'system'
