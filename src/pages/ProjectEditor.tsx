@@ -1008,6 +1008,7 @@ function ProjectEditorInner({
                             onMove={handleMove}
                             searchable
                             hideRoot
+                            indentationLine
                             collapseDuration={0.13}
                             indentSize={12}
                         />
