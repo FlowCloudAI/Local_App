@@ -5,6 +5,7 @@ import {
     type HelpTopicGroup,
     type HelpTopicKey,
 } from '../../../shared/help/helpCatalog'
+import {HOME_ONBOARDING_TOUR_ID, useTour} from '../../onboarding'
 import './HelpHome.css'
 
 interface HelpHomeProps {
@@ -20,6 +21,7 @@ export default function HelpHome({
     onSelectModule,
     onSelectTopic,
 }: HelpHomeProps) {
+    const {startRegisteredTour} = useTour()
     const topicCount = groups.reduce((total, group) => total + group.topics.length, 0)
 
     return (
@@ -38,6 +40,14 @@ export default function HelpHome({
                 <section className="help-index__section" aria-labelledby="help-index-quick">
                     <h3 id="help-index-quick">常用入口</h3>
                     <div className="help-index__quick-list">
+                        <button
+                            type="button"
+                            className="help-index__quick-item"
+                            onClick={() => startRegisteredTour(HOME_ONBOARDING_TOUR_ID, {force: true, markCompletedOnSkip: true})}
+                        >
+                            <strong>新手引导</strong>
+                            <span>重新播放首页和新建第一个世界观的操作指引。</span>
+                        </button>
                         {HELP_HOME_LINKS.map(link => (
                             <button
                                 key={link.key}

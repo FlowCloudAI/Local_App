@@ -32,7 +32,7 @@ import {
     type HomeDashboardData,
 } from '../features/home/homeActivity'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
-import {type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
+import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -169,7 +169,7 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
-    const {startTour} = useTour()
+    const {registerTour, startTour} = useTour()
     const [importing, setImporting] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
@@ -201,7 +201,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         if (reason === 'previous' || reason === 'skip' || reason === 'stop') setCreatorOpen(false)
     }, [])
     const homeOnboardingTour = useMemo<TourDefinition>(() => ({
-        id: 'desktop-home-first-world',
+        id: HOME_ONBOARDING_TOUR_ID,
         version: 1,
         steps: [
             {
@@ -276,6 +276,8 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     useEffect(() => {
         if (!hasSeenHomeWelcome()) setWelcomeOpen(true)
     }, [])
+
+    useEffect(() => registerTour(homeOnboardingTour), [homeOnboardingTour, registerTour])
 
     const finishWelcome = useCallback((startTutorial: boolean) => {
         markHomeWelcomeSeen()

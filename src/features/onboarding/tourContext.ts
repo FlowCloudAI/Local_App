@@ -6,6 +6,8 @@ export type TourStepLeaveReason = 'next' | 'previous' | 'skip' | 'complete' | 's
 export type TourStepTarget = string | Element | (() => Element | null)
 export type TourTargetStatus = 'none' | 'waiting' | 'ready' | 'missing'
 
+export const HOME_ONBOARDING_TOUR_ID = 'desktop-home-first-world'
+
 export interface TourStepLifecycleContext {
     tourId: string
     stepId: string
