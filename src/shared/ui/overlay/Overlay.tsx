@@ -39,6 +39,7 @@ export default function Overlay({
 }: OverlayProps) {
     const [mounted, setMounted] = useState(open)
     const [active, setActive] = useState(false)
+    const [overlayTop, setOverlayTop] = useState(0)
     const panelRef = useRef<HTMLDivElement>(null)
     // 用 ref 持有最新回调与可关闭标志，使下方副作用只依赖 open，避免 dismissible 抖动重跑。
     // 在 effect 中同步（不在渲染期写 ref，遵循 react-hooks/refs）。
@@ -60,6 +61,23 @@ export default function Overlay({
         const timer = setTimeout(() => setMounted(false), EXIT_DURATION_MS)
         return () => clearTimeout(timer)
     }, [open])
+
+    useEffect(() => {
+        if (variant !== 'floating') {
+            setOverlayTop(0)
+            return
+        }
+        if (!open) return
+
+        const updateOverlayTop = () => setOverlayTop(getOverlayTop())
+        updateOverlayTop()
+        const raf = requestAnimationFrame(updateOverlayTop)
+        window.addEventListener('resize', updateOverlayTop)
+        return () => {
+            cancelAnimationFrame(raf)
+            window.removeEventListener('resize', updateOverlayTop)
+        }
+    }, [open, variant])
 
     // 开启期间：注册返回栈、捕获阶段 Esc（优先于页面返回）、锁定滚动、聚焦面板。
     useEffect(() => {
@@ -100,6 +118,7 @@ export default function Overlay({
         <div
             className={`fc-overlay fc-overlay--${variant}`}
             data-state={active ? 'open' : 'closed'}
+            style={variant === 'floating' ? {top: overlayTop} : undefined}
             onMouseDown={(e) => {
                 // 仅背板（自身）被按下时关闭，面板内部按下不触发。
                 if (e.target === e.currentTarget && dismissibleRef.current) onCloseRef.current?.()
@@ -121,4 +140,11 @@ export default function Overlay({
         </div>,
         document.body,
     )
+}
+
+function getOverlayTop(): number {
+    const titleBar = document.querySelector('.top-bar')
+    if (!titleBar) return 0
+
+    return Math.max(0, titleBar.getBoundingClientRect().bottom)
 }
