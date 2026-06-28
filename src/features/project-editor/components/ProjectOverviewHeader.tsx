@@ -2,9 +2,10 @@ import {convertFileSrc} from '../../../api/assets'
 import {useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import type {Project} from '../../../api'
-import ActionMenu, {type ActionMenuItem} from '../../../shared/ui/overlay/ActionMenu'
+import FloatingPanel from '../../../shared/ui/overlay/FloatingPanel'
 import RenameDialog from '../../../shared/ui/overlay/RenameDialog'
 import ProjectOverviewStats from './ProjectOverviewStats'
+import '../../../shared/ui/overlay/FloatingPanelMenu.css'
 
 function parseDateMs(s?: string | null): number {
     if (!s) return 0
@@ -48,6 +49,14 @@ interface ProjectOverviewHeaderProps {
     exporting?: boolean
     onDelete?: () => void | Promise<void>
     onDescriptionChange?: (description: string) => void | Promise<void>
+}
+
+interface ProjectOverviewActionItem {
+    key: string
+    label: string
+    danger?: boolean
+    disabled?: boolean
+    onSelect: () => void
 }
 
 function ProjectOverviewHeader({
@@ -127,7 +136,7 @@ function ProjectOverviewHeader({
         }
     }
 
-    const actionItems: ActionMenuItem[] = [
+    const actionItems: ProjectOverviewActionItem[] = [
         onRename && {
             key: 'rename',
             label: '重命名',
@@ -150,7 +159,7 @@ function ProjectOverviewHeader({
             danger: true,
             onSelect: () => void handleDelete(),
         },
-    ].filter(Boolean) as ActionMenuItem[]
+    ].filter(Boolean) as ProjectOverviewActionItem[]
 
     return (
         <>
@@ -244,13 +253,30 @@ function ProjectOverviewHeader({
                     />
                 </div>
             </section>
-            <ActionMenu
+            <FloatingPanel
                 open={menuOpen}
                 onClose={() => setMenuOpen(false)}
-                title={project.name}
-                items={actionItems}
                 ariaLabel="项目编辑菜单"
-            />
+                className="fc-action-menu"
+            >
+                <div className="fc-action-menu__title">{project.name}</div>
+                <div className="fc-action-menu__list">
+                    {actionItems.map((item) => (
+                        <button
+                            key={item.key}
+                            type="button"
+                            className={`fc-action-menu__item${item.danger ? ' fc-action-menu__item--danger' : ''}`}
+                            disabled={item.disabled}
+                            onClick={() => {
+                                setMenuOpen(false)
+                                item.onSelect()
+                            }}
+                        >
+                            {item.label}
+                        </button>
+                    ))}
+                </div>
+            </FloatingPanel>
             <RenameDialog
                 open={renameOpen}
                 title="重命名世界"

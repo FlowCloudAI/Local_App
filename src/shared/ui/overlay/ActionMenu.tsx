@@ -1,5 +1,5 @@
 import FloatingPanel from './FloatingPanel'
-import './ActionMenu.css'
+import './FloatingPanelMenu.css'
 
 export interface ActionMenuItem {
     key: string

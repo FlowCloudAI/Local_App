@@ -1,4 +1,4 @@
-/* 动作菜单卡片：背板/居中由 FloatingPanel(Overlay) 提供，这里只管卡片与列表项。 */
+/* 浮动面板菜单列表：背板/居中由 FloatingPanel(Overlay) 提供，这里只管卡片与列表项。 */
 
 .fc-action-menu {
     width: min(20rem, 100%);
