@@ -51,6 +51,15 @@
     width: 100%;
 }
 
+.fc-overlay__panel--floating {
+    background: var(--mobile-surface-glass, var(--fc-color-bg-elevated));
+    border: var(--mobile-glass-border, 1px solid var(--fc-color-border));
+    border-radius: var(--fc-radius-lg);
+    box-sizing: border-box;
+    backdrop-filter: var(--mobile-glass-filter, none);
+    -webkit-backdrop-filter: var(--mobile-glass-filter, none);
+}
+
 /* 进场：浮动轻微放大淡入；上滑从底部滑入。 */
 .fc-overlay--floating .fc-overlay__panel {
     transform: scale(0.96);
