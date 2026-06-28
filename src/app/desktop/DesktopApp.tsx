@@ -1230,11 +1230,11 @@ function DesktopAppContent() {
                         tauriDragRegion
                         minTabWidth="10rem"
                         items={tabs}
-                        activeKey={activeKey}
+                        selectedKey={activeKey}
                         onReorder={(nextTabs) => {
                             dispatchTabState({type: 'reorder-tabs', tabs: nextTabs})
                         }}
-                        onChange={(key) => {
+                        onSelectedKeyChange={(key) => {
                             void handleTabChange(key)
                         }}
                         onClose={(key) => {
@@ -1250,7 +1250,7 @@ function DesktopAppContent() {
                         className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.minimize()}
-                        hoverBackground="var(--fc-color-bg-tertiary)"
+                        tokens={{hoverBackground: 'var(--fc-color-bg-tertiary)'}}
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1270,7 +1270,7 @@ function DesktopAppContent() {
                         className="window-control-btn"
                         variant="ghost"
                         onClick={() => win.toggleMaximize()}
-                        hoverBackground="var(--fc-color-bg-tertiary)"
+                        tokens={{hoverBackground: 'var(--fc-color-bg-tertiary)'}}
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1297,7 +1297,7 @@ function DesktopAppContent() {
                         className="window-control-btn window-control-btn--danger"
                         variant="ghost"
                         onClick={handleWindowClose}
-                        hoverBackground="var(--fc-color-danger)"
+                        tokens={{hoverBackground: 'var(--fc-color-danger)'}}
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1399,8 +1399,8 @@ function DesktopAppContent() {
                     collapsed={true}
                     collapsedWidth={50}
                     anchorState="collapse"
-                    onSelect={handleSideBarSelect}
-                    onCollapse={() => {}}
+                    onSelectedKeyChange={(key) => handleSideBarSelect(key)}
+                    onCollapsedChange={() => {}}
                     placement="right"
                 />
             </div>
