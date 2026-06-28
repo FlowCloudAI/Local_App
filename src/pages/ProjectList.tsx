@@ -1,15 +1,19 @@
-import {type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
+import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
 import {convertFileSrc} from '../api/assets'
 import {openFileDialog} from '../api/dialog'
-import {Button, Card, Input, RollingBox, useAlert} from 'flowcloudai-ui'
+import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
 import {
     db_get_entry,
     db_get_project,
+    db_delete_project,
     db_import_project_fcworld,
     db_preview_project_fcworld,
+    db_update_project,
     type FcworldImportPreview,
     type FcworldImportResult,
     type Project,
+    setting_get_settings,
+    setting_update_settings,
 } from '../api'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
@@ -27,6 +31,7 @@ import {
     type HomeActivityTarget,
     type HomeDashboardData,
 } from '../features/home/homeActivity'
+import RenameDialog from '../shared/ui/overlay/RenameDialog'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -86,6 +91,20 @@ function asOptionalString(value: unknown): string | null | undefined {
     return typeof value === 'string' || value == null ? value : undefined
 }
 
+function normalizeStarredProjectIds(projectIds: string[] | null | undefined) {
+    return Array.from(new Set((projectIds ?? []).filter(Boolean)))
+}
+
+function ProjectStarTag() {
+    return (
+        <span className="project-list-star-tag" aria-label="已标星">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3.3 14.8 9l6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.9 9.2 9 12 3.3Z" />
+            </svg>
+        </span>
+    )
+}
+
 function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
     switch (type) {
         case 'project':
@@ -130,11 +149,15 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
 
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
+    const {showContextMenu} = useContextMenu()
     const [importing, setImporting] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
+    const [starredProjectIds, setStarredProjectIds] = useState<string[]>([])
+    const [renameProject, setRenameProject] = useState<Project | null>(null)
+    const [projectActionBusy, setProjectActionBusy] = useState(false)
     const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
     const [validEntryTargetKeys, setValidEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
@@ -158,7 +181,22 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
     }, [])
 
+    useEffect(() => {
+        let cancelled = false
+        setting_get_settings()
+            .then(settings => {
+                if (!cancelled) setStarredProjectIds(normalizeStarredProjectIds(settings.starred_project_ids))
+            })
+            .catch(error => {
+                if (!cancelled) void showAlert(`加载星标项目失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [showAlert])
+
     const projectIdSet = useMemo(() => new Set(projects.map(project => project.id)), [projects])
+    const starredProjectIdSet = useMemo(() => new Set(starredProjectIds), [starredProjectIds])
 
     useEffect(() => {
         if (!hasLoadedProjects) return
@@ -263,6 +301,9 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             return name.includes(query) || description.includes(query)
         })
         .sort((a, b) => {
+            const starOrder = Number(starredProjectIdSet.has(b.id)) - Number(starredProjectIdSet.has(a.id))
+            if (starOrder !== 0) return starOrder
+
             const timeA = parseDateValue(asOptionalString(a.updated_at) ?? asOptionalString(a.created_at))
             const timeB = parseDateValue(asOptionalString(b.updated_at) ?? asOptionalString(b.created_at))
             const nameOrder = a.name.localeCompare(b.name, 'zh-CN')
@@ -279,6 +320,85 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                     return timeB - timeA || nameOrder
             }
         })
+
+    const saveStarredProjectIds = useCallback(async (projectIds: string[]) => {
+        const nextIds = normalizeStarredProjectIds(projectIds)
+        const settings = await setting_get_settings()
+        const nextSettings = {...settings, starred_project_ids: nextIds}
+        await setting_update_settings(nextSettings)
+        window.dispatchEvent(new CustomEvent('fc:settings-updated', {detail: nextSettings}))
+        return nextIds
+    }, [])
+
+    const toggleProjectStar = useCallback(async (project: Project) => {
+        const previousIds = starredProjectIds
+        const nextIds = previousIds.includes(project.id)
+            ? previousIds.filter(id => id !== project.id)
+            : [...previousIds, project.id]
+
+        setStarredProjectIds(nextIds)
+        try {
+            setStarredProjectIds(await saveStarredProjectIds(nextIds))
+        } catch (error) {
+            setStarredProjectIds(previousIds)
+            await showAlert(`保存星标失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [saveStarredProjectIds, showAlert, starredProjectIds])
+
+    const handleRenameProject = useCallback(async (name: string) => {
+        if (!renameProject) return
+        if (name === renameProject.name) {
+            setRenameProject(null)
+            return
+        }
+
+        setProjectActionBusy(true)
+        try {
+            await db_update_project({id: renameProject.id, name})
+            await invalidateProjectList()
+            setRenameProject(null)
+            await showAlert('项目已重命名', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            await showAlert(`重命名项目失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setProjectActionBusy(false)
+        }
+    }, [renameProject, showAlert])
+
+    const handleDeleteProject = useCallback(async (project: Project) => {
+        const confirmed = await showAlert(
+            `确定删除项目「${project.name}」吗？此操作不可撤销。`,
+            'warning',
+            'confirm',
+        )
+        if (confirmed !== 'yes') return
+
+        try {
+            await db_delete_project(project.id)
+            removeHomeProjectActivity(project.id)
+            await invalidateProjectList()
+            if (starredProjectIds.includes(project.id)) {
+                const nextIds = starredProjectIds.filter(id => id !== project.id)
+                setStarredProjectIds(nextIds)
+                await saveStarredProjectIds(nextIds)
+            }
+            await showAlert('项目已删除', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            await showAlert(`删除项目失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [saveStarredProjectIds, showAlert, starredProjectIds])
+
+    const handleProjectContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, project: Project) => {
+        showContextMenu(event, [
+            {label: '重命名', onClick: () => setRenameProject(project)},
+            {label: '删除', danger: true, onClick: () => void handleDeleteProject(project)},
+            {
+                label: starredProjectIdSet.has(project.id) ? '取消标星' : '标星',
+                onClick: () => void toggleProjectStar(project),
+            },
+        ])
+    }, [handleDeleteProject, showContextMenu, starredProjectIdSet, toggleProjectStar])
+
     const projectCountLabel = hasLoadedProjects ? projects.length : '-'
     const filteredProjectCountLabel = hasLoadedProjects ? filteredProjects.length : '-'
     const quickActions = useMemo<Array<{
@@ -558,6 +678,18 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 onRename={projectName => void handleImportConflictRename(projectName)}
                 onOverwrite={() => void handleImportConflictOverwrite()}
             />
+            <RenameDialog
+                open={Boolean(renameProject)}
+                title="重命名项目"
+                initialValue={renameProject?.name ?? ''}
+                placeholder="输入项目名称"
+                confirmText="保存"
+                busy={projectActionBusy}
+                onClose={() => {
+                    if (!projectActionBusy) setRenameProject(null)
+                }}
+                onConfirm={name => void handleRenameProject(name)}
+            />
             <FcworldProgressDialog progress={fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
@@ -790,12 +922,14 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         const createdAt = asOptionalString(project.created_at)
                                         const image = toProjectImageSrc(coverPath)
                                         const timestampLabel = formatDate(updatedAt ?? createdAt)
+                                        const isStarred = starredProjectIdSet.has(project.id)
 
                                         return (
                                             <div
                                                 key={project.id}
                                                 style={{cursor: onOpenProject ? 'pointer' : undefined}}
                                                 onClick={() => onOpenProject?.(project)}
+                                                onContextMenu={event => handleProjectContextMenu(event, project)}
                                             >
                                                 <Card
                                                     className="project-list-card"
@@ -805,6 +939,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                         </div>
                                                     ) : undefined}
                                                     title={project.name}
+                                                    tag={isStarred ? <ProjectStarTag /> : undefined}
                                                     description={project.description || '你的世界在等你回来，继续把新的角色、地点和事件写进去。'}
                                                     extraInfo={(
                                                         <div className="project-list-meta">

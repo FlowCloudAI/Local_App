@@ -71,6 +71,7 @@ export interface AppSettings {
   media_dir: string | null
   db_path: string | null
   plugins_path: string | null
+  starred_project_ids: string[]
   theme: string
   language: string
   editor_font_size: number

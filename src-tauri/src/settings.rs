@@ -18,6 +18,8 @@ pub struct AppSettings {
     /// 插件目录
     /// None = Windows 使用 Documents/FlowCloudAI/plugins，其他平台使用 app_data_dir()/plugins
     pub plugins_path: Option<String>,
+    /// 首页项目卡片的本机星标项目 ID。
+    pub starred_project_ids: Vec<String>,
 
     // ── 外观 ──────────────────────────────
     /// "system" | "light" | "dark"
@@ -61,6 +63,7 @@ impl Default for AppSettings {
             media_dir: None,
             db_path: None,
             plugins_path: None,
+            starred_project_ids: Vec::new(),
             theme: "system".to_string(),
             language: "zh-CN".to_string(),
             editor_font_size: 14,

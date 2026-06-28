@@ -496,6 +496,24 @@
   box-shadow: none;
 }
 
+.project-list-star-tag {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--fc-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--fc-color-warning) 55%, transparent);
+  background: var(--fc-color-warning-bg);
+  color: var(--fc-color-warning);
+  box-shadow: var(--fc-shadow-sm);
+}
+
+.project-list-star-tag svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  fill: currentColor;
+}
+
 .project-list-create-card {
   aspect-ratio: 3 / 4;
   display: flex;

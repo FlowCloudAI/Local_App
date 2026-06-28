@@ -633,6 +633,7 @@ export default function Settings({
             media_dir: null,
             db_path: null,
             plugins_path: null,
+            starred_project_ids: [],
             theme: 'system',
             language: 'zh-CN',
             editor_font_size: 14,
