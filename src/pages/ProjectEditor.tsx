@@ -966,13 +966,23 @@ function ProjectEditorInner({
             <FcworldProgressDialog progress={fcworldProgress} />
             <div className="pe-tree-panel">
                 <div className="pe-tree-panel__header">
-                    <button
-                        type="button"
-                        className="pe-tree-header-btn"
-                        onClick={() => onBackHome?.()}
-                    >
-                        返回主页
-                    </button>
+                    <div className="pe-tree-panel__header-actions">
+                        <button
+                            type="button"
+                            className="pe-tree-header-btn"
+                            onClick={() => onBackHome?.()}
+                        >
+                            返回主页
+                        </button>
+                        <button
+                            type="button"
+                            className={`pe-tree-header-btn${selectedKey === ROOT_ID ? ' is-active' : ''}`}
+                            aria-pressed={selectedKey === ROOT_ID}
+                            onClick={handleBreadcrumbProjectClick}
+                        >
+                            项目主页
+                        </button>
+                    </div>
                     <button
                         type="button"
                         className="pe-tree-toggle"
@@ -995,6 +1005,7 @@ function ProjectEditorInner({
                         onDeleteRequest={(node) => setDeleteTarget(node)}
                         onMove={handleMove}
                         searchable
+                        hideRoot
                         collapseDuration={0.13}
                         indentSize={12}
                     />

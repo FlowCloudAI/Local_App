@@ -60,6 +60,12 @@
     gap: 0.75rem;
 }
 
+.pe-tree-panel__header-actions {
+    display: flex;
+    min-width: 0;
+    gap: 0.5rem;
+}
+
 .pe-tree-header-btn {
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     border-radius: 999px;
@@ -79,6 +85,12 @@
 .pe-tree-header-btn:hover {
     border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
     background: color-mix(in srgb, var(--fc-color-primary) 14%, var(--fc-color-bg-secondary));
+    color: var(--fc-color-primary);
+}
+
+.pe-tree-header-btn.is-active {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
+    background: var(--fc-color-primary-subtle);
     color: var(--fc-color-primary);
 }
 
