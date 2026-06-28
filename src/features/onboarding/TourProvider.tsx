@@ -58,7 +58,7 @@ interface PopoverLayout {
 
 const DEFAULT_TARGET_WAIT_MS = 5000
 const TARGET_PADDING = 8
-const POPOVER_GAP = 14
+const POPOVER_GAP = 26
 const VIEWPORT_MARGIN = 16
 const DEFAULT_TOOLTIP_SIZE: TooltipSize = {
     width: 360,
