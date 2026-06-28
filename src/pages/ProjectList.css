@@ -499,18 +499,14 @@
 .project-list-star-tag {
   display: inline-grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--fc-radius-pill);
-  border: 1px solid color-mix(in srgb, var(--fc-color-warning) 55%, transparent);
-  background: var(--fc-color-warning-bg);
+  width: 2.4rem;
+  height: 2.4rem;
   color: var(--fc-color-warning);
-  box-shadow: var(--fc-shadow-sm);
 }
 
 .project-list-star-tag svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.8rem;
+  height: 1.8rem;
   fill: currentColor;
 }
 
