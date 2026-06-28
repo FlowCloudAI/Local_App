@@ -137,6 +137,81 @@
     opacity: 0.7;
 }
 
+/* ── 默认模板开关 ───────────────────────────────────────────── */
+
+.project-creator-template-toggle {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md, 0.5rem);
+    background: color-mix(in srgb, var(--fc-color-bg) 80%, var(--fc-color-bg-elevated));
+    cursor: pointer;
+}
+
+.project-creator-template-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.project-creator-template-toggle__control {
+    position: relative;
+    width: 2.4rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: var(--fc-color-border);
+    transition: background 0.15s;
+}
+
+.project-creator-template-toggle__thumb {
+    position: absolute;
+    top: 0.18rem;
+    left: 0.18rem;
+    width: 0.99rem;
+    height: 0.99rem;
+    border-radius: 50%;
+    background: var(--fc-color-bg-elevated);
+    box-shadow: var(--fc-shadow-sm);
+    transition: transform 0.15s;
+}
+
+.project-creator-template-toggle input:checked + .project-creator-template-toggle__control {
+    background: var(--fc-color-primary);
+}
+
+.project-creator-template-toggle input:checked + .project-creator-template-toggle__control .project-creator-template-toggle__thumb {
+    transform: translateX(1.05rem);
+}
+
+.project-creator-template-toggle input:focus-visible + .project-creator-template-toggle__control {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 24%, transparent);
+}
+
+.project-creator-template-toggle:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.project-creator-template-toggle__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    min-width: 0;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+    font-weight: 500;
+}
+
+.project-creator-template-toggle__text small {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    font-weight: 400;
+    line-height: 1.35;
+}
+
 /* ── 行内字段提示 / 重复错误 ───────────────────────────────────── */
 
 .project-creator-field-hint {

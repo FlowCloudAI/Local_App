@@ -16,6 +16,7 @@ interface ProjectCreatorProps {
 export default function ProjectCreator({open, onClose, onCreated, existingNames = [], backdropClassName}: ProjectCreatorProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
+    const [createDefaultTemplate, setCreateDefaultTemplate] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [apiError, setApiError] = useState<string | null>(null)
     const {showAlert} = useAlert()
@@ -25,6 +26,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
             queueMicrotask(() => {
                 setName('')
                 setDescription('')
+                setCreateDefaultTemplate(true)
                 setApiError(null)
                 setSubmitting(false)
             })
@@ -53,6 +55,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
             const project = await db_create_project({
                 name: trimmedName,
                 description: description.trim() || null,
+                createDefaultTemplate,
             })
             void showAlert('世界观已创建', 'success', 'nonInvasive', 1000)
             void invalidateProjectList()
@@ -124,6 +127,22 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                             maxLength={500}
                         />
                     </div>
+
+                    <label className="project-creator-template-toggle">
+                        <input
+                            type="checkbox"
+                            checked={createDefaultTemplate}
+                            onChange={event => setCreateDefaultTemplate(event.target.checked)}
+                            disabled={submitting}
+                        />
+                        <span className="project-creator-template-toggle__control" aria-hidden="true">
+                            <span className="project-creator-template-toggle__thumb"/>
+                        </span>
+                        <span className="project-creator-template-toggle__text">
+                            <span>创建默认模板</span>
+                            <small>按内置类型创建分类，并添加常用标签</small>
+                        </span>
+                    </label>
 
                     {apiError && (
                         <p className="project-creator-api-error">创建失败：{apiError}</p>

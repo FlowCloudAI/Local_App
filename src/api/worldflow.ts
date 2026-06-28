@@ -261,6 +261,7 @@ export interface CreateProjectInput {
     name: string
     description?: string | null
     coverPath?: string | null
+    createDefaultTemplate?: boolean
 }
 
 export interface UpdateProjectInput {
@@ -429,8 +430,13 @@ const normalizeProject = (project: Project): Project => ({
     cover_path: project.cover_path ?? project.cover_image ?? null,
 })
 
-export const db_create_project = ({name, description, coverPath}: CreateProjectInput) =>
-    command<Project>('db_create_project', {name, description, coverImage: coverPath}).then(normalizeProject)
+export const db_create_project = ({name, description, coverPath, createDefaultTemplate}: CreateProjectInput) =>
+    command<Project>('db_create_project', {
+        name,
+        description,
+        coverImage: coverPath,
+        createDefaultTemplate,
+    }).then(normalizeProject)
 
 export const db_get_project = (id: string) => command<Project>('db_get_project', {id}).then(normalizeProject)
 

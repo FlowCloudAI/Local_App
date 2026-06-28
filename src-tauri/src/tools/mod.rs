@@ -1847,7 +1847,7 @@ pub async fn move_entry(
     .map_err(|e| e.to_string())
 }
 
-/// 创建项目（含默认时间线标签初始化）
+/// 创建项目（含默认模板初始化）
 pub async fn create_project(
     state: &AppState,
     name: String,

@@ -6,14 +6,19 @@ pub async fn db_create_project(
     name: String,
     description: Option<String>,
     cover_image: Option<String>,
+    create_default_template: Option<bool>,
 ) -> Result<Project, String> {
     let db = state.inner().sqlite_db.lock().await;
-    db.create_project_with_default_timeline_tags(CreateProject {
+    let input = CreateProject {
         name,
         description,
         cover_image,
-    })
-    .await
+    };
+    if create_default_template.unwrap_or(true) {
+        db.create_project_with_default_timeline_tags(input).await
+    } else {
+        db.create_project(input).await
+    }
     .map_err(|e| e.to_string())
 }
 
