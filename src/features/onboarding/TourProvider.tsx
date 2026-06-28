@@ -78,6 +78,7 @@ export function TourProvider({children}: TourProviderProps) {
     const [targetRect, setTargetRect] = useState<TourTargetRect | null>(null)
     const [targetStatus, setTargetStatus] = useState<TourTargetStatus>('none')
     const targetElementRef = useRef<Element | null>(null)
+    const isPreparingStepRef = useRef(false)
     const navigationDirectionRef = useRef<TourNavigationDirection>('start')
 
     const currentStep = activeTour?.definition.steps[activeTour.currentIndex] ?? null
@@ -242,9 +243,10 @@ export function TourProvider({children}: TourProviderProps) {
         return true
     }, [])
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!activeTour || !currentStep) {
             targetElementRef.current = null
+            isPreparingStepRef.current = false
             setTargetRect(null)
             setTargetStatus('none')
             return undefined
@@ -255,12 +257,13 @@ export function TourProvider({children}: TourProviderProps) {
 
         const refreshTargetRect = () => {
             if (!disposed) {
-                syncTargetRect(Boolean(currentStep.target && targetElementRef.current))
+                syncTargetRect(Boolean(currentStep.target && targetElementRef.current && !isPreparingStepRef.current))
             }
         }
 
         const prepareStep = async () => {
             targetElementRef.current = null
+            isPreparingStepRef.current = Boolean(currentStep.target)
             setTargetRect(null)
             setTargetStatus(currentStep.target ? 'waiting' : 'none')
 
@@ -277,7 +280,11 @@ export function TourProvider({children}: TourProviderProps) {
                 }
             }
 
-            if (disposed || !currentStep.target) return
+            if (disposed) return
+            if (!currentStep.target) {
+                isPreparingStepRef.current = false
+                return
+            }
 
             const element = await waitForTarget(
                 currentStep.target,
@@ -288,6 +295,7 @@ export function TourProvider({children}: TourProviderProps) {
 
             targetElementRef.current = element
             if (!element) {
+                isPreparingStepRef.current = false
                 setTargetStatus('missing')
                 return
             }
@@ -297,6 +305,7 @@ export function TourProvider({children}: TourProviderProps) {
                 await waitForAnimationFrame()
                 if (disposed) return
             }
+            isPreparingStepRef.current = false
             syncTargetRect(true)
 
             if (currentStep.advanceOnTargetClick) {
@@ -323,6 +332,7 @@ export function TourProvider({children}: TourProviderProps) {
 
         return () => {
             disposed = true
+            isPreparingStepRef.current = false
             removeTargetClickListener?.()
             window.removeEventListener('resize', refreshTargetRect)
             window.removeEventListener('scroll', refreshTargetRect, true)
@@ -454,6 +464,8 @@ function TourOverlay({
             height: rect.height,
         })
     }, [currentStep.id, targetStatus, targetRect])
+
+    if (currentStep.target && targetStatus === 'waiting') return null
 
     return (
         <div className="fc-tour-layer" aria-live="polite">
