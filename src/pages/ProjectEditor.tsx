@@ -966,23 +966,13 @@ function ProjectEditorInner({
             <FcworldProgressDialog progress={fcworldProgress} />
             <div className="pe-tree-panel">
                 <div className="pe-tree-panel__header">
-                    <div className="pe-tree-panel__header-actions">
-                        <button
-                            type="button"
-                            className="pe-tree-header-btn"
-                            onClick={() => onBackHome?.()}
-                        >
-                            返回主页
-                        </button>
-                        <button
-                            type="button"
-                            className={`pe-tree-header-btn${selectedKey === ROOT_ID ? ' is-active' : ''}`}
-                            aria-pressed={selectedKey === ROOT_ID}
-                            onClick={handleBreadcrumbProjectClick}
-                        >
-                            项目主页
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        className="pe-tree-header-btn"
+                        onClick={() => onBackHome?.()}
+                    >
+                        返回主页
+                    </button>
                     <button
                         type="button"
                         className="pe-tree-toggle"
@@ -993,22 +983,35 @@ function ProjectEditorInner({
                 </div>
 
                 <div className="pe-tree-panel__body">
-                    <Tree
-                        treeData={roots}
-                        selectedKey={selectedKey}
-                        expandedKeys={expandedKeys}
-                        onExpandedKeysChange={setExpandedKeys}
-                        onViewportRowsChange={handleViewportRowsChange}
-                        onSelect={handleSelect}
-                        onRename={handleRename}
-                        onCreate={handleCreate}
-                        onDeleteRequest={(node) => setDeleteTarget(node)}
-                        onMove={handleMove}
-                        searchable
-                        hideRoot
-                        collapseDuration={0.13}
-                        indentSize={12}
-                    />
+                    <button
+                        type="button"
+                        className={`pe-tree-home-btn${selectedKey === ROOT_ID ? ' is-active' : ''}`}
+                        aria-pressed={selectedKey === ROOT_ID}
+                        onClick={handleBreadcrumbProjectClick}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M4 11.4 12 5l8 6.4v7.1a1.5 1.5 0 0 1-1.5 1.5h-4.2v-5.1H9.7V20H5.5A1.5 1.5 0 0 1 4 18.5z"/>
+                        </svg>
+                        <span>项目主页</span>
+                    </button>
+                    <div className="pe-tree-panel__tree">
+                        <Tree
+                            treeData={roots}
+                            selectedKey={selectedKey}
+                            expandedKeys={expandedKeys}
+                            onExpandedKeysChange={setExpandedKeys}
+                            onViewportRowsChange={handleViewportRowsChange}
+                            onSelect={handleSelect}
+                            onRename={handleRename}
+                            onCreate={handleCreate}
+                            onDeleteRequest={(node) => setDeleteTarget(node)}
+                            onMove={handleMove}
+                            searchable
+                            hideRoot
+                            collapseDuration={0.13}
+                            indentSize={12}
+                        />
+                    </div>
                 </div>
             </div>
 
