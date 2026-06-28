@@ -219,7 +219,6 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 onClose={() => setCreatorOpen(false)}
                 onCreated={handleOpenProject}
                 existingNames={projects.map(p => p.name)}
-                backdropClassName="project-creator-backdrop--no-blur"
             />
             <ProjectImportConflictDialog
                 open={Boolean(importConflict)}

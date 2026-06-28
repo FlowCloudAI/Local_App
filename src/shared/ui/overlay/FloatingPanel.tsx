@@ -8,6 +8,7 @@ export interface FloatingPanelProps {
     className?: string
     ariaLabel?: string
     labelledBy?: string
+    dataTourId?: string
     children?: ReactNode
 }
 

@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
-import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {db_create_project, type Project} from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import {invalidateProjectList} from '../projectListStore'
 import './ProjectCreator.css'
 
@@ -10,10 +10,9 @@ interface ProjectCreatorProps {
     onClose: () => void
     onCreated?: (project: Project) => void
     existingNames?: string[]
-    backdropClassName?: string
 }
 
-export default function ProjectCreator({open, onClose, onCreated, existingNames = [], backdropClassName}: ProjectCreatorProps) {
+export default function ProjectCreator({open, onClose, onCreated, existingNames = []}: ProjectCreatorProps) {
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
     const [createDefaultTemplate, setCreateDefaultTemplate] = useState(true)
@@ -32,15 +31,6 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
             })
         }
     }, [open])
-
-    useEffect(() => {
-        if (!open) return
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !submitting) onClose()
-        }
-        window.addEventListener('keydown', handler)
-        return () => window.removeEventListener('keydown', handler)
-    }, [open, submitting, onClose])
 
     const trimmedName = name.trim()
     const isDuplicate = trimmedName.length > 0 &&
@@ -67,16 +57,15 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
         }
     }
 
-    if (!open) return null
-
-    return createPortal(
-        <div
-            className={['project-creator-backdrop', backdropClassName].filter(Boolean).join(' ')}
-            onClick={e => {
-                if (e.target === e.currentTarget && !submitting) onClose()
-            }}
+    return (
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            dismissible={!submitting}
+            ariaLabel="新建世界观"
+            className="project-creator-dialog"
+            dataTourId="project-creator-dialog"
         >
-            <div className="project-creator-dialog" role="dialog" aria-modal="true" aria-label="新建世界观" data-tour-id="project-creator-dialog">
                 <div className="project-creator-header">
                     <span className="project-creator-title">新建世界观</span>
                     <button
@@ -159,8 +148,6 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                         {submitting ? '创建中…' : '创建'}
                     </Button>
                 </div>
-            </div>
-        </div>,
-        document.body
+        </FloatingPanel>
     )
 }

@@ -1,32 +1,9 @@
-/* ── 遮罩层 ──────────────────────────────────────────────────────────────── */
-
-.project-creator-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 500;
-    display: grid;
-    place-items: center;
-    padding: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-}
-
-.project-creator-backdrop--no-blur {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
 /* ── 对话框 ────────────────────────────────────────────────────────────────── */
 
 .project-creator-dialog {
     width: min(100%, 28rem);
     display: flex;
     flex-direction: column;
-    border-radius: 1.25rem;
-    border: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-lg);
     overflow: hidden;
 }
 

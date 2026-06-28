@@ -18,6 +18,7 @@ export interface OverlayProps {
     className?: string
     ariaLabel?: string
     labelledBy?: string
+    dataTourId?: string
     children?: ReactNode
 }
 
@@ -33,6 +34,7 @@ export default function Overlay({
     className,
     ariaLabel,
     labelledBy,
+    dataTourId,
     children,
 }: OverlayProps) {
     const [mounted, setMounted] = useState(open)
@@ -110,6 +112,7 @@ export default function Overlay({
                 aria-modal="true"
                 aria-label={ariaLabel}
                 aria-labelledby={labelledBy}
+                data-tour-id={dataTourId}
                 tabIndex={-1}
                 onMouseDown={(e) => e.stopPropagation()}
             >
