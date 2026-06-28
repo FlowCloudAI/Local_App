@@ -28,6 +28,47 @@
     max-width: 40rem;
 }
 
+.project-home-welcome-overlay {
+  width: min(100%, 32rem);
+}
+
+.project-home-welcome {
+  display: grid;
+  gap: var(--fc-space-xl);
+  padding: var(--fc-space-xl);
+}
+
+.project-home-welcome__body {
+  display: grid;
+  gap: var(--fc-space-sm);
+}
+
+.project-home-welcome__eyebrow {
+  color: var(--fc-color-primary);
+  font-size: var(--fc-font-size-sm);
+  font-weight: var(--fc-font-weight-semibold, 600);
+}
+
+.project-home-welcome h2 {
+  margin: 0;
+  color: var(--fc-color-text);
+  font-size: var(--fc-font-size-title-sm);
+  line-height: var(--fc-line-height-tight);
+}
+
+.project-home-welcome p {
+  margin: 0;
+  color: var(--fc-color-text-secondary);
+  line-height: var(--fc-line-height-normal);
+}
+
+.project-home-welcome__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--fc-space-sm);
+  flex-wrap: wrap;
+}
+
 .project-home-hero {
   margin-bottom: var(--fc-space-lg);
   padding-bottom: var(--fc-space-lg);

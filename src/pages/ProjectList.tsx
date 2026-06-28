@@ -1,4 +1,4 @@
-import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
 import {convertFileSrc} from '../api/assets'
 import {openFileDialog} from '../api/dialog'
 import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
@@ -31,7 +31,7 @@ import {
     type HomeActivityTarget,
     type HomeDashboardData,
 } from '../features/home/homeActivity'
-import RenameDialog from '../shared/ui/overlay/RenameDialog'
+import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
@@ -47,6 +47,8 @@ const SORT_OPTIONS: Array<{ key: Exclude<SortMode, 'name-asc' | 'name-desc'>; la
     {key: 'updated-desc', label: '最近更新'},
     {key: 'updated-asc', label: '最早更新'},
 ]
+const HOME_WELCOME_STORAGE_KEY = 'fc:onboarding:home-welcome:v1'
+const WELCOME_TOUR_START_DELAY_MS = 300
 
 function toProjectImageSrc(coverPath?: string | null): string | undefined {
     if (!coverPath) return undefined
@@ -94,6 +96,22 @@ function asOptionalString(value: unknown): string | null | undefined {
 
 function normalizeStarredProjectIds(projectIds: string[] | null | undefined) {
     return Array.from(new Set((projectIds ?? []).filter(Boolean)))
+}
+
+function hasSeenHomeWelcome(): boolean {
+    try {
+        return window.localStorage.getItem(HOME_WELCOME_STORAGE_KEY) === 'done'
+    } catch {
+        return false
+    }
+}
+
+function markHomeWelcomeSeen() {
+    try {
+        window.localStorage.setItem(HOME_WELCOME_STORAGE_KEY, 'done')
+    } catch {
+        // 本地存储不可用时只影响欢迎弹窗是否重复出现。
+    }
 }
 
 function ProjectStarTag() {
@@ -152,11 +170,11 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
     const {startTour} = useTour()
-    const debugTourStartedRef = useRef(false)
     const [importing, setImporting] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [welcomeOpen, setWelcomeOpen] = useState(false)
     const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
     const [starredProjectIds, setStarredProjectIds] = useState<string[]>([])
     const [renameProject, setRenameProject] = useState<Project | null>(null)
@@ -256,13 +274,16 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     }), [closeCreatorWhenBackToHome, closeCreatorWhenTourCancelled, openCreatorForTour])
 
     useEffect(() => {
-        if (debugTourStartedRef.current) return
-        const frame = window.requestAnimationFrame(() => {
-            if (debugTourStartedRef.current) return
-            debugTourStartedRef.current = true
-            startTour(homeOnboardingTour, {force: true, markCompletedOnSkip: false})
-        })
-        return () => window.cancelAnimationFrame(frame)
+        if (!hasSeenHomeWelcome()) setWelcomeOpen(true)
+    }, [])
+
+    const finishWelcome = useCallback((startTutorial: boolean) => {
+        markHomeWelcomeSeen()
+        setWelcomeOpen(false)
+        if (!startTutorial) return
+        window.setTimeout(() => {
+            startTour(homeOnboardingTour, {force: true, markCompletedOnSkip: true})
+        }, WELCOME_TOUR_START_DELAY_MS)
     }, [homeOnboardingTour, startTour])
 
     useEffect(() => {
@@ -757,6 +778,30 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
     return (
         <>
+            <FloatingPanel
+                open={welcomeOpen}
+                dismissible={false}
+                className="project-home-welcome-overlay"
+                ariaLabel="欢迎使用 FlowCloudAI"
+            >
+                <div className="project-home-welcome">
+                    <div className="project-home-welcome__body">
+                        <span className="project-home-welcome__eyebrow">欢迎使用 FlowCloudAI</span>
+                        <h2>先从第一个世界观开始</h2>
+                        <p>
+                            FlowCloudAI 会把世界项目、词条、灵感和 AI 辅助放在同一个创作工作区里。你可以先看一遍简短教程，也可以直接开始使用。
+                        </p>
+                    </div>
+                    <div className="project-home-welcome__actions">
+                        <Button type="button" variant="ghost" onClick={() => finishWelcome(false)}>
+                            暂不需要
+                        </Button>
+                        <Button type="button" onClick={() => finishWelcome(true)}>
+                            开启教程
+                        </Button>
+                    </div>
+                </div>
+            </FloatingPanel>
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
