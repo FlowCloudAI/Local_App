@@ -1081,6 +1081,7 @@ function ProjectEditorInner({
                                 onOpenTimeline={() => handleOpenProjectPanel('timeline')}
                                 onOpenWorldMap={() => handleOpenProjectPanel('world-map')}
                                 onOpenContradiction={() => handleOpenProjectPanel('contradiction')}
+                                onRename={(name) => handleRename(ROOT_ID, name)}
                                 onEditCover={() => setCoverPickerOpen(true)}
                                 onClearCover={() => {
                                     void (async () => {

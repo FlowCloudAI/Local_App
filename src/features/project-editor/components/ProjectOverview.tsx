@@ -36,6 +36,7 @@ function ProjectOverview({
                              onOpenTimeline,
                              onOpenWorldMap,
                              onOpenContradiction,
+                             onRename,
                              onEditCover,
                              onClearCover,
                              coverUpdating = false,
@@ -67,8 +68,7 @@ function ProjectOverview({
                 onEditCover={onEditCover}
                 onClearCover={onClearCover}
                 coverUpdating={coverUpdating}
-                onCreateEntry={onCreateEntry}
-                onOpenProjectAi={onOpenProjectAi}
+                onRename={onRename}
                 onExport={onExport}
                 exporting={exporting}
                 onDelete={onDelete}

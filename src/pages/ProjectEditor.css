@@ -428,10 +428,10 @@
 
 .pe-overview-hero {
     display: grid;
-    grid-template-columns: minmax(11rem, 13.5rem) minmax(0, 1fr);
+    grid-template-columns: minmax(11rem, 13.5rem) minmax(0, 1fr) auto;
     grid-template-areas:
-        "cover primary"
-        "cover secondary";
+        "cover primary actions"
+        "cover secondary secondary";
     gap: var(--fc-space-xl);
     align-items: start;
     margin-bottom: var(--fc-space-xl);
@@ -449,6 +449,12 @@
 
 .pe-overview-hero__secondary {
     grid-area: secondary;
+}
+
+.pe-overview-hero__actions {
+    grid-area: actions;
+    justify-self: end;
+    align-self: start;
 }
 
 .pe-overview-title {
@@ -523,30 +529,6 @@
     gap: var(--fc-space-sm);
     margin-top: var(--fc-space-lg);
     flex-wrap: wrap;
-}
-
-.pe-overview-primary-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--fc-space-sm);
-    flex-wrap: wrap;
-    margin-bottom: var(--fc-space-lg);
-}
-
-.pe-overview-danger-row {
-    margin-top: var(--fc-space-lg);
-    padding-top: var(--fc-space-md);
-    border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 60%, transparent);
-}
-
-.pe-overview-danger-row button {
-    color: var(--fc-color-danger);
-    opacity: 0.8;
-}
-
-.pe-overview-danger-row button:hover:not(:disabled) {
-    opacity: 1;
-    background: var(--fc-color-danger-bg, color-mix(in srgb, var(--fc-color-danger) 10%, transparent));
 }
 
 .pe-overview-meta {
@@ -1548,10 +1530,10 @@
 
 @container (max-width: 980px) {
     .pe-overview-hero {
-        grid-template-columns: minmax(11rem, 13.5rem) minmax(0, 1fr);
+        grid-template-columns: minmax(11rem, 13.5rem) minmax(0, 1fr) auto;
         grid-template-areas:
-            "cover primary"
-            "secondary secondary";
+            "cover primary actions"
+            "secondary secondary secondary";
     }
 
     .pe-project-cover {
@@ -1563,9 +1545,14 @@
     .pe-overview-hero {
         grid-template-columns: 1fr;
         grid-template-areas:
+            "actions"
             "cover"
             "primary"
             "secondary";
+    }
+
+    .pe-overview-hero__actions {
+        justify-self: end;
     }
 
     .pe-project-cover-card {

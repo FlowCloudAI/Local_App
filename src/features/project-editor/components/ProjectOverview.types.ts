@@ -31,6 +31,7 @@ export interface ProjectOverviewProps {
     onOpenTimeline?: () => void
     onOpenWorldMap?: () => void
     onOpenContradiction?: () => void
+    onRename?: (name: string) => void | Promise<void>
     onEditCover?: () => void
     onClearCover?: () => void
     coverUpdating?: boolean
