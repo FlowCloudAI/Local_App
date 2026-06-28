@@ -4,10 +4,6 @@
     width: min(100%, 32rem);
     display: flex;
     flex-direction: column;
-    border-radius: 1.25rem;
-    border: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-lg);
     overflow: hidden;
 }
 
