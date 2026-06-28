@@ -174,7 +174,6 @@
     font-size: var(--fc-font-size-md);
     line-height: 1.62;
     resize: none;
-    box-shadow: var(--mobile-shadow-card);
 }
 
 .mobile-idea__content:focus,

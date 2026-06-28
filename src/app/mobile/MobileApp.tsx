@@ -130,6 +130,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         allowTextEditingTargetGestures: ideaDrawerEnabled,
         onEdgeBackGesture: runBackNavigation,
     })
+    const sideDrawerProgress = categoryDrawerWidth > 0
+        ? Math.min(1, Math.max(0, sideDrawerSurfaceOffset / categoryDrawerWidth))
+        : 0
     const categoryDrawerSelection = useMemo<MobileCategoryDrawerSelection>(() => {
         if (currentPage?.type === 'projectHome') return {kind: 'projectHome'}
         if (currentPage?.type !== 'entryList') return {kind: 'projectHome'}
@@ -316,6 +319,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 style={{
                     '--mobile-entry-drawer-width': `${categoryDrawerWidth}px`,
                     '--mobile-entry-drawer-shift': `${sideDrawerSurfaceOffset}px`,
+                    '--mobile-entry-drawer-progress': sideDrawerProgress,
                 } as CSSProperties}
             >
                 {mobileSideDrawerEnabled && (

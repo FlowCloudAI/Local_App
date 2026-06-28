@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>海岸线 v2 算法详解</title>
+    <style>
+        :root {
+            --ink: #1f2d3d;
+            --ink2: #52606d;
+            --ink3: #8895a7;
+            --sea: #aecbe8;
+            --sea2: #cfe0f2;
+            --land: #ffffff;
+            --stroke: #2f6db0;
+            --sketch: #d4554d;
+            --accent: #2f6db0;
+            --accentbg: #eaf2fb;
+            --line: #dce3ec;
+            --bg: #f6f8fb;
+            --card: #ffffff;
+            --bandA: #2f6db0;
+            --bandB: #1f9d76;
+            --bandC: #c77f1a;
+            --env: #8b5cd6;
+            --warn: #c4554d;
+            --ok: #1f9d76;
+            --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            line-height: 1.75;
+            font-size: 16px
+        }
+
+        .wrap {
+            max-width: 940px;
+            margin: 0 auto;
+            padding: 0 20px 120px
+        }
+
+        header.hero {
+            background: linear-gradient(160deg, #1f3a5f, #2f6db0);
+            color: #fff;
+            padding: 54px 20px 40px;
+            margin-bottom: 8px
+        }
+
+        header.hero .inner {
+            max-width: 940px;
+            margin: 0 auto
+        }
+
+        header.hero h1 {
+            margin: 0 0 8px;
+            font-size: 30px;
+            letter-spacing: .5px
+        }
+
+        header.hero p {
+            margin: 0;
+            color: #d4e4f7;
+            font-size: 15px
+        }
+
+        header.hero .meta {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #a9c8ea;
+            font-family: var(--mono),serif
+        }
+
+        h2 {
+            font-size: 23px;
+            margin: 48px 0 4px;
+            padding-top: 12px;
+            border-top: 2px solid var(--line)
+        }
+
+        h2 .num {
+            display: inline-block;
+            min-width: 34px;
+            color: var(--accent);
+            font-family: var(--mono),serif
+        }
+
+        h3 {
+            font-size: 17px;
+            margin: 26px 0 6px;
+            color: var(--ink)
+        }
+
+        p {
+            margin: 10px 0
+        }
+
+        .lead {
+            color: var(--ink2);
+            font-size: 15.5px
+        }
+
+        code, kbd {
+            font-family: var(--mono),serif;
+            font-size: .88em;
+            background: var(--accentbg);
+            color: #1c4f86;
+            padding: 1px 6px;
+            border-radius: 5px
+        }
+
+        .fig {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 18px;
+            margin: 18px 0;
+            box-shadow: 0 1px 3px rgba(20, 40, 70, .05)
+        }
+
+        .fig svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 8px
+        }
+
+        .fig .cap {
+            font-size: 13px;
+            color: var(--ink3);
+            margin-top: 10px;
+            text-align: center
+        }
+
+        .note {
+            background: var(--accentbg);
+            border-left: 4px solid var(--accent);
+            padding: 12px 16px;
+            border-radius: 0 8px 8px 0;
+            margin: 16px 0;
+            font-size: 14.5px;
+            color: var(--ink2)
+        }
+
+        .note.warn {
+            background: #fbeeed;
+            border-left-color: var(--warn)
+        }
+
+        .note b {
+            color: var(--ink)
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 16px 0;
+            font-size: 14px
+        }
+
+        th, td {
+            border: 1px solid var(--line);
+            padding: 8px 11px;
+            text-align: left;
+            vertical-align: top
+        }
+
+        th {
+            background: var(--accentbg);
+            color: #1c4f86;
+            font-weight: 600
+        }
+
+        td code {
+            background: #f0f3f7
+        }
+
+        .cx {
+            font-family: var(--mono),serif;
+            font-weight: 700;
+            color: var(--warn);
+            white-space: nowrap
+        }
+
+        .cx.lin {
+            color: var(--ok)
+        }
+
+        .toc {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 16px 22px;
+            margin: 22px 0
+        }
+
+        .toc h4 {
+            margin: 0 0 8px;
+            font-size: 14px;
+            color: var(--ink3);
+            text-transform: uppercase;
+            letter-spacing: 1px
+        }
+
+        .toc ol {
+            margin: 0;
+            padding-left: 22px;
+            columns: 2;
+            column-gap: 30px
+        }
+
+        .toc a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14.5px
+        }
+
+        .toc a:hover {
+            text-decoration: underline
+        }
+
+        .pill {
+            display: inline-block;
+            font-family: var(--mono),serif;
+            font-size: 12px;
+            padding: 2px 9px;
+            border-radius: 20px;
+            background: var(--accentbg);
+            color: #1c4f86;
+            margin-right: 6px
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns:1fr 1fr;
+            gap: 14px
+        }
+
+        @media (max-width: 680px) {
+            .grid2 {
+                grid-template-columns:1fr
+            }
+
+            .toc ol {
+                columns: 1
+            }
+        }
+
+        .demo {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 18px;
+            margin: 18px 0
+        }
+
+        .ctrl {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px 22px;
+            align-items: center;
+            margin-bottom: 14px;
+            font-size: 14px
+        }
+
+        .ctrl label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            user-select: none
+        }
+
+        .ctrl .sw {
+            display: inline-block;
+            width: 13px;
+            height: 13px;
+            border-radius: 3px;
+            border: 2px solid
+        }
+
+        .ctrl input[type=range] {
+            vertical-align: middle
+        }
+
+        .formula {
+            font-family: var(--mono),serif;
+            background: #f0f3f7;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin: 12px 0;
+            font-size: 13.5px;
+            color: #33455c;
+            overflow-x: auto;
+            white-space: pre
+        }
+
+        .small {
+            font-size: 13px;
+            color: var(--ink3)
+        }
+
+        .kbadge {
+            font-family: var(--mono),serif;
+            font-size: 12px;
+            color: #fff;
+            padding: 1px 7px;
+            border-radius: 4px
+        }
+
+        ul.tight {
+            margin: 8px 0;
+            padding-left: 22px
+        }
+
+        ul.tight li {
+            margin: 4px 0
+        }
+    </style>
+</head>
+<body>
+<header class="hero">
+    <div class="inner">
+        <h1>海岸线 v2 算法详解</h1>
+        <p>从一份稀疏的手绘多边形，到一条自然、可控、确定性的海岸线 —— 逐步拆解</p>
+        <div class="meta">src-tauri/src/map/coastline_v2.rs · 入口 build_natural_coastline_polygon_v2</div>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <p class="lead">本文逐步讲解 v2 海岸线生成算法：每一步是什么、为什么这么做、怎么实现、代价多大。
+        图中大部分曲线由页面内 JavaScript <b>用与 Rust 相同的数学实时生成</b>（同一片示例大陆、同一套参数），不是示意画。
+        文末有一个可交互 demo，能逐层叠加噪声、调节压限。</p>
+
+    <div class="toc">
+        <h4>目录</h4>
+        <ol>
+            <li><a href="#ov">总览：一条流水线</a></li>
+            <li><a href="#s1">输入：稀疏草稿</a></li>
+            <li><a href="#s2">等弧长重采样</a></li>
+            <li><a href="#s3">角点圆化</a></li>
+            <li><a href="#s4">三层噪声谱（核心）</a></li>
+            <li><a href="#s5">粗糙度包络调制</a></li>
+            <li><a href="#s6">逐点位移与压限</a></li>
+            <li><a href="#s7">Taubin 平滑</a></li>
+            <li><a href="#s8">校验 · 重试 · 回退</a></li>
+            <li><a href="#s9">复杂度总表</a></li>
+            <li><a href="#demo">交互 demo</a></li>
+        </ol>
+    </div>
+
+    <!-- ============ 总览 ============ -->
+    <h2 id="ov"><span class="num">0</span>总览：一条流水线</h2>
+    <p>核心目标：把用户随手画的几个点（一个粗多边形）变成一条<b>看起来自然、整体仍贴合草稿、且同一形状每次生成结果一致</b>的海岸线。
+        整条管线是单向的，只有最后的"校验"环节可能触发回头重试：</p>
+
+    <div class="fig">
+        <svg viewBox="0 0 920 300" xmlns="http://www.w3.org/2000/svg" font-family="system-ui" font-size="13">
+            <defs>
+                <marker id="ar" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+                    <path d="M0,0 L7,3 L0,6 Z" fill="#8895a7"/>
+                </marker>
+            </defs>
+            <style>
+                .bx {
+                    fill: #fff;
+                    stroke: #2f6db0;
+                    stroke-width: 1.5;
+                    rx: 9px
+                }
+
+                .bt {
+                    fill: #1f2d3d;
+                    font-weight: 600
+                }
+
+                .bs {
+                    fill: #8895a7;
+                    font-size: 11px
+                }
+
+                .fl {
+                    stroke: #8895a7;
+                    stroke-width: 1.5;
+                    fill: none;
+                    marker-end: url(#ar)
+                }
+            </style>
+            <!-- row 1 -->
+            <rect class="bx" x="10" y="20" width="120" height="54" rx="9"/>
+            <text class="bt" x="70" y="42" text-anchor="middle">① 稀疏草稿</text>
+            <text class="bs" x="70" y="60" text-anchor="middle">V 个顶点</text>
+
+            <rect class="bx" x="160" y="20" width="130" height="54" rx="9"/>
+            <text class="bt" x="225" y="42" text-anchor="middle">② 等弧长重采样</text>
+            <text class="bs" x="225" y="60" text-anchor="middle">→ N 个等距点</text>
+
+            <rect class="bx" x="320" y="20" width="120" height="54" rx="9"/>
+            <text class="bt" x="380" y="42" text-anchor="middle">③ 角点圆化</text>
+            <text class="bs" x="380" y="60" text-anchor="middle">Laplacian</text>
+
+            <rect class="bx" x="470" y="20" width="150" height="54" rx="9"/>
+            <text class="bt" x="545" y="42" text-anchor="middle">④ 三层噪声谱</text>
+            <text class="bs" x="545" y="60" text-anchor="middle">A 宏观 / B 中 / C 细</text>
+
+            <rect class="bx" x="650" y="20" width="150" height="54" rx="9"/>
+            <text class="bt" x="725" y="38" text-anchor="middle">⑤ 粗糙度包络</text>
+            <text class="bs" x="725" y="56" text-anchor="middle">调制 B/C 振幅</text>
+
+            <path class="fl" d="M130,47 L158,47"/>
+            <path class="fl" d="M290,47 L318,47"/>
+            <path class="fl" d="M440,47 L468,47"/>
+            <path class="fl" d="M620,47 L648,47"/>
+            <!-- down -->
+            <path class="fl" d="M725,74 L725,108"/>
+            <!-- row 2 (right to left) -->
+            <rect class="bx" x="650" y="112" width="150" height="60" rx="9"/>
+            <text class="bt" x="725" y="134" text-anchor="middle">⑥ 逐点位移</text>
+            <text class="bs" x="725" y="151" text-anchor="middle">法线·结构/细节分离</text>
+            <text class="bs" x="725" y="165" text-anchor="middle">D_max 压限·安全限幅</text>
+
+            <rect class="bx" x="470" y="112" width="150" height="60" rx="9"/>
+            <text class="bt" x="545" y="138" text-anchor="middle">⑦ Taubin 平滑</text>
+            <text class="bs" x="545" y="156" text-anchor="middle">去高频毛刺·不收缩</text>
+
+            <rect class="bx" x="300" y="112" width="140" height="60" rx="9"/>
+            <text class="bt" x="370" y="138" text-anchor="middle">⑧ 校验</text>
+            <text class="bs" x="370" y="156" text-anchor="middle">自交 + 关键点包含</text>
+
+            <path class="fl" d="M648,142 L622,142"/>
+            <path class="fl" d="M470,142 L442,142"/>
+            <!-- decision -->
+            <path class="fl" d="M300,142 L210,142"/>
+            <polygon points="200,118 250,142 200,166 150,142" fill="#eaf2fb" stroke="#2f6db0" stroke-width="1.5"/>
+            <text x="175" y="138" text-anchor="middle" font-size="11" fill="#1c4f86">通过?</text>
+            <text x="175" y="152" text-anchor="middle" font-size="11" fill="#1c4f86"></text>
+
+            <path class="fl" d="M175,166 L175,210"/>
+            <text x="186" y="190" font-size="11" fill="#1f9d76">是</text>
+            <rect class="bx" x="110" y="214" width="130" height="44" rx="9" style="fill:#eafaf2;stroke:#1f9d76"/>
+            <text class="bt" x="175" y="241" text-anchor="middle" fill="#147a55">✓ 输出多边形</text>
+
+            <path class="fl" d="M150,142 L70,142 L70,160"/>
+            <text x="105" y="134" font-size="11" fill="#c4554d">否</text>
+            <rect class="bx" x="10" y="164" width="120" height="60" rx="9" style="fill:#fbeeed;stroke:#c4554d"/>
+            <text class="bt" x="70" y="188" text-anchor="middle" fill="#a23c34" font-size="12">降扰重试×3</text>
+            <text class="bs" x="70" y="205" text-anchor="middle">→回退平滑</text>
+            <text class="bs" x="70" y="218" text-anchor="middle">→返回原草稿</text>
+            <path class="fl" d="M70,224 L70,250 L300,250 L300,170" stroke-dasharray="4 3"/>
+            <text x="200" y="266" font-size="11" fill="#8895a7">重试结果再次送校验</text>
+        </svg>
+        <div class="cap">图 0：v2 管线总览。①→⑦ 单向；⑧ 校验不通过才回头降扰重试。</div>
+    </div>
+
+    <div class="note"><b>三个贯穿全程的设计原则：</b>
+        ① <b>弧长参数化</b> —— 噪声沿"整条轮廓的弧长"定义，而非逐条边，从根上消除"长边比短边平滑"与扇贝感；
+        ② <b>分层与分尺度</b> —— 宏观/中/细三层独立，宏观随图形缩放、细节用绝对像素；
+        ③ <b>确定性</b> —— 所有随机数由 <code>shape.id + name</code> 哈希派生，同一形状永远生成同一结果。
+    </div>
+
+    <!-- ============ 1 输入 ============ -->
+    <h2 id="s1"><span class="num">1</span>输入：稀疏草稿</h2>
+    <p>输入是用户在编辑器里点出的一个多边形 <code>MapShapeDraft</code>，通常只有 <b>4 ~ 数十个顶点</b>。
+        它定义了"这块陆地大致长什么样"，但边是笔直的、角是尖的——不像真实海岸。算法的任务是在<b>不破坏整体形状</b>的前提下，给它注入自然的起伏。
+    </p>
+    <div class="fig">
+        <div id="fig1"></div>
+        <div class="cap">图 1：本文统一使用的示例大陆草稿（6 个顶点）。后续每一步都基于它。</div>
+    </div>
+    <div class="note">顶点数 &lt; 3 直接原样返回。下面记原始顶点数为 <span class="cx lin">V</span>，是个小常数。</div>
+
+    <!-- ============ 2 重采样 ============ -->
+    <h2 id="s2"><span class="num">2</span>等弧长重采样</h2>
+    <p>第一步把稀疏多边形<b>沿周长均匀切成 N 个密集的等距点</b>。这是整个算法的地基，原因有二：</p>
+    <ul class="tight">
+        <li><b>解耦原始顶点</b>：之后噪声只认"我在轮廓上走了多远（弧长
+            s）"，完全不知道原始边/顶点在哪。这样在一条边里插入共线点不会改变结果（顶点细分不变性），也就不会出现 v1
+            那种"每条边一个鼓包"的扇贝纹。
+        </li>
+        <li><b>统一采样密度</b>：步长 <code>step = 最细波长 / 4</code>（默认 18/4 = 4.5px），保证最高频细节每周期至少 4
+            个采样点，杜绝混叠锯齿。
+        </li>
+    </ul>
+    <div class="formula">step = clamp(C带最小波长 / 4, 1, 8) // 默认 4.5px
+        N = clamp(ceil(周长 P / step), 32, max_points) // max_points: 默认 2048 / 印刷 10240
+    </div>
+    <div class="fig">
+        <div id="fig2"></div>
+        <div class="cap">图 2：草稿（红虚线）被重采样成 N 个等弧长点（蓝点）。点沿周长等距，与原始顶点无关。</div>
+    </div>
+    <div class="note"><b>N 是全程的主导变量</b>，随周长线性增长直到 <code>max_points</code> 封顶。后面所有复杂度都以它为单位。
+        <span class="pill">时间 O(N+V)</span><span class="pill">空间 O(N)</span></div>
+
+    <!-- ============ 3 角点圆化 ============ -->
+    <h2 id="s3"><span class="num">3</span>角点圆化</h2>
+    <p>在加噪声之前，先把手绘的尖角磨圆。理由：<b>自然地形没有精确的尖角</b>；而且若保留尖角，后面噪声会在尖点两侧沿突变的法线方向位移，形成"针刺"伪影。
+    </p>
+    <p>做法是对重采样后的点跑若干轮 <b>Laplacian 扩散</b>（每点向左右邻居中点移动一半）。妙处在于：<b>直线段上的点本就等于邻居中点、位置不变，只有有曲率的地方（原始角点）才被磨圆</b>。圆化范围
+        ≈ <code>步长 × √轮数</code>，轮数由半径推出（默认半径 22px、约 24 轮）。</p>
+    <div class="fig">
+        <div id="fig3"></div>
+        <div class="cap">图 3：左 = 重采样后（尖角）；右 = 圆化后（角变圆，直边纹丝不动）。</div>
+    </div>
+    <div class="note"><span class="pill">时间 O(R·N)，R≈24</span><span class="pill">空间 O(N)</span> R 是圆化轮数，封顶
+        96。
+    </div>
+
+    <!-- ============ 4 三层噪声 ============ -->
+    <h2 id="s4"><span class="num">4</span>三层噪声谱（核心）</h2>
+    <p>这是算法的心脏。海岸线的"自然感"来自<b>不同尺度的起伏叠加</b>：大尺度的海湾半岛、中尺度的波动、小尺度的细碎纹理。我们用三个独立的"噪声带"对应这三层，每一层都是一组<b>整数谐波正弦波的叠加</b>。
+    </p>
+
+    <h3>为什么用整数谐波？</h3>
+    <p>沿弧长 s∈[0,P) 构造 <code>f(s) = Σ aₖ·sin(2π·k·s/P + φₖ)</code>，其中 k 取<b>整数</b>。整数频率保证 <code>f(0) =
+        f(P)</code>——也就是绕轮廓一圈天然首尾相接，<b>闭合无缝</b>，不需要任何接缝处理。</p>
+
+    <h3>三个带的分尺度策略</h3>
+    <p>这是 v2 反复迭代后的关键设计——三层用<b>不同的尺度规则</b>：</p>
+    <table>
+        <thead>
+        <tr>
+            <th>带</th>
+            <th>角色</th>
+            <th>波长</th>
+            <th>峰值振幅</th>
+            <th>尺度策略</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td><b style="color:var(--bandA)">A</b></td>
+            <td>宏观海湾/半岛</td>
+            <td>P/7 ~ P/2.5</td>
+            <td>min(0.03·P, 55px)</td>
+            <td><b>相对周长</b>：大陆海湾大、小岛海湾小（分形自相似）</td>
+        </tr>
+        <tr>
+            <td><b style="color:var(--bandB)">B</b></td>
+            <td>中尺度波动</td>
+            <td>P/18~P/7.5，夹在 [40,110]~[90,240]px</td>
+            <td>min(0.018·P, 28px)</td>
+            <td><b>半相对</b>：跟随大小但被绝对窗口夹住</td>
+        </tr>
+        <tr>
+            <td><b style="color:var(--bandC)">C</b></td>
+            <td>细碎纹理</td>
+            <td><b>18 ~ 45px（绝对）</b></td>
+            <td>min(0.024·P, 8px)</td>
+            <td><b>绝对像素</b>：长直边与小岛每像素粗糙度一致</td>
+        </tr>
+        </tbody>
+    </table>
+    <div class="note">为什么 C 必须绝对？若细节波长随周长变长，大陆的长直边就会显得比小岛平滑——这正是中途踩过的坑。固定
+        18~45px 后，全图细节质感统一。
+    </div>
+
+    <h3>谐波的随机幅度与谱斜率</h3>
+    <p>每条谐波 k 的振幅 = <code>随机量 × k^(-β/2)</code>，β=1.8（分形海岸线典型谱斜率，高频按幂律衰减）；随机量在 <code>[0.25,
+        1]</code> 区间取，让带内谱线强弱不均、纹理更不规则。相位 φₖ 也是随机的。这些随机数都由种子哈希确定性派生。最后每带做
+        <b>RMS 归一</b>再按需缩放。</p>
+
+    <div class="fig">
+        <div id="fig4"></div>
+        <div class="cap">图 4：三个噪声带各自的波形（横轴 = 沿轮廓的弧长，纵轴 = 归一化位移）。A 长波大摆幅、B 中等、C
+            细密。它们将叠加成总位移。
+        </div>
+    </div>
+
+    <div class="note warn"><b>性能护栏：</b>波长越细、周长越大，整数谐波数越多（大陆 C 带可达数百条）。若全量求和，成本 = O(N ×
+        谐波数) 会爆炸。所以每带谐波数<b>封顶 96</b>，超出时分层抽样（每层 hash 抖动取一条，保持谱形与确定性）。记每带谐波上限为
+        <span class="cx">H=96</span>。
+        <br><span class="pill">时间 O(N·H·B)，B=3 带</span><span class="pill">空间 O(N·B + H)</span></div>
+
+    <!-- ============ 5 粗糙度包络 ============ -->
+    <h2 id="s5"><span class="num">5</span>粗糙度包络调制</h2>
+    <p>如果三层噪声在整条海岸上力度均匀，看起来会像"机器纹"——到处一样的抖动。真实海岸是<b>间歇</b>的：有的岸段礁石嶙峋，有的岸段平缓如滩。
+    </p>
+    <p>为此再生成一条<b>独立的低频包络</b>（波长 P/8~P/2，归一到 [0,1]），用它去调制 B、C 两带的振幅：包络高处粗糙、低处平静。调制深度
+        C 带 0.7、B 带 0.35、A 带不调制（宏观形态不该忽强忽弱）。</p>
+    <div class="fig">
+        <div id="fig5"></div>
+        <div class="cap">图 5：上 = 低频粗糙度包络（紫，0~1）；下 = C 带被它调制前后对比——包络低谷处细节被压平，形成"粗糙段 /
+            平静段"交替。
+        </div>
+    </div>
+    <div class="note"><span class="pill">时间 O(N·7)</span><span class="pill">空间 O(N)</span> 包络只有 ≤7 条谐波，成本可忽略。
+    </div>
+
+    <!-- ============ 6 逐点位移 ============ -->
+    <h2 id="s6"><span class="num">6</span>逐点位移与压限</h2>
+    <p>现在遍历 N
+        个采样点，把噪声变成实际的几何位移。每个点做下面这串运算——这是把"自然感"和"贴合草稿/不自交"两个矛盾目标调和的地方。</p>
+
+    <h3>6.1 位移方向 = 平滑法线</h3>
+    <p>位移沿轮廓<b>外法线</b>方向。法线由该点左右邻居连线（中心差分切线）旋转 90° 得到——用邻居而非原始边，法线平滑连续，不会在原始顶点处突跳。
+    </p>
+
+    <h3>6.2 结构层 / 细节层分离</h3>
+    <p>把三带分成两组：<b>结构层 = A + B</b>（决定整体轮廓走向），<b>细节层 = C</b>（海岸的细碎质感）。它们被区别对待，这是控制"贴合度"的关键。
+    </p>
+
+    <h3>6.3 D_max 软封顶（压限）</h3>
+    <p>问题：A、B 两层在某些点会<b>同相叠加</b>，把轮廓推得离草稿很远（曾达 ±90px），导致"认不出原形状"。
+        对策：<b>只对结构层（A+B）合计做软封顶</b>到 <code>D_max</code>（默认 35px），细节层 C 始终全振幅叠加、不受封顶。</p>
+    <p>"软"封顶用 tanh：位移在 D_max 的 60% 以内原样通过，超过后平滑渐近逼近 D_max、<b>永不触顶</b>。这区别于硬截断——硬截断会让一段岸线全部贴在
+        D_max 处形成"平直墙"；软封顶 + 始终活着的 C 细节，让封顶区<b>仍有起伏</b>，不出平直边。</p>
+    <div class="formula">structural = A + B
+        structural = softcap(structural, min(D_max, 0.3·特征尺寸)) // 软封顶
+        detail = C // 不封顶
+        offset = (structural + detail) × 角点衰减
+    </div>
+
+    <h3>6.4 局部特征尺寸限幅</h3>
+    <p>每个点还会测<b>局部肢体宽度</b>（到对面轮廓的最近距离）。宏观带在细窄肢体上自动熄火（避免把细臂扭断），细节带几乎不受影响。这样细臂紧贴草稿、宽阔腹地照常起大湾——限幅是<b>局部</b>的，不是全局一刀切。
+    </p>
+
+    <h3>6.5 末端安全限幅</h3>
+    <p>最后再用 <code>0.38 × 特征尺寸</code>（防自交）和关键点距离（防地点出界）做一道软饱和限幅。它与 D_max 各管各的：D_max
+        管贴合度，这道管几何安全。</p>
+
+    <div class="fig">
+        <div id="fig6"></div>
+        <div class="cap">图 6：沿轮廓的位移剖面。灰 = 结构层原始值（含越界尖峰）；蓝 = 软封顶后；橙 = 再叠加细节 C。注意结构尖峰被压在
+            ±D_max 内，但叠加细节后仍处处起伏。
+        </div>
+    </div>
+    <div class="note"><b>每点成本：</b>角点衰减 O(凹角数)、特征尺寸 O(V)、三带合成 O(B)、关键点 O(L)。
+        <span class="pill">时间 O(N·(V+L))</span><span class="pill">空间 O(N)</span> L = 关联关键地点数。
+    </div>
+
+    <!-- ============ 7 Taubin ============ -->
+    <h2 id="s7"><span class="num">7</span>Taubin 平滑</h2>
+    <p>位移后可能残留极高频的毛刺。普通 Laplacian 平滑会让整体<b>收缩</b>（轮廓越磨越小）。Taubin 平滑用一收一胀两步（λ=0.33
+        收、μ=−0.34 胀）抵消收缩，<b>去毛刺但不缩水</b>。默认只跑 1 轮。</p>
+    <div class="note"><span class="pill">时间 O(passes·N)</span><span class="pill">空间 O(N)</span> 之后还有一次相邻点去重
+        O(N)。
+    </div>
+
+    <!-- ============ 8 校验 ============ -->
+    <h2 id="s8"><span class="num">8</span>校验 · 重试 · 回退</h2>
+    <p>生成的轮廓要保证两个不变量：<b>不自交</b>、<b>所有关联关键地点仍在轮廓内</b>。校验流程：</p>
+    <div class="fig">
+        <svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" font-family="system-ui" font-size="13">
+            <defs>
+                <marker id="ar2" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+                    <path d="M0,0 L7,3 L0,6 Z" fill="#8895a7"/>
+                </marker>
+            </defs>
+            <style>.b2 {
+                fill: #fff;
+                stroke: #2f6db0;
+                stroke-width: 1.5
+            }
+
+            .t2 {
+                fill: #1f2d3d
+            }
+
+            .s2 {
+                fill: #8895a7;
+                font-size: 11px
+            }
+
+            .f2 {
+                stroke: #8895a7;
+                stroke-width: 1.5;
+                fill: none;
+                marker-end: url(#ar2)
+            }</style>
+            <rect class="b2" x="10" y="78" width="120" height="44" rx="9"/>
+            <text class="t2" x="70" y="98" text-anchor="middle">自然化生成</text>
+            <text class="s2" x="70" y="114" text-anchor="middle">scale=1.0</text>
+            <polygon points="240,60 330,100 240,140 150,100" fill="#eaf2fb" stroke="#2f6db0" stroke-width="1.5"/>
+            <text x="240" y="96" text-anchor="middle" font-size="12" fill="#1c4f86">自交? 关键点</text>
+            <text x="240" y="112" text-anchor="middle" font-size="12" fill="#1c4f86">出界?</text>
+            <path class="f2" d="M130,100 L150,100"/>
+            <rect class="b2" x="360" y="78" width="130" height="44" rx="9" style="fill:#eafaf2;stroke:#1f9d76"/>
+            <text class="t2" x="425" y="104" text-anchor="middle" fill="#147a55">都没有 → 输出</text>
+            <path class="f2" d="M330,100 L360,100"/>
+            <text x="345" y="92" font-size="11" fill="#1f9d76">否</text>
+            <rect class="b2" x="360" y="20" width="160" height="40" rx="9" style="fill:#fbeeed;stroke:#c4554d"/>
+            <text class="t2" x="440" y="45" text-anchor="middle" font-size="12">降扰重试 ×3（0.75/0.55/0.40）</text>
+            <path class="f2" d="M240,60 L240,40 L360,40"/>
+            <text x="250" y="54" font-size="11" fill="#c4554d">是</text>
+            <rect class="b2" x="560" y="20" width="150" height="40" rx="9" style="fill:#fbeeed;stroke:#c4554d"/>
+            <text class="t2" x="635" y="45" text-anchor="middle" font-size="12">仍失败 → 回退纯平滑</text>
+            <path class="f2" d="M520,40 L558,40"/>
+            <rect class="b2" x="740" y="20" width="150" height="40" rx="9" style="fill:#fbeeed;stroke:#c4554d"/>
+            <text class="t2" x="815" y="45" text-anchor="middle" font-size="12">再失败 → 返回原草稿</text>
+            <path class="f2" d="M710,40 L738,40"/>
+        </svg>
+        <div class="cap">图 8：校验与回退链。几何安全已由 §6.4/6.5 在构造上基本保证，重试极少触发。</div>
+    </div>
+    <div class="note warn"><b>这里藏着全程唯一的超线性成本。</b>自交检测 <code>find_polygon_self_intersections</code>
+        是<b>双重循环枚举所有边对</b>，复杂度 <span class="cx">O(N²)</span>。
+        <br>N=2048 → 4M，毫秒级；N=10240（印刷）→ 1 亿，~0.1–0.5s；若上 100k → 10¹⁰，分钟级。<b>这是把点数推向 100k
+            之前必须先换成网格/扫描线 O(N log N) 的瓶颈。</b>
+        <br><span class="pill">时间 O(N²) + O(N·L)</span><span class="pill">空间 O(N)（正常）</span></div>
+
+    <!-- ============ 9 复杂度 ============ -->
+    <h2 id="s9"><span class="num">9</span>复杂度总表</h2>
+    <p>符号：<span class="cx lin">N</span>=重采样点数（主导，数百~上万）、<span class="cx lin">V</span>=原始顶点数（小）、<span
+            class="cx">H</span>=每带谐波上限 96、<span class="cx lin">B</span>=带数 3、<span class="cx lin">L</span>=关键地点数（小）、<span
+            class="cx lin">R</span>=圆化轮数（≤96）。</p>
+    <table>
+        <thead>
+        <tr>
+            <th>阶段</th>
+            <th>时间</th>
+            <th>空间</th>
+            <th>说明</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>② 等弧长重采样</td>
+            <td class="cx lin">O(N+V)</td>
+            <td class="cx lin">O(N)</td>
+            <td>边指针单调推进</td>
+        </tr>
+        <tr>
+            <td>③ 角点圆化</td>
+            <td class="cx lin">O(R·N)</td>
+            <td class="cx lin">O(N)</td>
+            <td>R≈24，封顶 96</td>
+        </tr>
+        <tr>
+            <td>④ 三层噪声合成</td>
+            <td class="cx lin">O(N·H·B)</td>
+            <td class="cx lin">O(N·B+H)</td>
+            <td>最大常数项（~290 sin/点），但线性</td>
+        </tr>
+        <tr>
+            <td>⑤ 粗糙度包络</td>
+            <td class="cx lin">O(N·7)</td>
+            <td class="cx lin">O(N)</td>
+            <td>可忽略</td>
+        </tr>
+        <tr>
+            <td>⑥ 逐点位移/限幅</td>
+            <td class="cx lin">O(N·(V+L))</td>
+            <td class="cx lin">O(N)</td>
+            <td>特征尺寸每点扫 V 条边</td>
+        </tr>
+        <tr>
+            <td>⑦ Taubin 平滑 + 去重</td>
+            <td class="cx lin">O(N)</td>
+            <td class="cx lin">O(N)</td>
+            <td>passes 默认 1</td>
+        </tr>
+        <tr>
+            <td><b>⑧ 自交校验</b></td>
+            <td class="cx">O(N²)</td>
+            <td class="cx lin">O(N)</td>
+            <td><b>唯一超线性项 · 瓶颈</b></td>
+        </tr>
+        <tr>
+            <td>⑧ 关键点包含</td>
+            <td class="cx lin">O(N·L)</td>
+            <td class="cx lin">O(1)</td>
+            <td>L 次射线投射</td>
+        </tr>
+        </tbody>
+    </table>
+    <div class="formula">正常路径（一次成功）： T = O(N² + N·(H + V + L)) 主导项随 N 增大 → O(N²)
+        最坏路径（连环重试）： T ≈ 5 × 正常路径 （几何安全已就位，极少发生）
+        空间： S = O(N + V) 输出 O(N)
+    </div>
+    <div class="note"><b>一句话结论：</b>噪声合成虽然常数大但是线性的（谐波上限已摁住），<b>真正卡 100k 点的是 O(N²)
+        的自交校验</b>。当前默认 N≤2048 一切毫秒级；要扩到十万级点数，先改校验算法，而不是调任何审美参数。
+    </div>
+
+    <!-- ============ DEMO ============ -->
+    <h2 id="demo"><span class="num">10</span>交互 demo</h2>
+    <p>下面是用<b>同一套数学</b>实时生成的可交互版。逐个勾选噪声带看叠加效果，拖动 D_max 看压限如何把轮廓拉回草稿。红虚线是原始草稿。
+    </p>
+    <div class="demo">
+        <div class="ctrl">
+            <label><span class="sw" style="border-color:var(--bandA);background:var(--bandA)"></span><input
+                    type="checkbox" id="cbA" checked> A 宏观</label>
+            <label><span class="sw" style="border-color:var(--bandB);background:var(--bandB)"></span><input
+                    type="checkbox" id="cbB" checked> B 中尺度</label>
+            <label><span class="sw" style="border-color:var(--bandC);background:var(--bandC)"></span><input
+                    type="checkbox" id="cbC" checked> C 细节</label>
+            <label>D_max <input type="range" id="rngD" min="0" max="80" value="35" style="width:120px"> <b id="lblD"
+                                                                                                           style="font-family:var(--mono),serif">35</b>px</label>
+            <label><input type="checkbox" id="cbRound" checked> 角点圆化</label>
+        </div>
+        <div id="figdemo"></div>
+        <div class="cap" id="demoStat"></div>
+    </div>
+
+    <p class="small" style="margin-top:40px">本页由 flowcloudai项目组 为 FlowCloudAI 项目编纂 · 算法源码见 <code>app_main/src-tauri/src/map/coastline_v2.rs</code>
+        · 设计与迭代记录见 <code>docs/coastline_algorithm_redesign.md</code></p>
+
+</div>
+
+<script>
+    "use strict";
+    /* ===== 与 Rust 同构的参数（取自 constants.rs，2026-06） ===== */
+    const CFG = {
+        beta: 1.8, ampFloor: 0.25, roundPx: 22, dMax: 35, structFeatRatio: 0.3,
+        nearEdge: 0.38, knee: 0.6, lambda: 0.33, mu: -0.34,
+        A: {divMax: 7, divMin: 2.5, ampRatio: 0.03, ampCap: 55, feat: 0.2, rough: 0, structural: true},
+        B: {
+            divMax: 18,
+            divMin: 7.5,
+            wlMin: [40, 110],
+            wlMax: [90, 240],
+            ampRatio: 0.018,
+            ampCap: 28,
+            feat: 0.32,
+            rough: 0.35,
+            structural: true
+        },
+        C: {wl: [18, 45], ampRatio: 0.024, ampCap: 8, feat: 0.5, rough: 0.7, structural: false},
+    };
+    const SKETCH = [[180, 120], [760, 90], [900, 380], [820, 700], [420, 760], [140, 480]];
+
+    /* ===== 工具 ===== */
+    const TAU = Math.PI * 2;
+
+    function mulberry32(a) {
+        return function () {
+            a |= 0;
+            a = a + 0x6D2B79F5 | 0;
+            let t = Math.imul(a ^ a >>> 15, 1 | a);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
+
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+    function cumulative(v) {
+        let c = [0], t = 0;
+        for (let i = 0; i < v.length; i++) {
+            t += dist(v[i], v[(i + 1) % v.length]);
+            c.push(t);
+        }
+        return [c, t];
+    }
+
+    function resample(v, c, P, N) {
+        const pts = [], arc = [], step = P / N;
+        let e = 0;
+        for (let i = 0; i < N; i++) {
+            const s = i * step;
+            while (e + 1 < v.length && c[e + 1] <= s) e++;
+            const el = Math.max(c[e + 1] - c[e], 1e-9);
+            const t = (s - c[e]) / el;
+            const a = v[e], b = v[(e + 1) % v.length];
+            pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+            arc.push(s);
+        }
+        return [pts, arc, step];
+    }
+
+    function roundCorners(pts, passes) {
+        let cur = pts.map(p => [p[0], p[1]]);
+        const n = cur.length;
+        for (let p = 0; p < passes; p++) {
+            const nx = new Array(n);
+            for (let i = 0; i < n; i++) {
+                const pr = cur[(i + n - 1) % n], po = cur[i], fo = cur[(i + 1) % n];
+                nx[i] = [po[0] + 0.5 * ((pr[0] + fo[0]) / 2 - po[0]), po[1] + 0.5 * ((pr[1] + fo[1]) / 2 - po[1])];
+            }
+            cur = nx;
+        }
+        return cur;
+    }
+
+    const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+
+    function hrange(P, wlMin, wlMax) {
+        return [Math.max(1, Math.ceil(P / wlMax)), Math.floor(P / wlMin)];
+    }
+
+    function buildBand(rng, kMin, kMax, beta, floor) {
+        const hs = [];
+        let pow = 0;
+        const cap = 96;
+        const cnt = kMax - kMin + 1;
+        const take = Math.min(cnt, cap);
+        const strat = cnt / take;
+        for (let slot = 0; slot < take; slot++) {
+            const k = Math.min(kMax, kMin + Math.floor((slot + rng()) * strat));
+            const ar = floor + (1 - floor) * rng();
+            const amp = ar * Math.pow(k, -beta / 2);
+            const ph = rng() * TAU;
+            pow += amp * amp * 0.5;
+            hs.push([k, amp, ph]);
+        }
+        const rms = Math.sqrt(pow);
+        if (rms > 1e-9) hs.forEach(h => h[1] /= rms);
+        return hs;
+    }
+
+    function evalAt(hs, s, P) {
+        let v = 0;
+        for (let i = 0; i < hs.length; i++) {
+            v += hs[i][1] * Math.sin(TAU * hs[i][0] * s / P + hs[i][2]);
+        }
+        return v;
+    }
+
+    function normPeak(arr) {
+        let m = 0;
+        for (const v of arr) m = Math.max(m, Math.abs(v));
+        if (m > 1e-9) return arr.map(v => v / m);
+        return arr.slice();
+    }
+
+    function soft(req, cap) {
+        if (cap <= 1e-9) return 0;
+        const r = Math.abs(req) / cap;
+        if (r <= CFG.knee) return req;
+        const span = 1 - CFG.knee;
+        return Math.sign(req) * cap * (CFG.knee + span * Math.tanh((r - CFG.knee) / span));
+    }
+
+    function circDist(a, b, P) {
+        let d = Math.abs(a - b) % P;
+        return Math.min(d, P - d);
+    }
+
+    function arcToRange(s, lo, hi, P) {
+        if (s >= lo && s <= hi) return 0;
+        return Math.min(circDist(s, lo, P), circDist(s, hi, P));
+    }
+
+    function ptSeg(p, a, b) {
+        const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+        if (l2 < 1e-9) return dist(p, a);
+        const t = clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2, 0, 1);
+        return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t));
+    }
+
+    function featureSize(v, c, P, s, p, step) {
+        let f = Infinity;
+        for (let j = 0; j < v.length; j++) {
+            const ad = arcToRange(s, c[j], c[j + 1], P);
+            if (ad <= step) continue;
+            const d = ptSeg(p, v[j], v[(j + 1) % v.length]);
+            if (d >= ad * 0.5) continue;
+            f = Math.min(f, d);
+        }
+        return f;
+    }
+
+    /* ===== 核心：构造噪声场（返回各带归一值 + 元信息） ===== */
+    function buildPipeline() {
+        const [c, P] = cumulative(SKETCH);
+        const N = Math.round(P / (CFG.C.wl[0] / 4));
+        const [pts, arc, step] = resample(SKETCH, c, P, N);
+        const passes = clamp(Math.round(Math.pow(Math.min(CFG.roundPx, P * 0.06) / step, 2)), 2, 96);
+        const rng = mulberry32(987654);
+        // A
+        const [akMin, akMax] = hrange(P, P / CFG.A.divMax, P / CFG.A.divMin);
+        const aH = buildBand(rng, akMin, akMax, CFG.beta, CFG.ampFloor);
+        // B
+        const bWlMin = clamp(P / CFG.B.divMax, CFG.B.wlMin[0], CFG.B.wlMin[1]);
+        const bWlMax = clamp(P / CFG.B.divMin, CFG.B.wlMax[0], CFG.B.wlMax[1]);
+        const [bkMin, bkMax] = hrange(P, bWlMin, bWlMax);
+        const bH = buildBand(rng, bkMin, bkMax, CFG.beta, CFG.ampFloor);
+        // C
+        const [ckMin, ckMax] = hrange(P, CFG.C.wl[0], CFG.C.wl[1]);
+        const cH = buildBand(rng, ckMin, ckMax, CFG.beta, CFG.ampFloor);
+        // envelope
+        const eH = buildBand(rng, 2, 8, 1.0, CFG.ampFloor);
+        let env = arc.map(s => evalAt(eH, s, P));
+        {
+            let m = 0;
+            for (const v of env) m = Math.max(m, Math.abs(v));
+            env = m > 1e-9 ? env.map(v => (v / m + 1) / 2) : env.map(() => 1);
+        }
+        let A = normPeak(arc.map(s => evalAt(aH, s, P)));
+        let B = normPeak(arc.map(s => evalAt(bH, s, P)));
+        let C = normPeak(arc.map(s => evalAt(cH, s, P)));
+        // roughness modulation
+        B = B.map((v, i) => v * (1 - CFG.B.rough * (1 - env[i])));
+        C = C.map((v, i) => v * (1 - CFG.C.rough * (1 - env[i])));
+        const ampA = Math.min(CFG.A.ampRatio * P, CFG.A.ampCap);
+        const ampB = Math.min(CFG.B.ampRatio * P, CFG.B.ampCap);
+        const ampC = Math.min(CFG.C.ampRatio * P, CFG.C.ampCap);
+        return {c, P, N, pts, arc, step, passes, A, B, C, env, ampA, ampB, ampC};
+    }
+
+    const PIPE = buildPipeline();
+
+    /* ===== 生成最终多边形 ===== */
+    function generate(opts) {
+        const {c, P, N, arc, step, passes, A, B, C, ampA, ampB, ampC} = PIPE;
+        const base = opts.round ? roundCorners(PIPE.pts, passes) : PIPE.pts.map(p => [p[0], p[1]]);
+        const out = [];
+        for (let i = 0; i < N; i++) {
+            const bx = base[i][0], by = base[i][1];
+            const pr = base[(i + N - 1) % N], fo = base[(i + 1) % N];
+            const tx = fo[0] - pr[0], ty = fo[1] - pr[1], tl = Math.hypot(tx, ty);
+            if (tl < 1e-9) {
+                out.push([bx, by]);
+                continue;
+            }
+            const feat = featureSize(SKETCH, c, P, arc[i], [bx, by], step);
+            let structural = 0, detail = 0;
+            if (opts.A) structural += Math.min(ampA, CFG.A.feat * feat) * A[i];
+            if (opts.B) structural += Math.min(ampB, CFG.B.feat * feat) * B[i];
+            if (opts.C) detail += Math.min(ampC, CFG.C.feat * feat) * C[i];
+            const cap = Math.min(opts.dMax, CFG.structFeatRatio * feat);
+            structural = soft(structural, cap);
+            let off = structural + detail;
+            const safe = isFinite(feat) ? feat * CFG.nearEdge : 1e9;
+            off = soft(off, safe);
+            // outward normal (sketch is CW/CCW agnostic; sign chosen to push outward)
+            const sign = signedArea(SKETCH) >= 0 ? -1 : 1;
+            out.push([bx + sign * ty / tl * off, by + sign * (-tx) / tl * off]);
+        }
+        // taubin (1 pass)
+        return taubin(out, 1, CFG.lambda, CFG.mu);
+    }
+
+    function signedArea(v) {
+        let a = 0;
+        for (let i = 0; i < v.length; i++) {
+            const p = v[i], q = v[(i + 1) % v.length];
+            a += p[0] * q[1] - q[0] * p[1];
+        }
+        return a / 2;
+    }
+
+    function laplStep(pts, f) {
+        const n = pts.length, r = new Array(n);
+        for (let i = 0; i < n; i++) {
+            const pr = pts[(i + n - 1) % n], po = pts[i], fo = pts[(i + 1) % n];
+            r[i] = [po[0] + f * ((pr[0] + fo[0]) / 2 - po[0]), po[1] + f * ((pr[1] + fo[1]) / 2 - po[1])];
+        }
+        return r;
+    }
+
+    function taubin(pts, passes, l, m) {
+        let cur = pts;
+        for (let p = 0; p < passes; p++) {
+            cur = laplStep(cur, l);
+            cur = laplStep(cur, m);
+        }
+        return cur;
+    }
+
+    /* ===== SVG 绘制助手 ===== */
+    const SVGNS = "http://www.w3.org/2000/svg";
+
+    function svg(w, h) {
+        const s = document.createElementNS(SVGNS, "svg");
+        s.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        s.setAttribute("width", "100%");
+        return s;
+    }
+
+    function el(tag, attrs) {
+        const e = document.createElementNS(SVGNS, tag);
+        for (const k in attrs) e.setAttribute(k, attrs[k]);
+        return e;
+    }
+
+    function poly(points, close) {
+        return points.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1)).join("") + (close ? "Z" : "");
+    }
+
+    function fitView(points, pad) {
+        let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+        for (const p of points) {
+            minx = Math.min(minx, p[0]);
+            miny = Math.min(miny, p[1]);
+            maxx = Math.max(maxx, p[0]);
+            maxy = Math.max(maxy, p[1]);
+        }
+        return [minx - pad, miny - pad, (maxx - minx) + 2 * pad, (maxy - miny) + 2 * pad];
+    }
+
+    /* ===== 图 1：草稿 ===== */
+    (function () {
+        const vb = fitView(SKETCH, 60);
+        const s = svg(vb[2], vb[3]);
+        s.setAttribute("viewBox", vb.join(" "));
+        s.appendChild(el("rect", {x: vb[0], y: vb[1], width: vb[2], height: vb[3], fill: "var(--sea)"}));
+        s.appendChild(el("path", {
+            d: poly(SKETCH, true),
+            fill: "var(--land)",
+            stroke: "var(--sketch)",
+            "stroke-width": 3,
+            "stroke-dasharray": "10 7",
+            "stroke-linejoin": "round"
+        }));
+        for (const p of SKETCH) {
+            s.appendChild(el("circle", {cx: p[0], cy: p[1], r: 7, fill: "var(--sketch)"}));
+        }
+        document.getElementById("fig1").appendChild(s);
+    })();
+
+    /* ===== 图 2：重采样 ===== */
+    (function () {
+        const vb = fitView(SKETCH, 60);
+        const s = svg(vb[2], vb[3]);
+        s.setAttribute("viewBox", vb.join(" "));
+        s.appendChild(el("rect", {x: vb[0], y: vb[1], width: vb[2], height: vb[3], fill: "var(--sea)"}));
+        s.appendChild(el("path", {
+            d: poly(SKETCH, true),
+            fill: "var(--land)",
+            stroke: "var(--sketch)",
+            "stroke-width": 2,
+            "stroke-dasharray": "9 6"
+        }));
+        // sample a coarser set so dots are visible
+        const [c, P] = cumulative(SKETCH);
+        const Nshow = 90;
+        const [pts] = resample(SKETCH, c, P, Nshow);
+        for (const p of pts) {
+            s.appendChild(el("circle", {cx: p[0], cy: p[1], r: 4, fill: "var(--accent)"}));
+        }
+        document.getElementById("fig2").appendChild(s);
+    })();
+
+    /* ===== 图 3：圆化前后 ===== */
+    (function () {
+        const [c, P] = cumulative(SKETCH);
+        const N = PIPE.N;
+        const [pts, , step] = resample(SKETCH, c, P, N);
+        const rounded = roundCorners(pts, PIPE.passes);
+        const vb = fitView(SKETCH, 70);
+        const W = vb[2], H = vb[3];
+        const s = svg(W * 2 + 40, H);
+        s.setAttribute("viewBox", `0 0 ${W * 2 + 40} ${H}`);
+
+        function panel(ox, data, label) {
+            const g = el("g", {transform: `translate(${ox - vb[0]},${-vb[1]})`});
+            g.appendChild(el("rect", {x: vb[0], y: vb[1], width: W, height: H, fill: "var(--sea)"}));
+            g.appendChild(el("path", {
+                d: poly(data, true),
+                fill: "var(--land)",
+                stroke: "var(--stroke)",
+                "stroke-width": 2.4,
+                "stroke-linejoin": "round"
+            }));
+            const tx = el("text", {
+                x: vb[0] + W / 2,
+                y: vb[1] + 30,
+                "text-anchor": "middle",
+                "font-size": 22,
+                fill: "#1f2d3d",
+                "font-family": "system-ui"
+            });
+            tx.textContent = label;
+            g.appendChild(tx);
+            return g;
+        }
+
+        s.appendChild(panel(0, pts, "重采样（尖角）"));
+        s.appendChild(panel(W + 40, rounded, "圆化后"));
+        document.getElementById("fig3").appendChild(s);
+    })();
+
+    /* ===== 波形绘制 ===== */
+    function wavePlot(container, series, h) {
+        const W = 880, H = h || 120, pad = 8;
+        const s = svg(W, H);
+        s.setAttribute("viewBox", `0 0 ${W} ${H}`);
+        s.appendChild(el("rect", {x: 0, y: 0, width: W, height: H, fill: "#fbfcfe", stroke: "var(--line)", rx: 6}));
+        s.appendChild(el("line", {x1: 0, y1: H / 2, x2: W, y2: H / 2, stroke: "#e3e9f0", "stroke-width": 1}));
+        for (const ser of series) {
+            const arr = ser.data, n = arr.length;
+            let d = "";
+            for (let i = 0; i < n; i++) {
+                const x = pad + (W - 2 * pad) * i / (n - 1);
+                const y = H / 2 - arr[i] * (H / 2 - pad) * (ser.scale || 1);
+                d += (i ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1);
+            }
+            s.appendChild(el("path", {
+                d,
+                fill: "none",
+                stroke: ser.color,
+                "stroke-width": ser.w || 1.8,
+                opacity: ser.op || 1
+            }));
+            if (ser.label) {
+                const t = el("text", {
+                    x: 14,
+                    y: ser.ly || 18,
+                    "font-size": 12,
+                    fill: ser.color,
+                    "font-family": "system-ui",
+                    "font-weight": 700
+                });
+                t.textContent = ser.label;
+                s.appendChild(t);
+            }
+        }
+        container.appendChild(s);
+    }
+
+    /* ===== 图 4：三带波形 ===== */
+    (function () {
+        const box = document.getElementById("fig4");
+        wavePlot(box, [{data: PIPE.A, color: "var(--bandA)", label: "A 宏观（长波，大摆幅）"}]);
+        wavePlot(box, [{data: PIPE.B, color: "var(--bandB)", label: "B 中尺度"}]);
+        wavePlot(box, [{data: PIPE.C, color: "var(--bandC)", label: "C 细节（细密高频）"}]);
+    })();
+
+    /* ===== 图 5：包络 + 调制 ===== */
+    (function () {
+        const box = document.getElementById("fig5");
+        // envelope mapped to [-1,1] for display
+        wavePlot(box, [{data: PIPE.env.map(v => v * 2 - 1), color: "var(--env)", label: "粗糙度包络（0~1，低频）"}]);
+        // C raw (before modulation) vs modulated
+        const rng = mulberry32(987654);
+        // re-derive raw C without modulation for comparison
+        const {arc, P} = PIPE;
+        const [ckMin, ckMax] = hrange(P, CFG.C.wl[0], CFG.C.wl[1]);
+        // skip ahead rng state is fine to just rebuild deterministically from a fresh seed band-C-like
+        const cH = buildBand(mulberry32(555), ckMin, ckMax, CFG.beta, CFG.ampFloor);
+        let Craw = normPeak(arc.map(s => evalAt(cH, s, P)));
+        let Cmod = Craw.map((v, i) => v * (1 - CFG.C.rough * (1 - PIPE.env[i])));
+        wavePlot(box, [
+            {data: Craw, color: "#c9b18a", label: "C 细节：调制前（均匀）", w: 1.3, op: .7},
+            {data: Cmod, color: "var(--bandC)", label: "调制后（间歇：粗糙段/平静段）", ly: 34}
+        ], 130);
+    })();
+
+    /* ===== 图 6：位移剖面 ===== */
+    (function () {
+        const {arc, P, N, step, c, A, B, C, ampA, ampB, ampC} = PIPE;
+        const base = roundCorners(PIPE.pts, PIPE.passes);
+        const rawS = [], capS = [], full = [];
+        for (let i = 0; i < N; i++) {
+            const feat = featureSize(SKETCH, c, P, arc[i], base[i], step);
+            const st = Math.min(ampA, CFG.A.feat * feat) * A[i] + Math.min(ampB, CFG.B.feat * feat) * B[i];
+            const cap = Math.min(CFG.dMax, CFG.structFeatRatio * feat);
+            const stc = soft(st, cap);
+            const det = Math.min(ampC, CFG.C.feat * feat) * C[i];
+            rawS.push(st);
+            capS.push(stc);
+            full.push(stc + det);
+        }
+        const box = document.getElementById("fig6");
+        const sc = 1 / 55; // px -> normalized for plot
+        const s = svg(880, 180);
+        s.setAttribute("viewBox", "0 0 880 180");
+        s.appendChild(el("rect", {x: 0, y: 0, width: 880, height: 180, fill: "#fbfcfe", stroke: "var(--line)", rx: 6}));
+        s.appendChild(el("line", {x1: 0, y1: 90, x2: 880, y2: 90, stroke: "#e3e9f0"}));
+        // D_max guide lines
+        const dy = CFG.dMax * sc * 82;
+        s.appendChild(el("line", {
+            x1: 0,
+            y1: 90 - dy,
+            x2: 880,
+            y2: 90 - dy,
+            stroke: "#c4554d",
+            "stroke-width": 1,
+            "stroke-dasharray": "5 4",
+            opacity: .6
+        }));
+        s.appendChild(el("line", {
+            x1: 0,
+            y1: 90 + dy,
+            x2: 880,
+            y2: 90 + dy,
+            stroke: "#c4554d",
+            "stroke-width": 1,
+            "stroke-dasharray": "5 4",
+            opacity: .6
+        }));
+        const t = el("text", {x: 866, y: 90 - dy - 4, "font-size": 11, fill: "#c4554d", "text-anchor": "end"});
+        t.textContent = "±D_max";
+        s.appendChild(t);
+
+        function line(arr, col, w, op) {
+            let d = "";
+            for (let i = 0; i < arr.length; i++) {
+                const x = 8 + (864) * i / (arr.length - 1);
+                const y = 90 - arr[i] * sc * 82;
+                d += (i ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1);
+            }
+            s.appendChild(el("path", {d, fill: "none", stroke: col, "stroke-width": w, opacity: op || 1}));
+        }
+
+        line(rawS, "#9aa6b4", 1.3, .8);
+        line(capS, "var(--accent)", 1.8);
+        line(full, "var(--bandC)", 1.4, .9);
+        const lg = [["#9aa6b4", "结构层原始(A+B)"], ["var(--accent)", "软封顶后"], ["var(--bandC)", "+细节C=最终"]];
+        lg.forEach((it, i) => {
+            s.appendChild(el("rect", {x: 14 + i * 150, y: 12, width: 14, height: 4, fill: it[0]}));
+            const x = el("text", {x: 32 + i * 150, y: 18, "font-size": 11.5, fill: "#52606d"});
+            x.textContent = it[1];
+            s.appendChild(x);
+        });
+        box.appendChild(s);
+    })();
+
+    /* ===== 交互 demo ===== */
+    (function () {
+        const box = document.getElementById("figdemo");
+        const stat = document.getElementById("demoStat");
+        const vb = fitView(SKETCH, 90);
+
+        function render() {
+            box.innerHTML = "";
+            const opts = {
+                A: document.getElementById("cbA").checked, B: document.getElementById("cbB").checked,
+                C: document.getElementById("cbC").checked, dMax: +document.getElementById("rngD").value,
+                round: document.getElementById("cbRound").checked
+            };
+            document.getElementById("lblD").textContent = opts.dMax;
+            const out = generate(opts);
+            const s = svg(vb[2], vb[3]);
+            s.setAttribute("viewBox", vb.join(" "));
+            s.appendChild(el("rect", {x: vb[0], y: vb[1], width: vb[2], height: vb[3], fill: "var(--sea)"}));
+            s.appendChild(el("path", {
+                d: poly(out, true),
+                fill: "var(--land)",
+                stroke: "var(--stroke)",
+                "stroke-width": 2.4,
+                "stroke-linejoin": "round"
+            }));
+            s.appendChild(el("path", {
+                d: poly(SKETCH, true),
+                fill: "none",
+                stroke: "var(--sketch)",
+                "stroke-width": 1.8,
+                "stroke-dasharray": "9 6",
+                opacity: .8
+            }));
+            box.appendChild(s);
+            // max deviation stat
+            let maxd = 0;
+            for (const p of out) {
+                let m = 1e9;
+                for (let j = 0; j < SKETCH.length; j++) m = Math.min(m, ptSeg(p, SKETCH[j], SKETCH[(j + 1) % SKETCH.length]));
+                maxd = Math.max(maxd, m);
+            }
+            stat.textContent = `点数 ${out.length} · 距草稿最大偏离 ${maxd.toFixed(1)}px`;
+        }
+
+        ["cbA", "cbB", "cbC", "cbRound"].forEach(id => document.getElementById(id).addEventListener("change", render));
+        document.getElementById("rngD").addEventListener("input", render);
+        render();
+    })();
+</script>
+</body>
+</html>

@@ -79,6 +79,13 @@
     width: var(--mobile-entry-drawer-width, calc(100vw - 3.5rem));
     background: var(--mobile-side-drawer-bg);
     color: var(--fc-color-text);
+    transform: translate3d(
+            calc(var(--mobile-entry-drawer-shift, 0px) - var(--mobile-entry-drawer-width, calc(100vw - 3.5rem))),
+            0,
+            0
+    );
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
     touch-action: pan-y;
 }
 
@@ -106,6 +113,11 @@
     transition: none;
 }
 
+.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__drawer {
+    transition: none;
+}
+
+.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface,
 .mobile-app-side-drawer-shell.is-open .mobile-app-side-drawer-shell__surface {
     border-left-color: var(--fc-color-border);
     border-radius: var(--mobile-radius-sheet) 0 0 var(--mobile-radius-sheet);
@@ -116,15 +128,37 @@
     position: absolute;
     inset: 0;
     z-index: 60;
-    display: none;
+    display: block;
     padding: 0;
     border: 0;
-    background: transparent;
+    background: linear-gradient(
+            90deg,
+            rgb(0 0 0 / 25%) 0%,
+            rgb(0 0 0 / 15%) 5%,
+            rgb(0 0 0 / 10%) 20%
+    );
+    border-radius: inherit;
     cursor: pointer;
+    opacity: var(--mobile-entry-drawer-progress, 0);
+    pointer-events: none;
+    transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="dark"] .mobile-app-side-drawer-shell__surface-close {
+    background: linear-gradient(
+            90deg,
+            rgb(0 0 0 / 80%) 0%,
+            rgb(0 0 0 / 60%) 5%,
+            rgb(0 0 0 / 30%) 20%
+    );
+}
+
+.mobile-app-side-drawer-shell.is-dragging .mobile-app-side-drawer-shell__surface-close {
+    transition: none;
 }
 
 .mobile-app-side-drawer-shell.is-open .mobile-app-side-drawer-shell__surface-close {
-    display: block;
+    pointer-events: auto;
 }
 
 .mobile-app__content {
