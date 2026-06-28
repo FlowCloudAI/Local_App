@@ -37,9 +37,11 @@
     padding: var(--fc-space-lg, 1rem);
     border: 1px solid var(--fc-color-border, #d0d0d0);
     border-radius: var(--fc-radius-lg, 0.75rem);
-    background: var(--fc-color-bg-elevated, #ffffff);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     color: var(--fc-color-text, #1a1a1a);
     box-shadow: var(--fc-shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.1));
+    backdrop-filter: blur(var(--fc-space-xs));
+    -webkit-backdrop-filter: blur(var(--fc-space-xs));
     pointer-events: auto;
 }
 
@@ -47,8 +49,10 @@
     position: absolute;
     width: 0.75rem;
     height: 0.75rem;
-    background: var(--fc-color-bg-elevated, #ffffff);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     border: 1px solid var(--fc-color-border, #d0d0d0);
+    backdrop-filter: blur(var(--fc-space-xs));
+    -webkit-backdrop-filter: blur(var(--fc-space-xs));
     transform: rotate(45deg);
 }
 
