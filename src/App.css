@@ -343,7 +343,7 @@ body {
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-backdrop="acrylic"] {
     /* 外层画布磨砂底色：占比越高越实、越低越透出桌面，可按需调整 */
-    --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 80%, transparent);
+    --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 85%, transparent);
 }
 
 [data-backdrop="acrylic"] body {
