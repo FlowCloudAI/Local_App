@@ -33,7 +33,8 @@
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; style-src-elem 'self' 'unsafe-inline'; img-src 'self' data: fcimg: http://fcimg.localhost https://www.flowcloudai.cn",
       "capabilities": [
-        "default"
+        "default",
+        "desktop-lifecycle"
       ]
     }
   },
