@@ -8,8 +8,6 @@
     place-items: center;
     padding: 1rem;
     background: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 /* ── 对话框 ────────────────────────────────────────────────────────────────── */
