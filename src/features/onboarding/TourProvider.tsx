@@ -255,7 +255,7 @@ export function TourProvider({children}: TourProviderProps) {
 
         const refreshTargetRect = () => {
             if (!disposed) {
-                syncTargetRect(Boolean(currentStep.target))
+                syncTargetRect(Boolean(currentStep.target && targetElementRef.current))
             }
         }
 
