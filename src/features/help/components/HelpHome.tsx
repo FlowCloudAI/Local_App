@@ -28,7 +28,7 @@ export default function HelpHome({
                 <header className="help-index__header">
                     <div className="help-index__crumb">帮助中心</div>
                     <h2>帮助首页</h2>
-                    <p>按模块查找 FlowCloudAI 的核心操作说明，或从常用入口快速进入具体文档。</p>
+                    <p>按模块查找流云AI的核心操作说明，或从常用入口快速进入具体文档。</p>
                     <div className="help-index__meta" aria-label="帮助首页信息">
                         <span>{groups.length} 个分类</span>
                         <span>{topicCount} 篇文档</span>

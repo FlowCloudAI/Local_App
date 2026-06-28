@@ -264,7 +264,7 @@ export default function MobileProjectHome({
         const selectedPath = await saveFileDialog({
             defaultPath: buildProjectExportFileName(project.name),
             filters: [{
-                name: 'FlowCloudAI World',
+                name: '流云AI World',
                 extensions: ['fcworld'],
             }],
         })

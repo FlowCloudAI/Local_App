@@ -102,7 +102,7 @@ export default function MobileSettingsAboutSection({
                     <img className="mobile-settings-about-brand__icon" src="/icon.svg" alt=""/>
                     <div>
                         <div className="mobile-settings-about-card__title">流云AI</div>
-                        <div>FlowCloudAI 移动端创作与知识管理应用</div>
+                        <div>流云AI 移动端创作与知识管理应用</div>
                     </div>
                 </div>
                 <div className="mobile-settings-about-meta">

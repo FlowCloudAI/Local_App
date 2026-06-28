@@ -244,7 +244,7 @@ export function MobileSettingsMenuSection({
                 <span className="mobile-settings-menu-item__content">
                     <span className="mobile-settings-menu-item__label">关于</span>
                     <span className="mobile-settings-menu-item__summary">
-                        FlowCloudAI 移动端{version ? ` · ${version}` : ''}
+                        流云AI 移动端{version ? ` · ${version}` : ''}
                     </span>
                 </span>
                 <ChevronRightIcon/>

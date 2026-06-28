@@ -242,7 +242,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                         <img className="about-section-brand-icon" src="/icon.svg" alt=""/>
                     </div>
                     <div className="about-section-brand-copy">
-                        <div className="about-section-kicker">FlowCloudAI</div>
+                        <div className="about-section-kicker">流云AI</div>
                         <h2 className="about-section-title">流云AI</h2>
                         <p className="about-section-summary">
                             桌面端创意写作与知识管理应用。

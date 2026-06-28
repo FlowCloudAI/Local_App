@@ -279,7 +279,7 @@ export const HELP_TOPICS: HelpTopic[] = [
             {
                 id: 'plugin-source',
                 title: '插件来源',
-                lead: 'FlowCloudAI 使用 .fcplug 插件接入模型、图像生成和语音能力。',
+                lead: '流云AI使用 .fcplug 插件接入模型、图像生成和语音能力。',
                 items: ['插件包通常包含 manifest、wasm 模块和图标。', '只安装来源明确、与你当前需求匹配的插件。'],
                 figure: {
                     src: helpAiFigure,

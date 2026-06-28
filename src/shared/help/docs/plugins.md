@@ -1,5 +1,5 @@
 <!-- section:plugin-source -->
-FlowCloudAI 使用 .fcplug 插件接入模型、图像生成和语音能力。
+流云AI使用 .fcplug 插件接入模型、图像生成和语音能力。
 
 ![插件连接模型能力的示意图](../assets/help-ai.svg)
 

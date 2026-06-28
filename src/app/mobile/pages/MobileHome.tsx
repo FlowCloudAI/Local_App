@@ -572,7 +572,7 @@ export default function MobileHome({
         const selectedPath = await openFileDialog({
             multiple: false,
             filters: [{
-                name: 'FlowCloudAI World',
+                name: '流云AI World',
                 extensions: ['fcworld'],
             }],
         })

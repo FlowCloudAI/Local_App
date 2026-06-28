@@ -397,7 +397,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             title: '选择本地插件包',
             filters: [
                 {
-                    name: 'FlowCloudAI 插件包',
+                    name: '流云AI 插件包',
                     extensions: ['fcplug'],
                 },
             ],

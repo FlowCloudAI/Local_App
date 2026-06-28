@@ -289,7 +289,7 @@ export default function ThemeColorPreview({value, onChange}: ThemeColorPreviewPr
             const selectedPath = await saveFileDialog({
                 defaultPath: buildThemeConfigFileName(selectedRecipe.id),
                 filters: [{
-                    name: 'FlowCloudAI 主题配置',
+                    name: '流云AI 主题配置',
                     extensions: ['json'],
                 }],
             })

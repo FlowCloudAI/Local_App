@@ -119,7 +119,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         const selectedPath = await openFileDialog({
             multiple: false,
             filters: [{
-                name: 'FlowCloudAI World',
+                name: '流云AI World',
                 extensions: ['fcworld'],
             }],
         })

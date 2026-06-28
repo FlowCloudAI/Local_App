@@ -46,7 +46,7 @@ export default function UploadPlugin({open, onClose, onUploaded}: UploadPluginPr
             title: '选择要上传的插件包',
             filters: [
                 {
-                    name: 'FlowCloudAI 插件包',
+                    name: '流云AI 插件包',
                     extensions: ['fcplug'],
                 },
             ],
