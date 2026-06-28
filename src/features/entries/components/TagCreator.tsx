@@ -1,5 +1,4 @@
 import {type CSSProperties, useEffect, useMemo, useState} from 'react'
-import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {
     db_create_tag_schema,
@@ -9,6 +8,7 @@ import {
     type EntryTypeView,
     type TagSchema,
 } from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
 import './TagCreator.css'
 
@@ -226,21 +226,14 @@ export default function TagCreator({
         }
     }
 
-    if (!open) return null
-
-    return createPortal(
-        <div
-            className="tag-creator-backdrop"
-            onClick={e => {
-                if (e.target === e.currentTarget && !submitting) onClose()
-            }}
+    return (
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            dismissible={!submitting}
+            ariaLabel={isEditMode ? '编辑标签' : '新建标签'}
+            className="tag-creator-dialog"
         >
-            <div
-                className="tag-creator-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-label={isEditMode ? '编辑标签' : '新建标签'}
-            >
                 <div className="tag-creator-header">
                     <span className="tag-creator-title">{isEditMode ? '编辑标签' : '新建标签'}</span>
                     <button
@@ -467,8 +460,6 @@ export default function TagCreator({
                         </Button>
                     </div>
                 </div>
-            </div>
-        </div>,
-        document.body
+        </FloatingPanel>
     )
 }

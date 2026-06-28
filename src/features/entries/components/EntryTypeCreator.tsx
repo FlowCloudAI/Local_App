@@ -1,7 +1,7 @@
 import {type CSSProperties, useEffect, useState} from 'react'
-import {createPortal} from 'react-dom'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {type CustomEntryType, db_create_entry_type, db_delete_entry_type, db_update_entry_type,} from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryTypeCreator.css'
 
 const DEFAULT_COLOR = '#6B7280'
@@ -125,21 +125,14 @@ export default function EntryTypeCreator({
         }
     }
 
-    if (!open) return null
-
-    return createPortal(
-        <div
-            className="entry-type-creator-backdrop"
-            onClick={e => {
-                if (e.target === e.currentTarget && !submitting) onClose()
-            }}
+    return (
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            dismissible={!submitting}
+            ariaLabel={isEditMode ? '编辑词条类型' : '新建词条类型'}
+            className="entry-type-creator-dialog"
         >
-            <div
-                className="entry-type-creator-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-label={isEditMode ? '编辑词条类型' : '新建词条类型'}
-            >
                 <div className="entry-type-creator-header">
                     <span className="entry-type-creator-title">{isEditMode ? '编辑词条类型' : '新建词条类型'}</span>
                     <button
@@ -271,8 +264,6 @@ export default function EntryTypeCreator({
                         </Button>
                     </div>
                 </div>
-            </div>
-        </div>,
-        document.body
+        </FloatingPanel>
     )
 }

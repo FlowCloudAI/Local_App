@@ -1,15 +1,3 @@
-/* ── 遮罩层 ──────────────────────────────────────────────────────────────── */
-
-.entry-type-creator-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 500;
-    display: grid;
-    place-items: center;
-    padding: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg) 50%, transparent);
-}
-
 /* ── 对话框 ────────────────────────────────────────────────────────────────── */
 
 .entry-type-creator-dialog {

@@ -78,7 +78,10 @@ export default function Overlay({
         document.body.style.overflow = 'hidden'
 
         const prevFocus = document.activeElement as HTMLElement | null
-        const focusRaf = requestAnimationFrame(() => panelRef.current?.focus())
+        const focusRaf = requestAnimationFrame(() => {
+            if (document.activeElement && panelRef.current?.contains(document.activeElement)) return
+            panelRef.current?.focus()
+        })
 
         return () => {
             removeOverlay(id)
