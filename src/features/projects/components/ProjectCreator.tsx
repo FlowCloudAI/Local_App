@@ -76,7 +76,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                 if (e.target === e.currentTarget && !submitting) onClose()
             }}
         >
-            <div className="project-creator-dialog" role="dialog" aria-modal="true" aria-label="新建世界观">
+            <div className="project-creator-dialog" role="dialog" aria-modal="true" aria-label="新建世界观" data-tour-id="project-creator-dialog">
                 <div className="project-creator-header">
                     <span className="project-creator-title">新建世界观</span>
                     <button
@@ -100,6 +100,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                         </label>
                         <input
                             className="project-creator-input"
+                            data-tour-id="project-creator-name"
                             value={name}
                             onChange={e => setName(e.target.value)}
                             onKeyDown={e => {
@@ -119,6 +120,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                         <label className="project-creator-label">简介</label>
                         <textarea
                             className="project-creator-textarea"
+                            data-tour-id="project-creator-description"
                             value={description}
                             onChange={e => setDescription(e.target.value)}
                             placeholder="用一两句话描述这个世界…（可选）"
@@ -128,7 +130,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                         />
                     </div>
 
-                    <label className="project-creator-template-toggle">
+                    <label className="project-creator-template-toggle" data-tour-id="project-creator-template">
                         <input
                             type="checkbox"
                             checked={createDefaultTemplate}
@@ -153,7 +155,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                     <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
                         取消
                     </Button>
-                    <Button type="button" size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+                    <Button type="button" size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()} data-tour-id="project-creator-submit">
                         {submitting ? '创建中…' : '创建'}
                     </Button>
                 </div>

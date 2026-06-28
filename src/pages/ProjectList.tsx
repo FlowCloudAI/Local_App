@@ -1,4 +1,4 @@
-import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
+import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {convertFileSrc} from '../api/assets'
 import {openFileDialog} from '../api/dialog'
 import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
@@ -32,6 +32,7 @@ import {
     type HomeDashboardData,
 } from '../features/home/homeActivity'
 import RenameDialog from '../shared/ui/overlay/RenameDialog'
+import {type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -150,6 +151,8 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
+    const {startTour} = useTour()
+    const debugTourStartedRef = useRef(false)
     const [importing, setImporting] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
@@ -170,6 +173,97 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         hasLoaded: hasLoadedProjects,
         refresh: refreshProjects,
     } = useProjectListStore()
+    const openCreatorForTour = useCallback(() => {
+        setCreatorOpen(true)
+    }, [])
+    const closeCreatorWhenTourCancelled = useCallback(({reason}: TourStepLeaveContext) => {
+        if (reason === 'skip' || reason === 'stop') setCreatorOpen(false)
+    }, [])
+    const closeCreatorWhenBackToHome = useCallback(({reason}: TourStepLeaveContext) => {
+        if (reason === 'previous' || reason === 'skip' || reason === 'stop') setCreatorOpen(false)
+    }, [])
+    const homeOnboardingTour = useMemo<TourDefinition>(() => ({
+        id: 'desktop-home-first-world',
+        version: 1,
+        steps: [
+            {
+                id: 'home-overview',
+                target: '[data-tour-id="home-overview"]',
+                title: '这是创作首页',
+                content: '这里是进入 FlowCloudAI 后的起点。你可以继续已有世界，也可以从这里创建第一个世界观。',
+                placement: 'bottom',
+            },
+            {
+                id: 'home-actions',
+                target: '[data-tour-id="home-quick-actions"]',
+                title: '先选一个入口',
+                content: '重点功能会按当前状态给出入口。新用户先从“开始一个新世界”进入，其他能力可以以后再看。',
+                placement: 'bottom',
+            },
+            {
+                id: 'new-world-action',
+                target: '[data-tour-id="home-new-world-action"]',
+                title: '创建第一个世界观',
+                content: '这个入口会打开新建窗口。调试版点击下一步会自动打开窗口，方便继续看后面的步骤。',
+                placement: 'bottom',
+            },
+            {
+                id: 'creator-dialog',
+                target: '[data-tour-id="project-creator-dialog"]',
+                title: '新建世界观窗口',
+                content: '新世界只需要先填最小信息：名称、可选简介，以及是否生成默认模板。',
+                placement: 'right',
+                beforeEnter: openCreatorForTour,
+                afterLeave: closeCreatorWhenBackToHome,
+            },
+            {
+                id: 'creator-name',
+                target: '[data-tour-id="project-creator-name"]',
+                title: '先填世界观名称',
+                content: '名称是唯一必填项，建议用作品名、企划名或你能快速识别的世界名。',
+                placement: 'right',
+                beforeEnter: openCreatorForTour,
+                afterLeave: closeCreatorWhenTourCancelled,
+            },
+            {
+                id: 'creator-description',
+                target: '[data-tour-id="project-creator-description"]',
+                title: '简介可以先写一句话',
+                content: '简介不是设定正文，只要写清题材、基调或当前创作目标，后续 AI 辅助会更好用。',
+                placement: 'right',
+                beforeEnter: openCreatorForTour,
+                afterLeave: closeCreatorWhenTourCancelled,
+            },
+            {
+                id: 'creator-template',
+                target: '[data-tour-id="project-creator-template"]',
+                title: '默认模板先保持开启',
+                content: '默认模板会帮你生成常用分类和标签。第一次创建建议保留，后面不需要时再调整。',
+                placement: 'right',
+                beforeEnter: openCreatorForTour,
+                afterLeave: closeCreatorWhenTourCancelled,
+            },
+            {
+                id: 'creator-submit',
+                target: '[data-tour-id="project-creator-submit"]',
+                title: '填好后点击创建',
+                content: '名称填好后这里会变成可用。完成引导后窗口会保留，你可以直接创建第一个世界观。',
+                placement: 'top',
+                beforeEnter: openCreatorForTour,
+                afterLeave: closeCreatorWhenTourCancelled,
+            },
+        ],
+    }), [closeCreatorWhenBackToHome, closeCreatorWhenTourCancelled, openCreatorForTour])
+
+    useEffect(() => {
+        if (debugTourStartedRef.current) return
+        const frame = window.requestAnimationFrame(() => {
+            if (debugTourStartedRef.current) return
+            debugTourStartedRef.current = true
+            startTour(homeOnboardingTour, {force: true, markCompletedOnSkip: false})
+        })
+        return () => window.cancelAnimationFrame(frame)
+    }, [homeOnboardingTour, startTour])
 
     useEffect(() => {
         const refreshDashboard = () => setDashboard(loadHomeDashboardData())
@@ -693,7 +787,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             <FcworldProgressDialog progress={fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
-                    <section className="project-home-hero">
+                    <section className="project-home-hero" data-tour-id="home-overview">
                         <div className="project-home-hero__main">
                             <div className="project-list-title-block fc-page-title-block">
                                 <h1 className="project-list-title fc-page-title">创作首页</h1>
@@ -767,7 +861,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                         </div>
                     </section>
 
-                    <section className="project-home-panel project-home-panel--quick">
+                    <section className="project-home-panel project-home-panel--quick" data-tour-id="home-quick-actions">
                         <div className="project-home-panel__heading">
                             <h2>重点功能</h2>
                             <p>根据你现在的状态选择入口：新项目先建世界，零散想法先记灵感，已有材料可以直接交给 AI 梳理。</p>
@@ -778,6 +872,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     key={action.key}
                                     type="button"
                                     className={`project-home-action-item project-home-action-item--${action.tone}`}
+                                    data-tour-id={action.key === 'new-world' ? 'home-new-world-action' : undefined}
                                     onClick={() => {
                                         if (action.onClick) {
                                             action.onClick()
