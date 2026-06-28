@@ -1,13 +1,8 @@
-/* 浮动面板菜单列表：背板/居中由 FloatingPanel(Overlay) 提供，这里只管卡片与列表项。 */
+/* 浮动面板菜单列表：背板、圆角、边框由 FloatingPanel(Overlay) 提供。 */
 
 .fc-action-menu {
     width: min(20rem, 100%);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
-    border: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
-    border-radius: 1.15rem;
     padding: 0.35rem;
-    overflow: hidden;
-    backdrop-filter: blur(18px);
 }
 
 .fc-action-menu__title {
