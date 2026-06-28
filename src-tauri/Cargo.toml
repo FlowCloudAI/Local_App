@@ -1,6 +1,6 @@
 [package]
 name = "FlowCloudAI"
-version = "0.1.1"
+version = "0.1.3"
 description = "A Tauri-based desktop app for creative writing and knowledge management with AI assistance."
 authors = ["flowcloudai"]
 license = "MIT"
