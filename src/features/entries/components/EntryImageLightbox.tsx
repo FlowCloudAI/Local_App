@@ -1,7 +1,7 @@
 import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'react'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {open_entry_image_path} from '../../../api'
-import {Overlay} from '../../../shared/ui/overlay'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryImageLightbox.css'
 
 const MIN_SCALE = 1
@@ -297,7 +297,7 @@ export default function EntryImageLightbox({
     }
 
     return (
-        <Overlay
+        <FloatingPanel
             open={open}
             onClose={onClose}
             className="entry-editor-lightbox"
@@ -424,6 +424,6 @@ export default function EntryImageLightbox({
                     </div>
                 )}
             </div>
-        </Overlay>
+        </FloatingPanel>
     )
 }

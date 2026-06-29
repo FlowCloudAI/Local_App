@@ -6,9 +6,9 @@ import './Overlay.css'
 /** 退场动画时长，需 ≥ Overlay.css 中的 --fc-transition-slow（250ms）。 */
 const EXIT_DURATION_MS = 280
 
-export type OverlayVariant = 'floating' | 'sheet'
+type OverlayVariant = 'floating' | 'sheet'
 
-export interface OverlayProps {
+interface OverlayProps {
     open: boolean
     onClose?: () => void
     /** 背板点击 / Esc / 返回键是否关闭，默认 true。需强制用户做选择时传 false。 */
