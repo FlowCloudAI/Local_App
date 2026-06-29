@@ -58,7 +58,6 @@
     ],
     "resources": {
       "resources/templates": "templates",
-      "resources/ocr-sidecar": "ocr-sidecar",
       "icons/fcplug.ico": "icons/fcplug.ico",
       "icons/fcworld.ico": "icons/fcworld.ico"
     },

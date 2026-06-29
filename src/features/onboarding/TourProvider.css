@@ -8,7 +8,6 @@
 .fc-tour-scrim {
     position: fixed;
     background: color-mix(in srgb, var(--fc-color-bg-overlay, rgba(0, 0, 0, 0.4)) 92%, transparent);
-    backdrop-filter: blur(1px);
     pointer-events: auto;
 }
 

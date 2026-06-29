@@ -19,7 +19,6 @@ import {
     type CategoryCreatedEvent,
     type CategoryDeletedEvent,
     type CustomEntryType,
-    dbListSnapshots,
     db_create_category,
     db_create_entry,
     db_delete_category,
@@ -36,6 +35,7 @@ import {
     db_list_tag_schemas,
     db_update_category,
     db_update_project,
+    dbListSnapshots,
     ENTRY_CREATED,
     ENTRY_DELETED,
     ENTRY_UPDATED,
@@ -870,13 +870,11 @@ function ProjectEditorInner({
         expandTree()
         setSelectedKey(ROOT_ID)
         setSelection({kind: 'project'})
-        if (activeEntryId || activeToolPanel) {
-            void onBackToProject?.(projectId)
-        }
+        void onBackToProject?.(projectId)
         await new Promise<void>(resolve => {
             window.requestAnimationFrame(() => resolve())
         })
-    }, [activeEntryId, activeToolPanel, expandTree, onBackToProject, projectId])
+    }, [expandTree, onBackToProject, projectId])
 
     const projectEditorTour = useMemo<TourDefinition>(() => ({
         id: PROJECT_EDITOR_TOUR_ID,

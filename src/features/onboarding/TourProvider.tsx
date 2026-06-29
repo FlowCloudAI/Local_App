@@ -1,20 +1,20 @@
 import './TourProvider.css'
 import {Button} from 'flowcloudai-ui'
 import {
+    type CSSProperties,
+    type ReactNode,
     useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
     useRef,
     useState,
-    type CSSProperties,
-    type ReactNode,
 } from 'react'
 import {createPortal} from 'react-dom'
 import {logger} from '../../shared/logger'
 import {
-    TourContext,
     type StartTourOptions,
+    TourContext,
     type TourContextValue,
     type TourDefinition,
     type TourLabels,
@@ -57,6 +57,7 @@ interface PopoverLayout {
 }
 
 const DEFAULT_TARGET_WAIT_MS = 5000
+const TARGET_MESSAGE_DEBOUNCE_MS = 1000
 const TARGET_PADDING = 8
 const POPOVER_GAP = 26
 const VIEWPORT_MARGIN = 16
@@ -226,15 +227,13 @@ export function TourProvider({children}: TourProviderProps) {
     const syncTargetRect = useCallback((markMissing: boolean) => {
         const element = targetElementRef.current
         if (!element || !document.documentElement.contains(element)) {
-            setTargetRect(null)
-            if (markMissing) setTargetStatus('missing')
+            if (markMissing) setTargetStatus(status => status === 'ready' ? status : 'waiting')
             return false
         }
 
         const rect = element.getBoundingClientRect()
         if (rect.width <= 0 || rect.height <= 0) {
-            setTargetRect(null)
-            if (markMissing) setTargetStatus('missing')
+            if (markMissing) setTargetStatus(status => status === 'ready' ? status : 'waiting')
             return false
         }
 
@@ -468,7 +467,22 @@ function TourOverlay({
     const allowTargetInteraction = Boolean(currentStep.allowTargetInteraction || currentStep.advanceOnTargetClick)
     const paddedTargetRect = targetRect ? getPaddedTargetRect(targetRect) : null
     const popoverLayout = getPopoverLayout(currentStep, targetRect, tooltipSize)
-    const targetMessage = targetStatus === 'waiting' && targetRect ? '' : getTargetMessage(targetStatus)
+    const rawTargetMessage = targetStatus === 'waiting' && targetRect ? '' : getTargetMessage(targetStatus)
+    const [showTargetMessage, setShowTargetMessage] = useState(false)
+    const targetMessage = showTargetMessage ? rawTargetMessage : ''
+
+    useEffect(() => {
+        if (!rawTargetMessage) {
+            setShowTargetMessage(false)
+            return undefined
+        }
+
+        setShowTargetMessage(false)
+        const timer = window.setTimeout(() => {
+            setShowTargetMessage(true)
+        }, TARGET_MESSAGE_DEBOUNCE_MS)
+        return () => window.clearTimeout(timer)
+    }, [currentStep.id, rawTargetMessage])
 
     useLayoutEffect(() => {
         const element = tooltipRef.current
@@ -479,7 +493,7 @@ function TourOverlay({
             width: rect.width,
             height: rect.height,
         })
-    }, [currentStep.id, targetStatus, targetRect])
+    }, [currentStep.id, targetMessage, targetRect, targetStatus])
 
     return (
         <div className="fc-tour-layer" aria-live="polite">
