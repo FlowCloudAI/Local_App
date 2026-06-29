@@ -12,6 +12,16 @@
     overflow: hidden;
 }
 
+.project-relation-graph .fc-op-viewport {
+    display: flex;
+    min-height: 0;
+}
+
+.project-relation-graph .fc-op-viewport > .fc-rg {
+    flex: 1;
+    min-height: 0;
+}
+
 /* ─── 关系图谱节点：封面卡（按词条类型着色） ───────────────────────── */
 /* --rg-accent 由 renderNode 注入词条类型色；无类型时回退主色。 */
 .rg-node {

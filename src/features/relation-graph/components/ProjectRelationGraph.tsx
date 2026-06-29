@@ -703,7 +703,6 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                         edges={edges}
                         layoutFn={layoutFn}
                         renderNode={renderNode}
-                        height={720}
                         fitPadding={0.12}
                         fitDuration={500}
                         onLayoutStateChange={setLayoutState}
