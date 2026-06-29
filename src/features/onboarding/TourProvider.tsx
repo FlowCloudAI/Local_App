@@ -264,7 +264,7 @@ export function TourProvider({children}: TourProviderProps) {
         const prepareStep = async () => {
             targetElementRef.current = null
             isPreparingStepRef.current = Boolean(currentStep.target)
-            setTargetRect(null)
+            if (!currentStep.target) setTargetRect(null)
             setTargetStatus(currentStep.target ? 'waiting' : 'none')
 
             if (currentStep.beforeEnter) {
@@ -296,6 +296,7 @@ export function TourProvider({children}: TourProviderProps) {
             targetElementRef.current = element
             if (!element) {
                 isPreparingStepRef.current = false
+                setTargetRect(null)
                 setTargetStatus('missing')
                 return
             }
@@ -464,8 +465,6 @@ function TourOverlay({
             height: rect.height,
         })
     }, [currentStep.id, targetStatus, targetRect])
-
-    if (currentStep.target && targetStatus === 'waiting') return null
 
     return (
         <div className="fc-tour-layer" aria-live="polite">
