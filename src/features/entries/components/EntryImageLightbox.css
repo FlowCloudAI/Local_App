@@ -56,6 +56,8 @@
     display: grid;
     place-items: center;
     overflow: hidden;
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--fc-color-bg) 78%, black 8%);
 }
 
 .entry-editor-lightbox__zoom-surface {
@@ -77,8 +79,11 @@
 }
 
 .entry-editor-lightbox__image {
-    width: 100%;
-    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    display: block;
     object-fit: contain;
     border-radius: 0.9rem;
     transition: transform 0.12s ease;
@@ -93,7 +98,12 @@
 
 .entry-editor-lightbox__gallery {
     width: 100%;
+    height: 8.3rem;
     min-height: 0;
+    padding: 0.5rem 0 0.35rem;
+    border-top: 1px solid var(--fc-color-border);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, black 6%);
+    box-sizing: border-box;
 }
 
 .entry-editor-lightbox__gallery-view {
