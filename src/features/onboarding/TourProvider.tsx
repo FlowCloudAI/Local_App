@@ -306,6 +306,21 @@ export function TourProvider({children}: TourProviderProps) {
                 await waitForAnimationFrame()
                 if (disposed) return
             }
+
+            const latestElement = await waitForTarget(
+                currentStep.target,
+                currentStep.waitTimeoutMs ?? DEFAULT_TARGET_WAIT_MS,
+                () => disposed,
+            )
+            if (disposed) return
+            targetElementRef.current = latestElement
+            if (!latestElement) {
+                isPreparingStepRef.current = false
+                setTargetRect(null)
+                setTargetStatus('missing')
+                return
+            }
+
             isPreparingStepRef.current = false
             syncTargetRect(true)
 
@@ -453,7 +468,7 @@ function TourOverlay({
     const allowTargetInteraction = Boolean(currentStep.allowTargetInteraction || currentStep.advanceOnTargetClick)
     const paddedTargetRect = targetRect ? getPaddedTargetRect(targetRect) : null
     const popoverLayout = getPopoverLayout(currentStep, targetRect, tooltipSize)
-    const targetMessage = getTargetMessage(targetStatus)
+    const targetMessage = targetStatus === 'waiting' && targetRect ? '' : getTargetMessage(targetStatus)
 
     useLayoutEffect(() => {
         const element = tooltipRef.current
@@ -565,7 +580,7 @@ function waitForTarget(
             }
 
             const element = resolveTourTarget(target)
-            if (element) {
+            if (element && isMeasurableTourTarget(element)) {
                 resolve(element)
                 return
             }
@@ -580,6 +595,12 @@ function waitForTarget(
 
         tick()
     })
+}
+
+function isMeasurableTourTarget(element: Element): boolean {
+    if (!document.documentElement.contains(element)) return false
+    const rect = element.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0
 }
 
 function resolveTourTarget(target: TourStepTarget): Element | null {
