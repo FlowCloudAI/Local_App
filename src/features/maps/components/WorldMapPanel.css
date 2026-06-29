@@ -266,10 +266,6 @@
     flex-direction: column;
     gap: var(--fc-space-lg);
     padding: var(--fc-space-lg);
-    border-radius: var(--fc-radius-md);
-    border: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-lg);
 }
 
 .wm-utility-dialog--wide {

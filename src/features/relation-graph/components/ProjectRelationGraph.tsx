@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
 import {convertFileSrc} from '../../../api/assets'
 import {Button, ButtonGroup, ButtonToolbar, Input, Slider} from 'flowcloudai-ui'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import {RelationGraph} from './RelationGraph/RelationGraph'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
 import type {
@@ -581,111 +582,108 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
             )}
 
             {layoutPanelOpen && (
-                <div className="rg-layout-modal-backdrop" role="presentation" onMouseDown={() => setLayoutPanelOpen(false)}>
-                    <div
-                        className="rg-layout-dialog"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="布局参数"
-                        onMouseDown={(event) => event.stopPropagation()}
-                    >
-                        <div className="rg-layout-dialog__header">
-                            <h3>布局参数</h3>
+                <FloatingPanel
+                    open
+                    onClose={() => setLayoutPanelOpen(false)}
+                    className="rg-layout-dialog"
+                    ariaLabel="布局参数"
+                >
+                    <div className="rg-layout-dialog__header">
+                        <h3>布局参数</h3>
+                        <Button
+                            type="button"
+                            size="xs"
+                            variant="ghost"
+                            iconOnly
+                            className="rg-layout-dialog__close"
+                            aria-label="关闭"
+                            onClick={() => setLayoutPanelOpen(false)}
+                        >
+                            ×
+                        </Button>
+                    </div>
+
+                    <div className="rg-layout-dialog__body">
+                        <ButtonGroup className="rg-layout-mode">
                             <Button
                                 type="button"
-                                size="xs"
-                                variant="ghost"
-                                iconOnly
-                                className="rg-layout-dialog__close"
-                                aria-label="关闭"
-                                onClick={() => setLayoutPanelOpen(false)}
+                                size="sm"
+                                variant={layoutParamMode === 'simple' ? 'primary' : 'secondary'}
+                                onClick={() => setLayoutParamMode('simple')}
                             >
-                                ×
+                                简单
                             </Button>
-                        </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={layoutParamMode === 'advanced' ? 'primary' : 'secondary'}
+                                onClick={() => setLayoutParamMode('advanced')}
+                            >
+                                高级
+                            </Button>
+                        </ButtonGroup>
 
-                        <div className="rg-layout-dialog__body">
-                            <ButtonGroup className="rg-layout-mode">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={layoutParamMode === 'simple' ? 'primary' : 'secondary'}
-                                    onClick={() => setLayoutParamMode('simple')}
-                                >
-                                    简单
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant={layoutParamMode === 'advanced' ? 'primary' : 'secondary'}
-                                    onClick={() => setLayoutParamMode('advanced')}
-                                >
-                                    高级
-                                </Button>
-                            </ButtonGroup>
-
-                            {layoutParamMode === 'simple' ? (
-                                <div className="rg-layout-simple">
-                                    <div className="rg-layout-slider">
-                                        <label>
-                                            松散程度
-                                            <span>{layoutLooseness.toFixed(2)}x</span>
-                                        </label>
-                                        <Slider
-                                            value={layoutLooseness}
-                                            min={0.65}
-                                            max={1.8}
-                                            step={0.05}
-                                            tooltip
-                                            onChange={handleLayoutLoosenessChange}
-                                        />
-                                    </div>
+                        {layoutParamMode === 'simple' ? (
+                            <div className="rg-layout-simple">
+                                <div className="rg-layout-slider">
+                                    <label>
+                                        松散程度
+                                        <span>{layoutLooseness.toFixed(2)}x</span>
+                                    </label>
+                                    <Slider
+                                        value={layoutLooseness}
+                                        min={0.65}
+                                        max={1.8}
+                                        step={0.05}
+                                        tooltip
+                                        onChange={handleLayoutLoosenessChange}
+                                    />
                                 </div>
-                            ) : (
-                                <div className="rg-layout-advanced">
-                                    {ADVANCED_LAYOUT_GROUPS.map((group) => (
-                                        <section key={group.title} className="rg-layout-group">
-                                            <h4>{group.title}</h4>
-                                            <div className="rg-layout-field-grid">
-                                                {group.fields.map((field) => (
-                                                    <label key={field.key} className="rg-layout-field">
-                                                        <span>{field.label}</span>
-                                                        <Input
-                                                            size="sm"
-                                                            type="number"
-                                                            min={field.min}
-                                                            max={field.max}
-                                                            step={field.step ?? (field.integer ? 1 : 0.01)}
-                                                            value={advancedLayoutParams[field.key] ?? ''}
-                                                            showNumberStepper
-                                                            onValueChange={(value) => handleAdvancedLayoutParamChange(
-                                                                field.key,
-                                                                value,
-                                                                field.integer,
-                                                            )}
-                                                        />
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <ButtonToolbar align="right" className="rg-layout-dialog__footer">
-                            <Button type="button" size="sm" variant="outline" onClick={handleResetLayoutParams}>
-                                恢复默认
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(false)}>
-                                取消
-                            </Button>
-                            <Button type="button" size="sm" onClick={handleApplyLayoutParams}>
-                                应用并重新布局
-                            </Button>
-                        </ButtonToolbar>
+                            </div>
+                        ) : (
+                            <div className="rg-layout-advanced">
+                                {ADVANCED_LAYOUT_GROUPS.map((group) => (
+                                    <section key={group.title} className="rg-layout-group">
+                                        <h4>{group.title}</h4>
+                                        <div className="rg-layout-field-grid">
+                                            {group.fields.map((field) => (
+                                                <label key={field.key} className="rg-layout-field">
+                                                    <span>{field.label}</span>
+                                                    <Input
+                                                        size="sm"
+                                                        type="number"
+                                                        min={field.min}
+                                                        max={field.max}
+                                                        step={field.step ?? (field.integer ? 1 : 0.01)}
+                                                        value={advancedLayoutParams[field.key] ?? ''}
+                                                        showNumberStepper
+                                                        onValueChange={(value) => handleAdvancedLayoutParamChange(
+                                                            field.key,
+                                                            value,
+                                                            field.integer,
+                                                        )}
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                </div>
+
+                    <ButtonToolbar align="right" className="rg-layout-dialog__footer">
+                        <Button type="button" size="sm" variant="outline" onClick={handleResetLayoutParams}>
+                            恢复默认
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(false)}>
+                            取消
+                        </Button>
+                        <Button type="button" size="sm" onClick={handleApplyLayoutParams}>
+                            应用并重新布局
+                        </Button>
+                    </ButtonToolbar>
+                </FloatingPanel>
             )}
 
             {/* ── 视口 ── */}

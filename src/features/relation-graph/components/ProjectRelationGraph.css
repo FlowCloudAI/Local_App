@@ -132,27 +132,12 @@
 }
 
 /* ─── 布局参数面板 ─────────────────────────────────────────────── */
-.rg-layout-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--fc-space-lg, 16px);
-    background: var(--fc-color-bg-overlay);
-}
-
 .rg-layout-dialog {
     width: min(760px, calc(100vw - 32px));
     max-height: min(760px, calc(100vh - 32px));
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg, 12px);
-    background: var(--fc-color-bg-elevated, #fff);
-    box-shadow: var(--fc-shadow-lg, 0 18px 48px rgba(0, 0, 0, 0.22));
 }
 
 .rg-layout-dialog__header,

@@ -37,6 +37,7 @@ import {
     map_save_scene,
     type MapEntry,
 } from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
 import {compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
@@ -1744,55 +1745,52 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             )}
 
             {utilityPanel && (
-                <div className="wm-modal-backdrop" role="presentation" onMouseDown={() => setUtilityPanel(null)}>
-                    <div
-                        className={`wm-utility-dialog${utilityPanel === 'coastline' ? ' wm-utility-dialog--wide' : ''}`}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label={utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}
-                        onMouseDown={event => event.stopPropagation()}
-                    >
-                        <div className="wm-create-map-dialog__header">
-                            <h3>{utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}</h3>
-                            <button
-                                type="button"
-                                className="wm-icon-btn wm-icon-btn--close"
-                                onClick={() => setUtilityPanel(null)}
-                                aria-label="关闭"
-                            >
-                                <CloseIcon/>
-                            </button>
-                        </div>
-                        {utilityPanel === 'help' ? (
-                            <div className="wm-sidebar-hints">
-                                <div className="wm-sidebar-hint">点击「绘制图形」在画布上逐点绘制区域。</div>
-                                <div className="wm-sidebar-hint">双击画布或点击侧栏「完成图形」结束绘制。</div>
-                                <div className="wm-sidebar-hint">「预览草图」显示当前草稿，「生成海岸线」会自然化图形边缘。</div>
-                                <div className="wm-sidebar-hint">右键图形、顶点或地点可打开对应操作菜单。</div>
-                                <div className="wm-sidebar-hint">地图引擎和尺寸在创建时确定，创建后不在运行时切换。</div>
-                            </div>
-                        ) : (
-                            <>
-                                {coastlineParamFields}
-                                <div className="wm-create-map-dialog__footer">
-                                    <button
-                                        type="button"
-                                        className="wm-chip"
-                                        onClick={() => {
-                                            setCoastlineParams(DEFAULT_COASTLINE_PARAMS)
-                                            markMapUnsaved()
-                                        }}
-                                    >
-                                        恢复默认
-                                    </button>
-                                    <button type="button" className="wm-chip is-active" onClick={() => setUtilityPanel(null)}>
-                                        完成
-                                    </button>
-                                </div>
-                            </>
-                        )}
+                <FloatingPanel
+                    open
+                    onClose={() => setUtilityPanel(null)}
+                    className={`wm-utility-dialog${utilityPanel === 'coastline' ? ' wm-utility-dialog--wide' : ''}`}
+                    ariaLabel={utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}
+                >
+                    <div className="wm-create-map-dialog__header">
+                        <h3>{utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}</h3>
+                        <button
+                            type="button"
+                            className="wm-icon-btn wm-icon-btn--close"
+                            onClick={() => setUtilityPanel(null)}
+                            aria-label="关闭"
+                        >
+                            <CloseIcon/>
+                        </button>
                     </div>
-                </div>
+                    {utilityPanel === 'help' ? (
+                        <div className="wm-sidebar-hints">
+                            <div className="wm-sidebar-hint">点击「绘制图形」在画布上逐点绘制区域。</div>
+                            <div className="wm-sidebar-hint">双击画布或点击侧栏「完成图形」结束绘制。</div>
+                            <div className="wm-sidebar-hint">「预览草图」显示当前草稿，「生成海岸线」会自然化图形边缘。</div>
+                            <div className="wm-sidebar-hint">右键图形、顶点或地点可打开对应操作菜单。</div>
+                            <div className="wm-sidebar-hint">地图引擎和尺寸在创建时确定，创建后不在运行时切换。</div>
+                        </div>
+                    ) : (
+                        <>
+                            {coastlineParamFields}
+                            <div className="wm-create-map-dialog__footer">
+                                <button
+                                    type="button"
+                                    className="wm-chip"
+                                    onClick={() => {
+                                        setCoastlineParams(DEFAULT_COASTLINE_PARAMS)
+                                        markMapUnsaved()
+                                    }}
+                                >
+                                    恢复默认
+                                </button>
+                                <button type="button" className="wm-chip is-active" onClick={() => setUtilityPanel(null)}>
+                                    完成
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </FloatingPanel>
             )}
 
             {/* ── 顶部导航栏 ── */}
