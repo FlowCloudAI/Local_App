@@ -1,7 +1,12 @@
 import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'react'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {open_entry_image_path} from '../../../api'
+import {Overlay} from '../../../shared/ui/overlay'
 import './EntryImageLightbox.css'
+
+const MIN_SCALE = 1
+const MAX_SCALE = 5
+const ZOOM_STEP = 0.2
 
 type LightboxImage = {
     src?: string
@@ -24,6 +29,15 @@ interface EntryImageLightboxProps {
     onInsertMarkdown?: (index: number) => void
 }
 
+function clampScale(nextScale: number) {
+    return Math.min(MAX_SCALE, Math.max(MIN_SCALE, nextScale))
+}
+
+function isTextInputTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false
+    return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
 export default function EntryImageLightbox({
                                                open,
                                                images,
@@ -36,10 +50,6 @@ export default function EntryImageLightbox({
                                                onAddImage,
                                                onInsertMarkdown,
                                            }: EntryImageLightboxProps) {
-    const MIN_SCALE = 1
-    const MAX_SCALE = 5
-    const ZOOM_STEP = 0.2
-
     const {showAlert} = useAlert()
     const [viewMode, setViewMode] = useState<'preview' | 'gallery'>('preview')
     const [scale, setScale] = useState(1)
@@ -53,10 +63,6 @@ export default function EntryImageLightbox({
         startOffsetX: 0,
         startOffsetY: 0,
     })
-
-    function clampScale(nextScale: number) {
-        return Math.min(MAX_SCALE, Math.max(MIN_SCALE, nextScale))
-    }
 
     function resetPreviewTransform() {
         setScale(MIN_SCALE)
@@ -103,6 +109,61 @@ export default function EntryImageLightbox({
         })
         return () => window.cancelAnimationFrame(rafId)
     }, [open, viewMode, currentIndex])
+
+    useEffect(() => {
+        if (!open || viewMode !== 'preview') return
+
+        function resetByKeyboard() {
+            setScale(MIN_SCALE)
+            setOffset({x: 0, y: 0})
+            setIsDragging(false)
+            dragStateRef.current.pointerId = -1
+        }
+
+        function zoomByKeyboard(delta: number) {
+            setScale((current) => {
+                const safeScale = clampScale(current + delta)
+                if (safeScale === MIN_SCALE) {
+                    setOffset({x: 0, y: 0})
+                    setIsDragging(false)
+                    dragStateRef.current.pointerId = -1
+                }
+                return safeScale
+            })
+        }
+
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+            if (isTextInputTarget(event.target)) return
+
+            if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && images.length > 1) {
+                event.preventDefault()
+                const direction = event.key === 'ArrowLeft' ? -1 : 1
+                onIndexChange((currentIndex + images.length + direction) % images.length)
+                return
+            }
+
+            if (event.key === '0' || event.code === 'Numpad0') {
+                event.preventDefault()
+                resetByKeyboard()
+                return
+            }
+
+            if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') {
+                event.preventDefault()
+                zoomByKeyboard(ZOOM_STEP)
+                return
+            }
+
+            if (event.key === '-' || event.code === 'NumpadSubtract') {
+                event.preventDefault()
+                zoomByKeyboard(-ZOOM_STEP)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [currentIndex, images.length, onIndexChange, open, viewMode])
 
     if (!open || images.length === 0) return null
 
@@ -188,7 +249,12 @@ export default function EntryImageLightbox({
                     >
                         <div className="entry-editor-lightbox__thumb-media">
                             {image.src ? (
-                                <img src={image.src} alt={image.alt || `${infoTitle} ${index + 1}`}/>
+                                <img
+                                    src={image.src}
+                                    alt={image.alt || `${infoTitle} ${index + 1}`}
+                                    loading="lazy"
+                                    decoding="async"
+                                />
                             ) : (
                                 <span className="entry-editor-lightbox__thumb-empty">{index + 1}</span>
                             )}
@@ -231,9 +297,12 @@ export default function EntryImageLightbox({
     }
 
     return (
-        <div className="entry-editor-lightbox" onClick={(event) => {
-            if (event.target === event.currentTarget) onClose()
-        }}>
+        <Overlay
+            open={open}
+            onClose={onClose}
+            className="entry-editor-lightbox"
+            ariaLabel={`${infoTitle} 图片浏览`}
+        >
             <div className="entry-editor-lightbox__dialog">
                 <div className="entry-editor-lightbox__toolbar">
                     <div className="entry-editor-lightbox__meta">
@@ -339,6 +408,7 @@ export default function EntryImageLightbox({
                                         style={{
                                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                                         }}
+                                        decoding="async"
                                         draggable={false}
                                     />
                                 </div>
@@ -354,6 +424,6 @@ export default function EntryImageLightbox({
                     </div>
                 )}
             </div>
-        </div>
+        </Overlay>
     )
 }
