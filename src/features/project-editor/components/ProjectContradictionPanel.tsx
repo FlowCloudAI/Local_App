@@ -1,5 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {Button, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {
     ai_delete_world_check_report,
@@ -30,7 +31,7 @@ interface ProjectContradictionPanelProps {
     aiModel?: string | null
     activeEntryId?: string | null
     activeEntryTitle?: string | null
-    onBack: () => void
+    sidebarContainer?: HTMLElement | null
     onStartDiscussion?: (params: {
         title: string
         pluginId: string
@@ -48,28 +49,6 @@ const CHECK_KIND_OPTIONS: Array<{ value: WorldCheckKind; label: string }> = [
 
 function checkKindLabel(kind: WorldCheckKind): string {
     return CHECK_KIND_OPTIONS.find((item) => item.value === kind)?.label ?? '设定检测'
-}
-
-function BackArrow() {
-    return (
-        <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: 16, height: 16}}>
-            <path
-                d="M8.6 3.25L4.1 7.75L8.6 12.25"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M4.5 7.75H12.25"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-            />
-        </svg>
-    )
 }
 
 function CloseIcon() {
@@ -187,7 +166,7 @@ function ProjectContradictionPanel({
                                         aiModel = null,
                                         activeEntryId = null,
                                         activeEntryTitle = null,
-                                        onBack,
+                                        sidebarContainer,
                                         onStartDiscussion,
                                         onOpenEntry,
                                     }: ProjectContradictionPanelProps) {
@@ -500,13 +479,101 @@ function ProjectContradictionPanel({
         }
     }, [activeRecord])
 
+    const renderSidebarExternally = Boolean(sidebarContainer)
+    const sidebarStats = activeRecord ? (
+        <div className="pe-contradiction-sidebar__stats">
+            <div className="pe-contradiction-stat-card">
+                <span className="pe-contradiction-stat-card__value">{summary?.findingCount ?? 0}</span>
+                <span className="pe-contradiction-stat-card__label">问题条目</span>
+                {(summary?.findingCount ?? 0) > 0 && (
+                    <div className="pe-contradiction-severity-dist">
+                        {summary!.severityDist.critical > 0 && (
+                            <span className="pe-contradiction-severity-pill is-critical">{summary!.severityDist.critical} 严重</span>
+                        )}
+                        {summary!.severityDist.high > 0 && (
+                            <span className="pe-contradiction-severity-pill is-high">{summary!.severityDist.high} 高</span>
+                        )}
+                        {summary!.severityDist.medium > 0 && (
+                            <span className="pe-contradiction-severity-pill is-medium">{summary!.severityDist.medium} 中</span>
+                        )}
+                        {summary!.severityDist.low > 0 && (
+                            <span className="pe-contradiction-severity-pill is-low">{summary!.severityDist.low} 低</span>
+                        )}
+                    </div>
+                )}
+            </div>
+            <div className="pe-contradiction-stat-card">
+                <span className="pe-contradiction-stat-card__value">{summary?.unresolvedCount ?? 0}</span>
+                <span className="pe-contradiction-stat-card__label">待确认问题</span>
+            </div>
+            <div className="pe-contradiction-stat-card">
+                <span className="pe-contradiction-stat-card__value">{activeRecord.sourceEntryIds.length}</span>
+                <span className="pe-contradiction-stat-card__label">来源词条</span>
+            </div>
+        </div>
+    ) : (
+        <div className="pe-contradiction-sidebar__empty">选择报告后显示摘要统计。</div>
+    )
+
+    const historyPanel = (
+        <div className="pe-contradiction-sidebar">
+            {sidebarStats}
+            <section className="pe-contradiction-history">
+                <div className="pe-contradiction-section__header">
+                    <h3 className="pe-contradiction-section__title fc-section-title">历史报告</h3>
+                    <span className="pe-contradiction-section__meta">{historyItems.length} 份</span>
+                </div>
+                <RollingBox axis="y" className="pe-contradiction-history__scroll" thumbSize="thin">
+                    <div className="pe-contradiction-history__list">
+                        {historyLoading && historyItems.length === 0 ? (
+                            <div className="pe-contradiction-empty">正在加载历史报告…</div>
+                        ) : historyItems.length === 0 ? (
+                            <div className="pe-contradiction-empty">还没有生成过检测报告。</div>
+                        ) : historyItems.map((item) => (
+                            <article
+                                key={item.reportId}
+                                className={`pe-contradiction-history__item fc-op-item${item.reportId === selectedReportId ? ' is-active' : ''}`}
+                            >
+                                <button
+                                    type="button"
+                                    className="fc-op-item__content"
+                                    onClick={() => setSelectedReportId(item.reportId)}
+                                >
+                                    <div className="pe-contradiction-history__topline">
+                                        <span className="fc-op-item__meta">{formatDateTime(item.createdAt)}</span>
+                                        <span className="fc-op-count">{item.findingCount} 个问题</span>
+                                        <span className="fc-op-count">{checkKindLabel(item.checkKind)}</span>
+                                    </div>
+                                    <div className="fc-op-item__title">{item.overview}</div>
+                                    <div className="fc-op-item__meta">
+                                        <span>{item.scopeSummary}</span>
+                                        {item.truncated && <span className="fc-op-hint--error">已裁剪</span>}
+                                    </div>
+                                </button>
+                                <div className="fc-op-item__actions">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => void handleDelete(item.reportId)}
+                                    >
+                                        删除
+                                    </Button>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                </RollingBox>
+            </section>
+        </div>
+    )
+
     return (
         <div className="pe-contradiction-panel">
+            {renderSidebarExternally && sidebarContainer ? createPortal(historyPanel, sidebarContainer) : null}
+
             <div className="pe-contradiction-toolbar fc-op-header">
                 <div className="pe-contradiction-toolbar__left">
-                    <button type="button" className="fc-op-back-btn" onClick={onBack}>
-                        <BackArrow/>返回
-                    </button>
                     <div className="fc-op-header__title-block">
                         <h2 className="pe-contradiction-title fc-op-header__title">设定检测</h2>
                         <p className="pe-contradiction-desc fc-op-header__subtitle">生成结构化检测报告，保留历史记录，并可在右侧聊天区继续讨论这份报告。</p>
@@ -525,57 +592,8 @@ function ProjectContradictionPanel({
                 </div>
             </div>
 
-            <div className="pe-contradiction-layout">
-                <section className="pe-contradiction-history">
-                    <div className="pe-contradiction-section__header">
-                        <h3 className="pe-contradiction-section__title fc-section-title">历史报告</h3>
-                        <span className="pe-contradiction-section__meta">{historyItems.length} 份</span>
-                    </div>
-                    <RollingBox axis="y" className="pe-contradiction-history__scroll" thumbSize="thin">
-                        <div className="pe-contradiction-history__list">
-                            {historyLoading && historyItems.length === 0 ? (
-                                <div className="pe-contradiction-empty">正在加载历史报告…</div>
-                            ) : historyItems.length === 0 ? (
-                                <div className="pe-contradiction-empty">还没有生成过检测报告。</div>
-                            ) : historyItems.map((item) => (
-                                <article
-                                    key={item.reportId}
-                                    className={`pe-contradiction-history__item fc-op-item${item.reportId === selectedReportId ? ' is-active' : ''}`}
-                                >
-                                    <button
-                                        type="button"
-                                        className="fc-op-item__content"
-                                        onClick={() => setSelectedReportId(item.reportId)}
-                                    >
-                                        <div className="pe-contradiction-history__topline">
-                                            <span
-                                                className="fc-op-item__meta">{formatDateTime(item.createdAt)}</span>
-                                            <span
-                                                className="fc-op-count">{item.findingCount} 个问题</span>
-                                            <span className="fc-op-count">{checkKindLabel(item.checkKind)}</span>
-                                        </div>
-                                        <div className="fc-op-item__title">{item.overview}</div>
-                                        <div className="fc-op-item__meta">
-                                            <span>{item.scopeSummary}</span>
-                                            {item.truncated &&
-                                                <span className="fc-op-hint--error">已裁剪</span>}
-                                        </div>
-                                    </button>
-                                    <div className="fc-op-item__actions">
-                                        <Button type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => void handleDelete(item.reportId)}
-                                        >
-                                            删除
-                                        </Button>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    </RollingBox>
-                </section>
-
+            <div className={`pe-contradiction-layout${renderSidebarExternally ? ' pe-contradiction-layout--single' : ''}`}>
+                {!renderSidebarExternally && historyPanel}
                 <section className="pe-contradiction-report">
                     {!activeRecord ? (
                         <div className="pe-contradiction-empty pe-contradiction-empty--large">
@@ -606,44 +624,6 @@ function ProjectContradictionPanel({
                                                     onClick={() => void handleStartDiscussion()}>
                                                 在右侧继续讨论
                                             </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="pe-contradiction-stats">
-                                        <div className="pe-contradiction-stat-card">
-                                            <span
-                                                className="pe-contradiction-stat-card__value">{summary?.findingCount ?? 0}</span>
-                                            <span className="pe-contradiction-stat-card__label">问题条目</span>
-                                            {(summary?.findingCount ?? 0) > 0 && (
-                                                <div className="pe-contradiction-severity-dist">
-                                                    {summary!.severityDist.critical > 0 && (
-                                                        <span
-                                                            className="pe-contradiction-severity-pill is-critical">{summary!.severityDist.critical} 严重</span>
-                                                    )}
-                                                    {summary!.severityDist.high > 0 && (
-                                                        <span
-                                                            className="pe-contradiction-severity-pill is-high">{summary!.severityDist.high} 高</span>
-                                                    )}
-                                                    {summary!.severityDist.medium > 0 && (
-                                                        <span
-                                                            className="pe-contradiction-severity-pill is-medium">{summary!.severityDist.medium} 中</span>
-                                                    )}
-                                                    {summary!.severityDist.low > 0 && (
-                                                        <span
-                                                            className="pe-contradiction-severity-pill is-low">{summary!.severityDist.low} 低</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="pe-contradiction-stat-card">
-                                        <span
-                                            className="pe-contradiction-stat-card__value">{summary?.unresolvedCount ?? 0}</span>
-                                            <span className="pe-contradiction-stat-card__label">待确认问题</span>
-                                        </div>
-                                        <div className="pe-contradiction-stat-card">
-                                        <span
-                                            className="pe-contradiction-stat-card__value">{activeRecord.sourceEntryIds.length}</span>
-                                            <span className="pe-contradiction-stat-card__label">来源词条</span>
                                         </div>
                                     </div>
 

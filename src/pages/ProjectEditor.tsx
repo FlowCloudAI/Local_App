@@ -172,6 +172,7 @@ function ProjectEditorInner({
     const [treeCollapsed, setTreeCollapsed] = useState(false)
     const [worldMapSidebarHost, setWorldMapSidebarHost] = useState<HTMLDivElement | null>(null)
     const [relationGraphSidebarHost, setRelationGraphSidebarHost] = useState<HTMLDivElement | null>(null)
+    const [contradictionSidebarHost, setContradictionSidebarHost] = useState<HTMLDivElement | null>(null)
     const [dividerDragging, setDividerDragging] = useState(false)
     const isDragging = useRef(false)
     const layoutRef = useRef<HTMLDivElement>(null)
@@ -831,7 +832,8 @@ function ProjectEditorInner({
     const hasActiveTool = Boolean(activeToolPanel)
     const isWorldMapPanelActive = activeToolPanel === 'world-map'
     const isRelationGraphPanelActive = activeToolPanel === 'relation-graph'
-    const hasToolSidebar = isWorldMapPanelActive || isRelationGraphPanelActive
+    const isContradictionPanelActive = activeToolPanel === 'contradiction'
+    const hasToolSidebar = isWorldMapPanelActive || isRelationGraphPanelActive || isContradictionPanelActive
     const handleBreadcrumbProjectClick = useCallback(() => {
         setSelection({kind: 'project'})
         if (activeEntryId || activeToolPanel) {
@@ -1073,6 +1075,8 @@ function ProjectEditorInner({
                         <div className="pe-tool-sidebar-host" ref={setWorldMapSidebarHost}/>
                     ) : isRelationGraphPanelActive ? (
                         <div className="pe-tool-sidebar-host" ref={setRelationGraphSidebarHost}/>
+                    ) : isContradictionPanelActive ? (
+                        <div className="pe-tool-sidebar-host" ref={setContradictionSidebarHost}/>
                     ) : (
                         <>
                             <button
@@ -1253,7 +1257,7 @@ function ProjectEditorInner({
                                 aiModel={aiModel}
                                 activeEntryId={activeEntryId}
                                 activeEntryTitle={activeEntryTitle}
-                                onBack={() => onBackToProject?.(projectId)}
+                                sidebarContainer={contradictionSidebarHost}
                                 onStartDiscussion={onStartReportDiscussion}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                             />
