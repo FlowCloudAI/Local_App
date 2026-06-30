@@ -189,8 +189,8 @@ function ProjectEditorInner({
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
-    const [entryCount, setEntryCount] = useState(0)
     const [projectStats, setProjectStats] = useState<ProjectStats | null>(null)
+    const entryCount = projectStats?.entryCount ?? 0
     const [mapCount, setMapCount] = useState<number | null>(null)
     const [snapshotCount, setSnapshotCount] = useState<number | null>(null)
     const [riskSummary, setRiskSummary] = useState<ProjectRiskSummary | null>(null)
@@ -207,7 +207,7 @@ function ProjectEditorInner({
     const {registerTour} = useTour()
 
     const [selection, setSelection] = useState<Selection>({kind: 'project'})
-    const [selectedKey, setSelectedKey] = useState<string | undefined>(ROOT_ID)
+    const selectedKey = selection.kind === 'project' ? ROOT_ID : selection.id
     const [expandedKeys, setExpandedKeys] = useState<string[]>([ROOT_ID])
     const [deleteTarget, setDeleteTarget] = useState<CategoryTreeNode | null>(null)
     const [placeholderEntryIds, setPlaceholderEntryIds] = useState<Set<string>>(() => new Set())
@@ -218,6 +218,13 @@ function ProjectEditorInner({
 
     const touchProjectUpdatedAt = useCallback(() => {
         setProject(current => current ? {...current, updated_at: new Date().toISOString()} : current)
+    }, [])
+
+    const adjustEntryCount = useCallback((delta: number) => {
+        setProjectStats(current => current
+            ? {...current, entryCount: Math.max(0, current.entryCount + delta)}
+            : current
+        )
     }, [])
 
     const refreshProject = useCallback(async () => {
@@ -242,7 +249,6 @@ function ProjectEditorInner({
             project: proj,
             categories: cats,
             entryTypes: types,
-            entryCount: stats.entryCount,
             projectStats: stats,
             tagSchemas: tags,
         }
@@ -254,7 +260,6 @@ function ProjectEditorInner({
             setProject(data.project)
             setCategories(data.categories)
             setEntryTypes(data.entryTypes)
-            setEntryCount(data.entryCount)
             setProjectStats(data.projectStats)
             setTagSchemas(data.tagSchemas)
         } catch (e) {
@@ -272,7 +277,6 @@ function ProjectEditorInner({
                 setProject(data.project)
                 setCategories(data.categories)
                 setEntryTypes(data.entryTypes)
-                setEntryCount(data.entryCount)
                 setProjectStats(data.projectStats)
                 setTagSchemas(data.tagSchemas)
 
@@ -285,7 +289,6 @@ function ProjectEditorInner({
                         setProject(refreshed.project)
                         setCategories(refreshed.categories)
                         setEntryTypes(refreshed.entryTypes)
-                        setEntryCount(refreshed.entryCount)
                         setProjectStats(refreshed.projectStats)
                         setTagSchemas(refreshed.tagSchemas)
                     } catch (error) {
@@ -360,12 +363,12 @@ function ProjectEditorInner({
             listen<EntryCreatedEvent>(ENTRY_CREATED, (e) => {
                 if (e.payload.project_id === projectId) {
                     setCategoryEntryRefreshToken(t => t + 1)
-                    setEntryCount(c => c + 1)
+                    adjustEntryCount(1)
                 }
             }),
             listen<EntryDeletedEvent>(ENTRY_DELETED, () => {
                 setCategoryEntryRefreshToken(t => t + 1)
-                setEntryCount(c => Math.max(0, c - 1))
+                adjustEntryCount(-1)
             }),
             listen<CategoryCreatedEvent>(CATEGORY_CREATED, (e) => {
                 if (e.payload.project_id === projectId) {
@@ -383,7 +386,7 @@ function ProjectEditorInner({
             cancelled = true
             unlistens.forEach(fn => fn())
         }
-    }, [projectId, loadAll])
+    }, [projectId, loadAll, adjustEntryCount])
 
     useEffect(() => {
         if (!treeCollapsed) {
@@ -500,7 +503,6 @@ function ProjectEditorInner({
     }
 
     const handleSelect = (key: string) => {
-        setSelectedKey(key)
         if (key === ROOT_ID) {
             setSelection({kind: 'project'})
         } else {
@@ -611,7 +613,6 @@ function ProjectEditorInner({
             setCategories(prev => prev.filter(c => !toDelete.has(c.id)))
             if (toDelete.has(key) && (selection.kind === 'category') && toDelete.has(selection.id)) {
                 setSelection({kind: 'project'})
-                setSelectedKey(ROOT_ID)
             }
             await Promise.all([...toDelete].map(id => db_delete_category(id)))
             await refreshProject()
@@ -627,7 +628,6 @@ function ProjectEditorInner({
             )
             if (selection.kind === 'category' && selection.id === key) {
                 setSelection({kind: 'project'})
-                setSelectedKey(ROOT_ID)
             }
             await Promise.all(
                 children.map(child =>
@@ -657,13 +657,13 @@ function ProjectEditorInner({
                 next.add(created.id)
                 return next
             })
-            setEntryCount(count => count + 1)
+            adjustEntryCount(1)
             touchProjectUpdatedAt()
             onOpenEntry?.(projectId, {id: created.id, title: created.title})
         } catch (e) {
             await showAlert(`新建词条失败：${String(e)}`, 'error', 'nonInvasive', 2200)
         }
-    }, [projectId, onOpenEntry, showAlert, touchProjectUpdatedAt])
+    }, [projectId, onOpenEntry, showAlert, touchProjectUpdatedAt, adjustEntryCount])
 
     useEffect(() => {
         if (placeholderEntryIds.size === 0) return
@@ -700,7 +700,7 @@ function ProjectEditorInner({
                     const imagesEmpty = !entry.images || (Array.isArray(entry.images) && entry.images.length === 0)
                     if (titleUntouched && contentEmpty && summaryEmpty && imagesEmpty) {
                         await db_delete_entry(id)
-                        setEntryCount(count => Math.max(0, count - 1))
+                        adjustEntryCount(-1)
                         setCategoryEntryRefreshToken(current => current + 1)
                     }
                 } catch {
@@ -708,7 +708,7 @@ function ProjectEditorInner({
                 }
             })()
         }
-    }, [openEntryIds, placeholderEntryIds])
+    }, [openEntryIds, placeholderEntryIds, adjustEntryCount])
 
     const handleMove = async (key: string, targetKey: string, position: DropPosition) => {
         if (key === ROOT_ID) return
@@ -838,7 +838,6 @@ function ProjectEditorInner({
     const hasActiveEntry = Boolean(activeEntryId)
     const hasActiveTool = Boolean(activeToolPanel)
     const handleBreadcrumbProjectClick = useCallback(() => {
-        setSelectedKey(ROOT_ID)
         setSelection({kind: 'project'})
         if (activeEntryId || activeToolPanel) {
             void onBackToProject?.(projectId)
@@ -846,7 +845,6 @@ function ProjectEditorInner({
     }, [activeEntryId, activeToolPanel, onBackToProject, projectId])
 
     const handleBreadcrumbCategoryClick = useCallback((categoryId: string) => {
-        setSelectedKey(categoryId)
         setSelection({kind: 'category', id: categoryId})
         if (activeEntryId || activeToolPanel) {
             void onBackToProject?.(projectId)
@@ -868,7 +866,6 @@ function ProjectEditorInner({
 
     const showProjectOverviewForTour = useCallback(async () => {
         expandTree()
-        setSelectedKey(ROOT_ID)
         setSelection({kind: 'project'})
         void onBackToProject?.(projectId)
         await new Promise<void>(resolve => {
@@ -1294,7 +1291,7 @@ function ProjectEditorInner({
                                     }}
                                     onBack={() => onBackToProject?.(projectId)}
                                     onDelete={() => {
-                                        setEntryCount((c) => Math.max(0, c - 1))
+                                        adjustEntryCount(-1)
                                         setCategoryEntryRefreshToken((t) => t + 1)
                                         onDeleteEntry?.(projectId, entryId)
                                     }}
