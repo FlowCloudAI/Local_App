@@ -183,77 +183,6 @@
     font-weight: var(--fc-font-weight-semibold);
 }
 
-.mobile-project-home__next-steps {
-    display: flex;
-    gap: 0.7rem;
-    margin: 0 calc(var(--mobile-project-home-x) * -1);
-    padding: 0 var(--mobile-project-home-x);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-}
-
-.mobile-project-home__next-steps::-webkit-scrollbar {
-    display: none;
-}
-
-.mobile-project-home__next-card {
-    display: flex;
-    flex: 0 0 min(15.5rem, 82vw);
-    min-height: 8.6rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.45rem;
-    padding: 0.95rem;
-    border: var(--mobile-border-medium);
-    border-radius: var(--mobile-radius-card);
-    background: var(--mobile-surface-raised);
-    color: var(--fc-color-text);
-    font: inherit;
-    text-align: left;
-    box-shadow: var(--mobile-shadow-control-soft);
-    cursor: pointer;
-    touch-action: manipulation;
-}
-
-.mobile-project-home__next-card--primary {
-    background:
-        linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 12%, transparent), transparent 54%),
-        var(--mobile-surface-raised);
-}
-
-.mobile-project-home__next-card--ai {
-    background:
-        linear-gradient(135deg, color-mix(in srgb, var(--fc-color-purple, var(--fc-color-info)) 12%, transparent), transparent 54%),
-        var(--mobile-surface-raised);
-}
-
-.mobile-project-home__next-card--structure {
-    background:
-        linear-gradient(135deg, color-mix(in srgb, var(--fc-color-success) 10%, transparent), transparent 54%),
-        var(--mobile-surface-raised);
-}
-
-.mobile-project-home__next-title {
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-md);
-    font-weight: 740;
-    line-height: 1.25;
-}
-
-.mobile-project-home__next-desc {
-    flex: 1 1 auto;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    line-height: 1.45;
-}
-
-.mobile-project-home__next-action {
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-sm);
-    font-weight: 720;
-}
-
 .mobile-project-home__list {
     display: flex;
     flex-direction: column;
@@ -348,7 +277,6 @@
 }
 
 .mobile-project-home__description:active,
-.mobile-project-home__next-card:active,
 .mobile-project-home__cell:active,
 .mobile-project-home__tool:active,
 .mobile-project-home__section-action:active {

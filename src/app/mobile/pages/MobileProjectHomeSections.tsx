@@ -7,15 +7,6 @@ export interface ProjectHomeStatItem {
     value: string
 }
 
-export interface ProjectHomeNextStep {
-    key: string
-    title: string
-    description: string
-    action: string
-    tone: 'primary' | 'ai' | 'structure'
-    onClick: () => void
-}
-
 export interface ProjectHomeTool {
     key: string
     label: string
@@ -98,34 +89,6 @@ export function ProjectHomePrimaryActions({onCreateEntry, onOpenAi}: ProjectHome
             <Button type="button" size="sm" className="mobile-project-home__action" onClick={onCreateEntry}>+ 新建词条</Button>
             <Button type="button" size="sm" variant="outline" className="mobile-project-home__action" onClick={onOpenAi}>AI 讨论</Button>
         </div>
-    )
-}
-
-interface ProjectHomeNextStepsProps {
-    items: ProjectHomeNextStep[]
-}
-
-export function ProjectHomeNextSteps({items}: ProjectHomeNextStepsProps) {
-    return (
-        <section className="mobile-project-home__section">
-            <div className="mobile-project-home__section-head">
-                <h3 className="mobile-project-home__section-title">下一步建议</h3>
-            </div>
-            <div className="mobile-project-home__next-steps" data-mobile-horizontal-scroll="true">
-                {items.map(item => (
-                    <button
-                        type="button"
-                        key={item.key}
-                        className={`mobile-project-home__next-card mobile-project-home__next-card--${item.tone}`}
-                        onClick={item.onClick}
-                    >
-                        <span className="mobile-project-home__next-title">{item.title}</span>
-                        <span className="mobile-project-home__next-desc">{item.description}</span>
-                        <span className="mobile-project-home__next-action">{item.action}</span>
-                    </button>
-                ))}
-            </div>
-        </section>
     )
 }
 

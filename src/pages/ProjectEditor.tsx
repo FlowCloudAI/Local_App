@@ -910,14 +910,6 @@ function ProjectEditorInner({
                 beforeEnter: showProjectOverviewForTour,
             },
             {
-                id: 'next-steps',
-                target: '[data-tour-id="project-overview-next-steps"]',
-                title: '下一步建议',
-                content: '这些卡片会根据当前项目状态给出最直接的入口：补词条、让 AI 梳理，或处理结构问题。',
-                placement: 'top',
-                beforeEnter: showProjectOverviewForTour,
-            },
-            {
                 id: 'tools',
                 target: '[data-tour-id="project-overview-tools"]',
                 title: '高级工具',

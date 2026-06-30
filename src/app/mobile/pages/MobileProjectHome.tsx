@@ -28,10 +28,8 @@ import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldPro
 import {buildProjectExportFileName, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import {
     ProjectHomeHero,
-    ProjectHomeNextSteps,
     ProjectHomePrimaryActions,
     ProjectHomeResourceList,
-    type ProjectHomeNextStep,
     type ProjectHomeStatItem,
     ProjectHomeToolGrid,
     type ProjectHomeTool,
@@ -277,32 +275,6 @@ export default function MobileProjectHome({
         {key: 'images', label: '图片', value: formatNumber(imageCount)},
         {key: 'words', label: '字数', value: formatNumber(wordCount)},
     ]
-    const nextSteps: ProjectHomeNextStep[] = [
-        {
-            key: 'entry',
-            title: entryCount > 0 ? '继续补充词条' : '创建第一条词条',
-            description: entryCount > 0 ? '把新的角色、地点或事件写进当前世界。' : '先落下世界里的第一个实体。',
-            action: entryCount > 0 ? '新建词条' : '写第一条',
-            tone: 'primary',
-            onClick: () => void handleCreateEntry(null),
-        },
-        {
-            key: 'ai',
-            title: project.description?.trim() ? '让 AI 梳理下一步' : '让 AI 起草世界框架',
-            description: project.description?.trim() ? '基于现有资料扩写设定、整理缺口。' : '先生成世界方向、核心冲突和设定清单。',
-            action: 'AI 讨论',
-            tone: 'ai',
-            onClick: handleOpenAi,
-        },
-        {
-            key: 'structure',
-            title: categoryCount > 0 && tagSchemas.length > 0 ? '完善资料结构' : '建立资料规则',
-            description: categoryCount > 0 && tagSchemas.length > 0 ? '继续补齐类型、标签和分类规则。' : '为词条准备清晰的分类和标签。',
-            action: '类型管理',
-            tone: 'structure',
-            onClick: () => push({type: 'typeManager', params: {projectId, displayName: '类型管理'}}),
-        },
-    ]
     const advancedTools: ProjectHomeTool[] = [
         {key: 'relation', label: '关系图谱', meta: `${formatNumber(relationCount)} 关系`},
         {key: 'timeline', label: '时间线', meta: '时序'},
@@ -410,8 +382,6 @@ export default function MobileProjectHome({
                 onCreateEntry={() => void handleCreateEntry(null)}
                 onOpenAi={handleOpenAi}
             />
-
-            <ProjectHomeNextSteps items={nextSteps} />
 
             <ProjectHomeResourceList
                 entryCount={formatNumber(entryCount)}
