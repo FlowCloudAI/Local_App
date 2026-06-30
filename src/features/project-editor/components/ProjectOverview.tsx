@@ -13,7 +13,7 @@ import ProjectDashboard from './ProjectDashboard'
 import ProjectOverviewHeader from './ProjectOverviewHeader'
 import ProjectQuickActions from './ProjectQuickActions'
 import type {ProjectOverviewProps, ProjectOverviewVirtualChildProps} from './ProjectOverview.types'
-import {projectHomePerfInfo} from './projectHomePerfDebug'
+import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo} from './projectHomePerfDebug'
 
 function ProjectOverview({
                              project,
@@ -58,6 +58,7 @@ function ProjectOverview({
     })
 
     useEffect(() => {
+        if (!PROJECT_HOME_PERF_LOG_ENABLED) return
         projectHomePerfInfo('项目总览结构', {
             projectId: project.id,
             projectName: project.name,

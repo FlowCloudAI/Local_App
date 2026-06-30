@@ -14,7 +14,7 @@ import {
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
 import EntryTypeIcon from './EntryTypeIcon'
-import {projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
+import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
 
@@ -109,28 +109,29 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
         ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
         : null
     const coverSrc = toEntryCoverSrc(entry.cover)
-    const coverIsThumbnail = isThumbnailCover(entry.cover)
-
-    const handleCoverLoad = (event: SyntheticEvent<HTMLImageElement>) => {
-        const image = event.currentTarget
-        projectHomePerfInfo('词条封面加载成功', {
-            entryId: entry.id,
-            title: entry.title,
-            isThumbnail: coverIsThumbnail,
-            naturalWidth: image.naturalWidth,
-            naturalHeight: image.naturalHeight,
-            cover: entry.cover,
-        })
-    }
-
-    const handleCoverError = () => {
-        projectHomePerfWarn('词条封面加载失败', {
-            entryId: entry.id,
-            title: entry.title,
-            isThumbnail: coverIsThumbnail,
-            cover: entry.cover,
-        })
-    }
+    const imageDebugProps = PROJECT_HOME_PERF_LOG_ENABLED
+        ? {
+            onLoad: (event: SyntheticEvent<HTMLImageElement>) => {
+                const image = event.currentTarget
+                projectHomePerfInfo('词条封面加载成功', {
+                    entryId: entry.id,
+                    title: entry.title,
+                    isThumbnail: isThumbnailCover(entry.cover),
+                    naturalWidth: image.naturalWidth,
+                    naturalHeight: image.naturalHeight,
+                    cover: entry.cover,
+                })
+            },
+            onError: () => {
+                projectHomePerfWarn('词条封面加载失败', {
+                    entryId: entry.id,
+                    title: entry.title,
+                    isThumbnail: isThumbnailCover(entry.cover),
+                    cover: entry.cover,
+                })
+            },
+        }
+        : undefined
 
     return (
         <Card
@@ -144,8 +145,7 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
                         loading="lazy"
                         decoding="async"
                         fetchPriority="low"
-                        onLoad={handleCoverLoad}
-                        onError={handleCoverError}
+                        {...imageDebugProps}
                     />
                 ) : (
                     <div
@@ -315,11 +315,14 @@ function VirtualEntryGrid({
     const endIndex = Math.min(entries.length, (endRow + 1) * columnCount)
     const renderedEntryCount = Math.max(0, endIndex - startIndex)
     const renderedCreateCardCount = startIndex <= entries.length && (endRow + 1) * columnCount > entries.length ? 1 : 0
-    const renderedEntries = useMemo(() => entries.slice(startIndex, endIndex), [endIndex, entries, startIndex])
-    const renderedCoverStats = useMemo(() => summarizeEntryCovers(renderedEntries), [renderedEntries])
+    const renderedCoverStats = useMemo(
+        () => PROJECT_HOME_PERF_LOG_ENABLED ? summarizeEntryCovers(entries.slice(startIndex, endIndex)) : null,
+        [endIndex, entries, startIndex],
+    )
     const cells = []
 
     useEffect(() => {
+        if (!PROJECT_HOME_PERF_LOG_ENABLED) return
         projectHomePerfInfo('虚拟词条卡片', {
             totalEntryCards: entries.length,
             renderedEntryCards: renderedEntryCount,
@@ -532,11 +535,15 @@ function CategoryView({
     }
 
     const displayed = useMemo(() => sortEntries(entries, sortMode), [entries, sortMode])
-    const coverStats = useMemo(() => summarizeEntryCovers(displayed), [displayed])
+    const coverStats = useMemo(
+        () => PROJECT_HOME_PERF_LOG_ENABLED ? summarizeEntryCovers(displayed) : null,
+        [displayed],
+    )
     const hasVisibleEntries = displayed.length > 0
     const showLoadingOverlay = loading && hasVisibleEntries
 
     useEffect(() => {
+        if (!PROJECT_HOME_PERF_LOG_ENABLED) return
         projectHomePerfInfo('词条卡片数据', {
             projectId,
             categoryId,

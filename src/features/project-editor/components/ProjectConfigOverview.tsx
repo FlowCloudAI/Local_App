@@ -6,7 +6,7 @@ import {
     type TagSchema,
 } from '../../../api'
 import EntryTypeIcon from './EntryTypeIcon'
-import {projectHomePerfInfo} from './projectHomePerfDebug'
+import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo} from './projectHomePerfDebug'
 
 function getTagTypeLabel(type: string): string {
     switch (type) {
@@ -75,6 +75,7 @@ function ProjectConfigOverview({
     const entryTypeNameMap = useMemo(() => getEntryTypeNameMap(entryTypes), [entryTypes])
 
     useEffect(() => {
+        if (!PROJECT_HOME_PERF_LOG_ENABLED) return
         projectHomePerfInfo('类型与标签配置卡片', {
             entryTypeCards: entryTypes.length,
             builtinEntryTypeCards: entryTypes.filter(entryType => entryType.kind === 'builtin').length,
