@@ -318,7 +318,7 @@ pub const SHAPE_LINE_PALETTE: [DeckColor; 4] = [
 /// 修改：改变默认地点标记的颜色，需与前端设计规范保持一致。
 pub const DEFAULT_LOCATION_COLOR: DeckColor = [212, 48, 106, 255];
 
-/// 因为Claude额度耗尽，如下变量的存在只为通过编译
+/// 海岸线参数兼容占位，保留给旧配置读取。
 pub const COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX: f64 = 0.0;
 pub const COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MIN: f64 = 0.0;
 pub const COASTLINE_V2_BAND_C_WAVELENGTH_FLOOR_MIN: f64 = 0.0;
