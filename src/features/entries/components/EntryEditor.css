@@ -567,12 +567,20 @@
     }
 }
 
-.entry-editor-markdown,
+.entry-editor-markdown {
+    position: relative;
+    min-height: 0;
+    flex: 1;
+    user-select: text;
+}
+
 .entry-editor-preview {
     position: relative;
     min-height: 0;
     flex: 1;
     user-select: text;
+    overflow: auto;
+    padding: 1rem 1.1rem;
 }
 
 .entry-editor-workspace.is-editing .entry-editor-markdown {
@@ -623,11 +631,6 @@
 
 .entry-editor-workspace.is-editing .entry-editor-markdown-anchor {
     height: auto;
-}
-
-.entry-editor-preview {
-    overflow: auto;
-    padding: 1rem 1.1rem;
 }
 
 .entry-editor-readonly-title {
