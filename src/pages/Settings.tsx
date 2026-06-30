@@ -775,6 +775,212 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                         </div>
     )
 }
+
+interface PluginsPanelProps {
+    uploadDialogOpen: boolean
+    onCloseUploadDialog: () => void
+    onUploadComplete: () => void | Promise<void>
+    localPlugins: LocalPluginInfo[]
+    marketPlugins: RemotePluginInfo[]
+    loadingLocal: boolean
+    loadingMarket: boolean
+    installingLocalFile: boolean
+    localError: string | null
+    marketError: string | null
+    installingIds: Set<string>
+    uninstallingId: string | null
+    searchText: string
+    kindFilter: PluginKindFilter
+    onRefreshLocal: () => void | Promise<void>
+    onRefreshMarket: () => void | Promise<void>
+    onInstallFromFile: () => void | Promise<void>
+    onUploadLocalPlugin: () => void
+    onUninstall: (pluginId: string) => void | Promise<void>
+    onInstall: (pluginId: string) => void | Promise<void>
+    onSearchTextChange: (value: string) => void
+    onKindFilterChange: (value: PluginKindFilter) => void
+}
+
+function PluginsPanel({
+                          uploadDialogOpen,
+                          onCloseUploadDialog,
+                          onUploadComplete,
+                          localPlugins,
+                          marketPlugins,
+                          loadingLocal,
+                          loadingMarket,
+                          installingLocalFile,
+                          localError,
+                          marketError,
+                          installingIds,
+                          uninstallingId,
+                          searchText,
+                          kindFilter,
+                          onRefreshLocal,
+                          onRefreshMarket,
+                          onInstallFromFile,
+                          onUploadLocalPlugin,
+                          onUninstall,
+                          onInstall,
+                          onSearchTextChange,
+                          onKindFilterChange,
+                      }: PluginsPanelProps) {
+    const installedPluginMap = new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
+    const installedIds = new Set(installedPluginMap.keys())
+    const marketPluginMap = new Map(marketPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))
+    const filteredMarket = marketPlugins.filter(plugin => {
+        const matchKind = kindFilter === 'all' || plugin.kind.includes(kindFilter)
+        const query = searchText.trim().toLowerCase()
+        const matchSearch = !query
+            || plugin.name.toLowerCase().includes(query)
+            || plugin.author.toLowerCase().includes(query)
+        return matchKind && matchSearch
+    })
+
+    return (
+        <div className="settings-container fc-page-shell fc-page-shell--narrow">
+            <div className="settings-title fc-page-header">
+                <div className="fc-page-title-block">
+                    <h1 className="fc-page-title">插件管理</h1>
+                    <p className="fc-page-subtitle">安装、更新、上传和卸载本地 AI 插件。</p>
+                </div>
+            </div>
+
+            <UploadPlugin
+                open={uploadDialogOpen}
+                onClose={onCloseUploadDialog}
+                onUploaded={() => {
+                    void onUploadComplete()
+                }}
+            />
+
+            <section className="settings-section fc-section-card">
+                <div className="plugins-section-header">
+                    <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loadingLocal}
+                        onClick={onRefreshLocal}
+                    >
+                        {loadingLocal ? '刷新中…' : '刷新'}
+                    </Button>
+                </div>
+
+                {localError && (
+                    <div className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>
+                )}
+
+                <div className="plugins-list">
+                    {localPlugins.length === 0 && !loadingLocal ? (
+                        <div className="plugins-empty">暂无已安装插件</div>
+                    ) : (
+                        localPlugins.map(plugin => {
+                            const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
+                            const updateVersion = marketPlugin
+                            && isRemoteVersionNewer(plugin.version, marketPlugin.version)
+                                ? marketPlugin.version
+                                : undefined
+                            return (
+                                <LocalPluginCard
+                                    key={plugin.id}
+                                    plugin={plugin}
+                                    updateVersion={updateVersion}
+                                    onUninstall={onUninstall}
+                                    uninstalling={uninstallingId === plugin.id}
+                                />
+                            )
+                        })
+                    )}
+                </div>
+            </section>
+
+            <section className="settings-section fc-section-card">
+                <div className="plugins-section-header">
+                    <h2 className="plugins-section-title fc-section-title">插件库</h2>
+                    <div className="plugins-section-actions">
+                        <Button
+                            type="button"
+                            size="sm"
+                            disabled={installingLocalFile}
+                            onClick={onInstallFromFile}
+                        >
+                            {installingLocalFile ? '安装中…' : '安装本地插件'}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onUploadLocalPlugin}
+                        >
+                            上传本地插件
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={loadingMarket}
+                            onClick={onRefreshMarket}
+                        >
+                            {loadingMarket ? '加载中…' : '刷新'}
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="plugins-filter-bar">
+                    <Input
+                        placeholder="搜索名称或作者…"
+                        value={searchText}
+                        onValueChange={onSearchTextChange}
+                        className="plugins-search"
+                    />
+                    <div className="plugins-kind-tabs">
+                        {(['all', 'llm', 'image', 'tts'] as const).map(kind => (
+                            <button
+                                key={kind}
+                                className={`plugins-kind-tab${kindFilter === kind ? ' active' : ''}`}
+                                onClick={() => onKindFilterChange(kind)}
+                            >
+                                {kind === 'all' ? '全部' : kind.toUpperCase()}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {marketError && (
+                    <div className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>
+                )}
+
+                <div className="plugins-list">
+                    {filteredMarket.length === 0 && !loadingMarket ? (
+                        <div className="plugins-empty">
+                            {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
+                        </div>
+                    ) : (
+                        filteredMarket.map(plugin => {
+                            const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
+                            const hasUpdate = installedPlugin
+                                ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
+                                : false
+                            return (
+                                <MarketPluginCard
+                                    key={plugin.id}
+                                    plugin={plugin}
+                                    installedIds={installedIds}
+                                    installedVersion={installedPlugin?.version}
+                                    hasUpdate={hasUpdate}
+                                    onInstall={onInstall}
+                                    installing={installingIds.has(plugin.id)}
+                                />
+                            )
+                        })
+                    )}
+                </div>
+            </section>
+        </div>
+    )
+}
 interface SettingsProps {
     onBack?: () => void
     openIntent?: SettingsOpenIntent
@@ -1535,21 +1741,11 @@ export default function Settings({
     }
 
     const allPlugins = [...llmPlugins, ...imagePlugins, ...ttsPlugins]
-    const installedPluginMap = new Map(localPlugins.map(p => [normalizePluginKey(p.id), p]))
-    const installedIds = new Set(installedPluginMap.keys())
-    const marketPluginMap = new Map(marketPlugins.map(p => [normalizePluginKey(p.id), p]))
     const effectiveDbDir = settings.db_path || defaultPaths?.db_path || ''
     const derivedBackupDir = effectiveDbDir
         ? `${effectiveDbDir.replace(/[\\/]+$/, '')}${effectiveDbDir.includes('\\') ? '\\' : '/'}backup`
         : defaultPaths?.backup_path || ''
     const effectiveBackupDir = settings.backup_dir || derivedBackupDir
-
-    const filteredMarket = marketPlugins.filter(p => {
-        const matchKind = kindFilter === 'all' || p.kind.includes(kindFilter)
-        const q = searchText.trim().toLowerCase()
-        const matchSearch = !q || p.name.toLowerCase().includes(q) || p.author.toLowerCase().includes(q)
-        return matchKind && matchSearch
-    })
 
     return (
         <div className="settings-outer">
@@ -2250,141 +2446,30 @@ export default function Settings({
                         </div>
                     )}
                     {activeTab === 'plugins' && (
-                        <div className="settings-container fc-page-shell fc-page-shell--narrow">
-                            <div className="settings-title fc-page-header">
-                                <div className="fc-page-title-block">
-                                    <h1 className="fc-page-title">插件管理</h1>
-                                    <p className="fc-page-subtitle">安装、更新、上传和卸载本地 AI 插件。</p>
-                                </div>
-                            </div>
-
-                            <UploadPlugin
-                                open={uploadDialogOpen}
-                                onClose={() => setUploadDialogOpen(false)}
-                                onUploaded={() => {
-                                    void loadMarket()
-                                }}
-                            />
-
-                            <section className="settings-section fc-section-card">
-                                <div className="plugins-section-header">
-                                    <h2 className="plugins-section-title fc-section-title">已安装插件</h2>
-                                    <Button type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={loadingLocal}
-                                        onClick={loadLocal}
-                                    >
-                                        {loadingLocal ? '刷新中…' : '刷新'}
-                                    </Button>
-                                </div>
-
-                                {localError && <div
-                                    className="plugins-error fc-status-banner fc-status-banner--error">{localError}</div>}
-
-                                <div className="plugins-list">
-                                    {localPlugins.length === 0 && !loadingLocal ? (
-                                        <div className="plugins-empty">暂无已安装插件</div>
-                                    ) : (
-                                        localPlugins.map(plugin => {
-                                            const marketPlugin = marketPluginMap.get(normalizePluginKey(plugin.id))
-                                            const updateVersion = marketPlugin
-                                            && isRemoteVersionNewer(plugin.version, marketPlugin.version)
-                                                ? marketPlugin.version
-                                                : undefined
-                                            return (
-                                                <LocalPluginCard
-                                                    key={plugin.id}
-                                                    plugin={plugin}
-                                                    updateVersion={updateVersion}
-                                                    onUninstall={handleUninstall}
-                                                    uninstalling={uninstallingId === plugin.id}
-                                                />
-                                            )
-                                        })
-                                    )}
-                                </div>
-                            </section>
-
-                            <section className="settings-section fc-section-card">
-                                <div className="plugins-section-header">
-                                    <h2 className="plugins-section-title fc-section-title">插件库</h2>
-                                    <div className="plugins-section-actions">
-                                        <Button type="button"
-                                            size="sm"
-                                            disabled={installingLocalFile}
-                                            onClick={handleInstallFromFile}
-                                        >
-                                            {installingLocalFile ? '安装中…' : '安装本地插件'}
-                                        </Button>
-                                        <Button type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleUploadLocalPlugin}
-                                        >
-                                            上传本地插件
-                                        </Button>
-                                        <Button type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={loadingMarket}
-                                            onClick={loadMarket}
-                                        >
-                                            {loadingMarket ? '加载中…' : '刷新'}
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div className="plugins-filter-bar">
-                                    <Input
-                                        placeholder="搜索名称或作者…"
-                                        value={searchText}
-                                        onValueChange={setSearchText}
-                                        className="plugins-search"
-                                    />
-                                    <div className="plugins-kind-tabs">
-                                        {(['all', 'llm', 'image', 'tts'] as const).map(k => (
-                                            <button
-                                                key={k}
-                                                className={`plugins-kind-tab${kindFilter === k ? ' active' : ''}`}
-                                                onClick={() => setKindFilter(k)}
-                                            >
-                                                {k === 'all' ? '全部' : k.toUpperCase()}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {marketError && <div
-                                    className="plugins-error fc-status-banner fc-status-banner--error">{marketError}</div>}
-
-                                <div className="plugins-list">
-                                    {filteredMarket.length === 0 && !loadingMarket ? (
-                                        <div className="plugins-empty">
-                                            {marketPlugins.length === 0 ? '暂无可用插件' : '无匹配结果'}
-                                        </div>
-                                    ) : (
-                                        filteredMarket.map(plugin => {
-                                            const installedPlugin = installedPluginMap.get(normalizePluginKey(plugin.id))
-                                            const hasUpdate = installedPlugin
-                                                ? isRemoteVersionNewer(installedPlugin.version, plugin.version)
-                                                : false
-                                            return (
-                                                <MarketPluginCard
-                                                    key={plugin.id}
-                                                    plugin={plugin}
-                                                    installedIds={installedIds}
-                                                    installedVersion={installedPlugin?.version}
-                                                    hasUpdate={hasUpdate}
-                                                    onInstall={handleInstall}
-                                                    installing={installingIds.has(plugin.id)}
-                                                />
-                                            )
-                                        })
-                                    )}
-                                </div>
-                            </section>
-                        </div>
+                        <PluginsPanel
+                            uploadDialogOpen={uploadDialogOpen}
+                            onCloseUploadDialog={() => setUploadDialogOpen(false)}
+                            onUploadComplete={loadMarket}
+                            localPlugins={localPlugins}
+                            marketPlugins={marketPlugins}
+                            loadingLocal={loadingLocal}
+                            loadingMarket={loadingMarket}
+                            installingLocalFile={installingLocalFile}
+                            localError={localError}
+                            marketError={marketError}
+                            installingIds={installingIds}
+                            uninstallingId={uninstallingId}
+                            searchText={searchText}
+                            kindFilter={kindFilter}
+                            onRefreshLocal={loadLocal}
+                            onRefreshMarket={loadMarket}
+                            onInstallFromFile={handleInstallFromFile}
+                            onUploadLocalPlugin={handleUploadLocalPlugin}
+                            onUninstall={handleUninstall}
+                            onInstall={handleInstall}
+                            onSearchTextChange={setSearchText}
+                            onKindFilterChange={setKindFilter}
+                        />
                     )}
                     {activeTab === 'usage' && (
                         <div className="settings-container fc-page-shell fc-page-shell--narrow">
