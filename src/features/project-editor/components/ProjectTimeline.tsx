@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {Button, RollingBox, Timeline, type TimelineEvent} from 'flowcloudai-ui'
 import {db_list_timeline_events, type ProjectTimelineData, type TagSchema,} from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
@@ -9,6 +10,7 @@ interface ProjectTimelineProps {
     tagSchemas: TagSchema[]
     onBack?: () => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
+    sidebarContainer?: HTMLElement | null
 }
 
 interface TimelineTagHintGroup {
@@ -127,7 +129,7 @@ function BackArrow() {
     )
 }
 
-export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEntry}: ProjectTimelineProps) {
+export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEntry, sidebarContainer}: ProjectTimelineProps) {
     const [data, setData] = useState<ProjectTimelineData | null>(null)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<Error | null>(null)
@@ -289,9 +291,58 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
     )
 
     const matchedTagCount = Object.values(matchedSchemaNames).reduce((sum, names) => sum + names.length, 0)
+    const timelineStats = data ? (
+        <div className="project-timeline__stats-sidebar">
+            <div className="project-timeline__stats-title">统计数据</div>
+            <div className="project-timeline__stats-grid">
+                <div className="project-timeline__stat-card">
+                    <span>时间线事件</span>
+                    <strong>{data.matchedEntryCount}</strong>
+                </div>
+                <div className="project-timeline__stat-card">
+                    <span>持续区间</span>
+                    <strong>{eventStats.rangeEvents}</strong>
+                </div>
+                <div className="project-timeline__stat-card">
+                    <span>单点事件</span>
+                    <strong>{eventStats.pointEvents}</strong>
+                </div>
+                <div className="project-timeline__stat-card">
+                    <span>层级事件</span>
+                    <strong>{eventStats.hierarchyEvents}</strong>
+                </div>
+            </div>
+            <div className="project-timeline__stats-block">
+                <span className="project-timeline__stats-label">范围</span>
+                <span className="project-timeline__stats-value">{buildRangeText(data)}</span>
+            </div>
+            {matchedTagCount > 0 && (
+                <div className="project-timeline__stats-block">
+                    <span className="project-timeline__stats-label">识别标签</span>
+                    <span className="project-timeline__stats-value">
+                        {[
+                            matchedSchemaNames.start.length > 0 ? `开始 ${matchedSchemaNames.start.join('、')}` : '',
+                            matchedSchemaNames.end.length > 0 ? `结束 ${matchedSchemaNames.end.join('、')}` : '',
+                            matchedSchemaNames.parent.length > 0 ? `上级事件 ${matchedSchemaNames.parent.join('、')}` : '',
+                            matchedSchemaNames.show.length > 0 ? `显示 ${matchedSchemaNames.show.join('、')}` : '',
+                        ].filter(Boolean).join('；')}
+                    </span>
+                </div>
+            )}
+        </div>
+    ) : (
+        <div className="project-timeline__stats-sidebar">
+            <div className="project-timeline__stats-title">统计数据</div>
+            <div className="project-timeline__stats-empty">
+                {loading ? '正在加载时间线数据…' : '暂无统计数据。'}
+            </div>
+        </div>
+    )
 
     return (
         <div className="project-timeline fc-op-panel">
+            {sidebarContainer ? createPortal(timelineStats, sidebarContainer) : null}
+
             {/* ── 顶部 ── */}
             <div className="fc-op-header">
                 {onBack && (
@@ -322,9 +373,8 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
             </div>
 
             {/* ── 工具栏（统计标签） ── */}
-            {data && events.length > 0 && (
+            {!sidebarContainer && data && events.length > 0 && (
                 <div className="fc-op-toolbar">
-                    <span className="fc-op-chip">扫描词条 {data.scannedEntryCount}</span>
                     <span className="fc-op-chip">时间线事件 {data.matchedEntryCount}</span>
                     <span className="fc-op-chip">持续区间 {eventStats.rangeEvents}</span>
                     <span className="fc-op-chip">单点事件 {eventStats.pointEvents}</span>
