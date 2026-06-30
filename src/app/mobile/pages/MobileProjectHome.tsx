@@ -30,7 +30,17 @@ import {invalidateProjectContext, useProjectContextStore} from '../../../feature
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
-import {buildProjectExportFileName, formatProjectDate, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import {buildProjectExportFileName, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import {
+    ProjectHomeHero,
+    ProjectHomeNextSteps,
+    ProjectHomePrimaryActions,
+    ProjectHomeResourceList,
+    type ProjectHomeNextStep,
+    type ProjectHomeStatItem,
+    ProjectHomeToolGrid,
+    type ProjectHomeTool,
+} from './MobileProjectHomeSections'
 import './MobileProjectHome.css'
 
 interface Props {
@@ -275,7 +285,7 @@ export default function MobileProjectHome({
     const internalLinkCount = stats?.internalLinkCount ?? 0
     const categoryCount = categories.length
     const customTypeCount = entryTypes.filter(type => type.kind === 'custom').length
-    const statItems = [
+    const statItems: ProjectHomeStatItem[] = [
         {key: 'entries', label: '词条', value: formatNumber(entryCount)},
         {key: 'categories', label: '分类', value: formatNumber(categoryCount)},
         {key: 'types', label: '类型', value: formatNumber(entryTypes.length)},
@@ -283,7 +293,7 @@ export default function MobileProjectHome({
         {key: 'images', label: '图片', value: formatNumber(imageCount)},
         {key: 'words', label: '字数', value: formatNumber(wordCount)},
     ]
-    const nextSteps = [
+    const nextSteps: ProjectHomeNextStep[] = [
         {
             key: 'entry',
             title: entryCount > 0 ? '继续补充词条' : '创建第一条词条',
@@ -309,7 +319,7 @@ export default function MobileProjectHome({
             onClick: () => push({type: 'typeManager', params: {projectId, displayName: '类型管理'}}),
         },
     ]
-    const advancedTools = [
+    const advancedTools: ProjectHomeTool[] = [
         {key: 'relation', label: '关系图谱', meta: `${formatNumber(relationCount)} 关系`},
         {key: 'timeline', label: '时间线', meta: '时序'},
         {key: 'map', label: '世界地图', meta: '地图'},
@@ -402,141 +412,42 @@ export default function MobileProjectHome({
                 />}
             />
 
-            <section className="mobile-project-home__hero">
-                {image ? (
-                    <img
-                        src={image}
-                        alt={project.name}
-                        className="mobile-project-home__cover"
-                    />
-                ) : (
-                    <div className="mobile-project-home__cover mobile-project-home__cover--empty">
-                        {project.name.trim()[0] ?? '世'}
-                    </div>
-                )}
-                <div className="mobile-project-home__title-row">
-                    <div className="mobile-project-home__title-copy">
-                        <span className="mobile-project-home__eyebrow">世界观</span>
-                        <h2 className="mobile-project-home__title">{project.name}</h2>
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    className={`mobile-project-home__description${project.description ? '' : ' is-placeholder'}`}
-                    onClick={handleOpenDescription}
-                >
-                    {project.description || '添加项目描述'}
-                </button>
-                <div className="mobile-project-home__meta-row">
-                    <span>创建 {formatProjectDate(project.created_at)}</span>
-                    <span>更新 {formatProjectDate(project.updated_at)}</span>
-                </div>
-                <div
-                    className="mobile-project-home__stats"
-                    aria-label="项目统计"
-                    data-mobile-horizontal-scroll="true"
-                >
-                    {statItems.map(item => (
-                        <span key={item.key} className="mobile-project-home__stat">
-                            <strong>{item.value}</strong>
-                            <span>{item.label}</span>
-                        </span>
-                    ))}
-                </div>
-            </section>
+            <ProjectHomeHero
+                projectName={project.name}
+                description={project.description}
+                image={image}
+                createdAt={project.created_at}
+                updatedAt={project.updated_at}
+                statItems={statItems}
+                onOpenDescription={handleOpenDescription}
+            />
 
-            <div className="mobile-project-home__actions">
-                <Button type="button" size="sm" className="mobile-project-home__action" onClick={() => handleCreateEntry(null)}>+ 新建词条</Button>
-                <Button type="button" size="sm" variant="outline" className="mobile-project-home__action" onClick={handleOpenAi}>AI 讨论</Button>
-            </div>
+            <ProjectHomePrimaryActions
+                onCreateEntry={() => void handleCreateEntry(null)}
+                onOpenAi={handleOpenAi}
+            />
 
-            <section className="mobile-project-home__section">
-                <div className="mobile-project-home__section-head">
-                    <h3 className="mobile-project-home__section-title">下一步建议</h3>
-                </div>
-                <div className="mobile-project-home__next-steps" data-mobile-horizontal-scroll="true">
-                    {nextSteps.map(item => (
-                        <button
-                            type="button"
-                            key={item.key}
-                            className={`mobile-project-home__next-card mobile-project-home__next-card--${item.tone}`}
-                            onClick={item.onClick}
-                        >
-                            <span className="mobile-project-home__next-title">{item.title}</span>
-                            <span className="mobile-project-home__next-desc">{item.description}</span>
-                            <span className="mobile-project-home__next-action">{item.action}</span>
-                        </button>
-                    ))}
-                </div>
-            </section>
+            <ProjectHomeNextSteps items={nextSteps} />
 
-            <section className="mobile-project-home__section">
-                <div className="mobile-project-home__section-head">
-                    <h3 className="mobile-project-home__section-title">资料</h3>
-                </div>
-                <div className="mobile-project-home__list">
-                    <button
-                        type="button"
-                        className="mobile-project-home__cell"
-                        onClick={() => handleOpenEntryList(null, '全部词条')}
-                    >
-                        <span>
-                            <strong>全部词条</strong>
-                            <small>浏览项目中所有词条</small>
-                        </span>
-                        <em>{formatNumber(entryCount)}</em>
-                    </button>
+            <ProjectHomeResourceList
+                entryCount={formatNumber(entryCount)}
+                customTypeCount={formatNumber(customTypeCount)}
+                tagSchemaCount={formatNumber(tagSchemas.length)}
+                onOpenEntries={() => handleOpenEntryList(null, '全部词条')}
+                onOpenTypeManager={() => push({
+                    type: 'typeManager',
+                    params: {projectId, displayName: '类型管理'},
+                })}
+                onOpenTagManager={() => push({
+                    type: 'tagManager',
+                    params: {projectId, displayName: '标签管理'},
+                })}
+            />
 
-                    <button
-                        type="button"
-                        className="mobile-project-home__cell"
-                        onClick={() => push({
-                            type: 'typeManager',
-                            params: {projectId, displayName: '类型管理'},
-                        })}
-                    >
-                        <span>
-                            <strong>类型管理</strong>
-                            <small>管理自定义词条类型</small>
-                        </span>
-                        <em>{customTypeCount}</em>
-                    </button>
-
-                    <button
-                        type="button"
-                        className="mobile-project-home__cell"
-                        onClick={() => push({
-                            type: 'tagManager',
-                            params: {projectId, displayName: '标签管理'},
-                        })}
-                    >
-                        <span>
-                            <strong>标签管理</strong>
-                            <small>管理词条标签定义</small>
-                        </span>
-                        <em>{tagSchemas.length}</em>
-                    </button>
-                </div>
-            </section>
-
-            <section className="mobile-project-home__section">
-                <div className="mobile-project-home__section-head">
-                    <h3 className="mobile-project-home__section-title">高级工具</h3>
-                </div>
-                <div className="mobile-project-home__tool-grid">
-                    {advancedTools.map(tool => (
-                        <button
-                            type="button"
-                            key={tool.key}
-                            className="mobile-project-home__tool"
-                            onClick={() => handleUnavailableTool(tool.label)}
-                        >
-                            <span>{tool.label}</span>
-                            <small>{tool.meta}</small>
-                        </button>
-                    ))}
-                </div>
-            </section>
+            <ProjectHomeToolGrid
+                tools={advancedTools}
+                onSelectTool={handleUnavailableTool}
+            />
 
             <MobileAnchoredActionMenu
                 open={menuOpen}
