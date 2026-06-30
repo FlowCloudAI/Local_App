@@ -31,61 +31,77 @@ interface EntryEditorMetaPanelProps {
         tags: Record<string, string | number | boolean | null>
         images: EntryImage[]
     }
-    editorMode: 'edit' | 'browse'
-    loading: boolean
-    saving: boolean
-    generatingSummary: boolean
-    projectName: string
-    categories: Category[]
-    entryTypes: EntryTypeView[]
-    localTagSchemas: TagSchema[]
-    visibleTagSchemas: TagSchema[]
-    browseVisibleTagSchemas: TagSchema[]
-    implantedTagSchemaIdSet: Set<string>
-    availableTagSchemaOptions: { value: string; label: string }[]
-    tagSchemaPickerValue: string | undefined
-    ttsVoiceOptions: { value: string; label: string }[]
-    ttsVoiceSelectable: boolean
-    ttsVoicePluginName: string | null
-    ttsVoiceHint: string
-    onDraftChange: (updater: (prev: EntryEditorMetaPanelProps['draft']) => EntryEditorMetaPanelProps['draft']) => void
-    onOpenImageAddModal: () => void
-    onViewImageSet: () => void
-    onGenerateSummary: () => void
-    onAddVisibleTagSchema: (schemaId: string) => void
-    onOpenTagCreator: () => void
-    onStartCharacterChat?: () => void
+    status: {
+        editorMode: 'edit' | 'browse'
+        loading: boolean
+        saving: boolean
+        generatingSummary: boolean
+    }
+    projectContext: {
+        projectName: string
+        categories: Category[]
+        entryTypes: EntryTypeView[]
+    }
+    tagUi: {
+        localTagSchemas: TagSchema[]
+        visibleTagSchemas: TagSchema[]
+        browseVisibleTagSchemas: TagSchema[]
+        implantedTagSchemaIdSet: Set<string>
+        availableTagSchemaOptions: { value: string; label: string }[]
+        tagSchemaPickerValue: string | undefined
+    }
+    ttsVoice: {
+        options: { value: string; label: string }[]
+        selectable: boolean
+        pluginName: string | null
+        hint: string
+    }
+    actions: {
+        onDraftChange: (updater: (prev: EntryEditorMetaPanelProps['draft']) => EntryEditorMetaPanelProps['draft']) => void
+        onOpenImageAddModal: () => void
+        onViewImageSet: () => void
+        onGenerateSummary: () => void
+        onAddVisibleTagSchema: (schemaId: string) => void
+        onOpenTagCreator: () => void
+        onStartCharacterChat?: () => void
+    }
 }
 
 export default function EntryEditorMetaPanel({
                                                  entryId,
                                                  entry,
                                                  draft,
-                                                 editorMode,
-                                                 loading,
-                                                 saving,
-                                                 generatingSummary,
-                                                 projectName,
-                                                 categories,
-                                                 entryTypes,
-                                                 localTagSchemas,
-                                                 visibleTagSchemas,
-                                                 browseVisibleTagSchemas,
-                                                 implantedTagSchemaIdSet,
-                                                 availableTagSchemaOptions,
-                                                 tagSchemaPickerValue,
-                                                 ttsVoiceOptions,
-                                                 ttsVoiceSelectable,
-                                                 ttsVoicePluginName,
-                                                 ttsVoiceHint,
-                                                 onDraftChange,
-                                                 onOpenImageAddModal,
-                                                 onViewImageSet,
-                                                 onGenerateSummary,
-                                                 onAddVisibleTagSchema,
-                                                 onOpenTagCreator,
-                                                 onStartCharacterChat,
+                                                 status,
+                                                 projectContext,
+                                                 tagUi,
+                                                 ttsVoice,
+                                                 actions,
                                              }: EntryEditorMetaPanelProps) {
+    const {editorMode, loading, saving, generatingSummary} = status
+    const {projectName, categories, entryTypes} = projectContext
+    const {
+        localTagSchemas,
+        visibleTagSchemas,
+        browseVisibleTagSchemas,
+        implantedTagSchemaIdSet,
+        availableTagSchemaOptions,
+        tagSchemaPickerValue,
+    } = tagUi
+    const {
+        options: ttsVoiceOptions,
+        selectable: ttsVoiceSelectable,
+        pluginName: ttsVoicePluginName,
+        hint: ttsVoiceHint,
+    } = ttsVoice
+    const {
+        onDraftChange,
+        onOpenImageAddModal,
+        onViewImageSet,
+        onGenerateSummary,
+        onAddVisibleTagSchema,
+        onOpenTagCreator,
+        onStartCharacterChat,
+    } = actions
     const isBrowseMode = editorMode === 'browse'
     const trimmedTitle = normalizeComparableText(draft.title)
     const trimmedSummary = normalizeComparableText(draft.summary)

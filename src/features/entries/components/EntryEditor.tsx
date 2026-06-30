@@ -1229,35 +1229,31 @@ export default function EntryEditor({
                                 entryId={entryId}
                                 entry={entry}
                                 draft={draft}
-                                editorMode={editorMode}
-                                loading={loading}
-                                saving={saving}
-                                generatingSummary={generatingSummary}
-                                projectName={projectName}
-                                categories={categories}
-                                entryTypes={entryTypes}
-                                localTagSchemas={entryTags.localTagSchemas}
-                                visibleTagSchemas={entryTags.visibleTagSchemas}
-                                browseVisibleTagSchemas={entryTags.browseVisibleTagSchemas}
-                                implantedTagSchemaIdSet={entryTags.implantedTagSchemaIdSet}
-                                availableTagSchemaOptions={entryTags.availableTagSchemaOptions}
-                                tagSchemaPickerValue={entryTags.tagSchemaPickerValue}
-                                ttsVoiceOptions={ttsVoiceState.options}
-                                ttsVoiceSelectable={ttsVoiceState.selectable}
-                                ttsVoicePluginName={ttsVoiceState.pluginName}
-                                ttsVoiceHint={ttsVoiceState.hint}
-                                onDraftChange={setDraft}
-                                onOpenImageAddModal={() => openImageAddModal('add')}
-                                onViewImageSet={() => {
-                                    setLightboxIndex(0)
-                                    setLightboxOpen(true)
+                                status={{editorMode, loading, saving, generatingSummary}}
+                                projectContext={{projectName, categories, entryTypes}}
+                                tagUi={{
+                                    localTagSchemas: entryTags.localTagSchemas,
+                                    visibleTagSchemas: entryTags.visibleTagSchemas,
+                                    browseVisibleTagSchemas: entryTags.browseVisibleTagSchemas,
+                                    implantedTagSchemaIdSet: entryTags.implantedTagSchemaIdSet,
+                                    availableTagSchemaOptions: entryTags.availableTagSchemaOptions,
+                                    tagSchemaPickerValue: entryTags.tagSchemaPickerValue,
                                 }}
-                                onGenerateSummary={handleGenerateSummary}
-                                onAddVisibleTagSchema={entryTags.handleAddVisibleTagSchema}
-                                onOpenTagCreator={() => setTagCreatorOpen(true)}
-                                onStartCharacterChat={entry ? () => {
-                                    void onStartCharacterChat?.(entry)
-                                } : undefined}
+                                ttsVoice={ttsVoiceState}
+                                actions={{
+                                    onDraftChange: setDraft,
+                                    onOpenImageAddModal: () => openImageAddModal('add'),
+                                    onViewImageSet: () => {
+                                        setLightboxIndex(0)
+                                        setLightboxOpen(true)
+                                    },
+                                    onGenerateSummary: handleGenerateSummary,
+                                    onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema,
+                                    onOpenTagCreator: () => setTagCreatorOpen(true),
+                                    onStartCharacterChat: entry ? () => {
+                                        void onStartCharacterChat?.(entry)
+                                    } : undefined,
+                                }}
                             />
                             {editorMode === 'edit' ? (
                                 <div className="entry-editor-markdown">
