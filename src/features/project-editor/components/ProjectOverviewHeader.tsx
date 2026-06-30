@@ -3,7 +3,6 @@ import {Button, useAlert} from 'flowcloudai-ui'
 import type {Project} from '../../../api'
 import FloatingPanel from '../../../shared/ui/overlay/FloatingPanel'
 import RenameDialog from '../../../shared/ui/overlay/RenameDialog'
-import ProjectOverviewStats from './ProjectOverviewStats'
 import {formatProjectDate, toProjectImageSrc} from '../../projects/projectDisplay'
 import '../../../shared/ui/overlay/FloatingPanelMenu.css'
 
@@ -13,12 +12,6 @@ function formatDate(s?: string | null): string {
 
 interface ProjectOverviewHeaderProps {
     project: Project
-    entryCount: number
-    categoryCount: number
-    entryTypeCount: number
-    tagCount: number
-    imageCount?: number | null
-    wordCount?: number | null
     onEditCover?: () => void
     onClearCover?: () => void
     coverUpdating?: boolean
@@ -39,12 +32,6 @@ interface ProjectOverviewActionItem {
 
 function ProjectOverviewHeader({
                                    project,
-                                   entryCount,
-                                   categoryCount,
-                                   entryTypeCount,
-                                   tagCount,
-                                   imageCount,
-                                   wordCount,
                                    onEditCover,
                                    onClearCover,
                                    coverUpdating = false,
@@ -215,20 +202,12 @@ function ProjectOverviewHeader({
                     )}
                 </div>
 
-                <div className="pe-overview-hero__content pe-overview-hero__secondary" data-tour-id="project-overview-stats">
+                <div className="pe-overview-hero__content pe-overview-hero__secondary">
                     <div className="pe-overview-meta">
                         <span>创建于 {formatDate(project.created_at)}</span>
                         <span className="pe-meta-sep">·</span>
                         <span>更新于 {formatDate(project.updated_at)}</span>
                     </div>
-                    <ProjectOverviewStats
-                        entryCount={entryCount}
-                        categoryCount={categoryCount}
-                        entryTypeCount={entryTypeCount}
-                        tagCount={tagCount}
-                        imageCount={imageCount}
-                        wordCount={wordCount}
-                    />
                 </div>
             </section>
             <FloatingPanel

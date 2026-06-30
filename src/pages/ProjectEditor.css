@@ -438,7 +438,6 @@
     contain-intrinsic-size: auto 28rem;
 }
 
-.pe-stat-card,
 .pe-dashboard-panel,
 .pe-config-section,
 .pe-entry-type-item,
@@ -641,48 +640,6 @@
     display: flex;
     gap: var(--fc-space-xs);
     flex-wrap: wrap;
-}
-
-/* ── 统计网格 ───────────────────────────────────────────────────────────── */
-
-.pe-overview-hero__content .pe-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-    gap: var(--fc-space-sm);
-}
-
-.pe-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-    gap: var(--fc-space-sm);
-    margin-bottom: 0;
-}
-
-.pe-stat-card {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    min-height: 5rem;
-    padding: 0.7rem 0.85rem;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
-    background: color-mix(in srgb, var(--fc-color-bg-secondary) 72%, var(--fc-color-bg));
-    gap: 0.35rem;
-}
-
-.pe-stat-value {
-    font-size: var(--pe-font-size-stat-value);
-    font-weight: 700;
-    color: var(--fc-color-primary);
-    line-height: 1;
-}
-
-.pe-stat-label {
-    font-size: var(--pe-font-size-stat-label, var(--fc-font-size-xs));
-    color: var(--fc-color-text-secondary);
-    text-align: left;
-    line-height: 1.2;
 }
 
 /* ── 特性条目 ─────────────────────────────────────────────────────── */

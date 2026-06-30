@@ -95,7 +95,6 @@ interface Props {
         model: string
         reportContext: ReportConversationContext
     }) => void
-    onOpenProjectAi?: () => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     activeToolPanel?: ProjectPanel | null
     onOpenProjectPanel?: (panel: Exclude<ProjectPanel, 'overview'>, project: { id: string; name: string }) => void
@@ -160,7 +159,6 @@ function ProjectEditorInner({
                                 onEntryDirtyChange,
                                  onStartCharacterChat,
                                  onStartReportDiscussion,
-                                 onOpenProjectAi,
                                  onOpenPluginManagement,
                                  activeToolPanel = null,
                                  onOpenProjectPanel,
@@ -905,7 +903,7 @@ function ProjectEditorInner({
                 id: 'hero',
                 target: '[data-tour-id="project-overview-hero"]',
                 title: '项目主页展示核心信息',
-                content: '这里包含封面、项目名称、描述、创建时间和统计数据。右上角编辑菜单用于重命名、编辑描述、导出或删除世界。',
+                content: '这里包含封面、项目名称、描述和更新时间。右上角编辑菜单用于重命名、编辑描述、导出或删除世界。',
                 placement: 'bottom',
                 beforeEnter: showProjectOverviewForTour,
             },
@@ -1146,7 +1144,6 @@ function ProjectEditorInner({
                                 entryTypes={entryTypes}
                                 tagSchemas={tagSchemas}
                                 entryCount={entryCount}
-                                tagCount={tagSchemas.length}
                                 imageCount={projectStats?.imageCount ?? null}
                                 wordCount={projectStats?.wordCount ?? null}
                                 projectStats={projectStats}
@@ -1161,8 +1158,6 @@ function ProjectEditorInner({
                                     setEditingEntryType(null)
                                     setEntryTypeCreatorOpen(true)
                                 }}
-                                onCreateEntry={() => handleRequestCreateEntry(null)}
-                                onOpenProjectAi={onOpenProjectAi}
                                 onEditTag={(tag) => {
                                     setEditingTag(tag)
                                     setTagCreatorOpen(true)

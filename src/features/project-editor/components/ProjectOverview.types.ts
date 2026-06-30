@@ -14,7 +14,6 @@ export interface ProjectOverviewProps {
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
     entryCount: number
-    tagCount: number
     imageCount?: number | null
     wordCount?: number | null
     projectStats?: ProjectStats | null
@@ -23,10 +22,8 @@ export interface ProjectOverviewProps {
     riskSummary?: ProjectRiskSummary | null
     onCreateTag?: () => void
     onCreateEntryType?: () => void
-    onCreateEntry?: () => void | Promise<void>
     onEditTag?: (tag: TagSchema) => void
     onEditEntryType?: (entryType: CustomEntryType) => void
-    onOpenProjectAi?: () => void
     onOpenRelationGraph?: () => void
     onOpenTimeline?: () => void
     onOpenWorldMap?: () => void

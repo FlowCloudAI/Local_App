@@ -21,7 +21,6 @@ function ProjectOverview({
                              entryTypes,
                              tagSchemas,
                              entryCount,
-                             tagCount,
                              imageCount,
                              wordCount,
                              projectStats,
@@ -62,7 +61,6 @@ function ProjectOverview({
             projectName: project.name,
             categoryCards: categories.length,
             entryTypeCards: entryTypes.length,
-            tagCards: tagSchemas.length,
             entryCount,
             imageCount,
             wordCount,
@@ -84,7 +82,6 @@ function ProjectOverview({
         project.name,
         riskSummary,
         snapshotCount,
-        tagSchemas.length,
         wordCount,
     ])
 
@@ -92,12 +89,6 @@ function ProjectOverview({
         <RollingBox axis="y" ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin" showThumb="show">
             <ProjectOverviewHeader
                 project={project}
-                entryCount={entryCount}
-                categoryCount={categories.length}
-                entryTypeCount={entryTypes.length}
-                tagCount={tagCount}
-                imageCount={imageCount}
-                wordCount={wordCount}
                 onEditCover={onEditCover}
                 onClearCover={onClearCover}
                 coverUpdating={coverUpdating}
