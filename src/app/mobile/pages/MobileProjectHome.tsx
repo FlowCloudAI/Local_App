@@ -1,18 +1,12 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useRef, useState} from 'react'
+import {useCallback, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {saveFileDialog} from '../../../api/dialog'
 import {
     db_create_entry,
     db_delete_project,
     db_export_project_fcworld,
-    db_get_project,
-    db_list_all_entry_types,
-    db_list_tag_schemas,
     db_update_project,
-    type EntryTypeView,
-    type Project,
-    type TagSchema,
 } from '../../../api'
 import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
@@ -27,6 +21,7 @@ import {
 } from '../components/MobileTopControls'
 import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
 import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
+import {patchProjectDetail, useProjectDetailStore} from '../../../features/projects/projectDetailStore'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
@@ -131,10 +126,6 @@ export default function MobileProjectHome({
     const topActionsRef = useRef<HTMLDivElement>(null)
     const {showAlert} = useAlert()
     const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
-    const [project, setProject] = useState<Project | null>(null)
-    const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
-    const [tagSchemas, setTagSchemas] = useState<TagSchema[]>([])
-    const [loading, setLoading] = useState(true)
     const [menuOpen, setMenuOpen] = useState(false)
     const [renameOpen, setRenameOpen] = useState(false)
     const [renaming, setRenaming] = useState(false)
@@ -143,23 +134,13 @@ export default function MobileProjectHome({
     const [descriptionDraft, setDescriptionDraft] = useState('')
     const [descriptionSaving, setDescriptionSaving] = useState(false)
     const [exporting, setExporting] = useState(false)
+    const projectDetail = useProjectDetailStore(projectId)
+    const project = projectDetail.project
+    const entryTypes = projectDetail.entryTypes
+    const tagSchemas = projectDetail.tagSchemas
     const projectContext = useProjectContextStore(projectId)
     const categories = projectContext.categories
     const stats = projectContext.stats
-
-    useEffect(() => {
-        if (!projectId) return
-        setLoading(true)
-        Promise.all([
-            db_get_project(projectId),
-            db_list_all_entry_types(projectId),
-            db_list_tag_schemas(projectId),
-        ]).then(([p, types, tags]) => {
-            setProject(p)
-            setEntryTypes(types)
-            setTagSchemas(tags)
-        }).catch(logger.error).finally(() => setLoading(false))
-    }, [projectId])
 
     const handleCreateEntry = useCallback(async (categoryId: string | null) => {
         try {
@@ -193,7 +174,7 @@ export default function MobileProjectHome({
         setRenaming(true)
         try {
             await db_update_project({id: projectId, name})
-            setProject(prev => prev ? {...prev, name} : prev)
+            patchProjectDetail(projectId, {name})
             invalidateProjectList()
             setRenameOpen(false)
         } catch (e) {
@@ -206,7 +187,7 @@ export default function MobileProjectHome({
     const handleChangeCover = useCallback(async (coverPath: string | null) => {
         try {
             await db_update_project({id: projectId, coverPath})
-            setProject(prev => prev ? {...prev, cover_path: coverPath} : prev)
+            patchProjectDetail(projectId, {cover_path: coverPath})
             invalidateProjectList()
             setCoverOpen(false)
         } catch (e) {
@@ -224,7 +205,7 @@ export default function MobileProjectHome({
         try {
             const description = descriptionDraft.trim() || null
             const updated = await db_update_project({id: projectId, description})
-            setProject(prev => prev ? {...prev, description: updated.description ?? null} : updated)
+            patchProjectDetail(projectId, {description: updated.description ?? null})
             invalidateProjectList()
             setDescriptionOpen(false)
         } catch (e) {
@@ -274,7 +255,10 @@ export default function MobileProjectHome({
         }
     }, [project, projectId, pop, showAlert])
 
-    if (loading || (projectContext.loading && !projectContext.hasLoaded)) return <div className="mobile-page__loading">加载中…</div>
+    if ((projectDetail.loading && !projectDetail.hasLoaded) || (projectContext.loading && !projectContext.hasLoaded)) {
+        return <div className="mobile-page__loading">加载中…</div>
+    }
+    if (!project && projectDetail.error) return <div className="mobile-page__error">项目加载失败：{projectDetail.error}</div>
     if (!project) return <div className="mobile-page__error">项目不存在</div>
 
     const image = toProjectImageSrc(project.cover_path)
