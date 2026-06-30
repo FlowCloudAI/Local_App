@@ -73,6 +73,15 @@ type SearchSourceKey = keyof SearchSourceSettings
 type TemplateView = 'list' | 'detail'
 type SelectValue = string | number | (string | number)[]
 
+const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
+    {value: 'system', label: '系统配置'},
+    {value: 'ai', label: 'AI配置'},
+    {value: 'plugins', label: '插件管理'},
+    {value: 'templates', label: '提示词模板'},
+    {value: 'usage', label: '用量统计'},
+    {value: 'about', label: '关于'},
+]
+
 const AI_SETTINGS_SECTIONS: Array<{ value: AiSettingsSection; label: string }> = [
     {value: 'models', label: '模型'},
     {value: 'permissions', label: '权限与工具'},
@@ -235,6 +244,42 @@ function isRemoteVersionNewer(current: string, latest: string): boolean {
     }
 
     return comparePrerelease(latestVersion.prerelease, currentVersion.prerelease) > 0
+}
+
+interface SettingsSidebarProps {
+    activeTab: SettingsTab
+    onTabChange: (tab: SettingsTab) => void
+    onBack?: () => void
+}
+
+function SettingsSidebar({activeTab, onTabChange, onBack}: SettingsSidebarProps) {
+    return (
+        <aside className="settings-sidebar">
+            {onBack && (
+                <button
+                    type="button"
+                    className="settings-back-button"
+                    onClick={onBack}
+                >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 12H5M12 19l-7-7 7-7"/>
+                    </svg>
+                    <span>返回</span>
+                </button>
+            )}
+            {SETTINGS_TABS.map(tab => (
+                <button
+                    key={tab.value}
+                    type="button"
+                    className={`settings-sidebar-item ${activeTab === tab.value ? 'active' : ''}`}
+                    onClick={() => onTabChange(tab.value)}
+                >
+                    {tab.label}
+                </button>
+            ))}
+        </aside>
+    )
 }
 
 interface SettingsProps {
@@ -1178,44 +1223,7 @@ export default function Settings({
         return (
             <div className="settings-outer">
                 <div className="settings-page-layout">
-                    <aside className="settings-sidebar">
-                        <button
-                            className={`settings-sidebar-item ${activeTab === 'system' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('system')}
-                        >
-                            系统配置
-                        </button>
-                        <button
-                            className={`settings-sidebar-item ${activeTab === 'ai' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('ai')}
-                        >
-                            AI配置
-                        </button>
-                        <button
-                            className={`settings-sidebar-item ${activeTab === 'plugins' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('plugins')}
-                        >
-                            插件管理
-                        </button>
-                        <button
-                            className={`settings-sidebar-item ${activeTab === 'templates' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('templates')}
-                        >
-                            提示词模板
-                        </button>
-                        <button
-                            className={`settings-sidebar-item ${activeTab === 'usage' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('usage')}
-                        >
-                            用量统计
-                        </button>
-                        <button
-                            className={`settings-sidebar-item ${activeTab === 'about' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('about')}
-                        >
-                            关于
-                        </button>
-                    </aside>
+                    <SettingsSidebar activeTab={activeTab} onTabChange={setActiveTab}/>
                     <div className="settings-content" style={{padding: '20px'}}>加载中...</div>
                 </div>
             </div>
@@ -1272,57 +1280,7 @@ export default function Settings({
     return (
         <div className="settings-outer">
             <div className="settings-page-layout">
-                <aside className="settings-sidebar">
-                    {onBack && (
-                        <button
-                            type="button"
-                            className="settings-back-button"
-                            onClick={onBack}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M19 12H5M12 19l-7-7 7-7"/>
-                            </svg>
-                            <span>返回</span>
-                        </button>
-                    )}
-                    <button
-                        className={`settings-sidebar-item ${activeTab === 'system' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('system')}
-                    >
-                        系统配置
-                    </button>
-                    <button
-                        className={`settings-sidebar-item ${activeTab === 'ai' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('ai')}
-                    >
-                        AI配置
-                    </button>
-                    <button
-                        className={`settings-sidebar-item ${activeTab === 'plugins' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('plugins')}
-                    >
-                        插件管理
-                    </button>
-                    <button
-                        className={`settings-sidebar-item ${activeTab === 'templates' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('templates')}
-                    >
-                        提示词模板
-                    </button>
-                    <button
-                        className={`settings-sidebar-item ${activeTab === 'usage' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('usage')}
-                    >
-                        用量统计
-                    </button>
-                    <button
-                        className={`settings-sidebar-item ${activeTab === 'about' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('about')}
-                    >
-                        关于
-                    </button>
-                </aside>
+                <SettingsSidebar activeTab={activeTab} onTabChange={setActiveTab} onBack={onBack}/>
                 <RollingBox axis="y" className="settings-scroll-area" thumbSize={'thin'}>
                     <div className="settings-content">
                     {activeTab === 'system' && (
