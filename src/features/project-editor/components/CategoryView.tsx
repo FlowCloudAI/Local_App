@@ -14,6 +14,7 @@ import {
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
 import EntryTypeIcon from './EntryTypeIcon'
+import {projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
 
@@ -25,7 +26,7 @@ const ENTRY_GRID_GAP = 16
 const ENTRY_GRID_MIN_COLUMN_WIDTH = 248
 const ENTRY_GRID_DEFAULT_WIDTH = 960
 const ENTRY_GRID_FALLBACK_VIEWPORT_HEIGHT = 900
-const ENTRY_GRID_OVERSCAN_ROWS = 2
+const ENTRY_GRID_OVERSCAN_ROWS = 1
 
 function isThumbnailCover(cover?: string | null): boolean {
     if (!cover) return false
@@ -112,7 +113,7 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
 
     const handleCoverLoad = (event: SyntheticEvent<HTMLImageElement>) => {
         const image = event.currentTarget
-        logger.info('[项目主页性能诊断] 词条封面加载成功', {
+        projectHomePerfInfo('词条封面加载成功', {
             entryId: entry.id,
             title: entry.title,
             isThumbnail: coverIsThumbnail,
@@ -123,7 +124,7 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
     }
 
     const handleCoverError = () => {
-        logger.warn('[项目主页性能诊断] 词条封面加载失败', {
+        projectHomePerfWarn('词条封面加载失败', {
             entryId: entry.id,
             title: entry.title,
             isThumbnail: coverIsThumbnail,
@@ -319,7 +320,7 @@ function VirtualEntryGrid({
     const cells = []
 
     useEffect(() => {
-        logger.info('[项目主页性能诊断] 虚拟词条卡片', {
+        projectHomePerfInfo('虚拟词条卡片', {
             totalEntryCards: entries.length,
             renderedEntryCards: renderedEntryCount,
             renderedCreateCards: renderedCreateCardCount,
@@ -536,7 +537,7 @@ function CategoryView({
     const showLoadingOverlay = loading && hasVisibleEntries
 
     useEffect(() => {
-        logger.info('[项目主页性能诊断] 词条卡片数据', {
+        projectHomePerfInfo('词条卡片数据', {
             projectId,
             categoryId,
             categoryName,

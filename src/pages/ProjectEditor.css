@@ -423,6 +423,14 @@
     isolation: isolate;
 }
 
+.pe-next-steps,
+.pe-quick-actions,
+.pe-dashboard-section,
+.pe-config-grid {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 28rem;
+}
+
 .pe-overview-hero {
     display: grid;
     grid-template-columns: minmax(11rem, 13.5rem) minmax(0, 1fr) auto;

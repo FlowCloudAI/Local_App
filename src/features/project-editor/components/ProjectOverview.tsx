@@ -8,12 +8,12 @@ import {
     useState,
 } from 'react'
 import {RollingBox} from 'flowcloudai-ui'
-import {logger} from '../../../shared/logger'
 import ProjectConfigOverview from './ProjectConfigOverview'
 import ProjectDashboard from './ProjectDashboard'
 import ProjectOverviewHeader from './ProjectOverviewHeader'
 import ProjectQuickActions from './ProjectQuickActions'
 import type {ProjectOverviewProps, ProjectOverviewVirtualChildProps} from './ProjectOverview.types'
+import {projectHomePerfInfo} from './projectHomePerfDebug'
 
 function ProjectOverview({
                              project,
@@ -58,7 +58,7 @@ function ProjectOverview({
     })
 
     useEffect(() => {
-        logger.info('[项目主页性能诊断] 项目总览结构', {
+        projectHomePerfInfo('项目总览结构', {
             projectId: project.id,
             projectName: project.name,
             categoryCards: categories.length,
@@ -90,7 +90,7 @@ function ProjectOverview({
     ])
 
     return (
-        <RollingBox axis="y" ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin">
+        <RollingBox axis="y" ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin" showThumb="show">
             <ProjectOverviewHeader
                 project={project}
                 entryCount={entryCount}
