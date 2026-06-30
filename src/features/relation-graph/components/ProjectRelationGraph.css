@@ -95,10 +95,22 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+    width: 100%;
     padding: 8px;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 80%, transparent);
     border-radius: var(--fc-radius-sm);
     background: var(--fc-color-bg);
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.rg-sidebar__relation:hover,
+.rg-sidebar__relation.is-selected {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
+    background: var(--fc-color-primary-subtle);
 }
 
 .rg-sidebar__relation-main {

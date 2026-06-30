@@ -1057,7 +1057,7 @@ function ProjectEditorInner({
                         className="pe-tree-header-btn"
                         onClick={handleTreeHeaderBackClick}
                     >
-                        {hasToolSidebar ? '返回项目主页' : '返回主页'}
+                        {hasToolSidebar ? '返回' : '返回主页'}
                     </button>
                     <button
                         type="button"

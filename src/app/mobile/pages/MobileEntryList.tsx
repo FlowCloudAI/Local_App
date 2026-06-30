@@ -141,7 +141,7 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                     actions={[
                         {
                             key: 'back',
-                            label: '返回项目主页',
+                            label: '返回',
                             icon: <MobileBackIcon/>,
                             onClick: pop,
                         },

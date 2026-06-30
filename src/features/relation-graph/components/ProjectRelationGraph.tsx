@@ -309,6 +309,7 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
     const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
     const [edges, setEdges] = useState<RelationGraphEdge[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
+    const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
     const [dataLoading, setDataLoading] = useState(false)
     const [dataError, setDataError] = useState<Error | null>(null)
     const [layoutState, setLayoutState] = useState<RelationLayoutState>(INITIAL_LAYOUT_STATE)
@@ -345,6 +346,7 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
             const typeById = new Map(entries.map((entry) => [entry.id, entry.type ?? null]))
             setNodes(data.nodes.map((node) => ({...node, entryType: typeById.get(node.id) ?? null})))
             setEdges(data.edges)
+            setSelectedEdgeId(null)
             setEntryTypes(types)
 
             // 恢复持久化的布局参数；无记录则回到默认，避免不同项目之间串档。
@@ -518,7 +520,13 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
                         <div className="rg-sidebar__empty">暂无关系</div>
                     ) : (
                         edges.map((edge) => (
-                            <div key={edge.id} className="rg-sidebar__relation">
+                            <button
+                                key={edge.id}
+                                type="button"
+                                className={`rg-sidebar__relation${edge.id === selectedEdgeId ? ' is-selected' : ''}`}
+                                aria-pressed={edge.id === selectedEdgeId}
+                                onClick={() => setSelectedEdgeId(edge.id)}
+                            >
                                 <div className="rg-sidebar__relation-main">
                                     <span title={nodeTitleById.get(edge.source) ?? edge.source}>
                                         {nodeTitleById.get(edge.source) ?? edge.source}
@@ -531,7 +539,7 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
                                 <div className="rg-sidebar__relation-label" title={edge.label}>
                                     {edge.label || edge.kind}
                                 </div>
-                            </div>
+                            </button>
                         ))
                     )}
                 </div>
@@ -711,6 +719,8 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
                         fitPadding={0.12}
                         fitDuration={500}
                         onLayoutStateChange={setLayoutState}
+                        selectedEdgeId={selectedEdgeId}
+                        onSelectedEdgeChange={setSelectedEdgeId}
                     />
                 )}
             </div>

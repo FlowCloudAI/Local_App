@@ -3,11 +3,13 @@
 import {
     createContext,
     forwardRef,
+    useCallback,
     useContext,
     useEffect,
     useImperativeHandle,
     useRef,
     type CSSProperties,
+    type MouseEvent as ReactMouseEvent,
     type ForwardedRef,
     type RefObject,
     type ReactNode,
@@ -325,6 +327,8 @@ interface RelationGraphInnerProps {
     fitDuration: number;
     renderNode?: RenderNodeFn;
     onLayoutStateChange?: (state: RelationLayoutState) => void;
+    selectedEdgeId?: string | null;
+    onSelectedEdgeChange?: (edgeId: string | null) => void;
     rootRef: RefObject<HTMLDivElement | null>;
     exportRef?: ForwardedRef<RelationGraphRef>;
 }
@@ -338,6 +342,8 @@ function RelationGraphInner({
     fitDuration,
     renderNode,
     onLayoutStateChange,
+    selectedEdgeId,
+    onSelectedEdgeChange,
     rootRef,
     exportRef,
 }: RelationGraphInnerProps) {
@@ -356,6 +362,13 @@ function RelationGraphInner({
         setNodes(prev => buildRFNodes(inputNodes, prev));
         setEdges(buildRFEdges(inputEdges));
     }, [inputNodes, inputEdges, setNodes, setEdges]);
+
+    useEffect(() => {
+        setEdges(prev => prev.map(edge => ({
+            ...edge,
+            selected: edge.id === selectedEdgeId,
+        })));
+    }, [selectedEdgeId, setEdges]);
 
     const layoutState = useRelationLayout({ nodes, edges, layoutFn, nodeOrigin, fitPadding, fitDuration });
     const reactFlow = useReactFlow<Node<RGNodeData>, Edge>();
@@ -454,6 +467,14 @@ function RelationGraphInner({
         }
     }, [layoutState, onLayoutStateChange]);
 
+    const handleEdgeClick = useCallback((_: ReactMouseEvent, edge: Edge) => {
+        onSelectedEdgeChange?.(edge.id);
+    }, [onSelectedEdgeChange]);
+
+    const handlePaneClick = useCallback(() => {
+        onSelectedEdgeChange?.(null);
+    }, [onSelectedEdgeChange]);
+
     return (
         <RenderNodeCtx.Provider value={renderNode}>
             <div className="fc-rg__canvas">
@@ -473,6 +494,8 @@ function RelationGraphInner({
                     edges={edges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
+                    onEdgeClick={handleEdgeClick}
+                    onPaneClick={handlePaneClick}
                     nodeTypes={NODE_TYPES}
                     edgeTypes={EDGE_TYPES}
                     nodeOrigin={nodeOrigin}
@@ -514,6 +537,8 @@ export interface RelationGraphProps {
     /** fitBounds 动画时长（ms），默认 500 */
     fitDuration?: number;
     onLayoutStateChange?: (state: RelationLayoutState) => void;
+    selectedEdgeId?: string | null;
+    onSelectedEdgeChange?: (edgeId: string | null) => void;
     height?: string | number;
     width?: string | number;
     className?: string;
@@ -529,6 +554,8 @@ export const RelationGraph = forwardRef<RelationGraphRef, RelationGraphProps>(fu
     fitPadding = 0.1,
     fitDuration = 500,
     onLayoutStateChange,
+    selectedEdgeId,
+    onSelectedEdgeChange,
     height = '100%',
     width = '100%',
     className,
@@ -552,6 +579,8 @@ export const RelationGraph = forwardRef<RelationGraphRef, RelationGraphProps>(fu
                     fitPadding={fitPadding}
                     fitDuration={fitDuration}
                     onLayoutStateChange={onLayoutStateChange}
+                    selectedEdgeId={selectedEdgeId}
+                    onSelectedEdgeChange={onSelectedEdgeChange}
                     rootRef={rootRef}
                     exportRef={ref}
                 />
