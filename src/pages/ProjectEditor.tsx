@@ -1257,9 +1257,8 @@ function ProjectEditorInner({
                             <WorldMapPanel
                                 projectId={projectId}
                                 projectName={project.name}
-                                onBack={() => onBackToProject?.(projectId)}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
-                                mapListContainer={worldMapSidebarHost}
+                                sidebarContainer={worldMapSidebarHost}
                             />
                         )}
                     </div>

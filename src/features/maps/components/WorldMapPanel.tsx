@@ -429,16 +429,6 @@ function newMapEntry(name: string, renderer: MapShapeViewportRenderer, canvas: M
 
 // ── 图标 ─────────────────────────────────────────────────────────────────────
 
-function BackArrow() {
-    return (
-        <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: 16, height: 16}}>
-            <path d="M8.6 3.25L4.1 7.75L8.6 12.25" fill="none" stroke="currentColor" strokeWidth="1.8"
-                  strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M4.5 7.75H12.25" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
-    )
-}
-
 function PlusIcon() {
     return (
         <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: 13, height: 13}}>
@@ -486,9 +476,8 @@ function ImageIcon() {
 interface WorldMapPanelProps {
     projectId: string
     projectName: string
-    onBack?: () => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
-    mapListContainer?: HTMLElement | null
+    sidebarContainer?: HTMLElement | null
 }
 
 function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
@@ -496,7 +485,7 @@ function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
     return typeof value === 'string' ? value : ''
 }
 
-export default function WorldMapPanel({projectId, projectName, onBack, onOpenEntry, mapListContainer}: WorldMapPanelProps) {
+export default function WorldMapPanel({projectId, projectName, onOpenEntry, sidebarContainer}: WorldMapPanelProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
     const imageInputRef = useRef<HTMLInputElement>(null)
@@ -1636,9 +1625,9 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
     // ── 渲染 ────────────────────────────────────────────────────────────────
 
-    const renderMapListInExternalContainer = mapListContainer !== undefined
+    const renderMapSidebarInExternalContainer = Boolean(sidebarContainer)
     const mapListSection = (
-        <div className={`wm-sidebar__section wm-map-list-panel${renderMapListInExternalContainer ? ' wm-map-list-panel--external' : ''}`}>
+        <div className="wm-sidebar__section wm-map-list-panel">
             <div className="wm-sidebar__section-header">
                 <span className="wm-sidebar__section-title">地图列表</span>
                 <button type="button" className="wm-icon-btn" onClick={() => void handleCreateMap()}
@@ -1675,9 +1664,216 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
         </div>
     )
 
+    const mapSidebar = (
+        <div className={`wm-sidebar${renderMapSidebarInExternalContainer ? ' wm-sidebar--external' : ''}`}>
+            {mapListSection}
+            <div className="wm-sidebar__sep"/>
+
+            {/* 属性区域 */}
+            <div className="wm-sidebar__section wm-sidebar__section--flex">
+                <div className="wm-sidebar__section-header">
+                    <span className="wm-sidebar__section-title">
+                        {drawingShape ? '绘制中图形' : selectedShape ? '图形属性' : selectedLocation ? '地点属性' : activeMapId ? '地图属性' : '操作提示'}
+                    </span>
+                </div>
+                <RollingBox axis="y"
+                    className="wm-sidebar__body"
+                    thumbSize="thin"
+                    interceptWheel={(event) => {
+                        event.stopPropagation()
+                        return false
+                    }}
+                >
+                    {/* 当前地图名称 */}
+                    {activeMapId && !drawingShape && !selectedShape && (!selectedLocation || viewportMode === 'preview') && (
+                        <>
+                            <div className="wm-field">
+                                <label>地图名称</label>
+                                <input value={activeMapName} onChange={e => handleRename(e.target.value)}/>
+                            </div>
+                            <div className="wm-meta-row">
+                                <span>使用引擎</span><strong>{MAP_RENDERER_LABELS[previewRenderer]}</strong>
+                            </div>
+                            <div className="wm-meta-row">
+                                <span>地图大小</span><strong>{activeCanvas.width} × {activeCanvas.height}</strong>
+                            </div>
+                            <div className="wm-meta-row">
+                                <span>图形 / 地点</span><strong>{draft.shapes.length} / {draft.keyLocations.length}</strong>
+                            </div>
+                            {draft.shapes.length === 0 && draft.keyLocations.length === 0 && (
+                                <div className="wm-sidebar-hints">
+                                    <div className="wm-sidebar-hint">切换到编辑模式后，可绘制区域、添加地点或上传底图。</div>
+                                </div>
+                            )}
+                            {!validation.isValid && (
+                                <div className="wm-sidebar-hint wm-sidebar-hint--error">
+                                    当前草稿还没通过校验，完善图形或地点后才能生成海岸线。
+                                </div>
+                            )}
+                        </>
+                    )}
+                    {!activeMapId && (
+                        <div className="wm-sidebar-hints">
+                            <div className="wm-sidebar-hint">点击上方 + 新建第一张地图</div>
+                        </div>
+                    )}
+
+                    {/* 绘制中的图形编辑器 */}
+                    {drawingShape && (
+                        <>
+                            <div className="wm-field">
+                                <label>名称</label>
+                                <input value={drawingShape.name ?? ''}
+                                       onChange={e => updateDrawingShapeField('name', e.target.value)}/>
+                            </div>
+                            <div className="wm-field">
+                                <label>填充色</label>
+                                <div className="wm-color-row">
+                                    <span className="wm-color-swatch"
+                                          style={{background: drawingShape.fill ?? 'var(--fc-color-border)'}}/>
+                                    <input value={drawingShape.fill ?? ''} placeholder="#cccccc"
+                                           onChange={e => updateDrawingShapeField('fill', e.target.value)}/>
+                                </div>
+                            </div>
+                            <div className="wm-field">
+                                <label>描边色</label>
+                                <div className="wm-color-row">
+                                    <span className="wm-color-swatch"
+                                          style={{background: drawingShape.stroke ?? 'var(--fc-color-text-tertiary)'}}/>
+                                    <input value={drawingShape.stroke ?? ''} placeholder="#888888"
+                                           onChange={e => updateDrawingShapeField('stroke', e.target.value)}/>
+                                </div>
+                            </div>
+                            <div className="wm-meta-row">
+                                <span>已落点</span><strong>{drawingShape.vertices.length}</strong>
+                            </div>
+                            <div className="wm-sidebar-sep"/>
+                            <button type="button" className="wm-chip is-active is-full"
+                                    onClick={handleFinishDrawingShape}
+                                    disabled={drawingShape.vertices.length < 3}>完成图形
+                            </button>
+                            <button type="button" className="wm-chip is-full"
+                                    onClick={() => setDrawingShape(null)}>取消绘制
+                            </button>
+                        </>
+                    )}
+
+                    {/* 已选图形编辑器 */}
+                    {!drawingShape && selectedShape && viewportMode === 'edit' && (
+                        <>
+                            <div className="wm-field">
+                                <label>名称</label>
+                                <input value={selectedShape.name ?? ''}
+                                       onChange={e => updateSelectedShape('name', e.target.value)}/>
+                            </div>
+                            <div className="wm-field">
+                                <label>填充色</label>
+                                <div className="wm-color-row">
+                                    <span className="wm-color-swatch"
+                                          style={{background: selectedShape.fill ?? 'var(--fc-color-border)'}}/>
+                                    <input value={selectedShape.fill ?? ''} placeholder="#cccccc"
+                                           onChange={e => updateSelectedShape('fill', e.target.value)}/>
+                                </div>
+                            </div>
+                            <div className="wm-field">
+                                <label>描边色</label>
+                                <div className="wm-color-row">
+                                    <span className="wm-color-swatch"
+                                          style={{background: selectedShape.stroke ?? 'var(--fc-color-text-tertiary)'}}/>
+                                    <input value={selectedShape.stroke ?? ''} placeholder="#888888"
+                                           onChange={e => updateSelectedShape('stroke', e.target.value)}/>
+                                </div>
+                            </div>
+                            <div className="wm-meta-row">
+                                <span>顶点数</span><strong>{selectedShape.vertices.length}</strong>
+                            </div>
+                            <div className="wm-sidebar-sep"/>
+                            <button type="button" className="wm-chip is-danger is-full"
+                                    onClick={() => void requestDeleteShape(selectedShape.id)}>删除图形
+                            </button>
+                        </>
+                    )}
+
+                    {/* 已选地点编辑器 */}
+                    {!drawingShape && !selectedShape && selectedLocation && viewportMode === 'edit' && (
+                        <>
+                            <div className="wm-field">
+                                <label>名称</label>
+                                <input value={selectedLocation.name}
+                                       onChange={e => updateSelectedLocation('name', e.target.value)}/>
+                            </div>
+                            <div className="wm-field">
+                                <label>类型</label>
+                                <input value={selectedLocation.type}
+                                       onChange={e => updateSelectedLocation('type', e.target.value)}/>
+                            </div>
+                            <div className="wm-field">
+                                <label>关联图形</label>
+                                <select value={selectedLocation.shapeId ?? ''}
+                                        onChange={e => updateSelectedLocationShapeId(e.target.value || null)}>
+                                    <option value="">未关联</option>
+                                    {draft.shapes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="wm-field">
+                                <label>关联词条</label>
+                                <select
+                                    value={selectedLinkedEntryId}
+                                    onChange={e => updateSelectedLocationLinkedEntryId(e.target.value || null)}
+                                    disabled={entryOptions.length === 0}
+                                >
+                                    <option value="">未关联</option>
+                                    {entryOptions.map(entry => (
+                                        <option key={entry.id} value={entry.id}>
+                                            {entry.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            {entryOptions.length === 0 && (
+                                <div className="wm-sidebar-hint">
+                                    当前项目还没有类型为 location 的词条，暂时无法关联地点。
+                                </div>
+                            )}
+                            {selectedLinkedEntry && (
+                                <div className="wm-sidebar-actions">
+                                    <button
+                                        type="button"
+                                        className="wm-chip"
+                                        onClick={() => onOpenEntry?.({
+                                            id: selectedLinkedEntry.id,
+                                            title: selectedLinkedEntry.title
+                                        })}
+                                    >
+                                        打开词条
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="wm-chip"
+                                        onClick={() => updateSelectedLocationLinkedEntryId(null)}
+                                    >
+                                        清除关联
+                                    </button>
+                                </div>
+                            )}
+                            <div className="wm-meta-row">
+                                <span>坐标</span>
+                                <strong>{selectedLocation.x.toFixed(1)} / {selectedLocation.y.toFixed(1)}</strong>
+                            </div>
+                            <div className="wm-sidebar-sep"/>
+                            <button type="button" className="wm-chip is-danger is-full"
+                                    onClick={() => void requestDeleteLocation(selectedLocation.id)}>删除地点
+                            </button>
+                        </>
+                    )}
+                </RollingBox>
+            </div>
+        </div>
+    )
+
     return (
         <div className="wm-panel">
-            {renderMapListInExternalContainer && mapListContainer ? createPortal(mapListSection, mapListContainer) : null}
+            {renderMapSidebarInExternalContainer && sidebarContainer ? createPortal(mapSidebar, sidebarContainer) : null}
 
             {/* 隐藏的文件输入框 */}
             <input ref={imageInputRef} type="file" accept="image/*" style={{display: 'none'}}
@@ -1838,7 +2034,6 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
             {/* ── 顶部导航栏 ── */}
             <div className="wm-header">
-                <button type="button" className="wm-back-btn" onClick={onBack}><BackArrow/>返回</button>
                 <div className="wm-header__title-block fc-page-title-block">
                     <h2 className="wm-title">世界地图</h2>
                     <p className="wm-subtitle">当前项目：{projectName}。编辑区域、地点与海岸线风格。</p>
@@ -1954,211 +2149,7 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
             {/* ── 主体 ── */}
             <div className="wm-body">
-                {/* ── 侧边栏 ── */}
-                <div className="wm-sidebar">
-                    {!renderMapListInExternalContainer && mapListSection}
-                    {!renderMapListInExternalContainer && <div className="wm-sidebar__sep"/>}
-
-                    {/* 属性区域 */}
-                    <div className="wm-sidebar__section wm-sidebar__section--flex">
-                        <div className="wm-sidebar__section-header">
-                            <span className="wm-sidebar__section-title">
-                                {drawingShape ? '绘制中图形' : selectedShape ? '图形属性' : selectedLocation ? '地点属性' : activeMapId ? '地图属性' : '操作提示'}
-                            </span>
-                        </div>
-                        <RollingBox axis="y"
-                            className="wm-sidebar__body"
-                            thumbSize="thin"
-                            interceptWheel={(event) => {
-                                event.stopPropagation()
-                                return false
-                            }}
-                        >
-                            {/* 当前地图名称 */}
-                            {activeMapId && !drawingShape && !selectedShape && (!selectedLocation || viewportMode === 'preview') && (
-                                <>
-                                    <div className="wm-field">
-                                        <label>地图名称</label>
-                                        <input value={activeMapName} onChange={e => handleRename(e.target.value)}/>
-                                    </div>
-                                    <div className="wm-meta-row">
-                                        <span>使用引擎</span><strong>{MAP_RENDERER_LABELS[previewRenderer]}</strong>
-                                    </div>
-                                    <div className="wm-meta-row">
-                                        <span>地图大小</span><strong>{activeCanvas.width} × {activeCanvas.height}</strong>
-                                    </div>
-                                    <div className="wm-meta-row">
-                                        <span>图形 / 地点</span><strong>{draft.shapes.length} / {draft.keyLocations.length}</strong>
-                                    </div>
-                                    {draft.shapes.length === 0 && draft.keyLocations.length === 0 && (
-                                        <div className="wm-sidebar-hints">
-                                            <div className="wm-sidebar-hint">切换到编辑模式后，可绘制区域、添加地点或上传底图。</div>
-                                        </div>
-                                    )}
-                                    {!validation.isValid && (
-                                        <div className="wm-sidebar-hint wm-sidebar-hint--error">
-                                            当前草稿还没通过校验，完善图形或地点后才能生成海岸线。
-                                        </div>
-                                    )}
-                                </>
-                            )}
-                            {!activeMapId && (
-                                <div className="wm-sidebar-hints">
-                                    <div className="wm-sidebar-hint">点击上方 + 新建第一张地图</div>
-                                </div>
-                            )}
-
-                            {/* 绘制中的图形编辑器 */}
-                            {drawingShape && (
-                                <>
-                                    <div className="wm-field">
-                                        <label>名称</label>
-                                        <input value={drawingShape.name ?? ''}
-                                               onChange={e => updateDrawingShapeField('name', e.target.value)}/>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>填充色</label>
-                                        <div className="wm-color-row">
-                                            <span className="wm-color-swatch"
-                                                  style={{background: drawingShape.fill ?? 'var(--fc-color-border)'}}/>
-                                            <input value={drawingShape.fill ?? ''} placeholder="#cccccc"
-                                                   onChange={e => updateDrawingShapeField('fill', e.target.value)}/>
-                                        </div>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>描边色</label>
-                                        <div className="wm-color-row">
-                                            <span className="wm-color-swatch"
-                                                  style={{background: drawingShape.stroke ?? 'var(--fc-color-text-tertiary)'}}/>
-                                            <input value={drawingShape.stroke ?? ''} placeholder="#888888"
-                                                   onChange={e => updateDrawingShapeField('stroke', e.target.value)}/>
-                                        </div>
-                                    </div>
-                                    <div className="wm-meta-row">
-                                        <span>已落点</span><strong>{drawingShape.vertices.length}</strong>
-                                    </div>
-                                    <div className="wm-sidebar-sep"/>
-                                    <button type="button" className="wm-chip is-active is-full"
-                                            onClick={handleFinishDrawingShape}
-                                            disabled={drawingShape.vertices.length < 3}>完成图形
-                                    </button>
-                                    <button type="button" className="wm-chip is-full"
-                                            onClick={() => setDrawingShape(null)}>取消绘制
-                                    </button>
-                                </>
-                            )}
-
-                            {/* 已选图形编辑器 */}
-                            {!drawingShape && selectedShape && viewportMode === 'edit' && (
-                                <>
-                                    <div className="wm-field">
-                                        <label>名称</label>
-                                        <input value={selectedShape.name ?? ''}
-                                               onChange={e => updateSelectedShape('name', e.target.value)}/>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>填充色</label>
-                                        <div className="wm-color-row">
-                                            <span className="wm-color-swatch"
-                                                  style={{background: selectedShape.fill ?? 'var(--fc-color-border)'}}/>
-                                            <input value={selectedShape.fill ?? ''} placeholder="#cccccc"
-                                                   onChange={e => updateSelectedShape('fill', e.target.value)}/>
-                                        </div>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>描边色</label>
-                                        <div className="wm-color-row">
-                                            <span className="wm-color-swatch"
-                                                  style={{background: selectedShape.stroke ?? 'var(--fc-color-text-tertiary)'}}/>
-                                            <input value={selectedShape.stroke ?? ''} placeholder="#888888"
-                                                   onChange={e => updateSelectedShape('stroke', e.target.value)}/>
-                                        </div>
-                                    </div>
-                                    <div className="wm-meta-row">
-                                        <span>顶点数</span><strong>{selectedShape.vertices.length}</strong>
-                                    </div>
-                                    <div className="wm-sidebar-sep"/>
-                                    <button type="button" className="wm-chip is-danger is-full"
-                                            onClick={() => void requestDeleteShape(selectedShape.id)}>删除图形
-                                    </button>
-                                </>
-                            )}
-
-                            {/* 已选地点编辑器 */}
-                            {!drawingShape && !selectedShape && selectedLocation && viewportMode === 'edit' && (
-                                <>
-                                    <div className="wm-field">
-                                        <label>名称</label>
-                                        <input value={selectedLocation.name}
-                                               onChange={e => updateSelectedLocation('name', e.target.value)}/>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>类型</label>
-                                        <input value={selectedLocation.type}
-                                               onChange={e => updateSelectedLocation('type', e.target.value)}/>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>关联图形</label>
-                                        <select value={selectedLocation.shapeId ?? ''}
-                                                onChange={e => updateSelectedLocationShapeId(e.target.value || null)}>
-                                            <option value="">未关联</option>
-                                            {draft.shapes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="wm-field">
-                                        <label>关联词条</label>
-                                        <select
-                                            value={selectedLinkedEntryId}
-                                            onChange={e => updateSelectedLocationLinkedEntryId(e.target.value || null)}
-                                            disabled={entryOptions.length === 0}
-                                        >
-                                            <option value="">未关联</option>
-                                            {entryOptions.map(entry => (
-                                                <option key={entry.id} value={entry.id}>
-                                                    {entry.title}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {entryOptions.length === 0 && (
-                                        <div className="wm-sidebar-hint">
-                                            当前项目还没有类型为 location 的词条，暂时无法关联地点。
-                                        </div>
-                                    )}
-                                    {selectedLinkedEntry && (
-                                        <div className="wm-sidebar-actions">
-                                            <button
-                                                type="button"
-                                                className="wm-chip"
-                                                onClick={() => onOpenEntry?.({
-                                                    id: selectedLinkedEntry.id,
-                                                    title: selectedLinkedEntry.title
-                                                })}
-                                            >
-                                                打开词条
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="wm-chip"
-                                                onClick={() => updateSelectedLocationLinkedEntryId(null)}
-                                            >
-                                                清除关联
-                                            </button>
-                                        </div>
-                                    )}
-                                    <div className="wm-meta-row">
-                                        <span>坐标</span>
-                                        <strong>{selectedLocation.x.toFixed(1)} / {selectedLocation.y.toFixed(1)}</strong>
-                                    </div>
-                                    <div className="wm-sidebar-sep"/>
-                                    <button type="button" className="wm-chip is-danger is-full"
-                                            onClick={() => void requestDeleteLocation(selectedLocation.id)}>删除地点
-                                    </button>
-                                </>
-                            )}
-                        </RollingBox>
-                    </div>
-                </div>
+                {!renderMapSidebarInExternalContainer && mapSidebar}
 
                 {/* ── 视口 ── */}
                 <div className="wm-viewport-container">
