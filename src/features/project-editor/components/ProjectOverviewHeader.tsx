@@ -1,36 +1,14 @@
-import {convertFileSrc} from '../../../api/assets'
 import {useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import type {Project} from '../../../api'
 import FloatingPanel from '../../../shared/ui/overlay/FloatingPanel'
 import RenameDialog from '../../../shared/ui/overlay/RenameDialog'
 import ProjectOverviewStats from './ProjectOverviewStats'
+import {formatProjectDate, toProjectImageSrc} from '../../projects/projectDisplay'
 import '../../../shared/ui/overlay/FloatingPanelMenu.css'
 
-function parseDateMs(s?: string | null): number {
-    if (!s) return 0
-    const normalized = s.includes('T') ? s : s.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const t = new Date(withTimezone).getTime()
-    return Number.isNaN(t) ? 0 : t
-}
-
 function formatDate(s?: string | null): string {
-    const ms = parseDateMs(s)
-    if (!ms) return '未知'
-    return new Intl.DateTimeFormat('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(ms)
-}
-
-function toProjectImageSrc(coverPath?: string | null): string | undefined {
-    if (!coverPath) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(coverPath)) return coverPath
-    return convertFileSrc(coverPath, 'fcimg')
+    return formatProjectDate(s, {fallback: '未知', includeTime: true})
 }
 
 interface ProjectOverviewHeaderProps {

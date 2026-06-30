@@ -8,7 +8,6 @@ import {
 } from 'react'
 import {useDrag, useWheel} from '@use-gesture/react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
-import {convertFileSrc} from '../../../api/assets'
 import {openFileDialog} from '../../../api/dialog'
 import {
     db_count_entries,
@@ -40,6 +39,7 @@ import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {MobileTopActionPill} from '../components/MobileTopControls'
+import {formatProjectDate, parseProjectDateMs, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import './MobileHome.css'
 
 interface Props {
@@ -153,26 +153,8 @@ function renderDisplayIcon(mode: WorldDisplayMode) {
     return <FilterListIcon/>
 }
 
-function parseDateValue(value?: string | null): number {
-    if (!value) return 0
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const time = new Date(withTimezone).getTime()
-    return Number.isNaN(time) ? 0 : time
-}
-
-function formatDate(value?: string | null): string {
-    const timestamp = parseDateValue(value)
-    if (!timestamp) return '时间未知'
-    return new Intl.DateTimeFormat('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).format(timestamp)
-}
-
 function formatRelativeTime(value?: string | null): string {
-    const timestamp = parseDateValue(value)
+    const timestamp = parseProjectDateMs(value)
     if (!timestamp) return '时间未知'
 
     const diffMs = Date.now() - timestamp
@@ -184,13 +166,7 @@ function formatRelativeTime(value?: string | null): string {
     if (diffMs < hour) return `${Math.floor(diffMs / minute)} 分钟前`
     if (diffMs < day) return `${Math.floor(diffMs / hour)} 小时前`
     if (diffMs < 7 * day) return `${Math.floor(diffMs / day)} 天前`
-    return formatDate(value)
-}
-
-function toProjectImageSrc(coverPath?: string | null): string | undefined {
-    if (!coverPath) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(coverPath)) return coverPath
-    return convertFileSrc(coverPath, 'fcimg')
+    return formatProjectDate(value)
 }
 
 function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
@@ -481,14 +457,14 @@ export default function MobileHome({
                 const nameOrder = a.name.localeCompare(b.name, 'zh-CN')
                 switch (sortMode) {
                     case 'created-desc':
-                        return parseDateValue(b.created_at) - parseDateValue(a.created_at) || nameOrder
+                        return parseProjectDateMs(b.created_at) - parseProjectDateMs(a.created_at) || nameOrder
                     case 'name-asc':
                         return nameOrder
                     case 'size-desc':
                         return (entryCounts[b.id] ?? 0) - (entryCounts[a.id] ?? 0) || nameOrder
                     case 'updated-desc':
                     default:
-                        return parseDateValue(b.updated_at ?? b.created_at) - parseDateValue(a.updated_at ?? a.created_at) || nameOrder
+                        return parseProjectDateMs(b.updated_at ?? b.created_at) - parseProjectDateMs(a.updated_at ?? a.created_at) || nameOrder
                 }
             })
     }, [entryCounts, projects, searchText, sortMode])
@@ -717,7 +693,7 @@ export default function MobileHome({
 
     const renderWorldCard = (project: Project) => {
         const image = toProjectImageSrc(project.cover_path)
-        const meta = `${entryCounts[project.id] ?? 0} 词条 · 更新于 ${formatDate(project.updated_at ?? project.created_at)}`
+        const meta = `${entryCounts[project.id] ?? 0} 词条 · 更新于 ${formatProjectDate(project.updated_at ?? project.created_at)}`
         if (displayMode === 'list') {
             return (
                 <button

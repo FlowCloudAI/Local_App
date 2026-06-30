@@ -1,7 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {convertFileSrc} from '../../../api/assets'
 import {saveFileDialog} from '../../../api/dialog'
 import {
     db_create_entry,
@@ -31,6 +30,7 @@ import {invalidateProjectContext, useProjectContextStore} from '../../../feature
 import {invalidateProjectList} from '../../../features/projects/projectListStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
+import {buildProjectExportFileName, formatProjectDate, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import './MobileProjectHome.css'
 
 interface Props {
@@ -42,41 +42,6 @@ interface Props {
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
     params: MobileProjectPageParams
-}
-
-function toProjectImageSrc(coverPath?: string | null): string | undefined {
-    if (!coverPath) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(coverPath)) return coverPath
-    return convertFileSrc(coverPath, 'fcimg')
-}
-
-function buildProjectExportFileName(projectName: string): string {
-    const safeName = projectName
-        .split('')
-        .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
-        .join('')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 80)
-    return `${safeName || '世界观'}.fcworld`
-}
-
-function parseDateMs(value?: string | null): number {
-    if (!value) return 0
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const time = new Date(withTimezone).getTime()
-    return Number.isNaN(time) ? 0 : time
-}
-
-function formatDate(value?: string | null): string {
-    const timestamp = parseDateMs(value)
-    if (!timestamp) return '时间未知'
-    return new Intl.DateTimeFormat('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).format(timestamp)
 }
 
 function formatNumber(value?: number | null): string {
@@ -463,8 +428,8 @@ export default function MobileProjectHome({
                     {project.description || '添加项目描述'}
                 </button>
                 <div className="mobile-project-home__meta-row">
-                    <span>创建 {formatDate(project.created_at)}</span>
-                    <span>更新 {formatDate(project.updated_at)}</span>
+                    <span>创建 {formatProjectDate(project.created_at)}</span>
+                    <span>更新 {formatProjectDate(project.updated_at)}</span>
                 </div>
                 <div
                     className="mobile-project-home__stats"

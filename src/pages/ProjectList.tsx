@@ -1,5 +1,4 @@
 import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
-import {convertFileSrc} from '../api/assets'
 import {openFileDialog} from '../api/dialog'
 import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
 import {
@@ -33,6 +32,7 @@ import {
 } from '../features/home/homeActivity'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
+import {formatProjectDate, parseProjectDateMs, toProjectImageSrc} from '../features/projects/projectDisplay'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -50,32 +50,8 @@ const SORT_OPTIONS: Array<{ key: Exclude<SortMode, 'name-asc' | 'name-desc'>; la
 const HOME_WELCOME_STORAGE_KEY = 'fc:onboarding:home-welcome:v1'
 const WELCOME_TOUR_START_DELAY_MS = 300
 
-function toProjectImageSrc(coverPath?: string | null): string | undefined {
-    if (!coverPath) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(coverPath)) return coverPath
-    return convertFileSrc(coverPath, 'fcimg')
-}
-
-function parseDateValue(value?: string | null): number {
-    if (!value) return 0
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const time = new Date(withTimezone).getTime()
-    return Number.isNaN(time) ? 0 : time
-}
-
-function formatDate(value?: string | null): string {
-    const timestamp = parseDateValue(value)
-    if (!timestamp) return '时间未知'
-    return new Intl.DateTimeFormat('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).format(timestamp)
-}
-
 function formatRelativeTime(value?: string | null): string {
-    const timestamp = parseDateValue(value)
+    const timestamp = parseProjectDateMs(value)
     if (!timestamp) return '时间未知'
 
     const diffMs = Date.now() - timestamp
@@ -87,7 +63,7 @@ function formatRelativeTime(value?: string | null): string {
     if (diffMs < hour) return `${Math.floor(diffMs / minute)} 分钟前`
     if (diffMs < day) return `${Math.floor(diffMs / hour)} 小时前`
     if (diffMs < 7 * day) return `${Math.floor(diffMs / day)} 天前`
-    return formatDate(value)
+    return formatProjectDate(value)
 }
 
 function asOptionalString(value: unknown): string | null | undefined {
@@ -421,8 +397,8 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             const starOrder = Number(starredProjectIdSet.has(b.id)) - Number(starredProjectIdSet.has(a.id))
             if (starOrder !== 0) return starOrder
 
-            const timeA = parseDateValue(asOptionalString(a.updated_at) ?? asOptionalString(a.created_at))
-            const timeB = parseDateValue(asOptionalString(b.updated_at) ?? asOptionalString(b.created_at))
+            const timeA = parseProjectDateMs(asOptionalString(a.updated_at) ?? asOptionalString(a.created_at))
+            const timeB = parseProjectDateMs(asOptionalString(b.updated_at) ?? asOptionalString(b.created_at))
             const nameOrder = a.name.localeCompare(b.name, 'zh-CN')
 
             switch (sortMode) {
@@ -1063,7 +1039,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         const updatedAt = asOptionalString(project.updated_at)
                                         const createdAt = asOptionalString(project.created_at)
                                         const image = toProjectImageSrc(coverPath)
-                                        const timestampLabel = formatDate(updatedAt ?? createdAt)
+                                        const timestampLabel = formatProjectDate(updatedAt ?? createdAt)
                                         const isStarred = starredProjectIdSet.has(project.id)
 
                                         return (

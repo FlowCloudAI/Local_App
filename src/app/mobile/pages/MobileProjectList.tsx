@@ -1,6 +1,5 @@
 import {useCallback, useEffect, useState} from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
-import {convertFileSrc} from '../../../api/assets'
 import {openFileDialog} from '../../../api/dialog'
 import {
     db_count_entries,
@@ -18,28 +17,12 @@ import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldPro
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import {formatProjectDate, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import './MobileProjectList.css'
 
 interface Props {
     push: (page: MobilePage) => void
     setAiFocus: (focus: AiFocus) => void
-}
-
-function toProjectImageSrc(coverPath?: string | null): string | undefined {
-    if (!coverPath) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(coverPath)) return coverPath
-    return convertFileSrc(coverPath, 'fcimg')
-}
-
-function formatDate(value?: string | null): string {
-    if (!value) return '时间未知'
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T')
-    const withTimezone = /(?:[zZ]|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`
-    const time = new Date(withTimezone).getTime()
-    if (Number.isNaN(time)) return '时间未知'
-    return new Intl.DateTimeFormat('zh-CN', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-    }).format(time)
 }
 
 export default function MobileProjectList({push, setAiFocus}: Props) {
@@ -292,7 +275,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                                     imageHeight="8.5rem"
                                     extraInfo={
                                         <span className="mobile-project-card__meta">
-                                            {entryCounts[project.id] ?? 0} 词条 · {formatDate(project.updated_at)}
+                                            {entryCounts[project.id] ?? 0} 词条 · {formatProjectDate(project.updated_at)}
                                         </span>
                                     }
                                     variant="shadow"

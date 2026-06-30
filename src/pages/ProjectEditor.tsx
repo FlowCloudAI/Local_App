@@ -63,6 +63,7 @@ import ProjectTimeline from '../features/project-editor/components/ProjectTimeli
 import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
+import {buildProjectExportFileName} from '../features/projects/projectDisplay'
 import type {ReportConversationContext} from '../features/ai-chat/model/AiControllerTypes'
 import {PROJECT_EDITOR_TOUR_ID, type TourDefinition, useTour} from '../features/onboarding'
 import './ProjectEditor.css'
@@ -118,17 +119,6 @@ const PROJECT_PANEL_LABELS: Record<ProjectPanel, string> = {
     timeline: '时间线',
     contradiction: '设定检测',
     'world-map': '世界地图',
-}
-
-function buildProjectExportFileName(projectName: string): string {
-    const safeName = projectName
-        .split('')
-        .map((char) => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
-        .join('')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 80)
-    return `${safeName || '世界观'}.fcworld`
 }
 
 function getCategoryCacheKey(categoryId: string | null): string {
