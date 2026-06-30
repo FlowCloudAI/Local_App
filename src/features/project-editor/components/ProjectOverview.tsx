@@ -4,9 +4,11 @@ import {
     isValidElement,
     memo,
     useCallback,
+    useEffect,
     useState,
 } from 'react'
 import {RollingBox} from 'flowcloudai-ui'
+import {logger} from '../../../shared/logger'
 import ProjectConfigOverview from './ProjectConfigOverview'
 import ProjectDashboard from './ProjectDashboard'
 import ProjectOverviewHeader from './ProjectOverviewHeader'
@@ -54,6 +56,38 @@ function ProjectOverview({
         if (!isValidElement<ProjectOverviewVirtualChildProps>(child)) return child
         return cloneElement(child, {virtualScrollElement: overviewScrollElement})
     })
+
+    useEffect(() => {
+        logger.info('[项目主页性能诊断] 项目总览结构', {
+            projectId: project.id,
+            projectName: project.name,
+            categoryCards: categories.length,
+            entryTypeCards: entryTypes.length,
+            tagCards: tagSchemas.length,
+            entryCount,
+            imageCount,
+            wordCount,
+            mapCount,
+            snapshotCount,
+            hasRiskSummary: Boolean(riskSummary),
+            hasEntryGridChild: Boolean(children),
+            scrollElementReady: Boolean(overviewScrollElement),
+        })
+    }, [
+        categories.length,
+        children,
+        entryCount,
+        entryTypes.length,
+        imageCount,
+        mapCount,
+        overviewScrollElement,
+        project.id,
+        project.name,
+        riskSummary,
+        snapshotCount,
+        tagSchemas.length,
+        wordCount,
+    ])
 
     return (
         <RollingBox axis="y" ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin">

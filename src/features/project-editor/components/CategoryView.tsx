@@ -1,6 +1,16 @@
 import {logger} from '../../../shared/logger'
 import {convertFileSrc} from '../../../api/assets'
-import {type CSSProperties, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {
+    type CSSProperties,
+    memo,
+    type SyntheticEvent,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
 import EntryTypeIcon from './EntryTypeIcon'
@@ -16,6 +26,29 @@ const ENTRY_GRID_MIN_COLUMN_WIDTH = 248
 const ENTRY_GRID_DEFAULT_WIDTH = 960
 const ENTRY_GRID_FALLBACK_VIEWPORT_HEIGHT = 900
 const ENTRY_GRID_OVERSCAN_ROWS = 2
+
+function isThumbnailCover(cover?: string | null): boolean {
+    if (!cover) return false
+    const normalized = String(cover).replace(/\\/g, '/').toLowerCase()
+    return normalized.includes('/thumbs/') || normalized.includes('%2fthumbs%2f')
+}
+
+function summarizeEntryCovers(entries: EntryBrief[]) {
+    let withCover = 0
+    let thumbnail = 0
+    for (const entry of entries) {
+        if (!entry.cover) continue
+        withCover += 1
+        if (isThumbnailCover(entry.cover)) thumbnail += 1
+    }
+    return {
+        total: entries.length,
+        withCover,
+        thumbnail,
+        nonThumbnail: withCover - thumbnail,
+        withoutCover: entries.length - withCover,
+    }
+}
 
 function parseDateMs(s?: string | null): number {
     if (!s) return 0
@@ -75,6 +108,28 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
         ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
         : null
     const coverSrc = toEntryCoverSrc(entry.cover)
+    const coverIsThumbnail = isThumbnailCover(entry.cover)
+
+    const handleCoverLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+        const image = event.currentTarget
+        logger.info('[项目主页性能诊断] 词条封面加载成功', {
+            entryId: entry.id,
+            title: entry.title,
+            isThumbnail: coverIsThumbnail,
+            naturalWidth: image.naturalWidth,
+            naturalHeight: image.naturalHeight,
+            cover: entry.cover,
+        })
+    }
+
+    const handleCoverError = () => {
+        logger.warn('[项目主页性能诊断] 词条封面加载失败', {
+            entryId: entry.id,
+            title: entry.title,
+            isThumbnail: coverIsThumbnail,
+            cover: entry.cover,
+        })
+    }
 
     return (
         <Card
@@ -88,6 +143,8 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
                         loading="lazy"
                         decoding="async"
                         fetchPriority="low"
+                        onLoad={handleCoverLoad}
+                        onError={handleCoverError}
                     />
                 ) : (
                     <div
@@ -253,7 +310,44 @@ function VirtualEntryGrid({
     const visibleBottom = Math.max(visibleTop, Math.min(gridHeight, viewport.bottom))
     const startRow = Math.max(0, Math.floor(visibleTop / rowPitch) - ENTRY_GRID_OVERSCAN_ROWS)
     const endRow = Math.min(rowCount - 1, Math.ceil(visibleBottom / rowPitch) + ENTRY_GRID_OVERSCAN_ROWS)
+    const startIndex = startRow * columnCount
+    const endIndex = Math.min(entries.length, (endRow + 1) * columnCount)
+    const renderedEntryCount = Math.max(0, endIndex - startIndex)
+    const renderedCreateCardCount = startIndex <= entries.length && (endRow + 1) * columnCount > entries.length ? 1 : 0
+    const renderedEntries = useMemo(() => entries.slice(startIndex, endIndex), [endIndex, entries, startIndex])
+    const renderedCoverStats = useMemo(() => summarizeEntryCovers(renderedEntries), [renderedEntries])
     const cells = []
+
+    useEffect(() => {
+        logger.info('[项目主页性能诊断] 虚拟词条卡片', {
+            totalEntryCards: entries.length,
+            renderedEntryCards: renderedEntryCount,
+            renderedCreateCards: renderedCreateCardCount,
+            renderedCoverStats,
+            columnCount,
+            rowCount,
+            startRow,
+            endRow,
+            gridWidth: Math.round(gridWidth),
+            columnWidth,
+            rowHeight,
+            gridHeight,
+        })
+    }, [
+        columnCount,
+        columnWidth,
+        endIndex,
+        endRow,
+        entries.length,
+        gridHeight,
+        gridWidth,
+        renderedCoverStats,
+        renderedCreateCardCount,
+        renderedEntryCount,
+        rowCount,
+        rowHeight,
+        startRow,
+    ])
 
     for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
         for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
@@ -437,8 +531,40 @@ function CategoryView({
     }
 
     const displayed = useMemo(() => sortEntries(entries, sortMode), [entries, sortMode])
+    const coverStats = useMemo(() => summarizeEntryCovers(displayed), [displayed])
     const hasVisibleEntries = displayed.length > 0
     const showLoadingOverlay = loading && hasVisibleEntries
+
+    useEffect(() => {
+        logger.info('[项目主页性能诊断] 词条卡片数据', {
+            projectId,
+            categoryId,
+            categoryName,
+            mode: noScroll ? '项目主页内联虚拟网格' : '独立滚动网格',
+            loadedEntryCards: entries.length,
+            displayedEntryCards: displayed.length,
+            createCards: 1,
+            coverStats,
+            entryTypeCount: entryTypes.length,
+            typeFilter,
+            sortMode,
+            searchText: searchText.trim(),
+            usingPrefetchedEntries: prefetchedEntries !== undefined,
+        })
+    }, [
+        categoryId,
+        categoryName,
+        coverStats,
+        displayed.length,
+        entries.length,
+        entryTypes.length,
+        noScroll,
+        prefetchedEntries,
+        projectId,
+        searchText,
+        sortMode,
+        typeFilter,
+    ])
 
     const renderEntryGrid = () => (
         <div className="pe-entry-grid">

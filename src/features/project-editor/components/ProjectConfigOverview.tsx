@@ -1,10 +1,11 @@
-import {type CSSProperties, useMemo} from 'react'
+import {type CSSProperties, useEffect, useMemo} from 'react'
 import {Button, RollingBox} from 'flowcloudai-ui'
 import {
     entryTypeKey,
     type EntryTypeView,
     type TagSchema,
 } from '../../../api'
+import {logger} from '../../../shared/logger'
 import EntryTypeIcon from './EntryTypeIcon'
 
 function getTagTypeLabel(type: string): string {
@@ -70,8 +71,21 @@ function ProjectConfigOverview({
                                    onCreateEntryType,
                                    onEditTag,
                                    onEditEntryType,
-                               }: ProjectConfigOverviewProps) {
+}: ProjectConfigOverviewProps) {
     const entryTypeNameMap = useMemo(() => getEntryTypeNameMap(entryTypes), [entryTypes])
+
+    useEffect(() => {
+        logger.info('[项目主页性能诊断] 类型与标签配置卡片', {
+            entryTypeCards: entryTypes.length,
+            builtinEntryTypeCards: entryTypes.filter(entryType => entryType.kind === 'builtin').length,
+            customEntryTypeCards: entryTypes.filter(entryType => entryType.kind === 'custom').length,
+            tagCards: tagSchemas.length,
+            tagTargetBindings: tagSchemas.reduce(
+                (total, tag) => total + normalizeTagTargets(tag.target).length,
+                0,
+            ),
+        })
+    }, [entryTypes, tagSchemas])
 
     return (
         <div className="pe-config-grid" data-tour-id="project-overview-config">
