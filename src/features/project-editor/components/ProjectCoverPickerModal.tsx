@@ -18,6 +18,7 @@ import type {EntryImage} from '../../entries/lib/entryImage'
 import {normalizeEntryImages, toEntryImageSrc} from '../../entries/lib/entryImage'
 import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
+import './ProjectCoverPickerModal.css'
 
 type Tab = 'existing' | 'local' | 'ai'
 type GenerateState = 'idle' | 'generating' | 'success' | 'error'

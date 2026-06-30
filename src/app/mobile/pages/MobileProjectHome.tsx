@@ -466,7 +466,11 @@ export default function MobileProjectHome({
                     <span>创建 {formatDate(project.created_at)}</span>
                     <span>更新 {formatDate(project.updated_at)}</span>
                 </div>
-                <div className="mobile-project-home__stats" aria-label="项目统计">
+                <div
+                    className="mobile-project-home__stats"
+                    aria-label="项目统计"
+                    data-mobile-horizontal-scroll="true"
+                >
                     {statItems.map(item => (
                         <span key={item.key} className="mobile-project-home__stat">
                             <strong>{item.value}</strong>
