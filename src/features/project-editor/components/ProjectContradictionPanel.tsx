@@ -480,44 +480,8 @@ function ProjectContradictionPanel({
     }, [activeRecord])
 
     const renderSidebarExternally = Boolean(sidebarContainer)
-    const sidebarStats = activeRecord ? (
-        <div className="pe-contradiction-sidebar__stats">
-            <div className="pe-contradiction-stat-card">
-                <span className="pe-contradiction-stat-card__value">{summary?.findingCount ?? 0}</span>
-                <span className="pe-contradiction-stat-card__label">问题条目</span>
-                {(summary?.findingCount ?? 0) > 0 && (
-                    <div className="pe-contradiction-severity-dist">
-                        {summary!.severityDist.critical > 0 && (
-                            <span className="pe-contradiction-severity-pill is-critical">{summary!.severityDist.critical} 严重</span>
-                        )}
-                        {summary!.severityDist.high > 0 && (
-                            <span className="pe-contradiction-severity-pill is-high">{summary!.severityDist.high} 高</span>
-                        )}
-                        {summary!.severityDist.medium > 0 && (
-                            <span className="pe-contradiction-severity-pill is-medium">{summary!.severityDist.medium} 中</span>
-                        )}
-                        {summary!.severityDist.low > 0 && (
-                            <span className="pe-contradiction-severity-pill is-low">{summary!.severityDist.low} 低</span>
-                        )}
-                    </div>
-                )}
-            </div>
-            <div className="pe-contradiction-stat-card">
-                <span className="pe-contradiction-stat-card__value">{summary?.unresolvedCount ?? 0}</span>
-                <span className="pe-contradiction-stat-card__label">待确认问题</span>
-            </div>
-            <div className="pe-contradiction-stat-card">
-                <span className="pe-contradiction-stat-card__value">{activeRecord.sourceEntryIds.length}</span>
-                <span className="pe-contradiction-stat-card__label">来源词条</span>
-            </div>
-        </div>
-    ) : (
-        <div className="pe-contradiction-sidebar__empty">选择报告后显示摘要统计。</div>
-    )
-
     const historyPanel = (
         <div className="pe-contradiction-sidebar">
-            {sidebarStats}
             <section className="pe-contradiction-history">
                 <div className="pe-contradiction-section__header">
                     <h3 className="pe-contradiction-section__title fc-section-title">历史报告</h3>
@@ -624,6 +588,37 @@ function ProjectContradictionPanel({
                                                     onClick={() => void handleStartDiscussion()}>
                                                 在右侧继续讨论
                                             </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="pe-contradiction-stats">
+                                        <div className="pe-contradiction-stat-card">
+                                            <span className="pe-contradiction-stat-card__value">{summary?.findingCount ?? 0}</span>
+                                            <span className="pe-contradiction-stat-card__label">问题条目</span>
+                                            {(summary?.findingCount ?? 0) > 0 && (
+                                                <div className="pe-contradiction-severity-dist">
+                                                    {summary!.severityDist.critical > 0 && (
+                                                        <span className="pe-contradiction-severity-pill is-critical">{summary!.severityDist.critical} 严重</span>
+                                                    )}
+                                                    {summary!.severityDist.high > 0 && (
+                                                        <span className="pe-contradiction-severity-pill is-high">{summary!.severityDist.high} 高</span>
+                                                    )}
+                                                    {summary!.severityDist.medium > 0 && (
+                                                        <span className="pe-contradiction-severity-pill is-medium">{summary!.severityDist.medium} 中</span>
+                                                    )}
+                                                    {summary!.severityDist.low > 0 && (
+                                                        <span className="pe-contradiction-severity-pill is-low">{summary!.severityDist.low} 低</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="pe-contradiction-stat-card">
+                                            <span className="pe-contradiction-stat-card__value">{summary?.unresolvedCount ?? 0}</span>
+                                            <span className="pe-contradiction-stat-card__label">待确认问题</span>
+                                        </div>
+                                        <div className="pe-contradiction-stat-card">
+                                            <span className="pe-contradiction-stat-card__value">{activeRecord.sourceEntryIds.length}</span>
+                                            <span className="pe-contradiction-stat-card__label">来源词条</span>
                                         </div>
                                     </div>
 

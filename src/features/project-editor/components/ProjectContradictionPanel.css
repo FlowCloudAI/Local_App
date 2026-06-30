@@ -66,23 +66,6 @@
     overflow: hidden;
 }
 
-.pe-contradiction-sidebar__stats {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--fc-color-border);
-    flex-shrink: 0;
-}
-
-.pe-contradiction-sidebar__empty {
-    padding: 12px;
-    border-bottom: 1px solid var(--fc-color-border);
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-xs);
-    text-align: center;
-}
-
 .pe-contradiction-sidebar .pe-contradiction-history {
     flex: 1;
     border: 0;
@@ -244,6 +227,12 @@
     line-height: 1.7;
     color: var(--fc-color-text);
     white-space: pre-wrap;
+}
+
+.pe-contradiction-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
 }
 
 .pe-contradiction-stat-card {
@@ -506,7 +495,8 @@ button.pe-contradiction-chip--entry:hover {
 
 @container (max-width: 780px) {
     .pe-contradiction-layout,
-    .pe-contradiction-report__grid {
+    .pe-contradiction-report__grid,
+    .pe-contradiction-stats {
         grid-template-columns: 1fr;
     }
 
