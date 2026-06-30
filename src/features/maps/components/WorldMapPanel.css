@@ -335,6 +335,12 @@
     flex-shrink: 0;
 }
 
+.wm-map-list-panel--external {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .wm-sidebar__section--flex {
     flex: 1;
     min-height: 0;
@@ -381,6 +387,12 @@
     max-height: 200px;
     overflow-y: auto;
     padding: 4px 6px;
+}
+
+.wm-map-list-panel--external .wm-map-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
 }
 
 .wm-map-list__empty {

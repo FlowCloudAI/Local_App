@@ -1,4 +1,5 @@
 import {type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {
     RollingBox,
     Slider,
@@ -487,6 +488,7 @@ interface WorldMapPanelProps {
     projectName: string
     onBack?: () => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
+    mapListContainer?: HTMLElement | null
 }
 
 function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
@@ -494,7 +496,7 @@ function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
     return typeof value === 'string' ? value : ''
 }
 
-export default function WorldMapPanel({projectId, projectName, onBack, onOpenEntry}: WorldMapPanelProps) {
+export default function WorldMapPanel({projectId, projectName, onBack, onOpenEntry, mapListContainer}: WorldMapPanelProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
     const imageInputRef = useRef<HTMLInputElement>(null)
@@ -1634,8 +1636,49 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
 
     // ── 渲染 ────────────────────────────────────────────────────────────────
 
+    const renderMapListInExternalContainer = mapListContainer !== undefined
+    const mapListSection = (
+        <div className={`wm-sidebar__section wm-map-list-panel${renderMapListInExternalContainer ? ' wm-map-list-panel--external' : ''}`}>
+            <div className="wm-sidebar__section-header">
+                <span className="wm-sidebar__section-title">地图列表</span>
+                <button type="button" className="wm-icon-btn" onClick={() => void handleCreateMap()}
+                        title="新建地图">
+                    <PlusIcon/>
+                </button>
+            </div>
+            <div className="wm-map-list">
+                {maps.length === 0 && (
+                    <div className="wm-map-list__empty">暂无地图，点击 + 新建</div>
+                )}
+                {maps.map(m => (
+                    <div key={m.id}
+                         className={`wm-map-item${m.id === activeMapId ? ' is-active' : ''}`}
+                         onClick={() => void handleSwitchMap(m)}
+                    >
+                        <span className="wm-map-item__name">{m.name}</span>
+                        <span
+                            className="wm-map-item__meta">{MAP_RENDERER_LABELS[normalizeMapRenderer(m.renderer)]}</span>
+                        <button
+                            type="button"
+                            className="wm-map-item__delete"
+                            title="删除此地图"
+                            onClick={e => {
+                                e.stopPropagation();
+                                void handleDeleteMap(m.id)
+                            }}
+                        >
+                            <TrashIcon/>
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+
     return (
         <div className="wm-panel">
+            {renderMapListInExternalContainer && mapListContainer ? createPortal(mapListSection, mapListContainer) : null}
+
             {/* 隐藏的文件输入框 */}
             <input ref={imageInputRef} type="file" accept="image/*" style={{display: 'none'}}
                    onChange={handleImageFileChange}/>
@@ -1913,44 +1956,8 @@ export default function WorldMapPanel({projectId, projectName, onBack, onOpenEnt
             <div className="wm-body">
                 {/* ── 侧边栏 ── */}
                 <div className="wm-sidebar">
-                    {/* 地图列表区域 */}
-                    <div className="wm-sidebar__section">
-                        <div className="wm-sidebar__section-header">
-                            <span className="wm-sidebar__section-title">地图列表</span>
-                            <button type="button" className="wm-icon-btn" onClick={() => void handleCreateMap()}
-                                    title="新建地图">
-                                <PlusIcon/>
-                            </button>
-                        </div>
-                        <div className="wm-map-list">
-                            {maps.length === 0 && (
-                                <div className="wm-map-list__empty">暂无地图，点击 + 新建</div>
-                            )}
-                            {maps.map(m => (
-                                <div key={m.id}
-                                     className={`wm-map-item${m.id === activeMapId ? ' is-active' : ''}`}
-                                     onClick={() => void handleSwitchMap(m)}
-                                >
-                                    <span className="wm-map-item__name">{m.name}</span>
-                                    <span
-                                        className="wm-map-item__meta">{MAP_RENDERER_LABELS[normalizeMapRenderer(m.renderer)]}</span>
-                                    <button
-                                        type="button"
-                                        className="wm-map-item__delete"
-                                        title="删除此地图"
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            void handleDeleteMap(m.id)
-                                        }}
-                                    >
-                                        <TrashIcon/>
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="wm-sidebar__sep"/>
+                    {!renderMapListInExternalContainer && mapListSection}
+                    {!renderMapListInExternalContainer && <div className="wm-sidebar__sep"/>}
 
                     {/* 属性区域 */}
                     <div className="wm-sidebar__section wm-sidebar__section--flex">

@@ -137,6 +137,14 @@
     height: 100%;
 }
 
+.pe-tool-sidebar-host {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .pe-tree-toggle {
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     border-radius: 999px;
