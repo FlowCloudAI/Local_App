@@ -87,8 +87,9 @@ export function usePageStack(): PageStack {
     }, [pop])
 
     const replace = useCallback((page: MobilePage) => {
-        const next = [...stackRef.current]
-        next[next.length - 1] = page
+        const next = stackRef.current.length > 0
+            ? [...stackRef.current.slice(0, -1), page]
+            : [page]
         stackRef.current = next
         setStack(next)
     }, [])
