@@ -171,6 +171,7 @@ function ProjectEditorInner({
     const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_PX)
     const [treeCollapsed, setTreeCollapsed] = useState(false)
     const [worldMapSidebarHost, setWorldMapSidebarHost] = useState<HTMLDivElement | null>(null)
+    const [relationGraphSidebarHost, setRelationGraphSidebarHost] = useState<HTMLDivElement | null>(null)
     const [dividerDragging, setDividerDragging] = useState(false)
     const isDragging = useRef(false)
     const layoutRef = useRef<HTMLDivElement>(null)
@@ -829,6 +830,8 @@ function ProjectEditorInner({
     const hasActiveEntry = Boolean(activeEntryId)
     const hasActiveTool = Boolean(activeToolPanel)
     const isWorldMapPanelActive = activeToolPanel === 'world-map'
+    const isRelationGraphPanelActive = activeToolPanel === 'relation-graph'
+    const hasToolSidebar = isWorldMapPanelActive || isRelationGraphPanelActive
     const handleBreadcrumbProjectClick = useCallback(() => {
         setSelection({kind: 'project'})
         if (activeEntryId || activeToolPanel) {
@@ -837,13 +840,13 @@ function ProjectEditorInner({
     }, [activeEntryId, activeToolPanel, onBackToProject, projectId])
 
     const handleTreeHeaderBackClick = useCallback(() => {
-        if (isWorldMapPanelActive) {
+        if (hasToolSidebar) {
             handleBreadcrumbProjectClick()
             return
         }
 
         onBackHome?.()
-    }, [handleBreadcrumbProjectClick, isWorldMapPanelActive, onBackHome])
+    }, [handleBreadcrumbProjectClick, hasToolSidebar, onBackHome])
 
     const handleBreadcrumbCategoryClick = useCallback((categoryId: string) => {
         setSelection({kind: 'category', id: categoryId})
@@ -1054,7 +1057,7 @@ function ProjectEditorInner({
                         className="pe-tree-header-btn"
                         onClick={handleTreeHeaderBackClick}
                     >
-                        {isWorldMapPanelActive ? '返回项目主页' : '返回主页'}
+                        {hasToolSidebar ? '返回项目主页' : '返回主页'}
                     </button>
                     <button
                         type="button"
@@ -1068,6 +1071,8 @@ function ProjectEditorInner({
                 <div className="pe-tree-panel__body">
                     {isWorldMapPanelActive ? (
                         <div className="pe-tool-sidebar-host" ref={setWorldMapSidebarHost}/>
+                    ) : isRelationGraphPanelActive ? (
+                        <div className="pe-tool-sidebar-host" ref={setRelationGraphSidebarHost}/>
                     ) : (
                         <>
                             <button
@@ -1229,7 +1234,7 @@ function ProjectEditorInner({
                         {activeToolPanel === 'relation-graph' && (
                             <ProjectRelationGraph
                                 projectId={projectId}
-                                onBack={() => onBackToProject?.(projectId)}
+                                sidebarContainer={relationGraphSidebarHost}
                             />
                         )}
                         {activeToolPanel === 'timeline' && (

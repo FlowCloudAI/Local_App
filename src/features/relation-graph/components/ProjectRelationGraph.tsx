@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from 'react'
+import {createPortal} from 'react-dom'
 import {convertFileSrc} from '../../../api/assets'
 import {Button, ButtonGroup, ButtonToolbar, Input, Slider} from 'flowcloudai-ui'
 import {FloatingPanel} from '../../../shared/ui/overlay'
@@ -29,29 +30,7 @@ import './ProjectRelationGraph.css'
 
 interface ProjectRelationGraphProps {
     projectId: string
-    onBack?: () => void
-}
-
-function BackArrow() {
-    return (
-        <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: 16, height: 16}}>
-            <path
-                d="M8.6 3.25L4.1 7.75L8.6 12.25"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            />
-            <path
-                d="M4.5 7.75H12.25"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-            />
-        </svg>
-    )
+    sidebarContainer?: HTMLElement | null
 }
 
 const INITIAL_LAYOUT_STATE: RelationLayoutState = {
@@ -325,7 +304,7 @@ function parsePersistedLayoutConfig(raw: string | null): PersistedLayoutConfig |
     }
 }
 
-export default function ProjectRelationGraph({projectId, onBack}: ProjectRelationGraphProps) {
+export default function ProjectRelationGraph({projectId, sidebarContainer}: ProjectRelationGraphProps) {
     const [graphKey, setGraphKey] = useState(0)
     const [nodes, setNodes] = useState<ProjectRelationNode[]>([])
     const [edges, setEdges] = useState<RelationGraphEdge[]>([])
@@ -469,10 +448,11 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
         })
     }, [advancedLayoutParams, layoutLooseness, layoutParamMode, projectId])
 
-    const statsChips = [
-        {label: '词条', value: nodes.length},
-        {label: '关系', value: edges.length},
-    ]
+    const nodeTitleById = useMemo(() => {
+        const map = new Map<string, string>()
+        nodes.forEach((node) => map.set(node.id, node.title || node.label || node.id))
+        return map
+    }, [nodes])
 
     const statusItems = [
         dataLoading ? '数据加载中' : null,
@@ -519,15 +499,52 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
         )
     }, [entryTypeByKey])
 
+    const relationSidebar = (
+        <div className="rg-sidebar">
+            <div className="rg-sidebar__stats">
+                <div className="rg-sidebar__stat">
+                    <span>词条</span>
+                    <strong>{nodes.length}</strong>
+                </div>
+                <div className="rg-sidebar__stat">
+                    <span>关系</span>
+                    <strong>{edges.length}</strong>
+                </div>
+            </div>
+            <div className="rg-sidebar__section">
+                <div className="rg-sidebar__section-title">已有关系</div>
+                <div className="rg-sidebar__list">
+                    {edges.length === 0 ? (
+                        <div className="rg-sidebar__empty">暂无关系</div>
+                    ) : (
+                        edges.map((edge) => (
+                            <div key={edge.id} className="rg-sidebar__relation">
+                                <div className="rg-sidebar__relation-main">
+                                    <span title={nodeTitleById.get(edge.source) ?? edge.source}>
+                                        {nodeTitleById.get(edge.source) ?? edge.source}
+                                    </span>
+                                    <span className="rg-sidebar__relation-arrow">→</span>
+                                    <span title={nodeTitleById.get(edge.target) ?? edge.target}>
+                                        {nodeTitleById.get(edge.target) ?? edge.target}
+                                    </span>
+                                </div>
+                                <div className="rg-sidebar__relation-label" title={edge.label}>
+                                    {edge.label || edge.kind}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+
     return (
         <div className="project-relation-graph fc-op-panel">
+            {sidebarContainer ? createPortal(relationSidebar, sidebarContainer) : null}
+
             {/* ── 顶部 ── */}
             <div className="fc-op-header">
-                {onBack && (
-                    <button type="button" className="fc-op-back-btn" onClick={onBack}>
-                        <BackArrow/>返回
-                    </button>
-                )}
                 <div className="fc-op-header__title-block">
                     <h2 className="fc-op-header__title">关系图谱</h2>
                     <p className="fc-op-header__subtitle">
@@ -544,27 +561,17 @@ export default function ProjectRelationGraph({projectId, onBack}: ProjectRelatio
                 </div>
             </div>
 
-            {/* ── 工具栏（统计 + 状态） ── */}
-            {(nodes.length > 0 || statusItems.length > 0) && (
+            {/* ── 工具栏（状态） ── */}
+            {statusItems.length > 0 && (
                 <div className="fc-op-toolbar">
-                    {statsChips.map((chip) => (
-                        <span key={chip.label} className="fc-op-chip">
-                            {chip.label} {chip.value}
+                    {statusItems.map((item, index) => (
+                        <span
+                            key={index}
+                            className={`fc-op-status${dataError || layoutState.layoutError ? ' fc-op-status--error' : ''}`}
+                        >
+                            {item}
                         </span>
                     ))}
-                    {statusItems.length > 0 && (
-                        <>
-                            <div className="fc-op-toolbar__sep" />
-                            {statusItems.map((item, index) => (
-                                <span
-                                    key={index}
-                                    className={`fc-op-status${dataError || layoutState.layoutError ? ' fc-op-status--error' : ''}`}
-                                >
-                                    {item}
-                                </span>
-                            ))}
-                        </>
-                    )}
                 </div>
             )}
 
