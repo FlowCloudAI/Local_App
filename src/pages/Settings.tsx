@@ -283,6 +283,498 @@ function SettingsSidebar({activeTab, onTabChange, onBack}: SettingsSidebarProps)
     )
 }
 
+interface TemplatesPanelProps {
+    editorFontSize: number
+}
+
+function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
+    const {showAlert} = useAlert()
+    // ── 模板配置状态 ──
+    const [templateMetas, setTemplateMetas] = useState<TemplateMeta[]>([])
+    const [templateListLoading, setTemplateListLoading] = useState(false)
+    const [templateListError, setTemplateListError] = useState<string | null>(null)
+    const [templateView, setTemplateView] = useState<TemplateView>('list')
+    const [templateSelectedKey, setTemplateSelectedKey] = useState<string>('')
+    const [templateExpandedKeys, setTemplateExpandedKeys] = useState<string[]>([])
+    const [templateDocument, setTemplateDocument] = useState<TemplateDocument | null>(null)
+    const [templateDocumentLoading, setTemplateDocumentLoading] = useState(false)
+    const [templateDraft, setTemplateDraft] = useState('')
+    const [templateSaving, setTemplateSaving] = useState(false)
+    const [templateRestoring, setTemplateRestoring] = useState(false)
+    const [templatePageError, setTemplatePageError] = useState<TemplateValidationError | null>(null)
+
+    const loadTemplateList = useCallback(async () => {
+        setTemplateListLoading(true)
+        setTemplateListError(null)
+        try {
+            const metas = await template_list()
+            setTemplateMetas(metas)
+            setTemplateExpandedKeys(prev => {
+                if (prev.length > 0) return prev
+                return Array.from(new Set(metas.map(meta => `group:${meta.group}`)))
+            })
+        } catch (error) {
+            const message = String(error)
+            logger.error('提示词模板目录加载失败:', error)
+            setTemplateListError(message)
+            void showAlert(`提示词模板目录加载失败：${message}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setTemplateListLoading(false)
+        }
+    }, [showAlert])
+
+    useEffect(() => {
+        if (templateMetas.length === 0 && !templateListLoading && !templateListError) {
+            loadTemplateList().catch(logger.error)
+        }
+    }, [loadTemplateList, templateListError, templateListLoading, templateMetas.length])
+
+    const templateMetaMap = useMemo(
+        () => new Map(templateMetas.map(meta => [meta.id, meta])),
+        [templateMetas],
+    )
+
+    const templateTreeRows = useMemo<TemplateTreeRow[]>(() => {
+        const groupRows = Array.from(new Set(templateMetas.map(meta => meta.group)))
+            .sort((a, b) => {
+                const indexA = TEMPLATE_GROUP_ORDER.indexOf(a)
+                const indexB = TEMPLATE_GROUP_ORDER.indexOf(b)
+                const orderA = indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA
+                const orderB = indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB
+                return orderA - orderB || a.localeCompare(b)
+            })
+            .map((group, index) => ({
+                id: `group:${group}`,
+                parent_id: null,
+                name: TEMPLATE_GROUP_LABELS[group] ?? group,
+                sort_order: index,
+            }))
+
+        const templateRows = templateMetas.map((meta, index) => ({
+            id: meta.id,
+            parent_id: `group:${meta.group}`,
+            name: meta.title,
+            sort_order: index,
+            template_id: meta.id,
+            relative_path: meta.relative_path,
+        }))
+
+        return [...groupRows, ...templateRows]
+    }, [templateMetas])
+
+    const templateTreeData = useMemo(
+        () => flatToTree(templateTreeRows).roots,
+        [templateTreeRows],
+    )
+
+    const activeTemplateMeta = useMemo(() => {
+        if (templateDocument) return templateDocument.meta
+        if (!templateSelectedKey) return null
+        return templateMetaMap.get(templateSelectedKey) ?? null
+    }, [templateDocument, templateMetaMap, templateSelectedKey])
+
+    const templateIsDirty = templateDocument ? templateDraft !== templateDocument.content : false
+
+    const templateDiagnostics = useMemo<TeraEditorDiagnostic[]>(() => {
+        if (!templatePageError?.line || !templatePageError.column) return []
+        return [{
+            message: templatePageError.raw_message,
+            severity: 'error',
+            startLineNumber: templatePageError.line,
+            startColumn: templatePageError.column,
+            endLineNumber: templatePageError.line,
+            endColumn: templatePageError.column + 1,
+            source: 'tera',
+        }]
+    }, [templatePageError])
+
+    const openTemplateDetail = useCallback(async (templateId: string) => {
+        if (!templateMetaMap.has(templateId)) return
+        setTemplateSelectedKey(templateId)
+        setTemplateView('detail')
+        setTemplateDocumentLoading(true)
+        setTemplatePageError(null)
+
+        try {
+            const document = await template_get(templateId)
+            setTemplateDocument(document)
+            setTemplateDraft(document.content)
+        } catch (error) {
+            setTemplateDocument(null)
+            setTemplateDraft('')
+            void showAlert('加载提示词模板失败: ' + error, 'error')
+        } finally {
+            setTemplateDocumentLoading(false)
+        }
+    }, [showAlert, templateMetaMap])
+
+    const handleTemplateTreeSelect = useCallback((key: string) => {
+        if (!templateMetaMap.has(key)) return
+        void openTemplateDetail(key)
+    }, [openTemplateDetail, templateMetaMap])
+
+    const handleTemplateBack = useCallback(async () => {
+        if (templateIsDirty) {
+            const result = await showAlert('未保存的更改将丢失，是否继续？', 'warning', 'confirm')
+            if (result !== 'yes') return
+        }
+
+        setTemplateView('list')
+        setTemplateDocument(null)
+        setTemplateDraft('')
+        setTemplatePageError(null)
+        setTemplateDocumentLoading(false)
+        setTemplateSelectedKey('')
+    }, [showAlert, templateIsDirty])
+
+    const handleTemplateRestore = useCallback(async () => {
+        if (!templateDocument) return
+        const result = await showAlert(
+            '恢复默认内容后，当前所有更改都会丢失，是否继续？',
+            'warning',
+            'confirm'
+        )
+        if (result !== 'yes') return
+
+        try {
+            setTemplateRestoring(true)
+            const defaultContent = await template_get_default(templateDocument.meta.id)
+            setTemplateDraft(defaultContent)
+            setTemplatePageError(null)
+        } catch (error) {
+            void showAlert('恢复默认内容失败: ' + error, 'error')
+        } finally {
+            setTemplateRestoring(false)
+        }
+    }, [showAlert, templateDocument])
+
+    const handleOpenTemplateRootDir = useCallback(async () => {
+        try {
+            const path = await template_get_local_root_dir()
+            await open_in_file_manager(path)
+        } catch (error) {
+            void showAlert('打开提示词模板目录失败: ' + error, 'error')
+        }
+    }, [showAlert])
+
+    const handleOpenTemplateFilePath = useCallback(async () => {
+        if (!activeTemplateMeta) return
+        try {
+            const path = await template_get_effective_path(activeTemplateMeta.id)
+            await open_in_file_manager(path)
+        } catch (error) {
+            void showAlert('打开提示词模板文件失败: ' + error, 'error')
+        }
+    }, [activeTemplateMeta, showAlert])
+
+    const handleTemplateSave = useCallback(async () => {
+        if (!templateDocument) return
+
+        try {
+            setTemplateSaving(true)
+            setTemplatePageError(null)
+            const result: TemplateSaveResult = await template_save(templateDocument.meta.id, templateDraft)
+
+            if (result.status === 'success') {
+                setTemplateDocument(result.document)
+                setTemplateDraft(result.document.content)
+                void showAlert('提示词模板已保存', 'success', 'nonInvasive', 2000)
+                return
+            }
+
+            if (result.status === 'validation_error') {
+                setTemplatePageError(result.error)
+                return
+            }
+
+            setTemplatePageError({
+                message: '保存失败',
+                raw_message: result.message,
+                line: null,
+                column: null,
+            })
+            void showAlert('保存提示词模板失败: ' + result.message, 'error')
+        } catch (error) {
+            const message = String(error)
+            setTemplatePageError({
+                message: '保存失败',
+                raw_message: message,
+                line: null,
+                column: null,
+            })
+            void showAlert('保存提示词模板失败: ' + message, 'error')
+        } finally {
+            setTemplateSaving(false)
+        }
+    }, [showAlert, templateDocument, templateDraft])
+
+    return (
+                            <div className="settings-container fc-page-shell settings-template-shell">
+                                <div className="settings-title fc-page-header">
+                                    <div className="fc-page-title-block">
+                                        <h1 className="fc-page-title">提示词模板</h1>
+                                        <p className="fc-page-subtitle">集中管理内置提示词模板，保存后会立即检查语法是否有效。</p>
+                                    </div>
+                                </div>
+
+                                <div className="templates-workspace">
+                                {templateView === 'list' && (
+                                    <section className="settings-section fc-section-card templates-catalog-section">
+                                        <div className="templates-catalog-header">
+                                            <div>
+                                                <h2 className="settings-section-title fc-section-title">模板目录</h2>
+                                                <p className="templates-catalog-hint">
+                                                    共 {templateMetas.length} 个提示词模板，按用途分组展示。
+                                                </p>
+                                            </div>
+                                            <div className="templates-catalog-actions">
+                                                <Button type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        void handleOpenTemplateRootDir()
+                                                    }}
+                                                >
+                                                    打开本地路径
+                                                </Button>
+                                                <Button type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={templateListLoading}
+                                                    onClick={() => {
+                                                        loadTemplateList().catch(logger.error)
+                                                    }}
+                                                >
+                                                    {templateListLoading ? '刷新中…' : '刷新'}
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {templateListError ? (
+                                            <div className="settings-empty-state"
+                                                 style={{color: 'var(--fc-color-danger)'}}>
+                                                加载失败：{templateListError}
+                                                <div style={{marginTop: 8}}>
+                                                    <Button type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            loadTemplateList().catch(logger.error)
+                                                        }}
+                                                    >
+                                                        重试
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : templateListLoading && templateTreeData.length === 0 ? (
+                                            <div className="settings-empty-state">加载中...</div>
+                                        ) : templateTreeData.length === 0 ? (
+                                            <div className="settings-empty-state">暂无可编辑的提示词模板。</div>
+                                        ) : (
+                                            <div className="templates-tree-shell">
+                                                <Tree
+                                                    treeData={templateTreeData}
+                                                    selectedKey={templateSelectedKey}
+                                                    expandedKeys={templateExpandedKeys}
+                                                    onExpandedKeysChange={setTemplateExpandedKeys}
+                                                    onSelect={handleTemplateTreeSelect}
+                                                    searchable
+                                                    searchPlaceholder="搜索名称"
+                                                    collapseDuration={0.13}
+                                                    indentSize={7}
+                                                    renderTitle={(node: CategoryTreeNode) => {
+                                                        const row = node.raw as TemplateTreeRow
+                                                        if (!row.template_id) {
+                                                            return (
+                                                                <div className="templates-tree-group-title">
+                                                                    {row.name}
+                                                                </div>
+                                                            )
+                                                        }
+                                                        return (
+                                                            <div className="templates-tree-item">
+                                                                <div
+                                                                    className="templates-tree-item-name">{row.name}</div>
+                                                            </div>
+                                                        )
+                                                    }}
+                                                    canDrag={() => false}
+                                                    canDrop={() => false}
+                                                    canRename={() => false}
+                                                    canDelete={() => false}
+                                                    canCreate={() => false}
+                                                />
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
+
+                                {templateView === 'detail' && (
+                                    <section className="settings-section fc-section-card templates-detail-section">
+                                        <div className="templates-detail-toolbar">
+                                            <Button type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    void handleTemplateBack()
+                                                }}
+                                            >
+                                                返回
+                                            </Button>
+                                            <div className="templates-detail-toolbar-actions">
+                                                <Button type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={!templateDocument}
+                                                    onClick={() => {
+                                                        void handleOpenTemplateFilePath()
+                                                    }}
+                                                >
+                                                    打开本地路径
+                                                </Button>
+                                                <Button type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={!templateDocument || templateRestoring || templateSaving}
+                                                    onClick={() => {
+                                                        void handleTemplateRestore()
+                                                    }}
+                                                >
+                                                    {templateRestoring ? '恢复中...' : '恢复默认'}
+                                                </Button>
+                                                <Button type="button"
+                                                    size="sm"
+                                                    disabled={!templateDocument || !templateIsDirty || templateSaving || templateDocumentLoading}
+                                                    onClick={() => {
+                                                        void handleTemplateSave()
+                                                    }}
+                                                >
+                                                    {templateSaving ? '保存中...' : '保存'}
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {activeTemplateMeta ? (
+                                            <>
+                                                <div className="templates-detail-header">
+                                                    <div className="templates-detail-heading">
+                                                        <div className="templates-detail-topline">
+                                                            <div className="templates-detail-caption">当前内容</div>
+                                                            <span className="templates-detail-badge">
+                                                            {TEMPLATE_GROUP_LABELS[activeTemplateMeta.group] ?? activeTemplateMeta.group}
+                                                        </span>
+                                                        </div>
+                                                        <h2 className="templates-detail-title">{activeTemplateMeta.title}</h2>
+                                                        <div className="templates-detail-path">
+                                                            {activeTemplateMeta.relative_path}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <details className="templates-detail-disclosure">
+                                                    <summary className="templates-detail-disclosure-summary">
+                                                        <span>用途说明与参数</span>
+                                                        <span className="templates-detail-disclosure-meta">
+                                                        用于：{activeTemplateMeta.appear_in}
+                                                    </span>
+                                                        <span className="templates-detail-disclosure-meta">
+                                                        参数：{activeTemplateMeta.params.length} 个
+                                                    </span>
+                                                    </summary>
+                                                    <div className="templates-detail-grid">
+                                                        <div className="templates-detail-card">
+                                                            <div className="templates-detail-label">作用</div>
+                                                            <p className="templates-detail-text">{activeTemplateMeta.purpose}</p>
+                                                        </div>
+                                                        <div className="templates-detail-card">
+                                                            <div className="templates-detail-label">用于哪里</div>
+                                                            <p className="templates-detail-text">{activeTemplateMeta.appear_in}</p>
+                                                        </div>
+                                                        <div
+                                                            className="templates-detail-card templates-detail-card--params">
+                                                            <div className="templates-detail-label">参数</div>
+                                                            {activeTemplateMeta.params.length === 0 ? (
+                                                                <p className="templates-detail-text">这段内容不依赖额外参数。</p>
+                                                            ) : (
+                                                                <div className="templates-param-list">
+                                                                    {activeTemplateMeta.params.map(param => (
+                                                                        <div key={param.name}
+                                                                             className="templates-param-item">
+                                                                            <div
+                                                                                className="templates-param-name">{param.name}</div>
+                                                                            <div
+                                                                                className="templates-param-desc">{param.description}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </details>
+
+                                                {templatePageError && (
+                                                    <div className="templates-error-panel">
+                                                        <div
+                                                            className="templates-error-title">{templatePageError.message}</div>
+                                                        {(templatePageError.line && templatePageError.column) ? (
+                                                            <div className="templates-error-location">
+                                                                第 {templatePageError.line} 行，第 {templatePageError.column} 列
+                                                            </div>
+                                                        ) : null}
+                                                        <pre
+                                                            className="templates-error-raw">{templatePageError.raw_message}</pre>
+                                                    </div>
+                                                )}
+
+                                                <div className="templates-editor-shell">
+                                                    {templateDocumentLoading && !templateDocument ? (
+                                                        <div className="settings-empty-state">加载中...</div>
+                                                    ) : !templateDocument ? (
+                                                        <div
+                                                            className="settings-empty-state">加载失败，请返回目录后重试。</div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="templates-editor-meta">
+                                                            <span>
+                                                                当前来源：{templateDocument.is_override ? '你的自定义版本' : '系统默认版本'}
+                                                            </span>
+                                                                <span>
+                                                                {templateIsDirty ? '存在未保存更改' : '内容已保存'}
+                                                            </span>
+                                                            </div>
+                                                            <TeraEditor
+                                                                value={templateDraft}
+                                                                onChange={(value) => {
+                                                                    setTemplateDraft(value)
+                                                                    if (templatePageError) {
+                                                                        setTemplatePageError(null)
+                                                                    }
+                                                                }}
+                                                                height="100%"
+                                                                minHeight={0}
+                                                                fontSize={editorFontSize}
+                                                                lineHeight={24}
+                                                                wordWrap="on"
+                                                                diagnostics={templateDiagnostics}
+                                                                placeholder="请输入提示词模板内容"
+                                                                className="templates-editor"
+                                                                style={{minHeight: 0}}
+                                                            />
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="settings-empty-state">
+                                                未找到当前提示词模板信息。
+                                            </div>
+                                        )}
+                                    </section>
+                            )}
+                                </div>
+                        </div>
+    )
+}
 interface SettingsProps {
     onBack?: () => void
     openIntent?: SettingsOpenIntent
@@ -321,20 +813,6 @@ export default function Settings({
     const [defaultPaths, setDefaultPaths] = useState<DefaultPaths | null>(null)
     const [configDir, setConfigDir] = useState<string>('')
     const settingsSaveSuccessNoticeEnabledRef = useRef(false)
-
-    // ── 模板配置状态 ──
-    const [templateMetas, setTemplateMetas] = useState<TemplateMeta[]>([])
-    const [templateListLoading, setTemplateListLoading] = useState(false)
-    const [templateListError, setTemplateListError] = useState<string | null>(null)
-    const [templateView, setTemplateView] = useState<TemplateView>('list')
-    const [templateSelectedKey, setTemplateSelectedKey] = useState<string>('')
-    const [templateExpandedKeys, setTemplateExpandedKeys] = useState<string[]>([])
-    const [templateDocument, setTemplateDocument] = useState<TemplateDocument | null>(null)
-    const [templateDocumentLoading, setTemplateDocumentLoading] = useState(false)
-    const [templateDraft, setTemplateDraft] = useState('')
-    const [templateSaving, setTemplateSaving] = useState(false)
-    const [templateRestoring, setTemplateRestoring] = useState(false)
-    const [templatePageError, setTemplatePageError] = useState<TemplateValidationError | null>(null)
 
     // ── AI 配置状态 ──
     const [llmPlugins, setLlmPlugins] = useState<PluginInfo[]>([])
@@ -1005,216 +1483,6 @@ export default function Settings({
         () => getPluginById('tts', settings?.tts.plugin_id ?? null),
         [getPluginById, settings?.tts.plugin_id],
     )
-
-    const loadTemplateList = useCallback(async () => {
-        setTemplateListLoading(true)
-        setTemplateListError(null)
-        try {
-            const metas = await template_list()
-            setTemplateMetas(metas)
-            setTemplateExpandedKeys(prev => {
-                if (prev.length > 0) return prev
-                return Array.from(new Set(metas.map(meta => `group:${meta.group}`)))
-            })
-        } catch (error) {
-            const message = String(error)
-            logger.error('提示词模板目录加载失败:', error)
-            setTemplateListError(message)
-            void showAlert(`提示词模板目录加载失败：${message}`, 'error', 'nonInvasive', 3000)
-        } finally {
-            setTemplateListLoading(false)
-        }
-    }, [showAlert])
-
-    useEffect(() => {
-        if (
-            activeTab === 'templates' &&
-            templateMetas.length === 0 &&
-            !templateListLoading &&
-            !templateListError
-        ) {
-            loadTemplateList().catch(logger.error)
-        }
-    }, [activeTab, loadTemplateList, templateListError, templateListLoading, templateMetas.length])
-
-    const templateMetaMap = useMemo(
-        () => new Map(templateMetas.map(meta => [meta.id, meta])),
-        [templateMetas],
-    )
-
-    const templateTreeRows = useMemo<TemplateTreeRow[]>(() => {
-        const groupRows = Array.from(new Set(templateMetas.map(meta => meta.group)))
-            .sort((a, b) => {
-                const indexA = TEMPLATE_GROUP_ORDER.indexOf(a)
-                const indexB = TEMPLATE_GROUP_ORDER.indexOf(b)
-                const orderA = indexA === -1 ? Number.MAX_SAFE_INTEGER : indexA
-                const orderB = indexB === -1 ? Number.MAX_SAFE_INTEGER : indexB
-                return orderA - orderB || a.localeCompare(b)
-            })
-            .map((group, index) => ({
-                id: `group:${group}`,
-                parent_id: null,
-                name: TEMPLATE_GROUP_LABELS[group] ?? group,
-                sort_order: index,
-            }))
-
-        const templateRows = templateMetas.map((meta, index) => ({
-            id: meta.id,
-            parent_id: `group:${meta.group}`,
-            name: meta.title,
-            sort_order: index,
-            template_id: meta.id,
-            relative_path: meta.relative_path,
-        }))
-
-        return [...groupRows, ...templateRows]
-    }, [templateMetas])
-
-    const templateTreeData = useMemo(
-        () => flatToTree(templateTreeRows).roots,
-        [templateTreeRows],
-    )
-
-    const activeTemplateMeta = useMemo(() => {
-        if (templateDocument) return templateDocument.meta
-        if (!templateSelectedKey) return null
-        return templateMetaMap.get(templateSelectedKey) ?? null
-    }, [templateDocument, templateMetaMap, templateSelectedKey])
-
-    const templateIsDirty = templateDocument ? templateDraft !== templateDocument.content : false
-
-    const templateDiagnostics = useMemo<TeraEditorDiagnostic[]>(() => {
-        if (!templatePageError?.line || !templatePageError.column) return []
-        return [{
-            message: templatePageError.raw_message,
-            severity: 'error',
-            startLineNumber: templatePageError.line,
-            startColumn: templatePageError.column,
-            endLineNumber: templatePageError.line,
-            endColumn: templatePageError.column + 1,
-            source: 'tera',
-        }]
-    }, [templatePageError])
-
-    const openTemplateDetail = useCallback(async (templateId: string) => {
-        if (!templateMetaMap.has(templateId)) return
-        setTemplateSelectedKey(templateId)
-        setTemplateView('detail')
-        setTemplateDocumentLoading(true)
-        setTemplatePageError(null)
-
-        try {
-            const document = await template_get(templateId)
-            setTemplateDocument(document)
-            setTemplateDraft(document.content)
-        } catch (error) {
-            setTemplateDocument(null)
-            setTemplateDraft('')
-            void showAlert('加载提示词模板失败: ' + error, 'error')
-        } finally {
-            setTemplateDocumentLoading(false)
-        }
-    }, [showAlert, templateMetaMap])
-
-    const handleTemplateTreeSelect = useCallback((key: string) => {
-        if (!templateMetaMap.has(key)) return
-        void openTemplateDetail(key)
-    }, [openTemplateDetail, templateMetaMap])
-
-    const handleTemplateBack = useCallback(async () => {
-        if (templateIsDirty) {
-            const result = await showAlert('未保存的更改将丢失，是否继续？', 'warning', 'confirm')
-            if (result !== 'yes') return
-        }
-
-        setTemplateView('list')
-        setTemplateDocument(null)
-        setTemplateDraft('')
-        setTemplatePageError(null)
-        setTemplateDocumentLoading(false)
-        setTemplateSelectedKey('')
-    }, [showAlert, templateIsDirty])
-
-    const handleTemplateRestore = useCallback(async () => {
-        if (!templateDocument) return
-        const result = await showAlert(
-            '恢复默认内容后，当前所有更改都会丢失，是否继续？',
-            'warning',
-            'confirm'
-        )
-        if (result !== 'yes') return
-
-        try {
-            setTemplateRestoring(true)
-            const defaultContent = await template_get_default(templateDocument.meta.id)
-            setTemplateDraft(defaultContent)
-            setTemplatePageError(null)
-        } catch (error) {
-            void showAlert('恢复默认内容失败: ' + error, 'error')
-        } finally {
-            setTemplateRestoring(false)
-        }
-    }, [showAlert, templateDocument])
-
-    const handleOpenTemplateRootDir = useCallback(async () => {
-        try {
-            const path = await template_get_local_root_dir()
-            handleOpenDir(path)
-        } catch (error) {
-            void showAlert('打开提示词模板目录失败: ' + error, 'error')
-        }
-    }, [handleOpenDir, showAlert])
-
-    const handleOpenTemplateFilePath = useCallback(async () => {
-        if (!activeTemplateMeta) return
-        try {
-            const path = await template_get_effective_path(activeTemplateMeta.id)
-            handleOpenDir(path)
-        } catch (error) {
-            void showAlert('打开提示词模板文件失败: ' + error, 'error')
-        }
-    }, [activeTemplateMeta, handleOpenDir, showAlert])
-
-    const handleTemplateSave = useCallback(async () => {
-        if (!templateDocument) return
-
-        try {
-            setTemplateSaving(true)
-            setTemplatePageError(null)
-            const result: TemplateSaveResult = await template_save(templateDocument.meta.id, templateDraft)
-
-            if (result.status === 'success') {
-                setTemplateDocument(result.document)
-                setTemplateDraft(result.document.content)
-                void showAlert('提示词模板已保存', 'success', 'nonInvasive', 2000)
-                return
-            }
-
-            if (result.status === 'validation_error') {
-                setTemplatePageError(result.error)
-                return
-            }
-
-            setTemplatePageError({
-                message: '保存失败',
-                raw_message: result.message,
-                line: null,
-                column: null,
-            })
-            void showAlert('保存提示词模板失败: ' + result.message, 'error')
-        } catch (error) {
-            const message = String(error)
-            setTemplatePageError({
-                message: '保存失败',
-                raw_message: message,
-                line: null,
-                column: null,
-            })
-            void showAlert('保存提示词模板失败: ' + message, 'error')
-        } finally {
-            setTemplateSaving(false)
-        }
-    }, [showAlert, templateDocument, templateDraft])
 
     const ttsVoiceOptions = useMemo(
         () => buildTtsVoiceOptions(selectedTtsPlugin, '未选择'),
@@ -2225,270 +2493,7 @@ export default function Settings({
                         </div>
                     )}
                         {activeTab === 'templates' && (
-                            <div className="settings-container fc-page-shell settings-template-shell">
-                                <div className="settings-title fc-page-header">
-                                    <div className="fc-page-title-block">
-                                        <h1 className="fc-page-title">提示词模板</h1>
-                                        <p className="fc-page-subtitle">集中管理内置提示词模板，保存后会立即检查语法是否有效。</p>
-                                    </div>
-                                </div>
-
-                                <div className="templates-workspace">
-                                {templateView === 'list' && (
-                                    <section className="settings-section fc-section-card templates-catalog-section">
-                                        <div className="templates-catalog-header">
-                                            <div>
-                                                <h2 className="settings-section-title fc-section-title">模板目录</h2>
-                                                <p className="templates-catalog-hint">
-                                                    共 {templateMetas.length} 个提示词模板，按用途分组展示。
-                                                </p>
-                                            </div>
-                                            <div className="templates-catalog-actions">
-                                                <Button type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        void handleOpenTemplateRootDir()
-                                                    }}
-                                                >
-                                                    打开本地路径
-                                                </Button>
-                                                <Button type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={templateListLoading}
-                                                    onClick={() => {
-                                                        loadTemplateList().catch(logger.error)
-                                                    }}
-                                                >
-                                                    {templateListLoading ? '刷新中…' : '刷新'}
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {templateListError ? (
-                                            <div className="settings-empty-state"
-                                                 style={{color: 'var(--fc-color-danger)'}}>
-                                                加载失败：{templateListError}
-                                                <div style={{marginTop: 8}}>
-                                                    <Button type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => {
-                                                            loadTemplateList().catch(logger.error)
-                                                        }}
-                                                    >
-                                                        重试
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ) : templateListLoading && templateTreeData.length === 0 ? (
-                                            <div className="settings-empty-state">加载中...</div>
-                                        ) : templateTreeData.length === 0 ? (
-                                            <div className="settings-empty-state">暂无可编辑的提示词模板。</div>
-                                        ) : (
-                                            <div className="templates-tree-shell">
-                                                <Tree
-                                                    treeData={templateTreeData}
-                                                    selectedKey={templateSelectedKey}
-                                                    expandedKeys={templateExpandedKeys}
-                                                    onExpandedKeysChange={setTemplateExpandedKeys}
-                                                    onSelect={handleTemplateTreeSelect}
-                                                    searchable
-                                                    searchPlaceholder="搜索名称"
-                                                    collapseDuration={0.13}
-                                                    indentSize={7}
-                                                    renderTitle={(node: CategoryTreeNode) => {
-                                                        const row = node.raw as TemplateTreeRow
-                                                        if (!row.template_id) {
-                                                            return (
-                                                                <div className="templates-tree-group-title">
-                                                                    {row.name}
-                                                                </div>
-                                                            )
-                                                        }
-                                                        return (
-                                                            <div className="templates-tree-item">
-                                                                <div
-                                                                    className="templates-tree-item-name">{row.name}</div>
-                                                            </div>
-                                                        )
-                                                    }}
-                                                    canDrag={() => false}
-                                                    canDrop={() => false}
-                                                    canRename={() => false}
-                                                    canDelete={() => false}
-                                                    canCreate={() => false}
-                                                />
-                                            </div>
-                                        )}
-                                    </section>
-                                )}
-
-                                {templateView === 'detail' && (
-                                    <section className="settings-section fc-section-card templates-detail-section">
-                                        <div className="templates-detail-toolbar">
-                                            <Button type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    void handleTemplateBack()
-                                                }}
-                                            >
-                                                返回
-                                            </Button>
-                                            <div className="templates-detail-toolbar-actions">
-                                                <Button type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={!templateDocument}
-                                                    onClick={() => {
-                                                        void handleOpenTemplateFilePath()
-                                                    }}
-                                                >
-                                                    打开本地路径
-                                                </Button>
-                                                <Button type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={!templateDocument || templateRestoring || templateSaving}
-                                                    onClick={() => {
-                                                        void handleTemplateRestore()
-                                                    }}
-                                                >
-                                                    {templateRestoring ? '恢复中...' : '恢复默认'}
-                                                </Button>
-                                                <Button type="button"
-                                                    size="sm"
-                                                    disabled={!templateDocument || !templateIsDirty || templateSaving || templateDocumentLoading}
-                                                    onClick={() => {
-                                                        void handleTemplateSave()
-                                                    }}
-                                                >
-                                                    {templateSaving ? '保存中...' : '保存'}
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {activeTemplateMeta ? (
-                                            <>
-                                                <div className="templates-detail-header">
-                                                    <div className="templates-detail-heading">
-                                                        <div className="templates-detail-topline">
-                                                            <div className="templates-detail-caption">当前内容</div>
-                                                            <span className="templates-detail-badge">
-                                                            {TEMPLATE_GROUP_LABELS[activeTemplateMeta.group] ?? activeTemplateMeta.group}
-                                                        </span>
-                                                        </div>
-                                                        <h2 className="templates-detail-title">{activeTemplateMeta.title}</h2>
-                                                        <div className="templates-detail-path">
-                                                            {activeTemplateMeta.relative_path}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <details className="templates-detail-disclosure">
-                                                    <summary className="templates-detail-disclosure-summary">
-                                                        <span>用途说明与参数</span>
-                                                        <span className="templates-detail-disclosure-meta">
-                                                        用于：{activeTemplateMeta.appear_in}
-                                                    </span>
-                                                        <span className="templates-detail-disclosure-meta">
-                                                        参数：{activeTemplateMeta.params.length} 个
-                                                    </span>
-                                                    </summary>
-                                                    <div className="templates-detail-grid">
-                                                        <div className="templates-detail-card">
-                                                            <div className="templates-detail-label">作用</div>
-                                                            <p className="templates-detail-text">{activeTemplateMeta.purpose}</p>
-                                                        </div>
-                                                        <div className="templates-detail-card">
-                                                            <div className="templates-detail-label">用于哪里</div>
-                                                            <p className="templates-detail-text">{activeTemplateMeta.appear_in}</p>
-                                                        </div>
-                                                        <div
-                                                            className="templates-detail-card templates-detail-card--params">
-                                                            <div className="templates-detail-label">参数</div>
-                                                            {activeTemplateMeta.params.length === 0 ? (
-                                                                <p className="templates-detail-text">这段内容不依赖额外参数。</p>
-                                                            ) : (
-                                                                <div className="templates-param-list">
-                                                                    {activeTemplateMeta.params.map(param => (
-                                                                        <div key={param.name}
-                                                                             className="templates-param-item">
-                                                                            <div
-                                                                                className="templates-param-name">{param.name}</div>
-                                                                            <div
-                                                                                className="templates-param-desc">{param.description}</div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </details>
-
-                                                {templatePageError && (
-                                                    <div className="templates-error-panel">
-                                                        <div
-                                                            className="templates-error-title">{templatePageError.message}</div>
-                                                        {(templatePageError.line && templatePageError.column) ? (
-                                                            <div className="templates-error-location">
-                                                                第 {templatePageError.line} 行，第 {templatePageError.column} 列
-                                                            </div>
-                                                        ) : null}
-                                                        <pre
-                                                            className="templates-error-raw">{templatePageError.raw_message}</pre>
-                                                    </div>
-                                                )}
-
-                                                <div className="templates-editor-shell">
-                                                    {templateDocumentLoading && !templateDocument ? (
-                                                        <div className="settings-empty-state">加载中...</div>
-                                                    ) : !templateDocument ? (
-                                                        <div
-                                                            className="settings-empty-state">加载失败，请返回目录后重试。</div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="templates-editor-meta">
-                                                            <span>
-                                                                当前来源：{templateDocument.is_override ? '你的自定义版本' : '系统默认版本'}
-                                                            </span>
-                                                                <span>
-                                                                {templateIsDirty ? '存在未保存更改' : '内容已保存'}
-                                                            </span>
-                                                            </div>
-                                                            <TeraEditor
-                                                                value={templateDraft}
-                                                                onChange={(value) => {
-                                                                    setTemplateDraft(value)
-                                                                    if (templatePageError) {
-                                                                        setTemplatePageError(null)
-                                                                    }
-                                                                }}
-                                                                height="100%"
-                                                                minHeight={0}
-                                                                fontSize={settings.editor_font_size}
-                                                                lineHeight={24}
-                                                                wordWrap="on"
-                                                                diagnostics={templateDiagnostics}
-                                                                placeholder="请输入提示词模板内容"
-                                                                className="templates-editor"
-                                                                style={{minHeight: 0}}
-                                                            />
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="settings-empty-state">
-                                                未找到当前提示词模板信息。
-                                            </div>
-                                        )}
-                                    </section>
-                            )}
-                                </div>
-                        </div>
+                        <TemplatesPanel editorFontSize={settings.editor_font_size}/>
                     )}
                     </div>
                 </RollingBox>
