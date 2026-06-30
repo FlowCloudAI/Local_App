@@ -6,16 +6,15 @@ import {
     ai_fill_image_prompt,
     ai_list_plugins,
     ai_text_to_image,
-    db_get_entry,
     db_list_entries,
-    type Entry,
+    type EntryBrief,
     type ImageData,
     import_entry_images,
     import_remote_images,
     type PluginInfo,
 } from '../../../api'
 import type {EntryImage} from '../../entries/lib/entryImage'
-import {normalizeEntryImages, toEntryImageSrc} from '../../entries/lib/entryImage'
+import {toEntryImageSrc} from '../../entries/lib/entryImage'
 import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectCoverPickerModal.css'
@@ -43,23 +42,22 @@ interface ProjectCoverPickerModalProps {
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
 
-function extractEntryImages(entry: Entry): CoverLibraryItem[] {
-    const normalizedImages = normalizeEntryImages(entry.images)
-    return normalizedImages
-        .map((image, index) => {
-            const src = toEntryImageSrc(image)
-            const path = image.path ?? null
-            if (!src || !path) return null
+function extractEntryCoverImage(entry: EntryBrief): CoverLibraryItem | null {
+    if (!entry.cover) return null
+    const image: EntryImage = {
+        path: entry.cover,
+        is_cover: true,
+    }
+    const src = toEntryImageSrc(image)
+    if (!src) return null
 
-            return {
-                key: `${entry.id}:${path}:${index}`,
-                entryId: entry.id,
-                entryTitle: entry.title ?? '未命名词条',
-                image,
-                src,
-            } satisfies CoverLibraryItem
-        })
-        .filter((item): item is NonNullable<typeof item> => item !== null)
+    return {
+        key: `${entry.id}:${entry.cover}`,
+        entryId: entry.id,
+        entryTitle: entry.title ?? '未命名词条',
+        image,
+        src,
+    }
 }
 
 export default function ProjectCoverPickerModal({
@@ -132,20 +130,9 @@ export default function ProjectCoverPickerModal({
                 setSelectedModel(defaultPlugin?.default_model ?? defaultPlugin?.models[0] ?? '')
                 setSelectedSize(defaultPlugin?.supported_sizes[0] ?? '')
 
-                const detailResults = await Promise.all(
-                    briefs.map(async (brief) => {
-                        try {
-                            return await db_get_entry(brief.id)
-                        } catch {
-                            return null
-                        }
-                    }),
-                )
-                if (cancelled) return
-
-                const images = detailResults
-                    .filter((entry): entry is Entry => Boolean(entry))
-                    .flatMap((entry) => extractEntryImages(entry))
+                const images = briefs
+                    .map(extractEntryCoverImage)
+                    .filter((item): item is CoverLibraryItem => Boolean(item))
                 setLibraryItems(images)
             } catch (error) {
                 if (!cancelled) {
