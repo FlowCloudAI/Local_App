@@ -71,6 +71,12 @@ import type {EntryRelationDraft} from '../../project-editor/components/EntryRela
 
 type EditorMode = 'edit' | 'browse'
 type ImageAddModalMode = 'add' | 'insert'
+type TtsVoiceState = {
+    options: { value: string; label: string }[]
+    selectable: boolean
+    pluginName: string | null
+    hint: string
+}
 type EntryEditorCache = {
     entry: Entry
     draft: EntryDraft
@@ -115,6 +121,13 @@ interface EntryDraft {
 interface EditorHistory {
     draft: EntryDraft
     relationDrafts: EntryRelationDraft[]
+}
+
+const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
+    options: [{value: '', label: '请先在设置中选择默认 TTS 插件'}],
+    selectable: false,
+    pluginName: null,
+    hint: '请先在设置中选择默认 TTS 插件',
 }
 
 function buildDraft(entry: Entry): EntryDraft {
@@ -189,7 +202,6 @@ export default function EntryEditor({
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [editorFontSize, setEditorFontSize] = useState(14)
-    const [autoSaveStatus, setAutoSaveStatus] = useState('')
     const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode)
     const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -198,20 +210,13 @@ export default function EntryEditor({
     const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
 
     const [projectDataLoading, setProjectDataLoading] = useState(false)
-    const [ttsVoiceOptions, setTtsVoiceOptions] = useState<{ value: string; label: string }[]>([
-        {value: '', label: '请先在设置中选择默认 TTS 插件'},
-    ])
-    const [ttsVoiceSelectable, setTtsVoiceSelectable] = useState(false)
-    const [ttsVoicePluginName, setTtsVoicePluginName] = useState<string | null>(null)
-    const [ttsVoiceHint, setTtsVoiceHint] = useState('请先在设置中选择默认 TTS 插件')
+    const [ttsVoiceState, setTtsVoiceState] = useState<TtsVoiceState>(DEFAULT_TTS_VOICE_STATE)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
     const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
-    const [, setLinksLoading] = useState(false)
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
-    const [imageAddModalOpen, setImageAddModalOpen] = useState(false)
-    const [imageAddModalMode, setImageAddModalMode] = useState<ImageAddModalMode>('add')
+    const [imageAddModalMode, setImageAddModalMode] = useState<ImageAddModalMode | null>(null)
     const entryCacheRef = useRef<Record<string, EntryEditorCache>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -284,35 +289,46 @@ export default function EntryEditor({
                 if (cancelled) return
 
                 const selectedPlugin = resolvePreferredTtsPlugin(plugins as PluginInfo[], settings.tts.plugin_id)
-                setTtsVoicePluginName(selectedPlugin?.name ?? null)
-                setTtsVoiceOptions(buildTtsVoiceOptions(selectedPlugin, '跟随全局默认'))
+                const options = buildTtsVoiceOptions(selectedPlugin, '跟随全局默认')
 
                 if (!selectedPlugin) {
-                    setTtsVoiceSelectable(false)
-                    setTtsVoiceHint('当前没有可用的 TTS 插件')
+                    setTtsVoiceState({
+                        options,
+                        selectable: false,
+                        pluginName: null,
+                        hint: '当前没有可用的 TTS 插件',
+                    })
                     return
                 }
 
                 if (selectedPlugin.supported_voices.length === 0) {
-                    setTtsVoiceSelectable(false)
-                    setTtsVoiceHint(`插件「${selectedPlugin.name}」未声明可选音色`)
+                    setTtsVoiceState({
+                        options,
+                        selectable: false,
+                        pluginName: selectedPlugin.name,
+                        hint: `插件「${selectedPlugin.name}」未声明可选音色`,
+                    })
                     return
                 }
 
-                setTtsVoiceSelectable(true)
-                if (settings.tts.plugin_id) {
-                    setTtsVoiceHint(`使用「${selectedPlugin.name}」提供的音色列表`)
-                    return
-                }
-                setTtsVoiceHint(`当前未设置默认 TTS 插件，暂按「${selectedPlugin.name}」的音色列表展示`)
+                setTtsVoiceState({
+                    options,
+                    selectable: true,
+                    pluginName: selectedPlugin.name,
+                    hint: settings.tts.plugin_id
+                        ? `使用「${selectedPlugin.name}」提供的音色列表`
+                        : `当前未设置默认 TTS 插件，暂按「${selectedPlugin.name}」的音色列表展示`,
+                })
             })
             .catch((loadError) => {
                 if (cancelled) return
                 logger.error('加载 TTS 音色列表失败', loadError)
-                setTtsVoiceSelectable(false)
-                setTtsVoicePluginName(null)
-                setTtsVoiceOptions([{value: '', label: '音色列表加载失败'}])
-                setTtsVoiceHint('音色列表加载失败')
+                setTtsVoiceState({
+                    options: [{value: '', label: '音色列表加载失败'}],
+                    selectable: false,
+                    pluginName: null,
+                    hint: '音色列表加载失败',
+                })
             })
 
         return () => {
@@ -393,7 +409,6 @@ export default function EntryEditor({
 
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
-        setAutoSaveStatus('')
         lastSuccessfulSaveAtRef.current = Date.now()
         // 切换词条时重置历史追踪
         historyInitializedRef.current = null
@@ -454,7 +469,6 @@ export default function EntryEditor({
                 setLoading(false)
             })
 
-        setLinksLoading(true)
         Promise.all([
             db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
             db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
@@ -466,10 +480,6 @@ export default function EntryEditor({
                 setIncomingLinks(incoming)
                 setEntryRelations(relations)
                 setRelationDrafts(relations.map((relation) => buildRelationDraft(entryId, relation)))
-            })
-            .finally(() => {
-                if (cancelled) return
-                setLinksLoading(false)
             })
 
         return () => {
@@ -699,22 +709,12 @@ export default function EntryEditor({
         onDirtyChangeRef.current?.(hasChanges)
     }, [hasChanges])
 
-    useEffect(() => {
-        if (!entry) return
-        if (!hasChanges) {
-            setAutoSaveStatus('')
-            return
-        }
-        if (!trimmedTitle) {
-            setAutoSaveStatus('标题为空，无法保存')
-            return
-        }
-        if (hasInvalidRelationDrafts) {
-            setAutoSaveStatus('存在未完成关系，请处理后手动保存')
-            return
-        }
-        if (saving) return
-        setAutoSaveStatus('存在未保存修改')
+    const saveStatusText = useMemo(() => {
+        if (!entry || !hasChanges) return ''
+        if (!trimmedTitle) return '标题为空，无法保存'
+        if (hasInvalidRelationDrafts) return '存在未完成关系，请处理后手动保存'
+        if (saving) return ''
+        return '存在未保存修改'
     }, [entry, hasChanges, hasInvalidRelationDrafts, saving, trimmedTitle])
 
     useEffect(() => {
@@ -803,7 +803,6 @@ export default function EntryEditor({
         historyInitializedRef.current = null
         undoRedo.reset({draft: savedDraft, relationDrafts: savedRelationDrafts})
         lastSuccessfulSaveAtRef.current = Date.now()
-        setAutoSaveStatus('')
 
         if (reason === 'external') {
             if (previousEntry && previousEntry.title !== refreshed.title) {
@@ -899,7 +898,6 @@ export default function EntryEditor({
             }
             await onSaved?.(refreshed)
             lastSuccessfulSaveAtRef.current = Date.now()
-            setAutoSaveStatus('')
             void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
         } catch (e) {
             const message = String(e)
@@ -974,7 +972,6 @@ export default function EntryEditor({
 
     function openImageAddModal(mode: ImageAddModalMode) {
         setImageAddModalMode(mode)
-        setImageAddModalOpen(true)
     }
 
     async function handleUploadImages(): Promise<EntryImage[]> {
@@ -1137,7 +1134,6 @@ export default function EntryEditor({
         ),
         execute: () => {
             setImageAddModalMode('insert')
-            setImageAddModalOpen(true)
         },
     }), [])
 
@@ -1220,8 +1216,8 @@ export default function EntryEditor({
                             <span className="entry-editor-workspace__meta">
                             {editorMode === 'edit'
                                 ? (
-                                    autoSaveStatus
-                                        ? `${projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`} · ${autoSaveStatus}`
+                                    saveStatusText
+                                        ? `${projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`} · ${saveStatusText}`
                                         : (projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`)
                                 )
                                 : '单击双链查看预览，双击或按钮可在新页签打开。'}
@@ -1246,10 +1242,10 @@ export default function EntryEditor({
                                 implantedTagSchemaIdSet={entryTags.implantedTagSchemaIdSet}
                                 availableTagSchemaOptions={entryTags.availableTagSchemaOptions}
                                 tagSchemaPickerValue={entryTags.tagSchemaPickerValue}
-                                ttsVoiceOptions={ttsVoiceOptions}
-                                ttsVoiceSelectable={ttsVoiceSelectable}
-                                ttsVoicePluginName={ttsVoicePluginName}
-                                ttsVoiceHint={ttsVoiceHint}
+                                ttsVoiceOptions={ttsVoiceState.options}
+                                ttsVoiceSelectable={ttsVoiceState.selectable}
+                                ttsVoicePluginName={ttsVoiceState.pluginName}
+                                ttsVoiceHint={ttsVoiceState.hint}
                                 onDraftChange={setDraft}
                                 onOpenImageAddModal={() => openImageAddModal('add')}
                                 onViewImageSet={() => {
@@ -1441,7 +1437,7 @@ export default function EntryEditor({
             />
 
             <EntryImageAddModal
-                open={imageAddModalOpen}
+                open={imageAddModalMode !== null}
                 projectId={projectId}
                 projectName={projectName}
                 entryTitle={draft.title || entry?.title || null}
@@ -1449,9 +1445,9 @@ export default function EntryEditor({
                 entryType={draft.type || entry?.type || null}
                 aiPluginId={aiPluginId}
                 aiModel={aiModel}
-                mode={imageAddModalMode}
+                mode={imageAddModalMode ?? 'add'}
                 existingImages={draft.images}
-                onClose={() => setImageAddModalOpen(false)}
+                onClose={() => setImageAddModalMode(null)}
                 onUploadLocal={handleUploadImages}
                 onOpenPluginManagement={onOpenPluginManagement}
                 onAddAiImages={handleAddAiImages}
