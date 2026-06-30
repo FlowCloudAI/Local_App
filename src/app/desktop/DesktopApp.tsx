@@ -47,6 +47,12 @@ type ProjectToolTabMeta = {
 
 type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
 type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
+type OpenSettingsOptions = {
+    tab?: SettingsTab
+    pluginKind?: AiMissingPluginKind | 'all'
+    focusTarget?: SettingsFocusTarget | null
+    focusRequest?: boolean
+}
 const AI_MIN_PANEL_WIDTH = 500
 const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
 const RECENT_PAGE_LIMIT = 10
@@ -773,6 +779,19 @@ function DesktopAppContent() {
         }
     }, [entryDirtyMap, showAlert, win])
 
+    const openSettings = useCallback((options: OpenSettingsOptions = {}) => {
+        setSettingsInitialTab(options.tab ?? 'system')
+        setSettingsPluginKind(options.pluginKind ?? 'all')
+        setSettingsFocusTarget(options.focusTarget ?? null)
+        if (options.focusRequest) {
+            setSettingsFocusRequestId(requestId => requestId + 1)
+        }
+        setSelectedKey('settings')
+        dispatchTabState({type: 'clear-active'})
+        setMainContentKey('settings')
+        collapseAiPanel()
+    }, [collapseAiPanel])
+
     useEffect(() => {
         const p = win.onCloseRequested(async (event) => {
             if (windowClosingRef.current) return
@@ -801,36 +820,17 @@ function DesktopAppContent() {
             return
         }
         if (key === 'settings') {
-            setSettingsInitialTab('system')
-            setSettingsPluginKind('all')
-            setSettingsFocusTarget(null)
-            setSelectedKey('settings')
-            dispatchTabState({type: 'clear-active'})
-            setMainContentKey('settings')
-            collapseAiPanel()
+            openSettings()
         }
-    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, sidePanelContentKey])
+    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, openSettings, sidePanelContentKey])
 
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
-        setSettingsInitialTab('plugins')
-        setSettingsPluginKind(kind)
-        setSettingsFocusTarget(null)
-        setSelectedKey('settings')
-        dispatchTabState({type: 'clear-active'})
-        setMainContentKey('settings')
-        collapseAiPanel()
-    }, [collapseAiPanel])
+        openSettings({tab: 'plugins', pluginKind: kind})
+    }, [openSettings])
 
     const handleOpenWriterModeSettings = useCallback(() => {
-        setSettingsInitialTab('ai')
-        setSettingsPluginKind('all')
-        setSettingsFocusTarget('writer-mode')
-        setSettingsFocusRequestId((requestId) => requestId + 1)
-        setSelectedKey('settings')
-        dispatchTabState({type: 'clear-active'})
-        setMainContentKey('settings')
-        collapseAiPanel()
-    }, [collapseAiPanel])
+        openSettings({tab: 'ai', focusTarget: 'writer-mode', focusRequest: true})
+    }, [openSettings])
 
     const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {
         setSelectedKey('ai-chat')
