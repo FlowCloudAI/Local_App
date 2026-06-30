@@ -1070,8 +1070,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                     imageHeight="100%"
                                                     contentAreaRatio={0.2}
                                                     hoverContentAreaRatio={0.8}
-                                                    overlayStartOpacity={1}
-                                                    overlayEndOpacity={0}
                                                 />
                                             </div>
                                         )

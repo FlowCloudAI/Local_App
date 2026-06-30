@@ -182,8 +182,6 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
             imageHeight="100%"
             contentAreaRatio={0.5}
             hoverContentAreaRatio={0.8}
-            overlayStartOpacity={1}
-            overlayEndOpacity={0}
             onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
         />
     )

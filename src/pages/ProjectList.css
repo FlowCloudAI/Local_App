@@ -535,6 +535,7 @@
 .project-list-card.fc-card {
   background: var(--fc-color-bg-tertiary);
   box-shadow: none;
+  --fc-card-overlay-background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--fc-color-bg-overlay) 20%, transparent) 30%, color-mix(in srgb, var(--fc-color-bg-overlay) 50%, var(--fc-gray-1000)) 58%, color-mix(in srgb, var(--fc-color-bg-overlay) 10%, var(--fc-gray-1000)) 100%);
 }
 
 .project-list-star-tag {
@@ -602,7 +603,9 @@
   min-height: 45%;
   justify-content: flex-end;
   gap: 0.45rem;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-overlay) 20%, transparent) 0%, color-mix(in srgb, var(--fc-color-bg-overlay) 50%, var(--fc-gray-1000)) 35%, color-mix(in srgb, var(--fc-color-bg-overlay) 10%, var(--fc-gray-1000)) 100%);
+}
+
+.project-list-card::before {
   backdrop-filter: blur(1px);
 }
 
