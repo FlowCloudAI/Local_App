@@ -42,6 +42,9 @@ import EntryEditorLinkPreview from './EntryEditorLinkPreview'
 import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
+import useEntryImageState from '../hooks/useEntryImageState'
+import useEntryRelationState from '../hooks/useEntryRelationState'
+import useEntrySaveStatus from '../hooks/useEntrySaveStatus'
 import {buildEntryTagsPayload,} from './entryTagUtils'
 
 import './EntryEditor.css'
@@ -52,9 +55,9 @@ import {
     parseInternalEntryHref,
     resolveMarkdownAnchor,
 } from '../lib/entryMarkdown'
-import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages, toEntryImageSrc,} from '../lib/entryImage'
+import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
-import {areRelationDraftsEqual, buildRelationDraft, hasInvalidRelationDraft,} from '../lib/entryRelation'
+import {buildRelationDraft,} from '../lib/entryRelation'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
 import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import {
@@ -70,7 +73,6 @@ import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/tts
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
-type ImageAddModalMode = 'add' | 'insert'
 type TtsVoiceState = {
     options: { value: string; label: string }[]
     selectable: boolean
@@ -204,8 +206,6 @@ export default function EntryEditor({
     const [editorFontSize, setEditorFontSize] = useState(14)
     const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode)
-    const [lightboxOpen, setLightboxOpen] = useState(false)
-    const [lightboxIndex, setLightboxIndex] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
     const [projectEntryDetailsById, setProjectEntryDetailsById] = useState<Record<string, Entry>>({})
 
@@ -213,10 +213,27 @@ export default function EntryEditor({
     const [ttsVoiceState, setTtsVoiceState] = useState<TtsVoiceState>(DEFAULT_TTS_VOICE_STATE)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
-    const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
-    const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
-    const [imageAddModalMode, setImageAddModalMode] = useState<ImageAddModalMode | null>(null)
+    const {
+        entryRelations,
+        setEntryRelations,
+        relationDrafts,
+        setRelationDrafts,
+        hasRelationChanges,
+        hasInvalidRelationDrafts,
+        clearRelations,
+        applySavedRelations,
+    } = useEntryRelationState(entryId)
+    const {
+        lightboxOpen,
+        setLightboxOpen,
+        lightboxIndex,
+        setLightboxIndex,
+        lightboxImages,
+        imageAddModalMode,
+        openImageAddModal,
+        closeImageAddModal,
+    } = useEntryImageState(draft.images)
     const openEntryStateCacheRef = useRef<Record<string, OpenEntryEditorState>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -435,8 +452,7 @@ export default function EntryEditor({
         wikiLink.setWikiDraft?.(null)
         setOutgoingLinks([])
         setIncomingLinks([])
-        setEntryRelations([])
-        setRelationDrafts([])
+        clearRelations()
 
         if (cachedState) {
             setEntry(cachedState.entry)
@@ -478,15 +494,14 @@ export default function EntryEditor({
                 if (cancelled) return
                 setOutgoingLinks(outgoing)
                 setIncomingLinks(incoming)
-                setEntryRelations(relations)
-                setRelationDrafts(relations.map((relation) => buildRelationDraft(entryId, relation)))
+                applySavedRelations(relations)
             })
 
         return () => {
             cancelled = true
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [linkPreview.closeLinkPreview, wikiLink.setWikiDraft, entryId])
+    }, [linkPreview.closeLinkPreview, wikiLink.setWikiDraft, entryId, clearRelations, applySavedRelations])
 
     // projectId 变化时重置词条列表状态
     useEffect(() => {
@@ -601,10 +616,6 @@ export default function EntryEditor({
     const trimmedSummary = useMemo(() => normalizeComparableText(draft.summary), [draft.summary])
     const normalizedContent = useMemo(() => normalizeComparableContent(draft.content), [draft.content])
     const initialDraft = useMemo(() => (entry ? buildDraft(entry) : null), [entry])
-    const initialRelationDrafts = useMemo(
-        () => entryRelations.map((relation) => buildRelationDraft(entryId, relation)),
-        [entryId, entryRelations],
-    )
     const comparableInitial = useMemo(() => {
         if (!initialDraft) return null
         return {
@@ -617,14 +628,6 @@ export default function EntryEditor({
             images: initialDraft.images,
         }
     }, [initialDraft])
-    const hasRelationChanges = useMemo(
-        () => !areRelationDraftsEqual(relationDrafts, initialRelationDrafts),
-        [initialRelationDrafts, relationDrafts],
-    )
-    const hasInvalidRelationDrafts = useMemo(
-        () => relationDrafts.some((item) => hasInvalidRelationDraft(item, entryId)),
-        [entryId, relationDrafts],
-    )
     const hasChanges = Boolean(
         comparableInitial && (
             trimmedTitle !== comparableInitial.title
@@ -709,13 +712,13 @@ export default function EntryEditor({
         onDirtyChangeRef.current?.(hasChanges)
     }, [hasChanges])
 
-    const saveStatusText = useMemo(() => {
-        if (!entry || !hasChanges) return ''
-        if (!trimmedTitle) return '标题为空，无法保存'
-        if (hasInvalidRelationDrafts) return '存在未完成关系，请处理后手动保存'
-        if (saving) return ''
-        return '存在未保存修改'
-    }, [entry, hasChanges, hasInvalidRelationDrafts, saving, trimmedTitle])
+    const saveStatusText = useEntrySaveStatus({
+        entryLoaded: Boolean(entry),
+        hasChanges,
+        trimmedTitle,
+        hasInvalidRelationDrafts,
+        saving,
+    })
 
     useEffect(() => {
         if (!entry) return
@@ -732,12 +735,6 @@ export default function EntryEditor({
         }
         delete openEntryStateCacheRef.current[entryId]
     }, [draft, editorMode, entry, entryId, entryRelations, hasChanges, relationDrafts])
-
-    const lightboxImages = useMemo(() => draft.images.map((image) => ({
-        ...image,
-        src: toEntryImageSrc(image),
-    })), [draft.images])
-
 
     // 预览源码缓存：draft.content 不变时不重算
     const previewContent = useMemo(
@@ -779,8 +776,7 @@ export default function EntryEditor({
         setDraft(buildDraft(refreshed))
         setOutgoingLinks(refreshedOutgoing)
         setIncomingLinks(refreshedIncoming)
-        setEntryRelations(refreshedRelations)
-        setRelationDrafts(refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation)))
+        applySavedRelations(refreshedRelations, refreshed.id)
         setProjectEntryDetailsById((current) => ({...current, [refreshed.id]: refreshed}))
         setProjectEntries((current) => {
             const next = current.map((item) => (
@@ -812,7 +808,7 @@ export default function EntryEditor({
         }
 
         return refreshed
-    }, [entryId, undoRedo])
+    }, [applySavedRelations, entryId, undoRedo])
 
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
@@ -868,12 +864,10 @@ export default function EntryEditor({
         setError(null)
 
         try {
-            for (const draftRelation of relationDrafts) {
-                if (hasInvalidRelationDraft(draftRelation, entry.id)) {
-                    setError('存在未完成的词条关系，请先选择目标词条。')
-                    setSaving(false)
-                    return
-                }
+            if (hasInvalidRelationDrafts) {
+                setError('存在未完成的词条关系，请先选择目标词条。')
+                setSaving(false)
+                return
             }
 
             const savedBundle = await db_save_entry_bundle({
@@ -908,7 +902,7 @@ export default function EntryEditor({
         } finally {
             setSaving(false)
         }
-    }, [entry, canSave, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, relationDrafts, onTitleChange, onSaved, showAlert, reloadEntryFromDatabase])
+    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, relationDrafts, onTitleChange, onSaved, showAlert, reloadEntryFromDatabase, setEntryRelations])
 
     useEffect(() => {
         canSaveRef.current = canSave
@@ -921,7 +915,7 @@ export default function EntryEditor({
         isApplyingHistoryRef.current = true
         setDraft(history.draft)
         setRelationDrafts(history.relationDrafts)
-    }, [])
+    }, [setRelationDrafts])
 
     const handleUndo = useCallback(() => {
         const prev = undoRedo.undo()
@@ -968,11 +962,6 @@ export default function EntryEditor({
             window.removeEventListener('keydown', handleKeyShortcut)
         }
     }, [handleUndo, handleRedo])
-
-
-    function openImageAddModal(mode: ImageAddModalMode) {
-        setImageAddModalMode(mode)
-    }
 
     async function handleUploadImages(): Promise<EntryImage[]> {
         try {
@@ -1133,9 +1122,9 @@ export default function EntryEditor({
             </svg>
         ),
         execute: () => {
-            setImageAddModalMode('insert')
+            openImageAddModal('insert')
         },
-    }), [])
+    }), [openImageAddModal])
 
     const markdownToolbarCommands = useMemo<ICommand[]>(() => [
         withToolbarTitle(commands.bold, '加粗'),
@@ -1443,7 +1432,7 @@ export default function EntryEditor({
                 aiModel={aiModel}
                 mode={imageAddModalMode ?? 'add'}
                 existingImages={draft.images}
-                onClose={() => setImageAddModalMode(null)}
+                onClose={closeImageAddModal}
                 onUploadLocal={handleUploadImages}
                 onOpenPluginManagement={onOpenPluginManagement}
                 onAddAiImages={handleAddAiImages}
