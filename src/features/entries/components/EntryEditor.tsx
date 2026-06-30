@@ -77,7 +77,7 @@ type TtsVoiceState = {
     pluginName: string | null
     hint: string
 }
-type EntryEditorCache = {
+type OpenEntryEditorState = {
     entry: Entry
     draft: EntryDraft
     editorMode: EditorMode
@@ -207,7 +207,7 @@ export default function EntryEditor({
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
-    const [entryCache, setEntryCache] = useState<Record<string, Entry>>({})
+    const [projectEntryDetailsById, setProjectEntryDetailsById] = useState<Record<string, Entry>>({})
 
     const [projectDataLoading, setProjectDataLoading] = useState(false)
     const [ttsVoiceState, setTtsVoiceState] = useState<TtsVoiceState>(DEFAULT_TTS_VOICE_STATE)
@@ -217,7 +217,7 @@ export default function EntryEditor({
     const [relationDrafts, setRelationDrafts] = useState<EntryRelationDraft[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [imageAddModalMode, setImageAddModalMode] = useState<ImageAddModalMode | null>(null)
-    const entryCacheRef = useRef<Record<string, EntryEditorCache>>({})
+    const openEntryStateCacheRef = useRef<Record<string, OpenEntryEditorState>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
     const previewContainerRef = useRef<HTMLDivElement | null>(null)
@@ -387,7 +387,7 @@ export default function EntryEditor({
                 projectEntriesRef.current = next
                 return next
             })
-            setEntryCache((current) => ({...current, [created.id]: created}))
+            setProjectEntryDetailsById((current) => ({...current, [created.id]: created}))
             return {id: created.id, title: created.title}
         },
         onShowAlert: (message, type) => {
@@ -400,7 +400,7 @@ export default function EntryEditor({
     })
 
     const linkPreview = useLinkPreview({
-        entryCache,
+        entryCache: projectEntryDetailsById,
         projectEntries,
         ensureProjectEntriesLoaded: () => ensureProjectEntriesLoaded(),
         onOpenEntry,
@@ -420,14 +420,14 @@ export default function EntryEditor({
 
     useEffect(() => {
         const openEntryIdSet = new Set(openEntryIds)
-        entryCacheRef.current = Object.fromEntries(
-            Object.entries(entryCacheRef.current).filter(([cachedEntryId]) => openEntryIdSet.has(cachedEntryId)),
+        openEntryStateCacheRef.current = Object.fromEntries(
+            Object.entries(openEntryStateCacheRef.current).filter(([cachedEntryId]) => openEntryIdSet.has(cachedEntryId)),
         )
     }, [openEntryIds])
 
     useEffect(() => {
         let cancelled = false
-        const cachedState = entryCacheRef.current[entryId]
+        const cachedState = openEntryStateCacheRef.current[entryId]
         setLoading(true)
         setSaving(false)
         setError(null)
@@ -540,7 +540,7 @@ export default function EntryEditor({
                         }
                     }),
             )
-            setEntryCache((current) => ({
+            setProjectEntryDetailsById((current) => ({
                 ...current,
                 ...Object.fromEntries(results.filter(Boolean) as Array<readonly [string, Entry]>),
             }))
@@ -720,7 +720,7 @@ export default function EntryEditor({
     useEffect(() => {
         if (!entry) return
         if (hasChanges) {
-            entryCacheRef.current[entryId] = {
+            openEntryStateCacheRef.current[entryId] = {
                 entry,
                 draft,
                 editorMode,
@@ -730,7 +730,7 @@ export default function EntryEditor({
             }
             return
         }
-        delete entryCacheRef.current[entryId]
+        delete openEntryStateCacheRef.current[entryId]
     }, [draft, editorMode, entry, entryId, entryRelations, hasChanges, relationDrafts])
 
     const lightboxImages = useMemo(() => draft.images.map((image) => ({
@@ -747,7 +747,7 @@ export default function EntryEditor({
 
     const backlinks = useMemo(() => {
         const linkedEntryIds = new Set(incomingLinks.map((link) => link.a_id))
-        return Object.values(entryCache)
+        return Object.values(projectEntryDetailsById)
             .filter((item) => item.id !== entryId && linkedEntryIds.has(item.id))
             .sort((left, right) => parseDateValue(right.updated_at as string | null | undefined) - parseDateValue(left.updated_at as string | null | undefined))
             .map((item) => ({
@@ -761,7 +761,7 @@ export default function EntryEditor({
                 updated_at: String(item.updated_at ?? ''),
                 content: item.content,
             }))
-    }, [entryCache, entryId, incomingLinks])
+    }, [projectEntryDetailsById, entryId, incomingLinks])
 
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
 
@@ -781,7 +781,7 @@ export default function EntryEditor({
         setIncomingLinks(refreshedIncoming)
         setEntryRelations(refreshedRelations)
         setRelationDrafts(refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation)))
-        setEntryCache((current) => ({...current, [refreshed.id]: refreshed}))
+        setProjectEntryDetailsById((current) => ({...current, [refreshed.id]: refreshed}))
         setProjectEntries((current) => {
             const next = current.map((item) => (
                 item.id === refreshed.id
@@ -1396,7 +1396,7 @@ export default function EntryEditor({
                         outgoingLinks={outgoingLinks}
                         backlinks={backlinks}
                         projectEntries={projectEntries}
-                        entryCache={entryCache}
+                        entryDetailsById={projectEntryDetailsById}
                         categories={categories}
                         onOpenEntry={onOpenEntry}
                         onRelationDraftsChange={setRelationDrafts}

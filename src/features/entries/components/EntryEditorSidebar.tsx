@@ -14,7 +14,7 @@ interface EntryEditorSidebarProps {
     outgoingLinks: EntryLink[]
     backlinks: (EntryBrief & { content?: string | null })[]
     projectEntries: EntryBrief[]
-    entryCache: Record<string, Entry>
+    entryDetailsById: Record<string, Entry>
     categories: Category[]
     onOpenEntry?: (entry: { id: string; title: string }) => void
     onRelationDraftsChange: (drafts: EntryRelationDraft[]) => void
@@ -30,7 +30,7 @@ export default function EntryEditorSidebar({
                                                outgoingLinks,
                                                backlinks,
                                                projectEntries,
-                                               entryCache,
+                                               entryDetailsById,
                                                categories,
                                                onOpenEntry,
                                                onRelationDraftsChange,
@@ -104,7 +104,7 @@ export default function EntryEditorSidebar({
                         ) : (
                             <div className="entry-editor-outgoing-links__list">
                                 {outgoingLinks.map((link) => {
-                                    const target = entryCache[link.b_id] ?? projectEntries.find((item) => item.id === link.b_id)
+                                    const target = entryDetailsById[link.b_id] ?? projectEntries.find((item) => item.id === link.b_id)
                                     return (
                                         <button
                                             key={link.id}
