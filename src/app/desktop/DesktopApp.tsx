@@ -15,7 +15,7 @@ import {type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, use
 import {useIdeaPanel} from '../../pages/useIdeaPanel'
 import ProjectEditor from '../../pages/ProjectEditor'
 import ProjectList from '../../pages/ProjectList.tsx'
-import Settings, {type SettingsFocusTarget, type SettingsTab} from '../../pages/Settings'
+import Settings, {type SettingsOpenIntent} from '../../pages/Settings'
 import DockableSidePanel from '../../shared/ui/layout/DockableSidePanel'
 import type {AiMissingPluginKind} from '../../shared/ui/AiPluginMissingOverlay'
 import type {ReportConversationContext} from '../../features/ai-chat/model/AiControllerTypes'
@@ -47,10 +47,7 @@ type ProjectToolTabMeta = {
 
 type MainContentKey = 'home' | 'relation' | 'map-editor' | 'settings'
 type SidePanelContentKey = 'idea' | 'ai-chat' | 'snapshot' | 'help'
-type OpenSettingsOptions = {
-    tab?: SettingsTab
-    pluginKind?: AiMissingPluginKind | 'all'
-    focusTarget?: SettingsFocusTarget | null
+type OpenSettingsOptions = Omit<SettingsOpenIntent, 'requestId'> & {
     focusRequest?: boolean
 }
 const AI_MIN_PANEL_WIDTH = 500
@@ -389,10 +386,12 @@ function DesktopAppContent() {
     const [sidePanelContentKey, setSidePanelContentKey] = useState<SidePanelContentKey>('ai-chat')
     const [mountedSidePanelKeys, setMountedSidePanelKeys] = useState<SidePanelContentKey[]>([])
     const [helpRequest, setHelpRequest] = useState<HelpPanelRequest | null>(null)
-    const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('system')
-    const [settingsPluginKind, setSettingsPluginKind] = useState<AiMissingPluginKind | 'all'>('all')
-    const [settingsFocusTarget, setSettingsFocusTarget] = useState<SettingsFocusTarget | null>(null)
-    const [settingsFocusRequestId, setSettingsFocusRequestId] = useState(0)
+    const [settingsOpenIntent, setSettingsOpenIntent] = useState<SettingsOpenIntent>({
+        tab: 'system',
+        pluginKind: 'all',
+        focus: null,
+        requestId: 0,
+    })
     const [aiPanelWidth, setAiPanelWidth] = useState(AI_MIN_PANEL_WIDTH)
     const [aiPanelCollapsed, setAiPanelCollapsed] = useState(true)
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
@@ -780,12 +779,12 @@ function DesktopAppContent() {
     }, [entryDirtyMap, showAlert, win])
 
     const openSettings = useCallback((options: OpenSettingsOptions = {}) => {
-        setSettingsInitialTab(options.tab ?? 'system')
-        setSettingsPluginKind(options.pluginKind ?? 'all')
-        setSettingsFocusTarget(options.focusTarget ?? null)
-        if (options.focusRequest) {
-            setSettingsFocusRequestId(requestId => requestId + 1)
-        }
+        setSettingsOpenIntent(current => ({
+            tab: options.tab ?? 'system',
+            pluginKind: options.pluginKind ?? 'all',
+            focus: options.focus ?? null,
+            requestId: options.focusRequest ? (current.requestId ?? 0) + 1 : (current.requestId ?? 0),
+        }))
         setSelectedKey('settings')
         dispatchTabState({type: 'clear-active'})
         setMainContentKey('settings')
@@ -829,7 +828,7 @@ function DesktopAppContent() {
     }, [openSettings])
 
     const handleOpenWriterModeSettings = useCallback(() => {
-        openSettings({tab: 'ai', focusTarget: 'writer-mode', focusRequest: true})
+        openSettings({tab: 'ai', focus: 'writer-mode', focusRequest: true})
     }, [openSettings])
 
     const handleStartCharacterChat = useCallback(async (projectId: string, entry: { id: string; title: string }) => {
@@ -1361,10 +1360,7 @@ function DesktopAppContent() {
                         <div className={`page-wrapper ${mainContentKey === 'settings' ? 'active' : ''}`}>
                             {mainContentKey === 'settings' && (
                                 <Settings
-                                    initialTab={settingsInitialTab}
-                                    initialPluginKind={settingsPluginKind}
-                                    initialFocus={settingsFocusTarget}
-                                    focusRequestId={settingsFocusRequestId}
+                                    openIntent={settingsOpenIntent}
                                     onBack={() => {
                                     setMainContentKey('home')
                                     setSelectedKey('')

@@ -66,7 +66,8 @@ import './Settings.css'
 
 export type SettingsTab = 'system' | 'ai' | 'plugins' | 'templates' | 'usage' | 'about'
 export type SettingsFocusTarget = 'writer-mode'
-type PluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
+export type SettingsPluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
+type PluginKindFilter = SettingsPluginKindFilter
 type AiSettingsSection = 'models' | 'permissions' | 'keys'
 type SearchSourceKey = keyof SearchSourceSettings
 
@@ -284,19 +285,24 @@ function SettingsSidebar({activeTab, onTabChange, onBack}: SettingsSidebarProps)
 
 interface SettingsProps {
     onBack?: () => void
-    initialTab?: SettingsTab
-    initialPluginKind?: PluginKindFilter
-    initialFocus?: SettingsFocusTarget | null
-    focusRequestId?: number
+    openIntent?: SettingsOpenIntent
+}
+
+export interface SettingsOpenIntent {
+    tab?: SettingsTab
+    pluginKind?: SettingsPluginKindFilter
+    focus?: SettingsFocusTarget | null
+    requestId?: number
 }
 
 export default function Settings({
                                      onBack,
-                                     initialTab = 'system',
-                                     initialPluginKind = 'all',
-                                     initialFocus = null,
-                                     focusRequestId = 0,
+                                     openIntent,
                                  }: SettingsProps) {
+    const initialTab = openIntent?.tab ?? 'system'
+    const initialPluginKind = openIntent?.pluginKind ?? 'all'
+    const initialFocus = openIntent?.focus ?? null
+    const focusRequestId = openIntent?.requestId ?? 0
     const {showAlert} = useAlert()
     const showAlertRef = useRef(showAlert)
     const writerModeFieldRef = useRef<HTMLDivElement>(null)
