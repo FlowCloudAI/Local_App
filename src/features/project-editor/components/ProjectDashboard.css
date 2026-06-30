@@ -14,7 +14,6 @@
     gap: var(--fc-space-md);
 }
 
-.pe-dashboard-check,
 .pe-dashboard-action__badge {
     flex-shrink: 0;
     border-radius: var(--fc-radius-full);
@@ -246,28 +245,6 @@
 
 .pe-dashboard-health__label {
     color: var(--fc-color-primary);
-}
-
-.pe-dashboard-checks {
-    display: flex;
-    gap: var(--fc-space-xs);
-    flex-wrap: wrap;
-}
-
-.pe-dashboard-check {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--fc-space-xs) var(--fc-space-sm);
-}
-
-.pe-dashboard-check.is-passed {
-    background: var(--fc-color-success-bg);
-    color: var(--fc-color-success);
-}
-
-.pe-dashboard-check.is-missing {
-    background: var(--fc-color-warning-bg);
-    color: var(--fc-color-warning);
 }
 
 .pe-dashboard-distribution-grid {

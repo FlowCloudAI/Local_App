@@ -41,16 +41,6 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                     <DashboardKpiStrip items={dashboard.kpiItems}/>
                 </div>
             </div>
-            <div className="pe-dashboard-checks">
-                {dashboard.structureChecks.map(item => (
-                    <span
-                        key={item.label}
-                        className={`pe-dashboard-check ${item.passed ? 'is-passed' : 'is-missing'}`}
-                    >
-                        {item.label}
-                    </span>
-                ))}
-            </div>
 
             <div className="pe-dashboard-layout">
                 <div className="pe-dashboard-main-column">
