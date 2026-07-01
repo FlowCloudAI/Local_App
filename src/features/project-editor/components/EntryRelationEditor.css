@@ -157,7 +157,7 @@
     max-height: min(90vh, 42rem);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
     border-radius: 1rem;
     background: var(--fc-color-bg-elevated);
@@ -191,7 +191,7 @@
 
 .entry-relation-panel__body {
     min-height: 0;
-    overflow: auto;
+    overflow: visible;
     padding: 1rem;
 }
 
