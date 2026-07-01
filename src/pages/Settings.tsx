@@ -1936,12 +1936,18 @@ export default function Settings({
                                 </div>
                                 <div className="settings-field">
                                     <label className="settings-label">显示模式</label>
-                                    <Select
-                                        options={themeOptions}
-                                        value={settings.theme}
-                                        onChange={handleThemeChange}
-                                        style={{flex: 1}}
-                                    />
+                                    <div className="settings-theme-buttons" role="group" aria-label="显示模式">
+                                        {themeOptions.map(option => (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                className={`settings-theme-button${settings.theme === option.value ? ' active' : ''}`}
+                                                onClick={() => handleThemeChange(option.value)}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="settings-field">
                                     <label className="settings-label">外壳亚克力</label>
