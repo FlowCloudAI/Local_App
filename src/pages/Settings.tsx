@@ -140,7 +140,7 @@ const SEARCH_SOURCE_OPTIONS: Array<{ key: SearchSourceKey; label: string; hint: 
     },
 ]
 
-const USAGE_ACTIVITY_DAYS = 365
+const USAGE_ACTIVITY_DAYS = 180
 
 interface UsageActivityDay {
     date: string
@@ -171,11 +171,19 @@ function toLocalDateLabel(dateKey: string): string {
 
 function buildUsageMonthLabels(): string[] {
     const today = new Date()
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (USAGE_ACTIVITY_DAYS - 1))
-    return Array.from({length: 12}, (_, index) => {
-        const date = new Date(start.getFullYear(), start.getMonth() + index, 1)
-        return `${date.getMonth() + 1}月`
-    })
+    const labels: string[] = []
+
+    for (
+        let date = new Date(start.getFullYear(), start.getMonth(), 1);
+        date <= end;
+        date = new Date(date.getFullYear(), date.getMonth() + 1, 1)
+    ) {
+        labels.push(`${date.getMonth() + 1}月`)
+    }
+
+    return labels
 }
 
 function buildUsageActivityDays(rows: ApiUsageDaily[]): Array<UsageActivityDay | null> {
