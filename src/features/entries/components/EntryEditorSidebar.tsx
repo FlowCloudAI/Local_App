@@ -1,4 +1,5 @@
 import {useState} from 'react'
+import {RollingBox} from 'flowcloudai-ui'
 import type {Category, Entry, EntryBrief, EntryLink} from '../../../api'
 import {buildExcerpt, formatDate, getCategoryName} from '../lib/entryCommon'
 import EntryRelationCreator, {type EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator'
@@ -57,7 +58,7 @@ export default function EntryEditorSidebar({
                 </button>
 
                 {relationsExpanded && (
-                    <div className="entry-editor-relations__body">
+                    <RollingBox axis="y" className="entry-editor-relations__body" thumbSize="thin">
                         {isBrowseMode ? (
                             <EntryRelationViewer
                                 drafts={relationDrafts}
@@ -77,7 +78,7 @@ export default function EntryEditorSidebar({
                                 onOpenEntry={onOpenEntry}
                             />
                         )}
-                    </div>
+                    </RollingBox>
                 )}
             </section>
 
@@ -96,7 +97,7 @@ export default function EntryEditorSidebar({
                 </button>
 
                 {outgoingLinksExpanded && (
-                    <div className="entry-editor-outgoing-links__body">
+                    <RollingBox axis="y" className="entry-editor-outgoing-links__body" thumbSize="thin">
                         {outgoingLinks.length === 0 ? (
                             <div className="entry-editor-empty-tip">
                                 当前词条正文还没有通过 [[ ]] 引用其他词条。
@@ -131,7 +132,7 @@ export default function EntryEditorSidebar({
                                 })}
                             </div>
                         )}
-                    </div>
+                    </RollingBox>
                 )}
             </section>
 
@@ -150,7 +151,7 @@ export default function EntryEditorSidebar({
                 </button>
 
                 {backlinksExpanded && (
-                    <div className="entry-editor-backlinks__body">
+                    <RollingBox axis="y" className="entry-editor-backlinks__body" thumbSize="thin">
                         {backlinks.length === 0 ? (
                             <div className="entry-editor-empty-tip">
                                 目前还没有其他词条通过 [[ ]] 引用它。
@@ -176,7 +177,7 @@ export default function EntryEditorSidebar({
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </RollingBox>
                 )}
             </section>
         </>
