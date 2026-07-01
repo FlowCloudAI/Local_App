@@ -20,22 +20,6 @@ interface HighLightTagItemProps {
     onChange?: (value: HighLightTagValue) => void
 }
 
-function getTypeLabel(type: HighLightTagType): string {
-    if (type === 'number') return '数值'
-    if (type === 'boolean') return '布尔'
-    return '文本'
-}
-
-function getRangeText(schema: HighLightTagSchema): string | null {
-    if (schema.type !== 'number') return null
-    const hasMin = typeof schema.range_min === 'number'
-    const hasMax = typeof schema.range_max === 'number'
-    if (!hasMin && !hasMax) return null
-    if (hasMin && hasMax) return `建议范围 ${schema.range_min} - ${schema.range_max}`
-    if (hasMin) return `建议不小于 ${schema.range_min}`
-    return `建议不大于 ${schema.range_max}`
-}
-
 function formatValue(value?: HighLightTagValue): string {
     if (value == null || value === '') return '未填写'
     if (typeof value === 'boolean') return value ? '是' : '否'
@@ -43,13 +27,11 @@ function formatValue(value?: HighLightTagValue): string {
 }
 
 export default function HighLightTagItem({
-                                             schema,
-                                             value = null,
-                                             implanted = false,
-                                             mode = 'show',
-                                             onChange,
-                                         }: HighLightTagItemProps) {
-    const rangeText = getRangeText(schema)
+                                              schema,
+                                              value = null,
+                                              mode = 'show',
+                                              onChange,
+                                          }: HighLightTagItemProps) {
     const isEditMode = mode === 'edit'
 
     return (
@@ -57,14 +39,8 @@ export default function HighLightTagItem({
             <div className="highlight-tag-item__header">
                 <div className="highlight-tag-item__title-group">
                     <span className="highlight-tag-item__title">{schema.name}</span>
-                    {implanted && <span className="highlight-tag-item__badge">植入</span>}
                 </div>
-                <span className={`highlight-tag-item__type is-${schema.type}`}>{getTypeLabel(schema.type)}</span>
             </div>
-
-            {rangeText && (
-                <p className="highlight-tag-item__hint">{rangeText}</p>
-            )}
 
             {isEditMode ? (
                 schema.type === 'boolean' ? (

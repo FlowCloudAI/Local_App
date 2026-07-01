@@ -36,47 +36,6 @@
     user-select: text;
 }
 
-.highlight-tag-item__badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.16rem 0.44rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1;
-    white-space: nowrap;
-}
-
-.highlight-tag-item__type {
-    display: inline-flex;
-    flex-shrink: 0;
-    align-items: center;
-    padding: 0.22rem 0.5rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-xs);
-    line-height: 1;
-}
-
-.highlight-tag-item__type.is-number {
-    background: var(--fc-color-warning-bg);
-    color: var(--fc-color-warning-hover);
-}
-
-.highlight-tag-item__type.is-boolean {
-    background: var(--fc-color-success-bg);
-    color: var(--fc-color-success-hover);
-}
-
-.highlight-tag-item__hint {
-    margin: 0;
-    font-size: var(--fc-font-size-xs);
-    line-height: 1.5;
-    color: var(--fc-color-text-secondary);
-}
-
 .highlight-tag-item__value {
     min-height: 2.75rem;
     display: flex;
