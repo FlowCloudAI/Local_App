@@ -2615,27 +2615,29 @@ export default function Settings({
                                             aria-label={`最近 ${USAGE_ACTIVITY_COLUMNS} 周 Token 活动`}
                                             style={{'--usage-activity-columns': USAGE_ACTIVITY_COLUMNS} as CSSProperties}
                                         >
-                                            <div className="usage-heatmap-grid">
-                                                {usageActivityDays.map((day, index) => day ? (
-                                                    <span
-                                                        key={day.date}
-                                                        className={`usage-heatmap-cell usage-heatmap-cell--${day.intensity}`}
-                                                        title={`${day.label}：${day.totalTokens.toLocaleString()} tokens，${day.callCount.toLocaleString()} 次调用`}
-                                                    />
-                                                ) : (
-                                                    <span key={`empty-${index}`}
-                                                          className="usage-heatmap-cell usage-heatmap-cell--empty"/>
-                                                ))}
-                                            </div>
-                                            <div className="usage-heatmap-months">
-                                                {usageMonthLabels.map((item) => (
-                                                    <span
-                                                        key={`${item.label}-${item.column}`}
-                                                        style={{gridColumn: item.column}}
-                                                    >
-                                                        {item.label}
-                                                    </span>
-                                                ))}
+                                            <div className="usage-heatmap-track">
+                                                <div className="usage-heatmap-grid">
+                                                    {usageActivityDays.map((day, index) => day ? (
+                                                        <span
+                                                            key={day.date}
+                                                            className={`usage-heatmap-cell usage-heatmap-cell--${day.intensity}`}
+                                                            title={`${day.label}：${day.totalTokens.toLocaleString()} tokens，${day.callCount.toLocaleString()} 次调用`}
+                                                        />
+                                                    ) : (
+                                                        <span key={`empty-${index}`}
+                                                              className="usage-heatmap-cell usage-heatmap-cell--empty"/>
+                                                    ))}
+                                                </div>
+                                                <div className="usage-heatmap-months">
+                                                    {usageMonthLabels.map((item) => (
+                                                        <span
+                                                            key={`${item.label}-${item.column}`}
+                                                            style={{gridColumn: item.column}}
+                                                        >
+                                                            {item.label}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </section>

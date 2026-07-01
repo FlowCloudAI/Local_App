@@ -1163,10 +1163,18 @@
 
 .usage-heatmap {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    justify-content: flex-end;
     overflow: hidden;
     padding-bottom: 0.2rem;
+}
+
+.usage-heatmap-track {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    width: max-content;
+    min-width: 100%;
 }
 
 .usage-heatmap-grid {
@@ -1219,6 +1227,10 @@
 
 .usage-heatmap-months span {
     white-space: nowrap;
+}
+
+.usage-heatmap-months span:last-child {
+    justify-self: end;
 }
 
 .usage-insight-grid {
