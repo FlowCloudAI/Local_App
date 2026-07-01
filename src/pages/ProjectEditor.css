@@ -880,7 +880,22 @@
 }
 
 .pe-entry-type-item__icon--tag {
+    --pe-tag-type-color: var(--fc-color-primary);
+    background: color-mix(in srgb, var(--pe-tag-type-color) 12%, transparent);
+    color: color-mix(in srgb, var(--pe-tag-type-color) 76%, var(--fc-color-text-secondary));
     line-height: 1;
+}
+
+.pe-entry-type-item__icon--tag.is-number {
+    --pe-tag-type-color: var(--fc-color-primary);
+}
+
+.pe-entry-type-item__icon--tag.is-string {
+    --pe-tag-type-color: var(--fc-color-success, #2f9e44);
+}
+
+.pe-entry-type-item__icon--tag.is-boolean {
+    --pe-tag-type-color: var(--fc-color-danger, #ef4444);
 }
 
 .pe-tag-type-icon {

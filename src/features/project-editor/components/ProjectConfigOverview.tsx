@@ -47,6 +47,17 @@ function TagTypeIcon({type}: { type: string }) {
     }
 }
 
+function getTagTypeIconClass(type: string): string {
+    switch (type) {
+        case 'number':
+            return 'is-number'
+        case 'boolean':
+            return 'is-boolean'
+        default:
+            return 'is-string'
+    }
+}
+
 function getEntryTypeNameMap(entryTypes: EntryTypeView[]): Map<string, string> {
     return new Map(entryTypes.map(entryType => [entryTypeKey(entryType), entryType.name]))
 }
@@ -194,7 +205,9 @@ function ProjectConfigOverview({
                                     <div className="pe-entry-type-item__main">
                                         <div className="pe-entry-type-item__header">
                                             <div className="pe-entry-type-item__title-row">
-                                                <span className="pe-entry-type-item__icon pe-entry-type-item__icon--tag">
+                                                <span
+                                                    className={`pe-entry-type-item__icon pe-entry-type-item__icon--tag ${getTagTypeIconClass(tag.type)}`}
+                                                >
                                                     <TagTypeIcon type={tag.type}/>
                                                 </span>
                                                 <span className="pe-config-item__title">{tag.name}</span>
