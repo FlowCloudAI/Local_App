@@ -140,8 +140,8 @@ const SEARCH_SOURCE_OPTIONS: Array<{ key: SearchSourceKey; label: string; hint: 
     },
 ]
 
-const USAGE_ACTIVITY_DAYS = 180
 const USAGE_ACTIVITY_COLUMNS = 52
+const USAGE_ACTIVITY_CELL_COUNT = USAGE_ACTIVITY_COLUMNS * 7
 const DAY_MS = 24 * 60 * 60 * 1000
 
 interface UsageActivityDay {
@@ -183,10 +183,9 @@ function getLocalDayNumber(date: Date): number {
 function buildUsageMonthLabels(): UsageMonthLabel[] {
     const today = new Date()
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (USAGE_ACTIVITY_DAYS - 1))
-    const leadingEmptyDays = start.getDay()
-    const existingColumns = Math.ceil((leadingEmptyDays + USAGE_ACTIVITY_DAYS) / 7)
-    const fillerColumns = Math.max(0, USAGE_ACTIVITY_COLUMNS - existingColumns)
+    const trailingEmptyDays = 6 - end.getDay()
+    const actualDayCount = USAGE_ACTIVITY_CELL_COUNT - trailingEmptyDays
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (actualDayCount - 1))
     const labels: UsageMonthLabel[] = []
 
     for (
@@ -198,7 +197,7 @@ function buildUsageMonthLabels(): UsageMonthLabel[] {
         const offsetDays = getLocalDayNumber(labelDate) - getLocalDayNumber(start)
         labels.push({
             label: `${month.getMonth() + 1}月`,
-            column: fillerColumns + Math.floor((leadingEmptyDays + offsetDays) / 7) + 1,
+            column: Math.floor(offsetDays / 7) + 1,
         })
     }
 
@@ -208,33 +207,35 @@ function buildUsageMonthLabels(): UsageMonthLabel[] {
 function buildUsageActivityDays(rows: ApiUsageDaily[]): Array<UsageActivityDay | null> {
     const today = new Date()
     const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (USAGE_ACTIVITY_DAYS - 1))
+    const trailingEmptyDays = 6 - end.getDay()
+    const actualDayCount = USAGE_ACTIVITY_CELL_COUNT - trailingEmptyDays
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (actualDayCount - 1))
     const byDate = new Map(rows.map(row => [row.date, row]))
-    const maxTokens = Math.max(0, ...rows.map(row => row.total_tokens))
-    const leadingEmptyDays = start.getDay()
-    const existingColumns = Math.ceil((leadingEmptyDays + USAGE_ACTIVITY_DAYS) / 7)
-    const fillerCells = Math.max(0, USAGE_ACTIVITY_COLUMNS - existingColumns) * 7
-    const days: Array<UsageActivityDay | null> = Array.from(
-        {length: fillerCells + leadingEmptyDays},
-        () => null,
-    )
+    const rawDays: Array<{ dateKey: string; row?: ApiUsageDaily; totalTokens: number }> = []
 
-    for (let index = 0; index < USAGE_ACTIVITY_DAYS; index += 1) {
+    for (let index = 0; index < actualDayCount; index += 1) {
         const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index)
         const dateKey = toLocalDateKey(date)
         const row = byDate.get(dateKey)
         const totalTokens = row?.total_tokens ?? 0
+        rawDays.push({dateKey, row, totalTokens})
+    }
+
+    const maxTokens = Math.max(0, ...rawDays.map(day => day.totalTokens))
+    const days: Array<UsageActivityDay | null> = rawDays.map(({dateKey, row, totalTokens}) => {
         const intensity = totalTokens === 0 || maxTokens === 0
             ? 0
             : Math.min(4, Math.max(1, Math.ceil((totalTokens / maxTokens) * 4)))
-        days.push({
+        return {
             date: dateKey,
             label: toLocalDateLabel(dateKey),
             totalTokens,
             callCount: row?.call_count ?? 0,
             intensity,
-        })
-    }
+        }
+    })
+
+    days.push(...Array.from({length: trailingEmptyDays}, () => null))
 
     return days
 }
@@ -2611,7 +2612,7 @@ export default function Settings({
                                         </div>
                                         <div
                                             className="usage-heatmap"
-                                            aria-label={`最近 ${USAGE_ACTIVITY_DAYS} 天 Token 活动`}
+                                            aria-label={`最近 ${USAGE_ACTIVITY_COLUMNS} 周 Token 活动`}
                                             style={{'--usage-activity-columns': USAGE_ACTIVITY_COLUMNS} as CSSProperties}
                                         >
                                             <div className="usage-heatmap-grid">

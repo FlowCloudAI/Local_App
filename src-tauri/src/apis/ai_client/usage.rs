@@ -35,7 +35,7 @@ pub async fn ai_get_usage_by_model(
         .map_err(|e| ApiError::internal(e.to_string()))
 }
 
-/// 按本地日期聚合最近 180 天 API 用量
+/// 按本地日期聚合最近 52 周 API 用量
 #[tauri::command]
 pub async fn ai_get_usage_daily(
     state: State<'_, Arc<AppState>>,
@@ -46,7 +46,7 @@ pub async fn ai_get_usage_daily(
          COALESCE(SUM(prompt_tokens), 0), COALESCE(SUM(completion_tokens), 0), \
          COALESCE(SUM(total_tokens), 0), COUNT(*) \
          FROM api_usage_log \
-         WHERE date(created_at, 'localtime') >= date('now', 'localtime', '-179 days') \
+         WHERE date(created_at, 'localtime') >= date('now', 'localtime', '-363 days') \
          GROUP BY usage_date \
          ORDER BY usage_date ASC",
     )

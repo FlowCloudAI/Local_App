@@ -1162,18 +1162,21 @@
 }
 
 .usage-heatmap {
-    overflow-x: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    overflow: hidden;
     padding-bottom: 0.2rem;
 }
 
 .usage-heatmap-grid {
     display: grid;
+    flex: 0 0 auto;
     grid-auto-flow: column;
     grid-template-rows: repeat(7, 0.9rem);
     grid-auto-columns: 0.9rem;
     gap: 0.3rem;
     width: max-content;
-    margin-left: auto;
 }
 
 .usage-heatmap-cell {
@@ -1205,10 +1208,10 @@
 
 .usage-heatmap-months {
     display: grid;
+    flex: 0 0 auto;
     grid-template-columns: repeat(var(--usage-activity-columns), 0.9rem);
     column-gap: 0.3rem;
     width: max-content;
-    margin-left: auto;
     margin-top: 0.8rem;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
