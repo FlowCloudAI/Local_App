@@ -36,6 +36,41 @@
     user-select: text;
 }
 
+.highlight-tag-item__badge,
+.highlight-tag-item__type {
+    padding: 0.18rem 0.48rem;
+    border-radius: 999px;
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.highlight-tag-item__badge {
+    background: color-mix(in srgb, var(--fc-color-primary) 8%, transparent);
+    color: var(--fc-color-primary);
+}
+
+.highlight-tag-item__type {
+    background: color-mix(in srgb, var(--fc-color-warning) 13%, transparent);
+    color: var(--fc-color-warning);
+}
+
+.highlight-tag-item__type.is-string {
+    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
+    color: var(--fc-color-primary);
+}
+
+.highlight-tag-item__type.is-boolean {
+    background: color-mix(in srgb, var(--fc-color-success) 10%, transparent);
+    color: var(--fc-color-success);
+}
+
+.highlight-tag-item__hint {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    line-height: 1.4;
+}
+
 .highlight-tag-item__value {
     min-height: 2.75rem;
     display: flex;

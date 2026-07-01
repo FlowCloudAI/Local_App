@@ -445,11 +445,13 @@ export default function EntryEditorMetaPanel({
                             </div>
                         )}
                     </div>
-                    <div className="entry-editor-field-note">
-                        {draft.type
-                            ? '当前词条类型的植入标签会重点显示；切换类型后，原有标签只会取消强调，不会被删除。'
-                            : '未设置词条类型时，仅显示已添加的标签。'}
-                    </div>
+                    {!isBrowseMode && (
+                        <div className="entry-editor-field-note">
+                            {draft.type
+                                ? '当前词条类型的植入标签会重点显示；切换类型后，原有标签只会取消强调，不会被删除。'
+                                : '未设置词条类型时，仅显示已添加的标签。'}
+                        </div>
+                    )}
                     {localTagSchemas.length === 0 ? (
                         <div className="entry-editor-empty-tip">当前项目还没有标签定义，先创建一个再给词条填写。</div>
                     ) : isBrowseMode ? (
