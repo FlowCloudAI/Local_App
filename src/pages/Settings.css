@@ -87,7 +87,12 @@
 }
 
 .settings-container {
+  width: min(100%, 74rem);
   user-select: none;
+}
+
+.settings-container.fc-page-shell--narrow {
+  max-width: none;
 }
 
 .settings-title {
