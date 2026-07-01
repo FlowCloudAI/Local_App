@@ -1880,14 +1880,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                    onChange={handleImageFileChange}/>
 
             {newMapForm && (
-                <div className="wm-modal-backdrop" role="presentation" onMouseDown={() => setNewMapForm(null)}>
-                    <div
-                        className="wm-create-map-dialog"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="新建地图"
-                        onMouseDown={event => event.stopPropagation()}
-                    >
+                <FloatingPanel
+                    open
+                    onClose={() => setNewMapForm(null)}
+                    className="wm-create-map-dialog"
+                    ariaLabel="新建地图"
+                >
                         <div className="wm-create-map-dialog__header">
                             <h3>新建地图</h3>
                             <button
@@ -1979,8 +1977,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                 创建地图
                             </button>
                         </div>
-                    </div>
-                </div>
+                </FloatingPanel>
             )}
 
             {utilityPanel && (

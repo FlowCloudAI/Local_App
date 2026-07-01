@@ -21,6 +21,7 @@ import {
 import {listen} from '../../../api/events'
 import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectContradictionPanel.css'
 
@@ -744,8 +745,13 @@ function ProjectContradictionPanel({
                 </section>
             </div>
             {generateDialogOpen && (
-                <div className="pe-contradiction-modal" role="dialog" aria-modal="true" aria-labelledby="pe-generate-report-title">
-                    <div className="pe-contradiction-modal__dialog">
+                <FloatingPanel
+                    open
+                    onClose={() => setGenerateDialogOpen(false)}
+                    dismissible={!generating}
+                    labelledBy="pe-generate-report-title"
+                    className="pe-contradiction-modal"
+                >
                         <div className="pe-contradiction-modal__header">
                             <div>
                                 <h3 id="pe-generate-report-title" className="pe-contradiction-modal__title">生成新报告</h3>
@@ -863,8 +869,7 @@ function ProjectContradictionPanel({
                                 {generating ? (progressMessage ?? '检测中…') : '开始生成'}
                             </Button>
                         </div>
-                    </div>
-                </div>
+                </FloatingPanel>
             )}
         </div>
     )

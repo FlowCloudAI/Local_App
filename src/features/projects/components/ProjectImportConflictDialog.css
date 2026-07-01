@@ -1,23 +1,7 @@
-.project-import-conflict-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 520;
-    display: grid;
-    place-items: center;
-    padding: 1rem;
-    background: color-mix(in srgb, var(--fc-color-bg) 52%, transparent);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-}
-
 .project-import-conflict-dialog {
     width: min(100%, 30rem);
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--fc-color-border);
-    border-radius: 0.75rem;
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-lg);
     overflow: hidden;
 }
 

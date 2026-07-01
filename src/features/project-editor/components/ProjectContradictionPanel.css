@@ -532,22 +532,7 @@ button.pe-contradiction-chip--entry:hover {
 }
 
 .pe-contradiction-modal {
-    position: fixed;
-    inset: 0;
-    z-index: 80;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    background: var(--fc-color-bg-overlay);
-}
-
-.pe-contradiction-modal__dialog {
     width: min(460px, 100%);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-lg);
     overflow: hidden;
 }
 

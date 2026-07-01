@@ -1,6 +1,5 @@
 import {logger} from '../../../shared/logger'
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
-import {createPortal} from 'react-dom'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
     ai_fill_image_prompt,
@@ -13,6 +12,7 @@ import {
 } from '../../../api'
 import {buildEntryImageMarkdownRef, type EntryImage, toEntryImageSrc} from '../lib/entryImage'
 import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryImageAddModal.css'
 
 type Tab = 'existing' | 'local' | 'ai'
@@ -125,15 +125,6 @@ export default function EntryImageAddModal({
             })
         }
     }, [selectedPlugin, plugins])
-
-    useEffect(() => {
-        if (!open) return
-        const handler = (e: globalThis.KeyboardEvent) => {
-            if (e.key === 'Escape') onClose()
-        }
-        window.addEventListener('keydown', handler)
-        return () => window.removeEventListener('keydown', handler)
-    }, [open, onClose])
 
     const selectedPluginInfo = useMemo(
         () => plugins.find((p) => p.id === selectedPlugin),
@@ -264,34 +255,26 @@ export default function EntryImageAddModal({
         onOpenPluginManagement?.('image')
     }
 
-    if (!open) return null
-
-    return createPortal(
-        <div
-            className="entry-image-add-backdrop"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose()
-            }}
+    return (
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            ariaLabel="添加图片"
+            className="entry-image-add-dialog"
         >
-            <div
-                className="entry-image-add-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-label="添加图片"
-            >
-                <div className="entry-image-add-header">
-                    <span className="entry-image-add-title">{insertMode ? '插入图片' : '添加图片'}</span>
-                    <button
-                        className="entry-image-add-close app-dialog-close"
-                        onClick={onClose}
-                        aria-label="关闭"
-                    >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                                  strokeLinecap="round"/>
-                        </svg>
-                    </button>
-                </div>
+            <div className="entry-image-add-header">
+                <span className="entry-image-add-title">{insertMode ? '插入图片' : '添加图片'}</span>
+                <button
+                    className="entry-image-add-close app-dialog-close"
+                    onClick={onClose}
+                    aria-label="关闭"
+                >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
+                              strokeLinecap="round"/>
+                    </svg>
+                </button>
+            </div>
 
                 <div className="entry-image-add-tabs">
                     {insertMode && (
@@ -497,8 +480,6 @@ export default function EntryImageAddModal({
                         </div>
                     )}
                 </div>
-            </div>
-        </div>,
-        document.body
+        </FloatingPanel>
     )
 }

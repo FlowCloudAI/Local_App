@@ -2,6 +2,7 @@ import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
 import {listen} from '../../../api/events'
 import {confirm_entry_edit, ENTRY_EDIT_REQUEST, type EntryEditRequestEvent,} from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryEditModal.css'
 
 export default function EntryEditModal() {
@@ -26,11 +27,16 @@ export default function EntryEditModal() {
         setBusy(false)
     }
 
-    if (!pending) return null
-
     return (
-        <div className="eem-overlay">
-            <div className="eem-dialog">
+        <FloatingPanel
+            open={!!pending}
+            onClose={() => void respond(false)}
+            dismissible={!busy}
+            ariaLabel="AI 编辑请求"
+            className="eem-dialog"
+        >
+            {pending && (
+                <>
                 <div className="eem-header">
                     <span className="eem-title">AI 编辑请求</span>
                     <span className="eem-entry-name">{pending.entry_title}</span>
@@ -56,8 +62,9 @@ export default function EntryEditModal() {
                         确认修改
                     </button>
                 </div>
-            </div>
-        </div>
+                </>
+            )}
+        </FloatingPanel>
     )
 }
 

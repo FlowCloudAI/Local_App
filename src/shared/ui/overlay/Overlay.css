@@ -56,8 +56,9 @@
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
     box-sizing: border-box;
-    backdrop-filter: blur(var(--fc-space-xs));
-    -webkit-backdrop-filter: blur(var(--fc-space-xs));
+    box-shadow: var(--fc-shadow-lg);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
 }
 
 /* 进场：浮动轻微放大淡入；上滑从底部滑入。 */

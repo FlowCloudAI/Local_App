@@ -1,22 +1,9 @@
-.eem-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--fc-color-bg-overlay);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--fc-z-modal);
-}
-
 .eem-dialog {
-    background: var(--fc-color-bg-elevated);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
     width: min(720px, 90vw);
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--fc-shadow-lg);
+    overflow: hidden;
 }
 
 .eem-header {
