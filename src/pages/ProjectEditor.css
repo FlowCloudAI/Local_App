@@ -880,8 +880,19 @@
 }
 
 .pe-entry-type-item__icon--tag {
-    font-size: var(--fc-font-size-reading, 0.9rem);
-    font-weight: 700;
+    line-height: 1;
+}
+
+.pe-tag-type-icon {
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    overflow: visible;
 }
 
 .pe-entry-type-item__desc {

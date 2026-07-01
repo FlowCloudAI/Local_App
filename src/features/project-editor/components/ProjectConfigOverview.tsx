@@ -21,6 +21,32 @@ function getTagTypeLabel(type: string): string {
     }
 }
 
+function TagTypeIcon({type}: { type: string }) {
+    switch (type) {
+        case 'number':
+            return (
+                <svg className="pe-tag-type-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M7 17V7l10 10V7"/>
+                </svg>
+            )
+        case 'boolean':
+            return (
+                <svg className="pe-tag-type-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M8 6v12"/>
+                    <path d="M8 6h5.2a3 3 0 0 1 0 6H8"/>
+                    <path d="M8 12h5.7a3 3 0 0 1 0 6H8"/>
+                </svg>
+            )
+        default:
+            return (
+                <svg className="pe-tag-type-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 7h12"/>
+                    <path d="M12 7v10"/>
+                </svg>
+            )
+    }
+}
+
 function getEntryTypeNameMap(entryTypes: EntryTypeView[]): Map<string, string> {
     return new Map(entryTypes.map(entryType => [entryTypeKey(entryType), entryType.name]))
 }
@@ -169,7 +195,7 @@ function ProjectConfigOverview({
                                         <div className="pe-entry-type-item__header">
                                             <div className="pe-entry-type-item__title-row">
                                                 <span className="pe-entry-type-item__icon pe-entry-type-item__icon--tag">
-                                                    #
+                                                    <TagTypeIcon type={tag.type}/>
                                                 </span>
                                                 <span className="pe-config-item__title">{tag.name}</span>
                                                 <span className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
