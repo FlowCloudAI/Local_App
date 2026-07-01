@@ -1173,7 +1173,7 @@
     grid-auto-columns: 0.9rem;
     gap: 0.3rem;
     width: max-content;
-    min-width: 100%;
+    margin-left: auto;
 }
 
 .usage-heatmap-cell {
@@ -1204,13 +1204,18 @@
 }
 
 .usage-heatmap-months {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.6rem;
-    min-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(var(--usage-activity-columns), 0.9rem);
+    column-gap: 0.3rem;
+    width: max-content;
+    margin-left: auto;
     margin-top: 0.8rem;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
+}
+
+.usage-heatmap-months span {
+    white-space: nowrap;
 }
 
 .usage-insight-grid {
