@@ -1067,6 +1067,15 @@
     justify-content: flex-start;
     margin-left: 0;
   }
+
+  .usage-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-activity-header {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1129,6 +1138,154 @@
 }
 
 /* ── 用量统计 ── */
+
+.usage-activity-panel,
+.usage-insight-panel {
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    background: var(--fc-color-bg-secondary);
+    padding: 1.35rem;
+}
+
+.usage-activity-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: baseline;
+    margin-bottom: 1rem;
+}
+
+.usage-activity-total {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-heatmap {
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+}
+
+.usage-heatmap-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 0.72rem);
+    grid-auto-columns: 0.72rem;
+    gap: 0.26rem;
+    width: max-content;
+    min-width: 100%;
+}
+
+.usage-heatmap-cell {
+    width: 0.72rem;
+    height: 0.72rem;
+    border-radius: 0.2rem;
+    background: color-mix(in srgb, var(--fc-color-text) 7%, transparent);
+}
+
+.usage-heatmap-cell--empty {
+    visibility: hidden;
+}
+
+.usage-heatmap-cell--1 {
+    background: color-mix(in srgb, var(--fc-color-primary) 28%, var(--fc-color-bg) 72%);
+}
+
+.usage-heatmap-cell--2 {
+    background: color-mix(in srgb, var(--fc-color-primary) 45%, var(--fc-color-bg) 55%);
+}
+
+.usage-heatmap-cell--3 {
+    background: color-mix(in srgb, var(--fc-color-primary) 68%, var(--fc-color-bg) 32%);
+}
+
+.usage-heatmap-cell--4 {
+    background: var(--fc-color-primary);
+}
+
+.usage-heatmap-months {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(3rem, 1fr));
+    gap: 0.6rem;
+    width: max(100%, 42rem);
+    margin-top: 0.8rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.usage-insight-grid {
+    display: grid;
+    grid-template-columns: minmax(16rem, 0.9fr) minmax(20rem, 1.1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.usage-insight-list {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+}
+
+.usage-insight-list div,
+.usage-model-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.usage-insight-list dt {
+    color: var(--fc-color-text-secondary);
+}
+
+.usage-insight-list dd {
+    margin: 0;
+    color: var(--fc-color-text);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.usage-model-empty {
+    display: grid;
+    place-items: center;
+    min-height: 8rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    color: var(--fc-color-text-secondary);
+}
+
+.usage-model-list {
+    display: grid;
+    gap: 0.7rem;
+}
+
+.usage-model-item {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.usage-model-item:last-child {
+    border-bottom: none;
+}
+
+.usage-model-item__name {
+    color: var(--fc-color-text);
+    font-weight: 700;
+}
+
+.usage-model-item__meta {
+    margin-top: 0.15rem;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.usage-model-item__tokens {
+    color: var(--fc-color-primary);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
 
 .usage-stats-grid {
     display: grid;

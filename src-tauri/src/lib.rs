@@ -538,6 +538,7 @@ pub fn run() {
             ai_set_task_context,
             ai_get_usage_summary,
             ai_get_usage_by_model,
+            ai_get_usage_daily,
             docctx_supported_extensions,
             docctx_add_files,
             docctx_list_items,

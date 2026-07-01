@@ -23,8 +23,10 @@ import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
     ai_close_all_sessions,
     ai_get_usage_by_model,
+    ai_get_usage_daily,
     ai_get_usage_summary,
     type ApiUsageByModel,
+    type ApiUsageDaily,
     type ApiUsageSummary,
     type AppSettings,
     type DefaultPaths,
@@ -138,10 +140,71 @@ const SEARCH_SOURCE_OPTIONS: Array<{ key: SearchSourceKey; label: string; hint: 
     },
 ]
 
+const USAGE_ACTIVITY_DAYS = 365
+
+interface UsageActivityDay {
+    date: string
+    label: string
+    totalTokens: number
+    callCount: number
+    intensity: number
+}
+
 function normalizeThemeSelectValue(value: SelectValue): Theme {
     const theme = String(Array.isArray(value) ? value[0] ?? 'system' : value)
     if (theme === 'light' || theme === 'dark' || theme === 'system') return theme
     return 'system'
+}
+
+function padDatePart(value: number): string {
+    return String(value).padStart(2, '0')
+}
+
+function toLocalDateKey(date: Date): string {
+    return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`
+}
+
+function toLocalDateLabel(dateKey: string): string {
+    const date = new Date(`${dateKey}T00:00:00`)
+    return `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
+function buildUsageMonthLabels(): string[] {
+    const today = new Date()
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (USAGE_ACTIVITY_DAYS - 1))
+    return Array.from({length: 12}, (_, index) => {
+        const date = new Date(start.getFullYear(), start.getMonth() + index, 1)
+        return `${date.getMonth() + 1}月`
+    })
+}
+
+function buildUsageActivityDays(rows: ApiUsageDaily[]): Array<UsageActivityDay | null> {
+    const today = new Date()
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (USAGE_ACTIVITY_DAYS - 1))
+    const byDate = new Map(rows.map(row => [row.date, row]))
+    const maxTokens = Math.max(0, ...rows.map(row => row.total_tokens))
+    const leadingEmptyDays = start.getDay()
+    const days: Array<UsageActivityDay | null> = Array.from({length: leadingEmptyDays}, () => null)
+
+    for (let index = 0; index < USAGE_ACTIVITY_DAYS; index += 1) {
+        const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index)
+        const dateKey = toLocalDateKey(date)
+        const row = byDate.get(dateKey)
+        const totalTokens = row?.total_tokens ?? 0
+        const intensity = totalTokens === 0 || maxTokens === 0
+            ? 0
+            : Math.min(4, Math.max(1, Math.ceil((totalTokens / maxTokens) * 4)))
+        days.push({
+            date: dateKey,
+            label: toLocalDateLabel(dateKey),
+            totalTokens,
+            callCount: row?.call_count ?? 0,
+            intensity,
+        })
+    }
+
+    return days
 }
 
 function clampNumberValue(value: string, fallback: number, min: number, max: number): number {
@@ -1050,6 +1113,7 @@ export default function Settings({
     // ── 用量统计状态 ──
     const [usageSummary, setUsageSummary] = useState<ApiUsageSummary | null>(null)
     const [usageByModel, setUsageByModel] = useState<ApiUsageByModel[]>([])
+    const [usageDaily, setUsageDaily] = useState<ApiUsageDaily[]>([])
     const [usageLoading, setUsageLoading] = useState(false)
     const [usageError, setUsageError] = useState<string | null>(null)
 
@@ -1057,12 +1121,14 @@ export default function Settings({
         setUsageLoading(true)
         setUsageError(null)
         try {
-            const [summary, byModel] = await Promise.all([
+            const [summary, byModel, daily] = await Promise.all([
                 ai_get_usage_summary(),
                 ai_get_usage_by_model(),
+                ai_get_usage_daily(),
             ])
             setUsageSummary(summary)
             setUsageByModel(byModel)
+            setUsageDaily(daily)
         } catch (e) {
             setUsageError(String(e))
         } finally {
@@ -1698,6 +1764,13 @@ export default function Settings({
         () => normalizeSearchSources(settings?.search_sources),
         [settings?.search_sources],
     )
+    const usageActivityDays = useMemo(() => buildUsageActivityDays(usageDaily), [usageDaily])
+    const usageMonthLabels = useMemo(() => buildUsageMonthLabels(), [])
+    const usageActiveDays = usageDaily.filter(row => row.call_count > 0).length
+    const usageAverageTokens = usageSummary && usageSummary.call_count > 0
+        ? Math.round(usageSummary.total_tokens / usageSummary.call_count)
+        : 0
+    const usageTopModel = usageByModel[0] ?? null
 
     if (loading || !settings) {
         return (
@@ -2497,38 +2570,84 @@ export default function Settings({
                                 </div>
                             ) : (
                                 <>
-                                    {/* 总览卡片 */}
-                                    {usageSummary && (
-                                        <section className="settings-section fc-section-card">
-                                            <h2 className="settings-section-title fc-section-title">总览</h2>
-                                            <div className="usage-stats-grid">
-                                                <div className="usage-stat-card">
-                                                    <div className="usage-stat-value">
-                                                        {usageSummary.call_count.toLocaleString()}</div>
-                                                    <div className="usage-stat-label">API 调用次数</div>
-                                                </div>
-                                                <div className="usage-stat-card">
-                                                    <div className="usage-stat-value">
-                                                        {usageSummary.total_tokens.toLocaleString()}</div>
-                                                    <div className="usage-stat-label">总 Token 消耗</div>
-                                                </div>
-                                                <div className="usage-stat-card">
-                                                    <div className="usage-stat-value">
-                                                        {usageSummary.total_prompt_tokens.toLocaleString()}</div>
-                                                    <div className="usage-stat-label">Prompt Tokens</div>
-                                                </div>
-                                                <div className="usage-stat-card">
-                                                    <div className="usage-stat-value">
-                                                        {usageSummary.total_completion_tokens.toLocaleString()}</div>
-                                                    <div className="usage-stat-label">Completion Tokens</div>
-                                                </div>
+                                    <section className="usage-activity-panel">
+                                        <div className="usage-activity-header">
+                                            <h2 className="settings-section-title fc-section-title">Token 活动</h2>
+                                            <div className="usage-activity-total">
+                                                {usageSummary ? `${usageSummary.total_tokens.toLocaleString()} tokens` : '暂无数据'}
                                             </div>
-                                        </section>
-                                    )}
+                                        </div>
+                                        <div className="usage-heatmap" aria-label="最近 365 天 Token 活动">
+                                            <div className="usage-heatmap-grid">
+                                                {usageActivityDays.map((day, index) => day ? (
+                                                    <span
+                                                        key={day.date}
+                                                        className={`usage-heatmap-cell usage-heatmap-cell--${day.intensity}`}
+                                                        title={`${day.label}：${day.totalTokens.toLocaleString()} tokens，${day.callCount.toLocaleString()} 次调用`}
+                                                    />
+                                                ) : (
+                                                    <span key={`empty-${index}`}
+                                                          className="usage-heatmap-cell usage-heatmap-cell--empty"/>
+                                                ))}
+                                            </div>
+                                            <div className="usage-heatmap-months">
+                                                {usageMonthLabels.map((label, index) => (
+                                                    <span key={`${label}-${index}`}>{label}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </section>
 
-                                    {/* 模型明细 */}
+                                    <section className="usage-insight-grid">
+                                        <div className="usage-insight-panel">
+                                            <h2 className="settings-section-title fc-section-title">活动洞察</h2>
+                                            <dl className="usage-insight-list">
+                                                <div>
+                                                    <dt>API 调用次数</dt>
+                                                    <dd>{usageSummary?.call_count.toLocaleString() ?? '0'}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>活跃天数</dt>
+                                                    <dd>{usageActiveDays.toLocaleString()}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>平均每次 Token</dt>
+                                                    <dd>{usageAverageTokens.toLocaleString()}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>最常用模型</dt>
+                                                    <dd>{usageTopModel?.model ?? '无'}</dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+
+                                        <div className="usage-insight-panel">
+                                            <h2 className="settings-section-title fc-section-title">最常用的模型</h2>
+                                            {usageByModel.length === 0 ? (
+                                                <div className="usage-model-empty">
+                                                    尚未使用任何模型
+                                                </div>
+                                            ) : (
+                                                <div className="usage-model-list">
+                                                    {usageByModel.slice(0, 3).map((row) => (
+                                                        <div key={`${row.provider}-${row.model}-${row.modality}`}
+                                                             className="usage-model-item">
+                                                            <div>
+                                                                <div className="usage-model-item__name">{row.model}</div>
+                                                                <div className="usage-model-item__meta">{row.provider}</div>
+                                                            </div>
+                                                            <div className="usage-model-item__tokens">
+                                                                {row.total_tokens.toLocaleString()}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </section>
+
                                     <section className="settings-section fc-section-card">
-                                        <h2 className="settings-section-title fc-section-title">按模型统计</h2>
+                                        <h2 className="settings-section-title fc-section-title">模型明细</h2>
                                         {usageByModel.length === 0 ? (
                                             <div className="settings-empty-state">
                                                 暂无记录。使用 AI 对话后将自动统计。
