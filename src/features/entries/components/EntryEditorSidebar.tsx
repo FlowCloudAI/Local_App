@@ -1,8 +1,12 @@
 import {useState} from 'react'
-import {RollingBox} from 'flowcloudai-ui'
+import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import type {Category, Entry, EntryBrief, EntryLink} from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import {buildExcerpt, formatDate, getCategoryName} from '../lib/entryCommon'
-import EntryRelationCreator, {type EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator'
+import {
+    EntryRelationDraftForm,
+    type EntryRelationDraft,
+} from '../../project-editor/components/EntryRelationCreator'
 import EntryRelationViewer from '../../project-editor/components/EntryRelationViewer'
 
 interface EntryEditorSidebarProps {
@@ -21,6 +25,25 @@ interface EntryEditorSidebarProps {
     onRelationDraftsChange: (drafts: EntryRelationDraft[]) => void
 }
 
+type RelationPanelState =
+    | { mode: 'create'; draft: EntryRelationDraft }
+    | { mode: 'edit'; index: number; draft: EntryRelationDraft }
+
+function buildRelationLabel(draft: EntryRelationDraft): string {
+    const content = draft.content.trim() || '关联'
+    if (draft.direction === 'two_way') return `双向 · ${content}`
+    if (draft.direction === 'incoming') return `对方指向我 · ${content}`
+    return `我指向对方 · ${content}`
+}
+
+function createEmptyRelationDraft(): EntryRelationDraft {
+    return {
+        otherEntryId: null,
+        direction: 'outgoing',
+        content: '',
+    }
+}
+
 export default function EntryEditorSidebar({
                                                entryId,
                                                entry,
@@ -37,25 +60,90 @@ export default function EntryEditorSidebar({
                                                onRelationDraftsChange,
                                            }: EntryEditorSidebarProps) {
     const isBrowseMode = editorMode === 'browse'
+    const {showAlert} = useAlert()
     const [relationsExpanded, setRelationsExpanded] = useState(false)
     const [outgoingLinksExpanded, setOutgoingLinksExpanded] = useState(false)
     const [backlinksExpanded, setBacklinksExpanded] = useState(false)
+    const [relationPanel, setRelationPanel] = useState<RelationPanelState | null>(null)
+    const relationPanelDisabled = saving || projectDataLoading
+    const relationPanelCanSave = Boolean(relationPanel?.draft.otherEntryId) && !relationPanelDisabled
+
+    const openCreateRelationPanel = () => {
+        setRelationsExpanded(true)
+        setRelationPanel({
+            mode: 'create',
+            draft: createEmptyRelationDraft(),
+        })
+    }
+
+    const openEditRelationPanel = (index: number) => {
+        const draft = relationDrafts[index]
+        if (!draft) return
+        setRelationsExpanded(true)
+        setRelationPanel({
+            mode: 'edit',
+            index,
+            draft: {...draft},
+        })
+    }
+
+    const closeRelationPanel = () => setRelationPanel(null)
+
+    const updateRelationPanelDraft = (draft: EntryRelationDraft) => {
+        setRelationPanel((current) => current ? {...current, draft} : current)
+    }
+
+    const saveRelationPanel = () => {
+        if (!relationPanel || !relationPanelCanSave) return
+        if (relationPanel.mode === 'create') {
+            onRelationDraftsChange([...relationDrafts, relationPanel.draft])
+        } else {
+            onRelationDraftsChange(relationDrafts.map((draft, index) => (
+                index === relationPanel.index ? relationPanel.draft : draft
+            )))
+        }
+        closeRelationPanel()
+    }
+
+    const deleteRelationFromPanel = async () => {
+        if (!relationPanel || relationPanel.mode !== 'edit' || relationPanelDisabled) return
+        const otherEntry = projectEntries.find((item) => item.id === relationPanel.draft.otherEntryId)
+        const title = otherEntry?.title ?? '未选择词条'
+        const confirmed = await showAlert(`确定要删除与「${title}」的关系吗？`, 'warning', 'confirm')
+        if (confirmed !== 'yes') return
+        onRelationDraftsChange(relationDrafts.filter((_, index) => index !== relationPanel.index))
+        closeRelationPanel()
+    }
 
     return (
         <>
             <section className={`entry-editor-relations ${relationsExpanded ? 'is-expanded' : ''}`}>
-                <button
-                    type="button"
-                    className="entry-editor-relations__toggle"
-                    onClick={() => setRelationsExpanded((current) => !current)}
-                >
-                    <svg className="entry-editor-toggle__arrow" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" strokeWidth="2"
-                              strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <span>词条关系</span>
-                    <span className="entry-editor-relations__count">{relationDrafts.length}</span>
-                </button>
+                <div className="entry-editor-relations__header">
+                    <button
+                        type="button"
+                        className="entry-editor-relations__toggle"
+                        onClick={() => setRelationsExpanded((current) => !current)}
+                    >
+                        <svg className="entry-editor-toggle__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" strokeWidth="2"
+                                  strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>词条关系</span>
+                        <span className="entry-editor-relations__count">{relationDrafts.length}</span>
+                    </button>
+                    {!isBrowseMode && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="entry-editor-relations__add"
+                            disabled={relationPanelDisabled}
+                            onClick={openCreateRelationPanel}
+                        >
+                            + 添加
+                        </Button>
+                    )}
+                </div>
 
                 {relationsExpanded && (
                     <RollingBox axis="y" className="entry-editor-relations__body" thumbSize="thin">
@@ -68,15 +156,52 @@ export default function EntryEditorSidebar({
                                 onOpenEntry={onOpenEntry}
                             />
                         ) : (
-                            <EntryRelationCreator
-                                drafts={relationDrafts}
-                                entries={projectEntries}
-                                categories={categories}
-                                currentEntryId={entryId}
-                                disabled={saving || projectDataLoading}
-                                onChange={onRelationDraftsChange}
-                                onOpenEntry={onOpenEntry}
-                            />
+                            relationDrafts.length === 0 ? (
+                                <div className="entry-editor-empty-tip">
+                                    当前词条还没有结构化关系，可手动补充“依赖 / 包含 / 并列 / 对立”等语义连接。
+                                </div>
+                            ) : (
+                                <div className="entry-editor-relations__list">
+                                    {relationDrafts.map((draft, index) => {
+                                        const otherEntry = projectEntries.find((item) => item.id === draft.otherEntryId)
+                                        const title = otherEntry?.title ?? '未选择词条'
+                                        return (
+                                            <article key={draft.id ?? `draft-${index}`}
+                                                     className="entry-editor-relation-card">
+                                                <button
+                                                    type="button"
+                                                    className="entry-editor-relation-card__main"
+                                                    disabled={!otherEntry}
+                                                    onClick={() => {
+                                                        if (!otherEntry) return
+                                                        onOpenEntry?.({id: otherEntry.id, title: otherEntry.title})
+                                                    }}
+                                                >
+                                                    <span className="entry-editor-relation-card__title">{title}</span>
+                                                    <span className="entry-editor-relation-card__meta">
+                                                        {otherEntry
+                                                            ? `${getCategoryName(categories, otherEntry.category_id)} · ${buildRelationLabel(draft)}`
+                                                            : '词条不存在或已被删除'}
+                                                    </span>
+                                                    {otherEntry?.summary ? (
+                                                        <span className="entry-editor-relation-card__excerpt">
+                                                            {buildExcerpt(otherEntry.summary, 60)}
+                                                        </span>
+                                                    ) : null}
+                                                </button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => openEditRelationPanel(index)}
+                                                >
+                                                    编辑
+                                                </Button>
+                                            </article>
+                                        )
+                                    })}
+                                </div>
+                            )
                         )}
                     </RollingBox>
                 )}
@@ -180,6 +305,71 @@ export default function EntryEditorSidebar({
                     </RollingBox>
                 )}
             </section>
+
+            <FloatingPanel
+                open={Boolean(relationPanel)}
+                onClose={closeRelationPanel}
+                dismissible
+                ariaLabel={relationPanel?.mode === 'edit' ? '编辑词条关系' : '新增词条关系'}
+                className="entry-relation-panel"
+            >
+                {relationPanel && (
+                    <>
+                        <div className="entry-relation-panel__header">
+                            <span className="entry-relation-panel__title">
+                                {relationPanel.mode === 'edit' ? '编辑词条关系' : '新增词条关系'}
+                            </span>
+                            <button
+                                type="button"
+                                className="entry-relation-panel__close app-dialog-close"
+                                onClick={closeRelationPanel}
+                                aria-label="关闭"
+                            >
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
+                                          strokeLinecap="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="entry-relation-panel__body">
+                            <EntryRelationDraftForm
+                                draft={relationPanel.draft}
+                                entries={projectEntries}
+                                categories={categories}
+                                currentEntryId={entryId}
+                                disabled={relationPanelDisabled}
+                                onChange={updateRelationPanelDraft}
+                                onOpenEntry={onOpenEntry}
+                            />
+                        </div>
+                        <div className="entry-relation-panel__footer">
+                            {relationPanel.mode === 'edit' && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={relationPanelDisabled}
+                                    onClick={() => void deleteRelationFromPanel()}
+                                >
+                                    删除
+                                </Button>
+                            )}
+                            <span className="entry-relation-panel__spacer"/>
+                            <Button type="button" size="sm" variant="ghost" onClick={closeRelationPanel}>
+                                取消
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                disabled={!relationPanelCanSave}
+                                onClick={saveRelationPanel}
+                            >
+                                保存
+                            </Button>
+                        </div>
+                    </>
+                )}
+            </FloatingPanel>
         </>
     )
 }
