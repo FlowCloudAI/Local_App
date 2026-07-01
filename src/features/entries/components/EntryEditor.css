@@ -401,6 +401,14 @@
     gap: 0.7rem;
 }
 
+.entry-editor-tags-grid {
+    max-height: min(18rem, 42vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.25rem;
+    scrollbar-gutter: stable;
+}
+
 .entry-editor-tag-card {
     display: inline-flex;
     flex-direction: column;
