@@ -1167,6 +1167,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         const hints: string[] = []
+        const modeLabel = toolAccessMode === 'reader'
+            ? 'reader（读者模式）'
+            : toolAccessMode === 'writer'
+                ? 'writer（作家模式）'
+                : 'assistant（助手模式）'
+        hints.push(`当前工具权限模式：${modeLabel}。请只使用当前可用工具，不要声称拥有未开放能力。`)
         if (!webSearchEnabled) {
             hints.push(
                 '用户已禁用 "web_search" 和 "open_url" 工具。' +
@@ -1175,14 +1181,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
         if (!editModeEnabled) {
             hints.push(
-                '用户当前处于读者模式，所有写入类工具已被禁用。' +
+                'reader（读者模式）：所有写入类工具已被禁用。' +
                 '若用户要求修改内容，请告知其切换到"助手模式"或"作家模式"后再操作。'
             )
         } else if (toolAccessMode === 'assistant') {
-            hints.push('用户当前处于助手模式，写入和删除操作必须等待用户确认后才能执行。')
+            hints.push('assistant（助手模式）：允许写入工具，但写入和删除操作必须等待用户确认后才能执行。')
         } else if (toolAccessMode === 'writer') {
             hints.push(
-                '用户当前处于作家模式，常规新建、改写和移动操作可直接执行；删除类操作仍必须等待用户确认。'
+                'writer（作家模式）：常规新建、改写和移动操作可直接执行；删除类操作仍必须等待用户确认。'
             )
         }
         if (hints.length > 0) {

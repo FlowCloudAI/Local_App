@@ -44,7 +44,4 @@
 {% endif %}
 {% endfor %}
 
-请严格按照以上 JSON 格式输出：
-{
-  "checkKind": "{{ check_kind }}",
-  "overview": "
+请只输出一个合法 JSON 对象，并严格满足上述字段要求。
