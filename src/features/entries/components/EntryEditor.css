@@ -914,6 +914,10 @@
 .entry-editor-backlinks__body,
 .entry-editor-outgoing-links__body {
     border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+    max-height: min(24rem, 48vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
 }
 
 .entry-editor-toggle__arrow {
