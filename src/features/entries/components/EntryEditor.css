@@ -404,7 +404,6 @@
 .entry-editor-tags-grid {
     max-height: min(18rem, 42vh);
     overflow-y: auto;
-    overscroll-behavior: contain;
     padding-right: 0.25rem;
     scrollbar-gutter: stable;
 }
@@ -916,7 +915,6 @@
     border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     height: auto;
     max-height: min(24rem, 48vh);
-    overscroll-behavior: contain;
     scrollbar-gutter: stable;
 }
 
