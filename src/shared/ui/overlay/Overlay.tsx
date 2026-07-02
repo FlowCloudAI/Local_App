@@ -3,8 +3,8 @@ import {createPortal} from 'react-dom'
 import {pushOverlay, removeOverlay} from './overlayStack'
 import './Overlay.css'
 
-/** 退场动画时长，需 ≥ Overlay.css 中的 --fc-transition-slow（250ms）。 */
-const EXIT_DURATION_MS = 280
+/** 退场动画时长，需 ≥ Overlay.css 中的浮层过渡时长。 */
+const EXIT_DURATION_MS = 100
 
 type OverlayVariant = 'floating' | 'sheet'
 

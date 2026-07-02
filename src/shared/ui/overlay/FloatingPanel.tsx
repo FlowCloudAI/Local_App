@@ -58,11 +58,20 @@ export default function FloatingPanel({
                             variant="ghost"
                             size="sm"
                             iconOnly
+                            circle
                             aria-label={closeLabel}
                             disabled={!dismissible}
                             onClick={onClose}
                         >
-                            ×
+                            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                                <path
+                                    d="M5 5L15 15M15 5L5 15"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.4"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
                         </Button>
                     )}
                 </div>
