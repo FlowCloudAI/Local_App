@@ -60,7 +60,7 @@
 .pe-cover-picker__body {
     flex: 1;
     min-height: 0;
-    padding: var(--fc-space-lg) var(--fc-space-xl) var(--fc-space-xl);
+    padding: 0 var(--fc-space-xl) var(--fc-space-xl);
     overflow: auto;
 }
 
@@ -87,7 +87,7 @@
     justify-content: space-between;
     gap: var(--fc-space-md);
     flex-wrap: wrap;
-    padding: var(--fc-space-md) var(--fc-space-xl) 0;
+    padding: var(--fc-space-md) var(--fc-space-xl) var(--fc-space-lg);
     flex: 0 0 auto;
 }
 
