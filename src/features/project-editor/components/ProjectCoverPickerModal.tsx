@@ -1,5 +1,4 @@
 import {openFileDialog} from '../../../api/dialog'
-import {createPortal} from 'react-dom'
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -16,6 +15,7 @@ import {
 import type {EntryImage} from '../../entries/lib/entryImage'
 import {toEntryImageSrc} from '../../entries/lib/entryImage'
 import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
+import FloatingPanel from '../../../shared/ui/overlay/FloatingPanel'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectCoverPickerModal.css'
 
@@ -153,18 +153,6 @@ export default function ProjectCoverPickerModal({
             cancelled = true
         }
     }, [open, projectId, showAlert])
-
-    useEffect(() => {
-        if (!open) return
-
-        const handler = (event: globalThis.KeyboardEvent) => {
-            if (event.key === 'Escape' && !applying) {
-                onClose()
-            }
-        }
-        window.addEventListener('keydown', handler)
-        return () => window.removeEventListener('keydown', handler)
-    }, [applying, onClose, open])
 
     const selectedPluginInfo = useMemo(
         () => plugins.find((plugin) => plugin.id === selectedPlugin) ?? null,
@@ -321,42 +309,19 @@ export default function ProjectCoverPickerModal({
         onOpenPluginManagement?.('image')
     }
 
-    if (!open) return null
-
-    return createPortal(
-        <div
-            className="pe-cover-picker-backdrop"
-            onClick={(event) => {
-                if (event.target === event.currentTarget && !applying) {
-                    onClose()
-                }
-            }}
-        >
-            <div
-                className="pe-cover-picker-dialog"
-                role="dialog"
-                aria-modal="true"
-                aria-label="设置项目封面"
-            >
-                <div className="pe-cover-picker__header">
-                    <div className="fc-page-title-block">
-                        <h3 className="pe-cover-picker__title fc-section-title">设置项目封面</h3>
-                        <p className="pe-cover-picker__desc">可以从已有词条图片中选择，也可以上传或 AI 生成。</p>
-                    </div>
-                    <button
-                        type="button"
-                        className="pe-cover-picker__close app-dialog-close"
-                        onClick={onClose}
-                        disabled={applying}
-                        aria-label="关闭"
-                    >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                                  strokeLinecap="round"/>
-                        </svg>
-                    </button>
+    return (
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            dismissible={!applying}
+            title={(
+                <div className="pe-cover-picker__heading">
+                    <span className="pe-cover-picker__title fc-section-title">设置项目封面</span>
+                    <span className="pe-cover-picker__desc">可以从已有词条图片中选择，也可以上传或 AI 生成。</span>
                 </div>
-
+            )}
+            className="pe-cover-picker-dialog"
+        >
                 <div className="pe-cover-picker__tabs">
                     {([
                         {key: 'existing', label: '词条图片'},
@@ -374,19 +339,21 @@ export default function ProjectCoverPickerModal({
                     ))}
                 </div>
 
+                {activeTab === 'existing' && (
+                    <div className="pe-cover-picker__toolbar">
+                        <input
+                            className="pe-cover-picker__search"
+                            value={libraryQuery}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => setLibraryQuery(event.target.value)}
+                            placeholder="按词条标题或图片说明筛选"
+                        />
+                        <span className="pe-cover-picker__count">共 {filteredLibraryItems.length} 张</span>
+                    </div>
+                )}
+
                 <div className="pe-cover-picker__body">
                     {activeTab === 'existing' && (
                         <div className="pe-cover-picker__panel">
-                            <div className="pe-cover-picker__toolbar">
-                                <input
-                                    className="pe-cover-picker__search"
-                                    value={libraryQuery}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setLibraryQuery(event.target.value)}
-                                    placeholder="按词条标题或图片说明筛选"
-                                />
-                                <span className="pe-cover-picker__count">共 {filteredLibraryItems.length} 张</span>
-                            </div>
-
                             {loadingLibrary ? (
                                 <div className="pe-cover-picker__empty">正在加载词条图片…</div>
                             ) : filteredLibraryItems.length === 0 ? (
@@ -568,8 +535,6 @@ export default function ProjectCoverPickerModal({
                         </div>
                     )}
                 </div>
-            </div>
-        </div>,
-        document.body,
+        </FloatingPanel>
     )
 }
