@@ -346,9 +346,9 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
             {/* ── 顶部 ── */}
             <div className="fc-op-header">
                 {onBack && (
-                    <button type="button" className="fc-op-back-btn" onClick={onBack}>
+                    <Button type="button" className="fc-op-back-btn" variant="ghost" size="sm" onClick={onBack}>
                         <BackArrow/>返回
-                    </button>
+                    </Button>
                 )}
                 <div className="fc-op-header__title-block">
                     <h2 className="fc-op-header__title">时间线</h2>

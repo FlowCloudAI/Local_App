@@ -1,5 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
+import {Button} from 'flowcloudai-ui'
 import {listen} from '../../../api/events'
 import {confirm_entry_edit, ENTRY_EDIT_REQUEST, type EntryEditRequestEvent,} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
@@ -47,20 +48,26 @@ export default function EntryEditModal() {
                 </div>
 
                 <div className="eem-footer">
-                    <button
+                    <Button
+                        type="button"
                         className="eem-btn eem-btn-cancel"
+                        variant="outline"
+                        size="sm"
                         onClick={() => void respond(false)}
                         disabled={busy}
                     >
                         取消
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        type="button"
                         className="eem-btn eem-btn-confirm"
+                        variant="primary"
+                        size="sm"
                         onClick={() => void respond(true)}
                         disabled={busy}
                     >
                         确认修改
-                    </button>
+                    </Button>
                 </div>
                 </>
             )}

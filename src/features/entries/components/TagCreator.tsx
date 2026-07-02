@@ -300,22 +300,26 @@ export default function TagCreator({
                         <div className="tag-creator-label-row">
                             <label className="tag-creator-label">植入词条类型</label>
                             <div className="tag-creator-mini-actions">
-                                <button
+                                <Button
                                     type="button"
                                     className="tag-creator-mini-action"
+                                    variant="ghost"
+                                    size="xs"
                                     onClick={() => setSelectedTargets(allTargetKeys)}
                                     disabled={submitting}
                                 >
                                     全选
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
                                     className="tag-creator-mini-action"
+                                    variant="ghost"
+                                    size="xs"
                                     onClick={() => setSelectedTargets([])}
                                     disabled={submitting}
                                 >
                                     清空
-                                </button>
+                                </Button>
                             </div>
                         </div>
                         <p className="tag-creator-field-hint">

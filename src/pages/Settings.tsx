@@ -353,9 +353,11 @@ function SettingsSidebar({activeTab, onTabChange, onBack}: SettingsSidebarProps)
     return (
         <aside className="settings-sidebar">
             {onBack && (
-                <button
+                <Button
                     type="button"
                     className="settings-back-button"
+                    variant="ghost"
+                    size="sm"
                     onClick={onBack}
                 >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -363,7 +365,7 @@ function SettingsSidebar({activeTab, onTabChange, onBack}: SettingsSidebarProps)
                         <path d="M19 12H5M12 19l-7-7 7-7"/>
                     </svg>
                     <span>返回</span>
-                </button>
+                </Button>
             )}
             {SETTINGS_TABS.map(tab => (
                 <button

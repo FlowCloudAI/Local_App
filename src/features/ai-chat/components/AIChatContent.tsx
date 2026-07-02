@@ -3,7 +3,7 @@ import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import {createPortal} from 'react-dom'
 import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
-import {MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
+import {Button, MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_export_conversation,
     ai_list_plugins,
@@ -1252,14 +1252,20 @@ export default function AIChatContent({
                             placeholder="搜索对话"
                             ariaLabel="搜索 AI 对话"
                         />
-                        <button className="ai-sidebar-new-btn" onClick={() => void ctx.createNewConversation()}
-                                title="新对话">
+                        <Button
+                            type="button"
+                            className="ai-sidebar-new-btn"
+                            variant="primary"
+                            size="sm"
+                            onClick={() => void ctx.createNewConversation()}
+                            title="新对话"
+                        >
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
                                  strokeWidth="1.5">
                                 <path d="M7 2v10M2 7h10"/>
                             </svg>
                             <span>新对话</span>
-                        </button>
+                        </Button>
                     </div>
                 </div>
                 <div className="ai-conversations-list">
@@ -1791,34 +1797,37 @@ export default function AIChatContent({
                         {ctx.editingMessageId && (
                             <div className="ai-edit-indicator">
                                 <span>正在编辑上一条消息</span>
-                                <button onClick={() => {
+                                <Button type="button" variant="ghost" size="xs" onClick={() => {
                                     ctx.setEditingMessageId(null)
                                     ctx.setInputValue('')
                                 }}>取消
-                                </button>
+                                </Button>
                             </div>
                         )}
                         {isArchivedConversation && activeConversation && (
                             <div className="ai-archived-input-hint" role="status">
                                 <span>会话已归档，取消归档后可继续对话。</span>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
+                                    size="sm"
                                     onClick={(event) => ctx.toggleConversationArchived(activeConversation.id, event)}
                                 >
                                     取消归档
-                                </button>
+                                </Button>
                             </div>
                         )}
                         {!isArchivedConversation && llmApiKeyMissing && (
                             <div className="ai-api-key-input-hint" role="status" aria-live="polite">
                                 <span>LLM 插件「{activeLlmPluginName}」尚未配置 API Key。</span>
                                 {onOpenPluginManagement && (
-                                    <button
+                                    <Button
                                         type="button"
+                                        size="sm"
                                         onClick={() => onOpenPluginManagement('llm')}
                                     >
                                         去配置
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         )}

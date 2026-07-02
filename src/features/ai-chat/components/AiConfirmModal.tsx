@@ -1,5 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
+import {Button} from 'flowcloudai-ui'
 import {listen} from '../../../api/events'
 import {
     AI_WRITE_REQUEST,
@@ -69,16 +70,26 @@ export default function AiConfirmModal() {
                     {pending.kind === 'write' && <WriteView data={pending.data}/>}
 
                     <div className="acm-footer">
-                        <button className="acm-btn acm-btn-cancel" onClick={() => void respond(false)} disabled={busy}>
+                        <Button
+                            type="button"
+                            className="acm-btn acm-btn-cancel"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void respond(false)}
+                            disabled={busy}
+                        >
                             取消
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
                             className={`acm-btn ${pending.kind === 'cascade' && pending.data.step === 2 ? 'acm-btn-danger' : 'acm-btn-confirm'}`}
+                            variant={pending.kind === 'cascade' && pending.data.step === 2 ? 'danger' : 'primary'}
+                            size="sm"
                             onClick={() => void respond(true)}
                             disabled={busy}
                         >
                             {pending.kind === 'cascade' && pending.data.step === 2 ? '确认删除' : '确认'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
