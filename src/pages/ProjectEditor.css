@@ -425,25 +425,19 @@
     padding-top: var(--pe-breadcrumb-height);
 }
 
-.pe-project-view::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: 2;
-    width: 0.75rem;
-    height: var(--pe-breadcrumb-height);
-    background: var(--fc-color-bg);
-    pointer-events: none;
-}
-
 /* ── 项目概览 ─────────────────────────────────────────────────────── */
 
 .pe-overview {
     height: 100%;
     width: 100%;
-    padding: calc(var(--pe-breadcrumb-height) + var(--fc-space-lg)) var(--fc-space-xl) var(--fc-space-2xl);
+    padding: var(--fc-space-lg) var(--fc-space-xl) var(--fc-space-2xl);
     container-type: inline-size;
+}
+
+.pe-project-view > .pe-overview {
+    --roll-inset-top: var(--pe-breadcrumb-height);
+
+    padding-top: calc(var(--pe-breadcrumb-height) + var(--fc-space-lg));
 }
 
 .pe-overview-entries {

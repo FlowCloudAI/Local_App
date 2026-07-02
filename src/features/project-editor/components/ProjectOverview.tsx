@@ -86,7 +86,7 @@ function ProjectOverview({
     ])
 
     return (
-        <RollingBox axis="y" ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin" showThumb="show">
+        <RollingBox axis="y" customThumb ref={setOverviewScrollRef} className="pe-overview" thumbSize="thin" showThumb="show">
             <ProjectOverviewHeader
                 project={project}
                 onEditCover={onEditCover}
