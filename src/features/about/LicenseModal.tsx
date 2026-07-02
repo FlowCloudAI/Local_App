@@ -10,20 +10,13 @@ interface LicenseModalProps {
 
 export default function LicenseModal({open, onClose}: LicenseModalProps) {
     return (
-        <FloatingPanel open={open} onClose={onClose} ariaLabel={LICENSE_TITLE} className="license-modal-dialog">
-            <div className="license-modal-header">
-                <span className="license-modal-title">{LICENSE_TITLE}</span>
-                <button
-                    className="license-modal-close"
-                    onClick={onClose}
-                    aria-label="关闭"
-                >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-                    </svg>
-                </button>
-            </div>
-
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            title={LICENSE_TITLE}
+            ariaLabel={LICENSE_TITLE}
+            className="license-modal-dialog"
+        >
             <RollingBox axis="y" className="license-modal-body" thumbSize="thin">
                 <p className="license-modal-intro">{LICENSE_INTRO}</p>
                 {LICENSE_SECTIONS.map((section) => (

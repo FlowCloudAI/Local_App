@@ -310,27 +310,12 @@ export default function EntryEditorSidebar({
                 open={Boolean(relationPanel)}
                 onClose={closeRelationPanel}
                 dismissible
+                title={relationPanel?.mode === 'edit' ? '编辑词条关系' : '新增词条关系'}
                 ariaLabel={relationPanel?.mode === 'edit' ? '编辑词条关系' : '新增词条关系'}
                 className="entry-relation-panel"
             >
                 {relationPanel && (
                     <>
-                        <div className="entry-relation-panel__header">
-                            <span className="entry-relation-panel__title">
-                                {relationPanel.mode === 'edit' ? '编辑词条关系' : '新增词条关系'}
-                            </span>
-                            <button
-                                type="button"
-                                className="entry-relation-panel__close app-dialog-close"
-                                onClick={closeRelationPanel}
-                                aria-label="关闭"
-                            >
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                    <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                                          strokeLinecap="round"/>
-                                </svg>
-                            </button>
-                        </div>
                         <div className="entry-relation-panel__body">
                             <EntryRelationDraftForm
                                 draft={relationPanel.draft}

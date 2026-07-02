@@ -45,8 +45,14 @@ export default function RenameDialog({
     const canConfirm = trimmed.length > 0 && !busy
 
     return (
-        <FloatingPanel open={open} onClose={onClose} dismissible={!busy} ariaLabel={title} className="fc-rename-dialog">
-            <div className="fc-rename-dialog__title">{title}</div>
+        <FloatingPanel
+            open={open}
+            onClose={onClose}
+            dismissible={!busy}
+            title={title}
+            ariaLabel={title}
+            className="fc-rename-dialog"
+        >
             {label && <div className="fc-rename-dialog__label">{label}</div>}
             <Input
                 value={value}

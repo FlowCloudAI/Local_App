@@ -211,13 +211,13 @@ function ProjectOverviewHeader({
                 </div>
             </section>
             <FloatingPanel
-                open={menuOpen}
-                onClose={() => setMenuOpen(false)}
-                ariaLabel="项目编辑菜单"
-                className="fc-action-menu"
-            >
-                <div className="fc-action-menu__title">{project.name}</div>
-                <div className="fc-action-menu__list">
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            title={project.name}
+            ariaLabel="项目编辑菜单"
+            className="fc-action-menu"
+        >
+            <div className="fc-action-menu__list">
                     {actionItems.map((item) => (
                         <button
                             key={item.key}

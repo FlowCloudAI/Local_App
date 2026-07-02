@@ -52,20 +52,6 @@ function checkKindLabel(kind: WorldCheckKind): string {
     return CHECK_KIND_OPTIONS.find((item) => item.value === kind)?.label ?? '设定检测'
 }
 
-function CloseIcon() {
-    return (
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <path
-                d="M4.25 4.25L11.75 11.75M11.75 4.25L4.25 11.75"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-            />
-        </svg>
-    )
-}
-
 function formatDateTime(value: string): string {
     const parsed = new Date(value)
     if (Number.isNaN(parsed.getTime())) return value
@@ -746,28 +732,14 @@ function ProjectContradictionPanel({
             </div>
             {generateDialogOpen && (
                 <FloatingPanel
-                    open
-                    onClose={() => setGenerateDialogOpen(false)}
-                    dismissible={!generating}
-                    labelledBy="pe-generate-report-title"
-                    className="pe-contradiction-modal"
-                >
-                        <div className="pe-contradiction-modal__header">
-                            <div>
-                                <h3 id="pe-generate-report-title" className="pe-contradiction-modal__title">生成新报告</h3>
-                                <p className="pe-contradiction-modal__desc">选择检测方式、AI 插件和模型后开始生成。</p>
-                            </div>
-                            <button
-                                type="button"
-                                className="pe-contradiction-modal__close"
-                                onClick={() => setGenerateDialogOpen(false)}
-                                aria-label="关闭"
-                                disabled={generating}
-                            >
-                                <CloseIcon/>
-                            </button>
-                        </div>
-                        <div className="pe-contradiction-modal__body">
+            open
+            onClose={() => setGenerateDialogOpen(false)}
+            dismissible={!generating}
+            title="生成新报告"
+            className="pe-contradiction-modal"
+        >
+            <p className="pe-contradiction-modal__desc">选择检测方式、AI 插件和模型后开始生成。</p>
+            <div className="pe-contradiction-modal__body">
                             <label className="pe-contradiction-field">
                                 <span>检测类型</span>
                                 <Select

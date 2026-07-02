@@ -28,10 +28,10 @@ export default function ActionMenu({open, onClose, title, items, ariaLabel}: Act
         <FloatingPanel
             open={open}
             onClose={onClose}
+            title={title}
             ariaLabel={ariaLabel ?? title ?? '操作菜单'}
             className="fc-action-menu"
         >
-            {title && <div className="fc-action-menu__title">{title}</div>}
             <div className="fc-action-menu__list">
                 {items.map(item => (
                     <button

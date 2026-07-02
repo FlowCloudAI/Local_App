@@ -130,25 +130,11 @@ export default function EntryTypeCreator({
             open={open}
             onClose={onClose}
             dismissible={!submitting}
+            title={isEditMode ? '编辑词条类型' : '新建词条类型'}
             ariaLabel={isEditMode ? '编辑词条类型' : '新建词条类型'}
             className="entry-type-creator-dialog"
         >
-                <div className="entry-type-creator-header">
-                    <span className="entry-type-creator-title">{isEditMode ? '编辑词条类型' : '新建词条类型'}</span>
-                    <button
-                        className="entry-type-creator-close app-dialog-close"
-                        onClick={onClose}
-                        disabled={submitting}
-                        aria-label="关闭"
-                    >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                                  strokeLinecap="round"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="entry-type-creator-body">
+            <div className="entry-type-creator-body">
                     <div className="entry-type-creator-field">
                         <label className="entry-type-creator-label">
                             类型名称

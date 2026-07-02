@@ -756,17 +756,17 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
     return (
         <>
-            <FloatingPanel
-                open={welcomeOpen}
-                dismissible={false}
-                className="project-home-welcome-overlay"
-                ariaLabel="欢迎使用流云AI"
-            >
-                <div className="project-home-welcome">
-                    <div className="project-home-welcome__body">
-                        <span className="project-home-welcome__eyebrow">欢迎使用流云AI</span>
-                        <h2>先从第一个世界观开始</h2>
-                        <p>
+                        <FloatingPanel
+                            open={welcomeOpen}
+                            dismissible={false}
+                            title="先从第一个世界观开始"
+                            className="project-home-welcome-overlay"
+                            ariaLabel="欢迎使用流云AI"
+                        >
+                            <div className="project-home-welcome">
+                                <div className="project-home-welcome__body">
+                                    <span className="project-home-welcome__eyebrow">欢迎使用流云AI</span>
+                                    <p>
                             流云AI会把世界项目、词条、灵感和 AI 辅助放在同一个创作工作区里。你可以先看一遍简短教程，也可以直接开始使用。
                         </p>
                     </div>

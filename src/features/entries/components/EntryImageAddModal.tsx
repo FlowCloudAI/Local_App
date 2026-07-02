@@ -259,24 +259,11 @@ export default function EntryImageAddModal({
         <FloatingPanel
             open={open}
             onClose={onClose}
+            title={insertMode ? '插入图片' : '添加图片'}
             ariaLabel="添加图片"
             className="entry-image-add-dialog"
         >
-            <div className="entry-image-add-header">
-                <span className="entry-image-add-title">{insertMode ? '插入图片' : '添加图片'}</span>
-                <button
-                    className="entry-image-add-close app-dialog-close"
-                    onClick={onClose}
-                    aria-label="关闭"
-                >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                              strokeLinecap="round"/>
-                    </svg>
-                </button>
-            </div>
-
-                <div className="entry-image-add-tabs">
+            <div className="entry-image-add-tabs">
                     {insertMode && (
                         <button
                             type="button"

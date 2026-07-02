@@ -33,15 +33,13 @@ export default function EntryEditModal() {
             open={!!pending}
             onClose={() => void respond(false)}
             dismissible={!busy}
+            title="AI 编辑请求"
             ariaLabel="AI 编辑请求"
             className="eem-dialog"
         >
             {pending && (
                 <>
-                <div className="eem-header">
-                    <span className="eem-title">AI 编辑请求</span>
-                    <span className="eem-entry-name">{pending.entry_title}</span>
-                </div>
+                <div className="eem-entry-name">{pending.entry_title}</div>
 
                 <div className="eem-body">
                     <DiffView before={pending.before_content} after={pending.after_content}/>

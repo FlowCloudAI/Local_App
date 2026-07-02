@@ -61,6 +61,29 @@
     -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
 }
 
+.fc-floating-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-md) var(--fc-space-lg);
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.fc-floating-panel__title {
+    min-width: 0;
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-title-sm, 1.125rem);
+    font-weight: var(--fc-font-weight-semibold, 600);
+    line-height: var(--fc-line-height-tight);
+    overflow-wrap: anywhere;
+}
+
+.fc-floating-panel__close.fc-btn {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
 /* 进场：浮动轻微放大淡入；上滑从底部滑入。 */
 .fc-overlay--floating .fc-overlay__panel {
     transform: scale(0.96);

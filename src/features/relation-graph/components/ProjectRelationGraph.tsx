@@ -598,27 +598,13 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
 
             {layoutPanelOpen && (
                 <FloatingPanel
-                    open
-                    onClose={() => setLayoutPanelOpen(false)}
-                    className="rg-layout-dialog"
-                    ariaLabel="布局参数"
-                >
-                    <div className="rg-layout-dialog__header">
-                        <h3>布局参数</h3>
-                        <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            iconOnly
-                            className="rg-layout-dialog__close"
-                            aria-label="关闭"
-                            onClick={() => setLayoutPanelOpen(false)}
-                        >
-                            ×
-                        </Button>
-                    </div>
-
-                    <div className="rg-layout-dialog__body">
+            open
+            onClose={() => setLayoutPanelOpen(false)}
+            title="布局参数"
+            className="rg-layout-dialog"
+            ariaLabel="布局参数"
+        >
+            <div className="rg-layout-dialog__body">
                         <ButtonGroup className="rg-layout-mode">
                             <Button
                                 type="button"

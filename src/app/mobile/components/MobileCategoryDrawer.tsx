@@ -997,10 +997,10 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 open={!!moveTarget}
                 onClose={() => setMoveTarget(null)}
                 dismissible={!busy}
+                title="移动分类"
                 ariaLabel="移动分类"
                 className="mobile-category-drawer-dialog"
             >
-                <div className="mobile-category-drawer-dialog__title">移动分类</div>
                 <div className="mobile-category-drawer-dialog__summary">
                     将「{moveTarget?.name ?? ''}」移动到新的父分类。
                 </div>
@@ -1037,10 +1037,10 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 open={!!deleteTarget}
                 onClose={() => setDeleteTarget(null)}
                 dismissible={!busy}
+                title="删除分类"
                 ariaLabel="删除分类"
                 className="mobile-category-drawer-dialog"
             >
-                <div className="mobile-category-drawer-dialog__title">删除分类</div>
                 <div className="mobile-category-drawer-dialog__summary">
                     「{deleteTarget?.name ?? ''}」包含 {deleteImpact?.categoryCount ?? 0} 个分类节点、
                     {deleteImpact?.entryCount ?? 0} 个词条。

@@ -46,12 +46,10 @@ export default function ProjectImportConflictDialog({
             open={open}
             onClose={onCancel}
             dismissible={!busy}
+            title="发现同名世界观"
             ariaLabel="导入世界观重名处理"
             className="project-import-conflict-dialog"
         >
-            <div className="project-import-conflict-header">
-                <span className="project-import-conflict-title">发现同名世界观</span>
-            </div>
             <div className="project-import-conflict-body">
                 <p className="project-import-conflict-message">
                     当前已有“{preview.duplicateProject.projectName}”，请选择如何处理导入包中的“{preview.projectName}”。

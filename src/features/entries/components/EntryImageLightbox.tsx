@@ -300,6 +300,7 @@ export default function EntryImageLightbox({
         <FloatingPanel
             open={open}
             onClose={onClose}
+            title={`${infoTitle} 图片浏览`}
             className="entry-editor-lightbox"
             ariaLabel={`${infoTitle} 图片浏览`}
         >

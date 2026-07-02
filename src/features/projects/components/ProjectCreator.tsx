@@ -62,26 +62,12 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
             open={open}
             onClose={onClose}
             dismissible={!submitting}
+            title="新建世界观"
             ariaLabel="新建世界观"
             className="project-creator-dialog"
             dataTourId="project-creator-dialog"
         >
-                <div className="project-creator-header">
-                    <span className="project-creator-title">新建世界观</span>
-                    <button
-                        className="project-creator-close app-dialog-close"
-                        onClick={onClose}
-                        disabled={submitting}
-                        aria-label="关闭"
-                    >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                                  strokeLinecap="round"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="project-creator-body">
+            <div className="project-creator-body">
                     <div className="project-creator-field">
                         <label className="project-creator-label">
                             世界观名称

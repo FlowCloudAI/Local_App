@@ -1880,24 +1880,14 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                    onChange={handleImageFileChange}/>
 
             {newMapForm && (
-                <FloatingPanel
-                    open
-                    onClose={() => setNewMapForm(null)}
-                    className="wm-create-map-dialog"
-                    ariaLabel="新建地图"
-                >
-                        <div className="wm-create-map-dialog__header">
-                            <h3>新建地图</h3>
-                            <button
-                                type="button"
-                                className="wm-icon-btn wm-icon-btn--close"
-                                onClick={() => setNewMapForm(null)}
-                                aria-label="关闭"
-                            >
-                                <CloseIcon/>
-                            </button>
-                        </div>
-                        <div className="wm-create-map-dialog__body">
+        <FloatingPanel
+            open
+            onClose={() => setNewMapForm(null)}
+            title="新建地图"
+            className="wm-create-map-dialog"
+            ariaLabel="新建地图"
+        >
+            <div className="wm-create-map-dialog__body">
                             <div className="wm-field">
                                 <label>地图名称</label>
                                 <input
@@ -1981,24 +1971,14 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             )}
 
             {utilityPanel && (
-                <FloatingPanel
-                    open
-                    onClose={() => setUtilityPanel(null)}
-                    className={`wm-utility-dialog${utilityPanel === 'coastline' ? ' wm-utility-dialog--wide' : ''}`}
-                    ariaLabel={utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}
-                >
-                    <div className="wm-create-map-dialog__header">
-                        <h3>{utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}</h3>
-                        <button
-                            type="button"
-                            className="wm-icon-btn wm-icon-btn--close"
-                            onClick={() => setUtilityPanel(null)}
-                            aria-label="关闭"
-                        >
-                            <CloseIcon/>
-                        </button>
-                    </div>
-                    {utilityPanel === 'help' ? (
+        <FloatingPanel
+            open
+            onClose={() => setUtilityPanel(null)}
+            title={utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}
+            className={`wm-utility-dialog${utilityPanel === 'coastline' ? ' wm-utility-dialog--wide' : ''}`}
+            ariaLabel={utilityPanel === 'help' ? '操作说明' : '海岸线生成参数'}
+        >
+            {utilityPanel === 'help' ? (
                         <div className="wm-sidebar-hints">
                             <div className="wm-sidebar-hint">点击「绘制图形」在画布上逐点绘制区域。</div>
                             <div className="wm-sidebar-hint">双击画布或点击侧栏「完成图形」结束绘制。</div>

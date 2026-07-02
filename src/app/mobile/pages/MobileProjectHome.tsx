@@ -426,10 +426,10 @@ export default function MobileProjectHome({
                 open={descriptionOpen}
                 onClose={() => setDescriptionOpen(false)}
                 dismissible={!descriptionSaving}
+                title="编辑项目描述"
                 ariaLabel="编辑项目描述"
                 className="fc-rename-dialog"
             >
-                <div className="fc-rename-dialog__title">编辑项目描述</div>
                 <textarea
                     value={descriptionDraft}
                     onChange={(event) => setDescriptionDraft(event.currentTarget.value)}

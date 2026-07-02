@@ -231,25 +231,11 @@ export default function TagCreator({
             open={open}
             onClose={onClose}
             dismissible={!submitting}
+            title={isEditMode ? '编辑标签' : '新建标签'}
             ariaLabel={isEditMode ? '编辑标签' : '新建标签'}
             className="tag-creator-dialog"
         >
-                <div className="tag-creator-header">
-                    <span className="tag-creator-title">{isEditMode ? '编辑标签' : '新建标签'}</span>
-                    <button
-                        className="tag-creator-close app-dialog-close"
-                        onClick={onClose}
-                        disabled={submitting}
-                        aria-label="关闭"
-                    >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.75"
-                                  strokeLinecap="round"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <div className="tag-creator-body">
+            <div className="tag-creator-body">
                     <div className="tag-creator-field">
                         <label className="tag-creator-label">
                             标签名称

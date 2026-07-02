@@ -60,6 +60,7 @@ export default function AiConfirmModal() {
             open={!!pending}
             dismissible={!busy}
             onClose={() => void respond(false)}
+            title="AI 操作确认"
             ariaLabel="AI 操作确认"
         >
             {pending && (
