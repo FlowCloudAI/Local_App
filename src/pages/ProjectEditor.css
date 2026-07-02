@@ -310,7 +310,9 @@
     gap: 0.45rem;
     padding: 0 1rem;
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 82%, transparent);
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, transparent);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-caption, 0.75rem);
     user-select: none;
@@ -352,7 +354,7 @@
 .pe-project-view,
 .pe-entry-stack {
     position: absolute;
-    inset: var(--pe-breadcrumb-height) 0 0 0;
+    inset: 0;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -373,7 +375,7 @@
 
 .pe-tool-stack {
     position: absolute;
-    inset: var(--pe-breadcrumb-height) 0 0 0;
+    inset: 0;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -413,12 +415,34 @@
     z-index: 1;
 }
 
+.pe-project-view > .pe-category-view,
+.pe-tool-stack > .project-relation-graph,
+.pe-tool-stack > .project-timeline,
+.pe-tool-stack > .pe-contradiction-panel,
+.pe-tool-stack > .wm-panel,
+.pe-entry-layer > .entry-editor-page {
+    box-sizing: border-box;
+    padding-top: var(--pe-breadcrumb-height);
+}
+
+.pe-project-view::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    width: 0.75rem;
+    height: var(--pe-breadcrumb-height);
+    background: var(--fc-color-bg);
+    pointer-events: none;
+}
+
 /* ── 项目概览 ─────────────────────────────────────────────────────── */
 
 .pe-overview {
     height: 100%;
     width: 100%;
-    padding: var(--fc-space-lg) var(--fc-space-xl) var(--fc-space-2xl);
+    padding: calc(var(--pe-breadcrumb-height) + var(--fc-space-lg)) var(--fc-space-xl) var(--fc-space-2xl);
     container-type: inline-size;
 }
 
