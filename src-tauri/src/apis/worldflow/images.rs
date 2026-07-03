@@ -479,6 +479,6 @@ pub async fn db_ensure_project_cover_thumbnails(
     project_id: String,
 ) -> Result<CoverThumbnailMigrationSummary, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     ensure_project_cover_thumbnails_with_progress(&db, paths.inner(), &project_id, |_, _| {}).await
 }
