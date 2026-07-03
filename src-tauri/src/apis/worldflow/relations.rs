@@ -40,7 +40,7 @@ pub async fn db_create_relation(
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
     let a_id = Uuid::parse_str(&a_id).map_err(|e| e.to_string())?;
     let b_id = Uuid::parse_str(&b_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let relation = db
         .create_relation(CreateEntryRelation {
             project_id,
@@ -61,9 +61,14 @@ pub async fn db_create_relation(
 pub async fn db_get_relation(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: Option<String>,
 ) -> Result<EntryRelation, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_relation_db(state.inner(), &id, project_id.as_ref()).await?;
     db.get_relation(&id).await.map_err(|e| e.to_string())
 }
 
@@ -72,9 +77,14 @@ pub async fn db_get_relation(
 pub async fn db_list_relations_for_entry(
     state: State<'_, Arc<AppState>>,
     entry_id: String,
+    project_id: Option<String>,
 ) -> Result<Vec<EntryRelation>, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_entry_db(state.inner(), &entry_id, project_id.as_ref()).await?;
     db.list_relations_for_entry(&entry_id)
         .await
         .map_err(|e| e.to_string())
@@ -87,7 +97,7 @@ pub async fn db_list_relations_for_project(
     project_id: String,
 ) -> Result<Vec<EntryRelation>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.list_relations_for_project(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -100,7 +110,7 @@ pub async fn db_get_relation_graph_data(
     project_id: String,
 ) -> Result<RelationGraphData, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let entries = db
         .list_entries(&project_id, EntryFilter::default(), 1000, 0)
         .await
@@ -150,11 +160,16 @@ pub async fn db_get_relation_graph_data(
 pub async fn db_update_relation(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: Option<String>,
     relation: Option<RelationDirection>,
     content: Option<String>,
 ) -> Result<EntryRelation, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_relation_db(state.inner(), &id, project_id.as_ref()).await?;
     let relation = db
         .update_relation(&id, UpdateEntryRelation { relation, content })
         .await
@@ -166,9 +181,17 @@ pub async fn db_update_relation(
 
 /// 删除单条词条关系
 #[tauri::command]
-pub async fn db_delete_relation(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+pub async fn db_delete_relation(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    project_id: Option<String>,
+) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_relation_db(state.inner(), &id, project_id.as_ref()).await?;
     let relation = db.get_relation(&id).await.map_err(|e| e.to_string())?;
     db.delete_relation(&id).await.map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &relation.project_id).await
@@ -180,10 +203,15 @@ pub async fn db_delete_relations_between(
     state: State<'_, Arc<AppState>>,
     entry_a_id: String,
     entry_b_id: String,
+    project_id: Option<String>,
 ) -> Result<u64, String> {
     let entry_a_id = Uuid::parse_str(&entry_a_id).map_err(|e| e.to_string())?;
     let entry_b_id = Uuid::parse_str(&entry_b_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_entry_db(state.inner(), &entry_a_id, project_id.as_ref()).await?;
     let entry = db.get_entry(&entry_a_id).await.map_err(|e| e.to_string())?;
     let deleted = db
         .delete_relations_between(&entry_a_id, &entry_b_id)

@@ -10,7 +10,7 @@ pub async fn db_create_entry_link(
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
     let a_id = Uuid::parse_str(&a_id).map_err(|e| e.to_string())?;
     let b_id = Uuid::parse_str(&b_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let link = db
         .create_link(CreateEntryLink {
             project_id,
@@ -28,9 +28,14 @@ pub async fn db_create_entry_link(
 pub async fn db_list_outgoing_links(
     state: State<'_, Arc<AppState>>,
     entry_id: String,
+    project_id: Option<String>,
 ) -> Result<Vec<EntryLink>, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_entry_db(state.inner(), &entry_id, project_id.as_ref()).await?;
     db.list_outgoing_links(&entry_id)
         .await
         .map_err(|e| e.to_string())
@@ -41,9 +46,14 @@ pub async fn db_list_outgoing_links(
 pub async fn db_list_incoming_links(
     state: State<'_, Arc<AppState>>,
     entry_id: String,
+    project_id: Option<String>,
 ) -> Result<Vec<EntryLink>, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_entry_db(state.inner(), &entry_id, project_id.as_ref()).await?;
     db.list_incoming_links(&entry_id)
         .await
         .map_err(|e| e.to_string())
@@ -54,9 +64,14 @@ pub async fn db_list_incoming_links(
 pub async fn db_delete_links_from_entry(
     state: State<'_, Arc<AppState>>,
     entry_id: String,
+    project_id: Option<String>,
 ) -> Result<u64, String> {
     let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = project_id
+        .as_deref()
+        .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
+        .transpose()?;
+    let db = open_entry_db(state.inner(), &entry_id, project_id.as_ref()).await?;
     let current_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
     let deleted = db
         .delete_links_from_entry(&entry_id)
@@ -82,7 +97,7 @@ pub async fn db_replace_outgoing_links(
         .into_iter()
         .map(|id| Uuid::parse_str(&id).map_err(|e| e.to_string()))
         .collect::<Result<Vec<_>, String>>()?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let links = db
         .replace_outgoing_links(&project_id, &entry_id, &linked_entry_ids)
         .await

@@ -486,9 +486,9 @@ export default function EntryEditor({
             })
 
         Promise.all([
-            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
+            db_list_outgoing_links(entryId, projectId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId, projectId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId, projectId).catch(() => [] as EntryRelation[]),
         ])
             .then(([outgoing, incoming, relations]) => {
                 if (cancelled) return
@@ -765,9 +765,9 @@ export default function EntryEditor({
     const reloadEntryFromDatabase = useCallback(async (reason: 'external' | 'save' = 'external') => {
         const [refreshed, refreshedOutgoing, refreshedIncoming, refreshedRelations] = await Promise.all([
             db_get_entry(entryId, projectId),
-            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
+            db_list_outgoing_links(entryId, projectId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId, projectId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId, projectId).catch(() => [] as EntryRelation[]),
         ])
 
         const previousEntry = entryRef.current

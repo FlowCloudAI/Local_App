@@ -201,9 +201,9 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             db_list_categories(projectId),
             db_list_tag_schemas(projectId),
             db_list_entries({projectId, limit: 1000, offset: 0}),
-            db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
-            db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
+            db_list_outgoing_links(entryId, projectId).catch(() => [] as EntryLink[]),
+            db_list_incoming_links(entryId, projectId).catch(() => [] as EntryLink[]),
+            db_list_relations_for_entry(entryId, projectId).catch(() => [] as EntryRelation[]),
         ])
         setEntry(e)
         setEntryTypes(types)

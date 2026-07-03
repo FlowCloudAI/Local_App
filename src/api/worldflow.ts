@@ -387,6 +387,7 @@ export interface CreateRelationInput {
 
 export interface UpdateRelationInput {
     id: string
+    projectId?: string
     relation?: RelationDirection | null
     content?: string | null
 }
@@ -708,11 +709,11 @@ export const db_create_relation = ({
                                    }: CreateRelationInput) =>
     command<EntryRelation>('db_create_relation', {projectId, aId, bId, relation, content})
 
-export const db_get_relation = (id: string) =>
-    command<EntryRelation>('db_get_relation', {id})
+export const db_get_relation = (id: string, projectId?: string) =>
+    command<EntryRelation>('db_get_relation', {id, projectId: projectId ?? null})
 
-export const db_list_relations_for_entry = (entryId: string) =>
-    command<EntryRelation[]>('db_list_relations_for_entry', {entryId})
+export const db_list_relations_for_entry = (entryId: string, projectId?: string) =>
+    command<EntryRelation[]>('db_list_relations_for_entry', {entryId, projectId: projectId ?? null})
 
 export const db_list_relations_for_project = (projectId: string) =>
     command<EntryRelation[]>('db_list_relations_for_project', {projectId})
@@ -726,26 +727,26 @@ export const db_get_project_setting = (projectId: string, key: string) =>
 export const db_set_project_setting = (projectId: string, key: string, value: string) =>
     command<void>('db_set_project_setting', {projectId, key, value})
 
-export const db_update_relation = ({id, relation, content}: UpdateRelationInput) =>
-    command<EntryRelation>('db_update_relation', {id, relation, content})
+export const db_update_relation = ({id, projectId, relation, content}: UpdateRelationInput) =>
+    command<EntryRelation>('db_update_relation', {id, projectId: projectId ?? null, relation, content})
 
-export const db_delete_relation = (id: string) =>
-    command<void>('db_delete_relation', {id})
+export const db_delete_relation = (id: string, projectId?: string) =>
+    command<void>('db_delete_relation', {id, projectId: projectId ?? null})
 
-export const db_delete_relations_between = (entryAId: string, entryBId: string) =>
-    command<number>('db_delete_relations_between', {entryAId, entryBId})
+export const db_delete_relations_between = (entryAId: string, entryBId: string, projectId?: string) =>
+    command<number>('db_delete_relations_between', {entryAId, entryBId, projectId: projectId ?? null})
 
 export const db_create_entry_link = ({projectId, aId, bId}: CreateEntryLinkInput) =>
     command<EntryLink>('db_create_entry_link', {projectId, aId, bId})
 
-export const db_list_outgoing_links = (entryId: string) =>
-    command<EntryLink[]>('db_list_outgoing_links', {entryId})
+export const db_list_outgoing_links = (entryId: string, projectId?: string) =>
+    command<EntryLink[]>('db_list_outgoing_links', {entryId, projectId: projectId ?? null})
 
-export const db_list_incoming_links = (entryId: string) =>
-    command<EntryLink[]>('db_list_incoming_links', {entryId})
+export const db_list_incoming_links = (entryId: string, projectId?: string) =>
+    command<EntryLink[]>('db_list_incoming_links', {entryId, projectId: projectId ?? null})
 
-export const db_delete_links_from_entry = (entryId: string) =>
-    command<number>('db_delete_links_from_entry', {entryId})
+export const db_delete_links_from_entry = (entryId: string, projectId?: string) =>
+    command<number>('db_delete_links_from_entry', {entryId, projectId: projectId ?? null})
 
 export const db_replace_outgoing_links = (projectId: string, entryId: string, linkedEntryIds: string[]) =>
     command<EntryLink[]>('db_replace_outgoing_links', {projectId, entryId, linkedEntryIds})
