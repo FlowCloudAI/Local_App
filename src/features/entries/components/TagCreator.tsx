@@ -216,7 +216,7 @@ export default function TagCreator({
         setApiError(null)
 
         try {
-            await db_delete_tag_schema(initialTag.id)
+            await db_delete_tag_schema(initialTag.id, projectId)
             void showAlert('标签已删除', 'success', 'nonInvasive', 1000)
             onDeleted?.(initialTag.id)
             onClose()

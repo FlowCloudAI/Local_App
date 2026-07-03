@@ -233,6 +233,29 @@ pub(super) async fn ensure_project_world(
     sync_project_to_world(state, source_db, project).await
 }
 
+pub(super) async fn open_project_db(
+    state: &AppState,
+    project_id: &Uuid,
+) -> Result<SqliteDb, String> {
+    if let Ok(world_db) = state.world_store.open_world(*project_id).await {
+        if world_db.get_project(project_id).await.is_ok() {
+            return Ok(world_db);
+        }
+    }
+
+    let source_db = state.sqlite_db.lock().await.clone();
+    let project = source_db
+        .get_project(project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    sync_project_to_world(state, &source_db, &project).await?;
+    state
+        .world_store
+        .open_world(*project_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 async fn ensure_world_record(state: &AppState, project: &Project) -> Result<(), String> {
     if state.world_store.get_world(project.id).await.is_ok() {
         state

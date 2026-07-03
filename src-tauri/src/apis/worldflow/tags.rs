@@ -14,7 +14,7 @@ pub async fn db_create_tag_schema(
     sort_order: Option<i64>,
 ) -> Result<TagSchema, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let schema = db
         .create_tag_schema(CreateTagSchema {
             project_id,
@@ -39,9 +39,15 @@ pub async fn db_create_tag_schema(
 pub async fn db_get_tag_schema(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: Option<String>,
 ) -> Result<TagSchema, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = if let Some(project_id) = project_id {
+        let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+        open_project_db(state.inner(), &project_id).await?
+    } else {
+        state.inner().sqlite_db.lock().await.clone()
+    };
     db.get_tag_schema(&id).await.map_err(|e| e.to_string())
 }
 
@@ -52,7 +58,7 @@ pub async fn db_list_tag_schemas(
     project_id: String,
 ) -> Result<Vec<TagSchema>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.list_tag_schemas(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -75,7 +81,7 @@ pub async fn db_update_tag_schema(
 ) -> Result<TagSchema, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let schema = db
         .update_tag_schema(
             &id,
@@ -103,9 +109,11 @@ pub async fn db_update_tag_schema(
 pub async fn db_delete_tag_schema(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: String,
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let schema = db.get_tag_schema(&id).await.map_err(|e| e.to_string())?;
     db.delete_tag_schema(&id).await.map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &schema.project_id).await

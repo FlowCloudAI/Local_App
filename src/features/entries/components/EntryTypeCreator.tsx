@@ -90,6 +90,7 @@ export default function EntryTypeCreator({
             const entryType = initialEntryType
                 ? await db_update_entry_type({
                     id: initialEntryType.id,
+                    projectId,
                     ...payload,
                 })
                 : await db_create_entry_type({
@@ -115,7 +116,7 @@ export default function EntryTypeCreator({
         setApiError(null)
 
         try {
-            await db_delete_entry_type(initialEntryType.id)
+            await db_delete_entry_type(initialEntryType.id, projectId)
             void showAlert('词条类型已删除', 'success', 'nonInvasive', 1000)
             onDeleted?.(initialEntryType.id)
             onClose()

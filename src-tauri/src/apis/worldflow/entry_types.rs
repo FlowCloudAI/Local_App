@@ -6,7 +6,7 @@ pub async fn db_list_all_entry_types(
     project_id: String,
 ) -> Result<Vec<EntryTypeView>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.list_all_entry_types(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -19,7 +19,7 @@ pub async fn db_list_custom_entry_types(
     project_id: String,
 ) -> Result<Vec<CustomEntryType>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.list_custom_entry_types(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -36,7 +36,7 @@ pub async fn db_create_entry_type(
     color: Option<String>,
 ) -> Result<CustomEntryType, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let entry_type = db
         .create_entry_type(CreateCustomEntryType {
             project_id,
@@ -57,9 +57,15 @@ pub async fn db_create_entry_type(
 pub async fn db_get_entry_type(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: Option<String>,
 ) -> Result<CustomEntryType, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = if let Some(project_id) = project_id {
+        let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+        open_project_db(state.inner(), &project_id).await?
+    } else {
+        state.inner().sqlite_db.lock().await.clone()
+    };
     db.get_entry_type(&id).await.map_err(|e| e.to_string())
 }
 
@@ -68,13 +74,15 @@ pub async fn db_get_entry_type(
 pub async fn db_update_entry_type(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: String,
     name: Option<String>,
     description: Option<Option<String>>,
     icon: Option<Option<String>>,
     color: Option<Option<String>>,
 ) -> Result<CustomEntryType, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let entry_type = db
         .update_entry_type(
             &id,
@@ -97,9 +105,11 @@ pub async fn db_update_entry_type(
 pub async fn db_delete_entry_type(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: String,
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let entry_type = db.get_entry_type(&id).await.map_err(|e| e.to_string())?;
     db.delete_entry_type(&id).await.map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &entry_type.project_id).await

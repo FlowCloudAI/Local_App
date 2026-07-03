@@ -657,8 +657,8 @@ export const db_create_tag_schema = ({
         sortOrder,
     })
 
-export const db_get_tag_schema = (id: string) =>
-    command<TagSchema>('db_get_tag_schema', {id})
+export const db_get_tag_schema = (id: string, projectId?: string) =>
+    command<TagSchema>('db_get_tag_schema', {id, projectId: projectId ?? null})
 
 export const db_list_tag_schemas = (projectId: string) =>
     command<TagSchema[]>('db_list_tag_schemas', {projectId})
@@ -688,8 +688,8 @@ export const db_update_tag_schema = ({
         sortOrder,
     })
 
-export const db_delete_tag_schema = (id: string) =>
-    command<void>('db_delete_tag_schema', {id})
+export const db_delete_tag_schema = (id: string, projectId: string) =>
+    command<void>('db_delete_tag_schema', {id, projectId})
 
 export const db_create_relation = ({
                                        projectId,
@@ -775,6 +775,7 @@ export interface CreateEntryTypeInput {
 
 export interface UpdateEntryTypeInput {
     id: string
+    projectId: string
     name?: string | null
     description?: string | null | undefined
     icon?: string | null | undefined
@@ -790,11 +791,11 @@ export const db_list_custom_entry_types = (projectId: string) =>
 export const db_create_entry_type = ({projectId, name, description, icon, color}: CreateEntryTypeInput) =>
     command<CustomEntryType>('db_create_entry_type', {projectId, name, description, icon, color})
 
-export const db_get_entry_type = (id: string) =>
-    command<CustomEntryType>('db_get_entry_type', {id})
+export const db_get_entry_type = (id: string, projectId?: string) =>
+    command<CustomEntryType>('db_get_entry_type', {id, projectId: projectId ?? null})
 
-export const db_update_entry_type = ({id, name, description, icon, color}: UpdateEntryTypeInput) =>
-    command<CustomEntryType>('db_update_entry_type', {id, name, description, icon, color})
+export const db_update_entry_type = ({id, projectId, name, description, icon, color}: UpdateEntryTypeInput) =>
+    command<CustomEntryType>('db_update_entry_type', {id, projectId, name, description, icon, color})
 
-export const db_delete_entry_type = (id: string) =>
-    command<void>('db_delete_entry_type', {id})
+export const db_delete_entry_type = (id: string, projectId: string) =>
+    command<void>('db_delete_entry_type', {id, projectId})

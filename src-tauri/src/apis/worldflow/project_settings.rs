@@ -8,7 +8,7 @@ pub async fn db_get_project_setting(
     key: String,
 ) -> Result<Option<String>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.get_project_setting(&project_id, &key)
         .await
         .map_err(|e| e.to_string())
@@ -23,7 +23,7 @@ pub async fn db_set_project_setting(
     value: String,
 ) -> Result<(), String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.set_project_setting(&project_id, &key, &value)
         .await
         .map_err(|e| e.to_string())
