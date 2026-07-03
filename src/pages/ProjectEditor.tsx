@@ -685,13 +685,13 @@ function ProjectEditorInner({
         for (const id of removed) {
             void (async () => {
                 try {
-                    const entry = await db_get_entry(id)
+                    const entry = await db_get_entry(id, projectId)
                     const titleUntouched = (entry.title ?? '').trim() === '未命名词条'
                     const contentEmpty = !(entry.content ?? '').trim()
                     const summaryEmpty = !(entry.summary ?? '').trim()
                     const imagesEmpty = !entry.images || (Array.isArray(entry.images) && entry.images.length === 0)
                     if (titleUntouched && contentEmpty && summaryEmpty && imagesEmpty) {
-                        await db_delete_entry(id)
+                        await db_delete_entry(id, projectId)
                         adjustEntryCount(-1)
                         setCategoryEntryRefreshToken(current => current + 1)
                     }
@@ -700,7 +700,7 @@ function ProjectEditorInner({
                 }
             })()
         }
-    }, [openEntryIds, placeholderEntryIds, adjustEntryCount])
+    }, [openEntryIds, placeholderEntryIds, adjustEntryCount, projectId])
 
     const handleMove = async (key: string, targetKey: string, position: DropPosition) => {
         if (key === ROOT_ID) return

@@ -326,6 +326,7 @@ export interface CreateEntryInput {
 
 export interface UpdateEntryInput {
     id: string
+    projectId?: string
     categoryId?: string | null
     title?: string | null
     summary?: string | null
@@ -524,7 +525,8 @@ export const db_create_entry = ({
         images,
     })
 
-export const db_get_entry = (id: string) => command<Entry>('db_get_entry', {id})
+export const db_get_entry = (id: string, projectId?: string) =>
+    command<Entry>('db_get_entry', {id, projectId: projectId ?? null})
 
 export const db_list_entries = ({
                                     projectId,
@@ -568,6 +570,7 @@ export const db_count_entries = ({projectId, categoryId, entryType}: CountEntrie
 export const db_update_entry = (input: UpdateEntryInput) => {
     const {
         id,
+        projectId,
         categoryId,
         title,
         summary,
@@ -578,6 +581,7 @@ export const db_update_entry = (input: UpdateEntryInput) => {
     } = input
     return command<Entry>('db_update_entry', {
         id,
+        projectId: projectId ?? null,
         categoryId,
         title,
         summary: summary ?? null,
@@ -618,7 +622,8 @@ export const db_save_entry_bundle = (input: SaveEntryBundleInput) => {
     })
 }
 
-export const db_delete_entry = (id: string) => command<void>('db_delete_entry', {id})
+export const db_delete_entry = (id: string, projectId?: string) =>
+    command<void>('db_delete_entry', {id, projectId: projectId ?? null})
 
 export const db_create_entries_bulk = (entries: CreateEntryInput[]) =>
     command<number>('db_create_entries_bulk', {entries})

@@ -467,7 +467,7 @@ export default function EntryEditor({
             }
         }
 
-        void db_get_entry(entryId)
+        void db_get_entry(entryId, projectId)
             .then((result) => {
                 if (cancelled) return
                 setEntry(result)
@@ -548,7 +548,7 @@ export default function EntryEditor({
                     .filter((brief) => brief.id !== entryId)
                     .map(async (brief) => {
                         try {
-                            const detail = await db_get_entry(brief.id)
+                            const detail = await db_get_entry(brief.id, projectId)
                             return [brief.id, detail] as const
                         } catch {
                             return null
@@ -563,7 +563,7 @@ export default function EntryEditor({
         } catch {
             projectEntryDetailsStatusRef.current = 'idle'
         }
-    }, [entryId])
+    }, [entryId, projectId])
 
     // 按需加载：进入编辑模式或需要双链时调用
     const ensureProjectEntriesLoaded = useCallback(async () => {
@@ -764,7 +764,7 @@ export default function EntryEditor({
 
     const reloadEntryFromDatabase = useCallback(async (reason: 'external' | 'save' = 'external') => {
         const [refreshed, refreshedOutgoing, refreshedIncoming, refreshedRelations] = await Promise.all([
-            db_get_entry(entryId),
+            db_get_entry(entryId, projectId),
             db_list_outgoing_links(entryId).catch(() => [] as EntryLink[]),
             db_list_incoming_links(entryId).catch(() => [] as EntryLink[]),
             db_list_relations_for_entry(entryId).catch(() => [] as EntryRelation[]),
@@ -808,7 +808,7 @@ export default function EntryEditor({
         }
 
         return refreshed
-    }, [applySavedRelations, entryId, undoRedo])
+    }, [applySavedRelations, entryId, projectId, undoRedo])
 
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
@@ -850,12 +850,12 @@ export default function EntryEditor({
         )
         if (confirmed !== 'yes') return
         try {
-            await db_delete_entry(entry.id)
+            await db_delete_entry(entry.id, projectId)
             await onDelete?.()
         } catch (e) {
             void showAlert(`删除失败：${String(e)}`, 'error', 'nonInvasive', 2200)
         }
-    }, [entry, onDelete, showAlert])
+    }, [entry, onDelete, projectId, showAlert])
 
     const handleSave = useCallback(async () => {
         if (!entry || !canSave) return

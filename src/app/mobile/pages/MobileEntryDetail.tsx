@@ -196,7 +196,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     const reloadEntryState = useCallback(async () => {
         const [e, types, cats, schemas, briefs, outgoing, incoming, relations] = await Promise.all([
-            db_get_entry(entryId),
+            db_get_entry(entryId, projectId),
             db_list_all_entry_types(projectId),
             db_list_categories(projectId),
             db_list_tag_schemas(projectId),
@@ -412,12 +412,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         const result = await showAlert(`确定删除词条「${entry?.title ?? ''}」？此操作不可撤销。`, 'warning', 'confirm')
         if (result !== 'yes') return
         try {
-            await db_delete_entry(entryId)
+            await db_delete_entry(entryId, projectId)
             pop()
         } catch (e) {
             await showAlert(`删除失败：${String(e)}`, 'error', 'nonInvasive', 3000)
         }
-    }, [entry, entryId, pop, showAlert])
+    }, [entry, entryId, pop, projectId, showAlert])
 
     const handleTypeCreated = useCallback(async (created: CustomEntryType) => {
         try {

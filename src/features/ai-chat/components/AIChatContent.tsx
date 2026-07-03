@@ -574,7 +574,7 @@ export default function AIChatContent({
         const results = await Promise.all(
             briefs.map(async (brief) => {
                 try {
-                    const detail = await db_get_entry(brief.id)
+                    const detail = await db_get_entry(brief.id, brief.project_id)
                     return [brief.id, detail] as const
                 } catch {
                     return null

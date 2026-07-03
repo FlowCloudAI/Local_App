@@ -577,7 +577,7 @@ export function useIdeaPanel({
         if (!selectedIdea?.converted_entry_id || !selectedIdea.project_id) return
 
         try {
-            const entry = await db_get_entry(selectedIdea.converted_entry_id)
+            const entry = await db_get_entry(selectedIdea.converted_entry_id, selectedIdea.project_id)
             onOpenEntry?.(selectedIdea.project_id, {
                 id: entry.id,
                 title: entry.title,

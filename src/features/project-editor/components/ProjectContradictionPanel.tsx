@@ -440,7 +440,7 @@ function ProjectContradictionPanel({
         }
         if (ids.size === 0) return
         const idList = [...ids]
-        Promise.allSettled(idList.map((id) => db_get_entry(id))).then((results) => {
+        Promise.allSettled(idList.map((id) => db_get_entry(id, projectId))).then((results) => {
             const map: Record<string, string> = {}
             idList.forEach((id, i) => {
                 const r = results[i]
@@ -448,7 +448,7 @@ function ProjectContradictionPanel({
             })
             setEntryTitleMap(map)
         }).catch(() => {})
-    }, [activeRecord])
+    }, [activeRecord, projectId])
 
     const summary = useMemo(() => {
         if (!activeRecord) return null

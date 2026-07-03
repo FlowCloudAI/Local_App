@@ -346,7 +346,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
             await Promise.all(entryTargets.map(async item => {
                 try {
-                    const entry = await db_get_entry(item.entryId)
+                    const entry = await db_get_entry(item.entryId, item.projectId)
                     if (entry.project_id !== item.projectId) {
                         invalidEntryKeys.add(item.key)
                         removeHomeActivityTarget(item.target)

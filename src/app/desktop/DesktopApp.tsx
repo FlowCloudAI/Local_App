@@ -901,7 +901,7 @@ function DesktopAppContent() {
             case 'entry':
                 if (!target.projectId || !target.entryId) return
                 try {
-                    const entry = await db_get_entry(target.entryId)
+                    const entry = await db_get_entry(target.entryId, target.projectId)
                     if (entry.project_id !== target.projectId) {
                         removeHomeEntryActivity(target.projectId, target.entryId)
                         await showAlert('这个词条已不属于原项目，已从首页移除。', 'warning', 'nonInvasive', 3000)

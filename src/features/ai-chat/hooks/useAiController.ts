@@ -1094,7 +1094,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 focus.entryId ? (async () => {
                     const cached = entryTitleCacheRef.current.get(focus.entryId!)
                     if (cached !== undefined) return cached
-                    const entry = await db_get_entry(focus.entryId!)
+                    const entry = await db_get_entry(focus.entryId!, focus.projectId ?? undefined)
                     entryTitleCacheRef.current.set(focus.entryId!, entry.title)
                     return entry.title
                 })() : Promise.resolve(null),
@@ -1136,7 +1136,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 if (entrySnippetCacheRef.current.has(entryId)) {
                     return entrySnippetCacheRef.current.get(entryId)!
                 }
-                const entry = await db_get_entry(entryId)
+                const entry = await db_get_entry(entryId, projectId ?? undefined)
                 const snippet = entry.content?.slice(0, 500) ?? ''
                 entrySnippetCacheRef.current.set(entryId, snippet)
                 return snippet
