@@ -1,4 +1,5 @@
 use crate::apis::ai_client::{CreateLlmSessionResult, spawn_session_event_loop};
+use crate::apis::worldflow::common::open_project_db;
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
 use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState};
 use flowcloudai_client::llm::config::SessionConfig;
@@ -260,7 +261,9 @@ pub async fn ai_build_character_project_snapshot(
         )
         .with_kv("field", "entryId")
     })?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id)
+        .await
+        .map_err(ApiError::from_display)?;
 
     let project = db
         .get_project(&project_id)

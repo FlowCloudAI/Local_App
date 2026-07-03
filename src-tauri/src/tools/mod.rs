@@ -1,4 +1,7 @@
 use crate::AppState;
+use crate::apis::worldflow::common::{
+    open_category_db, open_entry_db, open_project_db, open_relation_db,
+};
 use uuid::Uuid;
 use worldflow_core::{
     CategoryOps, EntryOps, EntryRelationOps, EntryTypeOps, ProjectOps, TagSchemaOps, models::*,
@@ -612,10 +615,12 @@ pub async fn get_entries_dev(
         return Err("key 不能为空".to_string());
     }
 
-    let db = state.sqlite_db.lock().await;
-
     let scope = if let Ok(id) = Uuid::parse_str(key) {
-        if let Ok(project) = db.get_project(&id).await {
+        if let Ok(project_db) = open_project_db(state, &id).await {
+            let project = project_db
+                .get_project(&id)
+                .await
+                .map_err(|e| e.to_string())?;
             EntryListScope {
                 kind: EntryListScopeKind::Project,
                 id: project.id,
@@ -624,12 +629,16 @@ pub async fn get_entries_dev(
                 project_name: project.name,
                 category_ids: None,
             }
-        } else if let Ok(category) = db.get_category(&id).await {
-            let project = db
+        } else if let Ok(category_db) = open_category_db(state, &id, None).await {
+            let category = category_db
+                .get_category(&id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let project = category_db
                 .get_project(&category.project_id)
                 .await
                 .map_err(|e| e.to_string())?;
-            let categories = db
+            let categories = category_db
                 .list_categories(&category.project_id)
                 .await
                 .map_err(|e| e.to_string())?;
@@ -645,11 +654,20 @@ pub async fn get_entries_dev(
             return Err(format!("未找到项目或分类：{}", key));
         }
     } else {
-        let projects = db.list_projects().await.map_err(|e| e.to_string())?;
+        let catalog_db = state.sqlite_db.lock().await.clone();
+        let projects = catalog_db
+            .list_projects()
+            .await
+            .map_err(|e| e.to_string())?;
         let mut exact_candidates = Vec::new();
         let mut relaxed_candidates = Vec::new();
 
-        for project in &projects {
+        for catalog_project in &projects {
+            let db = open_project_db(state, &catalog_project.id).await?;
+            let project = db
+                .get_project(&catalog_project.id)
+                .await
+                .unwrap_or_else(|_| catalog_project.clone());
             let project_scope = EntryListScope {
                 kind: EntryListScopeKind::Project,
                 id: project.id,
@@ -704,6 +722,7 @@ pub async fn get_entries_dev(
         }
     };
 
+    let db = open_project_db(state, &scope.project_id).await?;
     let entry_types = db
         .list_all_entry_types(&scope.project_id)
         .await
@@ -844,7 +863,6 @@ pub async fn list_entry_dev(
     }
 
     let requested = EntryInfo::normalize(info);
-    let db = state.sqlite_db.lock().await;
     let mut outputs = Vec::with_capacity(keys.len());
 
     for key in keys {
@@ -854,13 +872,19 @@ pub async fn list_entry_dev(
         }
 
         let entry = if let Ok(id) = Uuid::parse_str(key) {
+            let db = open_entry_db(state, &id, None).await?;
             db.get_entry(&id).await.map_err(|e| e.to_string())?
         } else {
-            let projects = db.list_projects().await.map_err(|e| e.to_string())?;
+            let catalog_db = state.sqlite_db.lock().await.clone();
+            let projects = catalog_db
+                .list_projects()
+                .await
+                .map_err(|e| e.to_string())?;
             let mut exact_candidates = Vec::new();
             let mut relaxed_candidates = Vec::new();
 
             for project in &projects {
+                let db = open_project_db(state, &project.id).await?;
                 let mut offset = 0usize;
                 loop {
                     let batch = db
@@ -905,10 +929,13 @@ pub async fn list_entry_dev(
 
             match candidates.len() {
                 0 => return Err(format!("未找到词条：{}", key)),
-                1 => db
-                    .get_entry(&candidates[0].entry_id)
-                    .await
-                    .map_err(|e| e.to_string())?,
+                1 => {
+                    let candidate = &candidates[0];
+                    let db = open_project_db(state, &candidate.project_id).await?;
+                    db.get_entry(&candidate.entry_id)
+                        .await
+                        .map_err(|e| e.to_string())?
+                }
                 _ => {
                     return Err(format!(
                         "词条名「{}」命中多个候选，请改用 ID：\n{}",
@@ -919,6 +946,7 @@ pub async fn list_entry_dev(
             }
         };
 
+        let db = open_project_db(state, &entry.project_id).await?;
         let project = db
             .get_project(&entry.project_id)
             .await
@@ -1305,7 +1333,7 @@ pub async fn create_entry(
 ) -> Result<Entry, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
     let category_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.create_entry(CreateEntry {
         project_id,
         category_id: Some(category_id),
@@ -1324,7 +1352,7 @@ pub async fn create_entry(
 /// 列出项目分类
 pub async fn list_categories(state: &AppState, project_id: &str) -> Result<Vec<Category>, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.list_categories(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -1343,7 +1371,7 @@ pub async fn search_entries(
     let category_id = category_id
         .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
         .transpose()?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.search_entries(
         &project_id,
         query,
@@ -1360,7 +1388,7 @@ pub async fn search_entries(
 /// 获取词条完整内容
 pub async fn get_entry(state: &AppState, entry_id: &str) -> Result<Entry, String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     db.get_entry(&entry_id).await.map_err(|e| e.to_string())
 }
 
@@ -1376,7 +1404,7 @@ pub async fn list_all_entries(
     let category_id = category_id
         .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
         .transpose()?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.list_entries(
         &project_id,
         EntryFilter {
@@ -1403,7 +1431,7 @@ pub async fn list_entries_by_type(
     let category_id = category_id
         .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
         .transpose()?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.list_entries(
         &project_id,
         EntryFilter {
@@ -1423,7 +1451,7 @@ pub async fn list_tag_schemas(
     project_id: &str,
 ) -> Result<Vec<TagSchema>, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.list_tag_schemas(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -1441,7 +1469,7 @@ pub async fn get_entry_relations(
     String,
 > {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     let relations = db
         .list_relations_for_entry(&entry_id)
         .await
@@ -1466,7 +1494,7 @@ pub async fn get_entry_relations(
 /// 获取单条关系
 pub async fn get_relation(state: &AppState, relation_id: &str) -> Result<EntryRelation, String> {
     let id = Uuid::parse_str(relation_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_relation_db(state, &id, None).await?;
     db.get_relation(&id).await.map_err(|e| e.to_string())
 }
 
@@ -1480,7 +1508,7 @@ pub async fn create_relation(
 ) -> Result<EntryRelation, String> {
     let a_id = Uuid::parse_str(a_id).map_err(|e| e.to_string())?;
     let b_id = Uuid::parse_str(b_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &a_id, None).await?;
     // project_id 从 a_id 所属词条推导，无需调用方传入
     let entry_a = db.get_entry(&a_id).await.map_err(|e| e.to_string())?;
     db.create_relation(CreateEntryRelation {
@@ -1502,7 +1530,7 @@ pub async fn update_relation(
     content: Option<String>,
 ) -> Result<EntryRelation, String> {
     let id = Uuid::parse_str(relation_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_relation_db(state, &id, None).await?;
     db.update_relation(&id, UpdateEntryRelation { relation, content })
         .await
         .map_err(|e| e.to_string())
@@ -1511,7 +1539,7 @@ pub async fn update_relation(
 /// 删除词条关系
 pub async fn delete_relation(state: &AppState, relation_id: &str) -> Result<(), String> {
     let id = Uuid::parse_str(relation_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_relation_db(state, &id, None).await?;
     db.delete_relation(&id).await.map_err(|e| e.to_string())
 }
 
@@ -1521,7 +1549,7 @@ pub async fn get_project_summary(
     project_id: &str,
 ) -> Result<(Project, std::collections::HashMap<String, i64>), String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
 
     // 获取项目信息
     let project = db
@@ -1563,8 +1591,22 @@ pub async fn get_project_summary(
 
 /// 列出所有项目
 pub async fn list_projects(state: &AppState) -> Result<Vec<Project>, String> {
-    let db = state.sqlite_db.lock().await;
-    db.list_projects().await.map_err(|e| e.to_string())
+    let catalog_db = state.sqlite_db.lock().await.clone();
+    let projects = catalog_db
+        .list_projects()
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut result = Vec::with_capacity(projects.len());
+    for project in projects {
+        match open_project_db(state, &project.id).await {
+            Ok(db) => match db.get_project(&project.id).await {
+                Ok(world_project) => result.push(world_project),
+                Err(_) => result.push(project),
+            },
+            Err(_) => result.push(project),
+        }
+    }
+    Ok(result)
 }
 
 /// 更新词条基本字段（标题、摘要、类型，均可选）
@@ -1579,7 +1621,7 @@ pub async fn update_entry_fields(
     entry_type: Option<Option<String>>,
 ) -> Result<Entry, String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     db.update_entry(
         &entry_id,
         UpdateEntry {
@@ -1604,7 +1646,7 @@ pub async fn update_entry_content(
     content: Option<String>,
 ) -> Result<Entry, String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     db.update_entry(
         &entry_id,
         UpdateEntry {
@@ -1631,7 +1673,7 @@ pub async fn add_entry_tag(
 ) -> Result<Entry, String> {
     let entry_id_uuid = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let schema_id_uuid = Uuid::parse_str(schema_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id_uuid, None).await?;
     db.upsert_entry_tag(
         &entry_id_uuid,
         EntryTag {
@@ -1651,7 +1693,7 @@ pub async fn remove_entry_tag(
 ) -> Result<Entry, String> {
     let entry_id_uuid = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
     let schema_id_uuid = Uuid::parse_str(schema_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id_uuid, None).await?;
     db.remove_entry_tag(&entry_id_uuid, &schema_id_uuid)
         .await
         .map_err(|e| e.to_string())
@@ -1664,7 +1706,7 @@ pub async fn update_entry_tags(
     tags: Vec<EntryTag>,
 ) -> Result<Entry, String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     db.update_entry(
         &entry_id,
         UpdateEntry {
@@ -1685,7 +1727,7 @@ pub async fn update_entry_tags(
 /// 删除词条
 pub async fn delete_entry(state: &AppState, entry_id: &str) -> Result<(), String> {
     let entry_id = Uuid::parse_str(entry_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     db.delete_entry(&entry_id).await.map_err(|e| e.to_string())
 }
 
@@ -1700,7 +1742,7 @@ pub async fn create_category(
     let parent_id = parent_id
         .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
         .transpose()?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.create_category(CreateCategory {
         project_id,
         parent_id,
@@ -1714,7 +1756,7 @@ pub async fn create_category(
 /// 获取分类（含 project_id / parent_id 信息）
 pub async fn get_category(state: &AppState, category_id: &str) -> Result<Category, String> {
     let category_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_category_db(state, &category_id, None).await?;
     db.get_category(&category_id)
         .await
         .map_err(|e| e.to_string())
@@ -1743,7 +1785,7 @@ pub async fn preview_cascade_delete(
     category_id: &str,
 ) -> Result<(usize, usize), String> {
     let root_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_category_db(state, &root_id, None).await?;
     let root_cat = db.get_category(&root_id).await.map_err(|e| e.to_string())?;
     let all_cats = db
         .list_categories(&root_cat.project_id)
@@ -1785,7 +1827,7 @@ pub async fn cascade_delete_category(
     category_id: &str,
 ) -> Result<(usize, usize), String> {
     let root_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_category_db(state, &root_id, None).await?;
     let result = db
         .cascade_delete_category(&root_id)
         .await
@@ -1800,7 +1842,7 @@ pub async fn delete_category_move_to_parent(
     category_id: &str,
 ) -> Result<(), String> {
     let cat_id = Uuid::parse_str(category_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_category_db(state, &cat_id, None).await?;
     db.delete_category_move_to_parent(&cat_id)
         .await
         .map(|_| ())
@@ -1813,7 +1855,7 @@ pub async fn list_entry_types(
     project_id: &str,
 ) -> Result<Vec<EntryTypeView>, String> {
     let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_project_db(state, &project_id).await?;
     db.list_all_entry_types(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -1829,7 +1871,7 @@ pub async fn move_entry(
     let category_id = category_id
         .map(|id| Uuid::parse_str(id).map_err(|e| e.to_string()))
         .transpose()?;
-    let db = state.sqlite_db.lock().await;
+    let db = open_entry_db(state, &entry_id, None).await?;
     db.update_entry(
         &entry_id,
         UpdateEntry {
@@ -1853,12 +1895,16 @@ pub async fn create_project(
     name: String,
     description: Option<String>,
 ) -> Result<Project, String> {
-    let db = state.sqlite_db.lock().await;
-    db.create_project_with_default_timeline_tags(CreateProject {
-        name,
-        description,
-        cover_image: None,
-    })
-    .await
-    .map_err(|e| e.to_string())
+    let project = {
+        let db = state.sqlite_db.lock().await;
+        db.create_project_with_default_timeline_tags(CreateProject {
+            name,
+            description,
+            cover_image: None,
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    };
+    open_project_db(state, &project.id).await?;
+    Ok(project)
 }

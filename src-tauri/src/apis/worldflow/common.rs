@@ -233,7 +233,7 @@ pub(super) async fn ensure_project_world(
     sync_project_to_world(state, source_db, project).await
 }
 
-pub(super) async fn open_project_db(
+pub(crate) async fn open_project_db(
     state: &AppState,
     project_id: &Uuid,
 ) -> Result<SqliteDb, String> {
@@ -256,7 +256,7 @@ pub(super) async fn open_project_db(
         .map_err(|e| e.to_string())
 }
 
-pub(super) async fn open_entry_db(
+pub(crate) async fn open_entry_db(
     state: &AppState,
     entry_id: &Uuid,
     project_id: Option<&Uuid>,
@@ -292,7 +292,43 @@ pub(super) async fn open_entry_db(
     open_project_db(state, &entry.project_id).await
 }
 
-pub(super) async fn open_relation_db(
+pub(crate) async fn open_category_db(
+    state: &AppState,
+    category_id: &Uuid,
+    project_id: Option<&Uuid>,
+) -> Result<SqliteDb, String> {
+    if let Some(project_id) = project_id {
+        return open_project_db(state, project_id).await;
+    }
+
+    for world in state
+        .world_store
+        .list_worlds()
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        let Ok(db) = state.world_store.open_world(world.id).await else {
+            continue;
+        };
+        if db.get_category(category_id).await.is_ok() {
+            return Ok(db);
+        }
+    }
+
+    let source_db = state.sqlite_db.lock().await.clone();
+    let category = source_db
+        .get_category(category_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let project = source_db
+        .get_project(&category.project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    sync_project_to_world(state, &source_db, &project).await?;
+    open_project_db(state, &category.project_id).await
+}
+
+pub(crate) async fn open_relation_db(
     state: &AppState,
     relation_id: &Uuid,
     project_id: Option<&Uuid>,
