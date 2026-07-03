@@ -288,7 +288,7 @@ export function useSnapshotPanel({
         if (!currentProjectId) return
         if (blockWhenDirty()) return
         const confirmed = await showAlert(
-            `确定回退到「${formatSnapshotMessage(snapshot.message)}」？\n当前状态会先自动保存。`,
+            `确定回退到「${formatSnapshotMessage(snapshot.message)}」？\n确认后会重新载入当前项目。`,
             'warning',
             'confirm',
         )
