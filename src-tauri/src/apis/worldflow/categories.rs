@@ -19,7 +19,7 @@ pub async fn db_create_category(
     let parent_id = parent_id
         .map(|pid| Uuid::parse_str(&pid).map_err(|e| e.to_string()))
         .transpose()?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let category = db
         .create_category(CreateCategory {
             project_id,
@@ -39,9 +39,15 @@ pub async fn db_create_category(
 pub async fn db_get_category(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: Option<String>,
 ) -> Result<Category, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = if let Some(project_id) = project_id {
+        let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+        open_project_db(state.inner(), &project_id).await?
+    } else {
+        state.inner().sqlite_db.lock().await.clone()
+    };
     db.get_category(&id).await.map_err(|e| e.to_string())
 }
 
@@ -52,7 +58,7 @@ pub async fn db_list_categories(
     project_id: String,
 ) -> Result<Vec<Category>, String> {
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     db.list_categories(&project_id)
         .await
         .map_err(|e| e.to_string())
@@ -63,12 +69,14 @@ pub async fn db_list_categories(
 pub async fn db_update_category(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: String,
     parent_id: Option<Option<String>>,
     parent_id_set: Option<bool>,
     name: Option<String>,
     sort_order: Option<i64>,
 ) -> Result<Category, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
     let parent_id = if parent_id_set.unwrap_or(false) {
         Some(
             parent_id
@@ -84,7 +92,7 @@ pub async fn db_update_category(
             })
             .transpose()?
     };
-    let db = state.inner().sqlite_db.lock().await;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let category = db
         .update_category(
             &id,
@@ -103,9 +111,14 @@ pub async fn db_update_category(
 
 /// 删除分类
 #[tauri::command]
-pub async fn db_delete_category(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+pub async fn db_delete_category(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+    project_id: String,
+) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
     db.delete_category(&id).await.map_err(|e| e.to_string())?;
     touch_project_updated_at(&db, &category.project_id).await
@@ -116,9 +129,11 @@ pub async fn db_delete_category(state: State<'_, Arc<AppState>>, id: String) -> 
 pub async fn db_cascade_delete_category(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: String,
 ) -> Result<CategoryCascadeDeleteResult, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
     let result = db
         .cascade_delete_category(&id)
@@ -136,9 +151,11 @@ pub async fn db_cascade_delete_category(
 pub async fn db_delete_category_move_to_parent(
     state: State<'_, Arc<AppState>>,
     id: String,
+    project_id: String,
 ) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
     let category = db.get_category(&id).await.map_err(|e| e.to_string())?;
     db.delete_category_move_to_parent(&id)
         .await

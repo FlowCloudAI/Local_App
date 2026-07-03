@@ -134,7 +134,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                     sortOrder: maxOrder + 1,
                 })
             } else {
-                await db_update_category({id: renameTarget.category.id, name})
+                await db_update_category({id: renameTarget.category.id, projectId, name})
             }
             setRenameTarget(null)
             await invalidateProjectContext(projectId)
@@ -160,6 +160,7 @@ export default function MobileCategoryManager({push, params}: Props) {
             const maxOrder = siblings.length > 0 ? Math.max(...siblings.map(category => category.sort_order)) : -1
             await db_update_category({
                 id: moveTarget.id,
+                projectId,
                 parentId,
                 sortOrder: maxOrder + 1,
             })
@@ -178,11 +179,11 @@ export default function MobileCategoryManager({push, params}: Props) {
         try {
             let result: CategoryCascadeDeleteResult | null = null
             if (mode === 'empty') {
-                await db_delete_category(deleteTarget.id)
+                await db_delete_category(deleteTarget.id, projectId)
             } else if (mode === 'lift') {
-                await db_delete_category_move_to_parent(deleteTarget.id)
+                await db_delete_category_move_to_parent(deleteTarget.id, projectId)
             } else {
-                result = await db_cascade_delete_category(deleteTarget.id)
+                result = await db_cascade_delete_category(deleteTarget.id, projectId)
             }
             setDeleteTarget(null)
             await invalidateProjectContext(projectId)

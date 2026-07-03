@@ -321,7 +321,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                     sortOrder: maxOrder + 1,
                 })
             } else {
-                await db_update_category({id: renameTarget.category.id, name})
+                await db_update_category({id: renameTarget.category.id, projectId, name})
             }
             setRenameTarget(null)
             await notifyChanged()
@@ -347,6 +347,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             const maxOrder = siblings.length > 0 ? Math.max(...siblings.map(category => category.sort_order)) : -1
             await db_update_category({
                 id: moveTarget.id,
+                projectId,
                 parentId,
                 sortOrder: maxOrder + 1,
             })
@@ -357,7 +358,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         } finally {
             setBusy(false)
         }
-    }, [categories, moveTarget, notifyChanged, showAlert])
+    }, [categories, moveTarget, notifyChanged, projectId, showAlert])
 
     const handleMoveWithinSiblings = useCallback(async (target: Category, direction: SiblingDirection) => {
         const parentId = target.parent_id ?? null
@@ -375,7 +376,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             await Promise.all(reordered.map((category, index) => (
                 category.sort_order === index
                     ? Promise.resolve()
-                    : db_update_category({id: category.id, sortOrder: index})
+                    : db_update_category({id: category.id, projectId, sortOrder: index})
             )))
             await notifyChanged()
         } catch (error) {
@@ -383,7 +384,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         } finally {
             setBusy(false)
         }
-    }, [categories, notifyChanged, showAlert])
+    }, [categories, notifyChanged, projectId, showAlert])
 
     const handleMoveByDrop = useCallback(async (
         draggedId: string,
@@ -455,18 +456,18 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         setBusy(true)
         try {
             const parentChanged = (dragged.parent_id ?? null) !== nextParentId
-            const updateInputs: Array<{id: string; parentId?: string | null; sortOrder?: number}> = []
+            const updateInputs: Array<{id: string; projectId: string; parentId?: string | null; sortOrder?: number}> = []
             for (const [id, sortOrder] of orderMap) {
                 const original = categoryById.get(id)
                 if (!original) continue
                 if (id === draggedId) {
                     if (parentChanged || original.sort_order !== sortOrder) {
-                        updateInputs.push({id, parentId: nextParentId, sortOrder})
+                        updateInputs.push({id, projectId, parentId: nextParentId, sortOrder})
                     }
                     continue
                 }
                 if (original.sort_order !== sortOrder) {
-                    updateInputs.push({id, sortOrder})
+                    updateInputs.push({id, projectId, sortOrder})
                 }
             }
 
@@ -498,7 +499,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         } finally {
             setBusy(false)
         }
-    }, [categories, categoryById, notifyChanged, showAlert])
+    }, [categories, categoryById, notifyChanged, projectId, showAlert])
 
     const handleDelete = useCallback(async (mode: DeleteMode) => {
         if (!deleteTarget) return
@@ -506,11 +507,11 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         try {
             let result: CategoryCascadeDeleteResult | null = null
             if (mode === 'empty') {
-                await db_delete_category(deleteTarget.id)
+                await db_delete_category(deleteTarget.id, projectId)
             } else if (mode === 'lift') {
-                await db_delete_category_move_to_parent(deleteTarget.id)
+                await db_delete_category_move_to_parent(deleteTarget.id, projectId)
             } else {
-                result = await db_cascade_delete_category(deleteTarget.id)
+                result = await db_cascade_delete_category(deleteTarget.id, projectId)
             }
             setDeleteTarget(null)
             await notifyChanged()
@@ -527,7 +528,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         } finally {
             setBusy(false)
         }
-    }, [deleteTarget, notifyChanged, showAlert])
+    }, [deleteTarget, notifyChanged, projectId, showAlert])
 
     const moveCandidates = useMemo(() => {
         if (!moveTarget) return allRows

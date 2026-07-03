@@ -517,7 +517,7 @@ function ProjectEditorInner({
             const updated = await db_update_project({id: projectId, name: newName})
             setProject({...updated, updated_at: new Date().toISOString()})
         } else {
-            await db_update_category({id: key, name: newName})
+            await db_update_category({id: key, projectId, name: newName})
             setCategories(prev => prev.map(c => c.id === key ? {...c, name: newName} : c))
             await refreshProject()
             touchProjectUpdatedAt()
@@ -606,7 +606,7 @@ function ProjectEditorInner({
             if (toDelete.has(key) && (selection.kind === 'category') && toDelete.has(selection.id)) {
                 setSelection({kind: 'project'})
             }
-            await Promise.all([...toDelete].map(id => db_delete_category(id)))
+            await Promise.all([...toDelete].map(id => db_delete_category(id, projectId)))
             await refreshProject()
             touchProjectUpdatedAt()
         } else {
@@ -623,10 +623,10 @@ function ProjectEditorInner({
             }
             await Promise.all(
                 children.map(child =>
-                    db_update_category({id: child.id, parentId: target.parent_id ?? null})
+                    db_update_category({id: child.id, projectId, parentId: target.parent_id ?? null})
                 )
             )
-            await db_delete_category(key)
+            await db_delete_category(key, projectId)
             await refreshProject()
             touchProjectUpdatedAt()
         }
@@ -744,6 +744,7 @@ function ProjectEditorInner({
                 promises.push(
                     db_update_category({
                         id: key,
+                        projectId,
                         parentId: newParentId,
                         sortOrder: orderMap.get(key),
                     })
@@ -753,7 +754,7 @@ function ProjectEditorInner({
                 if (id === key && parentChanged) continue
                 const original = categories.find(c => c.id === id)
                 if (original && original.sort_order !== order) {
-                    promises.push(db_update_category({id, sortOrder: order}))
+                    promises.push(db_update_category({id, projectId, sortOrder: order}))
                 }
             }
             await Promise.all(promises)

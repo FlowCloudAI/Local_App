@@ -280,6 +280,7 @@ export interface CreateCategoryInput {
 
 export interface UpdateCategoryInput {
     id: string
+    projectId: string
     parentId?: string | null
     name?: string | null
     sortOrder?: number | null
@@ -478,27 +479,29 @@ export const db_create_category = ({
                                    }: CreateCategoryInput) =>
     command<Category>('db_create_category', {projectId, parentId, name, sortOrder})
 
-export const db_get_category = (id: string) => command<Category>('db_get_category', {id})
+export const db_get_category = (id: string, projectId?: string) =>
+    command<Category>('db_get_category', {id, projectId: projectId ?? null})
 
 export const db_list_categories = (projectId: string) =>
     command<Category[]>('db_list_categories', {projectId})
 
-export const db_update_category = ({id, parentId, name, sortOrder}: UpdateCategoryInput) =>
+export const db_update_category = ({id, projectId, parentId, name, sortOrder}: UpdateCategoryInput) =>
     command<Category>('db_update_category', {
         id,
+        projectId,
         ...(parentId !== undefined ? {parentId, parentIdSet: true} : {}),
         ...(name !== undefined ? {name} : {}),
         ...(sortOrder !== undefined ? {sortOrder} : {}),
     })
 
-export const db_delete_category = (id: string) =>
-    command<void>('db_delete_category', {id})
+export const db_delete_category = (id: string, projectId: string) =>
+    command<void>('db_delete_category', {id, projectId})
 
-export const db_cascade_delete_category = (id: string) =>
-    command<CategoryCascadeDeleteResult>('db_cascade_delete_category', {id})
+export const db_cascade_delete_category = (id: string, projectId: string) =>
+    command<CategoryCascadeDeleteResult>('db_cascade_delete_category', {id, projectId})
 
-export const db_delete_category_move_to_parent = (id: string) =>
-    command<void>('db_delete_category_move_to_parent', {id})
+export const db_delete_category_move_to_parent = (id: string, projectId: string) =>
+    command<void>('db_delete_category_move_to_parent', {id, projectId})
 
 export const db_create_entry = ({
                                     projectId,
