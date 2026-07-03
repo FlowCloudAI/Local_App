@@ -219,3 +219,58 @@ pub(super) async fn touch_project_updated_at(
     .map(|_| ())
     .map_err(|e| e.to_string())
 }
+
+pub(super) async fn ensure_project_world(
+    state: &AppState,
+    source_db: &SqliteDb,
+    project: &Project,
+) -> Result<(), String> {
+    if let Ok(world_db) = state.world_store.open_world(project.id).await {
+        if world_db.get_project(&project.id).await.is_ok() {
+            return Ok(());
+        }
+    }
+    sync_project_to_world(state, source_db, project).await
+}
+
+async fn ensure_world_record(state: &AppState, project: &Project) -> Result<(), String> {
+    if state.world_store.get_world(project.id).await.is_ok() {
+        state
+            .world_store
+            .rename_world(project.id, project.name.clone())
+            .await
+            .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+    state
+        .world_store
+        .create_world_with_id(project.id, project.name.clone())
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+pub(super) async fn sync_project_to_world(
+    state: &AppState,
+    source_db: &SqliteDb,
+    project: &Project,
+) -> Result<(), String> {
+    ensure_world_record(state, project).await?;
+    let world_db = state
+        .world_store
+        .open_world(project.id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let export = source_db
+        .export_project_csvs(project.id)
+        .await
+        .map_err(|e| e.to_string())?;
+    world_db
+        .import_csvs(
+            CsvImportBundle::from_export_items(export.items),
+            CsvImportMode::Replace,
+        )
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}

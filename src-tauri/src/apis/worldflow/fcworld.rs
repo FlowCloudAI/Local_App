@@ -2037,7 +2037,7 @@ pub async fn db_export_project_fcworld(
         let output_path_buf = PathBuf::from(&output_path);
 
         let (project, export) = {
-            let db = state.inner().sqlite_db.lock().await;
+            let db = state.inner().sqlite_db.lock().await.clone();
             let project = db
                 .get_project(&project_id)
                 .await
@@ -2108,15 +2108,22 @@ pub async fn db_import_project_fcworld(
     );
     let result = async {
         let input_path_buf = PathBuf::from(&input_path);
-        let db = state.inner().sqlite_db.lock().await;
-        import_fcworld_package_to_db(
+        let db = state.inner().sqlite_db.lock().await.clone();
+        let result = import_fcworld_package_to_db(
             &db,
             paths.inner(),
             &input_path_buf,
             options,
             progress.clone(),
         )
-        .await
+        .await?;
+        let project_id = Uuid::parse_str(&result.project_id).map_err(|e| e.to_string())?;
+        let project = db
+            .get_project(&project_id)
+            .await
+            .map_err(|e| e.to_string())?;
+        sync_project_to_world(state.inner(), &db, &project).await?;
+        Ok(result)
     }
     .await;
 
@@ -2140,7 +2147,7 @@ pub async fn db_preview_project_fcworld(
     );
     let result = async {
         let input_path_buf = PathBuf::from(&input_path);
-        let db = state.inner().sqlite_db.lock().await;
+        let db = state.inner().sqlite_db.lock().await.clone();
         preview_fcworld_package(&db, &input_path_buf, progress.clone()).await
     }
     .await;
