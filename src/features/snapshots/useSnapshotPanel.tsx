@@ -545,7 +545,7 @@ export function useSnapshotPanel({
                                                         {hasTop &&
                                                             <line
                                                                 x1={x}
-                                                                y1={-RAIL_OVERLAP}
+                                                                y1={-RAIL_OVERLAP * 2}
                                                                 x2={x}
                                                                 y2={midY + 1}
                                                                 stroke={color}
@@ -555,7 +555,7 @@ export function useSnapshotPanel({
                                                             x1={x}
                                                             y1={midY - 1}
                                                             x2={x}
-                                                            y2={RAIL_PX + RAIL_OVERLAP}
+                                                            y2={RAIL_PX + RAIL_OVERLAP * 2}
                                                             stroke={color}
                                                             strokeWidth="1.5"
                                                         />}
@@ -571,7 +571,7 @@ export function useSnapshotPanel({
                                                     return (
                                                         <path
                                                             key={`${row.node.id}-${parentLane}`}
-                                                            d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX + RAIL_OVERLAP}`}
+                                                            d={`M ${fromX} ${midY} C ${fromX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX * 0.78}, ${toX} ${RAIL_PX + RAIL_OVERLAP * 2}`}
                                                             fill="none"
                                                             stroke={color}
                                                             strokeWidth="1.5"
