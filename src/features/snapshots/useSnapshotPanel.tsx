@@ -11,9 +11,11 @@ import {
     dbSnapshot,
     dbSnapshotWithMessage,
     dbSwitchBranch,
+    formatApiError,
     type SnapshotBranchInfo,
     type SnapshotGraph,
     type SnapshotGraphNode,
+    toApiError,
 } from '../../api'
 import '../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../shared/ui/layout/DockPanelScaffold.css'
@@ -302,7 +304,7 @@ export function useSnapshotPanel({
             await load()
         } catch (error) {
             logger.error('回退失败', error)
-            void showAlert('回退失败', 'error')
+            void showAlert(formatApiError(toApiError(error)) || '回退失败', 'error')
         } finally {
             setActionId(null)
         }

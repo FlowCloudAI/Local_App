@@ -371,7 +371,7 @@ pub async fn db_snapshot_to_branch(
     }
 }
 
-/// 回退到指定快照（先自动保存 pre-rollback 快照，再全量替换数据库）
+/// 回退到指定快照（要求当前数据库已提交快照，并把当前分支重置到目标提交）
 #[tauri::command]
 pub async fn db_rollback_to(
     state: State<'_, Arc<AppState>>,
