@@ -2,8 +2,6 @@ import {logger} from '../../shared/logger'
 import {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {
-    type AppendResult,
-    dbAppendFrom,
     dbCreateBranch,
     dbGetSnapshotGraph,
     dbListBranches,
@@ -20,6 +18,7 @@ import {
 import '../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../shared/ui/layout/DockPanelScaffold.css'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../shared/ui/layout/DockPanelScaffold'
+import {FloatingPanel} from '../../shared/ui/overlay'
 import './components/SnapshotPanel.css'
 
 interface UseSnapshotPanelOptions {
@@ -52,6 +51,7 @@ const GRAPH_COLORS = [
 const LANE_GAP = 22
 const LANE_R = LANE_GAP / 2
 const GRAPH_PAD = LANE_R
+const BRANCH_NAME_MAX_LENGTH = 20
 
 function formatSnapshotTime(timestamp: number): string {
     const date = new Date(timestamp * 1000)
@@ -141,6 +141,34 @@ function laneX(lane: number): number {
     return GRAPH_PAD + lane * LANE_GAP
 }
 
+function clampBranchName(value: string): string {
+    return Array.from(value).slice(0, BRANCH_NAME_MAX_LENGTH).join('')
+}
+
+function buildBranchMembership(graph: SnapshotGraph): Map<string, string[]> {
+    const nodesById = new Map(graph.nodes.map(node => [node.id, node]))
+    const membership = new Map<string, string[]>()
+
+    for (const branch of graph.branches) {
+        if (!branch.target) continue
+        const stack = [branch.target]
+        const visited = new Set<string>()
+        while (stack.length > 0) {
+            const id = stack.pop()
+            if (!id || visited.has(id)) continue
+            visited.add(id)
+            const node = nodesById.get(id)
+            if (!node) continue
+            const names = membership.get(id) ?? []
+            if (!names.includes(branch.name)) names.push(branch.name)
+            membership.set(id, names)
+            for (const parent of node.parents) stack.push(parent)
+        }
+    }
+
+    return membership
+}
+
 export interface SnapshotPanelSlots {
     side: ReactNode
     main: ReactNode
@@ -163,7 +191,9 @@ export function useSnapshotPanel({
     const [saving, setSaving] = useState(false)
     const [branchSwitching, setBranchSwitching] = useState(false)
     const [message, setMessage] = useState('')
-    const [newBranchName, setNewBranchName] = useState('')
+    const [branchDialogNode, setBranchDialogNode] = useState<SnapshotGraphNode | null>(null)
+    const [branchNameDraft, setBranchNameDraft] = useState('')
+    const [branchCreating, setBranchCreating] = useState(false)
     const loadRequestIdRef = useRef(0)
 
     const load = useCallback(async () => {
@@ -201,6 +231,11 @@ export function useSnapshotPanel({
         void load()
     }, [load])
 
+    useEffect(() => {
+        setBranchDialogNode(null)
+        setBranchNameDraft('')
+    }, [projectId])
+
     const hasDirtyEntries = dirtyEntryCount > 0
     const requireProjectContext = useCallback(() => {
         if (projectId) return true
@@ -237,26 +272,7 @@ export function useSnapshotPanel({
         }
     }, [blockWhenDirty, load, message, projectId, requireProjectContext, showAlert])
 
-    const handleCreateBranch = useCallback(async () => {
-        if (!requireProjectContext()) return
-        const trimmedName = newBranchName.trim()
-        if (!trimmedName) {
-            void showAlert('请输入分支名称', 'warning')
-            return
-        }
-
-        try {
-            await dbCreateBranch(trimmedName, null, projectId)
-            setNewBranchName('')
-            void showAlert('分支已创建', 'success', 'nonInvasive', 2200)
-            await load()
-        } catch (error) {
-            logger.error('创建分支失败', error)
-            void showAlert('创建分支失败', 'error')
-        }
-    }, [load, newBranchName, projectId, requireProjectContext, showAlert])
-
-    const handleSwitchBranch = useCallback(async (branchName: string) => {
+    const handleSwitchBranch = useCallback(async (branchName: string, fromHistory = false) => {
         if (!requireProjectContext()) return
         const currentProjectId = projectId
         if (!currentProjectId) return
@@ -264,7 +280,9 @@ export function useSnapshotPanel({
         if (blockWhenDirty()) return
 
         const confirmed = await showAlert(
-            `切换到分支「${branchName}」会把数据库恢复到该分支最新版本，是否继续？`,
+            fromHistory
+                ? `将切换到分支「${branchName}」的最新版本。\n不会停留在当前选中的历史提交。是否继续？`
+                : `切换到分支「${branchName}」会把数据库恢复到该分支最新版本，是否继续？`,
             'warning',
             'confirm',
         )
@@ -283,6 +301,59 @@ export function useSnapshotPanel({
             setBranchSwitching(false)
         }
     }, [activeBranch, blockWhenDirty, load, onVersionApplied, projectId, requireProjectContext, showAlert])
+
+    const openBranchDialog = useCallback((node: SnapshotGraphNode) => {
+        setBranchDialogNode(node)
+        setBranchNameDraft('')
+    }, [])
+
+    const closeBranchDialog = useCallback(() => {
+        if (branchCreating) return
+        setBranchDialogNode(null)
+        setBranchNameDraft('')
+    }, [branchCreating])
+
+    const handleCreateBranchFromNode = useCallback(async () => {
+        if (!requireProjectContext()) return
+        const currentProjectId = projectId
+        if (!currentProjectId || !branchDialogNode) return
+        if (blockWhenDirty()) return
+        const branchName = clampBranchName(branchNameDraft.trim())
+        if (!branchName) {
+            void showAlert('请输入分支名称', 'warning')
+            return
+        }
+        if (Array.from(branchName).length > BRANCH_NAME_MAX_LENGTH) {
+            void showAlert(`分支名称不能超过 ${BRANCH_NAME_MAX_LENGTH} 个字。`, 'warning')
+            return
+        }
+        if (/[\\:*?"<>|]/.test(branchName) || branchName.includes('..') || branchName.includes('//') || branchName.startsWith('/') || branchName.endsWith('/')) {
+            void showAlert('分支名称不能包含非法字符。', 'warning')
+            return
+        }
+        if (branches.some(branch => branch.name === branchName)) {
+            void showAlert('分支名称已存在。', 'warning')
+            return
+        }
+
+        setBranchCreating(true)
+        setActionId(branchDialogNode.id)
+        try {
+            await dbCreateBranch(branchName, branchDialogNode.id, currentProjectId)
+            await dbSwitchBranch(branchName, currentProjectId)
+            onVersionApplied?.(currentProjectId)
+            setBranchDialogNode(null)
+            setBranchNameDraft('')
+            void showAlert(`已创建并切换到分支「${branchName}」`, 'success', 'nonInvasive', 2200)
+            await load()
+        } catch (error) {
+            logger.error('创建分支失败', error)
+            void showAlert(formatApiError(toApiError(error)) || '创建分支失败', 'error')
+        } finally {
+            setActionId(null)
+            setBranchCreating(false)
+        }
+    }, [blockWhenDirty, branchDialogNode, branchNameDraft, branches, load, onVersionApplied, projectId, requireProjectContext, showAlert])
 
     const handleRollback = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
         if (!requireProjectContext()) return
@@ -310,42 +381,6 @@ export function useSnapshotPanel({
         }
     }, [blockWhenDirty, load, onVersionApplied, projectId, requireProjectContext, showAlert])
 
-    const handleAppend = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
-        if (!requireProjectContext()) return
-        const currentProjectId = projectId
-        if (!currentProjectId) return
-        if (blockWhenDirty()) return
-        const confirmed = await showAlert(
-            `确定从「${formatSnapshotMessage(snapshot.message)}」追加恢复缺失记录？`,
-            'warning',
-            'confirm',
-        )
-        if (confirmed !== 'yes') return
-
-        setActionId(snapshot.id)
-        try {
-            const result: AppendResult = await dbAppendFrom(snapshot.id, currentProjectId)
-            onVersionApplied?.(currentProjectId)
-            const parts = [
-                result.projects && `项目 ${result.projects}`,
-                result.categories && `分类 ${result.categories}`,
-                result.entries && `词条 ${result.entries}`,
-                result.tagSchemas && `标签 ${result.tagSchemas}`,
-                result.relations && `关系 ${result.relations}`,
-                result.links && `链接 ${result.links}`,
-                result.entryTypes && `类型 ${result.entryTypes}`,
-                result.ideaNotes && `便签 ${result.ideaNotes}`,
-            ].filter(Boolean)
-            void showAlert(parts.length > 0 ? `已恢复: ${parts.join(', ')}` : '无新增记录', 'success', 'nonInvasive', 2200)
-            await load()
-        } catch (error) {
-            logger.error('追加恢复失败', error)
-            void showAlert('追加恢复失败', 'error')
-        } finally {
-            setActionId(null)
-        }
-    }, [blockWhenDirty, load, onVersionApplied, projectId, requireProjectContext, showAlert])
-
     const branchOptions = useMemo(() => (
         branches.map(branch => ({
             value: branch.name,
@@ -354,6 +389,7 @@ export function useSnapshotPanel({
     ), [branches])
 
     const graphRows = useMemo(() => buildGraphRows(graph.nodes), [graph.nodes])
+    const branchMembership = useMemo(() => buildBranchMembership(graph), [graph])
 
     const maxRailWidth = useMemo(() => {
         return graphRows.reduce((max, row) => {
@@ -385,21 +421,6 @@ export function useSnapshotPanel({
                         disabled={!projectId || loading || branchSwitching || branches.length === 0}
                     />
                     <span className="snapshot-side__branch-badge">{activeBranch || '未初始化'}</span>
-                </div>
-                <div className="snapshot-side__branch-create">
-                    <Input
-                        placeholder="新分支名称，例如 feature/世界观重写"
-                        value={newBranchName}
-                        onValueChange={setNewBranchName}
-                    />
-                    <Button type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void handleCreateBranch()}
-                            disabled={!projectId || loading || branchSwitching}
-                    >
-                        新建分支
-                    </Button>
                 </div>
             </div>
 
@@ -493,6 +514,11 @@ export function useSnapshotPanel({
                                 ? 'var(--fc-color-primary)'
                                 : GRAPH_COLORS[row.lane % GRAPH_COLORS.length]
                             const circleR = row.node.isActiveTip || row.node.isCurrentHead ? 6 : 5
+                            const containingBranches = branchMembership.get(row.node.id) ?? []
+                            const isOnActiveBranch = activeBranch ? containingBranches.includes(activeBranch) : false
+                            const switchBranchName = containingBranches.find(branchName => branchName !== activeBranch)
+                            const showRollback = isOnActiveBranch && !row.node.isActiveTip
+                            const showSwitch = !isOnActiveBranch && !!switchBranchName
                             return (
                                 <div
                                     key={row.node.id}
@@ -575,21 +601,33 @@ export function useSnapshotPanel({
                                             ))}
                                         </span>
                                         <span className="snapshot-main__item-actions">
+                                            {showRollback && (
+                                                <Button type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={actionId === row.node.id}
+                                                        onClick={() => void handleRollback(row.node)}
+                                                >
+                                                    回退
+                                                </Button>
+                                            )}
+                                            {showSwitch && switchBranchName && (
+                                                <Button type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={branchSwitching}
+                                                        onClick={() => void handleSwitchBranch(switchBranchName, true)}
+                                                >
+                                                    切换
+                                                </Button>
+                                            )}
                                             <Button type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    disabled={actionId === row.node.id}
-                                                    onClick={() => void handleRollback(row.node)}
+                                                    disabled={actionId === row.node.id || branchCreating}
+                                                    onClick={() => openBranchDialog(row.node)}
                                             >
-                                                回退
-                                            </Button>
-                                            <Button type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    disabled={actionId === row.node.id}
-                                                    onClick={() => void handleAppend(row.node)}
-                                            >
-                                                恢复
+                                                分支
                                             </Button>
                                         </span>
                                         <span className="snapshot-main__item-time">
@@ -601,13 +639,65 @@ export function useSnapshotPanel({
                         })}
                     </div>
                 )}
-            </div>
+        </div>
+    )
+
+    const branchDialog = (
+        <FloatingPanel
+            open={!!branchDialogNode}
+            onClose={closeBranchDialog}
+            dismissible={!branchCreating}
+            title="从此版本创建分支"
+            className="snapshot-branch-dialog"
+        >
+            <form
+                className="snapshot-branch-dialog__body"
+                onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleCreateBranchFromNode()
+                }}
+            >
+                <p className="snapshot-branch-dialog__copy">
+                    新分支会从「{branchDialogNode ? formatSnapshotMessage(branchDialogNode.message) : '当前版本'}」开始，并立即切换过去。
+                </p>
+                <Input
+                    autoFocus
+                    maxLength={BRANCH_NAME_MAX_LENGTH}
+                    placeholder="新分支名称"
+                    value={branchNameDraft}
+                    onValueChange={(value) => setBranchNameDraft(clampBranchName(value))}
+                />
+                <div className="snapshot-branch-dialog__meta">
+                    {Array.from(branchNameDraft).length}/{BRANCH_NAME_MAX_LENGTH}
+                </div>
+                <div className="snapshot-branch-dialog__actions">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={branchCreating}
+                        onClick={closeBranchDialog}
+                    >
+                        取消
+                    </Button>
+                    <Button
+                        type="submit"
+                        variant="primary"
+                        size="sm"
+                        disabled={branchCreating || branchNameDraft.trim().length === 0}
+                    >
+                        创建并切换
+                    </Button>
+                </div>
+            </form>
+        </FloatingPanel>
     )
 
     const mainContent = (
         <DockPanelMain className="snapshot-main">
             {mainTopbar}
             {mainViewport}
+            {branchDialog}
         </DockPanelMain>
     )
 
@@ -625,6 +715,7 @@ export function useSnapshotPanel({
                     {sideSections}
                 </DockPanelSide>
                 {mainViewport}
+                {branchDialog}
             </div>
         ),
     }

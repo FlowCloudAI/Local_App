@@ -59,15 +59,13 @@
     color: var(--fc-color-text-secondary);
 }
 
-.snapshot-side__branch-row,
-.snapshot-side__branch-create {
+.snapshot-side__branch-row {
     display: flex;
     align-items: center;
     gap: var(--fc-space-sm);
 }
 
-.snapshot-side__branch-row > :first-child,
-.snapshot-side__branch-create > :first-child {
+.snapshot-side__branch-row > :first-child {
     flex: 1;
     min-width: 0;
 }
@@ -297,6 +295,36 @@
     height: 1.5rem;
     padding: 0 6px;
     font-size: var(--fc-font-size-xs);
+}
+
+.snapshot-branch-dialog {
+    width: min(24rem, calc(100vw - 2rem));
+}
+
+.snapshot-branch-dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fc-space-sm);
+    padding: 0 var(--fc-space-lg) var(--fc-space-lg);
+}
+
+.snapshot-branch-dialog__copy {
+    margin: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.6;
+}
+
+.snapshot-branch-dialog__meta {
+    align-self: flex-end;
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.snapshot-branch-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--fc-space-sm);
 }
 
 /* ===== 窄屏适配（floating 模式 panel 容器） ===== */
