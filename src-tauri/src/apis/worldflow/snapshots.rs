@@ -106,6 +106,30 @@ fn snapshot_repo_dir(paths: &PathsState) -> Result<PathBuf, String> {
         .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))
 }
 
+fn parse_snapshot_project_id(project_id: Option<String>) -> Result<Option<Uuid>, String> {
+    project_id
+        .map(|id| Uuid::parse_str(&id).map_err(|e| e.to_string()))
+        .transpose()
+}
+
+async fn open_snapshot_db(state: &AppState, project_id: Option<&Uuid>) -> Result<SqliteDb, String> {
+    match project_id {
+        Some(project_id) => open_project_db(state, project_id).await,
+        None => Ok(state.sqlite_db.lock().await.clone()),
+    }
+}
+
+fn snapshot_repo_dir_for_project(
+    state: &AppState,
+    paths: &PathsState,
+    project_id: Option<&Uuid>,
+) -> Result<PathBuf, String> {
+    match project_id {
+        Some(project_id) => Ok(state.world_store.paths(*project_id).snapshots_dir),
+        None => snapshot_repo_dir(paths),
+    }
+}
+
 fn load_snapshot_graph(repo_dir: &Path, active_branch: &str) -> Result<SnapshotGraphDto, String> {
     let repo = match Repository::open(repo_dir) {
         Ok(repo) => repo,
@@ -202,8 +226,12 @@ fn load_snapshot_graph(repo_dir: &Path, active_branch: &str) -> Result<SnapshotG
 /// 手动触发一次快照（消息前缀 "manual <unix_secs>"）
 /// 返回 true 表示创建了新快照，false 表示内容无变化跳过
 #[tauri::command]
-pub async fn db_snapshot(state: State<'_, Arc<AppState>>) -> Result<bool, String> {
-    let db = state.inner().sqlite_db.lock().await;
+pub async fn db_snapshot(
+    state: State<'_, Arc<AppState>>,
+    project_id: Option<String>,
+) -> Result<bool, String> {
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     match db.snapshot().await {
         Ok(()) => Ok(true),
         Err(WorldflowError::NoChanges) => Ok(false),
@@ -216,9 +244,11 @@ pub async fn db_snapshot(state: State<'_, Arc<AppState>>) -> Result<bool, String
 #[tauri::command]
 pub async fn db_snapshot_with_message(
     state: State<'_, Arc<AppState>>,
+    project_id: Option<String>,
     message: String,
 ) -> Result<bool, String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     match db.snapshot_with_message(&message).await {
         Ok(()) => Ok(true),
         Err(WorldflowError::NoChanges) => Ok(false),
@@ -228,8 +258,12 @@ pub async fn db_snapshot_with_message(
 
 /// 获取当前活动分支
 #[tauri::command]
-pub async fn db_get_active_branch(state: State<'_, Arc<AppState>>) -> Result<String, String> {
-    let db = state.inner().sqlite_db.lock().await;
+pub async fn db_get_active_branch(
+    state: State<'_, Arc<AppState>>,
+    project_id: Option<String>,
+) -> Result<String, String> {
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.active_branch().await.map_err(|e| e.to_string())
 }
 
@@ -237,8 +271,10 @@ pub async fn db_get_active_branch(state: State<'_, Arc<AppState>>) -> Result<Str
 #[tauri::command]
 pub async fn db_list_branches(
     state: State<'_, Arc<AppState>>,
+    project_id: Option<String>,
 ) -> Result<Vec<SnapshotBranchInfoDto>, String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.list_branches()
         .await
         .map(|list| list.into_iter().map(SnapshotBranchInfoDto::from).collect())
@@ -251,8 +287,10 @@ pub async fn db_create_branch(
     state: State<'_, Arc<AppState>>,
     branch_name: String,
     from_ref: Option<String>,
+    project_id: Option<String>,
 ) -> Result<(), String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.create_branch(&branch_name, from_ref.as_deref())
         .await
         .map_err(|e| e.to_string())
@@ -263,8 +301,10 @@ pub async fn db_create_branch(
 pub async fn db_switch_branch(
     state: State<'_, Arc<AppState>>,
     branch_name: String,
+    project_id: Option<String>,
 ) -> Result<(), String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.switch_branch(&branch_name)
         .await
         .map_err(|e| e.to_string())
@@ -274,8 +314,10 @@ pub async fn db_switch_branch(
 #[tauri::command]
 pub async fn db_list_snapshots(
     state: State<'_, Arc<AppState>>,
+    project_id: Option<String>,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.list_snapshots()
         .await
         .map(|list| list.into_iter().map(SnapshotInfoDto::from).collect())
@@ -287,8 +329,10 @@ pub async fn db_list_snapshots(
 pub async fn db_list_snapshots_in_branch(
     state: State<'_, Arc<AppState>>,
     branch_name: String,
+    project_id: Option<String>,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.list_snapshots_in_branch(&branch_name)
         .await
         .map(|list| list.into_iter().map(SnapshotInfoDto::from).collect())
@@ -300,12 +344,12 @@ pub async fn db_list_snapshots_in_branch(
 pub async fn db_get_snapshot_graph(
     state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
+    project_id: Option<String>,
 ) -> Result<SnapshotGraphDto, String> {
-    let active_branch = {
-        let db = state.inner().sqlite_db.lock().await;
-        db.active_branch().await.map_err(|e| e.to_string())?
-    };
-    let repo_dir = snapshot_repo_dir(&paths)?;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
+    let active_branch = db.active_branch().await.map_err(|e| e.to_string())?;
+    let repo_dir = snapshot_repo_dir_for_project(state.inner(), &paths, project_id.as_ref())?;
     load_snapshot_graph(&repo_dir, &active_branch)
 }
 
@@ -316,8 +360,10 @@ pub async fn db_snapshot_to_branch(
     state: State<'_, Arc<AppState>>,
     branch_name: String,
     message: String,
+    project_id: Option<String>,
 ) -> Result<bool, String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     match db.snapshot_to_branch(&branch_name, &message).await {
         Ok(()) => Ok(true),
         Err(WorldflowError::NoChanges) => Ok(false),
@@ -330,8 +376,10 @@ pub async fn db_snapshot_to_branch(
 pub async fn db_rollback_to(
     state: State<'_, Arc<AppState>>,
     snapshot_id: String,
+    project_id: Option<String>,
 ) -> Result<(), String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.rollback_to(&snapshot_id)
         .await
         .map_err(|e| e.to_string())
@@ -342,8 +390,10 @@ pub async fn db_rollback_to(
 pub async fn db_append_from(
     state: State<'_, Arc<AppState>>,
     snapshot_id: String,
+    project_id: Option<String>,
 ) -> Result<AppendResultDto, String> {
-    let db = state.inner().sqlite_db.lock().await;
+    let project_id = parse_snapshot_project_id(project_id)?;
+    let db = open_snapshot_db(state.inner(), project_id.as_ref()).await?;
     db.append_from(&snapshot_id)
         .await
         .map(AppendResultDto::from)

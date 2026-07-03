@@ -1,5 +1,5 @@
 import {logger} from '../../shared/logger'
-import {type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
+import {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {Button, Input, Select, useAlert} from 'flowcloudai-ui'
 import {
     type AppendResult,
@@ -21,6 +21,7 @@ import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockP
 import './components/SnapshotPanel.css'
 
 interface UseSnapshotPanelOptions {
+    projectId?: string | null
     panelMode?: 'floating' | 'fullscreen'
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
@@ -143,6 +144,7 @@ export interface SnapshotPanelSlots {
 }
 
 export function useSnapshotPanel({
+                                     projectId = null,
                                      panelMode,
                                      onTogglePanelMode,
                                      onToggleCollapsed,
@@ -158,30 +160,50 @@ export function useSnapshotPanel({
     const [branchSwitching, setBranchSwitching] = useState(false)
     const [message, setMessage] = useState('')
     const [newBranchName, setNewBranchName] = useState('')
+    const loadRequestIdRef = useRef(0)
 
     const load = useCallback(async () => {
+        const requestId = loadRequestIdRef.current + 1
+        loadRequestIdRef.current = requestId
+        if (!projectId) {
+            setBranches([])
+            setGraph({activeBranch: '', branches: [], nodes: []})
+            setActiveBranch('')
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             const [branchList, snapshotGraph] = await Promise.all([
-                dbListBranches(),
-                dbGetSnapshotGraph(),
+                dbListBranches(projectId),
+                dbGetSnapshotGraph(projectId),
             ])
+            if (loadRequestIdRef.current !== requestId) return
             setBranches(branchList)
             setGraph(snapshotGraph)
             setActiveBranch(snapshotGraph.activeBranch)
         } catch (error) {
+            if (loadRequestIdRef.current !== requestId) return
             logger.error('加载快照图失败', error)
             void showAlert('加载版本信息失败', 'error')
         } finally {
-            setLoading(false)
+            if (loadRequestIdRef.current === requestId) {
+                setLoading(false)
+            }
         }
-    }, [showAlert])
+    }, [projectId, showAlert])
 
     useEffect(() => {
         void load()
     }, [load])
 
     const hasDirtyEntries = dirtyEntryCount > 0
+    const requireProjectContext = useCallback(() => {
+        if (projectId) return true
+        void showAlert('请先打开一个项目再操作版本。', 'warning')
+        return false
+    }, [projectId, showAlert])
+
     const blockWhenDirty = useCallback(() => {
         if (!hasDirtyEntries) return false
         void showAlert(
@@ -192,13 +214,14 @@ export function useSnapshotPanel({
     }, [dirtyEntryCount, hasDirtyEntries, showAlert])
 
     const handleSnapshot = useCallback(async () => {
+        if (!requireProjectContext()) return
         if (blockWhenDirty()) return
         setSaving(true)
         try {
             const trimmedMessage = message.trim()
             const created = trimmedMessage
-                ? await dbSnapshotWithMessage(trimmedMessage)
-                : await dbSnapshot()
+                ? await dbSnapshotWithMessage(trimmedMessage, projectId)
+                : await dbSnapshot(projectId)
             setMessage('')
             void showAlert(created ? '快照已创建' : '没有新变更，无需快照', created ? 'success' : 'info', 'nonInvasive', 2200)
             if (created) await load()
@@ -208,9 +231,10 @@ export function useSnapshotPanel({
         } finally {
             setSaving(false)
         }
-    }, [blockWhenDirty, load, message, showAlert])
+    }, [blockWhenDirty, load, message, projectId, requireProjectContext, showAlert])
 
     const handleCreateBranch = useCallback(async () => {
+        if (!requireProjectContext()) return
         const trimmedName = newBranchName.trim()
         if (!trimmedName) {
             void showAlert('请输入分支名称', 'warning')
@@ -218,7 +242,7 @@ export function useSnapshotPanel({
         }
 
         try {
-            await dbCreateBranch(trimmedName)
+            await dbCreateBranch(trimmedName, null, projectId)
             setNewBranchName('')
             void showAlert('分支已创建', 'success', 'nonInvasive', 2200)
             await load()
@@ -226,9 +250,10 @@ export function useSnapshotPanel({
             logger.error('创建分支失败', error)
             void showAlert('创建分支失败', 'error')
         }
-    }, [load, newBranchName, showAlert])
+    }, [load, newBranchName, projectId, requireProjectContext, showAlert])
 
     const handleSwitchBranch = useCallback(async (branchName: string) => {
+        if (!requireProjectContext()) return
         if (!branchName || branchName === activeBranch) return
         if (blockWhenDirty()) return
 
@@ -241,7 +266,7 @@ export function useSnapshotPanel({
 
         setBranchSwitching(true)
         try {
-            await dbSwitchBranch(branchName)
+            await dbSwitchBranch(branchName, projectId)
             void showAlert(`已切换到分支「${branchName}」`, 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
@@ -250,9 +275,10 @@ export function useSnapshotPanel({
         } finally {
             setBranchSwitching(false)
         }
-    }, [activeBranch, blockWhenDirty, load, showAlert])
+    }, [activeBranch, blockWhenDirty, load, projectId, requireProjectContext, showAlert])
 
     const handleRollback = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
+        if (!requireProjectContext()) return
         if (blockWhenDirty()) return
         const confirmed = await showAlert(
             `确定回退到「${formatSnapshotMessage(snapshot.message)}」？\n当前状态会先自动保存。`,
@@ -263,7 +289,7 @@ export function useSnapshotPanel({
 
         setActionId(snapshot.id)
         try {
-            await dbRollbackTo(snapshot.id)
+            await dbRollbackTo(snapshot.id, projectId)
             void showAlert('回退成功', 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
@@ -272,9 +298,10 @@ export function useSnapshotPanel({
         } finally {
             setActionId(null)
         }
-    }, [blockWhenDirty, load, showAlert])
+    }, [blockWhenDirty, load, projectId, requireProjectContext, showAlert])
 
     const handleAppend = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
+        if (!requireProjectContext()) return
         if (blockWhenDirty()) return
         const confirmed = await showAlert(
             `确定从「${formatSnapshotMessage(snapshot.message)}」追加恢复缺失记录？`,
@@ -285,7 +312,7 @@ export function useSnapshotPanel({
 
         setActionId(snapshot.id)
         try {
-            const result: AppendResult = await dbAppendFrom(snapshot.id)
+            const result: AppendResult = await dbAppendFrom(snapshot.id, projectId)
             const parts = [
                 result.projects && `项目 ${result.projects}`,
                 result.categories && `分类 ${result.categories}`,
@@ -304,7 +331,7 @@ export function useSnapshotPanel({
         } finally {
             setActionId(null)
         }
-    }, [blockWhenDirty, load, showAlert])
+    }, [blockWhenDirty, load, projectId, requireProjectContext, showAlert])
 
     const branchOptions = useMemo(() => (
         branches.map(branch => ({
@@ -342,7 +369,7 @@ export function useSnapshotPanel({
                         value={activeBranch}
                         onChange={(value) => void handleSwitchBranch(String(value))}
                         style={{flex: 1}}
-                        disabled={loading || branchSwitching || branches.length === 0}
+                        disabled={!projectId || loading || branchSwitching || branches.length === 0}
                     />
                     <span className="snapshot-side__branch-badge">{activeBranch || '未初始化'}</span>
                 </div>
@@ -356,7 +383,7 @@ export function useSnapshotPanel({
                             variant="outline"
                             size="sm"
                             onClick={() => void handleCreateBranch()}
-                            disabled={loading || branchSwitching}
+                            disabled={!projectId || loading || branchSwitching}
                     >
                         新建分支
                     </Button>
@@ -376,7 +403,7 @@ export function useSnapshotPanel({
                     <div className="snapshot-side__save-actions">
                         <Button type="button" variant="primary" size="sm"
                                 onClick={() => void handleSnapshot()}
-                                disabled={loading || saving}>
+                                disabled={!projectId || loading || saving}>
                             保存
                         </Button>
                     </div>
@@ -435,10 +462,14 @@ export function useSnapshotPanel({
                 ) : graphRows.length === 0 ? (
                     <div className="snapshot-main__empty">
                         <p className="snapshot-main__empty-title">
-                            {activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本'}
+                            {projectId
+                                ? (activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本')
+                                : '请先打开一个项目'}
                         </p>
                         <p className="snapshot-main__empty-copy">
-                            创建一次手动保存，或先切换到已有分支查看历史记录。
+                            {projectId
+                                ? '创建一次手动保存，或先切换到已有分支查看历史记录。'
+                                : '版本历史按世界观独立保存。'}
                         </p>
                     </div>
                 ) : (

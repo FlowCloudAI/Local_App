@@ -48,38 +48,42 @@ export interface AppendResult {
   ideaNotes: number
 }
 
-export const dbSnapshot = () =>
-    command<boolean>('db_snapshot')
+export const dbSnapshot = (projectId?: string | null) =>
+    command<boolean>('db_snapshot', {projectId: projectId ?? null})
 
-export const dbSnapshotWithMessage = (message: string) =>
-    command<boolean>('db_snapshot_with_message', {message})
+export const dbSnapshotWithMessage = (message: string, projectId?: string | null) =>
+    command<boolean>('db_snapshot_with_message', {message, projectId: projectId ?? null})
 
-export const dbGetActiveBranch = () =>
-    command<string>('db_get_active_branch')
+export const dbGetActiveBranch = (projectId?: string | null) =>
+    command<string>('db_get_active_branch', {projectId: projectId ?? null})
 
-export const dbListBranches = () =>
-    command<SnapshotBranchInfo[]>('db_list_branches')
+export const dbListBranches = (projectId?: string | null) =>
+    command<SnapshotBranchInfo[]>('db_list_branches', {projectId: projectId ?? null})
 
-export const dbCreateBranch = (branchName: string, fromRef?: string | null) =>
-    command<void>('db_create_branch', {branchName, fromRef: fromRef ?? null})
+export const dbCreateBranch = (
+    branchName: string,
+    fromRef?: string | null,
+    projectId?: string | null,
+) =>
+    command<void>('db_create_branch', {branchName, fromRef: fromRef ?? null, projectId: projectId ?? null})
 
-export const dbSwitchBranch = (branchName: string) =>
-    command<void>('db_switch_branch', {branchName})
+export const dbSwitchBranch = (branchName: string, projectId?: string | null) =>
+    command<void>('db_switch_branch', {branchName, projectId: projectId ?? null})
 
-export const dbListSnapshots = () =>
-  command<SnapshotInfo[]>('db_list_snapshots')
+export const dbListSnapshots = (projectId?: string | null) =>
+  command<SnapshotInfo[]>('db_list_snapshots', {projectId: projectId ?? null})
 
-export const dbListSnapshotsInBranch = (branchName: string) =>
-    command<SnapshotInfo[]>('db_list_snapshots_in_branch', {branchName})
+export const dbListSnapshotsInBranch = (branchName: string, projectId?: string | null) =>
+    command<SnapshotInfo[]>('db_list_snapshots_in_branch', {branchName, projectId: projectId ?? null})
 
-export const dbGetSnapshotGraph = () =>
-    command<SnapshotGraph>('db_get_snapshot_graph')
+export const dbGetSnapshotGraph = (projectId?: string | null) =>
+    command<SnapshotGraph>('db_get_snapshot_graph', {projectId: projectId ?? null})
 
-export const dbSnapshotToBranch = (branchName: string, message: string) =>
-    command<boolean>('db_snapshot_to_branch', {branchName, message})
+export const dbSnapshotToBranch = (branchName: string, message: string, projectId?: string | null) =>
+    command<boolean>('db_snapshot_to_branch', {branchName, message, projectId: projectId ?? null})
 
-export const dbRollbackTo = (snapshotId: string) =>
-  command<void>('db_rollback_to', { snapshotId })
+export const dbRollbackTo = (snapshotId: string, projectId?: string | null) =>
+  command<void>('db_rollback_to', { snapshotId, projectId: projectId ?? null })
 
-export const dbAppendFrom = (snapshotId: string) =>
-  command<AppendResult>('db_append_from', { snapshotId })
+export const dbAppendFrom = (snapshotId: string, projectId?: string | null) =>
+  command<AppendResult>('db_append_from', { snapshotId, projectId: projectId ?? null })

@@ -1025,6 +1025,7 @@ function DesktopAppContent() {
         onToggleCollapsed: collapseAiPanel,
     })
     const snapshotSlots = useSnapshotPanel({
+        projectId: aiFocus.projectId,
         panelMode: aiPanelMode,
         onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,

@@ -305,7 +305,7 @@ function ProjectEditorInner({
         void (async () => {
             const [mapsResult, snapshotsResult, riskResult] = await Promise.allSettled([
                 map_list_project_maps(projectId),
-                dbListSnapshots(),
+                dbListSnapshots(projectId),
                 ai_list_contradiction_reports(projectId),
             ])
             if (cancelled) return

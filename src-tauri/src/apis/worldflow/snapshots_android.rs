@@ -67,26 +67,34 @@ fn snapshot_unsupported<T>() -> Result<T, String> {
 }
 
 #[tauri::command]
-pub async fn db_snapshot(_state: State<'_, Arc<AppState>>) -> Result<bool, String> {
+pub async fn db_snapshot(
+    _state: State<'_, Arc<AppState>>,
+    _project_id: Option<String>,
+) -> Result<bool, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
 pub async fn db_snapshot_with_message(
     _state: State<'_, Arc<AppState>>,
+    _project_id: Option<String>,
     _message: String,
 ) -> Result<bool, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
-pub async fn db_get_active_branch(_state: State<'_, Arc<AppState>>) -> Result<String, String> {
+pub async fn db_get_active_branch(
+    _state: State<'_, Arc<AppState>>,
+    _project_id: Option<String>,
+) -> Result<String, String> {
     snapshot_unsupported()
 }
 
 #[tauri::command]
 pub async fn db_list_branches(
     _state: State<'_, Arc<AppState>>,
+    _project_id: Option<String>,
 ) -> Result<Vec<SnapshotBranchInfoDto>, String> {
     snapshot_unsupported()
 }
@@ -96,6 +104,7 @@ pub async fn db_create_branch(
     _state: State<'_, Arc<AppState>>,
     _branch_name: String,
     _from_ref: Option<String>,
+    _project_id: Option<String>,
 ) -> Result<(), String> {
     snapshot_unsupported()
 }
@@ -104,6 +113,7 @@ pub async fn db_create_branch(
 pub async fn db_switch_branch(
     _state: State<'_, Arc<AppState>>,
     _branch_name: String,
+    _project_id: Option<String>,
 ) -> Result<(), String> {
     snapshot_unsupported()
 }
@@ -111,6 +121,7 @@ pub async fn db_switch_branch(
 #[tauri::command]
 pub async fn db_list_snapshots(
     _state: State<'_, Arc<AppState>>,
+    _project_id: Option<String>,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
     snapshot_unsupported()
 }
@@ -119,6 +130,7 @@ pub async fn db_list_snapshots(
 pub async fn db_list_snapshots_in_branch(
     _state: State<'_, Arc<AppState>>,
     _branch_name: String,
+    _project_id: Option<String>,
 ) -> Result<Vec<SnapshotInfoDto>, String> {
     snapshot_unsupported()
 }
@@ -127,6 +139,7 @@ pub async fn db_list_snapshots_in_branch(
 pub async fn db_get_snapshot_graph(
     _state: State<'_, Arc<AppState>>,
     _paths: State<'_, PathsState>,
+    _project_id: Option<String>,
 ) -> Result<SnapshotGraphDto, String> {
     snapshot_unsupported()
 }
@@ -136,6 +149,7 @@ pub async fn db_snapshot_to_branch(
     _state: State<'_, Arc<AppState>>,
     _branch_name: String,
     _message: String,
+    _project_id: Option<String>,
 ) -> Result<bool, String> {
     snapshot_unsupported()
 }
@@ -144,6 +158,7 @@ pub async fn db_snapshot_to_branch(
 pub async fn db_rollback_to(
     _state: State<'_, Arc<AppState>>,
     _snapshot_id: String,
+    _project_id: Option<String>,
 ) -> Result<(), String> {
     snapshot_unsupported()
 }
@@ -152,6 +167,7 @@ pub async fn db_rollback_to(
 pub async fn db_append_from(
     _state: State<'_, Arc<AppState>>,
     _snapshot_id: String,
+    _project_id: Option<String>,
 ) -> Result<AppendResultDto, String> {
     snapshot_unsupported()
 }
