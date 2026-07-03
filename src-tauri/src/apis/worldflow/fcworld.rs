@@ -1598,6 +1598,13 @@ fn track_package_validation_progress(
     }
 }
 
+fn clone_paths_state(paths: &PathsState) -> PathsState {
+    PathsState {
+        db_path: paths.db_path.clone(),
+        plugins_path: paths.plugins_path.clone(),
+    }
+}
+
 fn normalize_project_name(name: &str) -> String {
     name.trim().to_lowercase()
 }
@@ -2039,15 +2046,30 @@ async fn import_fcworld_package_to_world_store(
     progress: FcworldProgressTracker,
 ) -> Result<FcworldImportResult, String> {
     let existing_projects = index_db.list_projects().await.map_err(|e| e.to_string())?;
-    let progress_for_validation = progress.clone();
-    let validated = import::read_and_validate_fcworld_package_with_progress(
-        input_path,
-        index_db.worldflow_schema_version(),
-        move |event| track_package_validation_progress(&progress_for_validation, event),
-    )?;
-    let decision = resolve_import_decision(&validated, &existing_projects, options)?;
-    let prepared = import::prepare_fcworld_import(validated, paths, &decision.project_name)?;
-    let expected_rows = expected_import_rows(&prepared.csv_items)?;
+    let input_path_for_prepare = input_path.to_path_buf();
+    let paths_for_prepare = clone_paths_state(paths);
+    let schema_version = index_db.worldflow_schema_version();
+    let progress_for_prepare = progress.clone();
+    let (prepared, expected_rows, overwrite_target) =
+        tauri::async_runtime::spawn_blocking(move || {
+            let progress_for_validation = progress_for_prepare.clone();
+            let validated = import::read_and_validate_fcworld_package_with_progress(
+                &input_path_for_prepare,
+                schema_version,
+                move |event| track_package_validation_progress(&progress_for_validation, event),
+            )?;
+            let decision = resolve_import_decision(&validated, &existing_projects, options)?;
+            let prepared = import::prepare_fcworld_import(
+                validated,
+                &paths_for_prepare,
+                &decision.project_name,
+            )?;
+            let expected_rows = expected_import_rows(&prepared.csv_items)?;
+            Ok::<_, String>((prepared, expected_rows, decision.overwrite_target))
+        })
+        .await
+        .map_err(|e| format!("导入准备任务异常退出: {e}"))??;
+    let prepared = Arc::new(prepared);
 
     state
         .world_store
@@ -2069,10 +2091,27 @@ async fn import_fcworld_package_to_world_store(
         "write_files",
         "写入导入资源和地图",
     );
-    if let Err(error) = write_prepared_import_files_with_progress(&prepared, paths, |path| {
-        progress.step("write_files", format!("已写入导入文件：{path}"));
-    }) {
-        return Err(cleanup_world_import_after_error(state, None, &prepared, paths, error).await);
+    let paths_for_write = clone_paths_state(paths);
+    let prepared_for_write = Arc::clone(&prepared);
+    let progress_for_write = progress.clone();
+    let write_result = tauri::async_runtime::spawn_blocking(move || {
+        write_prepared_import_files_with_progress(
+            prepared_for_write.as_ref(),
+            &paths_for_write,
+            |path| {
+                progress_for_write.step("write_files", format!("已写入导入文件：{path}"));
+            },
+        )
+    })
+    .await
+    .map_err(|e| format!("写入导入文件任务异常退出: {e}"));
+    match write_result {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) | Err(error) => {
+            return Err(
+                cleanup_world_import_after_error(state, None, &prepared, paths, error).await,
+            );
+        }
     }
 
     let db_row_total = total_import_rows(&expected_rows);
@@ -2172,7 +2211,7 @@ async fn import_fcworld_package_to_world_store(
         return Err(cleanup_world_import_after_error(state, None, &prepared, paths, reason).await);
     }
 
-    if let Some(target) = decision.overwrite_target {
+    if let Some(target) = overwrite_target {
         progress.add_total(1, "cleanup", "清理覆盖目标世界观");
         if let Err(error) = index_db.delete_project(&target.project_id).await {
             let reason = format!("删除覆盖目标世界观索引失败: {error}");
@@ -2207,10 +2246,10 @@ async fn import_fcworld_package_to_world_store(
 
     Ok(FcworldImportResult {
         input_path: input_path.to_string_lossy().to_string(),
-        package_id: prepared.package_id,
-        source_project_id: prepared.source_project_id,
+        package_id: prepared.package_id.clone(),
+        source_project_id: prepared.source_project_id.clone(),
         project_id: prepared.new_project_id.to_string(),
-        project_name: prepared.project_name,
+        project_name: prepared.project_name.clone(),
         asset_count: prepared.asset_count,
         map_count: prepared.map_count,
         file_size: prepared.input_file_size,
