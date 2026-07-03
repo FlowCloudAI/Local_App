@@ -1084,8 +1084,16 @@ pub async fn db_create_entries_bulk(
 
 /// 优化 FTS 索引，消除碎片；建议在 create_entries_bulk 后调用
 #[tauri::command]
-pub async fn db_optimize_fts(state: State<'_, Arc<AppState>>) -> Result<(), String> {
-    let db = state.inner().sqlite_db.lock().await;
+pub async fn db_optimize_fts(
+    state: State<'_, Arc<AppState>>,
+    project_id: Option<String>,
+) -> Result<(), String> {
+    let db = if let Some(project_id) = project_id {
+        let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+        open_project_db(state.inner(), &project_id).await?
+    } else {
+        state.inner().sqlite_db.lock().await.clone()
+    };
     db.optimize_fts().await.map_err(|e| e.to_string())
 }
 

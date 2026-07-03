@@ -629,7 +629,8 @@ export const db_delete_entry = (id: string, projectId?: string) =>
 export const db_create_entries_bulk = (entries: CreateEntryInput[]) =>
     command<number>('db_create_entries_bulk', {entries})
 
-export const db_optimize_fts = () => command<void>('db_optimize_fts')
+export const db_optimize_fts = (projectId?: string | null) =>
+    command<void>('db_optimize_fts', {projectId: projectId ?? null})
 
 export const import_entry_images = (projectId: string, filePaths: string[]) =>
     command<FCImage[]>('import_entry_images', {projectId, filePaths})
