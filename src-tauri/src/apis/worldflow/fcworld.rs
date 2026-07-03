@@ -2037,7 +2037,7 @@ pub async fn db_export_project_fcworld(
         let output_path_buf = PathBuf::from(&output_path);
 
         let (project, export) = {
-            let db = state.inner().sqlite_db.lock().await.clone();
+            let db = open_project_db(state.inner(), &project_id).await?;
             let project = db
                 .get_project(&project_id)
                 .await
