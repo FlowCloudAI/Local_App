@@ -1827,6 +1827,7 @@ fn cleanup_project_sidecar_files(paths: &PathsState, project_id: &Uuid) -> Resul
     }
 }
 
+#[cfg(test)]
 fn cleanup_after_file_write_error(
     package: &import::PreparedFcworldImport,
     paths: &PathsState,
@@ -1840,6 +1841,7 @@ fn cleanup_after_file_write_error(
     }
 }
 
+#[cfg(test)]
 async fn rollback_after_import_row_mismatch(
     db: &SqliteDb,
     package: &import::PreparedFcworldImport,
@@ -1861,6 +1863,7 @@ async fn rollback_after_import_row_mismatch(
     }
 }
 
+#[cfg(test)]
 async fn import_fcworld_package_to_db(
     db: &SqliteDb,
     paths: &PathsState,
@@ -2000,6 +2003,222 @@ async fn import_fcworld_package_to_db(
     })
 }
 
+async fn cleanup_world_import_after_error(
+    state: &AppState,
+    index_db: Option<&SqliteDb>,
+    package: &import::PreparedFcworldImport,
+    paths: &PathsState,
+    reason: String,
+) -> String {
+    let mut errors = Vec::new();
+    if let Some(index_db) = index_db {
+        if let Err(error) = index_db.delete_project(&package.new_project_id).await {
+            errors.push(format!("清理主库项目索引失败: {error}"));
+        }
+    }
+    if let Err(error) = state.world_store.delete_world(package.new_project_id).await {
+        errors.push(format!("清理导入世界库失败: {error}"));
+    }
+    if let Err(error) = cleanup_prepared_import_files(package, paths) {
+        errors.push(error);
+    }
+
+    if errors.is_empty() {
+        reason
+    } else {
+        format!("{reason}；回滚失败，需要人工介入：{}", errors.join("；"))
+    }
+}
+
+async fn import_fcworld_package_to_world_store(
+    index_db: &SqliteDb,
+    state: &AppState,
+    paths: &PathsState,
+    input_path: &Path,
+    options: Option<FcworldImportOptions>,
+    progress: FcworldProgressTracker,
+) -> Result<FcworldImportResult, String> {
+    let existing_projects = index_db.list_projects().await.map_err(|e| e.to_string())?;
+    let progress_for_validation = progress.clone();
+    let validated = import::read_and_validate_fcworld_package_with_progress(
+        input_path,
+        index_db.worldflow_schema_version(),
+        move |event| track_package_validation_progress(&progress_for_validation, event),
+    )?;
+    let decision = resolve_import_decision(&validated, &existing_projects, options)?;
+    let prepared = import::prepare_fcworld_import(validated, paths, &decision.project_name)?;
+    let expected_rows = expected_import_rows(&prepared.csv_items)?;
+
+    state
+        .world_store
+        .create_world_with_id(prepared.new_project_id, prepared.project_name.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+    let world_db = match state.world_store.open_world(prepared.new_project_id).await {
+        Ok(db) => db,
+        Err(error) => {
+            let reason = format!("打开导入世界库失败: {error}");
+            return Err(
+                cleanup_world_import_after_error(state, None, &prepared, paths, reason).await,
+            );
+        }
+    };
+
+    progress.add_total(
+        prepared.assets.len() + 1,
+        "write_files",
+        "写入导入资源和地图",
+    );
+    if let Err(error) = write_prepared_import_files_with_progress(&prepared, paths, |path| {
+        progress.step("write_files", format!("已写入导入文件：{path}"));
+    }) {
+        return Err(cleanup_world_import_after_error(state, None, &prepared, paths, error).await);
+    }
+
+    let db_row_total = total_import_rows(&expected_rows);
+    progress.add_total(db_row_total, "import_db", "写入导入数据库");
+    let import_result = match world_db
+        .import_csvs_with_progress(
+            CsvImportBundle {
+                items: prepared.csv_items.clone(),
+            },
+            CsvImportMode::Merge,
+            |event| match event.phase {
+                CsvImportProgressPhase::TableStarted => {
+                    progress.note("import_db", format!("开始写入 {}", event.table.file_name()));
+                }
+                CsvImportProgressPhase::RowProcessed => {
+                    progress.step(
+                        "import_db",
+                        format!(
+                            "写入 {}：{}/{} 行，新增 {} 行",
+                            event.table.file_name(),
+                            event.current,
+                            event.total,
+                            event.inserted
+                        ),
+                    );
+                }
+                CsvImportProgressPhase::TableFinished => {
+                    progress.note("import_db", format!("完成写入 {}", event.table.file_name()));
+                }
+            },
+        )
+        .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            let reason = format!("写入导入数据库失败: {error}");
+            return Err(
+                cleanup_world_import_after_error(state, None, &prepared, paths, reason).await,
+            );
+        }
+    };
+
+    let actual_rows = FcworldImportRows::from(import_result);
+    if actual_rows != expected_rows {
+        let reason =
+            format!("fcworld 导入行数不匹配: expected={expected_rows:?} actual={actual_rows:?}");
+        return Err(cleanup_world_import_after_error(state, None, &prepared, paths, reason).await);
+    }
+
+    let mut warnings = prepared.warnings.clone();
+    progress.add_total(
+        expected_rows.entries,
+        "thumbnails",
+        "生成导入词条主图缩略图",
+    );
+    match super::images::ensure_project_cover_thumbnails_with_progress(
+        &world_db,
+        paths,
+        &prepared.new_project_id,
+        |current, total| {
+            if total > 0 {
+                progress.step("thumbnails", format!("生成主图缩略图：{current}/{total}"));
+            }
+        },
+    )
+    .await
+    {
+        Ok(summary) => {
+            if summary.failed > 0 {
+                warnings.push(format!(
+                    "{} 个词条主图缩略图生成失败，已保留原图路径",
+                    summary.failed
+                ));
+            }
+        }
+        Err(error) => {
+            warnings.push(format!("导入成功，但生成主图缩略图失败：{error}"));
+        }
+    }
+
+    let project = world_db
+        .get_project(&prepared.new_project_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    if let Err(error) = index_db
+        .create_project_with_id(
+            project.id,
+            CreateProject {
+                name: project.name.clone(),
+                description: project.description.clone(),
+                cover_image: project.cover_image.clone(),
+            },
+        )
+        .await
+    {
+        let reason = format!("写入主库项目索引失败: {error}");
+        return Err(cleanup_world_import_after_error(state, None, &prepared, paths, reason).await);
+    }
+
+    if let Some(target) = decision.overwrite_target {
+        progress.add_total(1, "cleanup", "清理覆盖目标世界观");
+        if let Err(error) = index_db.delete_project(&target.project_id).await {
+            let reason = format!("删除覆盖目标世界观索引失败: {error}");
+            return Err(cleanup_world_import_after_error(
+                state,
+                Some(index_db),
+                &prepared,
+                paths,
+                reason,
+            )
+            .await);
+        }
+        if let Err(error) = state.world_store.delete_world(target.project_id).await {
+            let reason = format!("删除覆盖目标世界库失败: {error}");
+            return Err(cleanup_world_import_after_error(
+                state,
+                Some(index_db),
+                &prepared,
+                paths,
+                reason,
+            )
+            .await);
+        }
+        if let Err(error) = cleanup_project_sidecar_files(paths, &target.project_id) {
+            return Err(format!(
+                "覆盖导入已写入，但清理原世界观文件失败，需要人工介入：{error}"
+            ));
+        }
+        progress.step("cleanup", "已清理覆盖目标世界观");
+        warnings.push(format!("已覆盖原世界观：{}", target.project_name));
+    }
+
+    Ok(FcworldImportResult {
+        input_path: input_path.to_string_lossy().to_string(),
+        package_id: prepared.package_id,
+        source_project_id: prepared.source_project_id,
+        project_id: prepared.new_project_id.to_string(),
+        project_name: prepared.project_name,
+        asset_count: prepared.asset_count,
+        map_count: prepared.map_count,
+        file_size: prepared.input_file_size,
+        imported_rows: actual_rows,
+        warnings,
+    })
+}
+
 async fn preview_fcworld_package(
     db: &SqliteDb,
     input_path: &Path,
@@ -2109,21 +2328,15 @@ pub async fn db_import_project_fcworld(
     let result = async {
         let input_path_buf = PathBuf::from(&input_path);
         let db = state.inner().sqlite_db.lock().await.clone();
-        let result = import_fcworld_package_to_db(
+        import_fcworld_package_to_world_store(
             &db,
+            state.inner(),
             paths.inner(),
             &input_path_buf,
             options,
             progress.clone(),
         )
-        .await?;
-        let project_id = Uuid::parse_str(&result.project_id).map_err(|e| e.to_string())?;
-        let project = db
-            .get_project(&project_id)
-            .await
-            .map_err(|e| e.to_string())?;
-        sync_project_to_world(state.inner(), &db, &project).await?;
-        Ok(result)
+        .await
     }
     .await;
 
