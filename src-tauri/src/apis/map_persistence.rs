@@ -1,6 +1,7 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
@@ -39,8 +40,8 @@ pub struct ProjectMapStore {
 
 // ── 内部辅助 ──────────────────────────────────────────────────────────────────
 
-fn store_path(app: &AppHandle, project_id: &str) -> Result<PathBuf, String> {
-    let safe_id: String = project_id
+fn safe_project_id(project_id: &str) -> String {
+    project_id
         .chars()
         .map(|c| {
             if c.is_alphanumeric() || c == '-' || c == '_' {
@@ -49,7 +50,11 @@ fn store_path(app: &AppHandle, project_id: &str) -> Result<PathBuf, String> {
                 '_'
             }
         })
-        .collect();
+        .collect()
+}
+
+fn legacy_store_path(app: &AppHandle, project_id: &str) -> Result<PathBuf, String> {
+    let safe_id = safe_project_id(project_id);
     let paths = app
         .try_state::<crate::PathsState>()
         .ok_or_else(|| "paths state unavailable".to_string())?;
@@ -58,20 +63,22 @@ fn store_path(app: &AppHandle, project_id: &str) -> Result<PathBuf, String> {
         .parent()
         .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
     let dir = db_dir.join("maps");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join(format!("{safe_id}.json")))
 }
 
-fn load_store(app: &AppHandle, project_id: &str) -> Result<ProjectMapStore, String> {
-    let path = store_path(app, project_id)?;
-    if !path.exists() {
-        return Ok(ProjectMapStore {
-            project_id: project_id.to_string(),
-            maps: vec![],
-        });
-    }
-    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+fn store_path(app: &AppHandle, project_id: &str) -> Result<PathBuf, String> {
+    let project_id = Uuid::parse_str(project_id).map_err(|e| e.to_string())?;
+    let state = app
+        .try_state::<Arc<crate::AppState>>()
+        .ok_or_else(|| "app state unavailable".to_string())?;
+    Ok(state
+        .world_store
+        .paths(project_id)
+        .root_dir
+        .join("maps.json"))
+}
 
+fn parse_store_content(content: &str, project_id: &str) -> Result<ProjectMapStore, String> {
     // 优先尝试多地图格式
     if let Ok(store) = serde_json::from_str::<ProjectMapStore>(&content) {
         return Ok(store);
@@ -109,8 +116,33 @@ fn load_store(app: &AppHandle, project_id: &str) -> Result<ProjectMapStore, Stri
     })
 }
 
+fn load_store(app: &AppHandle, project_id: &str) -> Result<ProjectMapStore, String> {
+    let primary_path = store_path(app, project_id)?;
+    let legacy_path = legacy_store_path(app, project_id)?;
+    let path = if primary_path.exists() {
+        Some(primary_path)
+    } else if legacy_path.exists() {
+        Some(legacy_path)
+    } else {
+        None
+    };
+
+    let Some(path) = path else {
+        return Ok(ProjectMapStore {
+            project_id: project_id.to_string(),
+            maps: vec![],
+        });
+    };
+
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    parse_store_content(&content, project_id)
+}
+
 fn save_store(app: &AppHandle, store: &ProjectMapStore) -> Result<(), String> {
     let path = store_path(app, &store.project_id)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
     let content = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
     std::fs::write(&path, content).map_err(|e| e.to_string())?;
     Ok(())

@@ -1,5 +1,45 @@
 use super::common::*;
 
+fn project_map_sidecar_paths(
+    state: &AppState,
+    paths: &PathsState,
+    project_id: &Uuid,
+) -> Result<Vec<PathBuf>, String> {
+    let safe_id = project_id.to_string();
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
+    Ok(vec![
+        state
+            .world_store
+            .paths(*project_id)
+            .root_dir
+            .join("maps.json"),
+        db_dir.join("maps").join(format!("{safe_id}.json")),
+    ])
+}
+
+fn cleanup_project_map_sidecars(
+    state: &AppState,
+    paths: &PathsState,
+    project_id: &Uuid,
+) -> Result<(), String> {
+    let mut errors = Vec::new();
+    for path in project_map_sidecar_paths(state, paths, project_id)? {
+        if path.exists() {
+            if let Err(error) = std::fs::remove_file(&path) {
+                errors.push(format!("清理项目地图文件失败 {:?}: {error}", path));
+            }
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("；"))
+    }
+}
+
 #[tauri::command]
 pub async fn db_create_project(
     state: State<'_, Arc<AppState>>,
@@ -110,12 +150,19 @@ pub async fn db_update_project(
 
 /// 删除项目（级联删除所有分类、词条、标签定义、关系）
 #[tauri::command]
-pub async fn db_delete_project(state: State<'_, Arc<AppState>>, id: String) -> Result<(), String> {
+pub async fn db_delete_project(
+    state: State<'_, Arc<AppState>>,
+    paths: State<'_, PathsState>,
+    id: String,
+) -> Result<(), String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
     let db = state.inner().sqlite_db.lock().await.clone();
     db.delete_project(&id).await.map_err(|e| e.to_string())?;
     if let Err(error) = state.inner().world_store.delete_world(id).await {
         log::warn!("删除项目对应世界观失败: {}", error);
+    }
+    if let Err(error) = cleanup_project_map_sidecars(state.inner(), paths.inner(), &id) {
+        log::warn!("清理项目地图文件失败: {}", error);
     }
     Ok(())
 }

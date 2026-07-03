@@ -966,18 +966,37 @@ fn map_store_path(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, Stri
         .parent()
         .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
     Ok(db_dir
+        .join("worlds")
+        .join(safe_project_id(project_id))
+        .join("maps.json"))
+}
+
+fn legacy_map_store_path(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
+    Ok(db_dir
         .join("maps")
         .join(format!("{}.json", safe_project_id(project_id))))
 }
 
 fn load_map_store_value(paths: &PathsState, project_id: &Uuid) -> Result<Value, String> {
-    let path = map_store_path(paths, project_id)?;
-    if !path.exists() {
+    let primary_path = map_store_path(paths, project_id)?;
+    let legacy_path = legacy_map_store_path(paths, project_id)?;
+    let path = if primary_path.exists() {
+        Some(primary_path)
+    } else if legacy_path.exists() {
+        Some(legacy_path)
+    } else {
+        None
+    };
+    let Some(path) = path else {
         return Ok(json!({
             "projectId": project_id.to_string(),
             "maps": [],
         }));
-    }
+    };
 
     let content = std::fs::read_to_string(&path)
         .map_err(|e| format!("读取地图文件失败 {:?}: {}", path, e))?;
@@ -1797,10 +1816,14 @@ fn cleanup_prepared_import_files(
         }
     }
 
-    let map_path = map_store_path(paths, &package.new_project_id)?;
-    if map_path.exists() {
-        if let Err(error) = std::fs::remove_file(&map_path) {
-            errors.push(format!("清理地图文件失败 {:?}: {error}", map_path));
+    for map_path in [
+        map_store_path(paths, &package.new_project_id)?,
+        legacy_map_store_path(paths, &package.new_project_id)?,
+    ] {
+        if map_path.exists() {
+            if let Err(error) = std::fs::remove_file(&map_path) {
+                errors.push(format!("清理地图文件失败 {:?}: {error}", map_path));
+            }
         }
     }
 
@@ -1820,10 +1843,14 @@ fn cleanup_project_sidecar_files(paths: &PathsState, project_id: &Uuid) -> Resul
         }
     }
 
-    let map_path = map_store_path(paths, project_id)?;
-    if map_path.exists() {
-        if let Err(error) = std::fs::remove_file(&map_path) {
-            errors.push(format!("清理原世界观地图文件失败 {:?}: {error}", map_path));
+    for map_path in [
+        map_store_path(paths, project_id)?,
+        legacy_map_store_path(paths, project_id)?,
+    ] {
+        if map_path.exists() {
+            if let Err(error) = std::fs::remove_file(&map_path) {
+                errors.push(format!("清理原世界观地图文件失败 {:?}: {error}", map_path));
+            }
         }
     }
 
@@ -2981,12 +3008,8 @@ mod tests {
         assert!(Path::new(&imported_cover).starts_with(import_image_dir.join("thumbs")));
         assert!(Path::new(&imported_cover).exists());
 
-        let imported_maps_path = paths
-            .db_path
-            .parent()
-            .unwrap()
-            .join("maps")
-            .join(format!("{new_project_id}.json"));
+        let imported_maps_path =
+            map_store_path(&paths, &new_project_id).expect("应能解析导入地图路径");
         let maps_json = std::fs::read_to_string(imported_maps_path).expect("应写入空地图文件");
         let maps_value: Value = serde_json::from_str(&maps_json).expect("地图文件应为 JSON");
         assert_eq!(maps_value["projectId"], new_project_id.to_string());
