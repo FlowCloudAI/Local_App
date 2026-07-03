@@ -24,6 +24,7 @@ interface UseSnapshotPanelOptions {
     panelMode?: 'floating' | 'fullscreen'
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
+    dirtyEntryCount?: number
 }
 
 interface SnapshotGraphRow {
@@ -145,6 +146,7 @@ export function useSnapshotPanel({
                                      panelMode,
                                      onTogglePanelMode,
                                      onToggleCollapsed,
+                                     dirtyEntryCount = 0,
                                  }: UseSnapshotPanelOptions = {}): SnapshotPanelSlots {
     const {showAlert} = useAlert()
     const [branches, setBranches] = useState<SnapshotBranchInfo[]>([])
@@ -179,7 +181,18 @@ export function useSnapshotPanel({
         void load()
     }, [load])
 
+    const hasDirtyEntries = dirtyEntryCount > 0
+    const blockWhenDirty = useCallback(() => {
+        if (!hasDirtyEntries) return false
+        void showAlert(
+            `有 ${dirtyEntryCount} 个词条存在未保存更改，请先保存或关闭后再操作版本。`,
+            'warning',
+        )
+        return true
+    }, [dirtyEntryCount, hasDirtyEntries, showAlert])
+
     const handleSnapshot = useCallback(async () => {
+        if (blockWhenDirty()) return
         setSaving(true)
         try {
             const trimmedMessage = message.trim()
@@ -195,7 +208,7 @@ export function useSnapshotPanel({
         } finally {
             setSaving(false)
         }
-    }, [load, message, showAlert])
+    }, [blockWhenDirty, load, message, showAlert])
 
     const handleCreateBranch = useCallback(async () => {
         const trimmedName = newBranchName.trim()
@@ -217,6 +230,7 @@ export function useSnapshotPanel({
 
     const handleSwitchBranch = useCallback(async (branchName: string) => {
         if (!branchName || branchName === activeBranch) return
+        if (blockWhenDirty()) return
 
         const confirmed = await showAlert(
             `切换到分支「${branchName}」会把数据库恢复到该分支最新版本，是否继续？`,
@@ -236,9 +250,10 @@ export function useSnapshotPanel({
         } finally {
             setBranchSwitching(false)
         }
-    }, [activeBranch, load, showAlert])
+    }, [activeBranch, blockWhenDirty, load, showAlert])
 
     const handleRollback = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
+        if (blockWhenDirty()) return
         const confirmed = await showAlert(
             `确定回退到「${formatSnapshotMessage(snapshot.message)}」？\n当前状态会先自动保存。`,
             'warning',
@@ -257,9 +272,10 @@ export function useSnapshotPanel({
         } finally {
             setActionId(null)
         }
-    }, [load, showAlert])
+    }, [blockWhenDirty, load, showAlert])
 
     const handleAppend = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
+        if (blockWhenDirty()) return
         const confirmed = await showAlert(
             `确定从「${formatSnapshotMessage(snapshot.message)}」追加恢复缺失记录？`,
             'warning',
@@ -288,7 +304,7 @@ export function useSnapshotPanel({
         } finally {
             setActionId(null)
         }
-    }, [load, showAlert])
+    }, [blockWhenDirty, load, showAlert])
 
     const branchOptions = useMemo(() => (
         branches.map(branch => ({

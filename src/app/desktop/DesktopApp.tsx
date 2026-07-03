@@ -378,6 +378,10 @@ function DesktopAppContent() {
         projectId: projectTabMap[activeKey] ?? toolTabMap[activeKey]?.projectId ?? entryTabMap[activeKey]?.projectId ?? null,
         entryId: entryTabMap[activeKey]?.entryId ?? null,
     }), [activeKey, entryTabMap, projectTabMap, toolTabMap])
+    const dirtyEntryCount = useMemo(
+        () => Object.values(entryDirtyMap).filter(Boolean).length,
+        [entryDirtyMap],
+    )
 
     const aiController = useAiController(aiFocus)
 
@@ -1024,6 +1028,7 @@ function DesktopAppContent() {
         panelMode: aiPanelMode,
         onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
+        dirtyEntryCount,
     })
     const aiChatSlots = useAIChatPanel({
         controller: aiController,
