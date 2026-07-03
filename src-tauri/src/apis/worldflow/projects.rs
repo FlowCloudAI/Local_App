@@ -34,7 +34,8 @@ pub async fn db_get_project(
     let db = state.inner().sqlite_db.lock().await.clone();
     let project = db.get_project(&id).await.map_err(|e| e.to_string())?;
     ensure_project_world(state.inner(), &db, &project).await?;
-    Ok(project)
+    let world_db = open_project_db(state.inner(), &id).await?;
+    world_db.get_project(&id).await.map_err(|e| e.to_string())
 }
 
 /// 查询所有项目列表
@@ -42,10 +43,18 @@ pub async fn db_get_project(
 pub async fn db_list_projects(state: State<'_, Arc<AppState>>) -> Result<Vec<Project>, String> {
     let db = state.inner().sqlite_db.lock().await.clone();
     let projects = db.list_projects().await.map_err(|e| e.to_string())?;
+    let mut world_projects = Vec::with_capacity(projects.len());
     for project in &projects {
         ensure_project_world(state.inner(), &db, project).await?;
+        let world_db = open_project_db(state.inner(), &project.id).await?;
+        world_projects.push(
+            world_db
+                .get_project(&project.id)
+                .await
+                .map_err(|e| e.to_string())?,
+        );
     }
-    Ok(projects)
+    Ok(world_projects)
 }
 
 /// 更新项目信息
@@ -59,23 +68,43 @@ pub async fn db_update_project(
     cover_image: Option<Option<String>>,
 ) -> Result<Project, String> {
     let id = Uuid::parse_str(&id).map_err(|e| e.to_string())?;
+    let description = if description_set.unwrap_or(false) {
+        Some(description)
+    } else {
+        None
+    };
     let db = state.inner().sqlite_db.lock().await.clone();
-    let project = db
+    db.update_project(
+        &id,
+        UpdateProject {
+            name: name.clone(),
+            description: description.clone(),
+            cover_image: cover_image.clone(),
+        },
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let world_db = open_project_db(state.inner(), &id).await?;
+    let project = world_db
         .update_project(
             &id,
             UpdateProject {
                 name,
-                description: if description_set.unwrap_or(false) {
-                    Some(description)
-                } else {
-                    None
-                },
+                description,
                 cover_image,
             },
         )
         .await
         .map_err(|e| e.to_string())?;
-    sync_project_to_world(state.inner(), &db, &project).await?;
+    if let Err(error) = state
+        .inner()
+        .world_store
+        .rename_world(project.id, project.name.clone())
+        .await
+    {
+        log::warn!("更新项目对应世界观名称失败: {}", error);
+    }
     Ok(project)
 }
 
