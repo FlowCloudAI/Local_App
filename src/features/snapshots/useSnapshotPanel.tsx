@@ -84,12 +84,15 @@ function buildGraphRows(nodes: SnapshotGraphNode[]): SnapshotGraphRow[] {
 
     for (const node of nodes) {
         let lane = activeLanes.findIndex(entry => entry === node.id)
+        let isNewLane = false
         if (lane < 0) {
             lane = getFirstEmptyLane(activeLanes)
             activeLanes[lane] = node.id
+            isNewLane = true
         }
 
         const lanePresenceAbove = activeLanes.map(entry => entry !== null)
+        if (isNewLane) lanePresenceAbove[lane] = false
         const nextLanes = [...activeLanes]
         const connections: number[] = []
         const [firstParent, ...otherParents] = node.parents
