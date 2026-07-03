@@ -79,7 +79,7 @@ use tauri_plugin_log;
 use tokio::sync::Mutex;
 #[cfg(not(target_os = "android"))]
 use worldflow_core::SnapshotConfig;
-use worldflow_core::SqliteDb;
+use worldflow_core::{SqliteDb, WorldStore, WorldStoreConfig};
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
@@ -339,10 +339,19 @@ pub fn run() {
             let snapshot_dir = db_path.parent().map(|p| p.join("snapshots"));
 
             tauri::async_runtime::spawn(async move {
+                let world_store = match init_world_store(&resolved_db_path).await {
+                    Ok(store) => store,
+                    Err(e) => {
+                        mark_backend_failed(&app_handle, format!("世界观库初始化失败: {}", e));
+                        return;
+                    }
+                };
+
                 match init_db(&db_path, snapshot_dir.as_deref()).await {
                     Ok(db) => {
                         let app_state = Arc::new(AppState {
                             sqlite_db: Mutex::new(db),
+                            world_store,
                         });
 
                         let app = app_handle.clone();
@@ -638,6 +647,15 @@ async fn init_db(db_path: &Path, snapshot_dir: Option<&Path>) -> Result<SqliteDb
     } else {
         SqliteDb::new(&path_str).await.map_err(Into::into)
     }
+}
+
+async fn init_world_store(root_dir: &Path) -> Result<WorldStore> {
+    std::fs::create_dir_all(root_dir)?;
+    let config =
+        WorldStoreConfig::new(root_dir).with_snapshot_author("FlowCloudAI", "app@flowcloud.ai");
+    WorldStore::open_with_config(config)
+        .await
+        .map_err(Into::into)
 }
 
 fn prepare_db_path(_app: &AppHandle, db_dir: &Path) -> Result<PathBuf> {

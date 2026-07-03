@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use tokio::sync::{Mutex, mpsc, oneshot};
-use worldflow_core::SqliteDb;
+use worldflow_core::{SqliteDb, WorldStore};
 
 // ── 搜索引擎状态 ─────────────────────────────────────────────────────────────
 
@@ -108,6 +108,7 @@ pub struct PathsState {
 /// 数据库连接池状态
 pub struct AppState {
     pub sqlite_db: Mutex<SqliteDb>,
+    pub world_store: WorldStore,
 }
 
 // ── 待确认编辑状态 ───────────────────────────────────────────────────────────
