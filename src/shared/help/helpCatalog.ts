@@ -70,7 +70,7 @@ export const HELP_MODULES: HelpModule[] = [
     {key: 'knowledge', label: '资料管理', description: '词条、分类、关系和时间线。'},
     {key: 'ai', label: 'AI 与插件', description: '对话辅助、模型插件和密钥配置。'},
     {key: 'visualization', label: '地图与可视化', description: '地图、形状和地理复核。'},
-    {key: 'safety', label: '版本与排查', description: '快照、恢复和常见问题。'},
+    {key: 'safety', label: '版本与排查', description: '历史版本、分支路线和常见问题。'},
 ]
 
 export const HELP_TOPICS: HelpTopic[] = [
@@ -103,10 +103,10 @@ export const HELP_TOPICS: HelpTopic[] = [
                 id: 'first-review',
                 title: '完成首次复盘',
                 lead: '第一次复盘的目标是确认能继续写，而不是追求设定完整。',
-                items: ['用关系图检查关键词条是否孤立。', '重要改动前保存快照，避免早期试错覆盖掉可用版本。'],
+                items: ['用关系图检查关键词条是否孤立。', '重要改动前保存版本，避免早期试错覆盖掉可用版本。'],
             },
         ],
-        tips: ['先搭结构再追求细节。', '不要把草稿直接删掉，先归档到便签或保存快照。'],
+        tips: ['先搭结构再追求细节。', '不要把草稿直接删掉，先归档到便签或保存版本。'],
     },
     {
         key: 'workspace',
@@ -126,12 +126,12 @@ export const HELP_TOPICS: HelpTopic[] = [
                 id: 'right-dock',
                 title: '右侧 Dock',
                 lead: 'Dock 适合放临时辅助流程，避免打断主编辑现场。',
-                items: ['灵感便签、AI 对话、版本管理和帮助都在右侧 Dock 中切换。', '拖动左侧手柄可以调整宽度，拖到边缘可折叠。'],
+                items: ['灵感便签、AI 对话、历史版本和帮助都在右侧 Dock 中切换。', '拖动左侧手柄可以调整宽度，拖到边缘可折叠。'],
             },
             {
                 id: 'fullscreen',
                 title: '全屏模式',
-                lead: '需要集中处理 AI 对话、快照或帮助文档时，可以把 Dock 展开成全屏工作区。',
+                lead: '需要集中处理 AI 对话、历史版本或帮助文档时，可以把 Dock 展开成全屏工作区。',
                 items: ['点击顶栏全屏按钮进入全屏模式。', '全屏模式下左侧目录可以独立调整宽度。'],
             },
         ],
@@ -223,7 +223,7 @@ export const HELP_TOPICS: HelpTopic[] = [
                 id: 'shape-editing',
                 title: '形状编辑',
                 lead: '形状适合表达国家、城区、势力范围和特殊区域。',
-                items: ['编辑前先保存当前项目快照。', '复杂边界分阶段处理，避免一次修改过多导致难以回退。'],
+                items: ['编辑前先保存当前项目版本。', '复杂边界分阶段处理，避免一次修改过多导致难以回到旧版本。'],
             },
             {
                 id: 'map-review',
@@ -305,31 +305,31 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'snapshots',
         moduleKey: 'safety',
-        label: '版本管理',
-        summary: '用分支、快照、回退和恢复保护世界观数据。',
+        label: '历史版本',
+        summary: '用保存版本和分支路线保护世界观数据。',
         category: '安全',
         readingTime: '约 3 分钟',
         sections: [
             {
                 id: 'manual-save',
-                title: '手动保存',
-                lead: '快照是可回看的项目版本，适合在阶段性成果后保存。',
-                items: ['保存时写清这次改动的意图。', '大改剧情、导入资料或批量重命名前先保存快照。'],
+                title: '保存版本',
+                lead: '保存版本是可回看的项目状态，适合在阶段性成果后保存。',
+                items: ['保存时写清这次改动的意图。', '大改剧情、导入资料或批量重命名前先保存版本。'],
             },
             {
                 id: 'branches',
-                title: '分支',
-                lead: '分支适合尝试互斥剧情或大规模重写方案。',
+                title: '分支路线',
+                lead: '分支路线适合尝试互斥剧情或大规模重写方案。',
                 items: ['稳定主线保留在默认分支。', '实验分支命名应表达用途，例如“重写王都线”。'],
             },
             {
                 id: 'restore',
-                title: '回退与恢复',
-                lead: '回退会影响当前项目数据，操作前应确认目标版本。',
-                items: ['恢复旧版本前先阅读快照说明。', '不确定时优先追加恢复成新版本，而不是直接覆盖当前进展。'],
+                title: '回到旧版本',
+                lead: '回到旧版本会影响当前路线，操作前应确认目标版本。',
+                items: ['回到旧版本前先阅读版本说明。', '不确定时优先从旧版本创建分支路线，而不是直接覆盖当前进展。'],
             },
         ],
-        tips: ['重要改动前先保存快照。', '快照说明要写意图，不要只写“备份”。'],
+        tips: ['重要改动前先保存版本。', '版本说明要写意图，不要只写“备份”。'],
     },
     {
         key: 'troubleshooting',
@@ -342,8 +342,8 @@ export const HELP_TOPICS: HelpTopic[] = [
             {
                 id: 'data-missing',
                 title: '内容看起来丢失',
-                lead: '先确认自己所在的项目、分支和筛选条件，再判断是否真的丢失。',
-                items: ['检查当前项目和分类筛选。', '打开版本管理查看最近快照和分支记录。'],
+                lead: '先确认自己所在的项目、分支路线和筛选条件，再判断是否真的丢失。',
+                items: ['检查当前项目和分类筛选。', '打开历史版本查看最近保存和分支路线记录。'],
             },
             {
                 id: 'ai-not-working',

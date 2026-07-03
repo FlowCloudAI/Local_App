@@ -1171,7 +1171,7 @@ function DesktopAppContent() {
     const menuItems: SideBarItem[] = [
         {key: 'idea', label: '灵感便签', icon: IdeaIcon},
         {key: 'ai-chat', label: 'AI 对话', icon: AiChatIcon},
-        {key: 'snapshot', label: '版本管理', icon: SnapshotIcon},
+        {key: 'snapshot', label: '历史版本', icon: SnapshotIcon},
         {key: 'help', label: '帮助', icon: HelpIcon},
     ]
     const bottomItems: SideBarItem[] = [

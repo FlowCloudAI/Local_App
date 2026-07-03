@@ -67,7 +67,7 @@ function formatSnapshotTime(timestamp: number): string {
 function formatSnapshotMessage(message: string): string {
     const [type, ...rest] = message.split(' ')
     if (type === 'auto') return '自动保存'
-    if (type === 'manual') return rest.join(' ') || '手动保存'
+    if (type === 'manual') return rest.join(' ') || '保存版本'
     return message
 }
 
@@ -222,7 +222,7 @@ export function useSnapshotPanel({
         } catch (error) {
             if (loadRequestIdRef.current !== requestId) return
             logger.error('加载快照图失败', error)
-            void showAlert('加载版本信息失败', 'error')
+            void showAlert('加载历史版本失败', 'error')
         } finally {
             if (loadRequestIdRef.current === requestId) {
                 setLoading(false)
@@ -242,14 +242,14 @@ export function useSnapshotPanel({
     const hasDirtyEntries = dirtyEntryCount > 0
     const requireProjectContext = useCallback(() => {
         if (projectId) return true
-        void showAlert('请先打开一个项目再操作版本。', 'warning')
+        void showAlert('请先打开一个项目再操作历史版本。', 'warning')
         return false
     }, [projectId, showAlert])
 
     const blockWhenDirty = useCallback(() => {
         if (!hasDirtyEntries) return false
         void showAlert(
-            `有 ${dirtyEntryCount} 个词条存在未保存更改，请先保存或关闭后再操作版本。`,
+            `有 ${dirtyEntryCount} 个词条存在未保存更改，请先保存或关闭后再操作历史版本。`,
             'warning',
         )
         return true
@@ -265,11 +265,11 @@ export function useSnapshotPanel({
                 ? await dbSnapshotWithMessage(trimmedMessage, projectId)
                 : await dbSnapshot(projectId)
             setMessage('')
-            void showAlert(created ? '快照已创建' : '没有新变更，无需快照', created ? 'success' : 'info', 'nonInvasive', 2200)
+            void showAlert(created ? '版本已保存' : '没有新变化，无需保存', created ? 'success' : 'info', 'nonInvasive', 2200)
             if (created) await load()
         } catch (error) {
-            logger.error('创建快照失败', error)
-            void showAlert('创建快照失败', 'error')
+            logger.error('保存版本失败', error)
+            void showAlert('保存版本失败', 'error')
         } finally {
             setSaving(false)
         }
@@ -284,8 +284,8 @@ export function useSnapshotPanel({
 
         const confirmed = await showAlert(
             fromHistory
-                ? `将切换到分支「${branchName}」的最新版本。\n不会停留在当前选中的历史提交。是否继续？`
-                : `切换到分支「${branchName}」会把数据库恢复到该分支最新版本，是否继续？`,
+                ? `将切换到「${branchName}」分支路线的最新版本。\n不会停留在当前选中的历史版本。是否继续？`
+                : `将切换到「${branchName}」分支路线的最新版本。是否继续？`,
             'warning',
             'confirm',
         )
@@ -295,11 +295,11 @@ export function useSnapshotPanel({
         try {
             await dbSwitchBranch(branchName, currentProjectId)
             onVersionApplied?.(currentProjectId)
-            void showAlert(`已切换到分支「${branchName}」`, 'success', 'nonInvasive', 2200)
+            void showAlert(`已切换到「${branchName}」分支路线`, 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            logger.error('切换分支失败', error)
-            void showAlert('切换分支失败', 'error')
+            logger.error('切换分支路线失败', error)
+            void showAlert('切换分支路线失败', 'error')
         } finally {
             setBranchSwitching(false)
         }
@@ -347,11 +347,11 @@ export function useSnapshotPanel({
             onVersionApplied?.(currentProjectId)
             setBranchDialogNode(null)
             setBranchNameDraft('')
-            void showAlert(`已创建并切换到分支「${branchName}」`, 'success', 'nonInvasive', 2200)
+            void showAlert(`已创建并切换到「${branchName}」分支路线`, 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            logger.error('创建分支失败', error)
-            void showAlert(formatApiError(toApiError(error)) || '创建分支失败', 'error')
+            logger.error('创建分支路线失败', error)
+            void showAlert(formatApiError(toApiError(error)) || '创建分支路线失败', 'error')
         } finally {
             setActionId(null)
             setBranchCreating(false)
@@ -364,7 +364,7 @@ export function useSnapshotPanel({
         if (!currentProjectId) return
         if (blockWhenDirty()) return
         const confirmed = await showAlert(
-            `确定回退到「${formatSnapshotMessage(snapshot.message)}」？\n确认后会重新载入当前项目。`,
+            `回到「${formatSnapshotMessage(snapshot.message)}」？\n当前路线会回到这个版本，后面的版本将不再显示。`,
             'warning',
             'confirm',
         )
@@ -374,11 +374,11 @@ export function useSnapshotPanel({
         try {
             await dbRollbackTo(snapshot.id, currentProjectId)
             onVersionApplied?.(currentProjectId)
-            void showAlert('回退成功', 'success', 'nonInvasive', 2200)
+            void showAlert('已回到所选版本', 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
-            logger.error('回退失败', error)
-            void showAlert(formatApiError(toApiError(error)) || '回退失败', 'error')
+            logger.error('回到版本失败', error)
+            void showAlert(formatApiError(toApiError(error)) || '回到版本失败', 'error')
         } finally {
             setActionId(null)
         }
@@ -407,14 +407,14 @@ export function useSnapshotPanel({
 
     const sideTopbar = (
         <DockPanelTopbar className="snapshot-side__topbar" variant="side">
-            <DockPanelTitle className="snapshot-side__topbar-title">版本管理</DockPanelTitle>
+            <DockPanelTitle className="snapshot-side__topbar-title">历史版本</DockPanelTitle>
         </DockPanelTopbar>
     )
 
     const sideSections = (
         <>
             <div className="snapshot-side__section">
-                <div className="snapshot-side__section-title">当前分支</div>
+                <div className="snapshot-side__section-title">当前路线</div>
                 <div className="snapshot-side__branch-row">
                     <Select
                         options={branchOptions}
@@ -428,7 +428,7 @@ export function useSnapshotPanel({
             </div>
 
             <div className="snapshot-side__section">
-                <div className="snapshot-side__section-title">手动保存</div>
+                <div className="snapshot-side__section-title">保存版本</div>
                 <div className="snapshot-side__save-row">
                     <textarea
                         className="snapshot-side__save-textarea"
@@ -458,7 +458,7 @@ export function useSnapshotPanel({
 
     const mainTopbar = (
         <DockPanelTopbar className="snapshot-main__topbar">
-            <DockPanelTitle className="snapshot-main__title">提交历史</DockPanelTitle>
+            <DockPanelTitle className="snapshot-main__title">保存历史</DockPanelTitle>
             <div className="snapshot-main__topbar-actions">
                 <DockPanelIconButton
                     type="button"
@@ -494,19 +494,19 @@ export function useSnapshotPanel({
         <div className="snapshot-main__viewport">
                 {loading && graphRows.length === 0 ? (
                     <div className="snapshot-main__empty">
-                        <p className="snapshot-main__empty-title">正在加载版本历史…</p>
+                        <p className="snapshot-main__empty-title">正在加载保存历史…</p>
                     </div>
                 ) : graphRows.length === 0 ? (
                     <div className="snapshot-main__empty">
                         <p className="snapshot-main__empty-title">
                             {projectId
-                                ? (activeBranch ? `分支「${activeBranch}」暂无历史版本` : '暂无历史版本')
+                                ? (activeBranch ? `「${activeBranch}」分支路线暂无保存历史` : '暂无保存历史')
                                 : '请先打开一个项目'}
                         </p>
                         <p className="snapshot-main__empty-copy">
                             {projectId
-                                ? '创建一次手动保存，或先切换到已有分支查看历史记录。'
-                                : '版本历史按世界观独立保存。'}
+                                ? '先保存一个版本，或切换到已有分支路线查看保存历史。'
+                                : '保存历史按世界观独立保存。'}
                         </p>
                     </div>
                 ) : (
@@ -611,7 +611,7 @@ export function useSnapshotPanel({
                                                         disabled={actionId === row.node.id}
                                                         onClick={() => void handleRollback(row.node)}
                                                 >
-                                                    回退
+                                                    回到
                                                 </Button>
                                             )}
                                             {showSwitch && switchBranchName && (
@@ -650,7 +650,7 @@ export function useSnapshotPanel({
             open={!!branchDialogNode}
             onClose={closeBranchDialog}
             dismissible={!branchCreating}
-            title="从此版本创建分支"
+            title="从此版本创建分支路线"
             className="snapshot-branch-dialog"
         >
             <form
@@ -661,7 +661,7 @@ export function useSnapshotPanel({
                 }}
             >
                 <p className="snapshot-branch-dialog__copy">
-                    新分支会从「{branchDialogNode ? formatSnapshotMessage(branchDialogNode.message) : '当前版本'}」开始，并立即切换过去。
+                    新分支路线会从「{branchDialogNode ? formatSnapshotMessage(branchDialogNode.message) : '当前版本'}」开始继续编辑，原路线不会被修改。
                 </p>
                 <Input
                     autoFocus
