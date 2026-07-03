@@ -511,6 +511,7 @@ pub fn run() {
             ai_close_session,
             ai_close_all_sessions,
             ai_checkout,
+            ai_get_conversation_tree,
             ai_switch_plugin,
             ai_update_session,
             ai_text_to_image,

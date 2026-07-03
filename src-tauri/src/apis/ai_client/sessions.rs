@@ -317,6 +317,29 @@ pub async fn ai_checkout(
     handle.checkout(node_id).await.map_err(ApiError::internal)
 }
 
+/// 返回运行时会话的完整分支树，用于前端分支导航。
+#[tauri::command]
+pub async fn ai_get_conversation_tree(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+) -> Result<Vec<ConversationNode>, ApiError> {
+    let handle = {
+        let sessions = ai_state.sessions.lock().await;
+        sessions
+            .get(&session_id)
+            .map(|entry| entry.handle.clone())
+            .ok_or_else(|| {
+                ApiError::new(
+                    ErrorCode::LlmSessionNotFound,
+                    format!("Session '{}' 不存在", session_id),
+                )
+                .with_kv("session_id", session_id.clone())
+            })?
+    };
+
+    Ok(handle.get_all_nodes().await)
+}
+
 /// 切换会话使用的插件（下一轮对话生效）
 #[tauri::command]
 pub async fn ai_switch_plugin(

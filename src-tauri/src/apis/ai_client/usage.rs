@@ -56,12 +56,14 @@ pub async fn ai_get_usage_daily(
 
     Ok(rows
         .into_iter()
-        .map(|(date, prompt_tokens, completion_tokens, total_tokens, call_count)| ApiUsageDaily {
-            date,
-            prompt_tokens,
-            completion_tokens,
-            total_tokens,
-            call_count,
-        })
+        .map(
+            |(date, prompt_tokens, completion_tokens, total_tokens, call_count)| ApiUsageDaily {
+                date,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+                call_count,
+            },
+        )
         .collect())
 }
