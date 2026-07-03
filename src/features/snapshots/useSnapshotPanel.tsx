@@ -25,6 +25,7 @@ interface UseSnapshotPanelOptions {
     panelMode?: 'floating' | 'fullscreen'
     onTogglePanelMode?: () => void
     onToggleCollapsed?: () => void
+    onVersionApplied?: (projectId: string) => void
     dirtyEntryCount?: number
 }
 
@@ -148,6 +149,7 @@ export function useSnapshotPanel({
                                      panelMode,
                                      onTogglePanelMode,
                                      onToggleCollapsed,
+                                     onVersionApplied,
                                      dirtyEntryCount = 0,
                                  }: UseSnapshotPanelOptions = {}): SnapshotPanelSlots {
     const {showAlert} = useAlert()
@@ -254,6 +256,8 @@ export function useSnapshotPanel({
 
     const handleSwitchBranch = useCallback(async (branchName: string) => {
         if (!requireProjectContext()) return
+        const currentProjectId = projectId
+        if (!currentProjectId) return
         if (!branchName || branchName === activeBranch) return
         if (blockWhenDirty()) return
 
@@ -266,7 +270,8 @@ export function useSnapshotPanel({
 
         setBranchSwitching(true)
         try {
-            await dbSwitchBranch(branchName, projectId)
+            await dbSwitchBranch(branchName, currentProjectId)
+            onVersionApplied?.(currentProjectId)
             void showAlert(`已切换到分支「${branchName}」`, 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
@@ -275,10 +280,12 @@ export function useSnapshotPanel({
         } finally {
             setBranchSwitching(false)
         }
-    }, [activeBranch, blockWhenDirty, load, projectId, requireProjectContext, showAlert])
+    }, [activeBranch, blockWhenDirty, load, onVersionApplied, projectId, requireProjectContext, showAlert])
 
     const handleRollback = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
         if (!requireProjectContext()) return
+        const currentProjectId = projectId
+        if (!currentProjectId) return
         if (blockWhenDirty()) return
         const confirmed = await showAlert(
             `确定回退到「${formatSnapshotMessage(snapshot.message)}」？\n当前状态会先自动保存。`,
@@ -289,7 +296,8 @@ export function useSnapshotPanel({
 
         setActionId(snapshot.id)
         try {
-            await dbRollbackTo(snapshot.id, projectId)
+            await dbRollbackTo(snapshot.id, currentProjectId)
+            onVersionApplied?.(currentProjectId)
             void showAlert('回退成功', 'success', 'nonInvasive', 2200)
             await load()
         } catch (error) {
@@ -298,10 +306,12 @@ export function useSnapshotPanel({
         } finally {
             setActionId(null)
         }
-    }, [blockWhenDirty, load, projectId, requireProjectContext, showAlert])
+    }, [blockWhenDirty, load, onVersionApplied, projectId, requireProjectContext, showAlert])
 
     const handleAppend = useCallback(async (snapshot: Pick<SnapshotGraphNode, 'id' | 'message'>) => {
         if (!requireProjectContext()) return
+        const currentProjectId = projectId
+        if (!currentProjectId) return
         if (blockWhenDirty()) return
         const confirmed = await showAlert(
             `确定从「${formatSnapshotMessage(snapshot.message)}」追加恢复缺失记录？`,
@@ -312,7 +322,8 @@ export function useSnapshotPanel({
 
         setActionId(snapshot.id)
         try {
-            const result: AppendResult = await dbAppendFrom(snapshot.id, projectId)
+            const result: AppendResult = await dbAppendFrom(snapshot.id, currentProjectId)
+            onVersionApplied?.(currentProjectId)
             const parts = [
                 result.projects && `项目 ${result.projects}`,
                 result.categories && `分类 ${result.categories}`,
@@ -331,7 +342,7 @@ export function useSnapshotPanel({
         } finally {
             setActionId(null)
         }
-    }, [blockWhenDirty, load, projectId, requireProjectContext, showAlert])
+    }, [blockWhenDirty, load, onVersionApplied, projectId, requireProjectContext, showAlert])
 
     const branchOptions = useMemo(() => (
         branches.map(branch => ({

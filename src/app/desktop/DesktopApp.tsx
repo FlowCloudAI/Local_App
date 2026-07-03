@@ -401,6 +401,7 @@ function DesktopAppContent() {
     const [aiPanelMode, setAiPanelMode] = useState<'floating' | 'fullscreen'>('floating')
     const [fullscreenSideWidth, setFullscreenSideWidth] = useState(FULLSCREEN_SIDE_DEFAULT_WIDTH)
     const [fullscreenSideCollapsed, setFullscreenSideCollapsed] = useState(false)
+    const [projectReloadTokens, setProjectReloadTokens] = useState<Record<string, number>>({})
     useEffect(() => {
         if (aiPanelCollapsed) return
         setMountedSidePanelKeys(prev => (
@@ -636,6 +637,13 @@ function DesktopAppContent() {
     const handleEntryDirtyChange = useCallback((projectId: string, entryId: string, dirty: boolean) => {
         const tabKey = `entry-${projectId}-${entryId}`
         dispatchTabState({type: 'set-entry-dirty', tabKey, dirty})
+    }, [])
+
+    const handleProjectVersionApplied = useCallback((projectId: string) => {
+        setProjectReloadTokens(current => ({
+            ...current,
+            [projectId]: (current[projectId] ?? 0) + 1,
+        }))
     }, [])
 
     const handleBackToProject = useCallback((projectId: string) => {
@@ -1029,6 +1037,7 @@ function DesktopAppContent() {
         panelMode: aiPanelMode,
         onTogglePanelMode: togglePanelMode,
         onToggleCollapsed: collapseAiPanel,
+        onVersionApplied: handleProjectVersionApplied,
         dirtyEntryCount,
     })
     const aiChatSlots = useAIChatPanel({
@@ -1338,6 +1347,7 @@ function DesktopAppContent() {
                                         className={`home-page-layer ${activeHomeProjectId === projectId ? 'active' : ''}`}
                                     >
                                         <ProjectEditor
+                                            key={`${projectId}:${projectReloadTokens[projectId] ?? 0}`}
                                             projectId={projectId}
                                             activeToolPanel={toolTabMap[activeKey]?.projectId === projectId ? toolTabMap[activeKey].panel : null}
                                             onOpenProjectPanel={handleOpenProjectTool}
