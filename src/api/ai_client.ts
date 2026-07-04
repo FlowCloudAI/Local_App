@@ -416,6 +416,7 @@ export interface StoredMessage {
   content: string | null
   reasoning: string | null
   timestamp: string
+  work_seconds?: number | null
   tool_call_id?: string | null
   tool_calls?: {
     id?: string | null

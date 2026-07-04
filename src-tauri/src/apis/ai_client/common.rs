@@ -142,6 +142,8 @@ pub struct StoredMessage {
     pub reasoning: Option<String>,
     pub timestamp: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub work_seconds: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
@@ -496,9 +498,33 @@ pub(super) fn stored_conversation_to_runtime_seeds(
 }
 
 fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<StoredMessage> {
+    let mut turn_start_times: HashMap<u64, chrono::DateTime<chrono::FixedOffset>> = HashMap::new();
+    for node in &nodes {
+        if let Ok(timestamp) = chrono::DateTime::parse_from_rfc3339(&node.timestamp) {
+            turn_start_times
+                .entry(node.turn_id)
+                .and_modify(|start| {
+                    if timestamp < *start {
+                        *start = timestamp;
+                    }
+                })
+                .or_insert(timestamp);
+        }
+    }
+
     nodes
         .into_iter()
         .map(|node| {
+            let work_seconds = if node.message.role == "assistant" {
+                let end_time = chrono::DateTime::parse_from_rfc3339(&node.timestamp).ok();
+                end_time
+                    .zip(turn_start_times.get(&node.turn_id).copied())
+                    .map(|(end, start)| {
+                        end.signed_duration_since(start).num_seconds().max(0) as u64
+                    })
+            } else {
+                None
+            };
             let message = node.message;
             StoredMessage {
                 message_id: Some(format!("msg_{}", node.id)),
@@ -509,6 +535,7 @@ fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<St
                 content: message.content,
                 reasoning: message.reasoning_content,
                 timestamp: node.timestamp,
+                work_seconds,
                 tool_call_id: message.tool_call_id,
                 tool_calls: message.tool_calls,
                 attachments: Vec::new(),

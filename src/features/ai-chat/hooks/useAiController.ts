@@ -1,6 +1,7 @@
 import {logger} from '../../../shared/logger'
 import {type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {listen} from '../../../api/events'
+import type {MessageBoxBlock} from 'flowcloudai-ui'
 import {
     ai_build_character_project_snapshot,
     ai_compact_conversation,
@@ -428,16 +429,59 @@ const collectDocumentAttachmentItemIdsUntilMessage = (
     return collectDocumentAttachmentItemIds(collected)
 }
 
+const parseStoredTimestamp = (timestamp: string): number | null => {
+    const value = Date.parse(timestamp)
+    return Number.isFinite(value) ? value : null
+}
+
+const attachWorkSecondsToFirstBlock = (
+    blocks: MessageBoxBlock[],
+    seconds: number | undefined,
+): MessageBoxBlock[] => {
+    if (seconds === undefined || blocks.length === 0) return blocks
+    const normalizedSeconds = Math.max(0, Math.floor(seconds))
+    return blocks.map((block, index) => (
+        index === 0 ? {...block, seconds: normalizedSeconds} : block
+    ))
+}
+
 const storedToMessages = (messages: StoredMessage[]): Message[] => {
     const result: Message[] = []
     let pendingAssistant: Message | null = null
+    let pendingAssistantWorkSeconds: number | undefined
+    const turnStartTimes = new Map<number, number>()
+
+    messages.forEach((message) => {
+        if (message.turn_id == null) return
+        const timestamp = parseStoredTimestamp(message.timestamp)
+        if (timestamp == null) return
+        const current = turnStartTimes.get(message.turn_id)
+        if (current === undefined || timestamp < current) {
+            turnStartTimes.set(message.turn_id, timestamp)
+        }
+    })
+
+    const getStoredMessageWorkSeconds = (message: StoredMessage) => {
+        if (typeof message.work_seconds === 'number' && Number.isFinite(message.work_seconds)) {
+            return Math.max(0, Math.floor(message.work_seconds))
+        }
+        if (message.role !== 'assistant' || message.turn_id == null) return undefined
+        const start = turnStartTimes.get(message.turn_id)
+        const end = parseStoredTimestamp(message.timestamp)
+        if (start === undefined || end == null) return undefined
+        return Math.max(0, Math.round((end - start) / 1000))
+    }
 
     const flushPendingAssistant = () => {
         if (!pendingAssistant) return
         if (pendingAssistant.blocks && pendingAssistant.blocks.length > 0) {
-            result.push(pendingAssistant)
+            result.push({
+                ...pendingAssistant,
+                blocks: attachWorkSecondsToFirstBlock(pendingAssistant.blocks, pendingAssistantWorkSeconds),
+            })
         }
         pendingAssistant = null
+        pendingAssistantWorkSeconds = undefined
     }
 
     const ensureAssistant = (message: StoredMessage, index: number) => {
@@ -487,6 +531,10 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
         if (message.role === 'assistant') {
             const assistant = ensureAssistant(message, index)
             const nextBlocks = [...(assistant.blocks ?? [])]
+            const workSeconds = getStoredMessageWorkSeconds(message)
+            if (workSeconds !== undefined) {
+                pendingAssistantWorkSeconds = Math.max(pendingAssistantWorkSeconds ?? 0, workSeconds)
+            }
 
             if (message.reasoning) {
                 nextBlocks.push({type: 'reasoning', content: message.reasoning})

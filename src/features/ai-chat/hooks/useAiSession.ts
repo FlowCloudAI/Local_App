@@ -72,8 +72,24 @@ interface UseAiSessionOptions {
     onError: (msg: string) => void
 }
 
-const finalizePendingTools = (blocks: MessageBoxBlock[], result: string, isError = false): MessageBoxBlock[] => (
-    blocks.map(block => {
+const attachWorkSecondsToFirstBlock = (
+    blocks: MessageBoxBlock[],
+    seconds: number | undefined,
+): MessageBoxBlock[] => {
+    if (seconds === undefined || blocks.length === 0) return blocks
+    const normalizedSeconds = Math.max(0, Math.floor(seconds))
+    return blocks.map((block, index) => (
+        index === 0 ? {...block, seconds: normalizedSeconds} : block
+    ))
+}
+
+const finalizePendingTools = (
+    blocks: MessageBoxBlock[],
+    result: string,
+    isError = false,
+    workSeconds?: number,
+): MessageBoxBlock[] => {
+    const finalized = blocks.map(block => {
         if (block.type === 'reasoning' || block.type === 'content') {
             return {...block, streaming: false}
         }
@@ -93,7 +109,8 @@ const finalizePendingTools = (blocks: MessageBoxBlock[], result: string, isError
         }
         return block
     })
-)
+    return attachWorkSecondsToFirstBlock(finalized, workSeconds)
+}
 
 export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSessionOptions) {
     const [sessionId, setSessionId] = useState<string | null>(null)
@@ -116,6 +133,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
     const eventSeenAfterSendByRunRef = useRef<Record<string, boolean>>({})
     const lastEventNameByRunRef = useRef<Record<string, string>>({})
     const traceIdByRunRef = useRef<Record<string, string>>({})
+    const turnStartedAtByRunRef = useRef<Record<string, number>>({})
     const sessionIdRef = useRef<string | null>(null)
     const runIdRef = useRef<string | null>(null)
     // 标记每个 run 的下一个 TurnBegin 是用户发起的（非工具续轮）
@@ -174,6 +192,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         delete eventSeenAfterSendByRunRef.current[targetRunId]
         delete lastEventNameByRunRef.current[targetRunId]
         delete traceIdByRunRef.current[targetRunId]
+        delete turnStartedAtByRunRef.current[targetRunId]
         setRunStreaming(targetRunId, false)
         if (runIdRef.current === targetRunId) {
             sessionIdRef.current = null
@@ -226,6 +245,12 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         }, 15000)
     }, [])
 
+    const getRunWorkSeconds = useCallback((targetRunId: string): number | undefined => {
+        const startedAt = turnStartedAtByRunRef.current[targetRunId]
+        if (startedAt === undefined) return undefined
+        return Math.max(0, Math.round((Date.now() - startedAt) / 1000))
+    }, [])
+
     useEffect(() => {
         queueMicrotask(() => {
             syncActiveRunView(runId)
@@ -245,6 +270,9 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         // 只记录用户发起轮次的起始节点（工具续轮不更新）
         const unlistenTurnBegin = listen<AiEventTurnBegin>('ai:turn_begin', event => {
             markRunEvent('ai:turn_begin', event.payload.run_id)
+            if (turnStartedAtByRunRef.current[event.payload.run_id] === undefined) {
+                turnStartedAtByRunRef.current[event.payload.run_id] = Date.now()
+            }
             scheduleTurnBeginWatchdog(event.payload)
             logger.log('[useAiSession][turn_begin]', {
                 sessionId: event.payload.session_id,
@@ -529,7 +557,8 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 processingNodeIdByRunRef.current[rid] = null
 
                 const prev = blocksByRunRef.current[rid] ?? []
-                const finalBlocks = finalizePendingTools(prev, '会话已结束，未返回工具结果。')
+                const workSeconds = getRunWorkSeconds(rid)
+                const finalBlocks = finalizePendingTools(prev, '会话已结束，未返回工具结果。', false, workSeconds)
                 blocksByRunRef.current[rid] = finalBlocks
                 const contentText = finalBlocks
                     .filter(b => b.type === 'content')
@@ -575,6 +604,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     messageQueueRef.current = []
                     queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
+                    delete turnStartedAtByRunRef.current[rid]
                     setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
@@ -586,6 +616,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 onErrorRef.current(`对话失败: ${status.slice(6)}`)
                 queueMicrotask(() => {
                     delete blocksByRunRef.current[rid]
+                    delete turnStartedAtByRunRef.current[rid]
                     setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
@@ -596,7 +627,8 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 const prev = blocksByRunRef.current[rid] ?? []
                 if (prev.length > 0) {
                     // 保留已生成的部分内容，标记为非流式并提交给上层
-                    const finalBlocks = finalizePendingTools(prev, '会话已中断，未返回工具结果。', true)
+                    const workSeconds = getRunWorkSeconds(rid)
+                    const finalBlocks = finalizePendingTools(prev, '会话已中断，未返回工具结果。', true, workSeconds)
                     blocksByRunRef.current[rid] = finalBlocks
                     const contentText = finalBlocks
                         .filter(b => b.type === 'content')
@@ -623,6 +655,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     messageQueueRef.current = []
                     queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
+                    delete turnStartedAtByRunRef.current[rid]
                     setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
@@ -644,6 +677,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             onErrorRef.current(`AI 错误: ${formatApiError(err)}`)
             queueMicrotask(() => {
                 delete blocksByRunRef.current[event.payload.run_id]
+                delete turnStartedAtByRunRef.current[event.payload.run_id]
                 setRunStreaming(event.payload.run_id, false)
                 if (runIdRef.current === event.payload.run_id) {
                     setBlocks([])
@@ -668,7 +702,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             unlistenError.then(fn => fn())
             unlistenBranchChanged.then(fn => fn())
         }
-    }, [markRunEvent, scheduleTurnBeginWatchdog, setRunStreaming]) // 回调通过 ref 访问
+    }, [getRunWorkSeconds, markRunEvent, scheduleTurnBeginWatchdog, setRunStreaming]) // 回调通过 ref 访问
 
     // 分支树刷新
     const refreshTree = useCallback(async () => {
@@ -838,6 +872,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 logger.error('[useAiSession][发送链路] 后端发送命令失败', logPayload)
             }
             delete expectUserTurnByRunRef.current[rid]
+            delete turnStartedAtByRunRef.current[rid]
             setRunStreaming(rid, false)
             if (missingBackendSession) {
                 throw e
