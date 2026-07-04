@@ -72,6 +72,29 @@ interface UseAiSessionOptions {
     onError: (msg: string) => void
 }
 
+const finalizePendingTools = (blocks: MessageBoxBlock[], result: string, isError = false): MessageBoxBlock[] => (
+    blocks.map(block => {
+        if (block.type === 'reasoning' || block.type === 'content') {
+            return {...block, streaming: false}
+        }
+        if (block.type === 'tool' && block.tool.result == null) {
+            return {
+                ...block,
+                tool: {...block.tool, result, isError},
+            }
+        }
+        if (block.type === 'tool_use') {
+            return {
+                ...block,
+                tools: block.tools.map(tool => (
+                    tool.result == null ? {...tool, result, isError} : tool
+                )),
+            }
+        }
+        return block
+    })
+)
+
 export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSessionOptions) {
     const [sessionId, setSessionId] = useState<string | null>(null)
     const [runId, setRunId] = useState<string | null>(null)
@@ -506,12 +529,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 processingNodeIdByRunRef.current[rid] = null
 
                 const prev = blocksByRunRef.current[rid] ?? []
-                const finalBlocks = prev.map(b => {
-                    if (b.type === 'reasoning' || b.type === 'content') {
-                        return {...b, streaming: false}
-                    }
-                    return b
-                })
+                const finalBlocks = finalizePendingTools(prev, '会话已结束，未返回工具结果。')
                 blocksByRunRef.current[rid] = finalBlocks
                 const contentText = finalBlocks
                     .filter(b => b.type === 'content')
@@ -578,12 +596,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 const prev = blocksByRunRef.current[rid] ?? []
                 if (prev.length > 0) {
                     // 保留已生成的部分内容，标记为非流式并提交给上层
-                    const finalBlocks = prev.map(b => {
-                        if (b.type === 'reasoning' || b.type === 'content') {
-                            return {...b, streaming: false}
-                        }
-                        return b
-                    })
+                    const finalBlocks = finalizePendingTools(prev, '会话已中断，未返回工具结果。', true)
                     blocksByRunRef.current[rid] = finalBlocks
                     const contentText = finalBlocks
                         .filter(b => b.type === 'content')
