@@ -78,15 +78,15 @@
     font-family: var(--fc-font-family), sans-serif;
     font-size: var(--fc-font-size-reading, 0.9rem);
     line-height: 1.5;
-    outline: none;
     transition: border-color 0.15s, box-shadow 0.15s;
     box-sizing: border-box;
 }
 
-.entry-type-creator-input:focus,
-.entry-type-creator-textarea:focus {
+.entry-type-creator-input:focus {
     border-color: var(--fc-color-primary);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
+    outline-offset: 0;
+    box-shadow: none;
 }
 
 .entry-type-creator-input:disabled,
