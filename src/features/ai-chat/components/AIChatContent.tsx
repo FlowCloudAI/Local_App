@@ -254,13 +254,38 @@ function buildRenderableAiChatMarkdown(content: string): string {
         })
 }
 
-function buildRenderableAiChatBlocks(blocks?: MessageBoxBlock[]): MessageBoxBlock[] | undefined {
+function buildRenderableAiChatBlocks(
+    blocks?: MessageBoxBlock[],
+    finalizePendingTools = false,
+): MessageBoxBlock[] | undefined {
     if (!blocks) return undefined
-    return blocks.map((block) => (
-        block.type === 'content'
-            ? {...block, content: buildRenderableAiChatMarkdown(block.content)}
-            : block
-    ))
+    return blocks.map((block) => {
+        if (block.type === 'content') {
+            return {
+                ...block,
+                content: buildRenderableAiChatMarkdown(block.content),
+                streaming: finalizePendingTools ? false : block.streaming,
+            }
+        }
+        if (block.type === 'reasoning') {
+            return finalizePendingTools ? {...block, streaming: false} : block
+        }
+        if (finalizePendingTools && block.type === 'tool' && block.tool.result == null) {
+            return {
+                ...block,
+                tool: {...block.tool, result: '会话已结束，未返回工具结果。'},
+            }
+        }
+        if (finalizePendingTools && block.type === 'tool_use') {
+            return {
+                ...block,
+                tools: block.tools.map(tool => (
+                    tool.result == null ? {...tool, result: '会话已结束，未返回工具结果。'} : tool
+                )),
+            }
+        }
+        return block
+    })
 }
 
 const attachmentFileTypeLabel = (attachment: Attachment) => {
@@ -1620,7 +1645,7 @@ export default function AIChatContent({
                                     <MessageBox
                                         role={message.role}
                                         blocks={message.role === 'assistant'
-                                            ? buildRenderableAiChatBlocks(message.blocks)
+                                            ? buildRenderableAiChatBlocks(message.blocks, true)
                                             : message.blocks}
                                         contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                         content={message.role === 'assistant'
