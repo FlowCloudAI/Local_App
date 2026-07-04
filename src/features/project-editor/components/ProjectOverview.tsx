@@ -136,7 +136,7 @@ function ProjectOverview({
             />
 
             {children && (
-                <div className="pe-overview-entries" data-tour-id="project-overview-entries">
+                <div className="pe-overview-entries">
                     {childrenWithScrollElement}
                 </div>
             )}

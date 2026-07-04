@@ -1365,6 +1365,10 @@
     user-select: none;
 }
 
+.pe-category-navigation {
+    flex-shrink: 0;
+}
+
 .pe-category-toolbar {
     display: flex;
     align-items: center;

@@ -591,61 +591,63 @@ function CategoryView({
 
     return (
         <div className="pe-category-view">
-            <div className="pe-category-toolbar">
-                <div className="pe-category-title">{categoryId ? categoryName : (categoryName || '全部词条')}</div>
-                <div className="pe-category-toolbar-right">
-                    <Input
-                        className="pe-search-input"
-                        placeholder="搜索词条…"
-                        value={searchText}
-                        onValueChange={handleSearchChange}
-                    />
-                    <div className="pe-category-toolbar-actions">
-                        <Button type="button" size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
-                            + 新建词条
-                        </Button>
-                    </div>
-                    <div className="pe-sort-tabs">
-                        {SORT_OPTIONS.map((opt) => (
+            <div className="pe-category-navigation" data-tour-id={categoryId ? undefined : 'project-overview-entries'}>
+                <div className="pe-category-toolbar">
+                    <div className="pe-category-title">{categoryId ? categoryName : (categoryName || '全部词条')}</div>
+                    <div className="pe-category-toolbar-right">
+                        <Input
+                            className="pe-search-input"
+                            placeholder="搜索词条…"
+                            value={searchText}
+                            onValueChange={handleSearchChange}
+                        />
+                        <div className="pe-category-toolbar-actions">
+                            <Button type="button" size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
+                                + 新建词条
+                            </Button>
+                        </div>
+                        <div className="pe-sort-tabs">
+                            {SORT_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt.key}
+                                    className={`pe-sort-tab${sortMode === opt.key ? ' active' : ''}`}
+                                    onClick={() => setSortMode(opt.key)}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
                             <button
-                                key={opt.key}
-                                className={`pe-sort-tab${sortMode === opt.key ? ' active' : ''}`}
-                                onClick={() => setSortMode(opt.key)}
+                                className={`pe-sort-tab${sortMode === 'name-asc' || sortMode === 'name-desc' ? ' active' : ''}`}
+                                onClick={() => setSortMode(current => current === 'name-asc' ? 'name-desc' : 'name-asc')}
                             >
-                                {opt.label}
+                                {sortMode === 'name-desc' ? '标题 Z-A' : '标题 A-Z'}
                             </button>
-                        ))}
-                        <button
-                            className={`pe-sort-tab${sortMode === 'name-asc' || sortMode === 'name-desc' ? ' active' : ''}`}
-                            onClick={() => setSortMode(current => current === 'name-asc' ? 'name-desc' : 'name-asc')}
-                        >
-                            {sortMode === 'name-desc' ? '标题 Z-A' : '标题 A-Z'}
-                        </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="pe-type-filter">
-                <button
-                    className={`pe-type-chip${typeFilter === null ? ' active' : ''}`}
-                    onClick={() => setTypeFilter(null)}
-                >
-                    全部
-                </button>
-                {entryTypes.map((et) => {
-                    const key = entryTypeKey(et)
-                    return (
-                        <button
-                            key={key}
-                            className={`pe-type-chip${typeFilter === key ? ' active' : ''}`}
-                            style={{'--chip-color': et.color} as CSSProperties}
-                            onClick={() => setTypeFilter(typeFilter === key ? null : key)}
-                        >
-                            <EntryTypeIcon entryType={et} className="pe-type-chip-icon"/>
-                            {et.name}
-                        </button>
-                    )
-                })}
+                <div className="pe-type-filter">
+                    <button
+                        className={`pe-type-chip${typeFilter === null ? ' active' : ''}`}
+                        onClick={() => setTypeFilter(null)}
+                    >
+                        全部
+                    </button>
+                    {entryTypes.map((et) => {
+                        const key = entryTypeKey(et)
+                        return (
+                            <button
+                                key={key}
+                                className={`pe-type-chip${typeFilter === key ? ' active' : ''}`}
+                                style={{'--chip-color': et.color} as CSSProperties}
+                                onClick={() => setTypeFilter(typeFilter === key ? null : key)}
+                            >
+                                <EntryTypeIcon entryType={et} className="pe-type-chip-icon"/>
+                                {et.name}
+                            </button>
+                        )
+                    })}
+                </div>
             </div>
 
             <div className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}>
