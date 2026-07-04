@@ -873,7 +873,7 @@ function ProjectEditorInner({
 
     const showProjectOverviewForTour = useCallback(async () => {
         expandTree()
-        setSelection({kind: 'project'})
+        setSelection(prev => prev.kind === 'project' ? prev : {kind: 'project'})
         void onBackToProject?.(projectId)
         await new Promise<void>(resolve => {
             window.requestAnimationFrame(() => resolve())

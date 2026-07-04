@@ -57,7 +57,8 @@ interface PopoverLayout {
 }
 
 const DEFAULT_TARGET_WAIT_MS = 5000
-const TARGET_MESSAGE_DEBOUNCE_MS = 1000
+const TARGET_MESSAGE_DEBOUNCE_MS = 500
+const TOUR_GLIDE_RESET_MS = 320
 const TARGET_PADDING = 8
 const POPOVER_GAP = 26
 const VIEWPORT_MARGIN = 16
@@ -81,6 +82,8 @@ export function TourProvider({children}: TourProviderProps) {
     const targetElementRef = useRef<Element | null>(null)
     const isPreparingStepRef = useRef(false)
     const navigationDirectionRef = useRef<TourNavigationDirection>('start')
+    const glideTimerRef = useRef<number | null>(null)
+    const [isGliding, setIsGliding] = useState(false)
 
     const currentStep = activeTour?.definition.steps[activeTour.currentIndex] ?? null
 
@@ -224,6 +227,26 @@ export function TourProvider({children}: TourProviderProps) {
         safeStorageRemove(storageKey)
     }, [])
 
+    const clearGlideTimer = useCallback(() => {
+        if (glideTimerRef.current === null) return
+        window.clearTimeout(glideTimerRef.current)
+        glideTimerRef.current = null
+    }, [])
+
+    const startGlide = useCallback(() => {
+        clearGlideTimer()
+        setIsGliding(true)
+    }, [clearGlideTimer])
+
+    const finishGlide = useCallback(() => {
+        clearGlideTimer()
+        setIsGliding(true)
+        glideTimerRef.current = window.setTimeout(() => {
+            glideTimerRef.current = null
+            setIsGliding(false)
+        }, TOUR_GLIDE_RESET_MS)
+    }, [clearGlideTimer])
+
     const syncTargetRect = useCallback((markMissing: boolean) => {
         const element = targetElementRef.current
         if (!element || !document.documentElement.contains(element)) {
@@ -246,6 +269,8 @@ export function TourProvider({children}: TourProviderProps) {
         if (!activeTour || !currentStep) {
             targetElementRef.current = null
             isPreparingStepRef.current = false
+            clearGlideTimer()
+            setIsGliding(false)
             setTargetRect(null)
             setTargetStatus('none')
             return undefined
@@ -255,12 +280,12 @@ export function TourProvider({children}: TourProviderProps) {
         let removeTargetClickListener: (() => void) | null = null
 
         const refreshTargetRect = () => {
-            if (!disposed) {
-                syncTargetRect(Boolean(currentStep.target && targetElementRef.current && !isPreparingStepRef.current))
-            }
+            if (disposed || isPreparingStepRef.current) return
+            syncTargetRect(Boolean(currentStep.target && targetElementRef.current))
         }
 
         const prepareStep = async () => {
+            startGlide()
             targetElementRef.current = null
             isPreparingStepRef.current = Boolean(currentStep.target)
             if (!currentStep.target) setTargetRect(null)
@@ -282,6 +307,7 @@ export function TourProvider({children}: TourProviderProps) {
             if (disposed) return
             if (!currentStep.target) {
                 isPreparingStepRef.current = false
+                finishGlide()
                 return
             }
 
@@ -297,6 +323,7 @@ export function TourProvider({children}: TourProviderProps) {
                 isPreparingStepRef.current = false
                 setTargetRect(null)
                 setTargetStatus('missing')
+                finishGlide()
                 return
             }
 
@@ -317,11 +344,13 @@ export function TourProvider({children}: TourProviderProps) {
                 isPreparingStepRef.current = false
                 setTargetRect(null)
                 setTargetStatus('missing')
+                finishGlide()
                 return
             }
 
             isPreparingStepRef.current = false
             syncTargetRect(true)
+            finishGlide()
 
             if (currentStep.advanceOnTargetClick) {
                 const handleTargetClick = () => {
@@ -348,12 +377,13 @@ export function TourProvider({children}: TourProviderProps) {
         return () => {
             disposed = true
             isPreparingStepRef.current = false
+            clearGlideTimer()
             removeTargetClickListener?.()
             window.removeEventListener('resize', refreshTargetRect)
             window.removeEventListener('scroll', refreshTargetRect, true)
             mutationObserver.disconnect()
         }
-    }, [activeTour, currentStep, nextStep, syncTargetRect])
+    }, [activeTour, clearGlideTimer, currentStep, finishGlide, nextStep, startGlide, syncTargetRect])
 
     useEffect(() => {
         if (!activeTour) return undefined
@@ -422,6 +452,7 @@ export function TourProvider({children}: TourProviderProps) {
                     <TourOverlay
                         activeTour={activeTour}
                         currentStep={currentStep}
+                        isGliding={isGliding}
                         targetRect={targetRect}
                         targetStatus={targetStatus}
                         onPrevious={previousStep}
@@ -438,6 +469,7 @@ export function TourProvider({children}: TourProviderProps) {
 interface TourOverlayProps {
     activeTour: ActiveTour
     currentStep: TourStep
+    isGliding: boolean
     targetRect: TourTargetRect | null
     targetStatus: TourTargetStatus
     onPrevious: () => void
@@ -448,6 +480,7 @@ interface TourOverlayProps {
 function TourOverlay({
     activeTour,
     currentStep,
+    isGliding,
     targetRect,
     targetStatus,
     onPrevious,
@@ -496,7 +529,7 @@ function TourOverlay({
     }, [currentStep.id, targetMessage, targetRect, targetStatus])
 
     return (
-        <div className="fc-tour-layer" aria-live="polite">
+        <div className="fc-tour-layer" data-glide={isGliding ? 'true' : undefined} aria-live="polite">
             {getScrimStyles(targetRect).map((style, index) => (
                 <div
                     key={index}
@@ -538,7 +571,7 @@ function TourOverlay({
                 <div className="fc-tour-progress">
                     <span>{currentIndex + 1} / {totalSteps}</span>
                 </div>
-                <div className="fc-tour-body">
+                <div key={currentStep.id} className="fc-tour-body">
                     <h2 id="fc-tour-title" className="fc-tour-title">{currentStep.title}</h2>
                     <div id="fc-tour-content" className="fc-tour-content">{currentStep.content}</div>
                     {targetMessage && (
