@@ -285,7 +285,8 @@ export function TourProvider({children}: TourProviderProps) {
         }
 
         const prepareStep = async () => {
-            startGlide()
+            const shouldGlide = navigationDirectionRef.current !== 'start'
+            if (shouldGlide) startGlide()
             targetElementRef.current = null
             isPreparingStepRef.current = Boolean(currentStep.target)
             if (!currentStep.target) setTargetRect(null)
@@ -307,7 +308,7 @@ export function TourProvider({children}: TourProviderProps) {
             if (disposed) return
             if (!currentStep.target) {
                 isPreparingStepRef.current = false
-                finishGlide()
+                if (shouldGlide) finishGlide()
                 return
             }
 
@@ -323,7 +324,7 @@ export function TourProvider({children}: TourProviderProps) {
                 isPreparingStepRef.current = false
                 setTargetRect(null)
                 setTargetStatus('missing')
-                finishGlide()
+                if (shouldGlide) finishGlide()
                 return
             }
 
@@ -344,13 +345,13 @@ export function TourProvider({children}: TourProviderProps) {
                 isPreparingStepRef.current = false
                 setTargetRect(null)
                 setTargetStatus('missing')
-                finishGlide()
+                if (shouldGlide) finishGlide()
                 return
             }
 
             isPreparingStepRef.current = false
             syncTargetRect(true)
-            finishGlide()
+            if (shouldGlide) finishGlide()
 
             if (currentStep.advanceOnTargetClick) {
                 const handleTargetClick = () => {
