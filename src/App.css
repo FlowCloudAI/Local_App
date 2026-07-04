@@ -358,6 +358,7 @@ body {
 [data-backdrop="acrylic"] .top-bar,
 [data-backdrop="acrylic"] .main-content,
 [data-backdrop="acrylic"] .workspace-content,
+[data-backdrop="acrylic"] .dockable-side-panel--fullscreen,
 [data-backdrop="acrylic"] .pe-layout,
 [data-backdrop="acrylic"] .pe-tree-panel {
     background: transparent;
