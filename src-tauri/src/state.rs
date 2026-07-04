@@ -34,9 +34,29 @@ pub struct NetworkState {
 impl NetworkState {
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: build_http_client(),
         }
     }
+}
+
+#[cfg(target_os = "android")]
+fn build_http_client() -> reqwest::Client {
+    let root_store = rustls::RootCertStore::from_iter(
+        webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
+    );
+    let tls_config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+
+    reqwest::Client::builder()
+        .tls_backend_preconfigured(tls_config)
+        .build()
+        .expect("初始化 Android HTTP 客户端失败")
+}
+
+#[cfg(not(target_os = "android"))]
+fn build_http_client() -> reqwest::Client {
+    reqwest::Client::new()
 }
 
 // ── 启动就绪状态 ───────────────────────────────────────────────────────────────
