@@ -8,6 +8,7 @@
     --dock-panel-owned-border: 1px solid var(--fc-color-border);
     --dsp-width: 0px;
     --dockable-side-panel-fullscreen-side-width: 320px;
+    --dockable-side-panel-fullscreen-bg: var(--fc-color-bg-secondary);
 }
 
 .dockable-side-panel {
@@ -23,7 +24,7 @@
     flex: 1;
     height: 100%;
     padding: 0;
-    background: var(--fc-color-bg-secondary);
+    background: var(--dockable-side-panel-fullscreen-bg);
 }
 
 .dockable-side-panel--fullscreen.is-fullscreen-animating {

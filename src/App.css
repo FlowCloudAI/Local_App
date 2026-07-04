@@ -344,6 +344,7 @@ body {
 [data-backdrop="acrylic"] {
     /* 外层画布磨砂底色：占比越高越实、越低越透出桌面，可按需调整 */
     --app-shell-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 85%, transparent);
+    --app-shell-solid-bg: color-mix(in srgb, var(--fc-color-bg-secondary) 85%, var(--fc-color-bg));
 }
 
 [data-backdrop="acrylic"] body {
@@ -361,6 +362,23 @@ body {
 [data-backdrop="acrylic"] .pe-layout,
 [data-backdrop="acrylic"] .pe-tree-panel {
     background: transparent;
+}
+
+[data-backdrop="acrylic"] .dockable-side-panel--fullscreen {
+    --dockable-side-panel-fullscreen-bg: var(--app-shell-solid-bg);
+}
+
+[data-backdrop="acrylic"] .dockable-side-panel--fullscreen :where(
+    .dock-panel-side,
+    .idea-page,
+    .idea-page__sidebar,
+    .ai-chat-layout,
+    .ai-side-portal-host,
+    .snapshot-panel,
+    .snapshot-side,
+    .help-side
+) {
+    --dock-panel-sidebar-bg: var(--app-shell-solid-bg);
 }
 
 /* 组件库外层 chrome：右侧图标栏与浮动标签栏底色透明，露出磨砂层。
