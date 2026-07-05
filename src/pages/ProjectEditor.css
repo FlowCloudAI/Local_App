@@ -1506,6 +1506,7 @@
 .pe-entries-region {
     position: relative;
     min-height: 24rem;
+    padding-top: 1rem;
 }
 
 .pe-entries-region.is-scrollable {

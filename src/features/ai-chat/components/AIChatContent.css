@@ -1000,7 +1000,9 @@
     height: 32px;
     border-radius: 50%;
     border: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     color: var(--fc-color-text-secondary);
     cursor: pointer;
     display: flex;
@@ -1063,8 +1065,9 @@
 /* ========== 悬浮输入框 ========== */
 .ai-floating-input-wrapper {
     --ai-conversation-settings-input-overlap: 1.1rem;
+    --ai-floating-input-bottom-gap: 24px;
     position: absolute;
-    bottom: 24px;
+    bottom: var(--ai-floating-input-bottom-gap);
     left: 50%;
     transform: translateX(-50%);
     width: min(var(--ai-chat-content-max-width), calc(100% - 40px));
@@ -1075,24 +1078,26 @@
 .ai-floating-input-wrapper::before {
     content: '';
     position: absolute;
-    top: 50%;
-    bottom: -24px;
-    left: 50%;
-    width: 100vw;
-    transform: translateX(-50%);
+    top: 0;
+    bottom: calc(-1 * var(--ai-floating-input-bottom-gap));
+    left: 0;
+    right: 0;
     pointer-events: none;
     background: linear-gradient(
         180deg,
-        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 0%, transparent) 0%,
-        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 100%, transparent) calc(100% - 24px),
-        var(--ai-chat-bottom-mask-bg) 100%
+        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 10%, transparent) 0%,
+        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 90%, transparent) calc((100% - var(--ai-floating-input-bottom-gap)) / 2),
+        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 100%, transparent) calc(100% - var(--ai-floating-input-bottom-gap)),
+        color-mix(in srgb, var(--ai-chat-bottom-mask-bg) 100%, transparent) 100%
     );
     z-index: 110;
 }
 
 .ai-floating-input-inner {
     position: relative;
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     border-radius: var(--fc-radius-xl);
     padding: var(--fc-space-md) var(--fc-space-lg);
     display: flex;
@@ -1115,10 +1120,13 @@
     padding: var(--fc-space-md) var(--fc-space-lg) calc(var(--fc-space-md) + var(--ai-conversation-settings-input-overlap));
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--fc-radius-lg) var(--fc-radius-lg) 0 0;
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     box-shadow: 0 -0.35rem 1.2rem color-mix(in srgb, var(--fc-color-bg) 24%, transparent);
     transform-origin: center bottom;
-    will-change: transform;
+    opacity: 0;
+    will-change: transform, opacity;
     z-index: 90;
 }
 
@@ -1133,20 +1141,32 @@
 
 @keyframes ai-conversation-settings-drawer-open {
     from {
+        opacity: 0;
         transform: translateY(calc(100% - var(--ai-conversation-settings-input-overlap)));
     }
 
+    50% {
+        opacity: 1;
+    }
+
     to {
+        opacity: 1;
         transform: translateY(0);
     }
 }
 
 @keyframes ai-conversation-settings-drawer-close {
     from {
+        opacity: 1;
         transform: translateY(0);
     }
 
+    50% {
+        opacity: 0;
+    }
+
     to {
+        opacity: 0;
         transform: translateY(calc(100% - var(--ai-conversation-settings-input-overlap)));
     }
 }
@@ -1229,9 +1249,12 @@
 }
 
 .ai-main.is-character .ai-floating-input-inner,
+.ai-main.is-character .ai-scroll-to-bottom-btn,
+.ai-main.is-character .ai-conversation-settings-panel,
 .ai-main.is-character .ai-topbar {
     background: color-mix(in srgb, var(--fc-color-bg) 82%, rgba(14, 16, 26, 0.72));
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .ai-floating-textarea {
