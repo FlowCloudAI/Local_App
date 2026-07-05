@@ -2017,6 +2017,14 @@ where
     let path_text = map_path.to_string_lossy();
     on_file(path_text.as_ref());
 
+    if !package.history_files.is_empty() {
+        let snapshots_dir = world_snapshots_dir(paths, &package.new_project_id)?;
+        if snapshots_dir.exists() {
+            std::fs::remove_dir_all(&snapshots_dir)
+                .map_err(|e| format!("清理导入前历史目录失败 {:?}: {e}", snapshots_dir))?;
+        }
+    }
+
     for history_file in &package.history_files {
         let target_path =
             history_file_target_path(paths, &package.new_project_id, &history_file.path)?;
@@ -2385,6 +2393,7 @@ async fn import_fcworld_package_to_world_store(
     match write_result {
         Ok(Ok(())) => {}
         Ok(Err(error)) | Err(error) => {
+            drop(world_db);
             return Err(
                 cleanup_world_import_after_error(state, None, &prepared, paths, error).await,
             );
@@ -2425,6 +2434,7 @@ async fn import_fcworld_package_to_world_store(
         Ok(result) => result,
         Err(error) => {
             let reason = format!("写入导入数据库失败: {error}");
+            drop(world_db);
             return Err(
                 cleanup_world_import_after_error(state, None, &prepared, paths, reason).await,
             );
@@ -2435,6 +2445,7 @@ async fn import_fcworld_package_to_world_store(
     if actual_rows != expected_rows {
         let reason =
             format!("fcworld 导入行数不匹配: expected={expected_rows:?} actual={actual_rows:?}");
+        drop(world_db);
         return Err(cleanup_world_import_after_error(state, None, &prepared, paths, reason).await);
     }
 
@@ -2469,10 +2480,16 @@ async fn import_fcworld_package_to_world_store(
         }
     }
 
-    let project = world_db
-        .get_project(&prepared.new_project_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let project = match world_db.get_project(&prepared.new_project_id).await {
+        Ok(project) => project,
+        Err(error) => {
+            let reason = format!("读取导入项目失败: {error}");
+            drop(world_db);
+            return Err(
+                cleanup_world_import_after_error(state, None, &prepared, paths, reason).await,
+            );
+        }
+    };
     if let Err(error) = index_db
         .create_project_with_id(
             project.id,
@@ -2485,6 +2502,7 @@ async fn import_fcworld_package_to_world_store(
         .await
     {
         let reason = format!("写入主库项目索引失败: {error}");
+        drop(world_db);
         return Err(cleanup_world_import_after_error(state, None, &prepared, paths, reason).await);
     }
 
@@ -2492,6 +2510,7 @@ async fn import_fcworld_package_to_world_store(
         progress.add_total(1, "cleanup", "清理覆盖目标世界观");
         if let Err(error) = index_db.delete_project(&target.project_id).await {
             let reason = format!("删除覆盖目标世界观索引失败: {error}");
+            drop(world_db);
             return Err(cleanup_world_import_after_error(
                 state,
                 Some(index_db),
@@ -2503,6 +2522,7 @@ async fn import_fcworld_package_to_world_store(
         }
         if let Err(error) = state.world_store.delete_world(target.project_id).await {
             let reason = format!("删除覆盖目标世界库失败: {error}");
+            drop(world_db);
             return Err(cleanup_world_import_after_error(
                 state,
                 Some(index_db),
@@ -3057,6 +3077,59 @@ mod tests {
             world_snapshots_dir(&paths, &prepared.new_project_id).expect("应能解析导入历史目录");
         assert!(imported_snapshots.join(".git").join("config").exists());
         assert!(imported_snapshots.join("projects.csv").exists());
+    }
+
+    #[test]
+    fn write_import_history_replaces_initialized_snapshot_dir() {
+        let temp = tempfile::tempdir().expect("创建临时目录失败");
+        let paths = PathsState {
+            db_path: temp.path().join("db").join("catalog.db"),
+            plugins_path: temp.path().join("plugins"),
+        };
+        let project_id = Uuid::new_v4();
+        let active_branch = world_snapshots_dir(&paths, &project_id)
+            .expect("应能解析历史目录")
+            .join(".worldflow-active-branch");
+        if let Some(parent) = active_branch.parent() {
+            std::fs::create_dir_all(parent).expect("创建历史目录失败");
+        }
+        std::fs::write(&active_branch, "main").expect("写入已有分支标记失败");
+        let stale_file = active_branch
+            .parent()
+            .expect("应有历史目录")
+            .join("stale.txt");
+        std::fs::write(&stale_file, "old").expect("写入旧历史文件失败");
+
+        let package = import::PreparedFcworldImport {
+            package_id: "package".to_string(),
+            source_project_id: Uuid::new_v4().to_string(),
+            new_project_id: project_id,
+            project_name: "导入世界".to_string(),
+            csv_items: Vec::new(),
+            assets: Vec::new(),
+            maps_json: json!({
+                "projectId": project_id.to_string(),
+                "maps": []
+            })
+            .to_string(),
+            history_files: vec![PackageHistoryFile {
+                path: format!("{HISTORY_SNAPSHOTS_DIR}.worldflow-active-branch"),
+                bytes: b"main\n".to_vec(),
+            }],
+            asset_count: 0,
+            map_count: 0,
+            input_file_size: 0,
+            warnings: Vec::new(),
+            id_maps: import::ImportIdMaps::default(),
+        };
+
+        write_prepared_import_files_with_progress(&package, &paths, |_| {})
+            .expect("历史分支标记应可覆盖写入");
+        assert_eq!(
+            std::fs::read_to_string(active_branch).expect("读取分支标记失败"),
+            "main\n"
+        );
+        assert!(!stale_file.exists());
     }
 
     #[tokio::test]
