@@ -1078,22 +1078,7 @@ where
             fields[content_index] = rewrite_fcimg_refs(&content, &image_ref_map)?;
         }
 
-        let cover_path = fields
-            .get(cover_index)
-            .map(|value| decode_csv_opt_string(value))
-            .transpose()?
-            .flatten();
-        if let Some(path) = cover_path.filter(|value| !value.trim().is_empty()) {
-            let asset = collector.add_file_asset(
-                Path::new(&path),
-                "entry_cover",
-                "entry",
-                &entry_id,
-                "cover_path",
-            )?;
-            fields[cover_index] = encode_csv_opt_string(Some(&asset.path))?;
-            on_asset(&asset.path);
-        }
+        fields[cover_index] = encode_csv_opt_string(None)?;
 
         rows.push(fields);
     }
@@ -1394,25 +1379,12 @@ fn count_entry_asset_candidates(item: &CsvExportItem) -> Result<usize, String> {
         .clone();
     let id_index = header_index(&headers, "id")?;
     let images_index = header_index(&headers, "images")?;
-    let cover_index = header_index(&headers, "cover_path")?;
     let mut count = 0usize;
     for record in reader.records() {
         let record = record.map_err(|e| format!("读取 entries.csv 记录失败: {}", e))?;
         let entry_id = record.get(id_index).unwrap_or_default();
         count +=
             count_entry_images_candidates(record.get(images_index).unwrap_or_default(), entry_id)?;
-        let cover_path = record
-            .get(cover_index)
-            .map(decode_csv_opt_string)
-            .transpose()?
-            .flatten();
-        if cover_path
-            .as_deref()
-            .map(|value| !value.trim().is_empty())
-            .unwrap_or(false)
-        {
-            count += 1;
-        }
     }
     Ok(count)
 }
@@ -2234,35 +2206,6 @@ async fn import_fcworld_package_to_db(
     }
 
     let mut warnings = prepared.warnings.clone();
-    progress.add_total(
-        expected_rows.entries,
-        "thumbnails",
-        "生成导入词条主图缩略图",
-    );
-    match super::images::ensure_project_cover_thumbnails_with_progress(
-        db,
-        paths,
-        &prepared.new_project_id,
-        |current, total| {
-            if total > 0 {
-                progress.step("thumbnails", format!("生成主图缩略图：{current}/{total}"));
-            }
-        },
-    )
-    .await
-    {
-        Ok(summary) => {
-            if summary.failed > 0 {
-                warnings.push(format!(
-                    "{} 个词条主图缩略图生成失败，已保留原图路径",
-                    summary.failed
-                ));
-            }
-        }
-        Err(error) => {
-            warnings.push(format!("导入成功，但生成主图缩略图失败：{error}"));
-        }
-    }
 
     if let Some(target) = decision.overwrite_target {
         progress.add_total(1, "cleanup", "清理覆盖目标世界观");
@@ -2450,35 +2393,6 @@ async fn import_fcworld_package_to_world_store(
     }
 
     let mut warnings = prepared.warnings.clone();
-    progress.add_total(
-        expected_rows.entries,
-        "thumbnails",
-        "生成导入词条主图缩略图",
-    );
-    match super::images::ensure_project_cover_thumbnails_with_progress(
-        &world_db,
-        paths,
-        &prepared.new_project_id,
-        |current, total| {
-            if total > 0 {
-                progress.step("thumbnails", format!("生成主图缩略图：{current}/{total}"));
-            }
-        },
-    )
-    .await
-    {
-        Ok(summary) => {
-            if summary.failed > 0 {
-                warnings.push(format!(
-                    "{} 个词条主图缩略图生成失败，已保留原图路径",
-                    summary.failed
-                ));
-            }
-        }
-        Err(error) => {
-            warnings.push(format!("导入成功，但生成主图缩略图失败：{error}"));
-        }
-    }
 
     let project = match world_db.get_project(&prepared.new_project_id).await {
         Ok(project) => project,
@@ -2901,7 +2815,7 @@ mod tests {
         assert_eq!(manifest["format"], FCWORLD_FORMAT);
         assert_eq!(manifest["contents"]["worldflow"]["schemaVersion"], 5);
         assert_eq!(manifest["contents"]["counts"]["entries"], 1);
-        assert_eq!(manifest["contents"]["counts"]["images"], 4);
+        assert_eq!(manifest["contents"]["counts"]["images"], 3);
         assert_eq!(manifest["contents"]["maps"]["count"], 1);
         assert!(manifest["world"]["coverAssetId"].as_str().is_some());
 
@@ -2909,7 +2823,7 @@ mod tests {
             serde_json::from_str(&read_zip_text(&mut zip, "assets/index.json"))
                 .expect("解析资源索引失败");
         let assets = assets_index["assets"].as_array().expect("资源索引应为数组");
-        assert_eq!(assets.len(), 4);
+        assert_eq!(assets.len(), 3);
         for asset in assets {
             assert!(
                 asset["path"]
@@ -2976,8 +2890,8 @@ mod tests {
             validated.csv_items.len(),
             WorldflowCsvTable::ordered().len()
         );
-        assert_eq!(validated.assets_index.assets.len(), 4);
-        assert_eq!(validated.asset_bytes_by_path.len(), 4);
+        assert_eq!(validated.assets_index.assets.len(), 3);
+        assert_eq!(validated.asset_bytes_by_path.len(), 3);
         assert_eq!(validated.manifest.package_id, package.package_id);
         assert_eq!(
             validated.input_file_size,
@@ -3427,10 +3341,7 @@ mod tests {
                 .starts_with(&import_image_dir)
         );
         assert!(imported_entry.images.0[0].path.exists());
-        let imported_cover = imported_entry.cover_path.expect("词条封面应导入");
-        assert!(Path::new(&imported_cover).starts_with(&import_image_dir));
-        assert!(Path::new(&imported_cover).starts_with(import_image_dir.join("thumbs")));
-        assert!(Path::new(&imported_cover).exists());
+        assert!(imported_entry.cover_path.is_none());
 
         let imported_maps_path =
             map_store_path(&paths, &new_project_id).expect("应能解析导入地图路径");

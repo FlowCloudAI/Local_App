@@ -1,5 +1,4 @@
 import {logger} from '../../../shared/logger'
-import {convertFileSrc} from '../../../api/assets'
 import {
     type CSSProperties,
     memo,
@@ -13,6 +12,7 @@ import {
 } from 'react'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
 import {db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
+import EntryCoverImage from '../../entries/components/EntryCoverImage'
 import EntryTypeIcon from './EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
@@ -76,12 +76,6 @@ function placeholderMark(title: string): string {
     return trimmed ? trimmed[0] : '词'
 }
 
-function toEntryCoverSrc(cover?: string | null): string | undefined {
-    if (!cover) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(cover)) return cover
-    return convertFileSrc(String(cover), 'fcimg')
-}
-
 function sortEntries(entries: EntryBrief[], mode: SortMode): EntryBrief[] {
     return [...entries].sort((a, b) => {
         switch (mode) {
@@ -99,16 +93,16 @@ function sortEntries(entries: EntryBrief[], mode: SortMode): EntryBrief[] {
 }
 
 interface EntryCardItemProps {
+    projectId: string
     entry: EntryBrief
     entryTypes: EntryTypeView[]
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
-function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
+function EntryCardItem({projectId, entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
     const entryType = entry.type
         ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
         : null
-    const coverSrc = toEntryCoverSrc(entry.cover)
     const imageDebugProps = PROJECT_HOME_PERF_LOG_ENABLED
         ? {
             onLoad: (event: SyntheticEvent<HTMLImageElement>) => {
@@ -132,38 +126,44 @@ function EntryCardItem({entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
             },
         }
         : undefined
+    const coverFallback = (
+        <div
+            className="pe-entry-placeholder"
+            style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
+        >
+            <div className="pe-entry-placeholder__icon">
+                {entryType ? (
+                    <EntryTypeIcon entryType={entryType}
+                                   className="pe-entry-placeholder__type-icon"/>
+                ) : (
+                    <span className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
+                )}
+            </div>
+            <div className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
+                {placeholderMark(entry.title)}
+            </div>
+        </div>
+    )
 
     return (
         <Card
             className="pe-entry-card"
             imageSlot={(
-                coverSrc ? (
-                    <img
-                        src={coverSrc}
+                entry.cover ? (
+                    <EntryCoverImage
+                        projectId={projectId}
+                        entryId={entry.id}
+                        cover={entry.cover}
                         alt={entry.title}
                         className="pe-entry-cover"
                         loading="lazy"
                         decoding="async"
                         fetchPriority="low"
+                        fallback={coverFallback}
                         {...imageDebugProps}
                     />
                 ) : (
-                    <div
-                        className="pe-entry-placeholder"
-                        style={{'--entry-accent-color': entryType?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
-                    >
-                        <div className="pe-entry-placeholder__icon">
-                            {entryType ? (
-                                <EntryTypeIcon entryType={entryType}
-                                               className="pe-entry-placeholder__type-icon"/>
-                            ) : (
-                                <span className="pe-entry-placeholder__mark">{placeholderMark(entry.title)}</span>
-                            )}
-                        </div>
-                        <div className="pe-entry-placeholder__mark pe-entry-placeholder__mark--ghost">
-                            {placeholderMark(entry.title)}
-                        </div>
-                    </div>
+                    coverFallback
                 )
             )}
             title={entry.title}
@@ -207,6 +207,7 @@ function CreateEntryCard({
 }
 
 interface VirtualEntryGridProps {
+    projectId: string
     entries: EntryBrief[]
     entryTypes: EntryTypeView[]
     categoryId: string | null
@@ -222,6 +223,7 @@ interface VirtualGridViewport {
 }
 
 function VirtualEntryGrid({
+                              projectId,
                               entries,
                               entryTypes,
                               categoryId,
@@ -376,6 +378,7 @@ function VirtualEntryGrid({
                         />
                     ) : (
                         <EntryCardItem
+                            projectId={projectId}
                             entry={entry}
                             entryTypes={entryTypes}
                             onOpenEntry={onOpenEntry}
@@ -577,6 +580,7 @@ function CategoryView({
             {displayed.map((entry) => (
                 <EntryCardItem
                     key={entry.id}
+                    projectId={projectId}
                     entry={entry}
                     entryTypes={entryTypes}
                     onOpenEntry={onOpenEntry}
@@ -654,6 +658,7 @@ function CategoryView({
                 {hasVisibleEntries ? (
                     noScroll ? (
                         <VirtualEntryGrid
+                            projectId={projectId}
                             entries={displayed}
                             entryTypes={entryTypes}
                             categoryId={categoryId}

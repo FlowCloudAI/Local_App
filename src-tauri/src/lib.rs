@@ -352,6 +352,7 @@ pub fn run() {
                         let app_state = Arc::new(AppState {
                             sqlite_db: Mutex::new(db),
                             world_store,
+                            thumbnail_jobs: Mutex::new(std::collections::HashMap::new()),
                         });
 
                         let app = app_handle.clone();
@@ -458,6 +459,7 @@ pub fn run() {
             db_create_entries_bulk,
             db_optimize_fts,
             import_entry_images,
+            db_ensure_entry_cover_thumbnail,
             db_ensure_project_cover_thumbnails,
             open_entry_image_path,
             // 标签模式

@@ -1,5 +1,5 @@
 use super::common::*;
-use super::images::{copy_entry_images, prepare_entry_cover_path};
+use super::images::{copy_entry_images, use_derived_cover_thumbnails};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -355,8 +355,6 @@ pub async fn db_create_entry(
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
     let images = copy_entry_images(paths.inner(), &project_id, images)?;
-    let cover_path =
-        prepare_entry_cover_path(paths.inner(), &project_id, images.as_deref()).flatten();
     let db = open_project_db(state.inner(), &project_id).await?;
     let entry = db
         .create_entry(CreateEntry {
@@ -368,7 +366,7 @@ pub async fn db_create_entry(
             r#type,
             tags,
             images,
-            cover_path,
+            cover_path: None,
         })
         .await
         .map_err(|e| e.to_string())?;
@@ -397,6 +395,7 @@ pub async fn db_get_entry(
 #[tauri::command]
 pub async fn db_list_entries(
     state: State<'_, Arc<AppState>>,
+    paths: State<'_, PathsState>,
     project_id: String,
     category_id: Option<String>,
     entry_type: Option<String>,
@@ -427,7 +426,11 @@ pub async fn db_list_entries(
             limit,
             offset,
         )
-        .await;
+        .await
+        .map(|mut entries| {
+            use_derived_cover_thumbnails(paths.inner(), &project_id, &mut entries);
+            entries
+        });
 
     match &result {
         Ok(entries) => {
@@ -825,6 +828,7 @@ pub async fn db_get_project_stats(
 #[tauri::command]
 pub async fn db_search_entries(
     state: State<'_, Arc<AppState>>,
+    paths: State<'_, PathsState>,
     project_id: String,
     query: String,
     category_id: Option<String>,
@@ -855,7 +859,11 @@ pub async fn db_search_entries(
             },
             limit,
         )
-        .await;
+        .await
+        .map(|mut entries| {
+            use_derived_cover_thumbnails(paths.inner(), &project_id, &mut entries);
+            entries
+        });
 
     match &result {
         Ok(entries) => {
@@ -932,8 +940,7 @@ pub async fn db_update_entry(
     let db = open_entry_db(state.inner(), &id, project_id.as_ref()).await?;
     let current_entry = db.get_entry(&id).await.map_err(|e| e.to_string())?;
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, images)?;
-    let cover_path =
-        prepare_entry_cover_path(paths.inner(), &current_entry.project_id, images.as_deref());
+    let cover_path = images.as_ref().map(|_| None);
     let category_id = category_id
         .map(|cid| Uuid::parse_str(&cid).map_err(|e| e.to_string()))
         .transpose()?;
@@ -1005,8 +1012,7 @@ pub async fn db_save_entry_bundle(
         .collect::<Result<Vec<_>, String>>()?;
 
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, input.images)?;
-    let cover_path =
-        prepare_entry_cover_path(paths.inner(), &current_entry.project_id, images.as_deref());
+    let cover_path = images.as_ref().map(|_| None);
     let result = db
         .save_entry_bundle(SaveEntryBundle {
             project_id,

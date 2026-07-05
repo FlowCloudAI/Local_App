@@ -63,6 +63,24 @@ fn cover_thumbnail_hash(source_path: &Path) -> u64 {
     hasher.finish()
 }
 
+pub(super) fn entry_cover_thumbnail_path(
+    paths: &PathsState,
+    project_id: &Uuid,
+    source_path: &Path,
+) -> Result<PathBuf, String> {
+    if source_path.as_os_str().is_empty() {
+        return Err("主图路径为空，无法生成缩略图".to_string());
+    }
+    if !source_path.exists() {
+        return Err(format!("主图文件不存在: {:?}", source_path));
+    }
+
+    Ok(build_entry_thumbnails_dir(paths, project_id)?.join(format!(
+        "cover_{:016x}.jpg",
+        cover_thumbnail_hash(source_path)
+    )))
+}
+
 fn is_valid_cover_thumbnail(path: &Path) -> bool {
     let is_jpeg = path
         .extension()
@@ -80,21 +98,13 @@ pub(super) fn create_entry_cover_thumbnail(
     project_id: &Uuid,
     source_path: &Path,
 ) -> Result<PathBuf, String> {
-    if source_path.as_os_str().is_empty() {
-        return Err("主图路径为空，无法生成缩略图".to_string());
-    }
-    if !source_path.exists() {
-        return Err(format!("主图文件不存在: {:?}", source_path));
-    }
-
-    let thumbs_dir = build_entry_thumbnails_dir(paths, project_id)?;
+    let thumb_path = entry_cover_thumbnail_path(paths, project_id, source_path)?;
+    let thumbs_dir = thumb_path
+        .parent()
+        .ok_or_else(|| format!("无法解析缩略图目录: {:?}", thumb_path))?;
     std::fs::create_dir_all(&thumbs_dir)
         .map_err(|e| format!("创建缩略图目录失败 {:?}: {}", thumbs_dir, e))?;
 
-    let thumb_path = thumbs_dir.join(format!(
-        "cover_{:016x}.jpg",
-        cover_thumbnail_hash(source_path)
-    ));
     if thumb_path.exists() {
         return Ok(thumb_path);
     }
@@ -126,26 +136,42 @@ pub(super) fn create_entry_cover_thumbnail(
     Ok(thumb_path)
 }
 
-pub(super) fn prepare_entry_cover_path(
+pub(super) fn use_derived_cover_thumbnails(
     paths: &PathsState,
     project_id: &Uuid,
-    images: Option<&[FCImage]>,
-) -> Option<Option<String>> {
-    let images = images?;
-    let Some(cover_image) = images.iter().find(|image| image.is_cover) else {
-        return Some(None);
-    };
-    let original_path = cover_image.path.to_string_lossy().to_string();
-    match create_entry_cover_thumbnail(paths, project_id, &cover_image.path) {
-        Ok(path) => Some(Some(path.to_string_lossy().to_string())),
-        Err(error) => {
-            log::warn!(
-                "[cover_thumbnail] 生成词条主图缩略图失败，将回退到原图: path={:?} error={}",
-                cover_image.path,
-                error
-            );
-            Some(Some(original_path))
+    entries: &mut [EntryBrief],
+) {
+    for entry in entries {
+        let Some(source_path) = entry.cover.as_ref() else {
+            continue;
+        };
+        entry.cover = match entry_cover_thumbnail_path(paths, project_id, source_path) {
+            Ok(path) => Some(path),
+            Err(error) => {
+                log::debug!(
+                    "[cover_thumbnail] 跳过派生缩略图路径: entry_id={} path={:?} error={}",
+                    entry.id,
+                    source_path,
+                    error
+                );
+                None
+            }
         }
+    }
+}
+
+async fn clear_thumbnail_job(
+    state: &AppState,
+    thumb_path: &Path,
+    job_lock: &Arc<tokio::sync::Mutex<()>>,
+) {
+    let mut jobs = state.thumbnail_jobs.lock().await;
+    if jobs
+        .get(thumb_path)
+        .map(|current| Arc::ptr_eq(current, job_lock))
+        .unwrap_or(false)
+    {
+        jobs.remove(thumb_path);
     }
 }
 
@@ -481,4 +507,73 @@ pub async fn db_ensure_project_cover_thumbnails(
     let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
     let db = open_project_db(state.inner(), &project_id).await?;
     ensure_project_cover_thumbnails_with_progress(&db, paths.inner(), &project_id, |_, _| {}).await
+}
+
+#[tauri::command]
+pub async fn db_ensure_entry_cover_thumbnail(
+    state: State<'_, Arc<AppState>>,
+    paths: State<'_, PathsState>,
+    project_id: String,
+    entry_id: String,
+) -> Result<Option<String>, String> {
+    let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+    let entry_id = Uuid::parse_str(&entry_id).map_err(|e| e.to_string())?;
+    let db = open_project_db(state.inner(), &project_id).await?;
+    let entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
+    if entry.project_id != project_id {
+        return Err("词条不属于当前项目".to_string());
+    }
+
+    let Some(cover_image) = entry.images.0.iter().find(|image| image.is_cover) else {
+        return Ok(None);
+    };
+    let source_path = cover_image.path.clone();
+    let thumb_path = match entry_cover_thumbnail_path(paths.inner(), &project_id, &source_path) {
+        Ok(path) => path,
+        Err(error) => {
+            log::warn!(
+                "[cover_thumbnail] 无法派生词条主图缩略图路径: entry_id={} path={:?} error={}",
+                entry_id,
+                source_path,
+                error
+            );
+            return Ok(None);
+        }
+    };
+    if thumb_path.exists() {
+        return Ok(Some(thumb_path.to_string_lossy().to_string()));
+    }
+
+    let job_lock = {
+        let mut jobs = state.thumbnail_jobs.lock().await;
+        jobs.entry(thumb_path.clone())
+            .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+            .clone()
+    };
+    let guard = job_lock.lock().await;
+    if thumb_path.exists() {
+        drop(guard);
+        return Ok(Some(thumb_path.to_string_lossy().to_string()));
+    }
+
+    let paths_state = paths.inner().clone();
+    let project_id_for_task = project_id;
+    let source_path_for_task = source_path.clone();
+    let result = match tauri::async_runtime::spawn_blocking(move || {
+        create_entry_cover_thumbnail(&paths_state, &project_id_for_task, &source_path_for_task)
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            drop(guard);
+            clear_thumbnail_job(state.inner(), &thumb_path, &job_lock).await;
+            return Err(format!("生成缩略图任务失败: {error}"));
+        }
+    };
+
+    drop(guard);
+    clear_thumbnail_job(state.inner(), &thumb_path, &job_lock).await;
+
+    result.map(|path| Some(path.to_string_lossy().to_string()))
 }

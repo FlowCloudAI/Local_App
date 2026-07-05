@@ -117,6 +117,7 @@ impl BackendReadyState {
 // ── 路径状态 ──────────────────────────────────────────────────────────────────
 
 /// 解析后的数据目录路径（db 和 plugins）
+#[derive(Clone)]
 pub struct PathsState {
     pub db_path: PathBuf,
     pub plugins_path: PathBuf,
@@ -128,6 +129,7 @@ pub struct PathsState {
 pub struct AppState {
     pub sqlite_db: Mutex<SqliteDb>,
     pub world_store: WorldStore,
+    pub thumbnail_jobs: Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>,
 }
 
 // ── 待确认编辑状态 ───────────────────────────────────────────────────────────

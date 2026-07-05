@@ -1,5 +1,4 @@
 import {logger} from '../../../shared/logger'
-import {convertFileSrc} from '../../../api/assets'
 import {type CSSProperties, useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Card, Input} from 'flowcloudai-ui'
 import {
@@ -14,6 +13,7 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import EntryCoverImage from '../../../features/entries/components/EntryCoverImage'
 import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import './MobileEntryList.css'
 
@@ -39,12 +39,6 @@ function formatDate(s?: string | null): string {
 function placeholderMark(title: string): string {
     const trimmed = title.trim()
     return trimmed ? trimmed[0] : '词'
-}
-
-function toEntryCoverSrc(cover?: string | null): string | undefined {
-    if (!cover) return undefined
-    if (/^(https?:|data:|blob:|asset:|fcimg:)/i.test(cover)) return cover
-    return convertFileSrc(String(cover), 'fcimg')
 }
 
 function CategoryDrawerIcon() {
@@ -230,33 +224,38 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                         })
                         .map(entry => {
                             const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
-                            const coverSrc = toEntryCoverSrc(entry.cover)
+                            const coverFallback = (
+                                <span className="mobile-entry-card__placeholder">
+                                    <span className="mobile-entry-card__placeholder-icon">
+                                        {et ? (
+                                            <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
+                                        ) : (
+                                            <span className="mobile-entry-card__placeholder-mark">{placeholderMark(entry.title)}</span>
+                                        )}
+                                    </span>
+                                    <span className="mobile-entry-card__placeholder-ghost">
+                                        {placeholderMark(entry.title)}
+                                    </span>
+                                </span>
+                            )
                             return (
                                 <Card
                                     className="mobile-entry-card"
                                     key={entry.id}
                                     style={{'--mobile-entry-card-color': et?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
-                                    imageSlot={coverSrc ? (
-                                        <img
-                                            src={coverSrc}
+                                    imageSlot={entry.cover ? (
+                                        <EntryCoverImage
+                                            projectId={projectId}
+                                            entryId={entry.id}
+                                            cover={entry.cover}
                                             alt={entry.title}
                                             className="mobile-entry-card__cover"
                                             loading="lazy"
                                             decoding="async"
+                                            fallback={coverFallback}
                                         />
                                     ) : (
-                                        <span className="mobile-entry-card__placeholder">
-                                            <span className="mobile-entry-card__placeholder-icon">
-                                                {et ? (
-                                                    <EntryTypeIcon entryType={et} className="mobile-entry-card__placeholder-type-icon"/>
-                                                ) : (
-                                                    <span className="mobile-entry-card__placeholder-mark">{placeholderMark(entry.title)}</span>
-                                                )}
-                                            </span>
-                                            <span className="mobile-entry-card__placeholder-ghost">
-                                                {placeholderMark(entry.title)}
-                                            </span>
-                                        </span>
+                                        coverFallback
                                     )}
                                     title={entry.title}
                                     description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
