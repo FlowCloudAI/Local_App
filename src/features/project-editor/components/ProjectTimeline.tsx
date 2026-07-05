@@ -1,9 +1,10 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {Button, RollingBox, Timeline, type TimelineEvent} from 'flowcloudai-ui'
+import {Button, RollingBox} from 'flowcloudai-ui'
 import {db_list_timeline_events, type ProjectTimelineData, type TagSchema,} from '../../../api'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectTimeline.css'
+import {Timeline, type TimelineEvent} from './Timeline'
 
 interface ProjectTimelineProps {
     projectId: string
@@ -490,8 +491,8 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                                 events={timelineEvents}
                                 yearStart={data?.yearStart ?? Math.min(...timelineEvents.map((event) => event.startTime))}
                                 yearEnd={data?.yearEnd ?? Math.max(...timelineEvents.map((event) => event.endTime ?? event.startTime))}
-                                selectedEventId={selectedEventId}
-                                onEventSelect={handleTimelineSelect}
+                                selectedKey={selectedEventId}
+                                onSelectedKeyChange={handleTimelineSelect}
                             />
                         </div>
                     </section>

@@ -1,0 +1,200 @@
+/* 时间线旗帜视图 */
+.timeline-flag {
+    font-family: var(--fc-font-family), serif;
+    background: var(--fc-color-bg);
+    border-radius: var(--fc-radius-lg);
+    padding: var(--fc-space-xl);
+    box-shadow: var(--fc-shadow-sm);
+    border: 1px solid var(--fc-color-border);
+}
+
+.timeline-scroll-area {
+    overflow-x: auto;
+    overflow-y: hidden;
+    cursor: grab;
+    padding: var(--fc-space-md) 0;
+    background: var(--fc-color-bg);
+    scroll-behavior: auto;
+    user-select: none;
+}
+
+.timeline-scroll-area.dragging {
+    cursor: grabbing;
+}
+
+.timeline-scroll-area::-webkit-scrollbar {
+    height: 8px;
+}
+
+.timeline-scroll-area::-webkit-scrollbar-track {
+    background: var(--fc-color-bg-secondary);
+    border-radius: var(--fc-radius-full);
+}
+
+.timeline-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--fc-color-border);
+    border-radius: var(--fc-radius-full);
+}
+
+.flag-track {
+    position: relative;
+    min-width: 100%;
+    box-sizing: border-box;
+}
+
+.flag-axis {
+    position: absolute;
+    height: 30px;
+    z-index: 1;
+}
+
+.flag-axis-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--fc-color-border-hover);
+    border-radius: 1px;
+}
+
+.flag-ticks {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+}
+
+.flag-tick {
+    position: absolute;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.flag-tick-mark {
+    width: 1px;
+    height: 6px;
+    background: var(--fc-color-text-tertiary);
+}
+
+.flag-tick-label {
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
+    color: var(--fc-color-text-secondary);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.flag-event {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    z-index: 10;
+}
+
+.flag-body {
+    background: var(--fc-color-bg-elevated);
+    border: 1px solid var(--fc-color-border);
+    border-left: 3px solid var(--fc-color-primary);
+    border-radius: var(--fc-radius-md);
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    box-shadow: var(--fc-shadow-xs);
+    transition: all var(--fc-transition);
+    cursor: pointer;
+    height: 70px;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.flag-event:hover .flag-body {
+    box-shadow: var(--fc-shadow-md);
+    z-index: 20;
+    border-color: var(--fc-color-border-hover);
+}
+
+.flag-body.selected {
+    background-color: var(--fc-color-primary-subtle);
+    border-left-color: var(--fc-color-danger);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-danger) 20%, transparent);
+}
+
+.flag-title {
+    margin: 0;
+    font-size: var(--fc-font-size-md);
+    font-weight: var(--fc-font-weight-bold);
+    color: var(--fc-color-text);
+    line-height: var(--fc-line-height-tight);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.flag-desc {
+    margin: 4px 0 0;
+    font-size: var(--fc-font-size-xs);
+    color: var(--fc-color-text-secondary);
+    line-height: var(--fc-line-height-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.flag-pole-container {
+    position: relative;
+    width: 2px;
+    margin-left: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.flag-top-bar {
+    position: absolute;
+    top: 0;
+    left: -4px;
+    width: 10px;
+    height: 2px;
+    background: var(--fc-color-primary);
+    opacity: 0.6;
+}
+
+.flag-pole {
+    position: absolute;
+    top: 2px;
+    bottom: 0;
+    width: 2px;
+    background: var(--fc-color-primary);
+    opacity: 0.6;
+}
+
+.flag-pole-dot {
+    position: absolute;
+    bottom: -5px;
+    left: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--fc-color-primary);
+    border: 2px solid var(--fc-color-bg-elevated);
+    z-index: 5;
+}
+
+@media (max-width: 768px) {
+    .timeline-flag {
+        padding: var(--fc-space-md);
+    }
+
+    .flag-body {
+        height: 65px;
+    }
+
+    .flag-title {
+        font-size: var(--fc-font-size-sm);
+    }
+}
