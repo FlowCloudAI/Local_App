@@ -60,7 +60,7 @@ export function getEntryImageUuid(image?: FCImage | null): string | null {
 export function buildEntryImageMarkdownRef(image?: FCImage | null, projectId?: string | null): string | null {
     const uuid = getEntryImageUuid(image)
     if (!uuid) return null
-    return projectId ? `${FC_REF_PREFIX}${encodeURIComponent(projectId)}/image/${uuid}` : `${FCIMG_REF_PREFIX}${uuid}`
+    return projectId ? `${FC_REF_PREFIX}self/image/${uuid}` : `${FCIMG_REF_PREFIX}${uuid}`
 }
 
 function normalizeFcimgRef(value: string): string | null {

@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import type {Entry, EntryBrief} from '../../../api'
 import {normalizeEntryLookupTitle} from '../lib/entryCommon'
+import {resolveInternalEntryProjectId} from '../lib/entryMarkdown'
 
 interface UseLinkPreviewOptions {
     currentProjectId?: string | null
@@ -15,6 +16,7 @@ type EntryLinkTarget = {
     projectId?: string | null
     entryId?: string | null
     title: string
+    isSelfProject?: boolean
 }
 
 type LinkPreviewState = {
@@ -117,14 +119,26 @@ export default function useLinkPreview({
         ))
     }
 
+    function getLinkProjectId(link: EntryLinkTarget): string | null {
+        return resolveInternalEntryProjectId(link, currentProjectId)
+    }
+
     function getOpenMissingReason(link: EntryLinkTarget): string | null {
-        if (link.entryId && !link.projectId) return '旧版词条链接缺少项目 ID，无法定位词条。'
-        return null
+        if (!link.entryId) return null
+        const targetProjectId = getLinkProjectId(link)
+        if (targetProjectId) return null
+        return link.isSelfProject
+            ? '当前没有项目上下文，无法定位词条。'
+            : '旧版词条链接缺少项目 ID，无法定位词条。'
     }
 
     function getPreviewMissingReason(link: EntryLinkTarget): string | null {
-        return getOpenMissingReason(link)
-            ?? (link.projectId && link.projectId !== currentProjectId ? '词条链接指向其他项目，点击后打开。' : null)
+        const targetProjectId = getLinkProjectId(link)
+        if (link.entryId && targetProjectId && targetProjectId !== currentProjectId) {
+            return '词条链接指向其他项目，点击后打开。'
+        }
+        if (link.entryId) return getOpenMissingReason(link)
+        return null
     }
 
     function findProjectEntry(link: EntryLinkTarget): EntryBrief | undefined {
@@ -146,9 +160,10 @@ export default function useLinkPreview({
         updateLinkPreviewPosition(anchor)
         const missingReason = getPreviewMissingReason(link)
         if (missingReason) {
+            const targetProjectId = getLinkProjectId(link)
             setLinkPreview({
                 title: link.title,
-                projectId: link.projectId ?? null,
+                projectId: targetProjectId,
                 entryId: link.entryId ?? null,
                 missingReason,
             })
@@ -168,17 +183,19 @@ export default function useLinkPreview({
     function handleOpenLinkedEntry(link: EntryLinkTarget) {
         const missingReason = getOpenMissingReason(link)
         if (missingReason) {
+            const targetProjectId = getLinkProjectId(link)
             onMissingLink?.(missingReason)
             setLinkPreview({
                 title: link.title,
-                projectId: link.projectId ?? null,
+                projectId: targetProjectId,
                 entryId: link.entryId ?? null,
                 missingReason,
             })
             return
         }
-        if (link.entryId && link.projectId && link.projectId !== currentProjectId) {
-            onOpenEntry?.(link.projectId, {id: link.entryId, title: link.title || '词条'})
+        const targetProjectId = getLinkProjectId(link)
+        if (link.entryId && targetProjectId && targetProjectId !== currentProjectId) {
+            onOpenEntry?.(targetProjectId, {id: link.entryId, title: link.title || '词条'})
             return
         }
         const target = findProjectEntry(link)

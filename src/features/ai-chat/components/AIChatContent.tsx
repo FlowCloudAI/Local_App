@@ -41,6 +41,7 @@ import {
     buildInternalEntryMarkdown,
     type InternalEntryLink,
     parseInternalEntryHref,
+    resolveInternalEntryProjectId,
     resolveMarkdownAnchor,
 } from '../../entries/lib/entryMarkdown'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
@@ -223,6 +224,7 @@ function resolveActionMenuPlacement(anchorRect: DOMRect): ActionMenuPlacement {
 function buildAiChatEntryHref(link: InternalEntryLink): string {
     const params = new URLSearchParams()
     if (link.projectId) params.set('projectId', link.projectId)
+    if (link.isSelfProject) params.set('selfProject', '1')
     if (link.entryId) params.set('entryId', link.entryId)
     params.set('title', link.title)
     return `${AI_CHAT_ENTRY_LINK_PREFIX}${params.toString()}`
@@ -235,7 +237,7 @@ function parseAiChatEntryHref(href: string, fallbackTitle = ''): InternalEntryLi
         const projectId = params.get('projectId')?.trim() || null
         const entryId = params.get('entryId')?.trim() || null
         if (!title && !entryId) return null
-        return {title, projectId, entryId}
+        return {title, projectId, entryId, isSelfProject: params.get('selfProject') === '1'}
     }
 
     return parseInternalEntryHref(href, fallbackTitle)
@@ -854,7 +856,8 @@ export default function AIChatContent({
 
         const internalLink = getEntryLinkFromAnchor(anchor)
         if (!internalLink) return
-        if (!internalLink.projectId && !internalLink.entryId && !linkPreviewProjectId) {
+        const targetProjectId = resolveInternalEntryProjectId(internalLink, linkPreviewProjectId)
+        if (!targetProjectId && !internalLink.entryId && !linkPreviewProjectId) {
             void showAlert('当前对话没有项目上下文，无法打开词条链接。', 'warning', 'nonInvasive', 1800)
             return
         }
@@ -868,7 +871,8 @@ export default function AIChatContent({
         if (!anchor) return
         const internalLink = getEntryLinkFromAnchor(anchor)
         if (!internalLink) return
-        if (!linkPreviewProjectId && !internalLink.projectId) return
+        if (internalLink.entryId && !resolveInternalEntryProjectId(internalLink, linkPreviewProjectId)) return
+        if (!internalLink.entryId && !linkPreviewProjectId) return
         if (linkPreview.linkPreviewAnchorRef.current === anchor) {
             linkPreview.clearLinkPreviewCloseTimer()
             linkPreview.updateLinkPreviewPosition(anchor)

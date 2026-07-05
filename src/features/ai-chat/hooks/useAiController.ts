@@ -254,7 +254,7 @@ function buildReportBootstrapPrompt(reportContext: ReportConversationContext, us
         reportContext.truncated
             ? '注意：这份报告的检测范围经过裁剪，若结论依赖额外资料，请明确说明证据可能不足。'
             : '这份报告覆盖的是当前选定范围内的资料。',
-        '除非用户明确要求，不要在自然语言回答中直接展示内部 ID；需要引用具体词条时，优先使用标准 Markdown 链接格式：[词条标题](fc://项目ID/entry/词条ID)。',
+        '除非用户明确要求，不要在自然语言回答中直接展示内部 ID；需要引用当前项目具体词条时，优先使用标准 Markdown 链接格式：[词条标题](fc://self/entry/词条ID)。',
         `报告范围：${reportContext.scopeSummary}`,
         `来源词条 ID（仅供定位）：${reportContext.sourceEntryIds.join('、') || '无'}`,
         '报告 JSON 如下：',
@@ -1221,7 +1221,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 ? 'writer（作家模式）'
                 : 'assistant（助手模式）'
         hints.push(`当前工具权限模式：${modeLabel}。请只使用当前可用工具，不要声称拥有未开放能力。`)
-        hints.push('引用具体词条时使用 Markdown 链接格式：[词条标题](fc://项目ID/entry/词条ID)，不要使用缺少项目 ID 的旧格式。')
+        hints.push('引用当前项目具体词条时使用 Markdown 链接格式：[词条标题](fc://self/entry/词条ID)，不要使用缺少项目 ID 的旧格式。')
         if (!webSearchEnabled) {
             hints.push(
                 '用户已禁用 "web_search" 和 "open_url" 工具。' +

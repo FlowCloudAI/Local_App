@@ -62,6 +62,7 @@ import {
     buildMarkdownPreviewSource,
     isSafeExternalHref,
     parseInternalEntryHref,
+    resolveInternalEntryProjectId,
     resolveMarkdownAnchor,
 } from '../../../features/entries/lib/entryMarkdown'
 import {areTagMapsEqual} from '../../../features/entries/lib/entryTag'
@@ -341,11 +342,12 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         if (internalLink) {
             event.preventDefault()
             if (internalLink.entryId) {
-                if (!internalLink.projectId) {
+                const targetProjectId = resolveInternalEntryProjectId(internalLink, projectId)
+                if (!targetProjectId) {
                     void showAlert('旧版词条链接缺少项目 ID，无法定位词条。', 'warning', 'nonInvasive', 1800)
                     return
                 }
-                handleOpenLinkedEntry(internalLink.projectId, internalLink.entryId, internalLink.title)
+                handleOpenLinkedEntry(targetProjectId, internalLink.entryId, internalLink.title)
                 return
             }
             const targetTitle = internalLink.title.trim()
