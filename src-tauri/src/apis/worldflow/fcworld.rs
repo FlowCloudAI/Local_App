@@ -23,6 +23,7 @@ const FCWORLD_FORMAT_VERSION: u32 = 1;
 const WORLD_DATA_DIR: &str = "data/worldflow/";
 const ASSETS_INDEX_PATH: &str = "assets/index.json";
 const MAPS_PATH: &str = "maps/maps.json";
+const HISTORY_SNAPSHOTS_DIR: &str = "history/snapshots/";
 const FCWORLD_PROGRESS_EVENT: &str = "fcworld:progress";
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +34,8 @@ pub struct FcworldExportResult {
     pub project_id: String,
     pub asset_count: usize,
     pub map_count: usize,
+    pub history_file_count: usize,
+    pub has_history: bool,
     pub file_size: u64,
     pub warnings: Vec<String>,
 }
@@ -60,6 +63,8 @@ pub struct FcworldImportResult {
     pub project_name: String,
     pub asset_count: usize,
     pub map_count: usize,
+    pub history_file_count: usize,
+    pub has_history: bool,
     pub file_size: u64,
     pub imported_rows: FcworldImportRows,
     pub warnings: Vec<String>,
@@ -225,6 +230,8 @@ pub struct FcworldImportPreview {
     pub duplicate_project: Option<FcworldImportDuplicateProject>,
     pub asset_count: usize,
     pub map_count: usize,
+    pub history_file_count: usize,
+    pub has_history: bool,
     pub file_size: u64,
 }
 
@@ -291,6 +298,12 @@ struct PackageAssetBytes {
 }
 
 #[derive(Debug, Clone)]
+struct PackageHistoryFile {
+    path: String,
+    bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 struct AssetRef {
     id: String,
     path: String,
@@ -312,6 +325,7 @@ struct PreparedFcworldPackage {
     manifest_json: String,
     maps_json: String,
     assets: Vec<PackageAssetBytes>,
+    history_files: Vec<PackageHistoryFile>,
     asset_count: usize,
     map_count: usize,
     warnings: Vec<String>,
@@ -370,6 +384,8 @@ struct ManifestContents {
     worldflow: ManifestWorldflowContents,
     assets_index: ManifestFile,
     maps: ManifestFile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    history: Option<ManifestFile>,
     counts: ManifestCounts,
 }
 
@@ -536,6 +552,120 @@ fn sha256_hex(bytes: &[u8]) -> String {
         output.push_str(&format!("{byte:02x}"));
     }
     output
+}
+
+fn sha256_history_files(files: &[PackageHistoryFile]) -> String {
+    let mut hasher = Sha256::new();
+    for file in files {
+        hasher.update(file.path.as_bytes());
+        hasher.update([0]);
+        hasher.update((file.bytes.len() as u64).to_le_bytes());
+        hasher.update(&file.bytes);
+    }
+    let digest = hasher.finalize();
+    let mut output = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        output.push_str(&format!("{byte:02x}"));
+    }
+    output
+}
+
+fn relative_zip_path(path: &Path) -> Result<String, String> {
+    let mut parts = Vec::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::Normal(part) => {
+                let part = part
+                    .to_str()
+                    .ok_or_else(|| format!("历史文件路径不是 UTF-8: {:?}", path))?;
+                if part.is_empty() || part.contains('/') || part.contains('\\') {
+                    return Err(format!("历史文件路径包含非法片段: {:?}", path));
+                }
+                parts.push(part.to_string());
+            }
+            _ => return Err(format!("历史文件路径包含非法片段: {:?}", path)),
+        }
+    }
+    if parts.is_empty() {
+        return Err("历史文件路径不能为空".to_string());
+    }
+    Ok(parts.join("/"))
+}
+
+fn collect_history_files(snapshots_dir: &Path) -> Result<Vec<PackageHistoryFile>, String> {
+    if !snapshots_dir.exists() {
+        return Ok(Vec::new());
+    }
+    if !snapshots_dir.is_dir() {
+        return Err(format!("快照历史路径不是目录: {:?}", snapshots_dir));
+    }
+
+    fn visit(root: &Path, dir: &Path, files: &mut Vec<PackageHistoryFile>) -> Result<(), String> {
+        let mut entries = std::fs::read_dir(dir)
+            .map_err(|e| format!("读取快照历史目录失败 {:?}: {e}", dir))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("读取快照历史目录项失败 {:?}: {e}", dir))?;
+        entries.sort_by_key(|entry| entry.path());
+
+        for entry in entries {
+            let path = entry.path();
+            let metadata = entry
+                .metadata()
+                .map_err(|e| format!("读取快照历史文件信息失败 {:?}: {e}", path))?;
+            if metadata.is_dir() {
+                visit(root, &path, files)?;
+            } else if metadata.is_file() {
+                let relative = path
+                    .strip_prefix(root)
+                    .map_err(|e| format!("解析快照历史相对路径失败 {:?}: {e}", path))?;
+                let relative = relative_zip_path(relative)?;
+                let bytes = std::fs::read(&path)
+                    .map_err(|e| format!("读取快照历史文件失败 {:?}: {e}", path))?;
+                files.push(PackageHistoryFile {
+                    path: format!("{HISTORY_SNAPSHOTS_DIR}{relative}"),
+                    bytes,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    let mut files = Vec::new();
+    visit(snapshots_dir, snapshots_dir, &mut files)?;
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(files)
+}
+
+fn world_snapshots_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| format!("无法解析数据库目录: {:?}", paths.db_path))?;
+    Ok(db_dir
+        .join("worlds")
+        .join(project_id.to_string())
+        .join("snapshots"))
+}
+
+fn history_file_target_path(
+    paths: &PathsState,
+    project_id: &Uuid,
+    package_path: &str,
+) -> Result<PathBuf, String> {
+    let relative = package_path
+        .strip_prefix(HISTORY_SNAPSHOTS_DIR)
+        .ok_or_else(|| format!("历史文件路径不在预期目录: {package_path}"))?;
+    if relative.trim().is_empty() {
+        return Err("历史文件路径不能为空".to_string());
+    }
+    let mut target = world_snapshots_dir(paths, project_id)?;
+    for part in relative.split('/') {
+        if part.is_empty() || part == "." || part == ".." || part.contains('\\') {
+            return Err(format!("历史文件路径包含非法片段: {package_path}"));
+        }
+        target.push(part);
+    }
+    Ok(target)
 }
 
 fn image_dimensions(bytes: &[u8]) -> Result<(u32, u32), String> {
@@ -1373,6 +1503,7 @@ fn build_manifest(
     asset_count: usize,
     maps_json: &str,
     map_count: usize,
+    history_files: &[PackageHistoryFile],
 ) -> Result<String, String> {
     let tables = csv_items
         .iter()
@@ -1383,6 +1514,22 @@ fn build_manifest(
             sha256: item.sha256.clone(),
         })
         .collect::<Vec<_>>();
+
+    let has_history = !history_files.is_empty();
+    let mut features = vec![
+        "categories".to_string(),
+        "entries".to_string(),
+        "tagSchemas".to_string(),
+        "entryTypes".to_string(),
+        "relations".to_string(),
+        "entryLinks".to_string(),
+        "ideaNotes".to_string(),
+        "images".to_string(),
+        "maps".to_string(),
+    ];
+    if has_history {
+        features.push("gitHistory".to_string());
+    }
 
     let manifest = FcworldManifest {
         format: FCWORLD_FORMAT.to_string(),
@@ -1397,17 +1544,7 @@ fn build_manifest(
         },
         compatibility: ManifestCompatibility {
             min_app_version: "0.1.0".to_string(),
-            features: vec![
-                "categories".to_string(),
-                "entries".to_string(),
-                "tagSchemas".to_string(),
-                "entryTypes".to_string(),
-                "relations".to_string(),
-                "entryLinks".to_string(),
-                "ideaNotes".to_string(),
-                "images".to_string(),
-                "maps".to_string(),
-            ],
+            features,
         },
         world: ManifestWorld {
             source_project_id: project.id.to_string(),
@@ -1434,6 +1571,11 @@ fn build_manifest(
                 count: map_count,
                 sha256: sha256_hex(maps_json.as_bytes()),
             },
+            history: has_history.then(|| ManifestFile {
+                path: HISTORY_SNAPSHOTS_DIR.to_string(),
+                count: history_files.len(),
+                sha256: sha256_history_files(history_files),
+            }),
             counts: ManifestCounts {
                 categories: csv_row_count(csv_items, WorldflowCsvTable::Categories),
                 entries: csv_row_count(csv_items, WorldflowCsvTable::Entries),
@@ -1457,13 +1599,14 @@ fn prepare_fcworld_package(
     project: Project,
     export: ProjectCsvExport,
 ) -> Result<PreparedFcworldPackage, String> {
-    prepare_fcworld_package_with_progress(paths, project, export, |_| {})
+    prepare_fcworld_package_with_progress(paths, project, export, false, |_| {})
 }
 
 fn prepare_fcworld_package_with_progress<F>(
     paths: &PathsState,
     project: Project,
     export: ProjectCsvExport,
+    include_history: bool,
     mut on_asset: F,
 ) -> Result<PreparedFcworldPackage, String>
 where
@@ -1475,6 +1618,11 @@ where
         rewrite_csv_items(export.clone(), &mut collector, &mut on_asset)?;
     let (maps_json, map_count) =
         rewrite_maps_json(paths, &project.id, &mut collector, &mut on_asset)?;
+    let history_files = if include_history {
+        collect_history_files(&world_snapshots_dir(paths, &project.id)?)?
+    } else {
+        Vec::new()
+    };
     let (index_assets, package_assets) = collector.into_parts();
     let asset_count = index_assets.len();
     let assets_index_json = serde_json::to_string_pretty(&FcworldAssetsIndex {
@@ -1492,6 +1640,7 @@ where
         asset_count,
         &maps_json,
         map_count,
+        &history_files,
     )?;
 
     Ok(PreparedFcworldPackage {
@@ -1502,6 +1651,7 @@ where
         manifest_json,
         maps_json,
         assets: package_assets,
+        history_files,
         asset_count,
         map_count,
         warnings: Vec::new(),
@@ -1588,6 +1738,10 @@ where
     }
     write_zip_entry(&mut zip, options, MAPS_PATH, package.maps_json.as_bytes())?;
     on_entry(MAPS_PATH);
+    for history_file in &package.history_files {
+        write_zip_entry(&mut zip, options, &history_file.path, &history_file.bytes)?;
+        on_entry(&history_file.path);
+    }
 
     zip.finish()
         .map_err(|e| format!("完成 zip 写入失败 {:?}: {}", temp_path, e))?;
@@ -1754,6 +1908,8 @@ fn import_preview_from_package(
         duplicate_project,
         asset_count: package.assets_index.assets.len(),
         map_count: package.manifest.contents.maps.count,
+        history_file_count: package.history_files.len(),
+        has_history: !package.history_files.is_empty(),
         file_size: package.input_file_size,
     }
 }
@@ -1860,6 +2016,22 @@ where
         .map_err(|e| format!("写入导入地图失败 {:?}: {e}", map_path))?;
     let path_text = map_path.to_string_lossy();
     on_file(path_text.as_ref());
+
+    for history_file in &package.history_files {
+        let target_path =
+            history_file_target_path(paths, &package.new_project_id, &history_file.path)?;
+        if let Some(parent) = target_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("创建导入历史目录失败 {:?}: {e}", parent))?;
+        }
+        if target_path.exists() {
+            return Err(format!("导入历史目标已存在: {:?}", target_path));
+        }
+        std::fs::write(&target_path, &history_file.bytes)
+            .map_err(|e| format!("写入导入历史失败 {:?}: {e}", target_path))?;
+        let path_text = target_path.to_string_lossy();
+        on_file(path_text.as_ref());
+    }
     Ok(())
 }
 
@@ -1883,6 +2055,13 @@ fn cleanup_prepared_import_files(
             if let Err(error) = std::fs::remove_file(&map_path) {
                 errors.push(format!("清理地图文件失败 {:?}: {error}", map_path));
             }
+        }
+    }
+
+    let snapshots_dir = world_snapshots_dir(paths, &package.new_project_id)?;
+    if snapshots_dir.exists() {
+        if let Err(error) = std::fs::remove_dir_all(&snapshots_dir) {
+            errors.push(format!("清理历史目录失败 {:?}: {error}", snapshots_dir));
         }
     }
 
@@ -1910,6 +2089,16 @@ fn cleanup_project_sidecar_files(paths: &PathsState, project_id: &Uuid) -> Resul
             if let Err(error) = std::fs::remove_file(&map_path) {
                 errors.push(format!("清理原世界观地图文件失败 {:?}: {error}", map_path));
             }
+        }
+    }
+
+    let snapshots_dir = world_snapshots_dir(paths, project_id)?;
+    if snapshots_dir.exists() {
+        if let Err(error) = std::fs::remove_dir_all(&snapshots_dir) {
+            errors.push(format!(
+                "清理原世界观历史目录失败 {:?}: {error}",
+                snapshots_dir
+            ));
         }
     }
 
@@ -1976,9 +2165,9 @@ async fn import_fcworld_package_to_db(
     let expected_rows = expected_import_rows(&prepared.csv_items)?;
 
     progress.add_total(
-        prepared.assets.len() + 1,
+        prepared.assets.len() + 1 + prepared.history_files.len(),
         "write_files",
-        "写入导入资源和地图",
+        "写入导入资源、地图和历史",
     );
     if let Err(error) = write_prepared_import_files_with_progress(&prepared, paths, |path| {
         progress.step("write_files", format!("已写入导入文件：{path}"));
@@ -2090,6 +2279,8 @@ async fn import_fcworld_package_to_db(
         project_name: prepared.project_name,
         asset_count: prepared.asset_count,
         map_count: prepared.map_count,
+        history_file_count: prepared.history_files.len(),
+        has_history: !prepared.history_files.is_empty(),
         file_size: prepared.input_file_size,
         imported_rows: actual_rows,
         warnings,
@@ -2173,9 +2364,9 @@ async fn import_fcworld_package_to_world_store(
     };
 
     progress.add_total(
-        prepared.assets.len() + 1,
+        prepared.assets.len() + 1 + prepared.history_files.len(),
         "write_files",
-        "写入导入资源和地图",
+        "写入导入资源、地图和历史",
     );
     let paths_for_write = clone_paths_state(paths);
     let prepared_for_write = Arc::clone(&prepared);
@@ -2338,6 +2529,8 @@ async fn import_fcworld_package_to_world_store(
         project_name: prepared.project_name.clone(),
         asset_count: prepared.asset_count,
         map_count: prepared.map_count,
+        history_file_count: prepared.history_files.len(),
+        has_history: !prepared.history_files.is_empty(),
         file_size: prepared.input_file_size,
         imported_rows: actual_rows,
         warnings,
@@ -2370,6 +2563,7 @@ pub async fn db_export_project_fcworld(
     paths: State<'_, PathsState>,
     project_id: String,
     output_path: String,
+    include_history: Option<bool>,
     operation_id: Option<String>,
 ) -> Result<FcworldExportResult, String> {
     let progress = FcworldProgressTracker::new(
@@ -2378,6 +2572,7 @@ pub async fn db_export_project_fcworld(
     );
     let result = async {
         let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
+        let include_history = include_history.unwrap_or(true);
         let output_path_buf = PathBuf::from(&output_path);
 
         let (project, export) = {
@@ -2406,13 +2601,23 @@ pub async fn db_export_project_fcworld(
         let asset_total = count_export_asset_candidates(paths.inner(), &project_id, &export.items)?;
         progress.add_total(asset_total, "export_assets", "处理导出图片资源");
         progress.add_total(1, "export_maps", "处理导出地图数据");
-        let package =
-            prepare_fcworld_package_with_progress(paths.inner(), project, export, |path| {
+        let package = prepare_fcworld_package_with_progress(
+            paths.inner(),
+            project,
+            export,
+            include_history,
+            |path| {
                 progress.step("export_assets", format!("已处理资源：{path}"));
-            })?;
+            },
+        )?;
         progress.step("export_maps", "已处理地图数据");
 
-        let zip_total = 1 + package.csv_items.len() + 1 + package.assets.len() + 1;
+        let zip_total = 1
+            + package.csv_items.len()
+            + 1
+            + package.assets.len()
+            + 1
+            + package.history_files.len();
         progress.add_total(zip_total, "write_zip", "写入 fcworld 压缩包");
         let file_size = write_fcworld_package_with_progress(&package, &output_path_buf, |path| {
             progress.step("write_zip", format!("已写入包内文件：{path}"));
@@ -2424,6 +2629,8 @@ pub async fn db_export_project_fcworld(
             project_id: package.project_id.to_string(),
             asset_count: package.asset_count,
             map_count: package.map_count,
+            history_file_count: package.history_files.len(),
+            has_history: !package.history_files.is_empty(),
             file_size,
             warnings: package.warnings,
         })
@@ -2640,10 +2847,11 @@ mod tests {
             .expect("导出项目 CSV 失败");
         let source_project_id = project.id;
         let mut asset_progress = Vec::new();
-        let package = prepare_fcworld_package_with_progress(&paths, project, export, |path| {
-            asset_progress.push(path.to_string());
-        })
-        .expect("准备 fcworld 失败");
+        let package =
+            prepare_fcworld_package_with_progress(&paths, project, export, false, |path| {
+                asset_progress.push(path.to_string());
+            })
+            .expect("准备 fcworld 失败");
         assert_eq!(asset_progress.len(), package.asset_count);
         let output_path = temp.path().join("测试世界.fcworld");
         let mut zip_progress = Vec::new();
@@ -2794,6 +3002,61 @@ mod tests {
         let maps: Value = serde_json::from_str(&package.maps_json).expect("解析地图 JSON 失败");
         assert_eq!(maps["maps"].as_array().unwrap().len(), 0);
         assert_eq!(package.map_count, 0);
+    }
+
+    #[tokio::test]
+    async fn exports_and_imports_snapshot_history_files() {
+        let (temp, db, paths) = new_test_db("fcworld_history").await;
+        let project = db
+            .create_project(CreateProject {
+                name: "历史世界".to_string(),
+                description: None,
+                cover_image: None,
+            })
+            .await
+            .expect("创建项目失败");
+        let snapshots_dir = world_snapshots_dir(&paths, &project.id).expect("应能解析历史目录");
+        let git_config = snapshots_dir.join(".git").join("config");
+        if let Some(parent) = git_config.parent() {
+            std::fs::create_dir_all(parent).expect("创建测试历史目录失败");
+        }
+        std::fs::write(&git_config, "[core]\nrepositoryformatversion = 0\n")
+            .expect("写入测试 git 配置失败");
+        std::fs::write(snapshots_dir.join("projects.csv"), "id,name\n1,历史\n")
+            .expect("写入测试快照 CSV 失败");
+
+        let project = db.get_project(&project.id).await.expect("读取项目失败");
+        let export = db
+            .export_project_csvs(project.id)
+            .await
+            .expect("导出项目 CSV 失败");
+        let package = prepare_fcworld_package_with_progress(&paths, project, export, true, |_| {})
+            .expect("准备带历史 fcworld 失败");
+        assert_eq!(package.history_files.len(), 2);
+
+        let output_path = temp.path().join("历史世界.fcworld");
+        write_fcworld_package(&package, &output_path).expect("写入 fcworld 失败");
+        let mut zip = ZipArchive::new(File::open(&output_path).expect("打开导出包失败"))
+            .expect("读取 zip 失败");
+        assert!(zip.by_name("history/snapshots/.git/config").is_ok());
+        assert!(zip.by_name("history/snapshots/projects.csv").is_ok());
+
+        let manifest: Value = serde_json::from_str(&read_zip_text(&mut zip, "manifest.json"))
+            .expect("解析 manifest 失败");
+        assert_eq!(manifest["contents"]["history"]["count"], 2);
+
+        let validated =
+            import::read_and_validate_fcworld_package(&output_path, db.worldflow_schema_version())
+                .expect("导出包应可校验");
+        assert_eq!(validated.history_files.len(), 2);
+        let prepared = import::prepare_fcworld_import(validated, &paths, "历史世界【导入】")
+            .expect("导入数据应可准备");
+        write_prepared_import_files_with_progress(&prepared, &paths, |_| {})
+            .expect("导入历史文件应可写入");
+        let imported_snapshots =
+            world_snapshots_dir(&paths, &prepared.new_project_id).expect("应能解析导入历史目录");
+        assert!(imported_snapshots.join(".git").join("config").exists());
+        assert!(imported_snapshots.join("projects.csv").exists());
     }
 
     #[tokio::test]

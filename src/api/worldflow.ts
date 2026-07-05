@@ -145,6 +145,8 @@ export interface FcworldExportResult {
     projectId: string
     assetCount: number
     mapCount: number
+    historyFileCount: number
+    hasHistory: boolean
     fileSize: number
     warnings: string[]
 }
@@ -168,6 +170,8 @@ export interface FcworldImportResult {
     projectName: string
     assetCount: number
     mapCount: number
+    historyFileCount: number
+    hasHistory: boolean
     fileSize: number
     importedRows: FcworldImportRows
     warnings: string[]
@@ -187,6 +191,8 @@ export interface FcworldImportPreview {
     duplicateProject: FcworldImportDuplicateProject | null
     assetCount: number
     mapCount: number
+    historyFileCount: number
+    hasHistory: boolean
     fileSize: number
 }
 
@@ -460,8 +466,18 @@ export const db_update_project = (input: UpdateProjectInput) => {
 export const db_delete_project = (id: string) =>
     command<void>('db_delete_project', {id})
 
-export const db_export_project_fcworld = (projectId: string, outputPath: string, operationId?: string) =>
-    command<FcworldExportResult>('db_export_project_fcworld', {projectId, outputPath, operationId})
+export const db_export_project_fcworld = (
+    projectId: string,
+    outputPath: string,
+    operationId?: string,
+    includeHistory = true,
+) =>
+    command<FcworldExportResult>('db_export_project_fcworld', {
+        projectId,
+        outputPath,
+        includeHistory,
+        operationId,
+    })
 
 export const db_preview_project_fcworld = (inputPath: string, operationId?: string) =>
     command<FcworldImportPreview>('db_preview_project_fcworld', {inputPath, operationId})

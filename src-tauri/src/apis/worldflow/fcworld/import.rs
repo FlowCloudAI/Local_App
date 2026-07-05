@@ -33,6 +33,7 @@ pub(super) struct ValidatedFcworldPackage {
     pub assets_index: FcworldAssetsIndex,
     pub asset_bytes_by_path: HashMap<String, Vec<u8>>,
     pub maps_json: String,
+    pub history_files: Vec<PackageHistoryFile>,
     pub input_file_size: u64,
 }
 
@@ -63,6 +64,7 @@ pub(super) struct PreparedFcworldImport {
     pub csv_items: Vec<worldflow_core::CsvImportItem>,
     pub assets: Vec<PreparedImportAsset>,
     pub maps_json: String,
+    pub history_files: Vec<PackageHistoryFile>,
     pub asset_count: usize,
     pub map_count: usize,
     pub input_file_size: u64,
@@ -115,6 +117,7 @@ where
         let known = name == "manifest.json"
             || name == ASSETS_INDEX_PATH
             || name == MAPS_PATH
+            || name.starts_with(HISTORY_SNAPSHOTS_DIR)
             || name
                 .strip_prefix(WORLD_DATA_DIR)
                 .map(|file_name| {
@@ -212,6 +215,11 @@ fn validate_manifest(
     }
     if manifest.contents.maps.path != MAPS_PATH {
         return Err(format!("地图路径不匹配: {}", manifest.contents.maps.path));
+    }
+    if let Some(history) = &manifest.contents.history {
+        if history.path != HISTORY_SNAPSHOTS_DIR {
+            return Err(format!("历史路径不匹配: {}", history.path));
+        }
     }
     if manifest.contents.worldflow.tables.len() != WorldflowCsvTable::ordered().len() {
         return Err("CSV 表数量不匹配".to_string());
@@ -421,6 +429,64 @@ where
     Ok(maps_json)
 }
 
+fn validate_history_files_with_progress_inner<F>(
+    zip: &mut ZipArchive<File>,
+    zip_names: &HashSet<String>,
+    manifest: &FcworldManifest,
+    progress: &mut F,
+) -> Result<Vec<PackageHistoryFile>, String>
+where
+    F: FnMut(FcworldPackageProgress),
+{
+    let mut names = zip_names
+        .iter()
+        .filter(|name| name.starts_with(HISTORY_SNAPSHOTS_DIR))
+        .cloned()
+        .collect::<Vec<_>>();
+    names.sort();
+
+    let Some(history_manifest) = &manifest.contents.history else {
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+        return Err("zip 包含未声明的历史文件".to_string());
+    };
+
+    if names.len() != history_manifest.count {
+        return Err(format!(
+            "历史文件数量不匹配: manifest={} actual={}",
+            history_manifest.count,
+            names.len()
+        ));
+    }
+
+    progress(FcworldPackageProgress::AddTotal {
+        amount: names.len(),
+        phase: "validate_history",
+        message: "校验历史文件".to_string(),
+    });
+
+    let mut files = Vec::with_capacity(names.len());
+    for name in names {
+        let bytes = read_zip_bytes(zip, &name)?;
+        files.push(PackageHistoryFile {
+            path: name.clone(),
+            bytes,
+        });
+        progress(FcworldPackageProgress::Step {
+            phase: "validate_history",
+            message: format!("已校验历史文件：{name}"),
+        });
+    }
+
+    let sha256 = sha256_history_files(&files);
+    if sha256 != history_manifest.sha256 {
+        return Err("历史文件摘要不匹配".to_string());
+    }
+
+    Ok(files)
+}
+
 #[cfg(test)]
 pub(super) fn read_and_validate_fcworld_package(
     input_path: &Path,
@@ -476,6 +542,8 @@ where
     let (assets_index, asset_bytes_by_path) =
         validate_assets_index_with_progress_inner(&mut zip, &zip_names, &manifest, &mut progress)?;
     let maps_json = validate_maps_json_with_progress_inner(&mut zip, &manifest, &mut progress)?;
+    let history_files =
+        validate_history_files_with_progress_inner(&mut zip, &zip_names, &manifest, &mut progress)?;
 
     Ok(ValidatedFcworldPackage {
         manifest,
@@ -483,6 +551,7 @@ where
         assets_index,
         asset_bytes_by_path,
         maps_json,
+        history_files,
         input_file_size,
     })
 }
@@ -1540,6 +1609,7 @@ pub(super) fn prepare_fcworld_import(
         csv_items,
         assets,
         maps_json,
+        history_files: package.history_files,
         asset_count: package.assets_index.assets.len(),
         map_count,
         input_file_size: package.input_file_size,
