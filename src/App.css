@@ -384,3 +384,9 @@ body {
     -webkit-backdrop-filter: blur(var(--fc-space-xs)) !important;
     backdrop-filter: blur(var(--fc-space-xs)) !important;
 }
+
+.fc-context-menu {
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent) !important;
+    -webkit-backdrop-filter: blur(var(--fc-space-xs)) !important;
+    backdrop-filter: blur(var(--fc-space-xs)) !important;
+}
