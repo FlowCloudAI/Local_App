@@ -1491,6 +1491,68 @@
     overflow: visible;
 }
 
+/* ── 子分类入口 ────────────────────────────────────────────────────────── */
+
+.pe-subcategory-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--fc-color-border);
+    flex-shrink: 0;
+}
+
+.pe-subcategory-strip__title {
+    flex-shrink: 0;
+    color: var(--fc-color-text-tertiary);
+    font-size: var(--pe-font-size-type-chip, var(--fc-font-size-xs));
+}
+
+.pe-subcategory-list {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.pe-subcategory-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2rem;
+    max-width: 14rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: var(--fc-radius-md);
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 80%, transparent);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 78%, transparent);
+    color: var(--fc-color-text);
+    cursor: pointer;
+    font-size: var(--pe-font-size-control, var(--fc-font-size-control, 0.875rem));
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.pe-subcategory-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--fc-color-primary) 48%, var(--fc-color-border));
+    background: color-mix(in srgb, var(--fc-color-primary-subtle) 58%, transparent);
+}
+
+.pe-subcategory-card__marker {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 0.18rem;
+    background: var(--fc-color-primary);
+    flex-shrink: 0;
+}
+
+.pe-subcategory-card__name {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
 /* ── 条目区域 ─────────────────────────────────────────────────────────── */
 
 .pe-entries-status {

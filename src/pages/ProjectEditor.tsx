@@ -145,6 +145,10 @@ function areEntryBriefListsEqual(prev: EntryBrief[] | undefined, next: EntryBrie
     return true
 }
 
+function sortCategoriesByOrder(categories: Category[]): Category[] {
+    return [...categories].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, 'zh-CN'))
+}
+
 function ProjectEditorInner({
                                 projectId,
                                 aiPluginId = null,
@@ -779,6 +783,18 @@ function ProjectEditorInner({
         return flatToTree(flatRows)
     }, [project?.name, categories])
 
+    const rootChildCategories = useMemo(
+        () => sortCategoriesByOrder(categories.filter((category) => category.parent_id == null)),
+        [categories],
+    )
+
+    const selectedChildCategories = useMemo(
+        () => selection.kind === 'category'
+            ? sortCategoriesByOrder(categories.filter((category) => category.parent_id === selection.id))
+            : [],
+        [categories, selection],
+    )
+
     const storePrefetchedEntries = useCallback((categoryId: string | null, entries: EntryBrief[]) => {
         const cacheKey = getCategoryCacheKey(categoryId)
         setPrefetchedCategoryEntries((current) => {
@@ -1203,10 +1219,12 @@ function ProjectEditorInner({
                                     projectId={projectId}
                                     entryTypes={entryTypes}
                                     prefetchedEntries={prefetchedCategoryEntries[getCategoryCacheKey(null)]}
+                                    childCategories={rootChildCategories}
                                     refreshToken={categoryEntryRefreshToken}
                                     noScroll
                                     onDefaultEntriesLoaded={storePrefetchedEntries}
                                     onRequestCreateEntry={handleRequestCreateEntry}
+                                    onSelectCategory={handleSelect}
                                     onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 />
                             </ProjectOverview>
@@ -1218,9 +1236,11 @@ function ProjectEditorInner({
                                 projectId={projectId}
                                 entryTypes={entryTypes}
                                 prefetchedEntries={prefetchedCategoryEntries[getCategoryCacheKey(selection.id)]}
+                                childCategories={selectedChildCategories}
                                 refreshToken={categoryEntryRefreshToken}
                                 onDefaultEntriesLoaded={storePrefetchedEntries}
                                 onRequestCreateEntry={handleRequestCreateEntry}
+                                onSelectCategory={handleSelect}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                             />
                         )}

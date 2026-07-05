@@ -11,7 +11,7 @@ import {
     useState,
 } from 'react'
 import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
-import {db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
+import {type Category, db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
 import EntryCoverImage from '../../entries/components/EntryCoverImage'
 import EntryTypeIcon from './EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
@@ -407,11 +407,13 @@ interface CategoryViewProps {
     projectId: string
     entryTypes: EntryTypeView[]
     prefetchedEntries?: EntryBrief[]
+    childCategories?: Category[]
     refreshToken?: number
     noScroll?: boolean
     virtualScrollElement?: HTMLElement | null
     onDefaultEntriesLoaded?: (categoryId: string | null, entries: EntryBrief[]) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
+    onSelectCategory?: (categoryId: string) => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
@@ -421,11 +423,13 @@ function CategoryView({
                           projectId,
                           entryTypes,
                           prefetchedEntries,
+                          childCategories = [],
                           refreshToken = 0,
                           noScroll = false,
                           virtualScrollElement,
                           onDefaultEntriesLoaded,
                           onRequestCreateEntry,
+                          onSelectCategory,
                           onOpenEntry
                       }: CategoryViewProps) {
     const [entries, setEntries] = useState<EntryBrief[]>([])
@@ -664,6 +668,25 @@ function CategoryView({
                         )
                     })}
                 </div>
+                {childCategories.length > 0 && (
+                    <div className="pe-subcategory-strip" aria-label="子分类">
+                        <span className="pe-subcategory-strip__title">子分类</span>
+                        <div className="pe-subcategory-list">
+                            {childCategories.map((category) => (
+                                <button
+                                    key={category.id}
+                                    type="button"
+                                    className="pe-subcategory-card"
+                                    title={category.name}
+                                    onClick={() => onSelectCategory?.(category.id)}
+                                >
+                                    <span className="pe-subcategory-card__marker" aria-hidden="true"/>
+                                    <span className="pe-subcategory-card__name">{category.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}>
