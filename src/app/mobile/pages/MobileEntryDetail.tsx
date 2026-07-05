@@ -317,15 +317,17 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         navigateToTab('ai')
     }, [navigateToTab, projectId, entryId, setAiFocus])
 
-    const handleOpenLinkedEntry = useCallback((targetId: string) => {
-        if (targetId === entryId) return
-        const target = projectEntries.find(item => item.id === targetId)
+    const handleOpenLinkedEntry = useCallback((targetProjectId: string, targetId?: string, title?: string) => {
+        const resolvedProjectId = targetId ? targetProjectId : projectId
+        const resolvedEntryId = targetId ?? targetProjectId
+        if (resolvedProjectId === projectId && resolvedEntryId === entryId) return
+        const target = projectEntries.find(item => item.id === resolvedEntryId)
         push({
             type: 'entryDetail',
             params: {
-                projectId,
-                entryId: targetId,
-                displayName: target?.title ?? '词条',
+                projectId: resolvedProjectId,
+                entryId: resolvedEntryId,
+                displayName: target?.title ?? title ?? '词条',
             },
         })
     }, [entryId, projectEntries, projectId, push])
@@ -339,7 +341,11 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         if (internalLink) {
             event.preventDefault()
             if (internalLink.entryId) {
-                handleOpenLinkedEntry(internalLink.entryId)
+                if (!internalLink.projectId) {
+                    void showAlert('旧版词条链接缺少项目 ID，无法定位词条。', 'warning', 'nonInvasive', 1800)
+                    return
+                }
+                handleOpenLinkedEntry(internalLink.projectId, internalLink.entryId, internalLink.title)
                 return
             }
             const targetTitle = internalLink.title.trim()
@@ -348,7 +354,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 void showAlert(`未找到词条「${targetTitle}」`, 'warning', 'nonInvasive', 1800)
                 return
             }
-            handleOpenLinkedEntry(target.id)
+            handleOpenLinkedEntry(projectId, target.id, target.title)
             return
         }
 
@@ -365,7 +371,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             event.preventDefault()
             void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
         }
-    }, [handleOpenLinkedEntry, projectEntries, showAlert])
+    }, [handleOpenLinkedEntry, projectEntries, projectId, showAlert])
 
     const handleSave = useCallback(async () => {
         if (!title.trim()) {
@@ -524,7 +530,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     const applyWikiLink = useCallback((linkedEntry: { id: string; title: string }, draft: MobileWikiDraft | null = wikiDraft) => {
         if (!draft) return
-        const inserted = buildInternalEntryMarkdown(linkedEntry.title, linkedEntry.id)
+        const inserted = buildInternalEntryMarkdown(linkedEntry.title, linkedEntry.id, projectId)
         const nextContent = replaceRange(content, draft.start, draft.end, inserted)
         const nextCursor = draft.start + inserted.length
         setContent(nextContent)
@@ -534,7 +540,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             textarea?.focus()
             textarea?.setSelectionRange(nextCursor, nextCursor)
         })
-    }, [content, getContentTextarea, wikiDraft])
+    }, [content, getContentTextarea, projectId, wikiDraft])
 
     const handleCreateLinkedEntry = useCallback(async () => {
         const draft = wikiDraft

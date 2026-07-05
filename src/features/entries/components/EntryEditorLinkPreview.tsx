@@ -3,7 +3,7 @@ import type {Entry} from '../../../api'
 import {getCoverImage, normalizeEntryImages, toEntryImageSrc} from '../lib/entryImage'
 
 interface EntryEditorLinkPreviewProps {
-    linkPreview: { title: string; entryId: string | null } | null
+    linkPreview: { title: string; entryId: string | null; missingReason?: string } | null
     linkPreviewPosition: { top: number; left: number }
     linkPreviewEntry: Entry | null
     panelRef: RefObject<HTMLDivElement | null>
@@ -72,7 +72,7 @@ export default function EntryEditorLinkPreview({
                 </div>
             ) : (
                 <div className="entry-editor-link-preview__empty">
-                    当前项目中没有找到名为“{linkPreview.title}”的词条。
+                    {linkPreview.missingReason ?? `当前项目中没有找到名为“${linkPreview.title}”的词条。`}
                 </div>
             )}
         </div>

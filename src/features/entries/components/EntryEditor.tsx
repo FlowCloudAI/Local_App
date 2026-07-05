@@ -364,6 +364,7 @@ export default function EntryEditor({
     })
 
     const wikiLink = useWikiLink({
+        projectId,
         entryId,
         entryCategoryId: entry?.category_id,
         projectEntries,
@@ -417,10 +418,20 @@ export default function EntryEditor({
     })
 
     const linkPreview = useLinkPreview({
+        currentProjectId: projectId,
         entryCache: projectEntryDetailsById,
         projectEntries,
         ensureProjectEntriesLoaded: () => ensureProjectEntriesLoaded(),
-        onOpenEntry,
+        onOpenEntry: (targetProjectId, targetEntry) => {
+            if (targetProjectId !== projectId) {
+                void showAlert('该词条链接指向其他项目，当前编辑器无法直接打开。', 'warning', 'nonInvasive', 1800)
+                return
+            }
+            onOpenEntry?.(targetEntry)
+        },
+        onMissingLink: (message) => {
+            void showAlert(message, 'warning', 'nonInvasive', 1800)
+        },
     })
 
 

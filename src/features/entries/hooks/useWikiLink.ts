@@ -20,6 +20,7 @@ type WikiLinkOption =
     | { kind: 'create'; title: string }
 
 interface UseWikiLinkOptions {
+    projectId: string | null | undefined
     entryId: string
     entryCategoryId: string | null | undefined
     projectEntries: EntryBrief[]
@@ -33,6 +34,7 @@ interface UseWikiLinkOptions {
 }
 
 export default function useWikiLink({
+                                        projectId,
                                         entryId,
                                         entryCategoryId,
                                         projectEntries,
@@ -164,7 +166,7 @@ export default function useWikiLink({
 
     function applyWikiLink(linkedEntry: { title: string; id: string }) {
         if (!wikiDraft) return
-        const inserted = buildInternalEntryMarkdown(linkedEntry.title, linkedEntry.id)
+        const inserted = buildInternalEntryMarkdown(linkedEntry.title, linkedEntry.id, projectId ?? null)
         onContentChange(replaceRange(content, wikiDraft.start, wikiDraft.end, inserted))
         setWikiDraft(null)
         prevWikiDraftRef.current = null

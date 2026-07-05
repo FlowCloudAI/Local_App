@@ -6,11 +6,15 @@ const INTERNAL_ENTRY_HREF_PREFIX = 'entry://'
 const LEGACY_ENTRY_HREF_PREFIX = 'entry-title://'
 
 export type InternalEntryLink = {
+    projectId: string | null
     entryId: string | null
     title: string
 }
 
-export function buildInternalEntryHref(entryId: string): string {
+export function buildInternalEntryHref(entryId: string, projectId?: string | null): string {
+    if (projectId) {
+        return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(projectId)}/${encodeURIComponent(entryId)}`
+    }
     return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(entryId)}`
 }
 
@@ -18,27 +22,27 @@ export function buildLegacyEntryHref(title: string): string {
     return `${LEGACY_ENTRY_HREF_PREFIX}${encodeURIComponent(title)}`
 }
 
-export function buildInternalEntryMarkdown(title: string, entryId: string): string {
-    return `[${title}](${buildInternalEntryHref(entryId)})`
+export function buildInternalEntryMarkdown(title: string, entryId: string, projectId?: string | null): string {
+    return `[${title}](${buildInternalEntryHref(entryId, projectId)})`
 }
 
 export function parseInternalEntryLinks(content?: string | null): InternalEntryLink[] {
     if (!content) return []
 
     const links: InternalEntryLink[] = []
-    const markdownMatches = content.matchAll(/\[([^\]\n]+?)]\(entry:\/\/([^)]+)\)/g)
+    const markdownMatches = content.matchAll(/\[([^\]\n]+?)]\((entry:\/\/[^)]+)\)/g)
     for (const match of markdownMatches) {
         const title = String(match[1] ?? '').trim()
-        const entryId = decodeURIComponent(String(match[2] ?? '').trim())
-        if (!title || !entryId) continue
-        links.push({title, entryId})
+        const link = parseInternalEntryHref(String(match[2] ?? '').trim(), title)
+        if (!title || !link?.entryId) continue
+        links.push(link)
     }
 
     const wikiMatches = content.matchAll(/\[\[([^[\]\n]+?)]]/g)
     for (const match of wikiMatches) {
         const title = String(match[1] ?? '').trim()
         if (!title) continue
-        links.push({title, entryId: null})
+        links.push({title, projectId: null, entryId: null})
     }
 
     return links
@@ -95,9 +99,15 @@ export function isSafeExternalHref(href: string): boolean {
 
 export function parseInternalEntryHref(href: string, fallbackTitle = ''): InternalEntryLink | null {
     if (href.startsWith(INTERNAL_ENTRY_HREF_PREFIX)) {
-        const entryId = decodeURIComponent(href.slice(INTERNAL_ENTRY_HREF_PREFIX.length)).trim()
+        const value = href.slice(INTERNAL_ENTRY_HREF_PREFIX.length).trim()
+        const separatorIndex = value.indexOf('/')
+        const projectId = separatorIndex >= 0
+            ? decodeURIComponent(value.slice(0, separatorIndex)).trim()
+            : null
+        const entryId = decodeURIComponent(separatorIndex >= 0 ? value.slice(separatorIndex + 1) : value).trim()
         if (!entryId) return null
         return {
+            projectId: projectId || null,
             entryId,
             title: fallbackTitle.trim(),
         }
@@ -107,6 +117,7 @@ export function parseInternalEntryHref(href: string, fallbackTitle = ''): Intern
         const title = decodeURIComponent(href.slice(LEGACY_ENTRY_HREF_PREFIX.length)).trim()
         if (!title) return null
         return {
+            projectId: null,
             entryId: null,
             title,
         }

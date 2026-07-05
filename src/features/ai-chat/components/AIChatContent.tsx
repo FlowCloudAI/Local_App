@@ -222,6 +222,7 @@ function resolveActionMenuPlacement(anchorRect: DOMRect): ActionMenuPlacement {
 
 function buildAiChatEntryHref(link: InternalEntryLink): string {
     const params = new URLSearchParams()
+    if (link.projectId) params.set('projectId', link.projectId)
     if (link.entryId) params.set('entryId', link.entryId)
     params.set('title', link.title)
     return `${AI_CHAT_ENTRY_LINK_PREFIX}${params.toString()}`
@@ -231,9 +232,10 @@ function parseAiChatEntryHref(href: string, fallbackTitle = ''): InternalEntryLi
     if (href.startsWith(AI_CHAT_ENTRY_LINK_PREFIX)) {
         const params = new URLSearchParams(href.slice(AI_CHAT_ENTRY_LINK_PREFIX.length))
         const title = (params.get('title') ?? fallbackTitle).trim()
+        const projectId = params.get('projectId')?.trim() || null
         const entryId = params.get('entryId')?.trim() || null
         if (!title && !entryId) return null
-        return {title, entryId}
+        return {title, projectId, entryId}
     }
 
     return parseInternalEntryHref(href, fallbackTitle)
@@ -250,7 +252,7 @@ function buildRenderableAiChatMarkdown(content: string): string {
         .replace(/\[\[([^[\]\n]+?)]]/g, (_match, rawTitle) => {
             const title = String(rawTitle).trim()
             if (!title) return _match
-            return `[${title}](${buildAiChatEntryHref({title, entryId: null})})`
+            return `[${title}](${buildAiChatEntryHref({title, projectId: null, entryId: null})})`
         })
 }
 
@@ -636,12 +638,15 @@ export default function AIChatContent({
     }, [ensureProjectEntryDetailsLoaded, linkPreviewProjectId])
 
     const linkPreview = useLinkPreview({
+        currentProjectId: linkPreviewProjectId,
         entryCache,
         projectEntries,
         ensureProjectEntriesLoaded,
-        onOpenEntry: (entry) => {
-            if (!linkPreviewProjectId) return
-            onOpenEntry?.(linkPreviewProjectId, entry)
+        onOpenEntry: (projectId, entry) => {
+            onOpenEntry?.(projectId, entry)
+        },
+        onMissingLink: (message) => {
+            void showAlert(message, 'warning', 'nonInvasive', 1800)
         },
     })
     const {closeLinkPreview} = linkPreview
@@ -721,6 +726,7 @@ export default function AIChatContent({
     }, [activeLlmPluginId, ctx.pluginsReady, llmApiKeyState.refreshTick, llmUnavailable])
 
     const inputWikiLink = useWikiLink({
+        projectId: linkPreviewProjectId,
         entryId: ctx.focusContext.entryId ?? '',
         entryCategoryId: null,
         projectEntries,
@@ -848,7 +854,7 @@ export default function AIChatContent({
 
         const internalLink = getEntryLinkFromAnchor(anchor)
         if (!internalLink) return
-        if (!linkPreviewProjectId) {
+        if (!internalLink.projectId && !internalLink.entryId && !linkPreviewProjectId) {
             void showAlert('当前对话没有项目上下文，无法打开词条链接。', 'warning', 'nonInvasive', 1800)
             return
         }
@@ -858,11 +864,11 @@ export default function AIChatContent({
     }, [ensureProjectEntriesLoaded, getEntryLinkFromAnchor, linkPreview, linkPreviewProjectId, resolveEntryAnchor, showAlert])
 
     const handleEntryLinkMouseOver = useCallback((event: React.MouseEvent) => {
-        if (!linkPreviewProjectId) return
         const anchor = resolveEntryAnchor(event.target)
         if (!anchor) return
         const internalLink = getEntryLinkFromAnchor(anchor)
         if (!internalLink) return
+        if (!linkPreviewProjectId && !internalLink.projectId) return
         if (linkPreview.linkPreviewAnchorRef.current === anchor) {
             linkPreview.clearLinkPreviewCloseTimer()
             linkPreview.updateLinkPreviewPosition(anchor)
@@ -945,7 +951,7 @@ export default function AIChatContent({
             if (!title) return match
             const normalizedTitle = normalizeEntryLookupTitle(title)
             const target = entries.find((entry) => normalizeEntryLookupTitle(entry.title) === normalizedTitle)
-            return target ? buildInternalEntryMarkdown(target.title, target.id) : match
+            return target ? buildInternalEntryMarkdown(target.title, target.id, target.project_id) : match
         })
     }, [ensureProjectEntriesLoaded, linkPreviewProjectId])
 
