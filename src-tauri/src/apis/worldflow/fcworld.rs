@@ -656,6 +656,14 @@ fn rewrite_fcimg_refs(
     content: &str,
     image_ref_map: &HashMap<String, String>,
 ) -> Result<String, String> {
+    let with_fcimg = rewrite_legacy_fcimg_refs(content, image_ref_map)?;
+    rewrite_fc_image_refs(&with_fcimg, image_ref_map)
+}
+
+fn rewrite_legacy_fcimg_refs(
+    content: &str,
+    image_ref_map: &HashMap<String, String>,
+) -> Result<String, String> {
     if image_ref_map.is_empty() || !content.contains("fcimg:") {
         return Ok(content.to_string());
     }
@@ -688,6 +696,57 @@ fn rewrite_fcimg_refs(
             .to_string();
         if let Some(mapped) = image_ref_map.get(&decoded.to_ascii_lowercase()) {
             output.push_str(mapped);
+        } else {
+            output.push_str(encoded);
+        }
+        cursor = value_end;
+    }
+    output.push_str(&content[cursor..]);
+    Ok(output)
+}
+
+fn rewrite_fc_image_refs(
+    content: &str,
+    image_ref_map: &HashMap<String, String>,
+) -> Result<String, String> {
+    if image_ref_map.is_empty() || !content.contains("fc://") {
+        return Ok(content.to_string());
+    }
+
+    let mut output = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+    while let Some(offset) = content[cursor..].find("fc://") {
+        let prefix_start = cursor + offset;
+        let value_start = prefix_start + "fc://".len();
+        output.push_str(&content[cursor..value_start]);
+
+        let mut value_end = value_start;
+        for (relative, ch) in content[value_start..].char_indices() {
+            if is_fcimg_ref_char(ch) {
+                value_end = value_start + relative + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if value_end == value_start {
+            cursor = value_start;
+            continue;
+        }
+
+        let encoded = &content[value_start..value_end];
+        let parts = encoded.split('/').collect::<Vec<_>>();
+        if parts.len() == 3 && parts[1] == "image" {
+            let image_id = urlencoding::decode(parts[2])
+                .map_err(|e| format!("解析 fc 图片引用失败: {e}"))?
+                .to_string();
+            if let Some(mapped) = image_ref_map.get(&image_id.to_ascii_lowercase()) {
+                output.push_str(parts[0]);
+                output.push_str("/image/");
+                output.push_str(mapped);
+            } else {
+                output.push_str(encoded);
+            }
         } else {
             output.push_str(encoded);
         }
@@ -2528,7 +2587,10 @@ mod tests {
             category_id: None,
             title: "角色".to_string(),
             summary: Some("摘要".to_string()),
-            content: Some("正文".to_string()),
+            content: Some(format!(
+                "正文 ![图](fc://{}/image/entry-image) ![旧图](fcimg:entry-image)",
+                project.id
+            )),
             r#type: None,
             tags: None,
             images: Some(vec![FCImage {
@@ -2576,6 +2638,7 @@ mod tests {
             .export_project_csvs(project.id)
             .await
             .expect("导出项目 CSV 失败");
+        let source_project_id = project.id;
         let mut asset_progress = Vec::new();
         let package = prepare_fcworld_package_with_progress(&paths, project, export, |path| {
             asset_progress.push(path.to_string());
@@ -2637,6 +2700,10 @@ mod tests {
         assert!(!projects_csv.contains(&project_cover.to_string_lossy().to_string()));
         assert!(!entries_csv.contains(&entry_image.to_string_lossy().to_string()));
         assert!(!entries_csv.contains(&entry_cover.to_string_lossy().to_string()));
+        assert!(!entries_csv.contains(&format!("fc://{source_project_id}/image/entry-image")));
+        assert!(!entries_csv.contains("fcimg:entry-image"));
+        assert!(entries_csv.contains(&format!("fc://{source_project_id}/image/asset-")));
+        assert!(entries_csv.contains("fcimg:asset-"));
         assert!(projects_csv.contains("assets/images/"));
         assert!(entries_csv.contains("assets/images/"));
 
@@ -2687,6 +2754,22 @@ mod tests {
         assert_eq!(
             validated.input_file_size,
             std::fs::metadata(&output_path).unwrap().len()
+        );
+
+        let prepared = import::prepare_fcworld_import(validated, &paths, "测试世界【导入】")
+            .expect("导入数据应可重写");
+        let imported_entries_csv = prepared
+            .csv_items
+            .iter()
+            .find(|item| item.table == WorldflowCsvTable::Entries)
+            .map(|item| item.content.as_str())
+            .expect("应包含 entries.csv");
+        assert!(
+            imported_entries_csv
+                .contains(&format!("fc://{}/image/asset-", prepared.new_project_id))
+        );
+        assert!(
+            !imported_entries_csv.contains(&format!("fc://{}/image/asset-", source_project_id))
         );
     }
 
@@ -2789,7 +2872,10 @@ mod tests {
             category_id: None,
             title: "来源词条".to_string(),
             summary: None,
-            content: Some(format!("[目标](entry://{})", target.id)),
+            content: Some(format!(
+                "[旧目标](entry://{}) [新目标](fc://{}/entry/{}) [世界](fc://{})",
+                target.id, project.id, target.id, project.id
+            )),
             r#type: Some("character".to_string()),
             tags: Some(vec![EntryTag {
                 schema_id: tag_schema.id,
@@ -2901,6 +2987,8 @@ mod tests {
             .map(|item| item.content.as_str())
             .expect("应包含 entries.csv");
         assert!(entries_csv.contains(&format!("entry://{new_target_id}")));
+        assert!(entries_csv.contains(&format!("fc://{new_project_id}/entry/{new_target_id}")));
+        assert!(entries_csv.contains(&format!("fc://{new_project_id}")));
         assert!(entries_csv.contains(new_schema_id));
         assert!(!entries_csv.contains(&target.id.to_string()));
         assert!(!entries_csv.contains(&tag_schema.id.to_string()));

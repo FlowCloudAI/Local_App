@@ -735,7 +735,7 @@ fn rewrite_entry_tags_json(
 }
 
 fn is_entry_href_char(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '%'
+    ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '%' || ch == '/'
 }
 
 fn file_name_from_path(path: &str) -> Option<String> {
@@ -771,6 +771,15 @@ fn is_fcimg_ref_char(ch: char) -> bool {
 }
 
 fn rewrite_fcimg_refs(
+    content: &str,
+    image_ref_map: &HashMap<String, String>,
+    project_map: &HashMap<String, String>,
+) -> Result<String, String> {
+    let with_fcimg = rewrite_legacy_fcimg_refs(content, image_ref_map)?;
+    rewrite_fc_image_refs(&with_fcimg, image_ref_map, project_map)
+}
+
+fn rewrite_legacy_fcimg_refs(
     content: &str,
     image_ref_map: &HashMap<String, String>,
 ) -> Result<String, String> {
@@ -815,6 +824,66 @@ fn rewrite_fcimg_refs(
     Ok(output)
 }
 
+fn rewrite_fc_image_refs(
+    content: &str,
+    image_ref_map: &HashMap<String, String>,
+    project_map: &HashMap<String, String>,
+) -> Result<String, String> {
+    if image_ref_map.is_empty() || !content.contains("fc://") {
+        return Ok(content.to_string());
+    }
+
+    let mut output = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+    while let Some(offset) = content[cursor..].find("fc://") {
+        let prefix_start = cursor + offset;
+        let value_start = prefix_start + "fc://".len();
+        output.push_str(&content[cursor..value_start]);
+
+        let mut value_end = value_start;
+        for (relative, ch) in content[value_start..].char_indices() {
+            if is_fcimg_ref_char(ch) {
+                value_end = value_start + relative + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if value_end == value_start {
+            cursor = value_start;
+            continue;
+        }
+
+        let encoded = &content[value_start..value_end];
+        let parts = encoded.split('/').collect::<Vec<_>>();
+        if parts.len() == 3 && parts[1] == "image" {
+            let project_id = urlencoding::decode(parts[0])
+                .map_err(|e| format!("解析 fc 图片项目引用失败: {e}"))?
+                .to_string();
+            let image_id = urlencoding::decode(parts[2])
+                .map_err(|e| format!("解析 fc 图片引用失败: {e}"))?
+                .to_string();
+            if let Some(mapped_image) = image_ref_map.get(&image_id.to_ascii_lowercase()) {
+                output.push_str(
+                    project_map
+                        .get(&project_id)
+                        .map(String::as_str)
+                        .unwrap_or(parts[0]),
+                );
+                output.push_str("/image/");
+                output.push_str(mapped_image);
+            } else {
+                output.push_str(encoded);
+            }
+        } else {
+            output.push_str(encoded);
+        }
+        cursor = value_end;
+    }
+    output.push_str(&content[cursor..]);
+    Ok(output)
+}
+
 fn build_import_fcimg_ref_map(
     package: &ValidatedFcworldPackage,
     asset_targets: &HashMap<String, PathBuf>,
@@ -840,10 +909,76 @@ fn build_import_fcimg_ref_map(
     map
 }
 
-fn rewrite_entry_hrefs(
-    content: &str,
-    entry_map: &HashMap<String, String>,
-) -> Result<String, String> {
+fn rewrite_entry_hrefs(content: &str, id_maps: &ImportIdMaps) -> Result<String, String> {
+    let with_fc = rewrite_fc_hrefs(content, id_maps)?;
+    rewrite_legacy_entry_hrefs(&with_fc, id_maps)
+}
+
+fn rewrite_fc_hrefs(content: &str, id_maps: &ImportIdMaps) -> Result<String, String> {
+    if !content.contains("fc://") {
+        return Ok(content.to_string());
+    }
+
+    let mut output = String::with_capacity(content.len());
+    let mut cursor = 0usize;
+    while let Some(offset) = content[cursor..].find("fc://") {
+        let prefix_start = cursor + offset;
+        let value_start = prefix_start + "fc://".len();
+        output.push_str(&content[cursor..value_start]);
+
+        let mut value_end = value_start;
+        for (relative, ch) in content[value_start..].char_indices() {
+            if is_fcimg_ref_char(ch) {
+                value_end = value_start + relative + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if value_end == value_start {
+            cursor = value_start;
+            continue;
+        }
+
+        let encoded = &content[value_start..value_end];
+        let parts = encoded.split('/').collect::<Vec<_>>();
+        if parts.len() == 1 {
+            let project_id = urlencoding::decode(parts[0])
+                .map_err(|e| format!("解析 fc 项目链接失败: {e}"))?
+                .to_string();
+            output.push_str(
+                id_maps
+                    .projects
+                    .get(&project_id)
+                    .map(String::as_str)
+                    .unwrap_or(parts[0]),
+            );
+        } else if parts.len() == 3 && parts[1] == "entry" {
+            let project_id = urlencoding::decode(parts[0])
+                .map_err(|e| format!("解析 fc 词条项目链接失败: {e}"))?
+                .to_string();
+            let entry_id = urlencoding::decode(parts[2])
+                .map_err(|e| format!("解析 fc 词条链接失败: {e}"))?
+                .to_string();
+            if let Some(mapped_project) = id_maps.projects.get(&project_id) {
+                let mapped_entry =
+                    required_mapped_id(&id_maps.entries, &entry_id, "entries.content fc entry")?;
+                output.push_str(mapped_project);
+                output.push_str("/entry/");
+                output.push_str(&mapped_entry);
+            } else {
+                output.push_str(encoded);
+            }
+        } else {
+            output.push_str(encoded);
+        }
+        cursor = value_end;
+    }
+    output.push_str(&content[cursor..]);
+    Ok(output)
+}
+
+fn rewrite_legacy_entry_hrefs(content: &str, id_maps: &ImportIdMaps) -> Result<String, String> {
     let mut output = String::with_capacity(content.len());
     let mut cursor = 0usize;
     while let Some(offset) = content[cursor..].find("entry://") {
@@ -870,8 +1005,19 @@ fn rewrite_entry_hrefs(
             .map_err(|e| format!("解析 entry:// 链接失败: {e}"))?
             .to_string();
         if Uuid::parse_str(&decoded).is_ok() {
-            let mapped = required_mapped_id(entry_map, &decoded, "entries.content entry://")?;
+            let mapped =
+                required_mapped_id(&id_maps.entries, &decoded, "entries.content entry://")?;
             output.push_str(&mapped);
+        } else if let Some((project_id, entry_id)) = decoded.split_once('/') {
+            if let Some(mapped_project) = id_maps.projects.get(project_id) {
+                let mapped_entry =
+                    required_mapped_id(&id_maps.entries, entry_id, "entries.content entry://")?;
+                output.push_str(mapped_project);
+                output.push('/');
+                output.push_str(&mapped_entry);
+            } else {
+                output.push_str(encoded);
+            }
         } else {
             output.push_str(encoded);
         }
@@ -1008,9 +1154,10 @@ fn rewrite_entries_csv_for_import(
             row.get(content_index)
                 .map(String::as_str)
                 .unwrap_or_default(),
-            &id_maps.entries,
+            id_maps,
         )?;
-        let rewritten_content = rewrite_fcimg_refs(&rewritten_entry_content, fcimg_ref_map)?;
+        let rewritten_content =
+            rewrite_fcimg_refs(&rewritten_entry_content, fcimg_ref_map, &id_maps.projects)?;
         let rewritten_tags = rewrite_entry_tags_json(
             row.get(tags_index).map(String::as_str).unwrap_or_default(),
             id_maps,
