@@ -351,8 +351,8 @@ pub(super) fn copy_entry_images(
                 .and_then(|ext| ext.to_str())
                 .filter(|ext| !ext.is_empty());
             let file_name = match extension {
-                Some(ext) => format!("{}.{}", Uuid::new_v4(), ext),
-                None => Uuid::new_v4().to_string(),
+                Some(ext) => format!("{}.{}", Uuid::now_v7(), ext),
+                None => Uuid::now_v7().to_string(),
             };
             let target_path = target_dir.join(&file_name);
 
@@ -448,7 +448,7 @@ pub async fn import_remote_images(
             .last()
             .filter(|value| !value.is_empty() && value.len() <= 8)
             .unwrap_or("png");
-        let filename = format!("{}.{}", Uuid::new_v4(), ext);
+        let filename = format!("{}.{}", Uuid::now_v7(), ext);
         let local_path = target_dir.join(&filename);
 
         let bytes = network
