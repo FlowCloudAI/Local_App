@@ -726,7 +726,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     const handleInsertImageMarkdown = useCallback((targetIndex: number) => {
         const image = images[targetIndex]
-        const imageRef = buildEntryImageMarkdownRef(image)
+        const imageRef = buildEntryImageMarkdownRef(image, projectId)
         if (!image || !imageRef) {
             void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
             return
@@ -749,7 +749,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             nextTextarea?.focus()
             nextTextarea?.setSelectionRange(nextCursor, nextCursor)
         })
-    }, [content, entry?.title, getContentTextarea, images, showAlert, title])
+    }, [content, entry?.title, getContentTextarea, images, projectId, showAlert, title])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>

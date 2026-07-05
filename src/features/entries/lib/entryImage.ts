@@ -6,6 +6,7 @@ export type EntryImage = FCImage & {
 }
 
 const FCIMG_REF_PREFIX = 'fcimg:'
+const FC_REF_PREFIX = 'fc://'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function normalizeEntryImages(images?: FCImage[] | null): EntryImage[] {
@@ -56,9 +57,10 @@ export function getEntryImageUuid(image?: FCImage | null): string | null {
     return UUID_PATTERN.test(stem) ? stem : null
 }
 
-export function buildEntryImageMarkdownRef(image?: FCImage | null): string | null {
+export function buildEntryImageMarkdownRef(image?: FCImage | null, projectId?: string | null): string | null {
     const uuid = getEntryImageUuid(image)
-    return uuid ? `${FCIMG_REF_PREFIX}${uuid}` : null
+    if (!uuid) return null
+    return projectId ? `${FC_REF_PREFIX}${encodeURIComponent(projectId)}/image/${uuid}` : `${FCIMG_REF_PREFIX}${uuid}`
 }
 
 function normalizeFcimgRef(value: string): string | null {
@@ -84,8 +86,21 @@ function buildImageRefCandidates(image: FCImage): string[] {
     return [stem, fileName].map((item) => item.toLowerCase())
 }
 
-export function resolveEntryImageByFcimgRef(value: string, images: FCImage[]): FCImage | null {
-    const normalizedRef = normalizeFcimgRef(value)
+function normalizeFcImageRef(value: string): string | null {
+    if (!value.toLowerCase().startsWith(FC_REF_PREFIX)) return null
+    const parts = value.slice(FC_REF_PREFIX.length).split('/')
+    if (parts.length !== 3 || parts[1] !== 'image') return null
+    const raw = parts[2]?.split(/[?#]/, 1)[0]?.trim()
+    if (!raw) return null
+    try {
+        return decodeURIComponent(raw).toLowerCase()
+    } catch {
+        return raw.toLowerCase()
+    }
+}
+
+export function resolveEntryImageByMarkdownRef(value: string, images: FCImage[]): FCImage | null {
+    const normalizedRef = normalizeFcImageRef(value) ?? normalizeFcimgRef(value)
     if (!normalizedRef) return null
     return images.find((image) => buildImageRefCandidates(image).includes(normalizedRef)) ?? null
 }

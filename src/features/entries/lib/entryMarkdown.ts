@@ -1,8 +1,9 @@
 import {openUrl} from '../../../api/opener'
 import type {FCImage} from '../../../api'
-import {resolveEntryImageByFcimgRef, toEntryImageSrc} from './entryImage'
+import {resolveEntryImageByMarkdownRef, toEntryImageSrc} from './entryImage'
 
-const INTERNAL_ENTRY_HREF_PREFIX = 'entry://'
+const INTERNAL_ENTRY_HREF_PREFIX = 'fc://'
+const LEGACY_INTERNAL_ENTRY_HREF_PREFIX = 'entry://'
 const LEGACY_ENTRY_HREF_PREFIX = 'entry-title://'
 
 export type InternalEntryLink = {
@@ -13,9 +14,9 @@ export type InternalEntryLink = {
 
 export function buildInternalEntryHref(entryId: string, projectId?: string | null): string {
     if (projectId) {
-        return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(projectId)}/${encodeURIComponent(entryId)}`
+        return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(projectId)}/entry/${encodeURIComponent(entryId)}`
     }
-    return `${INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(entryId)}`
+    return `${LEGACY_INTERNAL_ENTRY_HREF_PREFIX}${encodeURIComponent(entryId)}`
 }
 
 export function buildLegacyEntryHref(title: string): string {
@@ -30,7 +31,7 @@ export function parseInternalEntryLinks(content?: string | null): InternalEntryL
     if (!content) return []
 
     const links: InternalEntryLink[] = []
-    const markdownMatches = content.matchAll(/\[([^\]\n]+?)]\((entry:\/\/[^)]+)\)/g)
+    const markdownMatches = content.matchAll(/\[([^\]\n]+?)]\(((?:fc|entry):\/\/[^)]+)\)/g)
     for (const match of markdownMatches) {
         const title = String(match[1] ?? '').trim()
         const link = parseInternalEntryHref(String(match[2] ?? '').trim(), title)
@@ -53,10 +54,10 @@ function encodeMarkdownUrl(value: string): string {
 }
 
 function buildImagePreviewSource(content: string, images: FCImage[]): string {
-    if (!images.length || !/!\[[^\]\n]*]\(fcimg:/i.test(content)) return content
+    if (!images.length || !/!\[[^\]\n]*]\((?:fcimg:|fc:\/\/[^)\s]+\/image\/)/i.test(content)) return content
 
-    return content.replace(/!\[([^\]\n]*)]\((fcimg:[^)]+)\)/gi, (match, alt, rawSrc) => {
-        const image = resolveEntryImageByFcimgRef(String(rawSrc).trim(), images)
+    return content.replace(/!\[([^\]\n]*)]\(((?:fcimg:|fc:\/\/[^)\s]+\/image\/)[^)]+)\)/gi, (match, alt, rawSrc) => {
+        const image = resolveEntryImageByMarkdownRef(String(rawSrc).trim(), images)
         const src = toEntryImageSrc(image)
         if (!src) return match
         return `![${alt}](${encodeMarkdownUrl(src)})`
@@ -100,6 +101,20 @@ export function isSafeExternalHref(href: string): boolean {
 export function parseInternalEntryHref(href: string, fallbackTitle = ''): InternalEntryLink | null {
     if (href.startsWith(INTERNAL_ENTRY_HREF_PREFIX)) {
         const value = href.slice(INTERNAL_ENTRY_HREF_PREFIX.length).trim()
+        const parts = value.split('/')
+        const projectId = decodeURIComponent(parts[0] ?? '').trim()
+        if (parts.length !== 3 || parts[1] !== 'entry' || !projectId) return null
+        const entryId = decodeURIComponent(parts[2] ?? '').trim()
+        if (!entryId) return null
+        return {
+            projectId,
+            entryId,
+            title: fallbackTitle.trim(),
+        }
+    }
+
+    if (href.startsWith(LEGACY_INTERNAL_ENTRY_HREF_PREFIX)) {
+        const value = href.slice(LEGACY_INTERNAL_ENTRY_HREF_PREFIX.length).trim()
         const separatorIndex = value.indexOf('/')
         const projectId = separatorIndex >= 0
             ? decodeURIComponent(value.slice(0, separatorIndex)).trim()

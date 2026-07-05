@@ -1054,7 +1054,7 @@ export default function EntryEditor({
     }
 
     function insertImageMarkdown(image: EntryImage | undefined, fallbackIndex = 0, closeLightbox = false) {
-        const imageRef = buildEntryImageMarkdownRef(image)
+        const imageRef = buildEntryImageMarkdownRef(image, projectId)
         if (!image || !imageRef) {
             void showAlert('当前图片还没有可用于正文引用的 uuid，请先保存词条后再插入。', 'warning', 'nonInvasive', 1800)
             return

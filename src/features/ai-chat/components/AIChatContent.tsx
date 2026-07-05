@@ -243,7 +243,7 @@ function parseAiChatEntryHref(href: string, fallbackTitle = ''): InternalEntryLi
 
 function buildRenderableAiChatMarkdown(content: string): string {
     return content
-        .replace(/\[([^\]\n]+?)]\((entry:\/\/[^)\s]+|entry-title:\/\/[^)]+)\)/g, (_match, rawTitle, rawHref) => {
+        .replace(/\[([^\]\n]+?)]\((fc:\/\/[^)\s]+\/entry\/[^)\s]+|entry:\/\/[^)\s]+|entry-title:\/\/[^)]+)\)/g, (_match, rawTitle, rawHref) => {
             const title = String(rawTitle).trim()
             const link = parseInternalEntryHref(String(rawHref), title)
             if (!link) return _match
