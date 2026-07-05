@@ -636,6 +636,44 @@ fn collect_history_files(snapshots_dir: &Path) -> Result<Vec<PackageHistoryFile>
     Ok(files)
 }
 
+fn count_history_files(snapshots_dir: &Path) -> Result<usize, String> {
+    if !snapshots_dir.exists() {
+        return Ok(0);
+    }
+    if !snapshots_dir.is_dir() {
+        return Err(format!("快照历史路径不是目录: {:?}", snapshots_dir));
+    }
+
+    fn visit(root: &Path, dir: &Path, count: &mut usize) -> Result<(), String> {
+        let mut entries = std::fs::read_dir(dir)
+            .map_err(|e| format!("读取快照历史目录失败 {:?}: {e}", dir))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("读取快照历史目录项失败 {:?}: {e}", dir))?;
+        entries.sort_by_key(|entry| entry.path());
+
+        for entry in entries {
+            let path = entry.path();
+            let metadata = entry
+                .metadata()
+                .map_err(|e| format!("读取快照历史文件信息失败 {:?}: {e}", path))?;
+            if metadata.is_dir() {
+                visit(root, &path, count)?;
+            } else if metadata.is_file() {
+                let relative = path
+                    .strip_prefix(root)
+                    .map_err(|e| format!("解析快照历史相对路径失败 {:?}: {e}", path))?;
+                relative_zip_path(relative)?;
+                *count = count.saturating_add(1);
+            }
+        }
+        Ok(())
+    }
+
+    let mut count = 0;
+    visit(snapshots_dir, snapshots_dir, &mut count)?;
+    Ok(count)
+}
+
 fn world_snapshots_dir(paths: &PathsState, project_id: &Uuid) -> Result<PathBuf, String> {
     let db_dir = paths
         .db_path
@@ -1791,15 +1829,29 @@ fn total_import_rows(rows: &FcworldImportRows) -> usize {
 fn track_package_validation_progress(
     tracker: &FcworldProgressTracker,
     event: import::FcworldPackageProgress,
+    use_dynamic_totals: bool,
 ) {
     match event {
         import::FcworldPackageProgress::AddTotal {
             amount,
             phase,
             message,
-        } => tracker.add_total(amount, phase, message),
+        } => {
+            if use_dynamic_totals {
+                tracker.add_total(amount, phase, message);
+            } else {
+                tracker.note(phase, message);
+            }
+        }
         import::FcworldPackageProgress::Step { phase, message } => tracker.step(phase, message),
     }
+}
+
+fn import_cleanup_progress_units(options: Option<&FcworldImportOptions>) -> usize {
+    matches!(
+        options.map(|options| options.mode),
+        Some(FcworldImportMode::Overwrite)
+    ) as usize
 }
 
 fn clone_paths_state(paths: &PathsState) -> PathsState {
@@ -2133,22 +2185,27 @@ async fn import_fcworld_package_to_db(
     options: Option<FcworldImportOptions>,
     progress: FcworldProgressTracker,
 ) -> Result<FcworldImportResult, String> {
+    let cleanup_units = import_cleanup_progress_units(options.as_ref());
+    let estimate =
+        import::estimate_fcworld_import_progress(input_path, db.worldflow_schema_version())?;
+    progress.add_total(
+        estimate.import_total(cleanup_units),
+        "prepare",
+        "准备导入进度",
+    );
+
     let existing_projects = db.list_projects().await.map_err(|e| e.to_string())?;
     let progress_for_validation = progress.clone();
     let validated = import::read_and_validate_fcworld_package_with_progress(
         input_path,
         db.worldflow_schema_version(),
-        move |event| track_package_validation_progress(&progress_for_validation, event),
+        move |event| track_package_validation_progress(&progress_for_validation, event, false),
     )?;
     let decision = resolve_import_decision(&validated, &existing_projects, options)?;
     let prepared = import::prepare_fcworld_import(validated, paths, &decision.project_name)?;
     let expected_rows = expected_import_rows(&prepared.csv_items)?;
 
-    progress.add_total(
-        prepared.assets.len() + 1 + prepared.history_files.len(),
-        "write_files",
-        "写入导入资源、地图和历史",
-    );
+    progress.note("write_files", "写入导入资源、地图和历史");
     if let Err(error) = write_prepared_import_files_with_progress(&prepared, paths, |path| {
         progress.step("write_files", format!("已写入导入文件：{path}"));
     }) {
@@ -2156,7 +2213,9 @@ async fn import_fcworld_package_to_db(
     }
 
     let db_row_total = total_import_rows(&expected_rows);
-    progress.add_total(db_row_total, "import_db", "写入导入数据库");
+    if db_row_total > 0 {
+        progress.note("import_db", "写入导入数据库");
+    }
     let import_result = match db
         .import_csvs_with_progress(
             CsvImportBundle {
@@ -2208,7 +2267,7 @@ async fn import_fcworld_package_to_db(
     let mut warnings = prepared.warnings.clone();
 
     if let Some(target) = decision.overwrite_target {
-        progress.add_total(1, "cleanup", "清理覆盖目标世界观");
+        progress.note("cleanup", "清理覆盖目标世界观");
         if let Err(error) = db.delete_project(&target.project_id).await {
             let reason = format!("删除覆盖目标世界观失败: {error}");
             return Err(rollback_after_import_row_mismatch(db, &prepared, paths, reason).await);
@@ -2277,6 +2336,14 @@ async fn import_fcworld_package_to_world_store(
     let input_path_for_prepare = input_path.to_path_buf();
     let paths_for_prepare = clone_paths_state(paths);
     let schema_version = index_db.worldflow_schema_version();
+    let cleanup_units = import_cleanup_progress_units(options.as_ref());
+    let estimate = import::estimate_fcworld_import_progress(input_path, schema_version)?;
+    progress.add_total(
+        estimate.import_total(cleanup_units),
+        "prepare",
+        "准备导入进度",
+    );
+
     let progress_for_prepare = progress.clone();
     let (prepared, expected_rows, overwrite_target) =
         tauri::async_runtime::spawn_blocking(move || {
@@ -2284,7 +2351,9 @@ async fn import_fcworld_package_to_world_store(
             let validated = import::read_and_validate_fcworld_package_with_progress(
                 &input_path_for_prepare,
                 schema_version,
-                move |event| track_package_validation_progress(&progress_for_validation, event),
+                move |event| {
+                    track_package_validation_progress(&progress_for_validation, event, false)
+                },
             )?;
             let decision = resolve_import_decision(&validated, &existing_projects, options)?;
             let prepared = import::prepare_fcworld_import(
@@ -2314,11 +2383,7 @@ async fn import_fcworld_package_to_world_store(
         }
     };
 
-    progress.add_total(
-        prepared.assets.len() + 1 + prepared.history_files.len(),
-        "write_files",
-        "写入导入资源、地图和历史",
-    );
+    progress.note("write_files", "写入导入资源、地图和历史");
     let paths_for_write = clone_paths_state(paths);
     let prepared_for_write = Arc::clone(&prepared);
     let progress_for_write = progress.clone();
@@ -2344,7 +2409,9 @@ async fn import_fcworld_package_to_world_store(
     }
 
     let db_row_total = total_import_rows(&expected_rows);
-    progress.add_total(db_row_total, "import_db", "写入导入数据库");
+    if db_row_total > 0 {
+        progress.note("import_db", "写入导入数据库");
+    }
     let import_result = match world_db
         .import_csvs_with_progress(
             CsvImportBundle {
@@ -2421,7 +2488,7 @@ async fn import_fcworld_package_to_world_store(
     }
 
     if let Some(target) = overwrite_target {
-        progress.add_total(1, "cleanup", "清理覆盖目标世界观");
+        progress.note("cleanup", "清理覆盖目标世界观");
         if let Err(error) = index_db.delete_project(&target.project_id).await {
             let reason = format!("删除覆盖目标世界观索引失败: {error}");
             drop(world_db);
@@ -2477,11 +2544,14 @@ async fn preview_fcworld_package(
     progress: FcworldProgressTracker,
 ) -> Result<FcworldImportPreview, String> {
     let existing_projects = db.list_projects().await.map_err(|e| e.to_string())?;
+    let estimate =
+        import::estimate_fcworld_import_progress(input_path, db.worldflow_schema_version())?;
+    progress.add_total(estimate.validation_total(), "prepare", "准备导入预检");
     let progress_for_validation = progress.clone();
     let validated = import::read_and_validate_fcworld_package_with_progress(
         input_path,
         db.worldflow_schema_version(),
-        move |event| track_package_validation_progress(&progress_for_validation, event),
+        move |event| track_package_validation_progress(&progress_for_validation, event, false),
     )?;
     Ok(import_preview_from_package(
         input_path,
@@ -2502,7 +2572,7 @@ pub async fn db_export_project_fcworld(
 ) -> Result<FcworldExportResult, String> {
     let progress = FcworldProgressTracker::new(
         FcworldProgressEmitter::new(Some(app), operation_id, "export"),
-        WorldflowCsvTable::ordered().len(),
+        0,
     );
     let result = async {
         let project_id = Uuid::parse_str(&project_id).map_err(|e| e.to_string())?;
@@ -2511,6 +2581,7 @@ pub async fn db_export_project_fcworld(
 
         let (project, export) = {
             let db = open_project_db(state.inner(), &project_id).await?;
+            progress.note("export_csv", "导出 CSV 数据");
             let project = db
                 .get_project(&project_id)
                 .await
@@ -2521,7 +2592,6 @@ pub async fn db_export_project_fcworld(
                     .export_csv_table(*table, CsvExportScope::Project { project_id })
                     .await
                     .map_err(|e| e.to_string())?;
-                progress.step("export_csv", format!("已导出 CSV：{}", item.file_name));
                 items.push(item);
             }
             let export = ProjectCsvExport {
@@ -2532,9 +2602,29 @@ pub async fn db_export_project_fcworld(
             (project, export)
         };
 
+        let csv_total = export.items.len();
         let asset_total = count_export_asset_candidates(paths.inner(), &project_id, &export.items)?;
-        progress.add_total(asset_total, "export_assets", "处理导出图片资源");
-        progress.add_total(1, "export_maps", "处理导出地图数据");
+        let history_total = if include_history {
+            count_history_files(&world_snapshots_dir(paths.inner(), &project_id)?)?
+        } else {
+            0
+        };
+        let zip_total = 1usize
+            .saturating_add(csv_total)
+            .saturating_add(1)
+            .saturating_add(asset_total)
+            .saturating_add(1)
+            .saturating_add(history_total);
+        let export_total = csv_total
+            .saturating_add(asset_total)
+            .saturating_add(1)
+            .saturating_add(zip_total);
+        progress.add_total(export_total, "prepare", "准备导出进度");
+        for item in &export.items {
+            progress.step("export_csv", format!("已导出 CSV：{}", item.file_name));
+        }
+        progress.note("export_assets", "处理导出图片资源");
+        progress.note("export_maps", "处理导出地图数据");
         let package = prepare_fcworld_package_with_progress(
             paths.inner(),
             project,
@@ -2546,13 +2636,7 @@ pub async fn db_export_project_fcworld(
         )?;
         progress.step("export_maps", "已处理地图数据");
 
-        let zip_total = 1
-            + package.csv_items.len()
-            + 1
-            + package.assets.len()
-            + 1
-            + package.history_files.len();
-        progress.add_total(zip_total, "write_zip", "写入 fcworld 压缩包");
+        progress.note("write_zip", "写入 fcworld 压缩包");
         let file_size = write_fcworld_package_with_progress(&package, &output_path_buf, |path| {
             progress.step("write_zip", format!("已写入包内文件：{path}"));
         })?;

@@ -74,6 +74,26 @@ pub(super) struct PreparedFcworldImport {
     pub id_maps: ImportIdMaps,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct FcworldImportProgressEstimate {
+    validation_units: usize,
+    write_file_units: usize,
+    import_row_units: usize,
+}
+
+impl FcworldImportProgressEstimate {
+    pub(super) fn validation_total(self) -> usize {
+        self.validation_units
+    }
+
+    pub(super) fn import_total(self, cleanup_units: usize) -> usize {
+        self.validation_units
+            .saturating_add(self.write_file_units)
+            .saturating_add(self.import_row_units)
+            .saturating_add(cleanup_units)
+    }
+}
+
 fn validate_package_path(path: &str) -> Result<(), String> {
     if path.trim().is_empty() {
         return Err("包内路径不能为空".to_string());
@@ -91,6 +111,54 @@ fn validate_package_path(path: &str) -> Result<(), String> {
         return Err(format!("包内路径包含非法片段: {path}"));
     }
     Ok(())
+}
+
+pub(super) fn estimate_fcworld_import_progress(
+    input_path: &Path,
+    current_schema_version: u32,
+) -> Result<FcworldImportProgressEstimate, String> {
+    if !input_path.exists() {
+        return Err(format!("导入文件不存在: {:?}", input_path));
+    }
+    if !input_path.is_file() {
+        return Err(format!("导入路径不是文件: {:?}", input_path));
+    }
+
+    let file =
+        File::open(input_path).map_err(|e| format!("打开导入文件失败 {:?}: {e}", input_path))?;
+    let mut zip = ZipArchive::new(file).map_err(|e| format!("读取 fcworld zip 失败: {e}"))?;
+    let zip_entry_units = zip.len();
+    let manifest_json = read_zip_text(&mut zip, "manifest.json")?;
+    let manifest = validate_manifest(&manifest_json, current_schema_version)?;
+    let table_units = WorldflowCsvTable::ordered().len();
+    let asset_units = manifest.contents.assets_index.count;
+    let history_units = manifest
+        .contents
+        .history
+        .as_ref()
+        .map(|history| history.count)
+        .unwrap_or(0);
+    let import_row_units = manifest
+        .contents
+        .worldflow
+        .tables
+        .iter()
+        .fold(0usize, |total, table| total.saturating_add(table.row_count));
+    let validation_units = 1usize
+        .saturating_add(zip_entry_units)
+        .saturating_add(1)
+        .saturating_add(table_units)
+        .saturating_add(1)
+        .saturating_add(asset_units)
+        .saturating_add(1)
+        .saturating_add(history_units);
+    let write_file_units = asset_units.saturating_add(1).saturating_add(history_units);
+
+    Ok(FcworldImportProgressEstimate {
+        validation_units,
+        write_file_units,
+        import_row_units,
+    })
 }
 
 fn validate_known_zip_entries_with_progress<F>(
