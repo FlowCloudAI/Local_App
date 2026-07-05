@@ -9,7 +9,7 @@ interface FcworldProgressDialogProps {
 export default function FcworldProgressDialog({progress}: FcworldProgressDialogProps) {
     if (!progress) return null
 
-    const countText = progress.total > 0 ? `${progress.current}/${progress.total}` : ''
+    const percent = Math.max(0, Math.min(100, progress.percent))
 
     return createPortal(
         <div className="fcworld-progress-layer" aria-live="polite">
@@ -22,11 +22,16 @@ export default function FcworldProgressDialog({progress}: FcworldProgressDialogP
                 </div>
                 <div className="fcworld-progress-body">
                     <div className="fcworld-progress-message">{progress.message}</div>
-                    {countText ? (
-                        <div className="fcworld-progress-meta">
-                            <span>{countText}</span>
-                        </div>
-                    ) : null}
+                    <div
+                        className="fcworld-progress-bar"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(percent)}
+                        aria-label={progress.message}
+                    >
+                        <div className="fcworld-progress-bar__fill" style={{width: `${percent}%`}}/>
+                    </div>
                 </div>
             </div>
         </div>,
