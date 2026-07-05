@@ -487,10 +487,6 @@ where
     })
 }
 
-fn new_uuid_string() -> String {
-    Uuid::new_v4().to_string()
-}
-
 fn csv_item_content(
     items: &[worldflow_core::CsvImportItem],
     table: WorldflowCsvTable,
@@ -569,7 +565,7 @@ fn collect_id_map(
         if old_id.trim().is_empty() {
             return Err(format!("{} 存在空 id", table.file_name()));
         }
-        if map.insert(old_id.clone(), new_uuid_string()).is_some() {
+        if map.insert(old_id.clone(), old_id.clone()).is_some() {
             return Err(format!("{} 存在重复 id: {old_id}", table.file_name()));
         }
     }
@@ -864,12 +860,12 @@ fn rewrite_fc_image_refs(
                 .map_err(|e| format!("解析 fc 图片引用失败: {e}"))?
                 .to_string();
             if let Some(mapped_image) = image_ref_map.get(&image_id.to_ascii_lowercase()) {
-                output.push_str(
-                    project_map
-                        .get(&project_id)
-                        .map(String::as_str)
-                        .unwrap_or(parts[0]),
-                );
+                let project_ref = if project_map.contains_key(&project_id) {
+                    "self"
+                } else {
+                    parts[0]
+                };
+                output.push_str(project_ref);
                 output.push_str("/image/");
                 output.push_str(mapped_image);
             } else {
@@ -946,13 +942,11 @@ fn rewrite_fc_hrefs(content: &str, id_maps: &ImportIdMaps) -> Result<String, Str
             let project_id = urlencoding::decode(parts[0])
                 .map_err(|e| format!("解析 fc 项目链接失败: {e}"))?
                 .to_string();
-            output.push_str(
-                id_maps
-                    .projects
-                    .get(&project_id)
-                    .map(String::as_str)
-                    .unwrap_or(parts[0]),
-            );
+            if id_maps.projects.contains_key(&project_id) {
+                output.push_str("self");
+            } else {
+                output.push_str(parts[0]);
+            }
         } else if parts.len() == 3 && parts[1] == "entry" {
             let project_id = urlencoding::decode(parts[0])
                 .map_err(|e| format!("解析 fc 词条项目链接失败: {e}"))?
@@ -960,10 +954,10 @@ fn rewrite_fc_hrefs(content: &str, id_maps: &ImportIdMaps) -> Result<String, Str
             let entry_id = urlencoding::decode(parts[2])
                 .map_err(|e| format!("解析 fc 词条链接失败: {e}"))?
                 .to_string();
-            if let Some(mapped_project) = id_maps.projects.get(&project_id) {
+            if id_maps.projects.contains_key(&project_id) {
                 let mapped_entry =
                     required_mapped_id(&id_maps.entries, &entry_id, "entries.content fc entry")?;
-                output.push_str(mapped_project);
+                output.push_str("self");
                 output.push_str("/entry/");
                 output.push_str(&mapped_entry);
             } else {
@@ -1558,6 +1552,67 @@ pub(super) fn prepare_fcworld_import(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collect_id_map_preserves_entity_ids() {
+        let entry_id = "aaaaaaaa-aaaa-7aaa-aaaa-aaaaaaaaaaaa";
+        let items = vec![worldflow_core::CsvImportItem {
+            table: WorldflowCsvTable::Entries,
+            file_name: "entries.csv".to_string(),
+            content: format!("id,project_id,title\n{entry_id},项目,词条\n"),
+        }];
+
+        let map = collect_id_map(&items, WorldflowCsvTable::Entries).expect("应可收集 ID");
+
+        assert_eq!(map.get(entry_id), Some(&entry_id.to_string()));
+    }
+
+    #[test]
+    fn rewrite_fc_hrefs_normalizes_source_project_to_self() {
+        let old_project_id = "11111111-1111-7111-8111-111111111111".to_string();
+        let new_project_id = "22222222-2222-7222-8222-222222222222".to_string();
+        let entry_id = "aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa".to_string();
+        let other_project_id = "33333333-3333-7333-8333-333333333333";
+
+        let mut id_maps = ImportIdMaps::default();
+        id_maps
+            .projects
+            .insert(old_project_id.clone(), new_project_id);
+        id_maps.entries.insert(entry_id.clone(), entry_id.clone());
+
+        let content = format!(
+            "fc://{old_project_id} [词条](fc://{old_project_id}/entry/{entry_id}) fc://{other_project_id}/entry/{entry_id}"
+        );
+        let rewritten = rewrite_fc_hrefs(&content, &id_maps).expect("新协议链接应可重写");
+
+        assert_eq!(
+            rewritten,
+            format!(
+                "fc://self [词条](fc://self/entry/{entry_id}) fc://{other_project_id}/entry/{entry_id}"
+            )
+        );
+    }
+
+    #[test]
+    fn rewrite_fc_image_refs_normalizes_source_project_to_self() {
+        let old_project_id = "11111111-1111-7111-8111-111111111111".to_string();
+        let new_project_id = "22222222-2222-7222-8222-222222222222".to_string();
+        let mut project_map = HashMap::new();
+        project_map.insert(old_project_id.clone(), new_project_id);
+        let mut image_ref_map = HashMap::new();
+        image_ref_map.insert("asset-000001".to_string(), "local-image-id".to_string());
+
+        let content = format!(
+            "![](fc://{old_project_id}/image/asset-000001) ![](fc://self/image/asset-000001)"
+        );
+        let rewritten = rewrite_fc_image_refs(&content, &image_ref_map, &project_map)
+            .expect("图片链接应可重写");
+
+        assert_eq!(
+            rewritten,
+            "![](fc://self/image/local-image-id) ![](fc://self/image/local-image-id)"
+        );
+    }
 
     #[test]
     fn rewrite_entry_relations_sorts_two_way_after_id_mapping() {
