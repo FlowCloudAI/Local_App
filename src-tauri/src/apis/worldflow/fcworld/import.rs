@@ -1,5 +1,6 @@
 use super::*;
 use base64::Engine;
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
@@ -146,6 +147,48 @@ fn read_zip_bytes(zip: &mut ZipArchive<File>, path: &str) -> Result<Vec<u8>, Str
     file.read_to_end(&mut bytes)
         .map_err(|e| format!("读取 zip 文件项失败 {path}: {e}"))?;
     Ok(bytes)
+}
+
+fn digest_to_hex(digest: impl AsRef<[u8]>) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = digest.as_ref();
+    let mut output = String::with_capacity(digest.len() * 2);
+    for &byte in digest {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+fn read_zip_asset_bytes_with_sha256(
+    zip: &mut ZipArchive<File>,
+    path: &str,
+    expected_size: u64,
+) -> Result<(Vec<u8>, String), String> {
+    let mut file = zip
+        .by_name(path)
+        .map_err(|e| format!("zip 缺少文件项 {path}: {e}"))?;
+    if file.size() != expected_size {
+        return Err(format!("资源大小不匹配: {path}"));
+    }
+
+    let mut bytes = Vec::with_capacity(usize::try_from(expected_size).unwrap_or(0));
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|e| format!("读取 zip 文件项失败 {path}: {e}"))?;
+        if read == 0 {
+            break;
+        }
+        let chunk = &buffer[..read];
+        hasher.update(chunk);
+        bytes.extend_from_slice(chunk);
+    }
+
+    Ok((bytes, digest_to_hex(hasher.finalize())))
 }
 
 fn read_zip_text(zip: &mut ZipArchive<File>, path: &str) -> Result<String, String> {
@@ -350,12 +393,11 @@ where
             return Err(format!("资源路径重复: {}", asset.path));
         }
 
-        let bytes = read_zip_bytes(zip, &asset.path)?;
+        let (bytes, sha256) = read_zip_asset_bytes_with_sha256(zip, &asset.path, asset.size)?;
         let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         if size != asset.size {
             return Err(format!("资源大小不匹配: {}", asset.path));
         }
-        let sha256 = sha256_hex(&bytes);
         if sha256 != asset.sha256 {
             return Err(format!("资源摘要不匹配: {}", asset.path));
         }
@@ -367,10 +409,6 @@ where
                 "资源 MIME 不匹配: {} manifest={} actual={guessed_mime}",
                 asset.path, asset.mime
             ));
-        }
-        let (width, height) = image_dimensions(&bytes)?;
-        if asset.width != Some(width) || asset.height != Some(height) {
-            return Err(format!("资源尺寸不匹配: {}", asset.path));
         }
         bytes_by_path.insert(asset.path.clone(), bytes);
         progress(FcworldPackageProgress::Step {
