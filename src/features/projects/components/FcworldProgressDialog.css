@@ -9,10 +9,12 @@
 
 .fcworld-progress-card {
     border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg-elevated);
+    border-radius: var(--fc-radius-lg);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     color: var(--fc-color-text);
     box-shadow: var(--fc-shadow-lg);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
 }
 
 .fcworld-progress-header {
