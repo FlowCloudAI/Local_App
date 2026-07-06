@@ -1512,15 +1512,16 @@
 .pe-subcategory-list {
     flex: 1 1 auto;
     min-width: 0;
-    height: 2.65rem;
+    height: 3.2rem;
 }
 
 .pe-subcategory-list .fc-roll__content {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-height: 0;
-    padding-bottom: 0.15rem;
+    min-height: 100%;
+    padding: 0.25rem 0 0.6rem;
+    box-sizing: border-box;
 }
 
 .pe-subcategory-card {
