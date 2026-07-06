@@ -75,6 +75,7 @@ const TREE_COLLAPSE_THRESHOLD_RATIO = 1 / 5
 const ROOT_ID = '__project_root__'
 const ALL_ENTRIES_CACHE_KEY = '__all_entries__'
 const CATEGORY_PREFETCH_LIMIT = 6
+const DEFAULT_CATEGORY_NAME = '新建分类'
 
 interface Props {
     projectId: string
@@ -149,6 +150,30 @@ function sortCategoriesByOrder(categories: Category[]): Category[] {
     return [...categories].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, 'zh-CN'))
 }
 
+function getCategoryNameKey(parentId: string | null, name: string): string {
+    return `${parentId ?? ROOT_ID}:${name.trim()}`
+}
+
+function hasSiblingCategoryName(categories: Category[], parentId: string | null, name: string, excludeId?: string): boolean {
+    const normalizedName = name.trim()
+    return categories.some(category =>
+        category.id !== excludeId
+        && (category.parent_id ?? null) === parentId
+        && category.name.trim() === normalizedName
+    )
+}
+
+function nextDefaultCategoryName(categories: Category[], parentId: string | null, pendingNameKeys: Set<string>): string {
+    let index = 0
+    while (true) {
+        const name = index === 0 ? DEFAULT_CATEGORY_NAME : `${DEFAULT_CATEGORY_NAME}(${index})`
+        if (!hasSiblingCategoryName(categories, parentId, name) && !pendingNameKeys.has(getCategoryNameKey(parentId, name))) {
+            return name
+        }
+        index += 1
+    }
+}
+
 function ProjectEditorInner({
                                 projectId,
                                 aiPluginId = null,
@@ -210,7 +235,13 @@ function ProjectEditorInner({
     const [prefetchedCategoryEntries, setPrefetchedCategoryEntries] = useState<Record<string, EntryBrief[]>>({})
     const placeholderSeenInOpenRef = useRef<Set<string>>(new Set())
     const prefetchingCategoryKeysRef = useRef<Set<string>>(new Set())
+    const categoriesRef = useRef<Category[]>([])
+    const pendingCategoryNameKeysRef = useRef<Set<string>>(new Set())
     const {showAlert} = useAlert()
+
+    useEffect(() => {
+        categoriesRef.current = categories
+    }, [categories])
 
     const touchProjectUpdatedAt = useCallback(() => {
         setProject(current => current ? {...current, updated_at: new Date().toISOString()} : current)
@@ -521,8 +552,23 @@ function ProjectEditorInner({
             const updated = await db_update_project({id: projectId, name: newName})
             setProject({...updated, updated_at: new Date().toISOString()})
         } else {
-            await db_update_category({id: key, projectId, name: newName})
-            setCategories(prev => prev.map(c => c.id === key ? {...c, name: newName} : c))
+            const trimmedName = newName.trim()
+            const currentCategories = categoriesRef.current
+            const target = currentCategories.find(category => category.id === key)
+            const parentId = target?.parent_id ?? null
+            const duplicate = hasSiblingCategoryName(currentCategories, parentId, trimmedName, key)
+                || pendingCategoryNameKeysRef.current.has(getCategoryNameKey(parentId, trimmedName))
+            if (duplicate) {
+                await showAlert(`同级分类中已存在「${trimmedName}」。`, 'warning', 'nonInvasive', 2400)
+                return
+            }
+
+            await db_update_category({id: key, projectId, name: trimmedName})
+            setCategories(prev => {
+                const next = prev.map(c => c.id === key ? {...c, name: trimmedName} : c)
+                categoriesRef.current = next
+                return next
+            })
             await refreshProject()
             touchProjectUpdatedAt()
         }
@@ -578,22 +624,34 @@ function ProjectEditorInner({
 
     const handleCreate = async (parentKey: string | null): Promise<string> => {
         const actualParentId = (!parentKey || parentKey === ROOT_ID) ? null : parentKey
-        const siblings = categories.filter(c =>
+        const currentCategories = categoriesRef.current
+        const siblings = currentCategories.filter(c =>
             actualParentId ? c.parent_id === actualParentId : c.parent_id == null
         )
         const maxOrder = siblings.length > 0
             ? Math.max(...siblings.map(c => c.sort_order))
             : -1
-        const newCat = await db_create_category({
-            projectId,
-            parentId: actualParentId,
-            name: '新建分类',
-            sortOrder: maxOrder + 1,
-        })
-        setCategories(prev => [...prev, newCat])
-        await refreshProject()
-        touchProjectUpdatedAt()
-        return newCat.id
+        const name = nextDefaultCategoryName(currentCategories, actualParentId, pendingCategoryNameKeysRef.current)
+        const pendingNameKey = getCategoryNameKey(actualParentId, name)
+        pendingCategoryNameKeysRef.current.add(pendingNameKey)
+        try {
+            const newCat = await db_create_category({
+                projectId,
+                parentId: actualParentId,
+                name,
+                sortOrder: maxOrder + 1,
+            })
+            setCategories(prev => {
+                const next = [...prev, newCat]
+                categoriesRef.current = next
+                return next
+            })
+            await refreshProject()
+            touchProjectUpdatedAt()
+            return newCat.id
+        } finally {
+            pendingCategoryNameKeysRef.current.delete(pendingNameKey)
+        }
     }
 
     const handleDelete = async (key: string, mode: 'lift' | 'cascade') => {
