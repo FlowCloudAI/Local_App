@@ -33,6 +33,8 @@ import {
     db_list_all_entry_types,
     db_list_categories,
     db_list_entries,
+    db_list_incoming_links,
+    db_list_outgoing_links,
     db_list_tag_schemas,
     db_update_category,
     db_update_project,
@@ -78,6 +80,13 @@ const ALL_ENTRIES_CACHE_KEY = '__all_entries__'
 const CATEGORY_PREFETCH_LIMIT = 6
 const DEFAULT_CATEGORY_NAME = '新建分类'
 const RISK_RELATED_ENTRY_LIMIT = 24
+const RISK_ENTRY_SCAN_LIMIT = 80
+
+type RiskEntryRef = { id: string; title: string }
+
+function isRiskEntryRef(entry: RiskEntryRef | null): entry is RiskEntryRef {
+    return entry !== null
+}
 
 interface Props {
     projectId: string
@@ -371,23 +380,71 @@ function ProjectEditorInner({
 
             if (riskResult.status === 'fulfilled') {
                 const reports = riskResult.value
+                let entryBriefs: EntryBrief[] = []
+                try {
+                    entryBriefs = await db_list_entries({
+                        projectId,
+                        categoryId: null,
+                        entryType: null,
+                        limit: RISK_ENTRY_SCAN_LIMIT,
+                        offset: 0,
+                    })
+                } catch (error) {
+                    logger.warn('ProjectEditor risk entries load failed', error)
+                }
                 const relatedEntryIds = Array.from(new Set(reports.flatMap(report => report.sourceEntryIds)))
                     .slice(0, RISK_RELATED_ENTRY_LIMIT)
-                const relatedEntries = (await Promise.all(relatedEntryIds.map(async id => {
+                const reportEntries = (await Promise.all(relatedEntryIds.map(async id => {
                     try {
                         const entry = await db_get_entry(id, projectId)
                         return {id: entry.id, title: entry.title}
                     } catch {
                         return null
                     }
-                }))).filter((entry): entry is { id: string; title: string } => Boolean(entry))
+                }))).filter(isRiskEntryRef)
+                const entryContents = (await Promise.all(entryBriefs.map(async brief => {
+                    try {
+                        const entry = await db_get_entry(brief.id, projectId)
+                        return {id: brief.id, title: brief.title, content: (entry.content ?? '').trim()}
+                    } catch {
+                        return null
+                    }
+                }))).filter((entry): entry is RiskEntryRef & { content: string } => entry !== null)
+                const isolatedEntries = (await Promise.all(entryBriefs.map(async brief => {
+                    try {
+                        const [outgoing, incoming] = await Promise.all([
+                            db_list_outgoing_links(brief.id, projectId),
+                            db_list_incoming_links(brief.id, projectId),
+                        ])
+                        return outgoing.length === 0 && incoming.length === 0 ? {id: brief.id, title: brief.title} : null
+                    } catch {
+                        return null
+                    }
+                }))).filter(isRiskEntryRef).slice(0, RISK_RELATED_ENTRY_LIMIT)
+                const briefEntries = (entries: EntryBrief[]) => entries
+                    .slice(0, RISK_RELATED_ENTRY_LIMIT)
+                    .map(entry => ({id: entry.id, title: entry.title}))
                 if (cancelled) return
                 setRiskSummary({
                     reportCount: reports.length,
                     issueCount: reports.reduce((sum, report) => sum + report.issueCount, 0),
                     unresolvedCount: reports.reduce((sum, report) => sum + report.unresolvedCount, 0),
                     latestOverview: reports[0]?.overview ?? null,
-                    relatedEntries,
+                    relatedEntriesByIssue: {
+                        uncategorized: briefEntries(entryBriefs.filter(entry => !entry.category_id)),
+                        empty: entryContents
+                            .filter(entry => entry.content.length === 0)
+                            .slice(0, RISK_RELATED_ENTRY_LIMIT)
+                            .map(({id, title}) => ({id, title})),
+                        summary: briefEntries(entryBriefs.filter(entry => !(entry.summary ?? '').trim())),
+                        isolated: isolatedEntries,
+                        short: entryContents
+                            .filter(entry => entry.content.length > 0 && entry.content.length < 100)
+                            .slice(0, RISK_RELATED_ENTRY_LIMIT)
+                            .map(({id, title}) => ({id, title})),
+                        contradiction: reportEntries,
+                        unresolved: reportEntries,
+                    },
                 })
             } else {
                 logger.warn('ProjectEditor contradiction summary load failed', riskResult.reason)

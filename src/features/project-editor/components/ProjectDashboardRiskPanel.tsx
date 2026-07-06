@@ -16,7 +16,7 @@ function severityOf(value: number | null | undefined, dangerAt = 1): DashboardIs
 }
 
 function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: ProjectDashboardRiskPanelProps) {
-    const [entryPanelOpen, setEntryPanelOpen] = useState(false)
+    const [activeIssue, setActiveIssue] = useState<DashboardIssueItem | null>(null)
     const qualityItems: DashboardIssueItem[] = [
         {
             key: 'uncategorized',
@@ -69,36 +69,24 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: Pro
         },
     ]
     const issueTotal = qualityItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
-    const relatedEntries = riskSummary?.relatedEntries ?? []
-    const openRelatedEntries = () => setEntryPanelOpen(true)
+    const relatedEntries = activeIssue ? (riskSummary?.relatedEntriesByIssue[activeIssue.key] ?? []) : []
 
     return (
         <>
-            <article
-                className="pe-dashboard-panel pe-dashboard-panel--quality pe-dashboard-panel--clickable"
-                role="button"
-                tabIndex={0}
-                onClick={openRelatedEntries}
-                onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        openRelatedEntries()
-                    }
-                }}
-            >
+            <article className="pe-dashboard-panel pe-dashboard-panel--quality">
                 <div className="pe-dashboard-panel__header">
                     <h3>待处理问题</h3>
                     <span>{issueTotal > 0 ? `${issueTotal} 项待处理` : '状态正常'}</span>
                 </div>
-                <DashboardIssueList items={qualityItems}/>
+                <DashboardIssueList items={qualityItems} onItemClick={setActiveIssue}/>
                 {riskSummary?.latestOverview && (
                     <p className="pe-dashboard-empty">{riskSummary.latestOverview}</p>
                 )}
             </article>
             <FloatingPanel
-                open={entryPanelOpen}
-                onClose={() => setEntryPanelOpen(false)}
-                title="相关词条"
+                open={Boolean(activeIssue)}
+                onClose={() => setActiveIssue(null)}
+                title={activeIssue ? `${activeIssue.label}相关词条` : '相关词条'}
                 ariaLabel="待处理问题相关词条"
                 className="pe-risk-entry-panel"
             >
@@ -109,7 +97,7 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: Pro
                             type="button"
                             className="pe-risk-entry-link"
                             onClick={() => {
-                                setEntryPanelOpen(false)
+                                setActiveIssue(null)
                                 onOpenEntry?.(entry)
                             }}
                         >

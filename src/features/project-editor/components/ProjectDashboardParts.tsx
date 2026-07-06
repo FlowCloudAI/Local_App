@@ -178,19 +178,34 @@ export function DashboardPieChart({items}: { items: DashboardBarItem[] }) {
     )
 }
 
-export function DashboardIssueList({items}: { items: DashboardIssueItem[] }) {
+export function DashboardIssueList({
+                                       items,
+                                       onItemClick,
+                                   }: {
+    items: DashboardIssueItem[]
+    onItemClick?: (item: DashboardIssueItem) => void
+}) {
     return (
         <div className="pe-dashboard-issue-list">
-            {items.map(item => (
-                <div
-                    key={item.key}
-                    className={`pe-dashboard-issue-row pe-dashboard-issue-row--${item.severity}`}
-                >
-                    <span className="pe-dashboard-issue-row__label">{item.label}</span>
-                    <strong>{formatDashboardNumber(item.value)}</strong>
-                    <span className="pe-dashboard-issue-row__hint">{item.hint}</span>
-                </div>
-            ))}
+            {items.map(item => {
+                const content = (
+                    <>
+                        <span className="pe-dashboard-issue-row__label">{item.label}</span>
+                        <strong>{formatDashboardNumber(item.value)}</strong>
+                        <span className="pe-dashboard-issue-row__hint">{item.hint}</span>
+                    </>
+                )
+                const className = `pe-dashboard-issue-row pe-dashboard-issue-row--${item.severity}${onItemClick ? ' pe-dashboard-issue-row--clickable' : ''}`
+                return onItemClick ? (
+                    <button key={item.key} type="button" className={className} onClick={() => onItemClick(item)}>
+                        {content}
+                    </button>
+                ) : (
+                    <div key={item.key} className={className}>
+                        {content}
+                    </div>
+                )
+            })}
         </div>
     )
 }

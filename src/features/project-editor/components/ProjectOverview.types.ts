@@ -49,5 +49,5 @@ export interface ProjectRiskSummary {
     issueCount: number
     unresolvedCount: number
     latestOverview?: string | null
-    relatedEntries: Array<{ id: string; title: string }>
+    relatedEntriesByIssue: Record<string, Array<{ id: string; title: string }>>
 }

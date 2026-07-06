@@ -36,6 +36,17 @@
     border-top: 1px dashed color-mix(in srgb, var(--fc-color-border) 48%, transparent);
 }
 
+button.pe-dashboard-issue-row {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
 .pe-dashboard-issue-row:first-child {
     padding-top: 0;
     border-top: 0;
@@ -43,6 +54,15 @@
 
 .pe-dashboard-issue-row:last-child {
     padding-bottom: 0;
+}
+
+.pe-dashboard-issue-row--clickable {
+    cursor: pointer;
+}
+
+.pe-dashboard-issue-row--clickable:hover,
+.pe-dashboard-issue-row--clickable:focus-visible {
+    background: color-mix(in srgb, var(--fc-color-primary) 8%, transparent);
 }
 
 .pe-dashboard-issue-row__label {
