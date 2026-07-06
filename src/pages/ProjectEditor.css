@@ -1574,14 +1574,6 @@
     font-size: var(--pe-font-size-status, var(--fc-font-size-control, 0.875rem));
 }
 
-.pe-entries-empty-message {
-    margin-bottom: var(--fc-space-md);
-    color: var(--fc-color-text);
-    opacity: 0.45;
-    font-size: var(--pe-font-size-status, var(--fc-font-size-control, 0.875rem));
-    text-align: center;
-}
-
 .pe-entries-region {
     position: relative;
     min-height: 24rem;

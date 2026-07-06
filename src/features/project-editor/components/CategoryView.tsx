@@ -27,7 +27,6 @@ const ENTRY_GRID_MIN_COLUMN_WIDTH = 248
 const ENTRY_GRID_DEFAULT_WIDTH = 960
 const ENTRY_GRID_FALLBACK_VIEWPORT_HEIGHT = 900
 const ENTRY_GRID_OVERSCAN_ROWS = 1
-const EMPTY_ENTRY_MESSAGE_DELAY_MS = 500
 
 function isThumbnailCover(cover?: string | null): boolean {
     if (!cover) return false
@@ -434,7 +433,6 @@ function CategoryView({
                       }: CategoryViewProps) {
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [loading, setLoading] = useState(false)
-    const [showEmptyMessage, setShowEmptyMessage] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
@@ -548,16 +546,6 @@ function CategoryView({
     )
     const hasVisibleEntries = displayed.length > 0
     const showLoadingOverlay = loading && hasVisibleEntries
-    const shouldShowEmptyMessage = !loading && !hasVisibleEntries
-
-    useEffect(() => {
-        if (!shouldShowEmptyMessage) {
-            setShowEmptyMessage(false)
-            return
-        }
-        const timer = setTimeout(() => setShowEmptyMessage(true), EMPTY_ENTRY_MESSAGE_DELAY_MS)
-        return () => clearTimeout(timer)
-    }, [shouldShowEmptyMessage])
 
     useEffect(() => {
         if (!PROJECT_HOME_PERF_LOG_ENABLED) return
@@ -609,28 +597,18 @@ function CategoryView({
         </div>
     )
 
-    const renderEmptyMessage = () => (
-        !hasVisibleEntries && showEmptyMessage ? (
-            <div className="pe-entries-empty-message">暂无符合条件的词条</div>
-        ) : null
-    )
-
     const renderEntryContent = () => noScroll ? (
-        <>
-            {renderEmptyMessage()}
-            <VirtualEntryGrid
-                projectId={projectId}
-                entries={displayed}
-                entryTypes={entryTypes}
-                categoryId={categoryId}
-                scrollElement={virtualScrollElement}
-                onRequestCreateEntry={onRequestCreateEntry}
-                onOpenEntry={onOpenEntry}
-            />
-        </>
+        <VirtualEntryGrid
+            projectId={projectId}
+            entries={displayed}
+            entryTypes={entryTypes}
+            categoryId={categoryId}
+            scrollElement={virtualScrollElement}
+            onRequestCreateEntry={onRequestCreateEntry}
+            onOpenEntry={onOpenEntry}
+        />
     ) : (
         <RollingBox axis="y" className="pe-entries-scroll" thumbSize="thin">
-            {renderEmptyMessage()}
             {renderEntryGrid()}
         </RollingBox>
     )
