@@ -483,12 +483,12 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
     const handleProjectContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, project: Project) => {
         showContextMenu(event, [
-            {label: '重命名', onClick: () => setRenameProject(project)},
-            {label: '删除', danger: true, onClick: () => void handleDeleteProject(project)},
             {
                 label: starredProjectIdSet.has(project.id) ? '取消标星' : '标星',
                 onClick: () => void toggleProjectStar(project),
             },
+            {label: '重命名', onClick: () => setRenameProject(project)},
+            {label: '删除', danger: true, onClick: () => void handleDeleteProject(project)},
         ])
     }, [handleDeleteProject, showContextMenu, starredProjectIdSet, toggleProjectStar])
 
@@ -687,6 +687,21 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
     }, [closeProgress, finishProgress, importing, openImportedProject, showAlert, startProgress])
 
+    const handlePageContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
+        if (
+            event.target instanceof Element
+            && event.target.closest('button, a, input, textarea, select, [role="button"], .project-list-card')
+        ) {
+            return
+        }
+
+        showContextMenu(event, [
+            {label: '刷新', disabled: loading, onClick: () => void refreshProjects()},
+            {label: '新建世界', onClick: () => setCreatorOpen(true)},
+            {label: '导入世界', disabled: importing, onClick: () => void handleImportProject()},
+        ])
+    }, [handleImportProject, importing, loading, refreshProjects, showContextMenu])
+
     const handleImportConflictCancel = useCallback(() => {
         if (!importing) setImportConflict(null)
     }, [importing])
@@ -809,7 +824,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             />
             <FcworldProgressDialog progress={fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
-                <div className="project-list-page fc-page-shell">
+                <div className="project-list-page fc-page-shell" onContextMenu={handlePageContextMenu}>
                     <section className="project-home-hero" data-tour-id="home-overview">
                         <div className="project-home-hero__main">
                             <div className="project-list-title-block fc-page-title-block">
