@@ -1470,6 +1470,7 @@ export default function Settings({
             db_path: null,
             plugins_path: null,
             starred_project_ids: [],
+            starred_entry_ids: [],
             theme: 'system',
             language: 'zh-CN',
             editor_font_size: 14,

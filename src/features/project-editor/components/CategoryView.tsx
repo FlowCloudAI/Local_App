@@ -2,6 +2,7 @@ import {logger} from '../../../shared/logger'
 import {
     type CSSProperties,
     memo,
+    type MouseEvent,
     type SyntheticEvent,
     useCallback,
     useEffect,
@@ -10,9 +11,21 @@ import {
     useRef,
     useState,
 } from 'react'
-import {Button, Card, Input, RollingBox} from 'flowcloudai-ui'
-import {type Category, db_list_entries, db_search_entries, type EntryBrief, entryTypeKey, type EntryTypeView,} from '../../../api'
+import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
+import {
+    type Category,
+    db_delete_entry,
+    db_list_entries,
+    db_search_entries,
+    db_update_entry,
+    type EntryBrief,
+    entryTypeKey,
+    type EntryTypeView,
+    setting_get_settings,
+    setting_update_settings,
+} from '../../../api'
 import EntryCoverImage from '../../entries/components/EntryCoverImage'
+import {RenameDialog} from '../../../shared/ui/overlay'
 import EntryTypeIcon from './EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
@@ -76,18 +89,36 @@ function placeholderMark(title: string): string {
     return trimmed ? trimmed[0] : '词'
 }
 
-function sortEntries(entries: EntryBrief[], mode: SortMode): EntryBrief[] {
+function normalizeStarredEntryIds(entryIds: string[] | null | undefined) {
+    return Array.from(new Set((entryIds ?? []).filter(Boolean)))
+}
+
+function EntryStarTag() {
+    return (
+        <span className="pe-entry-star-tag" aria-label="已标星">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3.3 14.8 9l6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.9 9.2 9 12 3.3Z" />
+            </svg>
+        </span>
+    )
+}
+
+function sortEntries(entries: EntryBrief[], mode: SortMode, starredEntryIdSet: Set<string>): EntryBrief[] {
     return [...entries].sort((a, b) => {
+        const starOrder = Number(starredEntryIdSet.has(b.id)) - Number(starredEntryIdSet.has(a.id))
+        if (starOrder !== 0) return starOrder
+        const nameOrder = a.title.localeCompare(b.title, 'zh-CN')
+
         switch (mode) {
             case 'updated-asc':
-                return parseDateMs(a.updated_at) - parseDateMs(b.updated_at)
+                return parseDateMs(a.updated_at) - parseDateMs(b.updated_at) || nameOrder
             case 'name-asc':
-                return a.title.localeCompare(b.title, 'zh-CN')
+                return nameOrder
             case 'name-desc':
-                return b.title.localeCompare(a.title, 'zh-CN')
+                return -nameOrder
             case 'updated-desc':
             default:
-                return parseDateMs(b.updated_at) - parseDateMs(a.updated_at)
+                return parseDateMs(b.updated_at) - parseDateMs(a.updated_at) || nameOrder
         }
     })
 }
@@ -96,10 +127,12 @@ interface EntryCardItemProps {
     projectId: string
     entry: EntryBrief
     entryTypes: EntryTypeView[]
+    isStarred: boolean
+    onContextMenu?: (event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
-function EntryCardItem({projectId, entry, entryTypes, onOpenEntry}: EntryCardItemProps) {
+function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, onOpenEntry}: EntryCardItemProps) {
     const entryType = entry.type
         ? entryTypes.find((et) => entryTypeKey(et) === entry.type)
         : null
@@ -144,6 +177,18 @@ function EntryCardItem({projectId, entry, entryTypes, onOpenEntry}: EntryCardIte
             </div>
         </div>
     )
+    const cardTag = isStarred || entryType ? (
+        <span className="pe-entry-card-tags">
+            {isStarred ? <EntryStarTag /> : null}
+            {entryType ? (
+                <span className="pe-entry-type-badge"
+                      style={{'--badge-color': entryType.color} as CSSProperties}>
+                    <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
+                    {entryType.name}
+                </span>
+            ) : null}
+        </span>
+    ) : undefined
 
     return (
         <Card
@@ -169,19 +214,14 @@ function EntryCardItem({projectId, entry, entryTypes, onOpenEntry}: EntryCardIte
             title={entry.title}
             description={entry.summary || '这个词条还没有摘要，点击后可继续补充设定内容。'}
             extraInfo={<div className="pe-entry-date">更新于 {formatDate(entry.updated_at)}</div>}
-            tag={entryType ? (
-                <span className="pe-entry-type-badge"
-                      style={{'--badge-color': entryType.color} as CSSProperties}>
-                    <EntryTypeIcon entryType={entryType} className="pe-entry-type-badge-icon"/>
-                    {entryType.name}
-                </span>
-            ) : undefined}
+            tag={cardTag}
             variant="shadow"
             hoverable
             expandContentOnHover
             imageHeight="100%"
             contentAreaRatio={0.5}
             hoverContentAreaRatio={0.8}
+            onContextMenu={event => onContextMenu?.(event, entry)}
             onClick={() => onOpenEntry?.({id: entry.id, title: entry.title})}
         />
     )
@@ -211,8 +251,10 @@ interface VirtualEntryGridProps {
     entries: EntryBrief[]
     entryTypes: EntryTypeView[]
     categoryId: string | null
+    starredEntryIdSet: Set<string>
     scrollElement?: HTMLElement | null
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
+    onEntryContextMenu?: (event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
@@ -224,13 +266,15 @@ interface VirtualGridViewport {
 
 function VirtualEntryGrid({
                               projectId,
-                              entries,
-                              entryTypes,
-                              categoryId,
-                              scrollElement,
-                              onRequestCreateEntry,
-                              onOpenEntry,
-                          }: VirtualEntryGridProps) {
+                               entries,
+                               entryTypes,
+                               categoryId,
+                               starredEntryIdSet,
+                               scrollElement,
+                               onRequestCreateEntry,
+                               onEntryContextMenu,
+                               onOpenEntry,
+                           }: VirtualEntryGridProps) {
     const rootRef = useRef<HTMLDivElement | null>(null)
     const measureFrameRef = useRef<number | null>(null)
     const [viewport, setViewport] = useState<VirtualGridViewport>({
@@ -381,6 +425,8 @@ function VirtualEntryGrid({
                             projectId={projectId}
                             entry={entry}
                             entryTypes={entryTypes}
+                            isStarred={starredEntryIdSet.has(entry.id)}
+                            onContextMenu={onEntryContextMenu}
                             onOpenEntry={onOpenEntry}
                         />
                     )}
@@ -413,6 +459,8 @@ interface CategoryViewProps {
     onDefaultEntriesLoaded?: (categoryId: string | null, entries: EntryBrief[]) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
     onSelectCategory?: (categoryId: string) => void
+    onEntryRenamed?: (entry: { id: string; title: string }) => void
+    onEntryDeleted?: (entryId: string) => void
     onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
@@ -426,16 +474,23 @@ function CategoryView({
                           refreshToken = 0,
                           noScroll = false,
                           virtualScrollElement,
-                          onDefaultEntriesLoaded,
-                          onRequestCreateEntry,
-                          onSelectCategory,
-                          onOpenEntry
-                      }: CategoryViewProps) {
+                           onDefaultEntriesLoaded,
+                           onRequestCreateEntry,
+                           onSelectCategory,
+                           onEntryRenamed,
+                           onEntryDeleted,
+                           onOpenEntry
+                       }: CategoryViewProps) {
+    const {showAlert} = useAlert()
+    const {showContextMenu} = useContextMenu()
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [loading, setLoading] = useState(false)
     const [searchText, setSearchText] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
+    const [starredEntryIds, setStarredEntryIds] = useState<string[]>([])
+    const [renameEntry, setRenameEntry] = useState<EntryBrief | null>(null)
+    const [entryActionBusy, setEntryActionBusy] = useState(false)
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const loadEntries = useCallback(async (
@@ -504,6 +559,20 @@ function CategoryView({
     }, [projectId, categoryId, onDefaultEntriesLoaded])
 
     useEffect(() => {
+        let cancelled = false
+        setting_get_settings()
+            .then(settings => {
+                if (!cancelled) setStarredEntryIds(normalizeStarredEntryIds(settings.starred_entry_ids))
+            })
+            .catch(error => {
+                if (!cancelled) void showAlert(`加载星标词条失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [showAlert])
+
+    useEffect(() => {
         if (!searchText.trim() && typeFilter === null && prefetchedEntries !== undefined) {
             setEntries(prefetchedEntries)
             setLoading(false)
@@ -539,7 +608,105 @@ function CategoryView({
         }, 300)
     }
 
-    const displayed = useMemo(() => sortEntries(entries, sortMode), [entries, sortMode])
+    const saveStarredEntryIds = useCallback(async (entryIds: string[]) => {
+        const nextIds = normalizeStarredEntryIds(entryIds)
+        const settings = await setting_get_settings()
+        const nextSettings = {...settings, starred_entry_ids: nextIds}
+        await setting_update_settings(nextSettings)
+        window.dispatchEvent(new CustomEvent('fc:settings-updated', {detail: nextSettings}))
+        return nextIds
+    }, [])
+
+    const toggleEntryStar = useCallback(async (entry: EntryBrief) => {
+        const previousIds = starredEntryIds
+        const nextIds = previousIds.includes(entry.id)
+            ? previousIds.filter(id => id !== entry.id)
+            : [...previousIds, entry.id]
+
+        setStarredEntryIds(nextIds)
+        try {
+            setStarredEntryIds(await saveStarredEntryIds(nextIds))
+        } catch (error) {
+            setStarredEntryIds(previousIds)
+            await showAlert(`保存星标失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [saveStarredEntryIds, showAlert, starredEntryIds])
+
+    const handleRenameEntry = useCallback(async (title: string) => {
+        if (!renameEntry) return
+        if (title === renameEntry.title) {
+            setRenameEntry(null)
+            return
+        }
+
+        setEntryActionBusy(true)
+        try {
+            const updated = await db_update_entry({id: renameEntry.id, projectId, title})
+            setEntries(current => current.map(entry => entry.id === updated.id
+                ? {...entry, title: updated.title, updated_at: updated.updated_at ?? new Date().toISOString()}
+                : entry
+            ))
+            setRenameEntry(null)
+            onEntryRenamed?.({id: updated.id, title: updated.title})
+            await showAlert('词条已重命名', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            await showAlert(`重命名词条失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setEntryActionBusy(false)
+        }
+    }, [onEntryRenamed, projectId, renameEntry, showAlert])
+
+    const handleDeleteEntry = useCallback(async (entry: EntryBrief) => {
+        const confirmed = await showAlert(
+            `确定删除词条「${entry.title}」吗？此操作不可撤销。`,
+            'warning',
+            'confirm',
+        )
+        if (confirmed !== 'yes') return
+
+        try {
+            await db_delete_entry(entry.id, projectId)
+            setEntries(current => current.filter(item => item.id !== entry.id))
+            if (starredEntryIds.includes(entry.id)) {
+                const nextIds = starredEntryIds.filter(id => id !== entry.id)
+                setStarredEntryIds(nextIds)
+                await saveStarredEntryIds(nextIds)
+            }
+            onEntryDeleted?.(entry.id)
+            await showAlert('词条已删除', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            await showAlert(`删除词条失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [onEntryDeleted, projectId, saveStarredEntryIds, showAlert, starredEntryIds])
+
+    const starredEntryIdSet = useMemo(() => new Set(starredEntryIds), [starredEntryIds])
+
+    const handleEntryContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => {
+        showContextMenu(event, [
+            {
+                label: starredEntryIdSet.has(entry.id) ? '取消标星' : '标星',
+                onClick: () => void toggleEntryStar(entry),
+            },
+            {label: '重命名', onClick: () => setRenameEntry(entry)},
+            {label: '删除', danger: true, onClick: () => void handleDeleteEntry(entry)},
+        ])
+    }, [handleDeleteEntry, showContextMenu, starredEntryIdSet, toggleEntryStar])
+
+    const handleEntriesContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
+        if (
+            event.target instanceof Element
+            && event.target.closest('button, a, input, textarea, select, [role="button"], .pe-entry-card, .pe-entry-create-card, .pe-subcategory-card')
+        ) {
+            return
+        }
+
+        showContextMenu(event, [
+            {label: '刷新', disabled: loading, onClick: () => void loadEntries(searchText, typeFilter)},
+            {label: '新建词条', onClick: () => void onRequestCreateEntry?.(categoryId)},
+        ])
+    }, [categoryId, loadEntries, loading, onRequestCreateEntry, searchText, showContextMenu, typeFilter])
+
+    const displayed = useMemo(() => sortEntries(entries, sortMode, starredEntryIdSet), [entries, sortMode, starredEntryIdSet])
     const coverStats = useMemo(
         () => PROJECT_HOME_PERF_LOG_ENABLED ? summarizeEntryCovers(displayed) : null,
         [displayed],
@@ -587,6 +754,8 @@ function CategoryView({
                     projectId={projectId}
                     entry={entry}
                     entryTypes={entryTypes}
+                    isStarred={starredEntryIdSet.has(entry.id)}
+                    onContextMenu={handleEntryContextMenu}
                     onOpenEntry={onOpenEntry}
                 />
             ))}
@@ -603,8 +772,10 @@ function CategoryView({
             entries={displayed}
             entryTypes={entryTypes}
             categoryId={categoryId}
+            starredEntryIdSet={starredEntryIdSet}
             scrollElement={virtualScrollElement}
             onRequestCreateEntry={onRequestCreateEntry}
+            onEntryContextMenu={handleEntryContextMenu}
             onOpenEntry={onOpenEntry}
         />
     ) : (
@@ -614,7 +785,20 @@ function CategoryView({
     )
 
     return (
-        <div className="pe-category-view">
+        <>
+            <RenameDialog
+                open={Boolean(renameEntry)}
+                title="重命名词条"
+                initialValue={renameEntry?.title ?? ''}
+                placeholder="输入词条标题"
+                confirmText="保存"
+                busy={entryActionBusy}
+                onClose={() => {
+                    if (!entryActionBusy) setRenameEntry(null)
+                }}
+                onConfirm={title => void handleRenameEntry(title)}
+            />
+            <div className="pe-category-view">
             <div className="pe-category-navigation" data-tour-id={categoryId ? undefined : 'project-overview-entries'}>
                 <div className="pe-category-toolbar">
                     <div className="pe-category-title">{categoryId ? categoryName : (categoryName || '全部词条')}</div>
@@ -693,7 +877,10 @@ function CategoryView({
                 )}
             </div>
 
-            <div className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}>
+            <div
+                className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}
+                onContextMenu={handleEntriesContextMenu}
+            >
                 {loading && !hasVisibleEntries ? (
                     <div className="pe-entries-status">加载中…</div>
                 ) : (
@@ -705,7 +892,8 @@ function CategoryView({
                     </div>
                 )}
             </div>
-        </div>
+            </div>
+        </>
     )
 }
 

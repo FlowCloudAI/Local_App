@@ -743,6 +743,19 @@ function ProjectEditorInner({
         }
     }, [projectId, onOpenEntry, showAlert, touchProjectUpdatedAt, adjustEntryCount])
 
+    const handleCategoryEntryRenamed = useCallback((entry: { id: string; title: string }) => {
+        onEntryTitleChange?.(projectId, entry)
+        setCategoryEntryRefreshToken(current => current + 1)
+        touchProjectUpdatedAt()
+    }, [onEntryTitleChange, projectId, touchProjectUpdatedAt])
+
+    const handleCategoryEntryDeleted = useCallback((entryId: string) => {
+        adjustEntryCount(-1)
+        setCategoryEntryRefreshToken(current => current + 1)
+        touchProjectUpdatedAt()
+        onDeleteEntry?.(projectId, entryId)
+    }, [adjustEntryCount, onDeleteEntry, projectId, touchProjectUpdatedAt])
+
     useEffect(() => {
         if (placeholderEntryIds.size === 0) return
         const stillOpen = new Set(openEntryIds)
@@ -1309,6 +1322,8 @@ function ProjectEditorInner({
                                     onDefaultEntriesLoaded={storePrefetchedEntries}
                                     onRequestCreateEntry={handleRequestCreateEntry}
                                     onSelectCategory={handleSelect}
+                                    onEntryRenamed={handleCategoryEntryRenamed}
+                                    onEntryDeleted={handleCategoryEntryDeleted}
                                     onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 />
                             </ProjectOverview>
@@ -1325,6 +1340,8 @@ function ProjectEditorInner({
                                 onDefaultEntriesLoaded={storePrefetchedEntries}
                                 onRequestCreateEntry={handleRequestCreateEntry}
                                 onSelectCategory={handleSelect}
+                                onEntryRenamed={handleCategoryEntryRenamed}
+                                onEntryDeleted={handleCategoryEntryDeleted}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                             />
                         )}

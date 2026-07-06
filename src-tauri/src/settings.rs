@@ -20,6 +20,8 @@ pub struct AppSettings {
     pub plugins_path: Option<String>,
     /// 首页项目卡片的本机星标项目 ID。
     pub starred_project_ids: Vec<String>,
+    /// 词条卡片的本机星标词条 ID。
+    pub starred_entry_ids: Vec<String>,
 
     // ── 外观 ──────────────────────────────
     /// "system" | "light" | "dark"
@@ -64,6 +66,7 @@ impl Default for AppSettings {
             db_path: None,
             plugins_path: None,
             starred_project_ids: Vec::new(),
+            starred_entry_ids: Vec::new(),
             theme: "system".to_string(),
             language: "zh-CN".to_string(),
             editor_font_size: 14,

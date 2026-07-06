@@ -72,6 +72,7 @@ export interface AppSettings {
   db_path: string | null
   plugins_path: string | null
   starred_project_ids: string[]
+  starred_entry_ids: string[]
   theme: string
   language: string
   editor_font_size: number

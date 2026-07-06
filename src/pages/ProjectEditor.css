@@ -1759,6 +1759,28 @@
     color: color-mix(in srgb, var(--fc-color-text-on-primary) 95%, transparent);
 }
 
+.pe-entry-card-tags {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    align-self: flex-start;
+}
+
+.pe-entry-star-tag {
+    display: inline-grid;
+    place-items: center;
+    width: 1.65rem;
+    height: 1.65rem;
+    color: var(--fc-color-warning);
+}
+
+.pe-entry-star-tag svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: currentColor;
+}
+
 .pe-entry-type-badge {
     --badge-accent: var(--badge-color, var(--fc-color-primary));
     display: inline-flex;
@@ -1773,6 +1795,10 @@
     color: color-mix(in srgb, var(--fc-color-text-on-primary) 94%, transparent);
     box-shadow: var(--fc-shadow-md);
     align-self: flex-start;
+}
+
+.pe-entry-card-tags .pe-entry-type-badge {
+    align-self: auto;
 }
 
 .pe-entry-type-badge-icon {
