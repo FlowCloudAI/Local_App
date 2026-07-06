@@ -609,6 +609,32 @@ function CategoryView({
         </div>
     )
 
+    const renderEmptyMessage = () => (
+        !hasVisibleEntries && showEmptyMessage ? (
+            <div className="pe-entries-empty-message">暂无符合条件的词条</div>
+        ) : null
+    )
+
+    const renderEntryContent = () => noScroll ? (
+        <>
+            {renderEmptyMessage()}
+            <VirtualEntryGrid
+                projectId={projectId}
+                entries={displayed}
+                entryTypes={entryTypes}
+                categoryId={categoryId}
+                scrollElement={virtualScrollElement}
+                onRequestCreateEntry={onRequestCreateEntry}
+                onOpenEntry={onOpenEntry}
+            />
+        </>
+    ) : (
+        <RollingBox axis="y" className="pe-entries-scroll" thumbSize="thin">
+            {renderEmptyMessage()}
+            {renderEntryGrid()}
+        </RollingBox>
+    )
+
     return (
         <div className="pe-category-view">
             <div className="pe-category-navigation" data-tour-id={categoryId ? undefined : 'project-overview-entries'}>
@@ -690,26 +716,10 @@ function CategoryView({
             </div>
 
             <div className={`pe-entries-region${noScroll ? ' is-inline' : ' is-scrollable'}`}>
-                {hasVisibleEntries ? (
-                    noScroll ? (
-                        <VirtualEntryGrid
-                            projectId={projectId}
-                            entries={displayed}
-                            entryTypes={entryTypes}
-                            categoryId={categoryId}
-                            scrollElement={virtualScrollElement}
-                            onRequestCreateEntry={onRequestCreateEntry}
-                            onOpenEntry={onOpenEntry}
-                        />
-                    ) : (
-                        <RollingBox axis="y" className="pe-entries-scroll" thumbSize="thin">
-                            {renderEntryGrid()}
-                        </RollingBox>
-                    )
+                {loading && !hasVisibleEntries ? (
+                    <div className="pe-entries-status">加载中…</div>
                 ) : (
-                    <div className="pe-entries-status">
-                        {loading ? '加载中…' : showEmptyMessage ? '暂无符合条件的词条' : ''}
-                    </div>
+                    renderEntryContent()
                 )}
                 {showLoadingOverlay && (
                     <div className="pe-entries-overlay" aria-hidden="true">
