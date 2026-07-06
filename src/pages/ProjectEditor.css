@@ -1186,15 +1186,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--fc-color-bg) 28%, rgba(8, 10, 18, 0.55));
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--fc-color-bg-overlay) 72%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
 }
 
 .pe-layout .fc-dialog {
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);
     border-radius: var(--fc-radius-xl);
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     box-shadow: var(--fc-shadow-lg);
+    -webkit-backdrop-filter: blur(var(--fc-space-xs));
+    backdrop-filter: blur(var(--fc-space-xs));
     padding: 0;
     max-width: 28rem;
     overflow: hidden;
