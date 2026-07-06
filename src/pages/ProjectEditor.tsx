@@ -668,17 +668,15 @@ function ProjectEditorInner({
         const currentCategories = categoriesRef.current
 
         if (mode === 'cascade') {
-            const toDelete = new Set<string>()
-            const collect = (id: string) => {
-                toDelete.add(id)
-                currentCategories.filter(c => c.parent_id === id).forEach(c => collect(c.id))
-            }
-            collect(key)
+            const toDeleteIds = collectCategorySubtreeIds(currentCategories, key)
+            const toDelete = new Set(toDeleteIds)
             setCategories(prev => prev.filter(c => !toDelete.has(c.id)))
             if (toDelete.has(key) && (selection.kind === 'category') && toDelete.has(selection.id)) {
                 setSelection({kind: 'project'})
             }
-            await Promise.all([...toDelete].map(id => db_delete_category(id, projectId)))
+            for (const id of [...toDeleteIds].reverse()) {
+                await db_delete_category(id, projectId)
+            }
             await refreshProject()
             touchProjectUpdatedAt()
         } else {
