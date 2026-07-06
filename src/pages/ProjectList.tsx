@@ -74,6 +74,10 @@ function normalizeStarredProjectIds(projectIds: string[] | null | undefined) {
     return Array.from(new Set((projectIds ?? []).filter(Boolean)))
 }
 
+function buildProjectMarkdownLink(project: Project) {
+    return `[${project.name}](fc://project/${encodeURIComponent(project.id)})`
+}
+
 function hasSeenHomeWelcome(): boolean {
     try {
         return window.localStorage.getItem(HOME_WELCOME_STORAGE_KEY) === 'done'
@@ -481,16 +485,26 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
     }, [saveStarredProjectIds, showAlert, starredProjectIds])
 
+    const copyProjectLink = useCallback(async (project: Project) => {
+        try {
+            await navigator.clipboard.writeText(buildProjectMarkdownLink(project))
+            await showAlert('链接已复制', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            await showAlert(`复制链接失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [showAlert])
+
     const handleProjectContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, project: Project) => {
         showContextMenu(event, [
             {
                 label: starredProjectIdSet.has(project.id) ? '取消标星' : '标星',
                 onClick: () => void toggleProjectStar(project),
             },
+            {label: '复制链接', onClick: () => void copyProjectLink(project)},
             {label: '重命名', onClick: () => setRenameProject(project)},
             {label: '删除', danger: true, onClick: () => void handleDeleteProject(project)},
         ])
-    }, [handleDeleteProject, showContextMenu, starredProjectIdSet, toggleProjectStar])
+    }, [copyProjectLink, handleDeleteProject, showContextMenu, starredProjectIdSet, toggleProjectStar])
 
     const projectCountLabel = hasLoadedProjects ? projects.length : '-'
     const filteredProjectCountLabel = hasLoadedProjects ? filteredProjects.length : '-'

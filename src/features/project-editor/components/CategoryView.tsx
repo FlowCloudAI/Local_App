@@ -25,6 +25,7 @@ import {
     setting_update_settings,
 } from '../../../api'
 import EntryCoverImage from '../../entries/components/EntryCoverImage'
+import {buildInternalEntryMarkdown} from '../../entries/lib/entryMarkdown'
 import {RenameDialog} from '../../../shared/ui/overlay'
 import EntryTypeIcon from './EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
@@ -679,6 +680,15 @@ function CategoryView({
         }
     }, [onEntryDeleted, projectId, saveStarredEntryIds, showAlert, starredEntryIds])
 
+    const copyEntryLink = useCallback(async (entry: EntryBrief) => {
+        try {
+            await navigator.clipboard.writeText(buildInternalEntryMarkdown(entry.title, entry.id, projectId))
+            await showAlert('链接已复制', 'success', 'nonInvasive', 1500)
+        } catch (error) {
+            await showAlert(`复制链接失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        }
+    }, [projectId, showAlert])
+
     const starredEntryIdSet = useMemo(() => new Set(starredEntryIds), [starredEntryIds])
 
     const handleEntryContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, entry: EntryBrief) => {
@@ -687,10 +697,11 @@ function CategoryView({
                 label: starredEntryIdSet.has(entry.id) ? '取消标星' : '标星',
                 onClick: () => void toggleEntryStar(entry),
             },
+            {label: '复制链接', onClick: () => void copyEntryLink(entry)},
             {label: '重命名', onClick: () => setRenameEntry(entry)},
             {label: '删除', danger: true, onClick: () => void handleDeleteEntry(entry)},
         ])
-    }, [handleDeleteEntry, showContextMenu, starredEntryIdSet, toggleEntryStar])
+    }, [copyEntryLink, handleDeleteEntry, showContextMenu, starredEntryIdSet, toggleEntryStar])
 
     const handleEntriesContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
         if (
