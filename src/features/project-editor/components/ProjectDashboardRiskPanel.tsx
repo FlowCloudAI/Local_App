@@ -1,4 +1,5 @@
 import {useState} from 'react'
+import {Button, RollingBox} from 'flowcloudai-ui'
 import type {ProjectStats} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import type {ProjectRiskSummary} from './ProjectOverview.types'
@@ -90,22 +91,29 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: Pro
                 ariaLabel="待处理问题相关词条"
                 className="pe-risk-entry-panel"
             >
-                <div className="pe-risk-entry-list">
-                    {relatedEntries.length > 0 ? relatedEntries.map(entry => (
-                        <button
-                            key={entry.id}
-                            type="button"
-                            className="pe-risk-entry-link"
-                            onClick={() => {
-                                setActiveIssue(null)
-                                onOpenEntry?.(entry)
-                            }}
-                        >
-                            {entry.title}
-                        </button>
-                    )) : (
-                        <p className="pe-dashboard-empty">暂无相关词条</p>
-                    )}
+                <RollingBox axis="y" showThumb="auto" thumbSize="thin" className="pe-risk-entry-scroll">
+                    <div className="pe-risk-entry-list">
+                        {relatedEntries.length > 0 ? relatedEntries.map(entry => (
+                            <button
+                                key={entry.id}
+                                type="button"
+                                className="pe-risk-entry-link"
+                                onClick={() => {
+                                    setActiveIssue(null)
+                                    onOpenEntry?.(entry)
+                                }}
+                            >
+                                {entry.title}
+                            </button>
+                        )) : (
+                            <p className="pe-dashboard-empty">暂无相关词条</p>
+                        )}
+                    </div>
+                </RollingBox>
+                <div className="pe-risk-entry-footer">
+                    <Button type="button" variant="primary" size="sm" onClick={() => setActiveIssue(null)}>
+                        确认
+                    </Button>
                 </div>
             </FloatingPanel>
         </>

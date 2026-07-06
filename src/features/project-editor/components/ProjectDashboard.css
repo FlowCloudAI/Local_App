@@ -410,8 +410,15 @@
 }
 
 .pe-risk-entry-panel {
+    display: flex;
+    flex-direction: column;
     width: min(34rem, calc(100vw - var(--fc-space-3xl) - var(--fc-space-3xl)));
     margin: var(--fc-space-lg);
+    overflow: hidden;
+}
+
+.pe-risk-entry-scroll {
+    max-height: min(22rem, 52vh);
 }
 
 .pe-risk-entry-list {
@@ -441,4 +448,11 @@
 .pe-risk-entry-link:focus-visible {
     border-color: color-mix(in srgb, var(--fc-color-primary) 56%, var(--fc-color-border));
     background: var(--fc-color-primary-subtle);
+}
+
+.pe-risk-entry-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-lg);
+    border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 64%, transparent);
 }

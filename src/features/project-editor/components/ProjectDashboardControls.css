@@ -32,8 +32,9 @@
     grid-template-rows: auto auto;
     column-gap: var(--fc-space-sm);
     align-items: center;
-    padding: var(--fc-space-sm) 0;
+    padding: var(--fc-space-sm) var(--fc-space-md);
     border-top: 1px dashed color-mix(in srgb, var(--fc-color-border) 48%, transparent);
+    border-radius: var(--fc-radius-md);
 }
 
 button.pe-dashboard-issue-row {
@@ -48,12 +49,7 @@ button.pe-dashboard-issue-row {
 }
 
 .pe-dashboard-issue-row:first-child {
-    padding-top: 0;
     border-top: 0;
-}
-
-.pe-dashboard-issue-row:last-child {
-    padding-bottom: 0;
 }
 
 .pe-dashboard-issue-row--clickable {
