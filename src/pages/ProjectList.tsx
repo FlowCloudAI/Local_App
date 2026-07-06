@@ -824,7 +824,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             />
             <FcworldProgressDialog progress={fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
-                <div className="project-list-page fc-page-shell" onContextMenu={handlePageContextMenu}>
+                <div className="project-list-page fc-page-shell">
                     <section className="project-home-hero" data-tour-id="home-overview">
                         <div className="project-home-hero__main">
                             <div className="project-list-title-block fc-page-title-block">
@@ -960,7 +960,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             </section>
                     </div>
 
-                    <section className="project-home-workbench">
+                    <section className="project-home-workbench" onContextMenu={handlePageContextMenu}>
                         <div className="project-list-header fc-page-header">
                             <div className="project-list-title-block fc-page-title-block">
                                 <h2 className="project-list-section-title">我的世界</h2>
