@@ -29,6 +29,7 @@ export interface ProjectDashboardModelInput {
     onOpenTimeline?: () => void
     onOpenWorldMap?: () => void
     onOpenContradiction?: () => void
+    onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
 export interface ProjectDashboardModel {

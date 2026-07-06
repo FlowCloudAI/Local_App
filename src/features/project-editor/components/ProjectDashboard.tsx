@@ -106,7 +106,11 @@ function ProjectDashboard(props: ProjectDashboardProps) {
                 </div>
 
                 <aside className="pe-dashboard-sidebar">
-                    <ProjectDashboardRiskPanel projectStats={props.projectStats} riskSummary={props.riskSummary}/>
+                    <ProjectDashboardRiskPanel
+                        projectStats={props.projectStats}
+                        riskSummary={props.riskSummary}
+                        onOpenEntry={props.onOpenEntry}
+                    />
                 </aside>
             </div>
         </section>

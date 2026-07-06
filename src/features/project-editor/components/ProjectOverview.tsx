@@ -35,6 +35,7 @@ function ProjectOverview({
                              onOpenTimeline,
                              onOpenWorldMap,
                              onOpenContradiction,
+                             onOpenEntry,
                              onRename,
                              onEditCover,
                              onClearCover,
@@ -124,6 +125,7 @@ function ProjectOverview({
                 onOpenTimeline={onOpenTimeline}
                 onOpenWorldMap={onOpenWorldMap}
                 onOpenContradiction={onOpenContradiction}
+                onOpenEntry={onOpenEntry}
             />
 
             <ProjectConfigOverview

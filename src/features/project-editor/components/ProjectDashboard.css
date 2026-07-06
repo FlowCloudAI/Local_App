@@ -102,6 +102,15 @@
     padding: var(--fc-space-md);
 }
 
+.pe-dashboard-panel--clickable {
+    cursor: pointer;
+}
+
+.pe-dashboard-panel--clickable:hover,
+.pe-dashboard-panel--clickable:focus-visible {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 54%, var(--fc-color-border));
+}
+
 .pe-dashboard-panel--primary {
     background: color-mix(in srgb, var(--fc-color-primary) 4%, var(--fc-color-bg-secondary));
 }
@@ -407,4 +416,30 @@
 
 .pe-dashboard-empty {
     margin: 0;
+}
+
+.pe-risk-entry-list {
+    display: grid;
+    gap: var(--fc-space-sm);
+    min-width: min(22rem, 70vw);
+}
+
+.pe-risk-entry-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--fc-color-border) 80%, transparent);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    text-align: left;
+    cursor: pointer;
+}
+
+.pe-risk-entry-link:hover,
+.pe-risk-entry-link:focus-visible {
+    border-color: color-mix(in srgb, var(--fc-color-primary) 56%, var(--fc-color-border));
+    background: var(--fc-color-primary-subtle);
 }

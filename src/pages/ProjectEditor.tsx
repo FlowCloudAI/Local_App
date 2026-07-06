@@ -77,6 +77,7 @@ const ROOT_ID = '__project_root__'
 const ALL_ENTRIES_CACHE_KEY = '__all_entries__'
 const CATEGORY_PREFETCH_LIMIT = 6
 const DEFAULT_CATEGORY_NAME = '新建分类'
+const RISK_RELATED_ENTRY_LIMIT = 24
 
 interface Props {
     projectId: string
@@ -370,11 +371,23 @@ function ProjectEditorInner({
 
             if (riskResult.status === 'fulfilled') {
                 const reports = riskResult.value
+                const relatedEntryIds = Array.from(new Set(reports.flatMap(report => report.sourceEntryIds)))
+                    .slice(0, RISK_RELATED_ENTRY_LIMIT)
+                const relatedEntries = (await Promise.all(relatedEntryIds.map(async id => {
+                    try {
+                        const entry = await db_get_entry(id, projectId)
+                        return {id: entry.id, title: entry.title}
+                    } catch {
+                        return null
+                    }
+                }))).filter((entry): entry is { id: string; title: string } => Boolean(entry))
+                if (cancelled) return
                 setRiskSummary({
                     reportCount: reports.length,
                     issueCount: reports.reduce((sum, report) => sum + report.issueCount, 0),
                     unresolvedCount: reports.reduce((sum, report) => sum + report.unresolvedCount, 0),
                     latestOverview: reports[0]?.overview ?? null,
+                    relatedEntries,
                 })
             } else {
                 logger.warn('ProjectEditor contradiction summary load failed', riskResult.reason)
@@ -1284,6 +1297,7 @@ function ProjectEditorInner({
                                 onOpenTimeline={() => handleOpenProjectPanel('timeline')}
                                 onOpenWorldMap={() => handleOpenProjectPanel('world-map')}
                                 onOpenContradiction={() => handleOpenProjectPanel('contradiction')}
+                                onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 onRename={(name) => handleRename(ROOT_ID, name)}
                                 onEditCover={() => setCoverPickerOpen(true)}
                                 onClearCover={() => {

@@ -28,6 +28,7 @@ export interface ProjectOverviewProps {
     onOpenTimeline?: () => void
     onOpenWorldMap?: () => void
     onOpenContradiction?: () => void
+    onOpenEntry?: (entry: { id: string; title: string }) => void
     onRename?: (name: string) => void | Promise<void>
     onEditCover?: () => void
     onClearCover?: () => void
@@ -48,4 +49,5 @@ export interface ProjectRiskSummary {
     issueCount: number
     unresolvedCount: number
     latestOverview?: string | null
+    relatedEntries: Array<{ id: string; title: string }>
 }

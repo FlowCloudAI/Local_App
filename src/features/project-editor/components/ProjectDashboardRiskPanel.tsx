@@ -1,10 +1,13 @@
+import {useState} from 'react'
 import type {ProjectStats} from '../../../api'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import type {ProjectRiskSummary} from './ProjectOverview.types'
 import {DashboardIssueList, type DashboardIssueItem} from './ProjectDashboardParts'
 
 interface ProjectDashboardRiskPanelProps {
     projectStats?: ProjectStats | null
     riskSummary?: ProjectRiskSummary | null
+    onOpenEntry?: (entry: { id: string; title: string }) => void
 }
 
 function severityOf(value: number | null | undefined, dangerAt = 1): DashboardIssueItem['severity'] {
@@ -12,7 +15,8 @@ function severityOf(value: number | null | undefined, dangerAt = 1): DashboardIs
     return value >= dangerAt ? 'danger' : 'warn'
 }
 
-function ProjectDashboardRiskPanel({projectStats, riskSummary}: ProjectDashboardRiskPanelProps) {
+function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: ProjectDashboardRiskPanelProps) {
+    const [entryPanelOpen, setEntryPanelOpen] = useState(false)
     const qualityItems: DashboardIssueItem[] = [
         {
             key: 'uncategorized',
@@ -65,18 +69,58 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary}: ProjectDashboard
         },
     ]
     const issueTotal = qualityItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
+    const relatedEntries = riskSummary?.relatedEntries ?? []
+    const openRelatedEntries = () => setEntryPanelOpen(true)
 
     return (
-        <article className="pe-dashboard-panel pe-dashboard-panel--quality">
-            <div className="pe-dashboard-panel__header">
-                <h3>待处理问题</h3>
-                <span>{issueTotal > 0 ? `${issueTotal} 项待处理` : '状态正常'}</span>
-            </div>
-            <DashboardIssueList items={qualityItems}/>
-            {riskSummary?.latestOverview && (
-                <p className="pe-dashboard-empty">{riskSummary.latestOverview}</p>
-            )}
-        </article>
+        <>
+            <article
+                className="pe-dashboard-panel pe-dashboard-panel--quality pe-dashboard-panel--clickable"
+                role="button"
+                tabIndex={0}
+                onClick={openRelatedEntries}
+                onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openRelatedEntries()
+                    }
+                }}
+            >
+                <div className="pe-dashboard-panel__header">
+                    <h3>待处理问题</h3>
+                    <span>{issueTotal > 0 ? `${issueTotal} 项待处理` : '状态正常'}</span>
+                </div>
+                <DashboardIssueList items={qualityItems}/>
+                {riskSummary?.latestOverview && (
+                    <p className="pe-dashboard-empty">{riskSummary.latestOverview}</p>
+                )}
+            </article>
+            <FloatingPanel
+                open={entryPanelOpen}
+                onClose={() => setEntryPanelOpen(false)}
+                title="相关词条"
+                ariaLabel="待处理问题相关词条"
+                className="pe-risk-entry-panel"
+            >
+                <div className="pe-risk-entry-list">
+                    {relatedEntries.length > 0 ? relatedEntries.map(entry => (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            className="pe-risk-entry-link"
+                            onClick={() => {
+                                setEntryPanelOpen(false)
+                                onOpenEntry?.(entry)
+                            }}
+                        >
+                            {entry.title}
+                        </button>
+                    )) : (
+                        <p className="pe-dashboard-empty">暂无相关词条</p>
+                    )}
+                </div>
+            </FloatingPanel>
+        </>
     )
 }
 
