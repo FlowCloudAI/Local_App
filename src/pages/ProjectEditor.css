@@ -449,6 +449,18 @@
     isolation: isolate;
 }
 
+.pe-overview-entries .pe-category-view {
+    height: auto;
+    overflow: visible;
+}
+
+.pe-overview-entries .pe-category-navigation {
+    position: sticky;
+    top: var(--pe-breadcrumb-height);
+    z-index: 4;
+    background: var(--fc-color-bg);
+}
+
 .pe-quick-actions,
 .pe-dashboard-section,
 .pe-config-grid {
