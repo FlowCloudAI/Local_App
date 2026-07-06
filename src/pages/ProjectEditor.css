@@ -1500,6 +1500,7 @@
     padding: 0.55rem 1rem;
     border-bottom: 1px solid var(--fc-color-border);
     flex-shrink: 0;
+    min-width: 0;
 }
 
 .pe-subcategory-strip__title {
@@ -1509,17 +1510,24 @@
 }
 
 .pe-subcategory-list {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 2.65rem;
+}
+
+.pe-subcategory-list .fc-roll__content {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-width: 0;
-    flex-wrap: wrap;
+    min-height: 0;
+    padding-bottom: 0.15rem;
 }
 
 .pe-subcategory-card {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
+    flex: 0 0 auto;
     min-height: 2rem;
     max-width: 14rem;
     padding: 0.35rem 0.7rem;

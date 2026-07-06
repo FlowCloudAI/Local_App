@@ -671,7 +671,7 @@ function CategoryView({
                 {childCategories.length > 0 && (
                     <div className="pe-subcategory-strip" aria-label="子分类">
                         <span className="pe-subcategory-strip__title">子分类</span>
-                        <div className="pe-subcategory-list">
+                        <RollingBox axis="x" className="pe-subcategory-list" thumbSize="thin">
                             {childCategories.map((category) => (
                                 <button
                                     key={category.id}
@@ -684,7 +684,7 @@ function CategoryView({
                                     <span className="pe-subcategory-card__name">{category.name}</span>
                                 </button>
                             ))}
-                        </div>
+                        </RollingBox>
                     </div>
                 )}
             </div>
