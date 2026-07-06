@@ -19,6 +19,7 @@ import {
     type CategoryCreatedEvent,
     type CategoryDeletedEvent,
     type CustomEntryType,
+    db_count_entries,
     db_create_category,
     db_create_entry,
     db_delete_category,
@@ -172,6 +173,14 @@ function nextDefaultCategoryName(categories: Category[], parentId: string | null
         }
         index += 1
     }
+}
+
+function collectCategorySubtreeIds(categories: Category[], categoryId: string): string[] {
+    const ids = [categoryId]
+    for (const category of categories) {
+        if (category.parent_id === categoryId) ids.push(...collectCategorySubtreeIds(categories, category.id))
+    }
+    return ids
 }
 
 function ProjectEditorInner({
@@ -656,12 +665,13 @@ function ProjectEditorInner({
 
     const handleDelete = async (key: string, mode: 'lift' | 'cascade') => {
         if (key === ROOT_ID) return
+        const currentCategories = categoriesRef.current
 
         if (mode === 'cascade') {
             const toDelete = new Set<string>()
             const collect = (id: string) => {
                 toDelete.add(id)
-                categories.filter(c => c.parent_id === id).forEach(c => collect(c.id))
+                currentCategories.filter(c => c.parent_id === id).forEach(c => collect(c.id))
             }
             collect(key)
             setCategories(prev => prev.filter(c => !toDelete.has(c.id)))
@@ -672,9 +682,9 @@ function ProjectEditorInner({
             await refreshProject()
             touchProjectUpdatedAt()
         } else {
-            const target = categories.find(c => c.id === key)
+            const target = currentCategories.find(c => c.id === key)
             if (!target) return
-            const children = categories.filter(c => c.parent_id === key)
+            const children = currentCategories.filter(c => c.parent_id === key)
             setCategories(prev =>
                 prev
                     .map(c => c.parent_id === key ? {...c, parent_id: target.parent_id ?? null} : c)
@@ -691,6 +701,22 @@ function ProjectEditorInner({
             await db_delete_category(key, projectId)
             await refreshProject()
             touchProjectUpdatedAt()
+        }
+    }
+
+    const handleDeleteRequest = async (node: CategoryTreeNode) => {
+        try {
+            const subtreeIds = collectCategorySubtreeIds(categoriesRef.current, node.key)
+            const entryCounts = await Promise.all(subtreeIds.map(categoryId =>
+                db_count_entries({projectId, categoryId, entryType: null})
+            ))
+            if (entryCounts.every(count => count === 0)) {
+                await handleDelete(node.key, 'cascade')
+                return
+            }
+            setDeleteTarget(node)
+        } catch (error) {
+            await showAlert(`删除分类失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         }
     }
 
@@ -1169,7 +1195,9 @@ function ProjectEditorInner({
                                     onSelect={handleSelect}
                                     onRename={handleRename}
                                     onCreate={handleCreate}
-                                    onDeleteRequest={(node) => setDeleteTarget(node)}
+                                    onDeleteRequest={(node) => {
+                                        void handleDeleteRequest(node)
+                                    }}
                                     onMove={handleMove}
                                     searchable
                                     hideRoot
