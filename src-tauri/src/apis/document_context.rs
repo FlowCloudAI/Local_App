@@ -37,15 +37,23 @@ pub fn docctx_supported_extensions() -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn docctx_add_files(
+pub async fn docctx_add_files(
     app: AppHandle,
     paths: State<'_, PathsState>,
     conversation_id: Option<String>,
     file_paths: Vec<String>,
 ) -> Result<Vec<DocumentContextItem>, ApiError> {
-    #[cfg(target_os = "android")]
-    let file_paths = prepare_android_file_paths(paths.inner(), file_paths)?;
-    let items = create_pending_items(paths.inner(), conversation_id, file_paths)?;
+    let paths_for_create = clone_paths(paths.inner());
+    let items = tauri::async_runtime::spawn_blocking(
+        move || -> Result<Vec<DocumentContextItem>, ApiError> {
+            #[cfg(target_os = "android")]
+            let file_paths = prepare_android_file_paths(&paths_for_create, file_paths)?;
+            create_pending_items(&paths_for_create, conversation_id, file_paths)
+                .map_err(ApiError::from)
+        },
+    )
+    .await
+    .map_err(|error| ApiError::internal(format!("添加文档任务异常退出：{}", error)))??;
     for item in items.clone() {
         if item.status == crate::document_context::DocumentContextStatus::Ready {
             emit_update(&app, item);

@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Context, Result, anyhow};
 use chrono::Utc;
@@ -19,6 +20,9 @@ use super::parser::default_parser_registry;
 
 const INDEX_FILE: &str = "index.json";
 const DEFAULT_CONTEXT_CHAR_BUDGET: usize = 24_000;
+const MAX_DOCUMENT_SOURCE_BYTES: u64 = 50 * 1024 * 1024;
+
+static INDEX_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,7 +54,6 @@ pub fn create_pending_items(
 ) -> Result<Vec<DocumentContextItem>> {
     let root = context_root_dir(paths)?;
     fs::create_dir_all(files_dir(&root))?;
-    let mut index = read_index(&root)?;
     let supported_extensions = default_parser_registry().supported_extensions();
     let mut created = Vec::new();
 
@@ -81,14 +84,16 @@ pub fn create_pending_items(
             };
             return Err(anyhow!("当前不支持解析 {} 文件", extension_label));
         }
+        ensure_source_size_allowed(&source_path)?;
         let sha256 = sha256_file(&source_path)?;
+        let archived_source_path = archive_source_file(&root, &source_path, &sha256, &extension)?;
         let now = Utc::now().to_rfc3339();
         let cached = read_cached_parse_output(&root, &sha256).ok();
         let item = DocumentContextItem {
             id: Uuid::new_v4().to_string(),
             conversation_id: conversation_id.clone(),
             file_name,
-            source_path: raw_path,
+            source_path: archived_source_path.to_string_lossy().to_string(),
             sha256,
             extension,
             parser_id: cached.as_ref().map(|cache| cache.meta.parser_id.clone()),
@@ -110,12 +115,69 @@ pub fn create_pending_items(
             updated_at: now,
             error: None,
         };
-        index.items.push(item.clone());
         created.push(item);
     }
 
+    let _guard = lock_index()?;
+    let mut index = read_index(&root)?;
+    index.items.extend(created.iter().cloned());
     write_index(&root, &index)?;
     Ok(created)
+}
+
+fn ensure_source_size_allowed(source_path: &Path) -> Result<()> {
+    let metadata = fs::metadata(source_path)
+        .with_context(|| format!("读取文件信息失败：{}", source_path.display()))?;
+    if metadata.len() > MAX_DOCUMENT_SOURCE_BYTES {
+        return Err(anyhow!(
+            "文件超过大小限制：{} MB",
+            MAX_DOCUMENT_SOURCE_BYTES / 1024 / 1024
+        ));
+    }
+    Ok(())
+}
+
+fn archive_source_file(
+    root: &Path,
+    source_path: &Path,
+    sha256: &str,
+    extension: &str,
+) -> Result<PathBuf> {
+    let item_dir = files_dir(root).join(sha256);
+    fs::create_dir_all(&item_dir)
+        .with_context(|| format!("创建文档归档目录失败：{}", item_dir.display()))?;
+    let target_path = item_dir.join(source_archive_file_name(extension));
+    if target_path.is_file() {
+        return Ok(target_path);
+    }
+
+    let temp_path = item_dir.join(format!("source.{}.tmp", Uuid::new_v4()));
+    fs::copy(source_path, &temp_path).with_context(|| {
+        format!(
+            "归档源文件失败：{} -> {}",
+            source_path.display(),
+            temp_path.display()
+        )
+    })?;
+
+    if let Err(error) = fs::rename(&temp_path, &target_path) {
+        if target_path.is_file() {
+            let _ = fs::remove_file(&temp_path);
+        } else {
+            return Err(error)
+                .with_context(|| format!("保存归档源文件失败：{}", target_path.display()));
+        }
+    }
+
+    Ok(target_path)
+}
+
+fn source_archive_file_name(extension: &str) -> String {
+    if extension.is_empty() {
+        "source".to_string()
+    } else {
+        format!("source.{}", extension)
+    }
 }
 
 struct CachedParseOutput {
@@ -155,6 +217,7 @@ pub fn list_items(
     conversation_id: Option<&str>,
 ) -> Result<Vec<DocumentContextItem>> {
     let root = context_root_dir(paths)?;
+    let _guard = lock_index()?;
     let mut items = read_index(&root)?.items;
     if let Some(conversation_id) = conversation_id {
         items.retain(|item| item.conversation_id.as_deref() == Some(conversation_id));
@@ -165,6 +228,7 @@ pub fn list_items(
 
 pub fn get_item(paths: &PathsState, item_id: &str) -> Result<DocumentContextItem> {
     let root = context_root_dir(paths)?;
+    let _guard = lock_index()?;
     read_index(&root)?
         .items
         .into_iter()
@@ -186,11 +250,7 @@ pub fn save_parse_success(
     parsed: &ParsedDocument,
 ) -> Result<DocumentContextItem> {
     let root = context_root_dir(paths)?;
-    let item = read_index(&root)?
-        .items
-        .into_iter()
-        .find(|item| item.id == item_id)
-        .ok_or_else(|| anyhow!("未找到文档上下文：{}", item_id))?;
+    let item = get_item(paths, item_id)?;
     let item_dir = files_dir(&root).join(&item.sha256);
     fs::create_dir_all(&item_dir)?;
 
@@ -239,6 +299,7 @@ pub fn save_parse_failure(
 
 pub fn remove_item(paths: &PathsState, item_id: &str) -> Result<()> {
     let root = context_root_dir(paths)?;
+    let _guard = lock_index()?;
     let mut index = read_index(&root)?;
     let before = index.items.len();
     index.items.retain(|item| item.id != item_id);
@@ -254,6 +315,7 @@ pub fn reassign_conversation(
     to_conversation_id: &str,
 ) -> Result<Vec<DocumentContextItem>> {
     let root = context_root_dir(paths)?;
+    let _guard = lock_index()?;
     let mut index = read_index(&root)?;
     let now = Utc::now().to_rfc3339();
     let mut updated = Vec::new();
@@ -282,7 +344,10 @@ pub fn build_context_markdown(
     max_chars: Option<usize>,
 ) -> Result<DocumentContextBuildResult> {
     let root = context_root_dir(paths)?;
-    let index = read_index(&root)?;
+    let items = {
+        let _guard = lock_index()?;
+        read_index(&root)?.items
+    };
     let selected: HashSet<&str> = item_ids.iter().map(String::as_str).collect();
     let budget = max_chars.unwrap_or(DEFAULT_CONTEXT_CHAR_BUDGET);
     let mut remaining = budget;
@@ -292,7 +357,7 @@ pub fn build_context_markdown(
 
     markdown.push_str("[用户附件上下文]\n以下内容来自用户添加的本地文件，仅作为回答参考。不要编造文件中没有的内容。\n\n");
 
-    for item in index.items {
+    for item in items {
         if item.conversation_id.as_deref() != Some(conversation_id) {
             continue;
         }
@@ -385,6 +450,12 @@ fn index_path(root: &Path) -> PathBuf {
     root.join(INDEX_FILE)
 }
 
+fn lock_index() -> Result<MutexGuard<'static, ()>> {
+    INDEX_LOCK
+        .lock()
+        .map_err(|_| anyhow!("文档上下文索引锁已损坏"))
+}
+
 fn read_index(root: &Path) -> Result<DocumentContextIndex> {
     let path = index_path(root);
     if !path.exists() {
@@ -404,6 +475,7 @@ fn update_item(
     update: impl FnOnce(&mut DocumentContextItem),
 ) -> Result<DocumentContextItem> {
     let root = context_root_dir(paths)?;
+    let _guard = lock_index()?;
     let mut index = read_index(&root)?;
     let item = index
         .items
@@ -460,4 +532,104 @@ fn write_json_file<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     fs::rename(&temp_path, path)
         .with_context(|| format!("保存 JSON 文件失败：{}", path.display()))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, File};
+
+    use tempfile::TempDir;
+
+    use crate::PathsState;
+    use crate::document_context::DocumentContextStatus;
+
+    use super::{MAX_DOCUMENT_SOURCE_BYTES, create_pending_items, list_items, mark_item_parsing};
+
+    fn test_paths(temp_dir: &TempDir) -> PathsState {
+        PathsState {
+            db_path: temp_dir.path().join("flowcloudai.db"),
+            plugins_path: temp_dir.path().join("plugins"),
+        }
+    }
+
+    #[test]
+    fn create_pending_items_archives_source_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let source_path = temp_dir.path().join("source.txt");
+        fs::write(&source_path, "alpha").unwrap();
+
+        let items = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![source_path.to_string_lossy().to_string()],
+        )
+        .unwrap();
+
+        let item = items.into_iter().next().unwrap();
+        assert_ne!(item.source_path, source_path.to_string_lossy());
+        assert!(item.source_path.ends_with("source.txt"));
+        fs::remove_file(&source_path).unwrap();
+        assert_eq!(fs::read_to_string(&item.source_path).unwrap(), "alpha");
+    }
+
+    #[test]
+    fn create_pending_items_rejects_oversized_source_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let source_path = temp_dir.path().join("large.txt");
+        File::create(&source_path)
+            .unwrap()
+            .set_len(MAX_DOCUMENT_SOURCE_BYTES + 1)
+            .unwrap();
+
+        let error = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![source_path.to_string_lossy().to_string()],
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("大小限制"));
+    }
+
+    #[test]
+    fn concurrent_index_updates_keep_all_items() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let first_path = temp_dir.path().join("first.txt");
+        let second_path = temp_dir.path().join("second.txt");
+        fs::write(&first_path, "first").unwrap();
+        fs::write(&second_path, "second").unwrap();
+        let items = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![
+                first_path.to_string_lossy().to_string(),
+                second_path.to_string_lossy().to_string(),
+            ],
+        )
+        .unwrap();
+
+        let handles = items
+            .iter()
+            .map(|item| {
+                let paths = paths.clone();
+                let item_id = item.id.clone();
+                std::thread::spawn(move || mark_item_parsing(&paths, &item_id).unwrap())
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let items = list_items(&paths, Some("conv_a")).unwrap();
+        assert_eq!(items.len(), 2);
+        assert!(
+            items
+                .iter()
+                .all(|item| item.status == DocumentContextStatus::Parsing)
+        );
+    }
 }
