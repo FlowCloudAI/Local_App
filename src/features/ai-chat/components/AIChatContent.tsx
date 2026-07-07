@@ -59,10 +59,10 @@ const CONTEXT_USAGE_RING_RADIUS = 10
 const CONTEXT_USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_USAGE_RING_RADIUS
 const CONVERSATION_SETTING_TOOLTIPS = {
     temperature: '温度：控制回答的随机性，越高越发散，越低越稳定。',
-    topP: 'top_p：限制候选词累计概率，越低越集中，越高越开放。',
+    topP: '回答开放度：越低越稳定严谨，越高越自由发散。',
     frequencyPenalty: '重复惩罚：启用后降低重复用词和句式，可设置具体强度。',
     presencePenalty: '存在惩罚：启用后鼓励模型引入新内容，可设置具体强度。',
-    systemPrompt: '当前对话独有提示词：只作用于当前对话，会作为额外 system 提示发送。',
+    systemPrompt: '当前对话独有 AI 指令：只作用于当前对话，会作为额外指令发送。',
 } as const
 const AI_TOOL_ACCESS_LABELS: Record<AiToolAccessMode, string> = {
     reader: '读者模式',
@@ -503,7 +503,7 @@ export default function AIChatContent({
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
     const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
-    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 LLM 插件'
+    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 AI 对话插件'
     const contextPluginInfo = ctx.plugins.find((plugin) => plugin.id === (activeConversation?.pluginId ?? ctx.selectedPlugin))
     const contextModelId = activeConversation?.model || ctx.selectedModel
     const contextModelInfo = contextPluginInfo?.model_infos.find((modelInfo) => modelInfo.id === contextModelId)
@@ -523,15 +523,15 @@ export default function AIChatContent({
             + currentInputTokenEstimate
         const usageTokens = latestUsage?.total_tokens ?? 0
         const usedTokens = Math.max(usageTokens, estimatedTokens)
-        const source = latestUsage && usageTokens >= estimatedTokens ? '供应商 usage' : '本地估算'
+        const source = latestUsage && usageTokens >= estimatedTokens ? '服务返回' : '本地估算'
         if (!contextWindowTokens || contextWindowTokens <= 0) {
             return {
                 label: usedTokens > 0 ? '?' : '0%',
                 percent: 0,
                 ringPercent: 0,
                 title: usedTokens > 0
-                    ? `上下文窗口信息未返回，已估算当前上下文约 ${formatTokenCount(usedTokens)} tokens`
-                    : '上下文窗口信息未返回，暂以 0% 显示',
+                    ? `对话记忆容量信息未返回，已估算当前对话记忆约 ${formatTokenCount(usedTokens)}`
+                    : '对话记忆容量信息未返回，暂以 0% 显示',
             }
         }
         const percent = Math.min(100, Math.max(0, (usedTokens / contextWindowTokens) * 100))
@@ -540,7 +540,7 @@ export default function AIChatContent({
             label,
             percent,
             ringPercent: percent > 0 && percent < 1 ? 1 : percent,
-            title: `上下文占用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)} tokens）`,
+            title: `对话记忆已用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)}）`,
         }
     }, [activeConversation?.settings.systemPrompt, contextWindowTokens, ctx.inputValue, ctx.messages, latestUsage])
     const showContextUsageIndicator = Boolean(contextModelId)
@@ -746,9 +746,9 @@ export default function AIChatContent({
     const sendDisabledReason = isArchivedConversation
         ? '取消归档后继续对话'
         : llmUnavailable
-            ? '请先安装 LLM 插件'
+            ? '请先安装 AI 对话插件'
             : llmApiKeyMissing
-                ? `请先配置 ${activeLlmPluginName} 的 API Key`
+                ? `请先配置 ${activeLlmPluginName} 的访问密钥`
                 : ctx.isStreaming
                     ? '正在生成中'
                     : !ctx.inputValue.trim()
@@ -963,7 +963,7 @@ export default function AIChatContent({
     const handleSendCurrentInput = useCallback(async () => {
         const rawInput = ctx.inputValue
         if (llmApiKeyMissing) {
-            await showAlert(`LLM 插件「${activeLlmPluginName}」尚未配置 API Key。`, 'warning', 'nonInvasive', 2600)
+            await showAlert(`AI 对话插件「${activeLlmPluginName}」尚未配置访问密钥。`, 'warning', 'nonInvasive', 2600)
             return
         }
         if (isArchivedConversation || llmUnavailable || !rawInput.trim() || ctx.isStreaming) return
@@ -1127,7 +1127,7 @@ export default function AIChatContent({
         }
 
         if (plugins.length === 0) {
-            await showAlert('当前没有可用的语音插件，请先安装 TTS 插件。', 'warning', 'nonInvasive', 2600)
+            await showAlert('当前没有可用的语音插件，请先安装 AI 语音插件。', 'warning', 'nonInvasive', 2600)
             return
         }
 
@@ -1147,7 +1147,7 @@ export default function AIChatContent({
         }
 
         if (!hasApiKey) {
-            await showAlert(`语音插件「${selectedPlugin.name}」尚未配置 API Key。`, 'warning', 'nonInvasive', 2600)
+            await showAlert(`语音插件「${selectedPlugin.name}」尚未配置访问密钥。`, 'warning', 'nonInvasive', 2600)
             return
         }
 
@@ -1752,7 +1752,7 @@ export default function AIChatContent({
                                     />
                                 </label>
                                 <label className="ai-conversation-settings-field" title={CONVERSATION_SETTING_TOOLTIPS.topP}>
-                                    <span>top_p</span>
+                                    <span>回答开放度</span>
                                     <ConversationNumberInput
                                         value={conversationSettings.topP}
                                         min={0}
@@ -1820,7 +1820,7 @@ export default function AIChatContent({
                                 </div>
                             </div>
                             <label className="ai-conversation-settings-prompt" title={CONVERSATION_SETTING_TOOLTIPS.systemPrompt}>
-                                <span>当前对话独有提示词</span>
+                                <span>当前对话独有 AI 指令</span>
                                 <textarea
                                     value={conversationSettings.systemPrompt}
                                     onChange={(event) => updateConversationSetting('systemPrompt', event.currentTarget.value)}
@@ -1855,7 +1855,7 @@ export default function AIChatContent({
                         )}
                         {!isArchivedConversation && llmApiKeyMissing && (
                             <div className="ai-api-key-input-hint" role="status" aria-live="polite">
-                                <span>LLM 插件「{activeLlmPluginName}」尚未配置 API Key。</span>
+                                <span>AI 对话插件「{activeLlmPluginName}」尚未配置访问密钥。</span>
                                 {onOpenPluginManagement && (
                                     <Button
                                         type="button"
@@ -2007,9 +2007,9 @@ export default function AIChatContent({
                             placeholder={isArchivedConversation
                                 ? '取消归档后继续对话'
                                 : llmUnavailable
-                                    ? '安装 LLM 插件后继续对话'
-                                    : llmApiKeyMissing
-                                        ? '配置 API Key 后继续对话'
+                                    ? '安装 AI 对话插件后继续对话'
+                                : llmApiKeyMissing
+                                        ? '配置访问密钥后继续对话'
                                         : '请输入消息...'}
                         />
                         {inputLimitMessage && (

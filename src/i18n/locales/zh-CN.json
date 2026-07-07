@@ -25,7 +25,7 @@
       "noDefault": "无默认"
     },
     "llm": {
-      "title": "LLM 默认配置",
+      "title": "AI 对话默认配置",
       "plugin": "插件",
       "model": "模型",
       "notSelected": "未选择",
@@ -39,18 +39,18 @@
       "selectPluginFirst": "请先选择插件"
     },
     "tts": {
-      "title": "TTS 默认配置",
+      "title": "AI 语音默认配置",
       "plugin": "插件",
       "model": "模型",
       "notSelected": "未选择",
       "selectPluginFirst": "请先选择插件"
     },
     "apiKey": {
-      "title": "API Key 管理",
+      "title": "访问密钥管理",
       "configured": "✓ 已配置",
       "delete": "删除",
       "configure": "配置",
-      "inputPrompt": "请输入 {{pluginId}} 的 API Key:"
+      "inputPrompt": "请输入 {{pluginId}} 的访问密钥:"
     },
     "actions": {
       "reset": "重置为默认",
@@ -58,8 +58,8 @@
       "saveSuccess": "设置已保存",
       "saveFailed": "保存失败: {{error}}",
       "loadFailed": "加载设置失败: {{error}}",
-      "apiKeySaved": "API Key 已保存",
-      "apiKeyDeleted": "API Key 已删除"
+      "apiKeySaved": "访问密钥已保存",
+      "apiKeyDeleted": "访问密钥已删除"
     }
   },
   "common": {

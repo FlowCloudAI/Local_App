@@ -85,9 +85,9 @@ interface UsageSectionProps {
 }
 
 function getPluginKindLabel(kind: string): string {
-    if (kind.includes('image')) return 'IMAGE'
-    if (kind.includes('tts')) return 'TTS'
-    return 'LLM'
+    if (kind.includes('image')) return 'AI 绘图'
+    if (kind.includes('tts')) return 'AI 语音'
+    return 'AI 对话'
 }
 
 function PluginKindIcon({kind}: {kind: string}) {
@@ -232,7 +232,7 @@ export function MobileSettingsMenuSection({
             >
                 <span className="mobile-settings-menu-item__content">
                     <span className="mobile-settings-menu-item__label">用量统计</span>
-                    <span className="mobile-settings-menu-item__summary">API 调用与 Token 消耗</span>
+                    <span className="mobile-settings-menu-item__summary">AI 使用与消耗统计</span>
                 </span>
                 <ChevronRightIcon/>
             </button>
@@ -294,7 +294,7 @@ export function MobileSettingsAiSection({
                 <div className="mobile-settings-api-key">
                     <div className="mobile-settings-api-key__header">
                         <div>
-                            <div className="mobile-settings-field-label">API Key</div>
+                            <div className="mobile-settings-field-label">访问密钥</div>
                             <div className="mobile-settings-api-key__desc">
                                 仅保存到系统密钥链，不在设置文件中写入明文
                             </div>
@@ -319,7 +319,7 @@ export function MobileSettingsAiSection({
                             onClick={() => void onSaveApiKey()}
                             disabled={!selectedPlugin || apiKeyBusy || !apiKeyDraft.trim()}
                         >
-                            {apiKeyBusy ? '处理中…' : '保存 API Key'}
+                            {apiKeyBusy ? '处理中…' : '保存访问密钥'}
                         </Button>
                         <Button
                             type="button"
@@ -585,7 +585,7 @@ export function MobileSettingsUsageSection({
     return (
         <div className="mobile-settings-section">
             <div className="mobile-settings-section__header">
-                <div className="mobile-settings-plugin-count">查看 API 调用次数与 Token 消耗</div>
+                <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
                 <Button type="button" size="sm" variant="outline" onClick={() => void onRefresh()} disabled={loading}>
                     {loading ? '刷新中…' : '刷新'}
                 </Button>
@@ -594,19 +594,19 @@ export function MobileSettingsUsageSection({
                 <div className="mobile-settings-usage-grid">
                     <div className="mobile-settings-usage-card">
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.call_count)}</div>
-                        <div className="mobile-settings-usage-card__label">API 调用</div>
+                        <div className="mobile-settings-usage-card__label">AI 使用</div>
                     </div>
                     <div className="mobile-settings-usage-card">
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_tokens)}</div>
-                        <div className="mobile-settings-usage-card__label">总 Token</div>
+                        <div className="mobile-settings-usage-card__label">总消耗</div>
                     </div>
                     <div className="mobile-settings-usage-card">
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_prompt_tokens)}</div>
-                        <div className="mobile-settings-usage-card__label">Prompt</div>
+                        <div className="mobile-settings-usage-card__label">提问消耗</div>
                     </div>
                     <div className="mobile-settings-usage-card">
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_completion_tokens)}</div>
-                        <div className="mobile-settings-usage-card__label">Completion</div>
+                        <div className="mobile-settings-usage-card__label">应答消耗</div>
                     </div>
                 </div>
             )}
@@ -623,7 +623,7 @@ export function MobileSettingsUsageSection({
                         <div className="mobile-settings-plugin-item__meta">
                             <span>{row.provider}</span>
                             <span>{formatUsageNumber(row.call_count)} 次</span>
-                            <span>{formatUsageNumber(row.total_tokens)} tokens</span>
+                            <span>{formatUsageNumber(row.total_tokens)} 消耗</span>
                         </div>
                     </div>
                 ))}

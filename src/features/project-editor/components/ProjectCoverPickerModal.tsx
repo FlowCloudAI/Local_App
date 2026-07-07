@@ -253,7 +253,7 @@ export default function ProjectCoverPickerModal({
     const handleFillPrompt = async () => {
         if (fillingPrompt || generateState === 'generating' || applying) return
         if (!aiPluginId) {
-            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
+            void showAlert('当前还没有可用的 AI 对话插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
             return
         }
 
@@ -457,7 +457,7 @@ export default function ProjectCoverPickerModal({
                             )}
 
                             <div className="pe-cover-picker__field">
-                                <label className="pe-cover-picker__label">提示词（Prompt）</label>
+                                <label className="pe-cover-picker__label">画面描述</label>
                                 <textarea
                                     className="pe-cover-picker__textarea"
                                     value={prompt}
@@ -476,7 +476,7 @@ export default function ProjectCoverPickerModal({
                                     onClick={() => void handleFillPrompt()}
                                     disabled={fillingPrompt || generateState === 'generating' || applying}
                                 >
-                                    {fillingPrompt ? '填充中…' : 'AI 填充提示词'}
+                                    {fillingPrompt ? '填充中…' : 'AI 填充描述'}
                                 </Button>
                                 <Button type="button"
                                     size="sm"

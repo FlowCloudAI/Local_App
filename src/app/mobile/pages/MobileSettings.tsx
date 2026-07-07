@@ -344,12 +344,12 @@ export default function MobileSettings({push, pop, page}: Props) {
 
     const handleSaveApiKey = useCallback(async () => {
         if (!selectedPlugin) {
-            await showAlert('请先选择 LLM 插件', 'warning', 'nonInvasive', 1800)
+            await showAlert('请先选择 AI 对话插件', 'warning', 'nonInvasive', 1800)
             return
         }
         const nextApiKey = apiKeyDraft.trim()
         if (!nextApiKey) {
-            await showAlert('请输入 API Key', 'warning', 'nonInvasive', 1800)
+            await showAlert('请输入访问密钥', 'warning', 'nonInvasive', 1800)
             return
         }
 
@@ -361,9 +361,9 @@ export default function MobileSettings({push, pop, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:api-key-changed', {
                 detail: {pluginId: selectedPlugin, hasApiKey: true},
             }))
-            await showAlert('API Key 已保存', 'success', 'nonInvasive', 1500)
+            await showAlert('访问密钥已保存', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            await showAlert(`API Key 保存失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`访问密钥保存失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setApiKeyBusy(false)
         }
@@ -371,7 +371,7 @@ export default function MobileSettings({push, pop, page}: Props) {
 
     const handleDeleteApiKey = useCallback(async () => {
         if (!selectedPlugin) return
-        const result = await showAlert('确认删除当前插件的 API Key？', 'warning', 'confirm')
+        const result = await showAlert('确认删除当前插件的访问密钥？', 'warning', 'confirm')
         if (result !== 'yes') return
 
         try {
@@ -382,9 +382,9 @@ export default function MobileSettings({push, pop, page}: Props) {
             window.dispatchEvent(new CustomEvent('fc:api-key-changed', {
                 detail: {pluginId: selectedPlugin, hasApiKey: false},
             }))
-            await showAlert('API Key 已删除', 'success', 'nonInvasive', 1500)
+            await showAlert('访问密钥已删除', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            await showAlert(`API Key 删除失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`访问密钥删除失败：${String(error)}`, 'error', 'nonInvasive', 3000)
         } finally {
             setApiKeyBusy(false)
         }
@@ -580,8 +580,8 @@ export default function MobileSettings({push, pop, page}: Props) {
     const modelOptions = (currentPlugin?.models ?? []).map(m => ({value: m, label: m}))
     const apiKeyStatusLabel = getApiKeyStatusLabel(apiKeyStatus)
     const apiKeyPlaceholder = apiKeyStatus === 'configured'
-        ? '已配置，输入新 Key 可覆盖'
-        : '输入当前 LLM 插件的 API Key'
+        ? '已配置，输入新密钥可覆盖'
+        : '输入当前 AI 对话插件的访问密钥'
 
     const themeOptions = [
         {value: 'system', label: '跟随系统'},

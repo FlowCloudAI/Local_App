@@ -126,10 +126,10 @@ interface EditorHistory {
 }
 
 const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
-    options: [{value: '', label: '请先在设置中选择默认 TTS 插件'}],
+    options: [{value: '', label: '请先在设置中选择默认 AI 语音插件'}],
     selectable: false,
     pluginName: null,
-    hint: '请先在设置中选择默认 TTS 插件',
+    hint: '请先在设置中选择默认 AI 语音插件',
 }
 
 function buildDraft(entry: Entry): EntryDraft {
@@ -313,7 +313,7 @@ export default function EntryEditor({
                         options,
                         selectable: false,
                         pluginName: null,
-                        hint: '当前没有可用的 TTS 插件',
+                    hint: '当前没有可用的 AI 语音插件',
                     })
                     return
                 }
@@ -334,7 +334,7 @@ export default function EntryEditor({
                     pluginName: selectedPlugin.name,
                     hint: settings.tts.plugin_id
                         ? `使用「${selectedPlugin.name}」提供的音色列表`
-                        : `当前未设置默认 TTS 插件，暂按「${selectedPlugin.name}」的音色列表展示`,
+                    : `当前未设置默认 AI 语音插件，暂按「${selectedPlugin.name}」的音色列表展示`,
                 })
             })
             .catch((loadError) => {

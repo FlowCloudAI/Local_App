@@ -95,8 +95,7 @@ export function toApiError(value: unknown): ApiError {
     return { code: ErrorCode.CoreClientInternalError, message: String(value) }
 }
 
-/** 取 message，必要时附 code，用于直接展示。 */
+/** 取 message，用于直接展示；错误码仅留给调用方日志。 */
 export function formatApiError(err: ApiError): string {
-    if (!err.code || err.code === ErrorCode.CoreClientInternalError) return err.message
-    return `${err.message} (${err.code})`
+    return err.message
 }

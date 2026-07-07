@@ -320,7 +320,7 @@ function BackendStartupScreen({status}: { status: BackendStartupStatus }) {
                     lineHeight: 1.6,
                     whiteSpace: 'pre-wrap',
                 }}>
-                    {failed ? status.message ?? '后端初始化失败' : '正在初始化本地数据'}
+                    {failed ? status.message ?? '应用启动失败，请重新打开' : '正在准备数据…'}
                 </div>
             </div>
         </div>

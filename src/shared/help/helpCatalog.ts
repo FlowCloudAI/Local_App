@@ -246,7 +246,7 @@ export const HELP_TOPICS: HelpTopic[] = [
                 id: 'chat',
                 title: '普通对话',
                 lead: '普通对话适合提纲、润色、设定追问和资料整理。',
-                items: ['先在设置中配置插件、模型和 API Key。', '提问时说明目标、范围和希望输出的格式。'],
+                items: ['先在设置中配置插件、模型和访问密钥。', '提问时说明目标、范围和希望输出的格式。'],
                 figure: {
                     src: helpAiFigure,
                     alt: 'AI 对话和上下文整理的示意图',
@@ -272,7 +272,7 @@ export const HELP_TOPICS: HelpTopic[] = [
         key: 'plugins',
         moduleKey: 'ai',
         label: '插件与密钥',
-        summary: '管理模型插件、API Key 和本地能力扩展。',
+                summary: '管理模型插件、访问密钥和本地能力扩展。',
         category: '设置',
         readingTime: '约 3 分钟',
         sections: [
@@ -290,8 +290,8 @@ export const HELP_TOPICS: HelpTopic[] = [
             {
                 id: 'api-key',
                 title: '密钥管理',
-                lead: 'API Key 属于敏感信息，应当交给系统密钥链保存。',
-                items: ['在设置页为对应插件配置 API Key。', '不要把真实密钥写入普通配置文件、模板或项目文档。'],
+                lead: '访问密钥属于敏感信息，应当交给系统密钥链保存。',
+                items: ['在设置页为对应插件配置访问密钥。', '不要把真实密钥写入普通配置文件、模板或项目文档。'],
             },
             {
                 id: 'plugin-errors',
@@ -349,7 +349,7 @@ export const HELP_TOPICS: HelpTopic[] = [
                 id: 'ai-not-working',
                 title: 'AI 没有响应',
                 lead: 'AI 调用依赖插件、密钥、网络和模型配置，排查时按顺序缩小范围。',
-                items: ['确认插件已安装且 API Key 已配置。', '切换到更简单的问题测试模型是否可用。'],
+                items: ['确认插件已安装且访问密钥已配置。', '切换到更简单的问题测试模型是否可用。'],
             },
             {
                 id: 'ui-stuck',
@@ -387,7 +387,7 @@ export const HELP_HOME_LINKS: HelpHomeLink[] = [
     {
         key: 'plugins',
         title: '插件与密钥',
-        description: '了解模型插件、API Key 和调用失败排查。',
+                description: '了解模型插件、访问密钥和调用失败排查。',
         topicKey: 'plugins',
         sectionId: 'api-key',
     },

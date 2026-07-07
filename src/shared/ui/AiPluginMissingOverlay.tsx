@@ -11,16 +11,16 @@ interface AiPluginMissingOverlayProps {
 
 const PLUGIN_COPY: Record<AiMissingPluginKind, { title: string; description: string }> = {
     llm: {
-        title: '未安装 LLM 插件',
-        description: 'AI 对话需要先安装一个 LLM 插件，安装完成后即可继续使用对话、角色聊天和报告讨论。',
+        title: '未安装 AI 对话插件',
+        description: 'AI 对话需要先安装一个 AI 对话插件，安装完成后即可继续使用对话、角色聊天和报告讨论。',
     },
     image: {
-        title: '未安装 Image 插件',
-        description: 'AI 生图需要先安装一个 Image 插件，安装完成后即可生成词条图片或项目封面。',
+        title: '未安装 AI 绘图插件',
+        description: 'AI 生图需要先安装一个 AI 绘图插件，安装完成后即可生成词条图片或项目封面。',
     },
     tts: {
-        title: '未安装 TTS 插件',
-        description: '角色语音需要先安装一个 TTS 插件，安装完成后即可播放或自动朗读角色回复。',
+        title: '未安装 AI 语音插件',
+        description: '角色语音需要先安装一个 AI 语音插件，安装完成后即可播放或自动朗读角色回复。',
     },
 }
 

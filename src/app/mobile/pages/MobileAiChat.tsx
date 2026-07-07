@@ -344,7 +344,7 @@ export default function MobileAiChat({
         () => plugins.find(plugin => plugin.id === activeLlmPluginId) ?? null,
         [activeLlmPluginId, plugins],
     )
-    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 LLM 插件'
+    const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 AI 对话插件'
     const activeModelId = activeConversation?.model || selectedModel
     const activeModelInfo = activeLlmPluginInfo?.model_infos.find(modelInfo => modelInfo.id === activeModelId)
     const activeModelLabel = activeModelInfo?.name && activeModelInfo.name !== activeModelId
@@ -412,15 +412,15 @@ export default function MobileAiChat({
         : isArchivedConversation
             ? '已归档对话不可继续发送'
             : pluginsLoading
-                ? '正在加载 LLM 插件…'
+                ? '正在加载 AI 对话插件…'
                 : llmUnavailable
-                    ? '请先配置 LLM 插件'
+                    ? '请先配置 AI 对话插件'
                     : pluginSelectionIncomplete
                         ? '请选择插件和模型'
-                        : llmApiKeyChecking
-                            ? '正在检查 API Key…'
+                    : llmApiKeyChecking
+                            ? '正在检查访问密钥…'
                             : llmApiKeyMissing
-                                ? '请先配置 API Key'
+                                ? '请先配置访问密钥'
                                 : '发消息或按住说话'
 
     useEffect(() => {
@@ -589,19 +589,19 @@ export default function MobileAiChat({
             return
         }
         if (llmUnavailable) {
-            await showAlert('当前没有可用的 LLM 插件，请先在设置中配置。', 'warning', 'nonInvasive', 2200)
+            await showAlert('当前没有可用的 AI 对话插件，请先在设置中配置。', 'warning', 'nonInvasive', 2200)
             return
         }
         if (pluginSelectionIncomplete) {
-            await showAlert('请先选择 LLM 插件和模型。', 'warning', 'nonInvasive', 1800)
+            await showAlert('请先选择 AI 对话插件和模型。', 'warning', 'nonInvasive', 1800)
             return
         }
         if (llmApiKeyChecking) {
-            await showAlert('正在检查 API Key，请稍后再发送。', 'warning', 'nonInvasive', 1800)
+            await showAlert('正在检查访问密钥，请稍后再发送。', 'warning', 'nonInvasive', 1800)
             return
         }
         if (llmApiKeyMissing) {
-            await showAlert(`请先在设置中配置 ${activeLlmPluginName} 的 API Key。`, 'warning', 'nonInvasive', 2200)
+            await showAlert(`请先在设置中配置 ${activeLlmPluginName} 的访问密钥。`, 'warning', 'nonInvasive', 2200)
             return
         }
         await sendMessage(inputValue)
@@ -903,7 +903,7 @@ export default function MobileAiChat({
                     />
                 </label>
                 <label className="mobile-ai-setting-field">
-                    <span>top_p</span>
+                    <span>回答开放度</span>
                     <input
                         type="number"
                         min={0}
@@ -1142,7 +1142,7 @@ export default function MobileAiChat({
                         )}
                         {llmUnavailable || llmApiKeyMissing ? (
                             <Button type="button" variant="outline" onClick={() => navigateToTab('settings')}>
-                                {llmApiKeyMissing ? '配置 API Key' : '去设置插件'}
+                                {llmApiKeyMissing ? '配置访问密钥' : '去设置插件'}
                             </Button>
                         ) : null}
                     </div>
@@ -1352,7 +1352,7 @@ export default function MobileAiChat({
                                 <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
                                 <span className="mobile-anchored-menu__text">
                                     <span>没有可用插件</span>
-                                    <small>请先在设置中安装 LLM 插件</small>
+                            <small>请先在设置中安装 AI 对话插件</small>
                                 </span>
                             </button>
                         ) : plugins.map(plugin => {

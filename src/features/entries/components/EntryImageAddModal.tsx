@@ -138,7 +138,7 @@ export default function EntryImageAddModal({
     const handleFillPrompt = async () => {
         if (fillingPrompt || generateState === 'generating') return
         if (!aiPluginId) {
-            void showAlert('当前还没有可用的 LLM 插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
+            void showAlert('当前还没有可用的 AI 对话插件，请先在 AI 面板选择或配置模型。', 'warning', 'nonInvasive', 2200)
             return
         }
 
@@ -339,7 +339,7 @@ export default function EntryImageAddModal({
                         <div className="entry-image-add-ai">
                             {pluginLoadError ? (
                                 <div className="entry-image-add-ai__error">
-                                    读取 Image 插件失败：{pluginLoadError}
+                                    读取 AI 绘图插件失败：{pluginLoadError}
                                 </div>
                             ) : pluginsLoaded && plugins.length === 0 ? (
                                 <AiPluginMissingOverlay
@@ -391,7 +391,7 @@ export default function EntryImageAddModal({
                             )}
 
                             <div className="entry-image-add-ai__field">
-                                <label className="entry-image-add-ai__label">提示词（Prompt）</label>
+                                <label className="entry-image-add-ai__label">画面描述</label>
                                 <textarea
                                     className="entry-image-add-ai__textarea"
                                     value={prompt}
@@ -410,7 +410,7 @@ export default function EntryImageAddModal({
                                     disabled={fillingPrompt || generateState === 'generating'}
                                     onClick={() => void handleFillPrompt()}
                                 >
-                                    {fillingPrompt ? '填充中…' : 'AI 填充提示词'}
+                                    {fillingPrompt ? '填充中…' : 'AI 填充描述'}
                                 </Button>
                                 <Button type="button"
                                     size="sm"

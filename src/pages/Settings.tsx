@@ -76,11 +76,18 @@ type SearchSourceKey = keyof SearchSourceSettings
 type TemplateView = 'list' | 'detail'
 type SelectValue = string | number | (string | number)[]
 
+const PLUGIN_KIND_LABELS: Record<PluginKindFilter, string> = {
+    all: '全部',
+    llm: 'AI 对话',
+    image: 'AI 绘图',
+    tts: 'AI 语音',
+}
+
 const SETTINGS_TABS: Array<{ value: SettingsTab; label: string }> = [
     {value: 'system', label: '系统配置'},
     {value: 'ai', label: 'AI配置'},
     {value: 'plugins', label: '插件管理'},
-    {value: 'templates', label: '提示词模板'},
+    {value: 'templates', label: 'AI 指令模板'},
     {value: 'usage', label: '用量统计'},
     {value: 'about', label: '关于'},
 ]
@@ -115,8 +122,8 @@ const SEARCH_SOURCE_OPTIONS: Array<{ key: SearchSourceKey; label: string; hint: 
     },
     {
         key: 'technical_wiki',
-        label: '技术 wiki',
-        hint: 'ArchWiki 等技术资料源。',
+        label: '专业参考',
+        hint: '专业资料源。',
     },
     {
         key: 'game_wiki',
@@ -413,9 +420,9 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
             })
         } catch (error) {
             const message = String(error)
-            logger.error('提示词模板目录加载失败:', error)
+            logger.error('AI 指令模板目录加载失败:', error)
             setTemplateListError(message)
-            void showAlert(`提示词模板目录加载失败：${message}`, 'error', 'nonInvasive', 3000)
+            void showAlert(`AI 指令模板目录加载失败：${message}`, 'error', 'nonInvasive', 3000)
         } finally {
             setTemplateListLoading(false)
         }
@@ -500,7 +507,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
         } catch (error) {
             setTemplateDocument(null)
             setTemplateDraft('')
-            void showAlert('加载提示词模板失败: ' + error, 'error')
+            void showAlert('加载 AI 指令模板失败: ' + error, 'error')
         } finally {
             setTemplateDocumentLoading(false)
         }
@@ -551,7 +558,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
             const path = await template_get_local_root_dir()
             await open_in_file_manager(path)
         } catch (error) {
-            void showAlert('打开提示词模板目录失败: ' + error, 'error')
+            void showAlert('打开 AI 指令模板目录失败: ' + error, 'error')
         }
     }, [showAlert])
 
@@ -561,7 +568,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
             const path = await template_get_effective_path(activeTemplateMeta.id)
             await open_in_file_manager(path)
         } catch (error) {
-            void showAlert('打开提示词模板文件失败: ' + error, 'error')
+            void showAlert('打开 AI 指令模板文件失败: ' + error, 'error')
         }
     }, [activeTemplateMeta, showAlert])
 
@@ -576,7 +583,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
             if (result.status === 'success') {
                 setTemplateDocument(result.document)
                 setTemplateDraft(result.document.content)
-                void showAlert('提示词模板已保存', 'success', 'nonInvasive', 2000)
+                void showAlert('AI 指令模板已保存', 'success', 'nonInvasive', 2000)
                 return
             }
 
@@ -591,7 +598,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                 line: null,
                 column: null,
             })
-            void showAlert('保存提示词模板失败: ' + result.message, 'error')
+                void showAlert('保存 AI 指令模板失败: ' + result.message, 'error')
         } catch (error) {
             const message = String(error)
             setTemplatePageError({
@@ -600,7 +607,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                 line: null,
                 column: null,
             })
-            void showAlert('保存提示词模板失败: ' + message, 'error')
+            void showAlert('保存 AI 指令模板失败: ' + message, 'error')
         } finally {
             setTemplateSaving(false)
         }
@@ -610,8 +617,8 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                             <div className="settings-container fc-page-shell settings-template-shell">
                                 <div className="settings-title fc-page-header">
                                     <div className="fc-page-title-block">
-                                        <h1 className="fc-page-title">提示词模板</h1>
-                                        <p className="fc-page-subtitle">集中管理内置提示词模板，保存后会立即检查语法是否有效。</p>
+                                        <h1 className="fc-page-title">AI 指令模板</h1>
+                                        <p className="fc-page-subtitle">集中管理内置 AI 指令模板，保存后自动检查格式是否正确。</p>
                                     </div>
                                 </div>
 
@@ -622,7 +629,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                             <div>
                                                 <h2 className="settings-section-title fc-section-title">模板目录</h2>
                                                 <p className="templates-catalog-hint">
-                                                    共 {templateMetas.length} 个提示词模板，按用途分组展示。
+                                                    共 {templateMetas.length} 个 AI 指令模板，按用途分组展示。
                                                 </p>
                                             </div>
                                             <div className="templates-catalog-actions">
@@ -667,7 +674,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                         ) : templateListLoading && templateTreeData.length === 0 ? (
                                             <div className="settings-empty-state">加载中...</div>
                                         ) : templateTreeData.length === 0 ? (
-                                            <div className="settings-empty-state">暂无可编辑的提示词模板。</div>
+                                            <div className="settings-empty-state">暂无可编辑的 AI 指令模板。</div>
                                         ) : (
                                             <div className="templates-tree-shell">
                                                 <Tree
@@ -771,12 +778,12 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
 
                                                 <details className="templates-detail-disclosure">
                                                     <summary className="templates-detail-disclosure-summary">
-                                                        <span>用途说明与参数</span>
+                                                        <span>用途说明与可用变量</span>
                                                         <span className="templates-detail-disclosure-meta">
                                                         用于：{activeTemplateMeta.appear_in}
                                                     </span>
                                                         <span className="templates-detail-disclosure-meta">
-                                                        参数：{activeTemplateMeta.params.length} 个
+                                                        可用变量：{activeTemplateMeta.params.length} 个
                                                     </span>
                                                     </summary>
                                                     <div className="templates-detail-grid">
@@ -790,9 +797,9 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                                         </div>
                                                         <div
                                                             className="templates-detail-card templates-detail-card--params">
-                                                            <div className="templates-detail-label">参数</div>
+                                                            <div className="templates-detail-label">可用变量</div>
                                                             {activeTemplateMeta.params.length === 0 ? (
-                                                                <p className="templates-detail-text">这段内容不依赖额外参数。</p>
+                                                                <p className="templates-detail-text">这段内容不依赖额外变量。</p>
                                                             ) : (
                                                                 <div className="templates-param-list">
                                                                     {activeTemplateMeta.params.map(param => (
@@ -854,7 +861,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                                                 lineHeight={24}
                                                                 wordWrap="on"
                                                                 diagnostics={templateDiagnostics}
-                                                                placeholder="请输入提示词模板内容"
+                                                        placeholder="请输入 AI 指令模板内容"
                                                                 className="templates-editor"
                                                                 style={{minHeight: 0}}
                                                             />
@@ -864,7 +871,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                             </>
                                         ) : (
                                             <div className="settings-empty-state">
-                                                未找到当前提示词模板信息。
+                                                未找到当前 AI 指令模板信息。
                                             </div>
                                         )}
                                     </section>
@@ -1040,7 +1047,7 @@ function PluginsPanel({
                                 className={`plugins-kind-tab${kindFilter === kind ? ' active' : ''}`}
                                 onClick={() => onKindFilterChange(kind)}
                             >
-                                {kind === 'all' ? '全部' : kind.toUpperCase()}
+                                {PLUGIN_KIND_LABELS[kind]}
                             </button>
                         ))}
                     </div>
@@ -1660,7 +1667,7 @@ export default function Settings({
         })
     }, [updateLlmDefaults])
 
-    // API Key 管理
+    // 访问密钥管理
     const handleConfigureApiKey = (pluginId: string) => {
         setExpandedApiKeyPluginId(current => current === pluginId ? null : pluginId)
         setApiKeyDraft('')
@@ -1669,7 +1676,7 @@ export default function Settings({
     const handleSaveApiKey = async (pluginId: string) => {
         const nextApiKey = apiKeyDraft.trim()
         if (!nextApiKey) {
-            void showAlert('请输入 API Key', 'error')
+            void showAlert('请输入访问密钥', 'error')
             return
         }
 
@@ -1680,7 +1687,7 @@ export default function Settings({
             window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: true}}))
             setExpandedApiKeyPluginId(null)
             setApiKeyDraft('')
-            void showAlert('API Key 已保存', 'success', 'nonInvasive', 2000)
+            void showAlert('访问密钥已保存', 'success', 'nonInvasive', 2000)
         } catch (error) {
             void showAlert('保存失败: ' + error, 'error')
         } finally {
@@ -1697,7 +1704,7 @@ export default function Settings({
                 setExpandedApiKeyPluginId(null)
                 setApiKeyDraft('')
             }
-            void showAlert('API Key 已删除', 'success', 'nonInvasive', 2000)
+            void showAlert('访问密钥已删除', 'success', 'nonInvasive', 2000)
         } catch (error) {
             void showAlert('删除失败: ' + error, 'error')
         }
@@ -2104,7 +2111,7 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">AI配置</h1>
-                                    <p className="fc-page-subtitle">配置默认模型、API Key、文本生成参数和 AI 工具权限。</p>
+                                    <p className="fc-page-subtitle">配置默认模型、访问密钥、文本生成选项和 AI 工具权限。</p>
                                 </div>
                             </div>
 
@@ -2129,7 +2136,7 @@ export default function Settings({
                             <section className="settings-section fc-section-card">
                                 <h2 className="settings-section-title fc-section-title">默认模型</h2>
                                 <div className="settings-ai-model-grid">
-                                    <div className="settings-ai-model-kind">LLM</div>
+                                    <div className="settings-ai-model-kind">AI 对话</div>
                                     <div className="settings-field settings-ai-model-field">
                                         <label className="settings-label">插件</label>
                                         <div className="settings-select-control">
@@ -2177,7 +2184,7 @@ export default function Settings({
                                     </div>
                                     <div className="settings-ai-model-extra"/>
 
-                                    <div className="settings-ai-model-kind">TTS</div>
+                                    <div className="settings-ai-model-kind">AI 语音</div>
                                     <div className="settings-field settings-ai-model-field">
                                         <label className="settings-label">插件</label>
                                         <div className="settings-select-control">
@@ -2241,8 +2248,8 @@ export default function Settings({
                                             })}
                                         />
                                     </label>
-                                    <label className="settings-text-model-field">
-                                        <span>top_p</span>
+                                    <label className="settings-text-model-field" title="回答开放度：越低越稳定严谨，越高越自由发散。">
+                                        <span>回答开放度</span>
                                         <input
                                             type="number"
                                             min={0}
@@ -2323,10 +2330,10 @@ export default function Settings({
                                 </>
                             )}
 
-                            {/* API Key 管理 */}
+                            {/* 访问密钥管理 */}
                             {aiSettingsSection === 'keys' && (
                             <section className="settings-section fc-section-card">
-                                <h2 className="settings-section-title fc-section-title">API Key 管理</h2>
+                                <h2 className="settings-section-title fc-section-title">访问密钥管理</h2>
                                 <div className="settings-row">
                                     {allPlugins.length === 0 ? (
                                         <div className="settings-empty-state">
@@ -2390,13 +2397,12 @@ export default function Settings({
                                                                     void handleSaveApiKey(plugin.id)
                                                                 }}
                                                             >
-                                                                <label className="settings-api-key-form-label">API
-                                                                    Key</label>
+                                                                <label className="settings-api-key-form-label">访问密钥</label>
                                                                 <Input
                                                                     type="password"
                                                                     value={isExpanded ? apiKeyDraft : ''}
                                                                     onValueChange={(value) => setApiKeyDraft(String(value))}
-                                                                    placeholder={`请输入 ${plugin.name} 的 API Key`}
+                                                                    placeholder={`请输入 ${plugin.name} 的访问密钥`}
                                                                     style={{flex: 1}}
                                                                 />
                                                                 <div className="settings-api-key-form-actions">
@@ -2462,10 +2468,10 @@ export default function Settings({
                                                 auto_compact_enabled: event.target.checked,
                                             })}
                                         />
-                                        <span>自动压缩上下文</span>
+                                        <span>自动精简对话记忆</span>
                                     </label>
                                     <span className="settings-field-hint">
-                                        本轮回复结束后检测上下文占用，超过阈值时使用当前模型生成会话摘要。
+                                        回复后若对话记忆较满，自动整理摘要，节省对话空间。
                                     </span>
                                 </div>
                                 {settings.llm.auto_compact_enabled && (
@@ -2591,7 +2597,7 @@ export default function Settings({
                             <div className="settings-title fc-page-header">
                                 <div className="fc-page-title-block">
                                     <h1 className="fc-page-title">用量统计</h1>
-                                    <p className="fc-page-subtitle">查看各个模型的 API 调用次数与 Token 消耗。</p>
+                                    <p className="fc-page-subtitle">查看各个模型的 AI 使用次数与消耗统计。</p>
                                 </div>
                             </div>
 
@@ -2608,14 +2614,14 @@ export default function Settings({
                                 <>
                                     <section className="usage-activity-panel">
                                         <div className="usage-activity-header">
-                                            <h2 className="settings-section-title fc-section-title">Token 活动</h2>
+                                            <h2 className="settings-section-title fc-section-title">AI 使用热力图</h2>
                                             <div className="usage-activity-total">
-                                                {usageSummary ? `${usageSummary.total_tokens.toLocaleString()} tokens` : '暂无数据'}
+                                                {usageSummary ? `${usageSummary.total_tokens.toLocaleString()} 消耗` : '暂无数据'}
                                             </div>
                                         </div>
                                         <div
                                             className="usage-heatmap"
-                                            aria-label={`最近 ${USAGE_ACTIVITY_COLUMNS} 周 Token 活动`}
+                                            aria-label={`最近 ${USAGE_ACTIVITY_COLUMNS} 周 AI 使用热力图`}
                                             style={{'--usage-activity-columns': USAGE_ACTIVITY_COLUMNS} as CSSProperties}
                                         >
                                             <div className="usage-heatmap-track">
@@ -2624,7 +2630,7 @@ export default function Settings({
                                                         <span
                                                             key={day.date}
                                                             className={`usage-heatmap-cell usage-heatmap-cell--${day.intensity}`}
-                                                            title={`${day.label}：${day.totalTokens.toLocaleString()} tokens，${day.callCount.toLocaleString()} 次调用`}
+                                                            title={`${day.label}：${day.totalTokens.toLocaleString()} 消耗，${day.callCount.toLocaleString()} 次调用`}
                                                         />
                                                     ) : (
                                                         <span key={`empty-${index}`}
@@ -2650,7 +2656,7 @@ export default function Settings({
                                             <h2 className="settings-section-title fc-section-title">活动洞察</h2>
                                             <dl className="usage-insight-list">
                                                 <div>
-                                                    <dt>API 调用次数</dt>
+                                                    <dt>AI 使用次数</dt>
                                                     <dd>{usageSummary?.call_count.toLocaleString() ?? '0'}</dd>
                                                 </div>
                                                 <div>
@@ -2658,7 +2664,7 @@ export default function Settings({
                                                     <dd>{usageActiveDays.toLocaleString()}</dd>
                                                 </div>
                                                 <div>
-                                                    <dt>平均每次 Token</dt>
+                                                    <dt>平均每次消耗</dt>
                                                     <dd>{usageAverageTokens.toLocaleString()}</dd>
                                                 </div>
                                                 <div>
@@ -2708,9 +2714,9 @@ export default function Settings({
                                                         <th>供应商</th>
                                                         <th>类型</th>
                                                         <th>调用次数</th>
-                                                        <th>Prompt Tokens</th>
-                                                        <th>Completion Tokens</th>
-                                                        <th>总 Tokens</th>
+                                                        <th>提问消耗</th>
+                                                        <th>应答消耗</th>
+                                                        <th>总消耗</th>
                                                     </tr>
                                                     </thead>
                                                     <tbody>

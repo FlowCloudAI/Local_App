@@ -253,7 +253,7 @@ export default function EntryEditorMetaPanel({
                         <div className="entry-editor-field-label-row">
                             <label className="entry-editor-field-label">角色语音</label>
                             <span
-                                className="entry-editor-field-note">留空时跟随全局 TTS 默认音色{ttsVoicePluginName ? ` · 当前来源：${ttsVoicePluginName}` : ''}</span>
+                                className="entry-editor-field-note">留空时跟随全局 AI 语音默认音色{ttsVoicePluginName ? ` · 当前来源：${ttsVoicePluginName}` : ''}</span>
                         </div>
                         {isBrowseMode ? (
                             <div className="entry-editor-readonly-summary">
