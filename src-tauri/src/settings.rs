@@ -32,7 +32,7 @@ pub struct AppSettings {
     pub editor_font_size: u8,
     /// 颜色主题配置。None = 使用默认流云配色。
     pub theme_color_config: Option<serde_json::Value>,
-    /// 是否启用桌面窗口毛玻璃外壳效果
+    /// 是否启用桌面窗口 Acrylic 外壳效果
     pub shell_acrylic_enabled: bool,
 
     // ── 备份行为 ───────────────────────────

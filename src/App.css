@@ -334,7 +334,7 @@ body {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    外壳毛玻璃模式
-   仅在 Windows 透明窗 + tauri.conf.json windowEffects:["blur"] 生效时启用，
+   仅在 Windows 透明窗 + tauri.conf.json windowEffects:["acrylic"] 生效时启用，
    由 main.tsx 确认平台后在 <html> 写入 data-backdrop="glass"。
    思路：外层 chrome（顶栏 / 画布 / 间隙 / 树栏）透出磨砂桌面，
         内容卡片（page-container 与 pe-content 内部）保持实色以保证可读性。
