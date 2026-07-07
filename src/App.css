@@ -87,7 +87,6 @@ body {
     gap: var(--fc-space-sm);
     padding: var(--fc-space-xs);
     height: 3rem;
-    background: var(--app-shell-bg);
     border-bottom: none;
     flex-shrink: 0;
     user-select: none;
@@ -194,7 +193,6 @@ body {
     padding-left: var(--app-drag-handle-width);
     padding-bottom: var(--app-drag-handle-width);
     overflow: hidden;
-    background: var(--app-shell-bg);
 }
 
 .workspace-content {
