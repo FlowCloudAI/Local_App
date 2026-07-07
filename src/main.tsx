@@ -48,7 +48,7 @@ function syncShellBackdrop(platformInfo: PlatformInfo, shellAcrylicEnabled: bool
         && shellAcrylicEnabled
 
     if (enabled) {
-        document.documentElement.setAttribute('data-backdrop', 'glass')
+        document.documentElement.setAttribute('data-backdrop', 'acrylic')
     } else {
         document.documentElement.removeAttribute('data-backdrop')
     }
