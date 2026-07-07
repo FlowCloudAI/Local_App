@@ -676,9 +676,11 @@ export default function MobileSettings({push, pop, page}: Props) {
                     language={settings?.language ?? 'zh-CN'}
                     languageOptions={languageOptions}
                     editorFontSize={settings?.editor_font_size ?? 14}
+                    glassEffectEnabled={settings?.shell_acrylic_enabled ?? true}
                     onThemeChange={setTheme}
                     onLanguageChange={language => updateSettingsDraft({language})}
                     onEditorFontSizeChange={fontSize => updateSettingsDraft({editor_font_size: clampEditorFontSize(fontSize)})}
+                    onGlassEffectChange={enabled => updateSettingsDraft({shell_acrylic_enabled: enabled})}
                     onSaveSettings={handleSave}
                 />
             )}

@@ -70,9 +70,11 @@ interface AppearanceSectionProps {
     language: string
     languageOptions: SelectOption[]
     editorFontSize: number
+    glassEffectEnabled: boolean
     onThemeChange: (value: 'system' | 'light' | 'dark') => void
     onLanguageChange: (value: string) => void
     onEditorFontSizeChange: (value: number) => void
+    onGlassEffectChange: (value: boolean) => void
     onSaveSettings: () => void | Promise<void>
 }
 
@@ -502,9 +504,11 @@ export function MobileSettingsAppearanceSection({
     language,
     languageOptions,
     editorFontSize,
+    glassEffectEnabled,
     onThemeChange,
     onLanguageChange,
     onEditorFontSizeChange,
+    onGlassEffectChange,
     onSaveSettings,
 }: AppearanceSectionProps) {
     return (
@@ -552,6 +556,14 @@ export function MobileSettingsAppearanceSection({
                         )}
                     </div>
                 </div>
+                <label className="mobile-settings-switch-field">
+                    <span>毛玻璃效果</span>
+                    <input
+                        type="checkbox"
+                        checked={glassEffectEnabled}
+                        onChange={event => onGlassEffectChange(event.currentTarget.checked)}
+                    />
+                </label>
                 <Button type="button" onClick={onSaveSettings} className="mobile-settings-full-button">
                     保存设置
                 </Button>

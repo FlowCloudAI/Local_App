@@ -2066,7 +2066,7 @@ export default function Settings({
                                     </div>
                                 </div>
                                 <div className="settings-field">
-                                    <label className="settings-label">外壳亚克力</label>
+                                    <label className="settings-label">毛玻璃效果</label>
                                     <label className="settings-checkbox-field">
                                         <input
                                             type="checkbox"
@@ -2079,7 +2079,7 @@ export default function Settings({
                                                 } : null)
                                             }}
                                         />
-                                        <span>启用透明毛玻璃背景</span>
+                                        <span>同时启用窗口外壳与组件毛玻璃背景</span>
                                     </label>
                                 </div>
                                 <ThemeColorPreview

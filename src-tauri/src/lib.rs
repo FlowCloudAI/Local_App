@@ -276,7 +276,7 @@ pub fn run() {
             if let Err(error) =
                 apply_shell_acrylic_setting(&app_handle, settings.shell_acrylic_enabled)
             {
-                log::warn!("应用窗口亚克力效果失败: {}", error);
+                log::warn!("应用窗口毛玻璃效果失败: {}", error);
             }
 
             // 解析用户自定义路径（在 settings 移入 manage 之前读取）

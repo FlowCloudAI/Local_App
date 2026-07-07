@@ -126,6 +126,21 @@
     width: 100%;
 }
 
+.mobile-settings-switch-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+}
+
+.mobile-settings-switch-field input {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--fc-color-primary);
+}
+
 .mobile-settings-button-content {
     display: inline-flex;
     align-items: center;

@@ -1,0 +1,106 @@
+/*
+ * 全局毛玻璃开关。默认关闭：组件回退为实色主题背景；
+ * 设置开启后由 main.tsx 在 <html> 写入 data-glass-effect="enabled"。
+ */
+:root {
+    --app-glass-filter: none;
+    --app-glass-filter-soft: none;
+    --app-glass-filter-strong: none;
+    --app-glass-bg-elevated: var(--fc-color-bg-elevated);
+    --app-glass-bg-elevated-strong: var(--fc-color-bg-elevated);
+    --app-glass-bg-shell: var(--fc-color-bg-secondary);
+    --app-glass-bg-scrim: var(--fc-color-bg);
+    --app-glass-bg-overlay: var(--fc-color-bg);
+    --app-glass-bg-error: color-mix(in srgb, var(--fc-color-danger, #ef4444) 18%, var(--fc-color-bg-elevated));
+}
+
+:root[data-glass-effect="enabled"] {
+    --app-glass-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    --app-glass-filter-soft: blur(2px);
+    --app-glass-filter-strong: blur(12px);
+    --app-glass-bg-elevated: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+    --app-glass-bg-elevated-strong: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
+    --app-glass-bg-shell: color-mix(in srgb, var(--fc-color-bg-secondary) 85%, transparent);
+    --app-glass-bg-scrim: color-mix(in srgb, var(--fc-color-bg) 58%, transparent);
+    --app-glass-bg-overlay: color-mix(in srgb, var(--fc-color-bg) 36%, transparent);
+    --app-glass-bg-error: color-mix(in srgb, var(--fc-color-danger, #ef4444) 20%, transparent);
+}
+
+:root:not([data-glass-effect="enabled"]),
+:root:not([data-glass-effect="enabled"]) .mobile-app {
+    --mobile-glass-filter: none;
+    --mobile-chrome-filter: none;
+    --mobile-chip-filter: none;
+    --mobile-surface-translucent: var(--fc-color-bg-elevated);
+    --mobile-surface-translucent-strong: var(--fc-color-bg-elevated);
+    --mobile-surface-glass: var(--fc-color-bg-elevated);
+    --mobile-surface-glass-strong: var(--fc-color-bg-elevated);
+    --mobile-surface-panel: var(--fc-color-bg-elevated);
+    --mobile-surface-dialog: var(--fc-color-bg-elevated);
+}
+
+:root .fc-overlay__panel--floating,
+:root .ai-scroll-to-bottom-btn,
+:root .ai-floating-input-inner,
+:root .ai-conversation-settings-panel,
+:root .fcworld-progress-card,
+:root .pe-breadcrumb,
+:root .pe-layout .fc-dialog,
+:root .fc-alert,
+:root .fc-context-menu,
+:root .fc-tour-popover,
+:root .fc-tour-popover__arrow::after,
+:root .fc-rg-edge-label,
+:root .monaco-hover {
+    background: var(--app-glass-bg-elevated) !important;
+    -webkit-backdrop-filter: var(--app-glass-filter) !important;
+    backdrop-filter: var(--app-glass-filter) !important;
+}
+
+:root .ai-plugin-missing--overlay,
+:root .ai-main-background::after {
+    background: var(--app-glass-bg-scrim) !important;
+    -webkit-backdrop-filter: var(--app-glass-filter-strong) !important;
+    backdrop-filter: var(--app-glass-filter-strong) !important;
+}
+
+:root .dock-panel-topbar,
+:root .ai-main.is-character .ai-topbar {
+    background: var(--app-glass-bg-elevated-strong) !important;
+    -webkit-backdrop-filter: var(--app-glass-filter-strong) !important;
+    backdrop-filter: var(--app-glass-filter-strong) !important;
+}
+
+:root .dock-panel-topbar--side {
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+
+:root .fc-rg__overlay--loading {
+    background-color: var(--app-glass-bg-overlay) !important;
+    -webkit-backdrop-filter: var(--app-glass-filter-soft) !important;
+    backdrop-filter: var(--app-glass-filter-soft) !important;
+}
+
+:root .fc-rg__overlay--error {
+    background-color: var(--app-glass-bg-error) !important;
+    -webkit-backdrop-filter: var(--app-glass-filter-soft) !important;
+    backdrop-filter: var(--app-glass-filter-soft) !important;
+}
+
+:root .pe-entries-overlay {
+    background: var(--app-glass-bg-overlay) !important;
+    -webkit-backdrop-filter: var(--app-glass-filter-soft) !important;
+    backdrop-filter: var(--app-glass-filter-soft) !important;
+}
+
+:root:not([data-glass-effect="enabled"]) .mobile-top-action-pill,
+:root:not([data-glass-effect="enabled"]) .mobile-anchored-menu,
+:root:not([data-glass-effect="enabled"]) .mobile-ai-model-pill,
+:root:not([data-glass-effect="enabled"]) .mobile-ai-composer-card,
+:root:not([data-glass-effect="enabled"]) .mobile-entry-card__tag {
+    background: var(--fc-color-bg-elevated) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}

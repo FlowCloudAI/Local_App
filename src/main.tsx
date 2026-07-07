@@ -7,6 +7,7 @@ import {get_platform_info, type AppSettings, type PlatformInfo, setting_get_sett
 import {getFormFactorOverride, isTauriRuntime} from './shared/devPreview'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
+import './glassEffect.css'
 
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
 // JS 运行时错误 & 未捕获 Promise rejection
@@ -35,13 +36,19 @@ function getFallbackPlatformInfo(): PlatformInfo {
 }
 
 function syncShellBackdrop(platformInfo: PlatformInfo, shellAcrylicEnabled: boolean) {
+    if (shellAcrylicEnabled) {
+        document.documentElement.setAttribute('data-glass-effect', 'enabled')
+    } else {
+        document.documentElement.removeAttribute('data-glass-effect')
+    }
+
     const enabled = isTauriRuntime()
         && platformInfo.os === 'windows'
         && platformInfo.formFactor === 'desktop'
         && shellAcrylicEnabled
 
     if (enabled) {
-        document.documentElement.setAttribute('data-backdrop', 'acrylic')
+        document.documentElement.setAttribute('data-backdrop', 'glass')
     } else {
         document.documentElement.removeAttribute('data-backdrop')
     }

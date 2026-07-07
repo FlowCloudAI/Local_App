@@ -110,7 +110,7 @@ pub async fn setting_update_settings(
 
     if old_shell_acrylic_enabled != new_settings.shell_acrylic_enabled {
         if let Err(error) = apply_shell_acrylic_setting(&app, new_settings.shell_acrylic_enabled) {
-            log::warn!("应用窗口亚克力效果失败: {}", error);
+            log::warn!("应用窗口毛玻璃效果失败: {}", error);
         }
     }
 
@@ -165,7 +165,7 @@ pub(crate) fn apply_shell_acrylic_setting(app: &AppHandle, enabled: bool) -> Res
 
         if enabled {
             window
-                .set_effects(EffectsBuilder::new().effect(Effect::Acrylic).build())
+                .set_effects(EffectsBuilder::new().effect(Effect::Blur).build())
                 .map_err(|e| e.to_string())
         } else {
             window
