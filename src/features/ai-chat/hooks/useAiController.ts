@@ -12,7 +12,6 @@ import {
     ai_get_conversation,
     ai_get_conversation_ui_state,
     ai_list_conversations,
-    ai_list_plugins,
     ai_list_tools,
     ai_rename_conversation,
     ai_save_character_conversation_meta,
@@ -37,7 +36,6 @@ import {
     type DocumentContextUpdatedEvent,
     ENTRY_UPDATED,
     type EntryUpdatedEvent,
-    type PluginInfo,
     setting_get_settings,
     type StoredConversationSettings,
     type StoredMessage,
@@ -51,6 +49,15 @@ import {
 import {type SessionMessage, useAiSession} from './useAiSession'
 import {estimateMessagesTokens} from '../lib/contextUsage'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
+import {
+    getAiPluginSnapshot,
+    refreshAiPluginStore,
+    setAiSelectedModel,
+    setAiSelectedPlugin,
+    setAiSelectedPluginModel,
+    setAiWriterModeAvailable,
+    useAiPluginStore,
+} from '../stores/aiPluginStore'
 import type {
     AiContextValue,
     AiFocusContext,
@@ -613,23 +620,14 @@ export interface AiFocus {
 }
 
 export function useAiController(focus: AiFocus): AiContextValue {
-    const [plugins, setPlugins] = useState<PluginInfo[]>([])
-    const [pluginsReady, setPluginsReady] = useState(false)
-    const [selectedPlugin, setSelectedPlugin] = useState('')
-    const [selectedModel, setSelectedModel] = useState('')
+    const {
+        plugins,
+        pluginsReady,
+        selectedPlugin,
+        selectedModel,
+        writerModeAvailable,
+    } = useAiPluginStore()
     const appSettingsRef = useRef<AppSettings | null>(null)
-    const pluginsRef = useRef<PluginInfo[]>([])
-    useEffect(() => {
-        pluginsRef.current = plugins
-    }, [plugins])
-    const selectedPluginRef = useRef(selectedPlugin)
-    const selectedModelRef = useRef(selectedModel)
-    useEffect(() => {
-        selectedPluginRef.current = selectedPlugin
-    }, [selectedPlugin])
-    useEffect(() => {
-        selectedModelRef.current = selectedModel
-    }, [selectedModel])
 
     const [conversations, setConversations] = useState<Conversation[]>([])
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -646,7 +644,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const [tools, setTools] = useState<ToolStatus[]>([])
     const [webSearchEnabled, setWebSearchEnabled] = useState(true)
     const [toolAccessMode, setToolAccessModeState] = useState<AiToolAccessMode>('assistant')
-    const [writerModeAvailable, setWriterModeAvailable] = useState(false)
     const editModeEnabled = toolAccessMode !== 'reader'
 
     const conversationsRef = useRef(conversations)
@@ -707,47 +704,17 @@ export function useAiController(focus: AiFocus): AiContextValue {
         activeConversationRef.current = activeConversation
     }, [activeConversation])
 
-    const syncPluginSelection = useCallback((pluginList: PluginInfo[], settings: AppSettings | null) => {
-        setPlugins(pluginList)
-
-        const preferredPluginId = activeConversationRef.current?.pluginId
-            || selectedPluginRef.current
-            || settings?.llm?.plugin_id
-            || ''
-        const nextPlugin = pluginList.find((plugin) => plugin.id === preferredPluginId)
-            ?? pluginList[0]
-            ?? null
-        const nextPluginId = nextPlugin?.id ?? ''
-
-        setSelectedPlugin(nextPluginId)
-
-        if (!nextPlugin) {
-            setSelectedModel('')
-            return
-        }
-
-        const preferredModel = activeConversationRef.current?.model
-            || selectedModelRef.current
-            || settings?.llm?.default_model
-            || ''
-        const nextModel = preferredModel && nextPlugin.models.includes(preferredModel)
-            ? preferredModel
-            : (nextPlugin.default_model ?? nextPlugin.models[0] ?? '')
-
-        setSelectedModel(nextModel)
-    }, [])
-
     const refreshAiSidebarState = useCallback(async (includeTools = false) => {
-        const [pluginList, settings, fetchedTools] = await Promise.all([
-            ai_list_plugins('llm'),
-            setting_get_settings().catch(() => null),
+        const [pluginState, fetchedTools] = await Promise.all([
+            refreshAiPluginStore({
+                preferredPluginId: activeConversationRef.current?.pluginId,
+                preferredModel: activeConversationRef.current?.model,
+            }),
             includeTools ? ai_list_tools() : Promise.resolve(null),
         ])
 
+        const settings = pluginState.settings
         appSettingsRef.current = settings
-        setWriterModeAvailable(Boolean(settings?.llm?.writer_mode_enabled))
-        syncPluginSelection(pluginList, settings)
-        setPluginsReady(true)
 
         if (fetchedTools) {
             const nextMode: AiToolAccessMode = 'assistant'
@@ -760,7 +727,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             setWebSearchEnabled(true)
             setToolAccessModeState(nextMode)
         }
-    }, [syncPluginSelection])
+    }, [])
 
     const activeConversationIdRef = useRef(activeConversationId)
     useEffect(() => {
@@ -824,7 +791,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const conversation = conversationsRef.current.find((item) => item.id === conversationId)
         if (!conversation || conversation.mode !== 'default') return
 
-        const plugin = pluginsRef.current.find((item) => item.id === conversation.pluginId)
+        const plugin = getAiPluginSnapshot().plugins.find((item) => item.id === conversation.pluginId)
         const modelInfo = plugin?.model_infos.find((item) => item.id === conversation.model)
         const contextWindowTokens = modelInfo?.context_window_tokens ?? null
         if (!contextWindowTokens || contextWindowTokens <= 0) return
@@ -1324,16 +1291,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [refreshAiSidebarState])
 
     useEffect(() => {
-        const handler = () => {
-            refreshAiSidebarState(false).catch((error) => {
-                logger.error('插件变更后刷新 AI 插件列表失败', error)
-            })
-        }
-        window.addEventListener('fc:plugins-changed', handler)
-        return () => window.removeEventListener('fc:plugins-changed', handler)
-    }, [refreshAiSidebarState])
-
-    useEffect(() => {
         const unlisten = listen('backend-ready', () => {
             refreshAiSidebarState(true).catch((error) => {
                 logger.error('后端就绪后刷新 AI 侧栏状态失败', error)
@@ -1390,16 +1347,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
             logger.warn('写入会话 UI 状态失败', error)
         })
     }, [conversationMetaLoaded, conversations])
-
-    useEffect(() => {
-        if (!selectedPlugin || plugins.length === 0) return
-        const plugin = plugins.find((item) => item.id === selectedPlugin)
-        if (!plugin) return
-        if (!selectedModel || !plugin.models.includes(selectedModel)) {
-            const defaultModel = plugin.default_model ?? plugin.models[0] ?? ''
-            if (defaultModel) setSelectedModel(defaultModel)
-        }
-    }, [selectedPlugin, plugins]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!conversationMetaLoaded || !pluginsReady || !selectedPlugin || !selectedModel) return
@@ -1526,8 +1473,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             settings: normalizeConversationSettings(),
         }
 
-        setSelectedPlugin(pluginId)
-        setSelectedModel(model)
+        setAiSelectedPluginModel(pluginId, model)
         setConversations((prev) => [conversation, ...prev])
         setActiveConversationId(conversation.id)
         activeConversationIdRef.current = conversation.id
@@ -1675,8 +1621,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const switchActiveConversationModel = useCallback(async (pluginId: string, model: string) => {
         if (!pluginId || !model) return
-        setSelectedPlugin(pluginId)
-        setSelectedModel(model)
+        setAiSelectedPluginModel(pluginId, model)
 
         const conv = activeConversationRef.current
         if (!conv) return
@@ -1728,8 +1673,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const targetConv = conversationsRef.current.find((conversation) => conversation.id === convId)
         if (targetConv) {
             session.activateSession(targetConv.sessionId, targetConv.runId)
-            setSelectedPlugin(targetConv.pluginId)
-            setSelectedModel(targetConv.model)
+            setAiSelectedPluginModel(targetConv.pluginId, targetConv.model)
 
             if (targetConv.messages.length === 0 && !targetConv.id.startsWith('conv_')) {
                 const stored = await ai_get_conversation(targetConv.id).catch(() => null)
@@ -2482,7 +2426,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             if (!nextSettings) return
             appSettingsRef.current = nextSettings
             const writerEnabled = Boolean(nextSettings.llm?.writer_mode_enabled)
-            setWriterModeAvailable(writerEnabled)
+            setAiWriterModeAvailable(writerEnabled)
             if (!writerEnabled && toolAccessMode === 'writer') {
                 setToolAccessModeState((current) => current === 'writer' ? 'assistant' : current)
                 setTools((current) => current.map((tool) => ({
@@ -2528,8 +2472,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         pluginsReady,
         selectedPlugin,
         selectedModel,
-        setSelectedPlugin,
-        setSelectedModel,
+        setSelectedPlugin: setAiSelectedPlugin,
+        setSelectedModel: setAiSelectedModel,
         conversations,
         activeConversationId,
         setActiveConversationId: selectConversation,
