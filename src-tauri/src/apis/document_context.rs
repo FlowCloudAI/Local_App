@@ -25,6 +25,7 @@ pub struct BuildDocumentContextRequest {
     #[serde(default)]
     pub item_ids: Vec<String>,
     pub max_chars: Option<usize>,
+    pub query: Option<String>,
 }
 
 #[tauri::command]
@@ -132,6 +133,7 @@ pub fn docctx_build_context(
         &request.conversation_id,
         &request.item_ids,
         request.max_chars,
+        request.query.as_deref(),
     )
     .map_err(ApiError::from)
 }

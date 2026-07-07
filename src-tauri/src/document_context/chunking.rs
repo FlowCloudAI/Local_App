@@ -1,6 +1,7 @@
 use super::model::DocumentChunk;
 
 const DEFAULT_CHUNK_CHARS: usize = 3_000;
+const DEFAULT_CHUNK_OVERLAP_CHARS: usize = 300;
 
 pub fn split_markdown_into_chunks(markdown: &str) -> Vec<DocumentChunk> {
     split_markdown_with_limit(markdown, DEFAULT_CHUNK_CHARS)
@@ -10,6 +11,7 @@ fn split_markdown_with_limit(markdown: &str, max_chars: usize) -> Vec<DocumentCh
     let mut chunks = Vec::new();
     let mut current = String::new();
     let mut current_heading: Option<String> = None;
+    let overlap_chars = DEFAULT_CHUNK_OVERLAP_CHARS.min(max_chars / 5);
 
     for line in markdown.lines() {
         let line_with_break = format!("{}\n", line);
@@ -19,8 +21,15 @@ fn split_markdown_with_limit(markdown: &str, max_chars: usize) -> Vec<DocumentCh
             > max_chars
             && !current.trim().is_empty();
 
-        if should_flush_for_heading || should_flush_for_size {
+        if should_flush_for_heading {
             push_chunk(&mut chunks, &mut current, current_heading.clone());
+        } else if should_flush_for_size {
+            push_chunk_with_overlap(
+                &mut chunks,
+                &mut current,
+                current_heading.clone(),
+                overlap_chars,
+            );
         }
 
         if let Some(heading) = line_heading {
@@ -69,6 +78,32 @@ fn push_chunk(chunks: &mut Vec<DocumentChunk>, current: &mut String, heading: Op
     current.clear();
 }
 
+fn push_chunk_with_overlap(
+    chunks: &mut Vec<DocumentChunk>,
+    current: &mut String,
+    heading: Option<String>,
+    overlap_chars: usize,
+) {
+    let overlap = trailing_chars(current, overlap_chars);
+    push_chunk(chunks, current, heading);
+    if !overlap.is_empty() {
+        current.push_str(&overlap);
+        if !current.ends_with('\n') {
+            current.push('\n');
+        }
+    }
+}
+
+fn trailing_chars(value: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let trimmed = value.trim();
+    let mut chars = trimmed.chars().rev().take(max_chars).collect::<Vec<_>>();
+    chars.reverse();
+    chars.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::split_markdown_with_limit;
@@ -79,5 +114,14 @@ mod tests {
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].heading.as_deref(), Some("标题"));
         assert_eq!(chunks[1].heading.as_deref(), Some("二级"));
+    }
+
+    #[test]
+    fn adds_overlap_when_split_by_size() {
+        let markdown = format!("# 标题\n{}\n{}\n", "甲".repeat(80), "乙".repeat(80));
+        let chunks = split_markdown_with_limit(&markdown, 100);
+        assert_eq!(chunks.len(), 2);
+        assert!(chunks[1].markdown.contains("甲甲甲"));
+        assert!(chunks[1].markdown.contains("乙乙乙"));
     }
 }

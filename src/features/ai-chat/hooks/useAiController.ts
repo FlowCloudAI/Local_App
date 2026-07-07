@@ -47,7 +47,7 @@ import {
     toApiError,
 } from '../../../api'
 import {type SessionMessage, useAiSession} from './useAiSession'
-import {estimateMessagesTokens} from '../lib/contextUsage'
+import {estimateMessagesTokens, estimateTextTokens} from '../lib/contextUsage'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import {
     getAiPluginSnapshot,
@@ -114,6 +114,8 @@ const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversati
 const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
 const DOCUMENT_CONTEXT_ATTRIBUTE = 'attached_documents'
 const DOCUMENT_CONTEXT_CHAR_BUDGET = 24_000
+const DOCUMENT_CONTEXT_MIN_CHAR_BUDGET = 4_000
+const DOCUMENT_CONTEXT_MAX_CHAR_BUDGET = 128_000
 const WEB_TOOL_NAMES = ['web_search', 'open_url']
 const READER_TOOL_NAMES = [
     'list_projects',
@@ -438,6 +440,31 @@ const mergeDocumentAttachmentItemIds = (...groups: Array<string[] | undefined>):
         })
     })
     return merged
+}
+
+const resolveDocumentContextCharBudget = (
+    conversation: Conversation | null | undefined,
+    query?: string,
+): number => {
+    const snapshot = getAiPluginSnapshot()
+    const pluginId = conversation?.pluginId ?? snapshot.selectedPlugin
+    const modelId = conversation?.model ?? snapshot.selectedModel
+    const plugin = snapshot.plugins.find((item) => item.id === pluginId)
+    const contextWindowTokens = plugin?.model_infos.find((item) => item.id === modelId)?.context_window_tokens ?? null
+    if (!contextWindowTokens || contextWindowTokens <= 0) return DOCUMENT_CONTEXT_CHAR_BUDGET
+
+    const historyTokens = estimateMessagesTokens(conversation?.messages ?? [])
+    const promptTokens = estimateTextTokens(query)
+    const systemPromptTokens = estimateTextTokens(conversation?.settings.systemPrompt)
+    const reservedReplyTokens = Math.max(2_000, Math.floor(contextWindowTokens * 0.2))
+    const availableTokens = contextWindowTokens - historyTokens - promptTokens - systemPromptTokens - reservedReplyTokens
+    if (availableTokens <= 0) return DOCUMENT_CONTEXT_MIN_CHAR_BUDGET
+
+    const documentTokens = Math.floor(availableTokens * 0.6)
+    return Math.max(
+        DOCUMENT_CONTEXT_MIN_CHAR_BUDGET,
+        Math.min(DOCUMENT_CONTEXT_MAX_CHAR_BUDGET, documentTokens * 2),
+    )
 }
 
 const collectDocumentAttachmentItemIds = (messages: Message[]): string[] =>
@@ -1239,15 +1266,18 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ctx: TaskContextPayload,
         conversationId: string,
         itemIds: string[] = [],
+        query?: string,
     ): Promise<TaskContextPayload> => {
         const selectedItemIds = mergeDocumentAttachmentItemIds(itemIds)
         if (selectedItemIds.length === 0) return ctx
 
         try {
+            const conversation = conversationsRef.current.find((item) => item.id === conversationId) ?? null
             const result = await docctx_build_context({
                 conversationId,
                 itemIds: selectedItemIds,
-                maxChars: DOCUMENT_CONTEXT_CHAR_BUDGET,
+                maxChars: resolveDocumentContextCharBudget(conversation, query),
+                query: query?.trim() || null,
             })
             if (result.sources.length === 0 || !result.markdown.trim()) return ctx
             return {
@@ -1865,6 +1895,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const syncPreparedSessionContext = async (
             target: PreparedAiSession,
             documentAttachmentItemIds: string[] = [],
+            query?: string,
         ) => {
             try {
                 await ai_update_session(
@@ -1876,7 +1907,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     focusRef.current.entryId,
                     currentSettings,
                 )
-                const enrichedCtx = await appendDocumentContext(ctx, target.conversationId, documentAttachmentItemIds)
+                const enrichedCtx = await appendDocumentContext(ctx, target.conversationId, documentAttachmentItemIds, query)
                 await ai_set_task_context(target.sid, enrichedCtx)
             } catch (error) {
                 logger.warn('[useAiController][发送链路] 同步对话独有设置失败，继续发送消息', {
@@ -1996,6 +2027,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
             collectDocumentAttachmentItemIds(messagesBeforeNewUser),
             pendingDocumentAttachmentIdsByConversationRef.current[currentConvId],
         )
+        const actualPrompt = currentConv.mode === 'report'
+        && !currentConv.reportSeeded
+        && currentConv.reportContext
+            ? buildReportBootstrapPrompt(currentConv.reportContext, trimmed)
+            : trimmed
         const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
         const existingRunId = sessionClosedForEdit ? null : currentConv.runId
         const preparedSession = await (async (): Promise<PreparedAiSession | null> => {
@@ -2101,6 +2137,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     ctx,
                     nextConversationId,
                     documentAttachmentItemIdsForSend,
+                    actualPrompt,
                 )
                 logger.log('[useAiController][发送链路] 准备推送任务上下文', {
                     traceId,
@@ -2159,13 +2196,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             .filter((item): item is DocumentContextItem => Boolean(item))
             .map(documentItemToAttachment)
 
-        await syncPreparedSessionContext(preparedSession, documentAttachmentItemIdsForSend)
-
-        const actualPrompt = currentConv.mode === 'report'
-        && !currentConv.reportSeeded
-        && currentConv.reportContext
-            ? buildReportBootstrapPrompt(currentConv.reportContext, trimmed)
-            : trimmed
+        await syncPreparedSessionContext(preparedSession, documentAttachmentItemIdsForSend, actualPrompt)
 
         const userMessage: Message = {
             id: `u_${Date.now()}`,
@@ -2221,7 +2252,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             const recoveredSession = await recreateMissingSession(preparedSession)
             if (!recoveredSession) return
-            await syncPreparedSessionContext(recoveredSession, documentAttachmentItemIdsForSend)
+            await syncPreparedSessionContext(recoveredSession, documentAttachmentItemIdsForSend, actualPrompt)
             logger.log('[useAiController][发送链路] 会话重建后重试发送', {
                 traceId,
                 conversationId: recoveredSession.conversationId,

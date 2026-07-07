@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -56,6 +57,17 @@ struct ChatMessageAttachmentScan {
 struct ChatAttachmentScan {
     #[serde(default)]
     sha256: String,
+}
+
+#[derive(Debug, Clone)]
+struct ChunkCandidate {
+    item_id: String,
+    file_name: String,
+    parser_id: Option<String>,
+    extension: String,
+    chunk: DocumentChunk,
+    order: usize,
+    score: f64,
 }
 
 pub fn context_root_dir(paths: &PathsState) -> Result<PathBuf> {
@@ -392,6 +404,7 @@ pub fn build_context_markdown(
     conversation_id: &str,
     item_ids: &[String],
     max_chars: Option<usize>,
+    query: Option<&str>,
 ) -> Result<DocumentContextBuildResult> {
     let root = context_root_dir(paths)?;
     let items = {
@@ -400,6 +413,18 @@ pub fn build_context_markdown(
     };
     let selected: HashSet<&str> = item_ids.iter().map(String::as_str).collect();
     let budget = max_chars.unwrap_or(DEFAULT_CONTEXT_CHAR_BUDGET);
+    let query_terms = query
+        .map(extract_query_terms)
+        .filter(|terms| !terms.is_empty())
+        .unwrap_or_default();
+    if !query_terms.is_empty() {
+        let candidates = collect_chunk_candidates(items, conversation_id, &selected)?;
+        return Ok(build_ranked_context_markdown(
+            rank_chunk_candidates(candidates, &query_terms),
+            budget,
+        ));
+    }
+
     let mut remaining = budget;
     let mut markdown = String::new();
     let mut sources = Vec::new();
@@ -474,6 +499,236 @@ pub fn build_context_markdown(
         sources,
         truncated,
     })
+}
+
+fn collect_chunk_candidates(
+    items: Vec<DocumentContextItem>,
+    conversation_id: &str,
+    selected: &HashSet<&str>,
+) -> Result<Vec<ChunkCandidate>> {
+    let mut candidates = Vec::new();
+    for item in items {
+        if item.conversation_id.as_deref() != Some(conversation_id) {
+            continue;
+        }
+        if !selected.is_empty() && !selected.contains(item.id.as_str()) {
+            continue;
+        }
+        if item.status != DocumentContextStatus::Ready {
+            continue;
+        }
+
+        let chunks_path = item
+            .chunks_path
+            .as_deref()
+            .ok_or_else(|| anyhow!("文档上下文缺少分块缓存：{}", item.id))?;
+        let chunks: Vec<DocumentChunk> = read_json_file(Path::new(chunks_path))?;
+        for chunk in chunks {
+            candidates.push(ChunkCandidate {
+                item_id: item.id.clone(),
+                file_name: item.file_name.clone(),
+                parser_id: item.parser_id.clone(),
+                extension: item.extension.clone(),
+                chunk,
+                order: candidates.len(),
+                score: 0.0,
+            });
+        }
+    }
+    Ok(candidates)
+}
+
+fn rank_chunk_candidates(
+    mut candidates: Vec<ChunkCandidate>,
+    query_terms: &HashSet<String>,
+) -> Vec<ChunkCandidate> {
+    let mut document_frequencies: HashMap<String, usize> = HashMap::new();
+    let term_counts = candidates
+        .iter()
+        .map(|candidate| {
+            let text = format!(
+                "{} {} {}",
+                candidate.file_name,
+                candidate.chunk.heading.as_deref().unwrap_or_default(),
+                candidate.chunk.markdown
+            );
+            let counts = term_counts(&text);
+            for term in query_terms {
+                if counts.contains_key(term) {
+                    *document_frequencies.entry(term.clone()).or_insert(0) += 1;
+                }
+            }
+            counts
+        })
+        .collect::<Vec<_>>();
+    let document_count = candidates.len().max(1) as f64;
+
+    for (index, candidate) in candidates.iter_mut().enumerate() {
+        let counts = &term_counts[index];
+        let total_terms = counts.values().sum::<usize>().max(1) as f64;
+        candidate.score = query_terms
+            .iter()
+            .map(|term| {
+                let tf = *counts.get(term).unwrap_or(&0) as f64;
+                if tf == 0.0 {
+                    return 0.0;
+                }
+                let df = *document_frequencies.get(term).unwrap_or(&0) as f64;
+                let idf = ((document_count + 1.0) / (df + 1.0)).ln() + 1.0;
+                (tf / total_terms.sqrt()) * idf
+            })
+            .sum();
+    }
+
+    candidates.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| a.order.cmp(&b.order))
+    });
+    candidates
+}
+
+fn build_ranked_context_markdown(
+    candidates: Vec<ChunkCandidate>,
+    budget: usize,
+) -> DocumentContextBuildResult {
+    let mut remaining = budget;
+    let mut markdown = String::new();
+    let mut sources = Vec::new();
+    let mut truncated = false;
+
+    markdown.push_str("[用户附件上下文]\n以下内容来自用户添加的本地文件，仅作为回答参考。不要编造文件中没有的内容。\n\n");
+
+    for candidate in candidates {
+        let heading = candidate
+            .chunk
+            .heading
+            .as_deref()
+            .or(candidate.chunk.source_ref.as_deref())
+            .unwrap_or(candidate.chunk.id.as_str());
+        let block = format!(
+            "## 文件：{}\n格式：.{}\n解析器：{}\n### {}\n{}\n\n",
+            candidate.file_name,
+            candidate.extension,
+            candidate.parser_id.as_deref().unwrap_or("unknown"),
+            heading,
+            candidate.chunk.markdown
+        );
+        let before_remaining = remaining;
+        if !append_with_budget(&mut markdown, &block, &mut remaining) {
+            truncated = true;
+        }
+        if remaining < before_remaining {
+            record_ranked_source(&mut sources, &candidate, before_remaining - remaining);
+        }
+        if truncated {
+            break;
+        }
+    }
+
+    if truncated {
+        markdown.push_str("\n（附件内容过长，已按当前上下文预算截断。）\n");
+    }
+
+    DocumentContextBuildResult {
+        markdown,
+        sources,
+        truncated,
+    }
+}
+
+fn record_ranked_source(
+    sources: &mut Vec<DocumentContextSource>,
+    candidate: &ChunkCandidate,
+    included_chars: usize,
+) {
+    if let Some(source) = sources
+        .iter_mut()
+        .find(|source| source.item_id == candidate.item_id)
+    {
+        source.included_chunks += 1;
+        source.included_chars += included_chars.min(candidate.chunk.char_count);
+        return;
+    }
+
+    sources.push(DocumentContextSource {
+        item_id: candidate.item_id.clone(),
+        file_name: candidate.file_name.clone(),
+        parser_id: candidate.parser_id.clone(),
+        format: Some(candidate.extension.clone()),
+        included_chunks: 1,
+        included_chars: included_chars.min(candidate.chunk.char_count),
+    });
+}
+
+fn extract_query_terms(query: &str) -> HashSet<String> {
+    extract_terms(query).into_iter().collect()
+}
+
+fn term_counts(text: &str) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for term in extract_terms(text) {
+        *counts.entry(term).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn extract_terms(text: &str) -> Vec<String> {
+    let mut terms = Vec::new();
+    let mut ascii = String::new();
+    let mut cjk = Vec::new();
+
+    for ch in text.chars() {
+        if ch.is_ascii_alphanumeric() {
+            flush_cjk_terms(&mut cjk, &mut terms);
+            ascii.push(ch.to_ascii_lowercase());
+        } else {
+            flush_ascii_term(&mut ascii, &mut terms);
+            if is_cjk(ch) {
+                cjk.push(ch);
+            } else {
+                flush_cjk_terms(&mut cjk, &mut terms);
+            }
+        }
+    }
+    flush_ascii_term(&mut ascii, &mut terms);
+    flush_cjk_terms(&mut cjk, &mut terms);
+    terms
+}
+
+fn flush_ascii_term(value: &mut String, terms: &mut Vec<String>) {
+    if value.len() >= 2 {
+        terms.push(std::mem::take(value));
+    } else {
+        value.clear();
+    }
+}
+
+fn flush_cjk_terms(chars: &mut Vec<char>, terms: &mut Vec<String>) {
+    match chars.len() {
+        0 => {}
+        1 => terms.push(chars[0].to_string()),
+        _ => {
+            for pair in chars.windows(2) {
+                terms.push(pair.iter().collect());
+            }
+        }
+    }
+    chars.clear();
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{3400}'..='\u{4dbf}'
+            | '\u{4e00}'..='\u{9fff}'
+            | '\u{f900}'..='\u{faff}'
+            | '\u{20000}'..='\u{2a6df}'
+            | '\u{2a700}'..='\u{2b73f}'
+            | '\u{2b740}'..='\u{2b81f}'
+            | '\u{2b820}'..='\u{2ceaf}'
+    )
 }
 
 fn append_with_budget(target: &mut String, value: &str, remaining: &mut usize) -> bool {
@@ -675,11 +930,13 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::PathsState;
-    use crate::document_context::DocumentContextStatus;
+    use crate::document_context::model::DocumentChunk;
+    use crate::document_context::{DocumentContextStatus, ParsedDocument};
 
     use super::{
-        MAX_DOCUMENT_SOURCE_BYTES, context_root_dir, create_pending_items, list_items,
-        mark_item_parsing, remove_item, remove_items_for_conversation,
+        MAX_DOCUMENT_SOURCE_BYTES, build_context_markdown, context_root_dir, create_pending_items,
+        list_items, mark_item_parsing, remove_item, remove_items_for_conversation,
+        save_parse_success,
     };
 
     fn test_paths(temp_dir: &TempDir) -> PathsState {
@@ -868,5 +1125,60 @@ mod tests {
         assert_eq!(list_items(&paths, Some("conv_b")).unwrap().len(), 1);
         assert!(!first_cache_dir.exists());
         assert!(second_cache_dir.is_dir());
+    }
+
+    #[test]
+    fn build_context_ranks_chunks_by_query_terms() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let source_path = temp_dir.path().join("source.txt");
+        fs::write(&source_path, "alpha").unwrap();
+        let item = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![source_path.to_string_lossy().to_string()],
+        )
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+        let parsed = ParsedDocument {
+            parser_id: "test".to_string(),
+            format: "txt".to_string(),
+            title: Some("source.txt".to_string()),
+            markdown: "苹果种植说明\n火星基地设定".to_string(),
+            plain_text: "苹果种植说明\n火星基地设定".to_string(),
+            chunks: vec![
+                DocumentChunk {
+                    id: "chunk_1".to_string(),
+                    heading: Some("苹果".to_string()),
+                    source_ref: None,
+                    markdown: "苹果种植说明，包含土壤和灌溉。".to_string(),
+                    char_count: 16,
+                },
+                DocumentChunk {
+                    id: "chunk_2".to_string(),
+                    heading: Some("火星".to_string()),
+                    source_ref: None,
+                    markdown: "火星基地设定，包含穹顶和供氧。".to_string(),
+                    char_count: 16,
+                },
+            ],
+            warnings: Vec::new(),
+        };
+        save_parse_success(&paths, &item.id, &parsed).unwrap();
+
+        let result = build_context_markdown(
+            &paths,
+            "conv_a",
+            &[item.id],
+            Some(10_000),
+            Some("火星基地如何供氧"),
+        )
+        .unwrap();
+
+        let mars_index = result.markdown.find("火星基地").unwrap();
+        let apple_index = result.markdown.find("苹果种植").unwrap();
+        assert!(mars_index < apple_index);
     }
 }

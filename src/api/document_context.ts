@@ -42,6 +42,7 @@ export interface BuildDocumentContextRequest {
     conversationId: string
     itemIds?: string[]
     maxChars?: number | null
+    query?: string | null
 }
 
 export const DOCCTX_UPDATED = 'docctx:updated'
@@ -70,5 +71,6 @@ export const docctx_build_context = (request: BuildDocumentContextRequest) =>
             conversationId: request.conversationId,
             itemIds: request.itemIds ?? [],
             maxChars: request.maxChars ?? null,
+            query: request.query ?? null,
         },
     })
