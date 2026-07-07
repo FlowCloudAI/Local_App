@@ -77,9 +77,14 @@ import {
     setAiSessionApi,
     setRuntimeConversation,
 } from '../stores/aiSessionStore'
+import {
+    setAiDocumentContextItemsByConversation,
+    setAiFocusContext,
+    setAiPendingDocumentAttachmentIdsByConversation,
+    useAiContextStore,
+} from '../stores/aiContextStore'
 import type {
     AiContextValue,
-    AiFocusContext,
     Attachment,
     Conversation,
     ConversationSettings,
@@ -681,14 +686,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const entrySnippetCacheRef = useRef<Map<string, string>>(new Map())
     const entryTitleCacheRef = useRef<Map<string, string>>(new Map())
     const conversationSettingsSaveTimersRef = useRef<Record<string, ReturnType<typeof window.setTimeout>>>({})
-    const [focusContext, setFocusContext] = useState<AiFocusContext>({
-        projectId: focus.projectId,
-        projectName: null,
-        entryId: focus.entryId,
-        entryTitle: null,
-        editModeEnabled,
-        webSearchEnabled,
-    })
+    const {
+        focusContext,
+        documentContextItemsByConversation,
+        pendingDocumentAttachmentIdsByConversation,
+    } = useAiContextStore()
 
     const activeConversation = useMemo(
         () => conversations.find((conversation) => conversation.id === activeConversationId),
@@ -696,12 +698,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
     )
 
     const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation])
-    const [documentContextItemsByConversation, setDocumentContextItemsByConversation] = useState<Record<string, DocumentContextItem[]>>({})
     const documentContextItemsByConversationRef = useRef(documentContextItemsByConversation)
     useEffect(() => {
         documentContextItemsByConversationRef.current = documentContextItemsByConversation
     }, [documentContextItemsByConversation])
-    const [pendingDocumentAttachmentIdsByConversation, setPendingDocumentAttachmentIdsByConversation] = useState<Record<string, string[]>>({})
     const pendingDocumentAttachmentIdsByConversationRef = useRef(pendingDocumentAttachmentIdsByConversation)
     useEffect(() => {
         pendingDocumentAttachmentIdsByConversationRef.current = pendingDocumentAttachmentIdsByConversation
@@ -756,7 +756,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const loadDocumentContextItems = useCallback(async (conversationId: string) => {
         const items = await docctx_list_items(conversationId)
-        setDocumentContextItemsByConversation((current) => ({
+        setAiDocumentContextItemsByConversation((current) => ({
             ...current,
             [conversationId]: items,
         }))
@@ -768,7 +768,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     ) => {
         if (fromConversationId === toConversationId) return []
         const migrated = await docctx_reassign_conversation(fromConversationId, toConversationId)
-        setDocumentContextItemsByConversation((current) => {
+        setAiDocumentContextItemsByConversation((current) => {
             const next = {...current}
             delete next[fromConversationId]
             if (migrated.length > 0) {
@@ -781,7 +781,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             }
             return next
         })
-        setPendingDocumentAttachmentIdsByConversation((current) => {
+        setAiPendingDocumentAttachmentIdsByConversation((current) => {
             const pendingIds = current[fromConversationId]
             if (!pendingIds?.length) return current
             const next = {...current}
@@ -1071,7 +1071,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     useEffect(() => {
         const unlisten = listen<DocumentContextUpdatedEvent>(DOCCTX_UPDATED, (event) => {
-            setDocumentContextItemsByConversation((current) =>
+            setAiDocumentContextItemsByConversation((current) =>
                 mergeDocumentContextItems(current, [event.payload.item]),
             )
             setAiConversations((current) => current.map((conversation) => ({
@@ -1128,7 +1128,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             ])
 
             if (cancelled) return
-            setFocusContext({
+            setAiFocusContext({
                 projectId: focus.projectId,
                 projectName: projectResult.status === 'fulfilled' ? projectResult.value : null,
                 entryId: focus.entryId,
@@ -1774,10 +1774,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const conversationId = activeConversationIdRef.current
         if (!conversationId || filePaths.length === 0) return
         const items = await docctx_add_files(conversationId, filePaths)
-        setDocumentContextItemsByConversation((current) =>
+        setAiDocumentContextItemsByConversation((current) =>
             mergeDocumentContextItems(current, items),
         )
-        setPendingDocumentAttachmentIdsByConversation((current) => {
+        setAiPendingDocumentAttachmentIdsByConversation((current) => {
             const existing = current[conversationId] ?? []
             const nextIds = items.map((item) => item.id)
             const merged = [...existing]
@@ -1793,7 +1793,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const removeDocumentContextItem = useCallback(async (itemId: string) => {
         await docctx_remove_item(itemId)
-        setDocumentContextItemsByConversation((current) => {
+        setAiDocumentContextItemsByConversation((current) => {
             const next = {...current}
             Object.entries(next).forEach(([conversationId, items]) => {
                 const filtered = items.filter((item) => item.id !== itemId)
@@ -1806,7 +1806,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             })
             return next
         })
-        setPendingDocumentAttachmentIdsByConversation((current) => {
+        setAiPendingDocumentAttachmentIdsByConversation((current) => {
             let changed = false
             const next = {...current}
             Object.entries(next).forEach(([conversationId, itemIds]) => {
@@ -1825,7 +1825,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const retryDocumentContextItem = useCallback(async (itemId: string) => {
         const item = await docctx_retry_item(itemId)
-        setDocumentContextItemsByConversation((current) =>
+        setAiDocumentContextItemsByConversation((current) =>
             mergeDocumentContextItems(current, [item]),
         )
     }, [])
@@ -2190,7 +2190,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
         setInputValue('')
         if (pendingAttachmentIds.length > 0) {
-            setPendingDocumentAttachmentIdsByConversation((current) => {
+            setAiPendingDocumentAttachmentIdsByConversation((current) => {
                 const next = {...current}
                 delete next[currentConvId]
                 delete next[preparedSession.conversationId]
