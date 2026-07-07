@@ -12,5 +12,6 @@ pub use model::{
 pub use parser::{DocumentParser, ParseInput, default_parser_registry};
 pub use storage::{
     build_context_markdown, create_pending_items, get_item, list_items, mark_item_parsing,
-    reassign_conversation, remove_item, save_parse_failure, save_parse_success,
+    reassign_conversation, remove_item, remove_items_for_conversation, save_parse_failure,
+    save_parse_success,
 };

@@ -39,6 +39,25 @@ struct ParseOutputMeta {
     warnings: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ChatConversationAttachmentScan {
+    #[serde(default)]
+    messages: Vec<ChatMessageAttachmentScan>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatMessageAttachmentScan {
+    #[serde(default)]
+    attachments: Vec<ChatAttachmentScan>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ChatAttachmentScan {
+    #[serde(default)]
+    sha256: String,
+}
+
 pub fn context_root_dir(paths: &PathsState) -> Result<PathBuf> {
     let db_dir = paths
         .db_path
@@ -299,14 +318,45 @@ pub fn save_parse_failure(
 
 pub fn remove_item(paths: &PathsState, item_id: &str) -> Result<()> {
     let root = context_root_dir(paths)?;
-    let _guard = lock_index()?;
-    let mut index = read_index(&root)?;
-    let before = index.items.len();
-    index.items.retain(|item| item.id != item_id);
-    if index.items.len() == before {
-        return Err(anyhow!("未找到文档上下文：{}", item_id));
+    {
+        let _guard = lock_index()?;
+        let mut index = read_index(&root)?;
+        let before = index.items.len();
+        index.items.retain(|item| item.id != item_id);
+        if index.items.len() == before {
+            return Err(anyhow!("未找到文档上下文：{}", item_id));
+        }
+        write_index(&root, &index)?;
     }
-    write_index(&root, &index)
+    garbage_collect_orphan_files(paths, &root);
+    Ok(())
+}
+
+pub fn remove_items_for_conversation(
+    paths: &PathsState,
+    conversation_id: &str,
+) -> Result<Vec<DocumentContextItem>> {
+    let root = context_root_dir(paths)?;
+    let removed = {
+        let _guard = lock_index()?;
+        let mut index = read_index(&root)?;
+        let mut removed = Vec::new();
+        index.items.retain(|item| {
+            let should_remove = item.conversation_id.as_deref() == Some(conversation_id);
+            if should_remove {
+                removed.push(item.clone());
+            }
+            !should_remove
+        });
+        if !removed.is_empty() {
+            write_index(&root, &index)?;
+        }
+        removed
+    };
+    if !removed.is_empty() {
+        garbage_collect_orphan_files(paths, &root);
+    }
+    Ok(removed)
 }
 
 pub fn reassign_conversation(
@@ -446,6 +496,14 @@ fn files_dir(root: &Path) -> PathBuf {
     root.join("files")
 }
 
+fn chats_dir(paths: &PathsState) -> Result<PathBuf> {
+    let db_dir = paths
+        .db_path
+        .parent()
+        .ok_or_else(|| anyhow!("无法解析数据库目录: {:?}", paths.db_path))?;
+    Ok(db_dir.join("chats"))
+}
+
 fn index_path(root: &Path) -> PathBuf {
     root.join(INDEX_FILE)
 }
@@ -467,6 +525,82 @@ fn read_index(root: &Path) -> Result<DocumentContextIndex> {
 fn write_index(root: &Path, index: &DocumentContextIndex) -> Result<()> {
     fs::create_dir_all(root)?;
     write_json_file(&index_path(root), index)
+}
+
+fn garbage_collect_orphan_files(paths: &PathsState, root: &Path) {
+    let referenced_sha256s = match collect_referenced_sha256s(paths, root) {
+        Ok(value) => value,
+        Err(error) => {
+            log::warn!("[docctx] 跳过文档缓存清理：{}", error);
+            return;
+        }
+    };
+    let files_dir = files_dir(root);
+    let Ok(entries) = fs::read_dir(&files_dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !is_sha256_dir_name(name) || referenced_sha256s.contains(name) {
+            continue;
+        }
+        if let Err(error) = fs::remove_dir_all(&path) {
+            log::warn!(
+                "[docctx] 清理无引用文档缓存失败 path={} error={}",
+                path.display(),
+                error
+            );
+        }
+    }
+}
+
+fn collect_referenced_sha256s(paths: &PathsState, root: &Path) -> Result<HashSet<String>> {
+    let mut referenced = {
+        let _guard = lock_index()?;
+        read_index(root)?
+            .items
+            .into_iter()
+            .filter_map(|item| (!item.sha256.is_empty()).then_some(item.sha256))
+            .collect::<HashSet<_>>()
+    };
+    referenced.extend(collect_chat_attachment_sha256s(paths)?);
+    Ok(referenced)
+}
+
+fn collect_chat_attachment_sha256s(paths: &PathsState) -> Result<HashSet<String>> {
+    let mut referenced = HashSet::new();
+    let chats_dir = chats_dir(paths)?;
+    let Ok(entries) = fs::read_dir(&chats_dir) else {
+        return Ok(referenced);
+    };
+
+    for entry in entries {
+        let path = entry?.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let conversation: ChatConversationAttachmentScan = read_json_file(&path)?;
+        for message in conversation.messages {
+            for attachment in message.attachments {
+                if !attachment.sha256.is_empty() {
+                    referenced.insert(attachment.sha256);
+                }
+            }
+        }
+    }
+
+    Ok(referenced)
+}
+
+fn is_sha256_dir_name(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn update_item(
@@ -543,7 +677,10 @@ mod tests {
     use crate::PathsState;
     use crate::document_context::DocumentContextStatus;
 
-    use super::{MAX_DOCUMENT_SOURCE_BYTES, create_pending_items, list_items, mark_item_parsing};
+    use super::{
+        MAX_DOCUMENT_SOURCE_BYTES, context_root_dir, create_pending_items, list_items,
+        mark_item_parsing, remove_item, remove_items_for_conversation,
+    };
 
     fn test_paths(temp_dir: &TempDir) -> PathsState {
         PathsState {
@@ -631,5 +768,105 @@ mod tests {
                 .iter()
                 .all(|item| item.status == DocumentContextStatus::Parsing)
         );
+    }
+
+    #[test]
+    fn remove_item_deletes_unreferenced_cache_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let source_path = temp_dir.path().join("source.txt");
+        fs::write(&source_path, "alpha").unwrap();
+        let item = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![source_path.to_string_lossy().to_string()],
+        )
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+        let cache_dir = context_root_dir(&paths)
+            .unwrap()
+            .join("files")
+            .join(&item.sha256);
+        assert!(cache_dir.is_dir());
+
+        remove_item(&paths, &item.id).unwrap();
+
+        assert!(!cache_dir.exists());
+    }
+
+    #[test]
+    fn remove_item_keeps_message_referenced_cache_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let source_path = temp_dir.path().join("source.txt");
+        fs::write(&source_path, "alpha").unwrap();
+        let item = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![source_path.to_string_lossy().to_string()],
+        )
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+        let chats_dir = temp_dir.path().join("chats");
+        fs::create_dir_all(&chats_dir).unwrap();
+        fs::write(
+            chats_dir.join("conv_a.json"),
+            format!(
+                r#"{{"messages":[{{"attachments":[{{"sha256":"{}"}}]}}]}}"#,
+                item.sha256
+            ),
+        )
+        .unwrap();
+        let cache_dir = context_root_dir(&paths)
+            .unwrap()
+            .join("files")
+            .join(&item.sha256);
+
+        remove_item(&paths, &item.id).unwrap();
+
+        assert!(cache_dir.is_dir());
+    }
+
+    #[test]
+    fn remove_items_for_conversation_only_removes_matching_conversation() {
+        let temp_dir = TempDir::new().unwrap();
+        let paths = test_paths(&temp_dir);
+        let first_path = temp_dir.path().join("first.txt");
+        let second_path = temp_dir.path().join("second.txt");
+        fs::write(&first_path, "first").unwrap();
+        fs::write(&second_path, "second").unwrap();
+        let first = create_pending_items(
+            &paths,
+            Some("conv_a".to_string()),
+            vec![first_path.to_string_lossy().to_string()],
+        )
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+        let second = create_pending_items(
+            &paths,
+            Some("conv_b".to_string()),
+            vec![second_path.to_string_lossy().to_string()],
+        )
+        .unwrap()
+        .into_iter()
+        .next()
+        .unwrap();
+        let root = context_root_dir(&paths).unwrap();
+        let first_cache_dir = root.join("files").join(&first.sha256);
+        let second_cache_dir = root.join("files").join(&second.sha256);
+
+        let removed = remove_items_for_conversation(&paths, "conv_a").unwrap();
+
+        assert_eq!(removed.len(), 1);
+        assert!(list_items(&paths, Some("conv_a")).unwrap().is_empty());
+        assert_eq!(list_items(&paths, Some("conv_b")).unwrap().len(), 1);
+        assert!(!first_cache_dir.exists());
+        assert!(second_cache_dir.is_dir());
     }
 }

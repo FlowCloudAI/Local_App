@@ -1,4 +1,5 @@
 use super::common::*;
+use crate::document_context::remove_items_for_conversation;
 use flowcloudai_client::ErrorCode;
 
 fn conversation_not_found(id: &str) -> ApiError {
@@ -242,7 +243,15 @@ pub async fn ai_delete_conversation(
     paths: State<'_, PathsState>,
     id: String,
 ) -> Result<(), ApiError> {
-    chat_store_delete_conversation(paths.inner(), &id).map_err(ApiError::internal)
+    chat_store_delete_conversation(paths.inner(), &id).map_err(ApiError::internal)?;
+    if let Err(error) = remove_items_for_conversation(paths.inner(), &id) {
+        log::warn!(
+            "[docctx] 删除会话后清理文档上下文失败 conversation_id={} error={}",
+            id,
+            error
+        );
+    }
+    Ok(())
 }
 
 /// 修改对话标题
