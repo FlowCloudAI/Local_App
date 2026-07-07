@@ -100,12 +100,13 @@ struct GovernanceScoreInput {
     tag_schema_count: usize,
     entry_count: usize,
     word_count: usize,
+    length_score_total: usize,
     relation_count: usize,
     internal_link_count: usize,
+    capped_connection_count: usize,
     unset_type_count: usize,
     uncategorized_entry_count: usize,
     empty_content_entry_count: usize,
-    short_content_entry_count: usize,
     missing_summary_entry_count: usize,
     isolated_entry_count: usize,
 }
@@ -126,16 +127,12 @@ fn build_governance_score(input: GovernanceScoreInput) -> ProjectGovernanceScore
     let summary_count = input
         .entry_count
         .saturating_sub(input.missing_summary_entry_count);
-    let long_content_count = input
-        .entry_count
-        .saturating_sub(input.short_content_entry_count);
     let connected_count = input.entry_count.saturating_sub(input.isolated_entry_count);
-    let average_word_score = average_words.min(100);
+    let length_score = ratio_score(input.length_score_total, input.entry_count * 100);
     let content_score = clamp_score(
         (ratio_score(non_empty_count, input.entry_count) * 35
-            + ratio_score(summary_count, input.entry_count) * 25
-            + ratio_score(long_content_count, input.entry_count) * 25
-            + average_word_score * 15)
+            + ratio_score(summary_count, input.entry_count) * 35
+            + length_score * 30)
             / 100,
     );
     let structure_score = [
@@ -155,53 +152,37 @@ fn build_governance_score(input: GovernanceScoreInput) -> ProjectGovernanceScore
             / 100,
     );
     let relation_density_score = if input.entry_count > 0 {
-        ((input.relation_count + input.internal_link_count) * 100 / input.entry_count).min(100)
+        (input.capped_connection_count * 100 / (input.entry_count * 3)).min(100)
     } else {
         0
     };
     let connectivity_score = clamp_score(
         (ratio_score(connected_count, input.entry_count) * 70 + relation_density_score * 30) / 100,
     );
-    let risk_issue_count = input.uncategorized_entry_count
-        + input.empty_content_entry_count
-        + input.short_content_entry_count
-        + input.missing_summary_entry_count
-        + input.isolated_entry_count;
-    let risk_score = if input.entry_count == 0 {
-        0
-    } else {
-        100usize.saturating_sub(((risk_issue_count * 100) / (input.entry_count * 5)).min(100))
-    };
     let dimensions = vec![
-        ProjectGovernanceDimension {
-            key: "structure".to_string(),
-            label: "结构配置".to_string(),
-            score: structure_score,
-            weight: 20,
-        },
         ProjectGovernanceDimension {
             key: "content".to_string(),
             label: "内容完整".to_string(),
             score: content_score,
-            weight: 25,
+            weight: 35,
         },
         ProjectGovernanceDimension {
             key: "ownership".to_string(),
             label: "组织归属".to_string(),
             score: ownership_score,
-            weight: 20,
+            weight: 30,
         },
         ProjectGovernanceDimension {
             key: "connectivity".to_string(),
             label: "关系连通".to_string(),
             score: connectivity_score,
-            weight: 20,
+            weight: 25,
         },
         ProjectGovernanceDimension {
-            key: "risk".to_string(),
-            label: "风险控制".to_string(),
-            score: risk_score,
-            weight: 15,
+            key: "structure".to_string(),
+            label: "结构配置".to_string(),
+            score: structure_score,
+            weight: 10,
         },
     ];
     let score = dimensions
@@ -239,6 +220,60 @@ fn build_governance_score(input: GovernanceScoreInput) -> ProjectGovernanceScore
                 passed: average_words >= 100,
             },
         ],
+    }
+}
+
+#[cfg(test)]
+mod governance_score_tests {
+    use super::*;
+
+    fn base_input() -> GovernanceScoreInput {
+        GovernanceScoreInput {
+            category_count: 1,
+            entry_type_count: 1,
+            tag_schema_count: 1,
+            entry_count: 10,
+            word_count: 1000,
+            length_score_total: 1000,
+            relation_count: 1,
+            internal_link_count: 0,
+            capped_connection_count: 30,
+            unset_type_count: 0,
+            uncategorized_entry_count: 0,
+            empty_content_entry_count: 0,
+            missing_summary_entry_count: 0,
+            isolated_entry_count: 0,
+        }
+    }
+
+    #[test]
+    fn governance_score_uses_v2_weights_without_risk_dimension() {
+        let mut input = base_input();
+        input.word_count = 500;
+        input.length_score_total = 500;
+        input.empty_content_entry_count = 5;
+        input.missing_summary_entry_count = 5;
+
+        let score = build_governance_score(input);
+
+        assert_eq!(score.score, 82);
+        assert!(!score.dimensions.iter().any(|item| item.key == "risk"));
+        assert_eq!(
+            score
+                .dimensions
+                .iter()
+                .find(|item| item.key == "content")
+                .map(|item| item.weight),
+            Some(35)
+        );
+        assert_eq!(
+            score
+                .dimensions
+                .iter()
+                .find(|item| item.key == "structure")
+                .map(|item| item.weight),
+            Some(10)
+        );
     }
 }
 
@@ -633,6 +668,7 @@ pub async fn db_get_project_stats(
 
     let mut image_count = 0usize;
     let mut word_count = 0usize;
+    let mut length_score_total = 0usize;
     let mut entry_count = 0usize;
     let mut internal_link_count = 0usize;
     let mut unset_type_count = 0usize;
@@ -645,7 +681,7 @@ pub async fn db_get_project_stats(
     let mut entries_by_type = HashMap::<Option<String>, (usize, usize)>::new();
     let mut entries_by_category = HashMap::<Option<Uuid>, (usize, usize)>::new();
     let mut entry_ids = HashSet::<Uuid>::new();
-    let mut connected_entry_ids = HashSet::<Uuid>::new();
+    let mut connection_neighbors = HashMap::<Uuid, HashSet<Uuid>>::new();
     let mut offset = 0usize;
     const PAGE_SIZE: usize = 500;
     const SHORT_CONTENT_CHAR_THRESHOLD: usize = 100;
@@ -670,9 +706,26 @@ pub async fn db_get_project_stats(
         .await
         .map_err(|e| e.to_string())?
         .len();
+    let mut relation_pairs = HashSet::<(Uuid, Uuid)>::new();
     for relation in &relations {
-        connected_entry_ids.insert(relation.a_id);
-        connected_entry_ids.insert(relation.b_id);
+        if relation.a_id == relation.b_id {
+            continue;
+        }
+        let pair = if relation.a_id < relation.b_id {
+            (relation.a_id, relation.b_id)
+        } else {
+            (relation.b_id, relation.a_id)
+        };
+        if relation_pairs.insert(pair) {
+            connection_neighbors
+                .entry(relation.a_id)
+                .or_default()
+                .insert(relation.b_id);
+            connection_neighbors
+                .entry(relation.b_id)
+                .or_default()
+                .insert(relation.a_id);
+        }
     }
 
     loop {
@@ -704,6 +757,8 @@ pub async fn db_get_project_stats(
             entry_ids.insert(entry.id);
             image_count += entry.images.0.len();
             word_count += entry_word_count;
+            length_score_total += entry_word_count.min(SHORT_CONTENT_CHAR_THRESHOLD) * 100
+                / SHORT_CONTENT_CHAR_THRESHOLD;
 
             if category_id.is_none() {
                 uncategorized_entry_count += 1;
@@ -756,8 +811,24 @@ pub async fn db_get_project_stats(
                 .await
                 .map_err(|e| e.to_string())?;
             internal_link_count += outgoing_links.len();
-            if !outgoing_links.is_empty() || !incoming_links.is_empty() {
-                connected_entry_ids.insert(entry.id);
+            let linked_entry_ids = outgoing_links
+                .iter()
+                .chain(incoming_links.iter())
+                .filter_map(|link| {
+                    if link.a_id == entry.id && link.b_id != entry.id {
+                        Some(link.b_id)
+                    } else if link.b_id == entry.id && link.a_id != entry.id {
+                        Some(link.a_id)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashSet<_>>();
+            if !linked_entry_ids.is_empty() {
+                connection_neighbors
+                    .entry(entry.id)
+                    .or_default()
+                    .extend(linked_entry_ids);
             }
         }
 
@@ -769,8 +840,32 @@ pub async fn db_get_project_stats(
 
     let isolated_entry_count = entry_ids
         .iter()
-        .filter(|entry_id| !connected_entry_ids.contains(entry_id))
+        .filter(|entry_id| {
+            connection_neighbors
+                .get(entry_id)
+                .map(|neighbors| {
+                    !neighbors
+                        .iter()
+                        .any(|neighbor| entry_ids.contains(neighbor))
+                })
+                .unwrap_or(true)
+        })
         .count();
+    let capped_connection_count = entry_ids
+        .iter()
+        .map(|entry_id| {
+            connection_neighbors
+                .get(entry_id)
+                .map(|neighbors| {
+                    neighbors
+                        .iter()
+                        .filter(|neighbor| entry_ids.contains(neighbor))
+                        .count()
+                        .min(3)
+                })
+                .unwrap_or(0)
+        })
+        .sum::<usize>();
     let mut entries_by_type = entries_by_type
         .into_iter()
         .map(|(entry_type, (count, word_count))| ProjectEntryTypeStat {
@@ -795,12 +890,13 @@ pub async fn db_get_project_stats(
         tag_schema_count,
         entry_count,
         word_count,
+        length_score_total,
         relation_count: relations.len(),
         internal_link_count,
+        capped_connection_count,
         unset_type_count,
         uncategorized_entry_count,
         empty_content_entry_count,
-        short_content_entry_count,
         missing_summary_entry_count,
         isolated_entry_count,
     });

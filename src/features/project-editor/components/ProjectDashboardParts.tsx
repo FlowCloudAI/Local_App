@@ -255,17 +255,19 @@ export function DashboardSignalList({items}: { items: DashboardSignalItem[] }) {
     )
 }
 
-export function HealthMeter({score}: { score: number }) {
-    const status = score >= 80 ? '结构稳定' : score >= 55 ? '仍需补强' : '基础偏弱'
+export function HealthMeter({score, entryCount}: { score: number; entryCount: number }) {
+    const hasEnoughEntries = entryCount >= 10
+    const status = !hasEnoughEntries ? '资料量不足' : score >= 80 ? '结构稳定' : score >= 55 ? '仍需补强' : '基础偏弱'
+    const displayScore = hasEnoughEntries ? score : '—'
     return (
         <div className="pe-dashboard-health">
-            <div className="pe-dashboard-health__ring" style={getBarStyle(score, 100)}>
-                <span>{score}</span>
+            <div className="pe-dashboard-health__ring" style={getBarStyle(hasEnoughEntries ? score : 0, 100)}>
+                <span>{displayScore}</span>
             </div>
             <div className="pe-dashboard-health__body">
                 <span className="pe-dashboard-health__label">资料整理评分</span>
                 <strong>{status}</strong>
-                <span>根据分类、词条类型、标签、内容数量和平均字数估算。</span>
+                <span>{hasEnoughEntries ? '根据内容完整、组织归属、关系连通和结构配置估算。' : '至少 10 个词条后显示评分。'}</span>
             </div>
         </div>
     )

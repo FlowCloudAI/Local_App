@@ -35,7 +35,7 @@ function ProjectDashboard(props: ProjectDashboardProps) {
 
             <div className="pe-dashboard-status-strip">
                 <article className="pe-dashboard-kpi pe-dashboard-kpi--health">
-                    <HealthMeter score={dashboard.structureScore}/>
+                    <HealthMeter score={dashboard.structureScore} entryCount={dashboard.effectiveEntryCount}/>
                 </article>
                 <div className="pe-dashboard-status-strip__kpis">
                     <DashboardKpiStrip items={dashboard.kpiItems}/>
