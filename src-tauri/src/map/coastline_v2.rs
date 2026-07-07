@@ -58,6 +58,9 @@ const COASTLINE_V2_NOISE_SALT_B: u64 = 0xA0761_D649_5B19_0C5 ^ 0x735A_2D97;
 const COASTLINE_V2_NOISE_SALT_C: u64 = 0x8EBC_6AF0_9C88_C6E3;
 /// 粗糙度调制包络的盐值（与三带独立）。
 const COASTLINE_V2_NOISE_SALT_ROUGHNESS: u64 = 0x589E_C77B_3C99_45A1;
+/// 算法版本标记，打进生成日志——用于确认运行中的后端确实加载了最新算法
+/// （tauri dev 的 Rust 改动需重启进程才生效，此前多次误判为参数不生效）。
+const COASTLINE_V2_ALGO_VERSION: &str = "v2.8-压限";
 
 macro_rules! param {
     ($params:expr, $field:ident, $default:expr) => {
@@ -73,11 +76,12 @@ pub fn build_natural_coastline_polygon_v2(
 ) -> Vec<[f64; 2]> {
     let started_at = Instant::now();
     log::info!(
-        "开始海岸线v2计算：shape_id={}，name={}，原始顶点数={}，关联关键地点数={}",
+        "开始海岸线v2计算：shape_id={}，name={}，原始顶点数={}，关联关键地点数={}，算法版本={}",
         shape.id,
         shape.name,
         shape.vertices.len(),
-        related_locations.len()
+        related_locations.len(),
+        COASTLINE_V2_ALGO_VERSION
     );
 
     if shape.vertices.len() < 3 {
