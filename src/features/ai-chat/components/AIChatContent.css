@@ -1640,8 +1640,6 @@
 .ai-tool-access-select-btn svg {
     width: 0.875rem;
     height: 0.875rem;
-    transform-origin: center;
-    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .ai-tool-access-select-btn span {
@@ -1649,8 +1647,17 @@
     text-align: left;
 }
 
-.ai-tool-access-select-btn[aria-expanded='true'] svg {
-    transform: rotate(-90deg);
+.ai-tool-access-select-btn.is-reader,
+.ai-floating-toolbar .ai-tool-access-select-btn.is-reader {
+    background: var(--fc-color-success-bg);
+    border-color: var(--fc-color-success);
+    color: var(--fc-color-success);
+}
+
+.ai-tool-access-select-btn.is-reader:hover {
+    background: color-mix(in srgb, var(--fc-color-success-bg) 82%, var(--fc-color-bg-elevated));
+    border-color: var(--fc-color-success);
+    color: var(--fc-color-success-hover);
 }
 
 .ai-tool-access-select-btn.is-writer,
@@ -1694,6 +1701,15 @@
     white-space: nowrap;
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;
+    display: grid;
+    grid-template-columns: 0.875rem minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--fc-space-xs);
+}
+
+.ai-tool-access-menu-item-icon {
+    width: 0.875rem;
+    height: 0.875rem;
 }
 
 .ai-tool-access-menu-item:hover {
@@ -1704,6 +1720,11 @@
     background: color-mix(in srgb, var(--fc-color-primary) 6%, var(--fc-color-bg-elevated));
     color: color-mix(in srgb, var(--fc-color-primary) 82%, var(--fc-color-text));
     font-weight: var(--fc-font-weight-medium);
+}
+
+.ai-tool-access-menu-item.is-reader.active {
+    background: color-mix(in srgb, var(--fc-color-success-bg) 72%, transparent);
+    color: var(--fc-color-success);
 }
 
 /* ========== 模型切换弹出菜单 ========== */

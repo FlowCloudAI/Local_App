@@ -37,6 +37,7 @@ import useLinkPreview from '../../entries/hooks/useLinkPreview'
 import useWikiLink from '../../entries/hooks/useWikiLink'
 import EntryEditorLinkPreview from '../../entries/components/EntryEditorLinkPreview'
 import EntryEditorWikiLink from '../../entries/components/EntryEditorWikiLink'
+import AiToolAccessIcon from './AiToolAccessIcon'
 import {
     buildInternalEntryMarkdown,
     type InternalEntryLink,
@@ -2069,7 +2070,7 @@ export default function AIChatContent({
                                         <div className="ai-tool-access-select" ref={toolAccessSelectRef}>
                                             <button
                                                 type="button"
-                                                className={`ai-toolbar-btn ai-tool-access-select-btn active ${ctx.toolAccessMode === 'writer' ? 'is-writer' : ''}`}
+                                                className={`ai-toolbar-btn ai-tool-access-select-btn active ${ctx.toolAccessMode === 'reader' ? 'is-reader' : ''} ${ctx.toolAccessMode === 'writer' ? 'is-writer' : ''}`}
                                                 onClick={(event) => {
                                                     event.stopPropagation()
                                                     setIsToolAccessMenuOpen((open) => !open)
@@ -2078,19 +2079,10 @@ export default function AIChatContent({
                                                 aria-haspopup="listbox"
                                                 aria-expanded={isToolAccessMenuOpen}
                                             >
-                                                <svg
-                                                    width="14"
-                                                    height="14"
-                                                    viewBox="0 0 16 16"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="1.8"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    aria-hidden="true"
-                                                >
-                                                    <path d="M6 4l4 4-4 4"/>
-                                                </svg>
+                                                <AiToolAccessIcon
+                                                    mode={ctx.toolAccessMode}
+                                                    className="ai-tool-access-icon"
+                                                />
                                                 <span>{AI_TOOL_ACCESS_LABELS[ctx.toolAccessMode]}</span>
                                             </button>
                                             {isToolAccessMenuOpen && (
@@ -2101,14 +2093,18 @@ export default function AIChatContent({
                                                             type="button"
                                                             role="option"
                                                             aria-selected={ctx.toolAccessMode === mode}
-                                                            className={`ai-tool-access-menu-item ${ctx.toolAccessMode === mode ? 'active' : ''}`}
+                                                            className={`ai-tool-access-menu-item is-${mode} ${ctx.toolAccessMode === mode ? 'active' : ''}`}
                                                             title={AI_TOOL_ACCESS_TITLES[mode]}
                                                             onClick={(event) => {
                                                                 event.stopPropagation()
                                                                 void handleToolAccessModeSelect(mode)
                                                             }}
                                                         >
-                                                            {AI_TOOL_ACCESS_LABELS[mode]}
+                                                            <AiToolAccessIcon
+                                                                mode={mode}
+                                                                className="ai-tool-access-menu-item-icon"
+                                                            />
+                                                            <span>{AI_TOOL_ACCESS_LABELS[mode]}</span>
                                                         </button>
                                                     ))}
                                                 </div>

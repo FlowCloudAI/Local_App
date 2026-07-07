@@ -450,6 +450,11 @@
     font-weight: var(--fc-font-weight-semibold);
 }
 
+.mobile-ai-tool-mode-menu__row--reader.active {
+    background: color-mix(in srgb, var(--fc-color-success-bg) 72%, transparent);
+    color: var(--fc-color-success);
+}
+
 .mobile-ai-tool-mode-menu__row--writer.active {
     background: color-mix(in srgb, var(--fc-color-warning-bg) 72%, transparent);
     color: var(--fc-color-warning);
@@ -611,6 +616,12 @@
     border-color: color-mix(in srgb, var(--fc-color-warning) 42%, transparent);
     background: var(--fc-color-warning-bg);
     color: var(--fc-color-warning);
+}
+
+.mobile-ai-composer-card__chip--mode.is-reader {
+    border-color: color-mix(in srgb, var(--fc-color-success) 42%, transparent);
+    background: var(--fc-color-success-bg);
+    color: var(--fc-color-success);
 }
 
 .mobile-ai-composer-card__chip--mode.is-menu-open {
