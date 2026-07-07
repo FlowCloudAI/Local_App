@@ -654,7 +654,7 @@
   padding: 1rem;
   background:
     radial-gradient(circle at top right, color-mix(in srgb, var(--fc-color-text-on-primary) 22%, transparent), transparent 34%),
-    linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 95%, transparent), color-mix(in srgb, var(--fc-color-primary-hover) 85%, transparent) 46%, color-mix(in srgb, var(--fc-blue-900) 92%, transparent));
+    linear-gradient(135deg, color-mix(in srgb, var(--fc-color-primary) 95%, transparent), color-mix(in srgb, var(--fc-color-primary-hover) 85%, transparent) 46%, color-mix(in srgb, var(--fc-color-primary-active) 92%, transparent));
 }
 
 .project-list-placeholder::after {
