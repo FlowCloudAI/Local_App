@@ -58,6 +58,13 @@ import {
     setAiWriterModeAvailable,
     useAiPluginStore,
 } from '../stores/aiPluginStore'
+import {
+    setAiActiveConversationId,
+    setAiConversationMetaLoaded,
+    setAiConversations,
+    setAiUnreadConversationIds,
+    useAiConversationStore,
+} from '../stores/aiConversationStore'
 import type {
     AiContextValue,
     AiFocusContext,
@@ -629,10 +636,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
     } = useAiPluginStore()
     const appSettingsRef = useRef<AppSettings | null>(null)
 
-    const [conversations, setConversations] = useState<Conversation[]>([])
-    const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
-    const [unreadConversationIds, setUnreadConversationIds] = useState<Record<string, boolean>>({})
-    const [conversationMetaLoaded, setConversationMetaLoaded] = useState(false)
+    const {
+        conversations,
+        activeConversationId,
+        unreadConversationIds,
+        conversationMetaLoaded,
+    } = useAiConversationStore()
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
     const [autoScroll, setAutoScroll] = useState(true)
 
@@ -831,7 +840,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             await sessionApiRef.current?.closeSession(message.sessionId)
             delete runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
-            setConversations((prev) => prev.map((item) =>
+            setAiConversations((prev) => prev.map((item) =>
                 item.id === conversationId ? {...item, sessionId: null, runId: null} : item,
             ))
         } catch (error) {
@@ -871,7 +880,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             ?? null
 
         let latestUserMessageWithAttachments: Message | null = null
-        setConversations((prev) => prev.map((conversation) => {
+        setAiConversations((prev) => prev.map((conversation) => {
             const matchedByRuntime =
                 conversation.sessionId === message.sessionId && conversation.runId === message.runId
             const matchedByMap = targetConversationId != null && conversation.id === targetConversationId
@@ -895,7 +904,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             }
         }))
         if (resolvedConversationId) {
-            setUnreadConversationIds((prev) => {
+            setAiUnreadConversationIds((prev) => {
                 const next = {...prev}
                 if (resolvedConversationId === activeConversationIdRef.current) {
                     delete next[resolvedConversationId]
@@ -915,7 +924,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const targetConversationId =
             runtimeConversationRef.current[runtimeConversationKey(payload.sessionId, payload.runId)]
 
-        setConversations((prev) => prev.map((conversation) => {
+        setAiConversations((prev) => prev.map((conversation) => {
             const matchedByRuntime =
                 conversation.sessionId === payload.sessionId && conversation.runId === payload.runId
             const matchedByMap = targetConversationId != null && conversation.id === targetConversationId
@@ -956,13 +965,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const selectConversation = useCallback((convId: string | null) => {
         activeConversationIdRef.current = convId
-        setActiveConversationId(convId)
+        setAiActiveConversationId(convId)
         const conversation = convId
             ? conversationsRef.current.find((item) => item.id === convId)
             : null
         session.activateSession(conversation?.sessionId ?? null, conversation?.runId ?? null)
         if (convId) {
-            setUnreadConversationIds((prev) => {
+            setAiUnreadConversationIds((prev) => {
                 if (!prev[convId]) return prev
                 const next = {...prev}
                 delete next[convId]
@@ -989,7 +998,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             return
         }
 
-        setConversations((prev) => prev.map((conversation) => {
+        setAiConversations((prev) => prev.map((conversation) => {
             if (
                 conversation.id !== currentConversationId
                 || conversation.sessionId !== session.sessionId
@@ -1030,7 +1039,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (!convId || convId.startsWith('conv_')) return
         ai_get_conversation(convId).then(stored => {
             if (!stored) return
-            setConversations(prev => prev.map(c =>
+            setAiConversations(prev => prev.map(c =>
                 c.id === convId
                     ? {
                         ...c,
@@ -1062,7 +1071,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             setDocumentContextItemsByConversation((current) =>
                 mergeDocumentContextItems(current, [event.payload.item]),
             )
-            setConversations((current) => current.map((conversation) => ({
+            setAiConversations((current) => current.map((conversation) => ({
                 ...conversation,
                 messages: conversation.messages.map((message) => {
                     if (!message.attachments?.some((attachment) =>
@@ -1322,13 +1331,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     buildConversationFromMeta(meta, storedMetaMap, uiStateMap)
                 ))
 
-                setConversations(convs)
-                setActiveConversationId(null)
+                setAiConversations(convs)
+                setAiActiveConversationId(null)
             } else {
-                setConversations([])
-                setActiveConversationId(null)
+                setAiConversations([])
+                setAiActiveConversationId(null)
             }
-            setConversationMetaLoaded(true)
+            setAiConversationMetaLoaded(true)
         }
 
         void init()
@@ -1354,7 +1363,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
         const existingDraft = conversationsRef.current.find(isEmptyDraftConversation)
         if (existingDraft) {
-            setConversations((prev) => prev.map((conversation) =>
+            setAiConversations((prev) => prev.map((conversation) =>
                 conversation.id === existingDraft.id
                     ? {
                         ...conversation,
@@ -1368,7 +1377,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     }
                     : conversation,
             ))
-            setActiveConversationId(existingDraft.id)
+            setAiActiveConversationId(existingDraft.id)
             activeConversationIdRef.current = existingDraft.id
             session.activateSession(null, null)
             return
@@ -1379,15 +1388,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
             selectedModel,
             buildDefaultConversationSettings(appSettingsRef.current),
         )
-        setConversations((prev) => [draft, ...prev])
-        setActiveConversationId(draft.id)
+        setAiConversations((prev) => [draft, ...prev])
+        setAiActiveConversationId(draft.id)
         activeConversationIdRef.current = draft.id
         session.activateSession(null, null)
     }, [conversationMetaLoaded, pluginsReady, selectedModel, selectedPlugin, session])
 
     useEffect(() => {
         if (!activeConversationId?.startsWith('conv_') || !selectedPlugin || !selectedModel) return
-        setConversations((prev) => prev.map((conversation) => {
+        setAiConversations((prev) => prev.map((conversation) => {
             if (conversation.id !== activeConversationId || !isEmptyDraftConversation(conversation)) {
                 return conversation
             }
@@ -1410,7 +1419,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const createNewConversation = useCallback(async () => {
         if (!selectedPlugin || !selectedModel) {
             session.activateSession(null, null)
-            setActiveConversationId(null)
+            setAiActiveConversationId(null)
             activeConversationIdRef.current = null
             setInputValue('')
             setEditingMessageId(null)
@@ -1424,11 +1433,11 @@ export function useAiController(focus: AiFocus): AiContextValue {
             buildDefaultConversationSettings(appSettingsRef.current),
         )
         session.activateSession(null, null)
-        setConversations((prev) => [
+        setAiConversations((prev) => [
             draft,
             ...prev.filter((conversation) => !isEmptyDraftConversation(conversation)),
         ])
-        setActiveConversationId(draft.id)
+        setAiActiveConversationId(draft.id)
         activeConversationIdRef.current = draft.id
         setInputValue('')
         setEditingMessageId(null)
@@ -1474,8 +1483,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }
 
         setAiSelectedPluginModel(pluginId, model)
-        setConversations((prev) => [conversation, ...prev])
-        setActiveConversationId(conversation.id)
+        setAiConversations((prev) => [conversation, ...prev])
+        setAiActiveConversationId(conversation.id)
         activeConversationIdRef.current = conversation.id
         session.activateSession(null, null)
         setInputValue('')
@@ -1527,8 +1536,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         runtimeConversationRef.current[
             runtimeConversationKey(created.sessionId, created.runId)
             ] = created.conversationId
-        setConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)])
-        setActiveConversationId(conversation.id)
+        setAiConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)])
+        setAiActiveConversationId(conversation.id)
         activeConversationIdRef.current = conversation.id
         setInputValue('')
         setEditingMessageId(null)
@@ -1536,7 +1545,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [selectedModel, selectedPlugin, session, sessionParams.maxToolRounds])
 
     const updateConversationCharacterAutoPlay = useCallback((convId: string, autoPlay: boolean) => {
-        setConversations((prev) => prev.map((conversation) => (
+        setAiConversations((prev) => prev.map((conversation) => (
             conversation.id === convId
                 ? {...conversation, characterAutoPlay: autoPlay}
                 : conversation
@@ -1561,7 +1570,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 toStoredConversationSettings(settings, appSettingsRef.current),
             )
                 .then((saved) => {
-                    setConversations((prev) => prev.map((conversation) =>
+                    setAiConversations((prev) => prev.map((conversation) =>
                         conversation.id === convId
                             ? {...conversation, settings: normalizeConversationSettings(saved)}
                             : conversation,
@@ -1587,7 +1596,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         patch: Partial<ConversationSettings>,
     ) => {
         let nextSettings: ConversationSettings | null = null
-        setConversations((prev) => prev.map((conversation) => {
+        setAiConversations((prev) => prev.map((conversation) => {
             if (conversation.id !== convId) return conversation
             nextSettings = normalizeConversationSettings({
                 ...conversation.settings,
@@ -1635,7 +1644,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             delete runtimeConversationRef.current[runtimeConversationKey(conv.sessionId, conv.runId)]
         }
 
-        setConversations((prev) => prev.map((conversation) =>
+        setAiConversations((prev) => prev.map((conversation) =>
             conversation.id === conv.id
                 ? {
                     ...conversation,
@@ -1658,9 +1667,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const switchConversation = useCallback(async (convId: string) => {
         if (convId === activeConversationIdRef.current) return
-        setActiveConversationId(convId)
+        setAiActiveConversationId(convId)
         activeConversationIdRef.current = convId
-        setUnreadConversationIds((prev) => {
+        setAiUnreadConversationIds((prev) => {
             if (!prev[convId]) return prev
             const next = {...prev}
             delete next[convId]
@@ -1678,7 +1687,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             if (targetConv.messages.length === 0 && !targetConv.id.startsWith('conv_')) {
                 const stored = await ai_get_conversation(targetConv.id).catch(() => null)
                 if (stored) {
-                    setConversations((prev) => prev.map((conversation) =>
+                    setAiConversations((prev) => prev.map((conversation) =>
                         conversation.id === convId
                             ? {
                                 ...conversation,
@@ -1707,8 +1716,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             await ai_delete_conversation(conv.id).catch(logger.error)
         }
 
-        setConversations((prev) => prev.filter((conversation) => conversation.id !== convId))
-        setUnreadConversationIds((prev) => {
+        setAiConversations((prev) => prev.filter((conversation) => conversation.id !== convId))
+        setAiUnreadConversationIds((prev) => {
             if (!prev[convId]) return prev
             const next = {...prev}
             delete next[convId]
@@ -1722,7 +1731,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
         if (activeConversationIdRef.current === convId) {
             session.activateSession(null, null)
-            setActiveConversationId(null)
+            setAiActiveConversationId(null)
             activeConversationIdRef.current = null
             setInputValue('')
             setEditingMessageId(null)
@@ -1733,7 +1742,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const renameConversation = useCallback(async (convId: string, title: string) => {
         const trimmed = title.trim()
         if (!trimmed) return
-        setConversations((prev) => prev.map((conversation) =>
+        setAiConversations((prev) => prev.map((conversation) =>
             conversation.id === convId ? {...conversation, title: trimmed} : conversation,
         ))
         await ai_rename_conversation(convId, trimmed).catch(logger.error)
@@ -1741,7 +1750,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const toggleConversationPinned = useCallback((convId: string, event?: MouseEvent) => {
         event?.stopPropagation()
-        setConversations((prev) => prev.map((conversation) =>
+        setAiConversations((prev) => prev.map((conversation) =>
             conversation.id === convId
                 ? {...conversation, pinnedAt: conversation.pinnedAt ? null : new Date().toISOString()}
                 : conversation,
@@ -1753,7 +1762,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const nextArchivedAt = conversationsRef.current.find((conversation) => conversation.id === convId)?.archivedAt
             ? null
             : new Date().toISOString()
-        setConversations((prev) => prev.map((conversation) =>
+        setAiConversations((prev) => prev.map((conversation) =>
             conversation.id === convId
                 ? {...conversation, archivedAt: nextArchivedAt}
                 : conversation,
@@ -1890,7 +1899,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
             delete runtimeConversationRef.current[runtimeConversationKey(failedSession.sid, failedSession.runId)]
             session.activateSession(null, null)
-            setConversations((prev) => prev.map((conversation) =>
+            setAiConversations((prev) => prev.map((conversation) =>
                 conversation.id === failedSession.conversationId
                     ? {...conversation, sessionId: null, runId: null}
                     : conversation,
@@ -1918,7 +1927,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             runtimeConversationRef.current[
                 runtimeConversationKey(created.sessionId, created.runId)
             ] = nextConversationId
-            setConversations((prev) => prev.map((conversation) =>
+            setAiConversations((prev) => prev.map((conversation) =>
                 conversation.id === failedSession.conversationId
                     ? {
                         ...conversation,
@@ -1929,7 +1938,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     : conversation,
             ))
             if (activeConversationIdRef.current === failedSession.conversationId) {
-                setActiveConversationId(nextConversationId)
+                setAiActiveConversationId(nextConversationId)
                 activeConversationIdRef.current = nextConversationId
             }
 
@@ -1950,8 +1959,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 pluginId: selectedPlugin,
                 model: selectedModel,
             })
-            setConversations((prev) => [draftConversation, ...prev])
-            setActiveConversationId(draftConversation.id)
+            setAiConversations((prev) => [draftConversation, ...prev])
+            setAiActiveConversationId(draftConversation.id)
             activeConversationIdRef.current = draftConversation.id
             session.activateSession(null, null)
             setAutoScroll(true)
@@ -1966,7 +1975,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             const editIdx = currentConv.messages.findIndex((message) => message.id === editingMessageId)
             if (editIdx !== -1) {
                 messagesBeforeNewUser = currentConv.messages.slice(0, editIdx)
-                setConversations((prev) => prev.map((conversation) =>
+                setAiConversations((prev) => prev.map((conversation) =>
                     conversation.id === currentConvId
                         ? {...conversation, messages: conversation.messages.slice(0, editIdx)}
                         : conversation,
@@ -1978,7 +1987,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 } else if (currentConv.sessionId) {
                     await session.closeSession(currentConv.sessionId)
                     sessionClosedForEdit = true
-                    setConversations((prev) => prev.map((conversation) =>
+                    setAiConversations((prev) => prev.map((conversation) =>
                         conversation.id === currentConvId
                             ? {...conversation, sessionId: null, runId: null}
                             : conversation,
@@ -2124,15 +2133,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 ] = nextConversationId
 
             if (isPending) {
-                setConversations((prev) => prev.map((conversation) =>
+                setAiConversations((prev) => prev.map((conversation) =>
                     conversation.id === currentConvId
                         ? {...conversation, id: created.conversationId, sessionId: created.sessionId, runId: created.runId}
                         : conversation,
                 ))
-                setActiveConversationId(created.conversationId)
+                setAiActiveConversationId(created.conversationId)
                 activeConversationIdRef.current = created.conversationId
             } else {
-                setConversations((prev) => prev.map((conversation) =>
+                setAiConversations((prev) => prev.map((conversation) =>
                     conversation.id === currentConvId
                         ? {...conversation, sessionId: created.sessionId, runId: created.runId}
                         : conversation,
@@ -2173,7 +2182,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             attachments: userAttachments.length > 0 ? userAttachments : undefined,
         }
 
-        setConversations((prev) => prev.map((conversation) => {
+        setAiConversations((prev) => prev.map((conversation) => {
             if (conversation.id !== preparedSession.conversationId) return conversation
             const isFirstMessage = conversation.messages.length === 0
             return {
@@ -2344,7 +2353,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             runtimeConversationRef.current[
                 runtimeConversationKey(created.sessionId, created.runId)
             ] = conv.id
-            setConversations((prev) => prev.map((c) =>
+            setAiConversations((prev) => prev.map((c) =>
                 c.id === conv.id ? {...c, sessionId: created.sessionId, runId: created.runId} : c,
             ))
 
@@ -2382,7 +2391,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             }
         }
 
-        setConversations((prev) => prev.map((conversation) =>
+        setAiConversations((prev) => prev.map((conversation) =>
             conversation.id === activeConversationIdRef.current
                 ? {...conversation, messages: conversation.messages.slice(0, messageIndex)}
                 : conversation,
@@ -2413,7 +2422,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (conv.runId && session.isRunStreaming(conv.runId)) return
 
         await session.closeSession(conv.sessionId)
-        setConversations((prev) => prev.map((conversation) =>
+        setAiConversations((prev) => prev.map((conversation) =>
             conversation.id === conversationId
                 ? {...conversation, sessionId: null, runId: null}
                 : conversation,
