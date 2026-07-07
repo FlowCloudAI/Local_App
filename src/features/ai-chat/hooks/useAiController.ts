@@ -65,6 +65,18 @@ import {
     setAiUnreadConversationIds,
     useAiConversationStore,
 } from '../stores/aiConversationStore'
+import {
+    abortAiStreamingController,
+    clearAutoCompactInFlight,
+    deleteRuntimeConversation,
+    deleteRuntimeConversationsById,
+    findRuntimeConversation,
+    getAiSessionApi,
+    markAutoCompactInFlight,
+    setAiAbortController,
+    setAiSessionApi,
+    setRuntimeConversation,
+} from '../stores/aiSessionStore'
 import type {
     AiContextValue,
     AiFocusContext,
@@ -93,7 +105,6 @@ const buildAiLogPreview = (content: string) => {
     return normalized.length > 120 ? `${normalized.slice(0, 120)}...` : normalized
 }
 
-const runtimeConversationKey = (sessionId: string, runId: string) => `${sessionId}::${runId}`
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
 const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
 const DOCUMENT_CONTEXT_ATTRIBUTE = 'attached_documents'
@@ -781,11 +792,6 @@ export function useAiController(focus: AiFocus): AiContextValue {
         return migrated
     }, [])
 
-    const runtimeConversationRef = useRef<Record<string, string>>({})
-    const abortControllerRef = useRef<AbortController | null>(null)
-    const sessionApiRef = useRef<ReturnType<typeof useAiSession> | null>(null)
-    const autoCompactInFlightRef = useRef<Set<string>>(new Set())
-
     const maybeAutoCompactAfterMessage = useCallback(async (
         conversationId: string,
         message: SessionMessage,
@@ -815,8 +821,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (usageRatio < compactSettings.auto_compact_threshold_ratio) return
 
         const inFlightKey = `${conversationId}:${message.nodeId}`
-        if (autoCompactInFlightRef.current.has(inFlightKey)) return
-        autoCompactInFlightRef.current.add(inFlightKey)
+        if (!markAutoCompactInFlight(inFlightKey)) return
 
         try {
             const result = await ai_compact_conversation({
@@ -838,8 +843,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
             })
             if (!result.applied) return
 
-            await sessionApiRef.current?.closeSession(message.sessionId)
-            delete runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
+            await getAiSessionApi()?.closeSession(message.sessionId)
+            deleteRuntimeConversation(message.sessionId, message.runId)
             setAiConversations((prev) => prev.map((item) =>
                 item.id === conversationId ? {...item, sessionId: null, runId: null} : item,
             ))
@@ -849,7 +854,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 error,
             })
         } finally {
-            autoCompactInFlightRef.current.delete(inFlightKey)
+            clearAutoCompactInFlight(inFlightKey)
         }
     }, [])
 
@@ -871,8 +876,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [])
 
     const onMessage = useCallback((message: SessionMessage) => {
-        const targetConversationId =
-            runtimeConversationRef.current[runtimeConversationKey(message.sessionId, message.runId)]
+        const targetConversationId = findRuntimeConversation(message.sessionId, message.runId)
         const resolvedConversationId = targetConversationId
             ?? conversationsRef.current.find((conversation) => (
                 conversation.sessionId === message.sessionId && conversation.runId === message.runId
@@ -921,8 +925,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [maybeAutoCompactAfterMessage, persistUserMessageAttachments])
 
     const onUserTurnBegin = useCallback((payload: { sessionId: string; runId: string; nodeId: number }) => {
-        const targetConversationId =
-            runtimeConversationRef.current[runtimeConversationKey(payload.sessionId, payload.runId)]
+        const targetConversationId = findRuntimeConversation(payload.sessionId, payload.runId)
 
         setAiConversations((prev) => prev.map((conversation) => {
             const matchedByRuntime =
@@ -960,7 +963,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const session = useAiSession({onMessage, onUserTurnBegin, onError})
     useEffect(() => {
-        sessionApiRef.current = session
+        setAiSessionApi(session)
     }, [session])
 
     const selectConversation = useCallback((convId: string | null) => {
@@ -1533,9 +1536,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             reportSeeded: false,
             settings: normalizeConversationSettings(),
         }
-        runtimeConversationRef.current[
-            runtimeConversationKey(created.sessionId, created.runId)
-            ] = created.conversationId
+        setRuntimeConversation(created.sessionId, created.runId, created.conversationId)
         setAiConversations((prev) => [conversation, ...prev.filter((item) => item.id !== conversation.id)])
         setAiActiveConversationId(conversation.id)
         activeConversationIdRef.current = conversation.id
@@ -1641,7 +1642,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             await session.closeSession(conv.sessionId)
         }
         if (conv.sessionId && conv.runId) {
-            delete runtimeConversationRef.current[runtimeConversationKey(conv.sessionId, conv.runId)]
+            deleteRuntimeConversation(conv.sessionId, conv.runId)
         }
 
         setAiConversations((prev) => prev.map((conversation) =>
@@ -1723,11 +1724,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             delete next[convId]
             return next
         })
-        Object.entries(runtimeConversationRef.current).forEach(([key, mappedConvId]) => {
-            if (mappedConvId === convId) {
-                delete runtimeConversationRef.current[key]
-            }
-        })
+        deleteRuntimeConversationsById(convId)
 
         if (activeConversationIdRef.current === convId) {
             session.activateSession(null, null)
@@ -1897,7 +1894,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 runId: failedSession.runId,
             })
 
-            delete runtimeConversationRef.current[runtimeConversationKey(failedSession.sid, failedSession.runId)]
+            deleteRuntimeConversation(failedSession.sid, failedSession.runId)
             session.activateSession(null, null)
             setAiConversations((prev) => prev.map((conversation) =>
                 conversation.id === failedSession.conversationId
@@ -1924,9 +1921,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             if (isPending && nextConversationId !== failedSession.conversationId) {
                 await migrateDocumentContextConversation(failedSession.conversationId, nextConversationId)
             }
-            runtimeConversationRef.current[
-                runtimeConversationKey(created.sessionId, created.runId)
-            ] = nextConversationId
+            setRuntimeConversation(created.sessionId, created.runId, nextConversationId)
             setAiConversations((prev) => prev.map((conversation) =>
                 conversation.id === failedSession.conversationId
                     ? {
@@ -1966,7 +1961,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             setAutoScroll(true)
         }
 
-        abortControllerRef.current = new AbortController()
+        setAiAbortController(new AbortController())
 
         let sessionClosedForEdit = false
         let messagesBeforeNewUser = currentConv.messages
@@ -2012,7 +2007,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     runId: existingRunId,
                 })
                 session.activateSession(existingSid, existingRunId)
-                runtimeConversationRef.current[runtimeConversationKey(existingSid, existingRunId)] = currentConvId
+                setRuntimeConversation(existingSid, existingRunId, currentConvId)
                 return {sid: existingSid, runId: existingRunId, conversationId: currentConvId}
             }
 
@@ -2128,9 +2123,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 })
             }
 
-            runtimeConversationRef.current[
-                runtimeConversationKey(created.sessionId, created.runId)
-                ] = nextConversationId
+            setRuntimeConversation(created.sessionId, created.runId, nextConversationId)
 
             if (isPending) {
                 setAiConversations((prev) => prev.map((conversation) =>
@@ -2263,7 +2256,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     ])
 
     const stopStreaming = useCallback(() => {
-        abortControllerRef.current?.abort()
+        abortAiStreamingController()
         const conv = activeConversationRef.current
         void session.cancelSession(conv?.sessionId)
     }, [session])
@@ -2328,7 +2321,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         let currentRunId = conv.runId
         if (currentSid && currentRunId) {
             session.activateSession(currentSid, currentRunId)
-            runtimeConversationRef.current[runtimeConversationKey(currentSid, currentRunId)] = conv.id
+            setRuntimeConversation(currentSid, currentRunId, conv.id)
         }
 
         if (!currentSid || !currentRunId) {
@@ -2350,9 +2343,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             }
             currentSid = created.sessionId
             currentRunId = created.runId
-            runtimeConversationRef.current[
-                runtimeConversationKey(created.sessionId, created.runId)
-            ] = conv.id
+            setRuntimeConversation(created.sessionId, created.runId, conv.id)
             setAiConversations((prev) => prev.map((c) =>
                 c.id === conv.id ? {...c, sessionId: created.sessionId, runId: created.runId} : c,
             ))
