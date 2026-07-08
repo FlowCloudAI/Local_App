@@ -42,8 +42,10 @@ import {FloatingPanel} from '../../../shared/ui/overlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
 import {compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
+import {isMapDebugLogEnabled} from '../styles/common'
 
 function mapLog(msg: string) {
+    if (!isMapDebugLogEnabled()) return
     void log_message('info', `[WorldMap] ${msg}`)
 }
 
@@ -1270,6 +1272,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                 },
             }
             : pixiPropsWithLod
+
+        // 非调试态直接用原始 renderOverlay，跳过纯用于日志追踪的包装
+        //（避免每次渲染多一层间接调用与模板字符串构造）。
+        if (!isMapDebugLogEnabled()) {
+            return basePixiProps
+        }
 
         if (!basePixiProps.renderOverlay) {
             mapLog('wrapRenderOverlay: no renderOverlay to wrap')

@@ -18,7 +18,7 @@ import type {
     PixiLabelRule,
     PixiMapStyle,
 } from './types'
-import {hexToRgbaColor, strokeToRgbaColor} from '../common'
+import {hexToRgbaColor, isMapDebugLogEnabled, strokeToRgbaColor} from '../common'
 import {
     drawPixiCompassAsset,
     drawPixiEffectAsset,
@@ -28,6 +28,7 @@ import {
 } from './assets'
 
 function pixiOverlayLog(msg: string) {
+    if (!isMapDebugLogEnabled()) return
     void log_message('info', `[PixiOverlay] ${msg}`)
 }
 
@@ -253,7 +254,15 @@ function useImageTexture(url: string): Texture {
 
 function PixiTextureOverlay({context, style}: { context: MapPixiPreviewOverlayContext; style: PixiMapStyle }) {
     pixiOverlayLog('PixiTextureOverlay: ENTER')
-    const dataUrl = useMemo(() => createOverlayDataUrl(context, style), [context, style])
+    // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
+    //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
+    // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
+    // createOverlayDataUrl（整块画布 toDataURL + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
+    const dataUrl = useMemo(
+        () => createOverlayDataUrl(context, style),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [context.scene.shapes, context.scene.canvas.width, context.scene.canvas.height, style],
+    )
     pixiOverlayLog(`PixiTextureOverlay: useMemo dataUrl=${dataUrl ? 'present' : 'empty'}`)
     const texture = useImageTexture(dataUrl)
     pixiOverlayLog(`PixiTextureOverlay: useImageTexture returned texture=${texture !== Texture.EMPTY ? 'loaded' : 'empty'}`)

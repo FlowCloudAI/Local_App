@@ -1,11 +1,12 @@
 import {log_message} from '../../../../api'
 import type {MapStyleCompileContext} from '../common'
-import {makeSolidBackgroundDataUrl, paintToRgbaColor, strokeToRgbaColor,} from '../common'
+import {isMapDebugLogEnabled, makeSolidBackgroundDataUrl, paintToRgbaColor, strokeToRgbaColor,} from '../common'
 import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
 import {buildPixiLocationIconAsset, createPixiPaperTextureAsset} from './assets'
 import {createPixiOverlayRenderer} from './overlays'
 
 function pixiLog(msg: string) {
+    if (!isMapDebugLogEnabled()) return
     void log_message('info', `[PixiCompiler] ${msg}`)
 }
 

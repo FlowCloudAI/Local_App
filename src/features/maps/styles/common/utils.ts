@@ -1,6 +1,29 @@
 import type {MapPreviewBackgroundImage, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {MapStyleBackgroundImageToken, MapStylePaintToken, MapStyleStrokeToken} from './types'
 
+let mapDebugLogCache: boolean | null = null
+
+/**
+ * 地图渲染调试日志开关（默认关闭）。地图渲染热路径里散布着大量 `log_message` IPC 日志，
+ * 每帧调用会向后端狂发 IPC、显著拖慢帧率；因此默认关闭，只在显式开启时输出。
+ * 开启方式：URL 加 `?mapDebug=1`，或设置 `localStorage['fc:mapDebug']='1'` 后刷新。
+ */
+export function isMapDebugLogEnabled(): boolean {
+    if (mapDebugLogCache === null) {
+        try {
+            const hasWindow = typeof window !== 'undefined'
+            const byQuery = hasWindow
+                && new URLSearchParams(window.location.search).get('mapDebug') === '1'
+            const byStorage = hasWindow
+                && window.localStorage?.getItem('fc:mapDebug') === '1'
+            mapDebugLogCache = Boolean(byQuery || byStorage)
+        } catch {
+            mapDebugLogCache = false
+        }
+    }
+    return mapDebugLogCache
+}
+
 function clampAlpha(opacity: number | undefined, fallback = 255): number {
     if (typeof opacity !== 'number' || !Number.isFinite(opacity)) return fallback
     return Math.max(0, Math.min(255, Math.round(opacity * 255)))
