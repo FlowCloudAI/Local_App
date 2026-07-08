@@ -136,6 +136,111 @@ function drawCoastlineLayer(
     ctx.restore()
 }
 
+interface CoastlineHatchParams {
+    rings?: number
+    gap?: number
+    width?: number
+    color?: string
+    opacity?: number
+}
+
+/** 在给定 ctx 上把所有陆地描成一条闭合路径（不描边不填充），供膨胀遮罩复用。 */
+function traceLandPath(
+    maskCtx: CanvasRenderingContext2D,
+    shapes: { polygon: [number, number][] }[],
+): void {
+    maskCtx.beginPath()
+    for (const shape of shapes) {
+        const polygon = shape.polygon
+        maskCtx.moveTo(polygon[0][0], polygon[0][1])
+        for (let i = 1; i < polygon.length; i++) {
+            maskCtx.lineTo(polygon[i][0], polygon[i][1])
+        }
+        maskCtx.closePath()
+    }
+}
+
+/**
+ * 把所有陆地按距离 d 做形态学膨胀（圆形结构元 = 填充 + 半径 d 的圆头描边），画成实心遮罩。
+ * 圆形结构元让尖角/小碎边被"磨圆"，深湾处相邻边界平滑合并，从根本上避免顶点外扩会产生的自交。
+ */
+function paintDilatedLand(
+    maskCtx: CanvasRenderingContext2D,
+    shapes: { polygon: [number, number][] }[],
+    width: number,
+    height: number,
+    distance: number,
+): void {
+    maskCtx.clearRect(0, 0, width, height)
+    maskCtx.fillStyle = '#000'
+    maskCtx.strokeStyle = '#000'
+    maskCtx.lineJoin = 'round'
+    maskCtx.lineCap = 'round'
+    maskCtx.lineWidth = Math.max(0.01, distance * 2)
+    traceLandPath(maskCtx, shapes)
+    maskCtx.fill()
+    if (distance > 0) maskCtx.stroke()
+}
+
+/**
+ * 海岸线晕线：向海侧一圈圈逐渐变淡的等距轮廓（古地图/托尔金标志性的"海里一圈圈线"）。
+ * 做法：对"陆地膨胀 d"与"陆地膨胀 d−线宽"求差，得到偏移 d 处的一条细环。圆形结构元
+ * 天然避免尖角自交，深湾/小碎边处相邻晕线会平滑合并而非乱交叠。绘制在场景坐标里。
+ */
+function drawCoastlineHatching(
+    ctx: CanvasRenderingContext2D,
+    context: MapPixiPreviewOverlayContext,
+    hatch: CoastlineHatchParams,
+): void {
+    const rings = Math.max(1, Math.min(12, Math.round(getNumberParam(hatch.rings, 4))))
+    const gap = Math.max(1, getNumberParam(hatch.gap, 7))
+    const lineWidth = Math.max(0.4, getNumberParam(hatch.width, 0.9))
+    const opacity = Math.max(0, Math.min(1, getNumberParam(hatch.opacity, 0.5)))
+    const rgba = hexToRgbaColor(getStringParam(hatch.color, '#6a4a26'))
+    const width = context.scene.canvas.width
+    const height = context.scene.canvas.height
+    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
+    if (!shapes.length || width <= 0 || height <= 0) return
+
+    const maskCanvas = document.createElement('canvas')
+    maskCanvas.width = width
+    maskCanvas.height = height
+    const maskCtx = maskCanvas.getContext('2d')
+    const ringCanvas = document.createElement('canvas')
+    ringCanvas.width = width
+    ringCanvas.height = height
+    const ringCtx = ringCanvas.getContext('2d')
+    if (!maskCtx || !ringCtx) return
+
+    for (let ring = 1; ring <= rings; ring++) {
+        const ringOpacity = opacity * (1 - (ring - 1) / rings)
+        if (ringOpacity <= 0.01) continue
+        const distance = ring * gap
+
+        // 外圈：陆地膨胀 distance
+        paintDilatedLand(maskCtx, shapes, width, height, distance)
+        ringCtx.globalCompositeOperation = 'source-over'
+        ringCtx.clearRect(0, 0, width, height)
+        ringCtx.drawImage(maskCanvas, 0, 0)
+
+        // 减去内圈：陆地膨胀 distance − lineWidth，剩下一条细环
+        paintDilatedLand(maskCtx, shapes, width, height, Math.max(0, distance - lineWidth))
+        ringCtx.globalCompositeOperation = 'destination-out'
+        ringCtx.drawImage(maskCanvas, 0, 0)
+
+        // 用晕线颜色给细环上色（source-in：只在细环 alpha 处着色）
+        ringCtx.globalCompositeOperation = 'source-in'
+        ringCtx.fillStyle = colorToCss(rgba, 1)
+        ringCtx.fillRect(0, 0, width, height)
+        ringCtx.globalCompositeOperation = 'source-over'
+
+        ctx.save()
+        ctx.globalAlpha = ringOpacity
+        ctx.drawImage(ringCanvas, 0, 0)
+        ctx.restore()
+    }
+}
+
 function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverlayContext, style: PixiMapStyle) {
     const plugin = style.decorations?.find(item => item.id === 'compass')
     const size = getNumberParam(plugin?.params?.size, 58)
@@ -191,6 +296,17 @@ function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: Pixi
 
     const coastlinePlugin = style.decorations?.find(item => item.id === 'coastline-outline')
     if (style.coastline?.enabled && coastlinePlugin) {
+        // 先画向海侧的等距晕线（在下），再叠陆地边界描边（在上）。hatchRings>0 才启用。
+        const hatchParams = coastlinePlugin.params
+        if (getNumberParam(hatchParams?.hatchRings, 0) > 0) {
+            drawCoastlineHatching(ctx, context, {
+                rings: getNumberParam(hatchParams?.hatchRings, 4),
+                gap: getNumberParam(hatchParams?.hatchGap, 7),
+                width: getNumberParam(hatchParams?.hatchWidth, 0.9),
+                color: getStringParam(hatchParams?.hatchColor, '#6a4a26'),
+                opacity: getNumberParam(hatchParams?.hatchOpacity, 0.5),
+            })
+        }
         const brushAsset = getStringParam(coastlinePlugin.params?.brush, 'tolkien-coastline') as PixiBrushAssetId
         style.coastline.layers.forEach((layer, index) => drawCoastlineLayer(ctx, context, layer, index, brushAsset))
     }

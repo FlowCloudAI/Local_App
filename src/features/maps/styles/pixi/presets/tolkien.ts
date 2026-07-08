@@ -112,6 +112,13 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
             params: {
                 brush: 'tolkien-coastline',
                 roughness: 1.2,
+                // 海岸线晕线（向海侧一圈圈逐渐变淡的等距轮廓）。hatchRings>0 时启用；
+                // 可调 hatchRings/hatchGap/hatchOpacity 控制密度与强度。
+                hatchRings: 4,
+                hatchGap: 7,
+                hatchWidth: 0.9,
+                hatchColor: '#6a4a26',
+                hatchOpacity: 0.5,
             },
         },
         {
