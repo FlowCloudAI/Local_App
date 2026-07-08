@@ -1,4 +1,5 @@
 import {logger} from '../../../shared/logger'
+import {rehypeSanitizeRawHtml} from '../../../shared/markdown/rehypeSanitizeRawHtml'
 import {openFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
@@ -1270,6 +1271,7 @@ export default function EntryEditor({
                                             fontSizeScale={editorFontSize / 14}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
+                                            previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
                                             toolbarCommands={markdownToolbarCommands}
                                             onKeyDown={(event) => {
                                                 if (!(event.ctrlKey || event.metaKey) || event.repeat) return
@@ -1366,6 +1368,7 @@ export default function EntryEditor({
                                         background={"transparent"}
                                         fontSizeScale={editorFontSize / 14}
                                         autoHeight
+                                        previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
                                     />
 
                                     <EntryEditorLinkPreview

@@ -7,6 +7,21 @@ use std::time::{Duration, Instant};
 
 const MARKET_LIST_TIMEOUT_SECS: u64 = 12;
 
+/// 校验市场插件 ID：仅允许安全字符，杜绝路径穿越（如 `..\..\x`）与 URL 路径注入。
+/// 该值同时会拼进请求 URL 与本地临时文件名。
+fn validate_market_plugin_id(id: &str) -> anyhow::Result<()> {
+    let ok = !id.is_empty()
+        && id.len() <= 128
+        && !id.contains("..")
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+    if !ok {
+        anyhow::bail!("非法插件 ID: {id}");
+    }
+    Ok(())
+}
+
 fn market_plugin_count(value: &serde_json::Value) -> Option<usize> {
     value.as_array().map(Vec::len).or_else(|| {
         value
@@ -232,10 +247,13 @@ pub(super) async fn market_download(
     id: &str,
     dest: &Path,
 ) -> anyhow::Result<()> {
+    validate_market_plugin_id(id)?;
     let bytes = client
         .get(format!("{}/{}/download", MARKET_BASE, id))
         .send()
         .await?
+        // 非 2xx 直接报错，避免把 404/错误页正文当成插件写盘。
+        .error_for_status()?
         .bytes()
         .await?;
     fs::write(dest, bytes).await?;

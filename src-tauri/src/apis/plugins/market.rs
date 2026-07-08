@@ -49,7 +49,8 @@ pub async fn plugin_market_install(
 
     // 先下载到系统临时目录，再由 install_plugin_from_path 复制到 plugins_dir。
     // 直接下载到 plugins_dir 会导致 Windows 上 src==dst 时 std::fs::copy 报 os error 32。
-    let tmp = std::env::temp_dir().join(format!("{}.fcplug", plugin_id));
+    // 临时文件用随机名，避免 plugin_id 参与路径构造导致穿越（market_download 内另有 ID 校验）。
+    let tmp = std::env::temp_dir().join(format!("{}.fcplug", uuid::Uuid::new_v4()));
     market_download(&net.client, &plugin_id, &tmp)
         .await
         .map_err(ApiError::from_display)?;

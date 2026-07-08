@@ -1,6 +1,7 @@
 use crate::settings::SearchSourceSettings;
 use anyhow::Result;
 use ego_tree::NodeRef;
+use futures::StreamExt;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{ToolRegistry, arg_str};
 use moka::future::Cache;
@@ -200,11 +201,37 @@ pub fn register_web_tools(registry: &mut ToolRegistry) -> Result<()> {
                     return Ok(msg);
                 }
 
-                let html = response
-                    .text()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("读取响应失败: {}", e))?;
+                // Fix: 响应正文设上限，避免被超大 body 打爆后端内存（panic=abort 下 OOM = 杀进程）。
+                // 先按声明的 Content-Length 短路，再流式读取兜住无 Content-Length 的分块响应。
+                const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
+                if let Some(len) = response.content_length() {
+                    if len as usize > MAX_BODY_BYTES {
+                        return Ok(format!(
+                            "HTTP {}\n\n[响应过大：Content-Length {} 字节，超过 {} 字节上限，已跳过]",
+                            status, len, MAX_BODY_BYTES
+                        ));
+                    }
+                }
 
+                let charset = content_type.split(';').find_map(|p| {
+                    p.trim()
+                        .strip_prefix("charset=")
+                        .map(|c| c.trim().trim_matches('"').to_string())
+                });
+
+                let mut stream = response.bytes_stream();
+                let mut raw: Vec<u8> = Vec::new();
+                while let Some(chunk) = stream.next().await {
+                    let chunk = chunk.map_err(|e| anyhow::anyhow!("读取响应失败: {}", e))?;
+                    let remaining = MAX_BODY_BYTES.saturating_sub(raw.len());
+                    if chunk.len() >= remaining {
+                        raw.extend_from_slice(&chunk[..remaining]);
+                        break;
+                    }
+                    raw.extend_from_slice(&chunk);
+                }
+
+                let html = decode_body(&raw, charset.as_deref());
                 let text = html_to_text(&html);
 
                 const MAX_CHARS: usize = 8000;
@@ -261,23 +288,49 @@ fn validate_url(raw: &str) -> Result<String> {
 }
 
 fn is_private_host(host: &str) -> bool {
-    let h = host.to_ascii_lowercase();
+    let mut h = host.trim().to_ascii_lowercase();
+    // 去掉末尾的 FQDN 点（"example.com." 与 "example.com" 等价）
+    while h.ends_with('.') {
+        h.pop();
+    }
     if h == "localhost" || h.ends_with(".localhost") {
         return true;
     }
-    if let Ok(ip) = h.parse::<std::net::IpAddr>() {
-        return match ip {
-            std::net::IpAddr::V4(v4) => {
-                v4.is_loopback()
-                    || v4.is_private()
-                    || v4.is_link_local()
-                    || v4.is_broadcast()
-                    || v4.is_unspecified()
-            }
-            std::net::IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
-        };
+    // IPv6 字面量在 host_str() 中带方括号（如 "[::1]"），先剥括号再解析，
+    // 否则 parse 失败会被误判为“公网域名”而放行。
+    let ip_str = h
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(h.as_str());
+    match ip_str.parse::<std::net::IpAddr>() {
+        Ok(ip) => is_private_ip(ip),
+        Err(_) => false,
     }
-    false
+}
+
+fn is_private_ip(ip: std::net::IpAddr) -> bool {
+    use std::net::IpAddr;
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_unspecified()
+        }
+        IpAddr::V6(v6) => {
+            // IPv4-mapped（如 ::ffff:169.254.169.254）按其内嵌的 V4 地址判定，
+            // 避免用映射写法绕过 V4 私网检查。
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return is_private_ip(IpAddr::V4(v4));
+            }
+            let seg0 = v6.segments()[0];
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || (seg0 & 0xfe00) == 0xfc00 // ULA fc00::/7
+                || (seg0 & 0xffc0) == 0xfe80 // link-local fe80::/10
+        }
+    }
 }
 
 // 允许重定向条件：同域名（含 www 差异），且 scheme 只能同级或升级（http→https）
@@ -1251,6 +1304,17 @@ fn extract_uddg_url(href: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// 按 Content-Type 声明的 charset 解码响应字节（缺省 UTF-8）。
+/// 替代 reqwest 的 `.text()`，以便配合流式上限读取；用 encoding_rs 保留对
+/// GBK 等非 UTF-8 页面的解码能力（百度等中文站点会用到）。
+fn decode_body(bytes: &[u8], charset: Option<&str>) -> String {
+    let encoding = charset
+        .and_then(|c| encoding_rs::Encoding::for_label(c.as_bytes()))
+        .unwrap_or(encoding_rs::UTF_8);
+    let (text, _, _) = encoding.decode(bytes);
+    text.into_owned()
 }
 
 /// 将 HTML 转换为 Markdown（保留链接/标题/列表结构），失败时降级为纯文本

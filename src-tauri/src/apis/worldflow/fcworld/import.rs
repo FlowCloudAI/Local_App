@@ -240,6 +240,15 @@ fn read_zip_asset_bytes_with_sha256(
         return Err(format!("资源大小不匹配: {path}"));
     }
 
+    // 防解压/容量炸弹：expected_size 来自不可信 manifest，封顶后再预分配，
+    // 否则一个声明 20GB 的条目会触发超大分配 → OOM，在 panic="abort" 下直接杀进程。
+    const MAX_ASSET_BYTES: u64 = 128 * 1024 * 1024;
+    if expected_size > MAX_ASSET_BYTES {
+        return Err(format!(
+            "资源过大（{expected_size} 字节，超过 {MAX_ASSET_BYTES} 字节上限）: {path}"
+        ));
+    }
+
     let mut bytes = Vec::with_capacity(usize::try_from(expected_size).unwrap_or(0));
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];

@@ -6,6 +6,7 @@ import type {
     MapPreviewShape
 } from '../../../components/MapShapeEditor'
 import type {MapStyleDefinition} from './types'
+import {escapeHtml} from './utils'
 
 function buildLocationIcon(): MapPreviewKeyLocationIcon | null {
     return null
@@ -13,7 +14,7 @@ function buildLocationIcon(): MapPreviewKeyLocationIcon | null {
 
 function buildShapeTooltip(shape: MapPreviewShape): MapDeckPreviewTooltip {
     return {
-        html: `<div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.98);color:#1f2937;border:1px solid rgba(148,163,184,0.35);box-shadow:0 10px 28px rgba(15,23,42,0.12);font-family:&quot;Microsoft YaHei UI&quot;, &quot;PingFang SC&quot;, sans-serif;"><strong>${shape.name}</strong><span>边界点数：${shape.polygon.length}</span></div>`,
+        html: `<div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.98);color:#1f2937;border:1px solid rgba(148,163,184,0.35);box-shadow:0 10px 28px rgba(15,23,42,0.12);font-family:&quot;Microsoft YaHei UI&quot;, &quot;PingFang SC&quot;, sans-serif;"><strong>${escapeHtml(shape.name)}</strong><span>边界点数：${shape.polygon.length}</span></div>`,
         style: {
             backgroundColor: 'transparent',
             border: 'none',
@@ -25,7 +26,7 @@ function buildShapeTooltip(shape: MapPreviewShape): MapDeckPreviewTooltip {
 
 function buildLocationTooltip(location: MapPreviewKeyLocation): MapDeckPreviewTooltip {
     return {
-        html: `<div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.98);color:#0f172a;border:1px solid rgba(59,130,246,0.18);box-shadow:0 10px 28px rgba(15,23,42,0.12);font-family:&quot;Microsoft YaHei UI&quot;, &quot;PingFang SC&quot;, sans-serif;"><strong>${location.name}</strong><span>类型：${location.type}</span><span>坐标：${Math.round(location.position[0])}, ${Math.round(location.position[1])}</span></div>`,
+        html: `<div style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.98);color:#0f172a;border:1px solid rgba(59,130,246,0.18);box-shadow:0 10px 28px rgba(15,23,42,0.12);font-family:&quot;Microsoft YaHei UI&quot;, &quot;PingFang SC&quot;, sans-serif;"><strong>${escapeHtml(location.name)}</strong><span>类型：${escapeHtml(location.type)}</span><span>坐标：${Math.round(location.position[0])}, ${Math.round(location.position[1])}</span></div>`,
         style: {
             backgroundColor: 'transparent',
             border: 'none',

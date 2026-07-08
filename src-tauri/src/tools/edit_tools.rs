@@ -42,7 +42,7 @@ async fn dispatch_edit_op(
             if start_line == 0 {
                 anyhow::bail!("修改未完成：start_line 必须从 1 开始");
             }
-            if end_line + 1 < start_line {
+            if end_line.saturating_add(1) < start_line {
                 anyhow::bail!(
                     "修改未完成：end_line ({}) 无效：最小可为 start_line - 1 ({})（纯插入模式）",
                     end_line,

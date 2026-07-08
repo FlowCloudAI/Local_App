@@ -1,5 +1,6 @@
 import MarkdownPreview from '@uiw/react-markdown-preview'
 import {type CSSProperties, type Dispatch, type MouseEvent as ReactMouseEvent, type RefObject, type SetStateAction} from 'react'
+import {rehypeSanitizeRawHtml} from '../../../shared/markdown/rehypeSanitizeRawHtml'
 import {TagItem} from 'flowcloudai-ui'
 import {
     type Entry,
@@ -182,6 +183,7 @@ export function MobileEntryDetailView({
                         source={viewMarkdownSource}
                         className="mobile-entry-detail__markdown-preview"
                         wrapperElement={{'data-color-mode': colorMode}}
+                        rehypePlugins={[rehypeSanitizeRawHtml]}
                     />
                 </div>
             ) : (

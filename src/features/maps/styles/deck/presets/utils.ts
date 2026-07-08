@@ -1,4 +1,18 @@
 /**
+ * 转义 HTML 特殊字符。tooltip 的 html 字段最终走 deck.gl / MapPixiPreview 的 innerHTML
+ * 渲染，用户或导入的实体名（shape.name / location.name / location.type）必须先转义，
+ * 否则可注入 HTML/CSS（`</strong><style>…` 等）。
+ */
+export function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+}
+
+/**
  * 将 SVG 字符串编码为 DataURL（base64 编码）。
  * 兼容 WebView2 等对 ;utf8 非标准格式支持不完整的环境。
  */

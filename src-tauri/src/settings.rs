@@ -86,6 +86,29 @@ impl Default for AppSettings {
     }
 }
 
+/// 原子写文件：先写同目录临时文件并 fsync，再 rename 覆盖目标。
+/// 避免原地 fs::write 在写一半时崩溃/断电留下截断文件（整表/整份配置被破坏）。
+pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write;
+    let Some(name) = path.file_name() else {
+        return Err(anyhow::anyhow!("非法文件路径: {:?}", path));
+    };
+    let mut tmp_name = name.to_os_string();
+    tmp_name.push(".tmp");
+    let tmp_path = path.with_file_name(tmp_name);
+
+    {
+        let mut file = std::fs::File::create(&tmp_path)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+    }
+    if let Err(e) = std::fs::rename(&tmp_path, path) {
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(e.into());
+    }
+    Ok(())
+}
+
 impl AppSettings {
     /// 从 settings.json 加载；文件不存在时返回默认值
     pub fn load(path: &Path) -> Self {
@@ -101,7 +124,9 @@ impl AppSettings {
             std::fs::create_dir_all(parent)?;
         }
         let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, json)?;
+        // 原子写：settings.json 含 db_path/media_dir 等关键路径；原地写被截断后
+        // load() 会静默回落默认值 → 用户自定义库路径“消失”、世界库看似丢失。
+        write_atomic(path, json.as_bytes())?;
         Ok(())
     }
 }
@@ -276,7 +301,8 @@ mod file_key_store {
         std::fs::create_dir_all(dir).map_err(|e| anyhow::anyhow!("创建密钥目录失败: {}", e))?;
         let json =
             serde_json::to_vec_pretty(map).map_err(|e| anyhow::anyhow!("序列化密钥失败: {}", e))?;
-        std::fs::write(dir.join(FILE_NAME), json)
+        // 原子写：整份 api_keys.json 每次全量重写，原地写被截断会一次性丢掉所有已存 Key。
+        super::write_atomic(&dir.join(FILE_NAME), &json)
             .map_err(|e| anyhow::anyhow!("写入密钥文件失败: {}", e))
     }
 

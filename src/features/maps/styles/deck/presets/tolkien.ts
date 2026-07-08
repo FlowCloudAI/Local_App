@@ -9,14 +9,14 @@ import type {
 } from './types'
 import {createParchmentTexture} from './textures'
 import {createVignetteEffect} from './effects'
-import {deckColorToHex} from './utils'
+import {deckColorToHex, escapeHtml} from './utils'
 import {buildTolkienLocationIcon} from './icons'
 import {buildCoastOutlines} from './generators/coast'
 import {buildCompassPaths, buildCompassPolygons} from './generators/compass'
 
 function buildShapeTooltip(shape: MapPreviewShape): MapDeckPreviewTooltip {
     return {
-        html: `<div style="display:flex;flex-direction:column;gap:4px;min-width:180px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg, rgba(249,237,203,0.98), rgba(230,207,160,0.96));color:#5c3b22;border:1px solid rgba(120,78,39,0.35);box-shadow:0 14px 32px rgba(88,52,24,0.18);font-family:&quot;Georgia&quot;, &quot;Times New Roman&quot;, &quot;STSong&quot;, serif;"><strong style="font-size:14px;">${shape.name}</strong><span>边界点数：${shape.polygon.length}</span></div>`,
+        html: `<div style="display:flex;flex-direction:column;gap:4px;min-width:180px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg, rgba(249,237,203,0.98), rgba(230,207,160,0.96));color:#5c3b22;border:1px solid rgba(120,78,39,0.35);box-shadow:0 14px 32px rgba(88,52,24,0.18);font-family:&quot;Georgia&quot;, &quot;Times New Roman&quot;, &quot;STSong&quot;, serif;"><strong style="font-size:14px;">${escapeHtml(shape.name)}</strong><span>边界点数：${shape.polygon.length}</span></div>`,
         style: {
             backgroundColor: 'transparent',
             border: 'none',
@@ -28,7 +28,7 @@ function buildShapeTooltip(shape: MapPreviewShape): MapDeckPreviewTooltip {
 
 function buildLocationTooltip(location: MapPreviewKeyLocation): MapDeckPreviewTooltip {
     return {
-        html: `<div style="display:flex;flex-direction:column;gap:4px;min-width:190px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg, rgba(249,237,203,0.98), rgba(230,207,160,0.96));color:#5c3b22;border:1px solid rgba(120,78,39,0.35);box-shadow:0 14px 32px rgba(88,52,24,0.18);font-family:&quot;Georgia&quot;, &quot;Times New Roman&quot;, &quot;STSong&quot;, serif;"><strong style="font-size:14px;">${location.name}</strong><span>类型：${location.type}</span><span>坐标：${Math.round(location.position[0])}, ${Math.round(location.position[1])}</span></div>`,
+        html: `<div style="display:flex;flex-direction:column;gap:4px;min-width:190px;padding:12px 14px;border-radius:12px;background:linear-gradient(180deg, rgba(249,237,203,0.98), rgba(230,207,160,0.96));color:#5c3b22;border:1px solid rgba(120,78,39,0.35);box-shadow:0 14px 32px rgba(88,52,24,0.18);font-family:&quot;Georgia&quot;, &quot;Times New Roman&quot;, &quot;STSong&quot;, serif;"><strong style="font-size:14px;">${escapeHtml(location.name)}</strong><span>类型：${escapeHtml(location.type)}</span><span>坐标：${Math.round(location.position[0])}, ${Math.round(location.position[1])}</span></div>`,
         style: {
             backgroundColor: 'transparent',
             border: 'none',

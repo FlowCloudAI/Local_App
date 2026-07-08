@@ -2,10 +2,11 @@ import type {MapDeckPreviewTooltip, MapPreviewKeyLocation, MapPreviewScene, MapP
 import type {MapStyleDefinition} from './types'
 import {createRicePaperTexture} from './textures'
 import {createInkBleedEffect} from './effects'
+import {escapeHtml} from './utils'
 
 function buildShapeTooltip(shape: MapPreviewShape): MapDeckPreviewTooltip {
     return {
-        html: `<div style="display:flex;flex-direction:column;gap:5px;min-width:170px;padding:10px 12px;border-radius:4px;background:rgba(255,255,255,0.96);color:#111111;border:1px solid rgba(17,17,17,0.22);box-shadow:6px 8px 0 rgba(17,17,17,0.08);font-family:&quot;STKaiti&quot;, &quot;KaiTi&quot;, &quot;FangSong&quot;, serif;"><strong>${shape.name}</strong><span>边界点数：${shape.polygon.length}</span></div>`,
+        html: `<div style="display:flex;flex-direction:column;gap:5px;min-width:170px;padding:10px 12px;border-radius:4px;background:rgba(255,255,255,0.96);color:#111111;border:1px solid rgba(17,17,17,0.22);box-shadow:6px 8px 0 rgba(17,17,17,0.08);font-family:&quot;STKaiti&quot;, &quot;KaiTi&quot;, &quot;FangSong&quot;, serif;"><strong>${escapeHtml(shape.name)}</strong><span>边界点数：${shape.polygon.length}</span></div>`,
         style: {
             backgroundColor: 'transparent',
             border: 'none',
@@ -17,7 +18,7 @@ function buildShapeTooltip(shape: MapPreviewShape): MapDeckPreviewTooltip {
 
 function buildLocationTooltip(location: MapPreviewKeyLocation): MapDeckPreviewTooltip {
     return {
-        html: `<div style="display:flex;flex-direction:column;gap:5px;min-width:180px;padding:10px 12px;border-radius:4px;background:rgba(255,255,255,0.96);color:#111111;border:1px solid rgba(17,17,17,0.22);box-shadow:6px 8px 0 rgba(17,17,17,0.08);font-family:&quot;STKaiti&quot;, &quot;KaiTi&quot;, &quot;FangSong&quot;, serif;"><strong>${location.name}</strong><span>类型：${location.type}</span><span>坐标：${Math.round(location.position[0])}, ${Math.round(location.position[1])}</span></div>`,
+        html: `<div style="display:flex;flex-direction:column;gap:5px;min-width:180px;padding:10px 12px;border-radius:4px;background:rgba(255,255,255,0.96);color:#111111;border:1px solid rgba(17,17,17,0.22);box-shadow:6px 8px 0 rgba(17,17,17,0.08);font-family:&quot;STKaiti&quot;, &quot;KaiTi&quot;, &quot;FangSong&quot;, serif;"><strong>${escapeHtml(location.name)}</strong><span>类型：${escapeHtml(location.type)}</span><span>坐标：${Math.round(location.position[0])}, ${Math.round(location.position[1])}</span></div>`,
         style: {
             backgroundColor: 'transparent',
             border: 'none',

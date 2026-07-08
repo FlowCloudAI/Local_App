@@ -256,9 +256,20 @@ pub fn setting_open_backup_dir(app: AppHandle, path: String) -> Result<(), Strin
 }
 
 /// 将主题配置导出到用户通过保存对话框选择的路径。
+/// 注意：本命令是注册过的 IPC，webview 脚本可用任意 path+content 调用（任意写原语）。
+/// 加固：禁止落地可执行/脚本类扩展名，避免被用于向启动目录等写入 .exe/.bat/.lnk。
 #[tauri::command]
 pub fn setting_export_theme_config(path: String, content: String) -> Result<(), String> {
+    const BLOCKED_EXTS: &[&str] = &[
+        "exe", "bat", "cmd", "com", "scr", "pif", "lnk", "ps1", "psm1", "vbs", "vbe", "js", "jse",
+        "wsf", "wsh", "msi", "msp", "reg", "dll", "sys", "cpl", "jar", "hta", "gadget", "url",
+    ];
     let export_path = PathBuf::from(path);
+    if let Some(ext) = export_path.extension().and_then(|e| e.to_str()) {
+        if BLOCKED_EXTS.contains(&ext.to_ascii_lowercase().as_str()) {
+            return Err(format!("不允许导出为该类型文件：.{}", ext));
+        }
+    }
     if let Some(parent) = export_path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())

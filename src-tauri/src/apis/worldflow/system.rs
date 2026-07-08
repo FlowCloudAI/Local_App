@@ -75,12 +75,20 @@ pub fn read_app_log(app: AppHandle) -> Result<AppLogSnapshot, String> {
 }
 
 /// 在系统文件管理器中打开指定路径。
-/// 走 Rust 端的 OpenerExt，绕过插件 JS-tier 的 scope 校验，
-/// 避免 "Not allowed to open path" —— 这些路径全部来自后端配置查询，可信。
+/// 走 Rust 端的 OpenerExt，绕过插件 JS-tier 的 scope 校验，避免 "Not allowed to open path"。
+/// 注意：本命令是注册过的 IPC，webview 里任何脚本都能调用，不能假设 path 一定“可信”。
+/// 加固：拒绝 UNC/网络路径（否则会沦为“打开远程可执行文件”的原语），并要求路径本地存在。
 #[tauri::command]
 pub fn open_in_file_manager(app: AppHandle, path: String) -> Result<(), String> {
+    let trimmed = path.trim();
+    if trimmed.starts_with("\\\\") || trimmed.starts_with("//") {
+        return Err("不允许打开 UNC/网络路径".to_string());
+    }
+    if !std::path::Path::new(trimmed).exists() {
+        return Err("路径不存在".to_string());
+    }
     app.opener()
-        .open_path(path, None::<&str>)
+        .open_path(trimmed.to_string(), None::<&str>)
         .map_err(|e| e.to_string())
 }
 

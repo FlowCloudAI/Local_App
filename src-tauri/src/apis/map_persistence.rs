@@ -144,7 +144,22 @@ fn save_store(app: &AppHandle, store: &ProjectMapStore) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let content = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
-    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+
+    // 原子写：maps.json 是该项目地图的唯一副本（未镜像进 SQLite）。
+    // 原地 fs::write 会先截断再写，中途崩溃/断电会留下半截文件 → 整项目地图全丢。
+    // 改为先写临时文件并 fsync，再 rename 覆盖目标（rename 在同目录内原子）。
+    let tmp_path = path.with_extension("json.tmp");
+    {
+        use std::io::Write;
+        let mut file = std::fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
+        file.write_all(content.as_bytes())
+            .map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&tmp_path, &path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp_path);
+        e.to_string()
+    })?;
     Ok(())
 }
 
