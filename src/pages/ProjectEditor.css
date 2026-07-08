@@ -8,7 +8,6 @@
     display: flex;
     height: 100%;
     overflow: hidden;
-    background: var(--fc-color-bg-secondary);
 }
 
 .pe-loading {
@@ -27,7 +26,6 @@
     width: var(--pe-tree-width);
     height: 100%;
     overflow: hidden;
-    background: var(--fc-color-bg-secondary);
     border-right: none;
     display: flex;
     flex-direction: column;
