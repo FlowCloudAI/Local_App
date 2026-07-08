@@ -213,14 +213,12 @@ function useImageTexture(url: string): Texture {
         }
 
         let cancelled = false
-        let activeTexture: Texture | null = null
         const image = new Image()
 
         image.onload = () => {
             if (cancelled) return
             try {
-                activeTexture = Texture.from({resource: image}, true)
-                setTexture(activeTexture)
+                setTexture(Texture.from({resource: image}, true))
                 pixiOverlayLog(`useImageTexture: loaded ok urlLen=${url.length}`)
             } catch (e) {
                 pixiOverlayLog(`useImageTexture: Texture.from failed ${e instanceof Error ? e.message : String(e)}`)
@@ -237,11 +235,18 @@ function useImageTexture(url: string): Texture {
 
         return () => {
             cancelled = true
-            if (activeTexture && activeTexture !== Texture.EMPTY && !activeTexture.destroyed) {
-                activeTexture.destroy(true)
-            }
         }
     }, [url])
+
+    // 纹理销毁延到它被下一张纹理替换（或组件卸载）之后再做，避免 Sprite 渲染已销毁纹理
+    // 触发 Pixi applyStyleParams 读取 null.style 崩溃（详见 MapPixiPreview.usePixiImageTexture）。
+    useEffect(() => {
+        return () => {
+            if (texture !== Texture.EMPTY && !texture.destroyed) {
+                texture.destroy(true)
+            }
+        }
+    }, [texture])
 
     return texture
 }

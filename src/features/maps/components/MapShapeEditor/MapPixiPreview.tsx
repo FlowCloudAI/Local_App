@@ -460,7 +460,6 @@ function usePixiImageTexture(url: string | undefined): Texture {
         }
 
         let cancelled = false;
-        let activeTexture: Texture | null = null;
         const image = new Image();
 
         if (!url.startsWith('data:')) {
@@ -472,8 +471,7 @@ function usePixiImageTexture(url: string | undefined): Texture {
                 return;
             }
 
-            activeTexture = Texture.from({resource: image}, true);
-            setTexture(activeTexture);
+            setTexture(Texture.from({resource: image}, true));
         };
         image.onerror = () => {
             if (!cancelled) {
@@ -484,11 +482,20 @@ function usePixiImageTexture(url: string | undefined): Texture {
 
         return () => {
             cancelled = true;
-            if (activeTexture && activeTexture !== Texture.EMPTY && !activeTexture.destroyed) {
-                activeTexture.destroy(true);
-            }
         };
     }, [url]);
+
+    // 纹理销毁延到它被下一张纹理替换（或组件卸载）之后再做：此时 React 已提交新纹理、
+    // Sprite 不再引用旧纹理，才可安全 destroy。若像原来那样在加载 effect 的 cleanup 里
+    // 同步销毁，state 仍指向旧纹理，Sprite 会在下一帧渲染已销毁纹理，触发 Pixi
+    // applyStyleParams 读取 null.style 崩溃（切换非默认地图风格并保存地图时复现）。
+    useEffect(() => {
+        return () => {
+            if (texture !== Texture.EMPTY && !texture.destroyed) {
+                texture.destroy(true);
+            }
+        };
+    }, [texture]);
 
     return texture;
 }
