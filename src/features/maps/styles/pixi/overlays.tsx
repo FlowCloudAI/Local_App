@@ -18,7 +18,7 @@ import type {
     PixiLabelRule,
     PixiMapStyle,
 } from './types'
-import {hexToRgbaColor, isMapDebugLogEnabled, strokeToRgbaColor} from '../common'
+import {hexToRgbaColor, isMapDebugLogEnabled, mapRenderScale, strokeToRgbaColor} from '../common'
 import {
     drawPixiCompassAsset,
     drawPixiEffectAsset,
@@ -191,26 +191,31 @@ function drawCoastlineHatching(
     ctx: CanvasRenderingContext2D,
     context: MapPixiPreviewOverlayContext,
     hatch: CoastlineHatchParams,
+    scale: number,
 ): void {
     const rings = Math.max(1, Math.min(12, Math.round(getNumberParam(hatch.rings, 4))))
     const gap = Math.max(1, getNumberParam(hatch.gap, 7))
     const lineWidth = Math.max(0.4, getNumberParam(hatch.width, 0.9))
     const opacity = Math.max(0, Math.min(1, getNumberParam(hatch.opacity, 0.5)))
     const rgba = hexToRgbaColor(getStringParam(hatch.color, '#6a4a26'))
-    const width = context.scene.canvas.width
-    const height = context.scene.canvas.height
+    const sceneW = context.scene.canvas.width
+    const sceneH = context.scene.canvas.height
+    const physW = Math.round(sceneW * scale)
+    const physH = Math.round(sceneH * scale)
     const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
-    if (!shapes.length || width <= 0 || height <= 0) return
+    if (!shapes.length || physW <= 0 || physH <= 0) return
 
     const maskCanvas = document.createElement('canvas')
-    maskCanvas.width = width
-    maskCanvas.height = height
+    maskCanvas.width = physW
+    maskCanvas.height = physH
     const maskCtx = maskCanvas.getContext('2d')
     const ringCanvas = document.createElement('canvas')
-    ringCanvas.width = width
-    ringCanvas.height = height
+    ringCanvas.width = physW
+    ringCanvas.height = physH
     const ringCtx = ringCanvas.getContext('2d')
     if (!maskCtx || !ringCtx) return
+    // 遮罩按场景坐标绘制到物理分辨率（超采样）。
+    maskCtx.scale(scale, scale)
 
     for (let ring = 1; ring <= rings; ring++) {
         const ringOpacity = opacity * (1 - (ring - 1) / rings)
@@ -218,27 +223,63 @@ function drawCoastlineHatching(
         const distance = ring * gap
 
         // 外圈：陆地膨胀 distance
-        paintDilatedLand(maskCtx, shapes, width, height, distance)
+        paintDilatedLand(maskCtx, shapes, sceneW, sceneH, distance)
         ringCtx.globalCompositeOperation = 'source-over'
-        ringCtx.clearRect(0, 0, width, height)
+        ringCtx.clearRect(0, 0, physW, physH)
         ringCtx.drawImage(maskCanvas, 0, 0)
 
         // 减去内圈：陆地膨胀 distance − lineWidth，剩下一条细环
-        paintDilatedLand(maskCtx, shapes, width, height, Math.max(0, distance - lineWidth))
+        paintDilatedLand(maskCtx, shapes, sceneW, sceneH, Math.max(0, distance - lineWidth))
         ringCtx.globalCompositeOperation = 'destination-out'
         ringCtx.drawImage(maskCanvas, 0, 0)
 
         // 用晕线颜色给细环上色（source-in：只在细环 alpha 处着色）
         ringCtx.globalCompositeOperation = 'source-in'
         ringCtx.fillStyle = colorToCss(rgba, 1)
-        ringCtx.fillRect(0, 0, width, height)
+        ringCtx.fillRect(0, 0, physW, physH)
         ringCtx.globalCompositeOperation = 'source-over'
 
+        // ringCanvas 是物理分辨率；主 ctx 处于 scale 变换下，这里清空变换按 1:1 贴回。
         ctx.save()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
         ctx.globalAlpha = ringOpacity
         ctx.drawImage(ringCanvas, 0, 0)
         ctx.restore()
     }
+}
+
+interface LandDepthParams {
+    width?: number
+    color?: string
+    opacity?: number
+}
+
+/**
+ * 陆地纵深：沿海岸向陆地内侧画一条又宽又柔的暗边（裁剪到陆地内部），形成"近岸略深、
+ * 内陆渐亮"的内阴影，让陆地不再是纯色剪纸。绘制在场景坐标里（随主 ctx 的超采样一起变清晰）。
+ */
+function drawLandDepth(
+    ctx: CanvasRenderingContext2D,
+    context: MapPixiPreviewOverlayContext,
+    depth: LandDepthParams,
+): void {
+    const bandWidth = Math.max(2, getNumberParam(depth.width, 26))
+    const opacity = Math.max(0, Math.min(1, getNumberParam(depth.opacity, 0.16)))
+    const rgba = hexToRgbaColor(getStringParam(depth.color, '#5a3a1c'))
+    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
+    if (!shapes.length) return
+
+    ctx.save()
+    traceLandPath(ctx, shapes)
+    ctx.clip()
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    ctx.lineWidth = bandWidth * 2
+    ctx.strokeStyle = colorToCss(rgba, opacity)
+    ctx.filter = `blur(${Math.max(1, bandWidth * 0.5)}px)`
+    traceLandPath(ctx, shapes)
+    ctx.stroke()
+    ctx.restore()
 }
 
 function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverlayContext, style: PixiMapStyle) {
@@ -272,14 +313,30 @@ function isEffectPluginId(id: string): id is PixiEffectPluginId {
 
 function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: PixiMapStyle): string {
     pixiOverlayLog(`createOverlayDataUrl: canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
+    const sceneW = context.scene.canvas.width
+    const sceneH = context.scene.canvas.height
+    if (sceneW <= 0 || sceneH <= 0) return ''
+    // 超采样：位图按 scale 放大生成，Sprite 仍按场景尺寸显示 → 放大更清晰。
+    const scale = mapRenderScale(sceneW, sceneH)
     const canvas = document.createElement('canvas')
-    canvas.width = context.scene.canvas.width
-    canvas.height = context.scene.canvas.height
+    canvas.width = Math.round(sceneW * scale)
+    canvas.height = Math.round(sceneH * scale)
     const ctx = canvas.getContext('2d')
 
     if (!ctx) {
         pixiOverlayLog('createOverlayDataUrl: getContext(2d) returned null')
         return ''
+    }
+    ctx.scale(scale, scale)
+
+    // 陆地纵深（近岸内阴影）：画在最底层，其余效果叠加其上。opacity>0 才启用。
+    const landDepthPlugin = style.decorations?.find(item => item.id === 'land-depth')
+    if (landDepthPlugin && getNumberParam(landDepthPlugin.params?.opacity, 0) > 0) {
+        drawLandDepth(ctx, context, {
+            width: getNumberParam(landDepthPlugin.params?.width, 26),
+            color: getStringParam(landDepthPlugin.params?.color, '#5a3a1c'),
+            opacity: getNumberParam(landDepthPlugin.params?.opacity, 0.16),
+        })
     }
 
     for (const effect of style.effects ?? []) {
@@ -305,7 +362,7 @@ function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: Pixi
                 width: getNumberParam(hatchParams?.hatchWidth, 0.9),
                 color: getStringParam(hatchParams?.hatchColor, '#6a4a26'),
                 opacity: getNumberParam(hatchParams?.hatchOpacity, 0.5),
-            })
+            }, scale)
         }
         const brushAsset = getStringParam(coastlinePlugin.params?.brush, 'tolkien-coastline') as PixiBrushAssetId
         style.coastline.layers.forEach((layer, index) => drawCoastlineLayer(ctx, context, layer, index, brushAsset))

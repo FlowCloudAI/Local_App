@@ -1,6 +1,6 @@
 import {log_message} from '../../../../api'
 import type {MapStyleCompileContext} from '../common'
-import {isMapDebugLogEnabled, makeSolidBackgroundDataUrl, paintToRgbaColor, strokeToRgbaColor,} from '../common'
+import {isMapDebugLogEnabled, makeSolidBackgroundDataUrl, mapRenderScale, paintToRgbaColor, strokeToRgbaColor,} from '../common'
 import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
 import {buildPixiLocationIconAsset, createPixiPaperTextureAsset} from './assets'
 import {createPixiOverlayRenderer} from './overlays'
@@ -49,7 +49,13 @@ function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<Pixi
     }
 
     if (background.kind === 'generated-texture') {
-        const textureUrl = createPixiPaperTextureAsset(background.texture, canvas.width, canvas.height)
+        // 超采样生成，再按场景尺寸显示 → 放大时纸纹更锐利。
+        const scale = mapRenderScale(canvas.width, canvas.height)
+        const textureUrl = createPixiPaperTextureAsset(
+            background.texture,
+            Math.round(canvas.width * scale),
+            Math.round(canvas.height * scale),
+        )
 
         if (textureUrl) {
             return {

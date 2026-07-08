@@ -26,7 +26,7 @@ export type PixiLocationIconAsset =
     | 'tolkien-ruin'
     | 'ink-dot'
     | 'ink-seal'
-export type PixiDecorationPluginId = 'coastline-outline' | 'compass'
+export type PixiDecorationPluginId = 'coastline-outline' | 'compass' | 'land-depth'
 export type PixiEffectPluginId =
     | 'paper-grain'
     | 'vignette'

@@ -130,6 +130,15 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
                 color: '#5a3a1c',
             },
         },
+        {
+            // 陆地纵深：近岸内阴影，opacity>0 启用；width 控制阴影带宽度。
+            id: 'land-depth',
+            params: {
+                width: 26,
+                color: '#5a3a1c',
+                opacity: 0.16,
+            },
+        },
     ],
     effects: [
         {

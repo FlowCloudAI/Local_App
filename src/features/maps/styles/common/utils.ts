@@ -1,6 +1,19 @@
 import type {MapPreviewBackgroundImage, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {MapStyleBackgroundImageToken, MapStylePaintToken, MapStyleStrokeToken} from './types'
 
+const MAP_RENDER_BASE_SCALE = 2
+const MAP_RENDER_MAX_DIM = 4096
+
+/**
+ * 风格化纹理（叠加层 / 纸底）的超采样倍率：按此倍率放大生成位图、再按场景尺寸显示，
+ * 让放大查看时更锐利（避免"场景分辨率单张位图放大即糊"）。按最大边封顶，避免超出 GPU
+ * 纹理上限。这些纹理都在已 memoize 的路径里一次性生成，超采样只增加一次性开销，不碰帧率。
+ */
+export function mapRenderScale(width: number, height: number): number {
+    const longest = Math.max(width, height, 1)
+    return Math.max(1, Math.min(MAP_RENDER_BASE_SCALE, MAP_RENDER_MAX_DIM / longest))
+}
+
 let mapDebugLogCache: boolean | null = null
 
 /**
