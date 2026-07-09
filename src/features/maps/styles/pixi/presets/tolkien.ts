@@ -145,7 +145,7 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
         {
             // 海洋：离岸越远越深，且以海岸线晕线为界一层层加深（depthBands/depthGap
             // 与 coastline-outline 的 hatchRings/hatchGap 对齐 → 台阶落在晕线上、加深宽度=晕线宽度）。
-            // depthOpacity=深海蓝上限；depthShallowFade=近岸减淡强度。为 0 即关闭对应部分。
+            // depthOpacity=深海蓝上限；depthShallowFade=近岸减淡强度。
             id: 'sea',
             params: {
                 depthBands: 4,
@@ -153,15 +153,6 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
                 depthColor: '#345d7a',
                 depthOpacity: 0.5,
                 depthShallowFade: 0.9,
-                waveSpacing: 48,
-                waveAmplitude: 2.4,
-                waveLength: 9,
-                waveWidth: 1,
-                waveColor: '#345d7a',
-                waveOpacity: 0.2,
-                waveMargin: 5,
-                waveSegLength: 24,
-                waveDensity: 0.7,
             },
         },
     ],
