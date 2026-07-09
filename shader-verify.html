@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"/>
+    <title>shader verify harness</title>
+    <style>
+        body { margin: 0; background: #202020; }
+        #root { width: 960px; height: 640px; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+    // 浏览器无 Tauri 运行时：把 log_message 的 IPC 重定向到 console，
+    // 让 ?mapDebug=1 的编译/叠加日志可被 Playwright 捕获；其余命令拒绝。
+    window.__TAURI_INTERNALS__ = {
+        invoke: function (cmd, args) {
+            if (cmd === 'log_message') {
+                console.info('[fc-log] ' + (args && args.message))
+                return Promise.resolve()
+            }
+            return Promise.reject(new Error('no tauri runtime: ' + cmd))
+        },
+    }
+</script>
+<script type="module" src="/src/__shaderVerify__/main.tsx"></script>
+</body>
+</html>
