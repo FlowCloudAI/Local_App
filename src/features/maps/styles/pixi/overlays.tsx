@@ -282,6 +282,180 @@ function drawLandDepth(
     ctx.restore()
 }
 
+interface SeaDepthParams {
+    bands?: number
+    gap?: number
+    color?: string
+    /** 深海（远岸）蓝的不透明度上限。 */
+    opacity?: number
+    /** 近岸减淡强度 0~1：越大近岸越浅、深浅对比越强。 */
+    shallowFade?: number
+}
+
+/**
+ * 海水深浅：整片海面铺深蓝，再按"到海岸的距离"在近岸逐渐减淡 → 离岸越远越深、越靠岸越浅。
+ * 用陆地逐层形态学膨胀累积出一张"近岸=强、离岸→0"的 fade 遮罩，再以它 destination-out 减淡深蓝。
+ * 过渡宽度 = bands×gap；圆形结构元保证近岸减淡带平滑、无尖角自交。最后挖掉陆地只留海侧。
+ */
+function drawSeaDepthBands(
+    ctx: CanvasRenderingContext2D,
+    context: MapPixiPreviewOverlayContext,
+    params: SeaDepthParams,
+    scale: number,
+): void {
+    const bands = Math.max(1, Math.min(24, Math.round(getNumberParam(params.bands, 6))))
+    const gap = Math.max(1, getNumberParam(params.gap, 10))
+    const deepOpacity = Math.max(0, Math.min(1, getNumberParam(params.opacity, 0.22)))
+    const shallowFade = Math.max(0, Math.min(1, getNumberParam(params.shallowFade, 0.9)))
+    const rgba = hexToRgbaColor(getStringParam(params.color, '#3f6f8f'))
+    if (deepOpacity <= 0) return
+    const sceneW = context.scene.canvas.width
+    const sceneH = context.scene.canvas.height
+    const physW = Math.round(sceneW * scale)
+    const physH = Math.round(sceneH * scale)
+    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
+    if (!shapes.length || physW <= 0 || physH <= 0) return
+
+    const maskCanvas = document.createElement('canvas')
+    maskCanvas.width = physW
+    maskCanvas.height = physH
+    const maskCtx = maskCanvas.getContext('2d')
+    const fadeCanvas = document.createElement('canvas')
+    fadeCanvas.width = physW
+    fadeCanvas.height = physH
+    const fadeCtx = fadeCanvas.getContext('2d')
+    const bandCanvas = document.createElement('canvas')
+    bandCanvas.width = physW
+    bandCanvas.height = physH
+    const bandCtx = bandCanvas.getContext('2d')
+    if (!maskCtx || !fadeCtx || !bandCtx) return
+    maskCtx.scale(scale, scale)
+
+    // fade 遮罩：陆地逐层膨胀累积，越靠岸被覆盖层数越多 → alpha 越高；离岸 bands×gap 外→0。
+    const perLayer = 1 / bands
+    fadeCtx.globalCompositeOperation = 'source-over'
+    for (let k = 1; k <= bands; k++) {
+        paintDilatedLand(maskCtx, shapes, sceneW, sceneH, k * gap)
+        fadeCtx.globalAlpha = perLayer
+        fadeCtx.drawImage(maskCanvas, 0, 0)
+    }
+    fadeCtx.globalAlpha = 1
+
+    // 深蓝铺满整片，再用 fade 在近岸 destination-out 减淡（离岸保持深蓝）。
+    bandCtx.fillStyle = colorToCss(rgba, deepOpacity)
+    bandCtx.fillRect(0, 0, physW, physH)
+    bandCtx.globalCompositeOperation = 'destination-out'
+    bandCtx.globalAlpha = shallowFade
+    bandCtx.drawImage(fadeCanvas, 0, 0)
+    bandCtx.globalAlpha = 1
+    bandCtx.globalCompositeOperation = 'source-over'
+
+    // 挖掉陆地本体，只保留海侧
+    paintDilatedLand(maskCtx, shapes, sceneW, sceneH, 0)
+    bandCtx.globalCompositeOperation = 'destination-out'
+    bandCtx.drawImage(maskCanvas, 0, 0)
+    bandCtx.globalCompositeOperation = 'source-over'
+
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(bandCanvas, 0, 0)
+    ctx.restore()
+}
+
+interface SeaWaveParams {
+    spacing?: number    // 分布网格步长（越小越密）
+    amplitude?: number
+    wavelength?: number // 单段波浪周期（越小越密）
+    width?: number
+    color?: string
+    opacity?: number
+    margin?: number
+    segLength?: number  // 每段波浪的长度
+    density?: number    // 每格出现概率 0~1
+}
+
+/**
+ * 程序化海浪：不是贯穿的水纹线，而是散布在海面的一段段短正弦波。
+ * 用抖动网格 + 噪声跳过做随机分布（各段不落在同一纬线上），每段长度/振幅/相位各异。
+ * 再挖掉陆地（含少量岸边留白），只在海面留下断续水纹。
+ */
+function drawSeaWaves(
+    ctx: CanvasRenderingContext2D,
+    context: MapPixiPreviewOverlayContext,
+    params: SeaWaveParams,
+    scale: number,
+): void {
+    const cell = Math.max(6, getNumberParam(params.spacing, 24))
+    const amplitude = Math.max(0, getNumberParam(params.amplitude, 2.4))
+    const wavelength = Math.max(4, getNumberParam(params.wavelength, 9))
+    const lineWidth = Math.max(0.4, getNumberParam(params.width, 1))
+    const opacity = Math.max(0, Math.min(1, getNumberParam(params.opacity, 0.2)))
+    const margin = Math.max(0, getNumberParam(params.margin, 4))
+    const segLength = Math.max(6, getNumberParam(params.segLength, 22))
+    const density = Math.max(0, Math.min(1, getNumberParam(params.density, 0.6)))
+    const rgba = hexToRgbaColor(getStringParam(params.color, '#345d7a'))
+    if (opacity <= 0) return
+    const sceneW = context.scene.canvas.width
+    const sceneH = context.scene.canvas.height
+    const physW = Math.round(sceneW * scale)
+    const physH = Math.round(sceneH * scale)
+    if (physW <= 0 || physH <= 0) return
+
+    const waveCanvas = document.createElement('canvas')
+    waveCanvas.width = physW
+    waveCanvas.height = physH
+    const waveCtx = waveCanvas.getContext('2d')
+    if (!waveCtx) return
+
+    waveCtx.save()
+    waveCtx.scale(scale, scale)
+    waveCtx.strokeStyle = colorToCss(rgba, opacity)
+    waveCtx.lineWidth = lineWidth
+    waveCtx.lineJoin = 'round'
+    waveCtx.lineCap = 'round'
+    for (let gy = cell * 0.5; gy < sceneH; gy += cell) {
+        for (let gx = cell * 0.5; gx < sceneW; gx += cell) {
+            const seed = gx * 0.1237 + gy * 0.3719
+            if (pointNoise(seed * 1.7 + 3.1) > density) continue
+            const cx = gx + (pointNoise(seed + 11.1) - 0.5) * cell * 1.4
+            const cy = gy + (pointNoise(seed + 23.3) - 0.5) * cell * 1.4
+            const phase = pointNoise(seed + 5.5) * Math.PI * 2
+            const len = segLength * (0.55 + pointNoise(seed + 7.7) * 0.9)
+            const amp = amplitude * (0.55 + pointNoise(seed + 9.9) * 0.9)
+            const half = len / 2
+            waveCtx.beginPath()
+            for (let x = -half; x <= half; x += 2.5) {
+                const yy = cy + Math.sin((x / wavelength) * Math.PI * 2 + phase) * amp
+                if (x === -half) waveCtx.moveTo(cx + x, yy)
+                else waveCtx.lineTo(cx + x, yy)
+            }
+            waveCtx.stroke()
+        }
+    }
+    waveCtx.restore()
+
+    // 挖掉陆地（含少量岸边留白），只在海面留下水纹。
+    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
+    if (shapes.length) {
+        const maskCanvas = document.createElement('canvas')
+        maskCanvas.width = physW
+        maskCanvas.height = physH
+        const maskCtx = maskCanvas.getContext('2d')
+        if (maskCtx) {
+            maskCtx.scale(scale, scale)
+            paintDilatedLand(maskCtx, shapes, sceneW, sceneH, margin)
+            waveCtx.globalCompositeOperation = 'destination-out'
+            waveCtx.drawImage(maskCanvas, 0, 0)
+            waveCtx.globalCompositeOperation = 'source-over'
+        }
+    }
+
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(waveCanvas, 0, 0)
+    ctx.restore()
+}
+
 function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverlayContext, style: PixiMapStyle) {
     const plugin = style.decorations?.find(item => item.id === 'compass')
     const size = getNumberParam(plugin?.params?.size, 58)
@@ -328,6 +502,34 @@ function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: Pixi
         return ''
     }
     ctx.scale(scale, scale)
+
+    // 海洋处理（近岸蓝色水深带 + 程序化海浪），画在最底层。
+    const seaPlugin = style.decorations?.find(item => item.id === 'sea')
+    if (seaPlugin) {
+        const sea = seaPlugin.params
+        if (getNumberParam(sea?.depthOpacity, 0) > 0) {
+            drawSeaDepthBands(ctx, context, {
+                bands: getNumberParam(sea?.depthBands, 6),
+                gap: getNumberParam(sea?.depthGap, 10),
+                color: getStringParam(sea?.depthColor, '#3f6f8f'),
+                opacity: getNumberParam(sea?.depthOpacity, 0.22),
+                shallowFade: getNumberParam(sea?.depthShallowFade, 0.9),
+            }, scale)
+        }
+        if (getNumberParam(sea?.waveOpacity, 0) > 0) {
+            drawSeaWaves(ctx, context, {
+                spacing: getNumberParam(sea?.waveSpacing, 24),
+                amplitude: getNumberParam(sea?.waveAmplitude, 2.4),
+                wavelength: getNumberParam(sea?.waveLength, 9),
+                width: getNumberParam(sea?.waveWidth, 1),
+                color: getStringParam(sea?.waveColor, '#345d7a'),
+                opacity: getNumberParam(sea?.waveOpacity, 0.2),
+                margin: getNumberParam(sea?.waveMargin, 4),
+                segLength: getNumberParam(sea?.waveSegLength, 22),
+                density: getNumberParam(sea?.waveDensity, 0.6),
+            }, scale)
+        }
+    }
 
     // 陆地纵深（近岸内阴影）：画在最底层，其余效果叠加其上。opacity>0 才启用。
     const landDepthPlugin = style.decorations?.find(item => item.id === 'land-depth')
