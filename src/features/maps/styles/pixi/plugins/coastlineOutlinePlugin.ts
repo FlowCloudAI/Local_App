@@ -1,160 +1,81 @@
 /**
- * Coastline Outline Shader 插件
+ * Coastline Outline 插件（shader）
  *
- * 海岸线晕线效果：向海侧绘制多层等距轮廓线，逐渐变淡。
- * 基于距离场采样，避免形态学膨胀的多 pass 开销。
- *
- * Canvas 版本需要 ~120ms，Shader 预期 ~2ms（60× 加速）
+ * 海岸线晕线：向海侧的多圈等距轮廓线，越远越淡（古地图/托尔金标志元素）。
+ * 距离场等值线与 Canvas 版圆形结构元形态学膨胀边界在数学上等价，视觉一致。
+ * 注意：海岸线本体描边（style.coastline.layers 的抖动笔画）与罗盘不在此处——
+ * 它们是矢量线稿，由 overlays 的 linework Canvas 位图绘制并叠在所有 shader 效果之上。
  */
 
-import { Filter, GlProgram, UniformGroup } from 'pixi.js'
-import type {
-    PixiPluginImplementation,
-    PluginRenderer,
-    ShaderRenderContext,
-} from '../types'
-import type { MapStyleParameterRecord } from '../../common'
-import { getNumberParam, getStringParam } from '../utils'
-import { parseColorToVec3 } from '../shaderRegistry'
+import type {Shader} from 'pixi.js'
+import type {MapStyleParameterRecord} from '../../common'
+import type {PixiPluginImplementation, ShaderRenderer} from '../types'
+import {getNumberParam, getStringParam} from '../utils'
+import {parseColorToVec3} from '../shaderRegistry'
+import {coastFieldGlsl, createSceneQuadShader, updateSceneQuadShader} from './shared'
 
-/**
- * 默认 Vertex Shader
- */
-const defaultVertexShader = `
-in vec2 aPosition;
-out vec2 vTextureCoord;
-
-uniform mat3 uProjectionMatrix;
-uniform mat3 uTextureMatrix;
-
-void main() {
-    gl_Position = vec4((uProjectionMatrix * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
-    vTextureCoord = (uTextureMatrix * vec3(aPosition, 1.0)).xy;
-}
-`
-
-/**
- * Coastline Hatch Fragment Shader
- *
- * 基于距离场采样，绘制多层同心环形线条
- */
-const coastlineHatchFragmentShader = `
+const hatchFragment = `
 precision highp float;
 
-uniform sampler2D uTexture;
-uniform sampler2D u_distanceField;
-uniform sampler2D u_landMask;
-uniform vec2 u_resolution;
+in vec2 vUV;
+out vec4 finalColor;
 
-uniform float u_rings;           // 晕线圈数
-uniform float u_gap;             // 晕线间隔（像素）
-uniform float u_width;           // 晕线宽度（像素）
-uniform vec3 u_hatchColor;       // 晕线颜色
-uniform float u_hatchOpacity;    // 基础不透明度
+uniform vec2 uCanvasSize;
+uniform float uRings;
+uniform float uGap;
+uniform float uWidth;
+uniform vec3 uHatchColor;
+uniform float uHatchOpacity;
 
-varying vec2 vTextureCoord;
+${coastFieldGlsl}
 
 void main() {
-  float distToCoast = texture2D(u_distanceField, vTextureCoord).r * length(u_resolution);
-  float isLand = texture2D(u_landMask, vTextureCoord).r;
+    vec4 field = texture(uCoastField, vUV);
+    if (field.g > 0.5) discard; // 只画海洋侧
 
-  // 只处理海洋侧
-  if (isLand > 0.5) {
-    discard;
-  }
+    float dist = coastDistance(field);
+    float ring = floor(dist / uGap + 0.5); // 最近的晕线序号
+    if (ring < 1.0 || ring > uRings) discard;
 
-  float totalAlpha = 0.0;
+    float delta = abs(dist - ring * uGap);
+    float halfW = uWidth * 0.5;
+    float edge = 1.0 - smoothstep(halfW, halfW + 0.75, delta);
+    float ringFade = 1.0 - (ring - 1.0) / uRings; // 与 Canvas 版一致的线性衰减
+    float alpha = uHatchOpacity * ringFade * edge;
 
-  // 遍历每个晕线环
-  for (float ring = 1.0; ring <= u_rings; ring += 1.0) {
-    float ringDist = ring * u_gap;
-    float delta = abs(distToCoast - ringDist);
-
-    if (delta < u_width) {
-      // 环内平滑过渡
-      float ringFade = 1.0 - (ring - 1.0) / u_rings;  // 越远越淡
-      float edgeFade = smoothstep(u_width, 0.0, delta);  // 边缘抗锯齿
-      totalAlpha += edgeFade * ringFade;
-    }
-  }
-
-  totalAlpha = clamp(totalAlpha, 0.0, 1.0);
-
-  if (totalAlpha < 0.01) {
-    discard;
-  }
-
-  gl_FragColor = vec4(u_hatchColor, totalAlpha * u_hatchOpacity);
+    if (alpha < 0.004) discard;
+    finalColor = vec4(uHatchColor * alpha, alpha);
 }
 `
 
-/**
- * 创建 Coastline Outline Shader 渲染器
- */
-function createCoastlineOutlineShaderRenderer(params: MapStyleParameterRecord): PluginRenderer {
-    const rings = Math.max(1, Math.min(12, Math.round(getNumberParam(params.hatchRings, 4))))
-    const gap = Math.max(1, getNumberParam(params.hatchGap, 7))
-    const width = Math.max(0.4, getNumberParam(params.hatchWidth, 0.9))
+function createCoastlineOutlineShaderRenderer(params: MapStyleParameterRecord): ShaderRenderer | null {
+    const rings = Math.max(0, Math.min(12, Math.round(getNumberParam(params.hatchRings, 4))))
     const opacity = Math.max(0, Math.min(1, getNumberParam(params.hatchOpacity, 0.5)))
-    const hatchColor = parseColorToVec3(
-        getStringParam(params.hatchColor, '#6a4a26'),
-        [106 / 255, 74 / 255, 38 / 255]
-    )
+    if (rings <= 0 || opacity <= 0) return null
 
-    const filter = new Filter({
-        glProgram: GlProgram.from({
-            vertex: defaultVertexShader,
-            fragment: coastlineHatchFragmentShader,
-        }),
-        resources: {
-            uniforms: new UniformGroup({
-                u_resolution: { value: [800, 600], type: 'vec2<f32>' },
-                u_rings: { value: rings, type: 'f32' },
-                u_gap: { value: gap, type: 'f32' },
-                u_width: { value: width, type: 'f32' },
-                u_hatchColor: { value: hatchColor, type: 'vec3<f32>' },
-                u_hatchOpacity: { value: opacity, type: 'f32' },
-            }),
+    const shader = createSceneQuadShader({
+        name: 'map-coastline-hatch',
+        fragment: hatchFragment,
+        useCoastField: true,
+        uniforms: {
+            uRings: {value: rings, type: 'f32'},
+            uGap: {value: Math.max(1, getNumberParam(params.hatchGap, 7)), type: 'f32'},
+            uWidth: {value: Math.max(0.4, getNumberParam(params.hatchWidth, 0.9)), type: 'f32'},
+            uHatchColor: {value: parseColorToVec3(getStringParam(params.hatchColor, '#6a4a26'), [106 / 255, 74 / 255, 38 / 255]), type: 'vec3<f32>'},
+            uHatchOpacity: {value: opacity, type: 'f32'},
         },
     })
 
     return {
         type: 'shader',
-        filter,
-        update: (context: ShaderRenderContext) => {
-            const uniforms = filter.resources.uniforms.uniforms
-            uniforms.u_resolution = [context.scene.canvas.width, context.scene.canvas.height]
-            uniforms.u_distanceField = context.distanceField
-            uniforms.u_landMask = context.landMask
-        },
+        shader,
+        update: context => updateSceneQuadShader(shader, context),
+        destroy: () => (shader as Shader).destroy(),
     }
 }
 
-/**
- * Canvas 2D 版本的 coastline-outline（保留作为 fallback）
- */
-function createCoastlineOutlineCanvasRenderer(params: MapStyleParameterRecord): PluginRenderer {
-    return {
-        type: 'canvas',
-        render: (_ctx: CanvasRenderingContext2D, context: ShaderRenderContext) => {
-            // Canvas 版本的实现（引用现有 overlays.tsx 中的 drawCoastlineHatching）
-            console.log('[CoastlineOutlinePlugin] Canvas fallback rendered', params, context)
-        },
-    }
-}
-
-/**
- * Coastline Outline 插件实现
- */
 export const coastlineOutlinePlugin: PixiPluginImplementation = {
     id: 'coastline-outline',
     pluginType: 'decoration',
-    defaultImplementation: 'shader',
-    createRenderer: (params: MapStyleParameterRecord, impl: 'canvas' | 'shader'): PluginRenderer => {
-        if (impl === 'shader') {
-            return createCoastlineOutlineShaderRenderer(params)
-        } else {
-            return createCoastlineOutlineCanvasRenderer(params)
-        }
-    },
+    createShaderRenderer: createCoastlineOutlineShaderRenderer,
 }

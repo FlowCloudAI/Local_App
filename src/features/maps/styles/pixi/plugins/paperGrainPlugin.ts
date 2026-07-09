@@ -1,158 +1,74 @@
 /**
- * Paper Grain Shader 插件
+ * Paper Grain 插件（shader）
  *
- * 纸张颗粒效果：在画布上随机生成深浅颗粒点，模拟纸张纤维质感。
- * 这是第一个完整的 shader 实现，用于验证整个架构的可行性。
+ * 纸张颗粒：按场景像素格撒深浅颗粒点，模拟纸面 tooth。
+ * 关键点：
+ * - 以 floor(场景坐标) 为哈希单元 → 颗粒钉在"纸面"上，缩放平移不游移；
+ *   （旧实现用 gl_FragCoord 屏幕坐标，颗粒会贴着屏幕漂）
+ * - density 语义与 Canvas 版一致：整幅画布上的颗粒总数，
+ *   换算为每像素概率 density / (w*h)。（旧实现按 density/10000 每像素概率，
+ *   比 Canvas 版多出两个数量级。）
  */
 
-import { Filter, GlProgram, UniformGroup } from 'pixi.js'
-import type {
-    PixiPluginImplementation,
-    PluginRenderer,
-    ShaderRenderContext,
-} from '../types'
-import type { MapStyleParameterRecord } from '../../common'
-import { getNumberParam, getStringParam } from '../utils'
-import { parseColorToVec3 } from '../shaderRegistry'
+import type {Shader} from 'pixi.js'
+import type {MapStyleParameterRecord} from '../../common'
+import type {PixiPluginImplementation, ShaderRenderer} from '../types'
+import {getNumberParam, getStringParam} from '../utils'
+import {parseColorToVec3} from '../shaderRegistry'
+import {createSceneQuadShader, hashGlsl, updateSceneQuadShader} from './shared'
 
-/**
- * Paper Grain Fragment Shader
- */
-const paperGrainFragmentShader = `
+const paperGrainFragment = `
 precision highp float;
 
-uniform vec2 u_resolution;
-uniform float u_density;         // 颗粒密度（点数 / 100万像素）
-uniform vec3 u_darkColor;        // 深色颗粒
-uniform vec3 u_lightColor;       // 亮色颗粒
-uniform float u_opacity;         // 整体不透明度
+in vec2 vUV;
+out vec4 finalColor;
 
-varying vec2 vTextureCoord;
+uniform vec2 uCanvasSize;
+uniform float uDfRange;
+uniform float uDensity;
+uniform vec3 uDarkColor;
+uniform vec3 uLightColor;
+uniform float uGrainOpacity;
 
-// 简单哈希函数（伪随机数生成）
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
-}
+${hashGlsl}
 
 void main() {
-  vec2 pos = gl_FragCoord.xy;
-  float noise = hash(pos);
+    vec2 cell = floor(vUV * uCanvasSize);
+    float threshold = uDensity / max(uCanvasSize.x * uCanvasSize.y, 1.0);
+    if (hash(cell) >= threshold) discard;
 
-  // 密度控制：density=1600 → 每像素 0.00016 概率
-  float threshold = u_density / 10000.0;
-
-  if (noise < threshold) {
-    // 颗粒颜色随机（深浅混合）
-    float colorNoise = hash(pos + vec2(271.8, 0.0));
-    vec3 grainColor = mix(u_darkColor, u_lightColor, colorNoise);
-    gl_FragColor = vec4(grainColor, u_opacity);
-  } else {
-    discard;
-  }
+    // 与 Canvas 版一致：58% 概率暗色颗粒，透明度随机浮动
+    vec3 grain = mix(uDarkColor, uLightColor, step(0.58, hash(cell + vec2(271.8, 0.0))));
+    float alpha = uGrainOpacity * (0.35 + 0.65 * hash(cell + vec2(97.3, 41.1)));
+    finalColor = vec4(grain * alpha, alpha);
 }
 `
 
-/**
- * 创建 Paper Grain Shader 渲染器
- */
-function createPaperGrainShaderRenderer(params: MapStyleParameterRecord): PluginRenderer {
-    const density = getNumberParam(params.density, 1600)
-    const opacity = getNumberParam(params.opacity, 0.08)
-    const darkColor = parseColorToVec3(
-        getStringParam(params.darkColor, 'rgba(96, 60, 20, 1)'),
-        [96 / 255, 60 / 255, 20 / 255]
-    )
-    const lightColor = parseColorToVec3(
-        getStringParam(params.lightColor, 'rgba(255, 246, 212, 1)'),
-        [1.0, 246 / 255, 212 / 255]
-    )
+function createPaperGrainShaderRenderer(params: MapStyleParameterRecord): ShaderRenderer | null {
+    const opacity = Math.max(0, Math.min(1, getNumberParam(params.opacity, 0.08)))
+    if (opacity <= 0) return null
 
-    const filter = new Filter({
-        glProgram: GlProgram.from({
-            vertex: `
-                in vec2 aPosition;
-                out vec2 vTextureCoord;
-
-                uniform mat3 uProjectionMatrix;
-                uniform mat3 uTextureMatrix;
-
-                void main() {
-                    gl_Position = vec4((uProjectionMatrix * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
-                    vTextureCoord = (uTextureMatrix * vec3(aPosition, 1.0)).xy;
-                }
-            `,
-            fragment: paperGrainFragmentShader,
-        }),
-        resources: {
-            uniforms: new UniformGroup({
-                u_resolution: { value: [800, 600], type: 'vec2<f32>' },
-                u_density: { value: density, type: 'f32' },
-                u_darkColor: { value: darkColor, type: 'vec3<f32>' },
-                u_lightColor: { value: lightColor, type: 'vec3<f32>' },
-                u_opacity: { value: opacity, type: 'f32' },
-            }),
+    const shader = createSceneQuadShader({
+        name: 'map-paper-grain',
+        fragment: paperGrainFragment,
+        uniforms: {
+            uDensity: {value: Math.max(80, Math.min(20000, getNumberParam(params.density, 1300))), type: 'f32'},
+            uDarkColor: {value: parseColorToVec3(getStringParam(params.darkColor, 'rgba(70, 45, 22, 1)'), [70 / 255, 45 / 255, 22 / 255]), type: 'vec3<f32>'},
+            uLightColor: {value: parseColorToVec3(getStringParam(params.lightColor, 'rgba(255, 248, 220, 1)'), [1.0, 248 / 255, 220 / 255]), type: 'vec3<f32>'},
+            uGrainOpacity: {value: opacity, type: 'f32'},
         },
     })
 
     return {
         type: 'shader',
-        filter,
-        update: (context: ShaderRenderContext) => {
-            // 更新分辨率 uniform
-            const uniforms = filter.resources.uniforms.uniforms
-            uniforms.u_resolution = [context.scene.canvas.width, context.scene.canvas.height]
-        },
+        shader,
+        update: context => updateSceneQuadShader(shader, context),
+        destroy: () => (shader as Shader).destroy(),
     }
 }
 
-/**
- * Canvas 2D 版本的 paper-grain（保留作为 fallback）
- */
-function createPaperGrainCanvasRenderer(params: MapStyleParameterRecord): PluginRenderer {
-    return {
-        type: 'canvas',
-        render: (ctx: CanvasRenderingContext2D, context: ShaderRenderContext) => {
-            const density = getNumberParam(params.density, 1600)
-            const opacity = getNumberParam(params.opacity, 0.08)
-            const darkColorStr = getStringParam(params.darkColor, 'rgba(96, 60, 20, 1)')
-            const lightColorStr = getStringParam(params.lightColor, 'rgba(255, 246, 212, 1)')
-
-            const width = context.scene.canvas.width
-            const height = context.scene.canvas.height
-            const threshold = density / 10000.0
-
-            ctx.save()
-            ctx.globalAlpha = opacity
-
-            // 简单的随机点生成（Canvas 版本）
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const noise = Math.random()
-                    if (noise < threshold) {
-                        const colorNoise = Math.random()
-                        ctx.fillStyle = colorNoise > 0.5 ? lightColorStr : darkColorStr
-                        ctx.fillRect(x, y, 1, 1)
-                    }
-                }
-            }
-
-            ctx.restore()
-        },
-    }
-}
-
-/**
- * Paper Grain 插件实现
- */
 export const paperGrainPlugin: PixiPluginImplementation = {
     id: 'paper-grain',
     pluginType: 'effect',
-    defaultImplementation: 'shader',
-    createRenderer: (params: MapStyleParameterRecord, impl: 'canvas' | 'shader'): PluginRenderer => {
-        if (impl === 'shader') {
-            return createPaperGrainShaderRenderer(params)
-        } else {
-            return createPaperGrainCanvasRenderer(params)
-        }
-    },
+    createShaderRenderer: createPaperGrainShaderRenderer,
 }

@@ -116,8 +116,6 @@ export interface PixiLabelStyle {
 export interface PixiStylePluginConfig {
     id: PixiDecorationPluginId | PixiEffectPluginId
     params?: MapStyleParameterRecord
-    // 新增：指定实现方式（自动选择、强制 shader、强制 canvas）
-    implementation?: 'auto' | 'shader' | 'canvas'
 }
 
 export interface PixiMapStyle {
@@ -149,31 +147,29 @@ export interface ShaderRenderContext {
         shapes: Array<{ polygon: [number, number][] }>
         canvas: { width: number; height: number }
     }
-    // 预计算的纹理资源
-    distanceField?: unknown  // Pixi Texture，避免循环依赖先用 unknown
-    landMask?: unknown
+    /**
+     * 海岸场纹理（Pixi Texture，避免循环依赖用 unknown）：
+     * R=到海岸线距离（归一到 COAST_FIELD_RANGE_PX），G=陆地遮罩。
+     */
+    coastField?: unknown
 }
 
 export interface ShaderRenderer {
     type: 'shader'
-    // 创建 Pixi Filter 或自定义 Mesh
-    filter: unknown  // Pixi Filter
-    // 更新 shader uniform（场景数据、参数变化时调用）
+    /** Pixi Shader；由 overlays 挂到场景坐标系的 Mesh 四边形上渲染 */
+    shader: unknown
+    /** 场景数据/画布尺寸变化时同步 uniform 与海岸场纹理 */
     update?: (context: ShaderRenderContext) => void
+    /** 释放 shader 资源（GlProgram 走 Pixi 全局缓存，不随之销毁） */
+    destroy?: () => void
 }
-
-export interface CanvasRenderer {
-    type: 'canvas'
-    // Canvas 2D 渲染函数
-    render: (ctx: CanvasRenderingContext2D, context: ShaderRenderContext) => void
-}
-
-export type PluginRenderer = ShaderRenderer | CanvasRenderer
 
 export interface PixiPluginImplementation {
     id: PixiDecorationPluginId | PixiEffectPluginId
     pluginType: 'decoration' | 'effect'
-    defaultImplementation: 'canvas' | 'shader'
-    // 创建渲染器的工厂函数
-    createRenderer: (params: MapStyleParameterRecord, impl: 'canvas' | 'shader') => PluginRenderer | null
+    /**
+     * 创建 shader 渲染器；返回 null 表示按当前参数无需渲染
+     * （如透明度为 0），或该插件没有 shader 实现（只存在于 Canvas 叠加位图）。
+     */
+    createShaderRenderer: (params: MapStyleParameterRecord) => ShaderRenderer | null
 }

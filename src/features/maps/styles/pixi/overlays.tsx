@@ -1,14 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
 import '@pixi/react'
 import {extend} from '@pixi/react'
-import {Container, Graphics, Sprite, Text} from 'pixi.js'
-extend({Container, Graphics, Sprite, Text})
-pixiOverlayLog('MODULE_INIT: extend called for Container, Graphics, Sprite, Text')
+import {Container, Graphics, Mesh, Sprite, Text} from 'pixi.js'
+extend({Container, Graphics, Mesh, Sprite, Text})
+pixiOverlayLog('MODULE_INIT: extend called for Container, Graphics, Mesh, Sprite, Text')
 
 import type {ReactNode} from 'react'
 import {useCallback, useEffect, useMemo, useState} from 'react'
-import type {TextStyleOptions} from 'pixi.js'
-import {Filter, Texture} from 'pixi.js'
+import type {TextStyleOptions, TextureShader} from 'pixi.js'
+import {MeshGeometry, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
 import type {MapPixiPreviewOverlayContext, MapPreviewKeyLocation, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {
@@ -17,7 +17,9 @@ import type {
     PixiEffectPluginId,
     PixiLabelRule,
     PixiMapStyle,
+    PixiStylePluginConfig,
     ShaderRenderContext,
+    ShaderRenderer,
 } from './types'
 import {hexToRgbaColor, isMapDebugLogEnabled, mapRenderScale, strokeToRgbaColor} from '../common'
 import {
@@ -28,6 +30,7 @@ import {
     type PixiCompassAssetId,
 } from './assets'
 import {parseColorToVec3, shaderRegistry} from './shaderRegistry'
+import {createCoastFieldCanvas} from './utils'
 
 function pixiOverlayLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -487,11 +490,31 @@ function isEffectPluginId(id: string): id is PixiEffectPluginId {
         || id === 'chromatic-ageing'
 }
 
-function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiMapStyle): HTMLCanvasElement | null {
-    pixiOverlayLog(`createOverlayCanvas: canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
+/**
+ * 叠加位图绘制模式：
+ * - full：全部效果（Canvas 回退路径）；
+ * - linework：只画矢量线稿（海岸线本体描边 + 罗盘）。shader 路径下距离场类
+ *   效果都交给 Mesh 插件，线稿位图叠在它们之上，重绘开销只剩轻量笔画。
+ */
+type OverlayCanvasMode = 'full' | 'linework'
+
+function createOverlayCanvas(
+    context: MapPixiPreviewOverlayContext,
+    style: PixiMapStyle,
+    mode: OverlayCanvasMode = 'full',
+): HTMLCanvasElement | null {
+    pixiOverlayLog(`createOverlayCanvas: mode=${mode} canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
     const sceneW = context.scene.canvas.width
     const sceneH = context.scene.canvas.height
     if (sceneW <= 0 || sceneH <= 0) return null
+
+    const showCoastStrokes = Boolean(
+        style.coastline?.enabled
+        && style.coastline.layers.length
+        && style.decorations?.some(item => item.id === 'coastline-outline'),
+    )
+    const showCompass = hasDecoration(style, 'compass')
+    if (mode === 'linework' && !showCoastStrokes && !showCompass) return null
     // 超采样：位图按 scale 放大生成，Sprite 仍按场景尺寸显示 → 放大更清晰。
     const scale = mapRenderScale(sceneW, sceneH)
     const canvas = document.createElement('canvas')
@@ -506,7 +529,7 @@ function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiM
     ctx.scale(scale, scale)
 
     // 海洋处理（近岸蓝色水深带 + 程序化海浪），画在最底层。
-    const seaPlugin = style.decorations?.find(item => item.id === 'sea')
+    const seaPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'sea') : undefined
     if (seaPlugin) {
         const sea = seaPlugin.params
         if (getNumberParam(sea?.depthOpacity, 0) > 0) {
@@ -534,7 +557,7 @@ function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiM
     }
 
     // 陆地纵深（近岸内阴影）：画在最底层，其余效果叠加其上。opacity>0 才启用。
-    const landDepthPlugin = style.decorations?.find(item => item.id === 'land-depth')
+    const landDepthPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'land-depth') : undefined
     if (landDepthPlugin && getNumberParam(landDepthPlugin.params?.opacity, 0) > 0) {
         drawLandDepth(ctx, context, {
             width: getNumberParam(landDepthPlugin.params?.width, 26),
@@ -543,26 +566,29 @@ function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiM
         })
     }
 
-    for (const effect of style.effects ?? []) {
-        if (!isEffectPluginId(effect.id)) continue
-        // 色彩老化由独立的 multiply 混合层处理（见 PixiChromaticAgeingLayer）：
-        // 在透明叠加 canvas 上画 multiply 不与下方场景发生混合，只会退化成一层平铺色纱。
-        if (effect.id === 'chromatic-ageing') continue
-        drawPixiEffectAsset({
-            ctx,
-            asset: effect.id,
-            width: context.scene.canvas.width,
-            height: context.scene.canvas.height,
-            shapes: context.scene.shapes,
-            params: effect.params,
-        })
+    if (mode === 'full') {
+        for (const effect of style.effects ?? []) {
+            if (!isEffectPluginId(effect.id)) continue
+            // 色彩老化由独立的 multiply 混合层处理（见 PixiChromaticAgeingLayer）：
+            // 在透明叠加 canvas 上画 multiply 不与下方场景发生混合，只会退化成一层平铺色纱。
+            if (effect.id === 'chromatic-ageing') continue
+            drawPixiEffectAsset({
+                ctx,
+                asset: effect.id,
+                width: context.scene.canvas.width,
+                height: context.scene.canvas.height,
+                shapes: context.scene.shapes,
+                params: effect.params,
+            })
+        }
     }
 
     const coastlinePlugin = style.decorations?.find(item => item.id === 'coastline-outline')
     if (style.coastline?.enabled && coastlinePlugin) {
         // 先画向海侧的等距晕线（在下），再叠陆地边界描边（在上）。hatchRings>0 才启用。
+        // linework 模式下晕线由 shader 插件绘制，这里只留矢量描边。
         const hatchParams = coastlinePlugin.params
-        if (getNumberParam(hatchParams?.hatchRings, 0) > 0) {
+        if (mode === 'full' && getNumberParam(hatchParams?.hatchRings, 0) > 0) {
             drawCoastlineHatching(ctx, context, {
                 rings: getNumberParam(hatchParams?.hatchRings, 4),
                 gap: getNumberParam(hatchParams?.hatchGap, 7),
@@ -575,7 +601,7 @@ function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiM
         style.coastline.layers.forEach((layer, index) => drawCoastlineLayer(ctx, context, layer, index, brushAsset))
     }
 
-    if (hasDecoration(style, 'compass')) {
+    if (showCompass) {
         drawCompass(ctx, context, style)
     }
 
@@ -623,112 +649,95 @@ function useCanvasTexture(canvas: HTMLCanvasElement | null): Texture {
 /**
  * Shader 模式的 Overlay 渲染
  *
- * 使用 Pixi Filter 渲染各种效果，避免 Canvas 2D 的性能瓶颈
+ * 每个插件是一个覆盖场景的 Mesh 四边形（场景坐标 + UV=场景归一化坐标），
+ * 兄弟节点按序 alpha 混合合成。不用 Filter 堆叠：后一个 pass 的 discard
+ * 会把前一个 pass 的输出清掉，且 Filter 的屏幕空间 frame 数学在平移缩放
+ * 下极易出错。海岸场纹理在此组件内生成并由 useCanvasTexture 管理生命周期。
  */
 function PixiShaderOverlay({
     context,
     style,
-    shaderContext,
+    coastField,
 }: {
     context: MapPixiPreviewOverlayContext
     style: PixiMapStyle
-    shaderContext: {
-        useShader: boolean
-        distanceField?: unknown
-        landMask?: unknown
-    }
+    coastField: Texture
 }) {
-    pixiOverlayLog('PixiShaderOverlay: ENTER')
+    const sceneW = context.scene.canvas.width
+    const sceneH = context.scene.canvas.height
+    const shapes = context.scene.shapes
 
-    // 收集所有需要渲染的插件
-    const filters = useMemo(() => {
-        const result: Filter[] = []
+    // GPU 资源统一走"effect 内创建 + setState、被替换后在 cleanup 里销毁旧值"的模式
+    //（与 useCanvasTexture 一致）。不能在 useMemo 里建资源、在 cleanup 里销毁：
+    // StrictMode 会保留 useMemo 缓存并重放 effect 的 cleanup/setup，重放后 Mesh
+    // 将渲染已销毁的 shader/geometry。
 
-        // 构建 ShaderRenderContext
+    // 场景四边形几何：aPosition 用场景坐标，aUV 0..1
+    const [geometry, setGeometry] = useState<MeshGeometry | null>(null)
+    useEffect(() => {
+        setGeometry(new MeshGeometry({
+            positions: new Float32Array([0, 0, sceneW, 0, sceneW, sceneH, 0, sceneH]),
+            uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+            indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+        }))
+    }, [sceneW, sceneH])
+    useEffect(() => () => {
+        geometry?.destroy()
+    }, [geometry])
+
+    const [renderItems, setRenderItems] = useState<Array<{key: string; renderer: ShaderRenderer}>>([])
+    useEffect(() => {
         const renderContext: ShaderRenderContext = {
-            scene: {
-                shapes: context.scene.shapes,
-                canvas: context.scene.canvas,
-            },
-            distanceField: shaderContext.distanceField,
-            landMask: shaderContext.landMask,
+            scene: {shapes, canvas: {width: sceneW, height: sceneH}},
+            coastField,
         }
 
-        // 处理 decorations
-        if (style.decorations) {
-            for (const decoration of style.decorations) {
-                const plugin = shaderRegistry.get(decoration.id)
-                if (!plugin) {
-                    pixiOverlayLog(`PixiShaderOverlay: plugin not found: ${decoration.id}`)
-                    continue
-                }
-
-                const impl = decoration.implementation ?? 'auto'
-                const useShaderForThis = impl === 'shader' || (impl === 'auto' && plugin.defaultImplementation === 'shader')
-
-                if (useShaderForThis) {
-                    const renderer = plugin.createRenderer(decoration.params ?? {}, 'shader')
-                    if (renderer && renderer.type === 'shader') {
-                        // 更新 shader uniform
-                        if (renderer.update) {
-                            renderer.update(renderContext)
-                        }
-                        result.push(renderer.filter as Filter)
-                        pixiOverlayLog(`PixiShaderOverlay: added shader for ${decoration.id}`)
-                    }
-                }
-            }
+        const items: Array<{key: string; renderer: ShaderRenderer}> = []
+        const push = (config: PixiStylePluginConfig | undefined) => {
+            if (!config) return
+            const plugin = shaderRegistry.get(config.id)
+            const renderer = plugin?.createShaderRenderer(config.params ?? {}) ?? null
+            if (!renderer) return
+            renderer.update?.(renderContext)
+            items.push({key: config.id, renderer})
+            pixiOverlayLog(`PixiShaderOverlay: added mesh for ${config.id}`)
         }
 
-        // 处理 effects
-        if (style.effects) {
-            for (const effect of style.effects) {
-                const plugin = shaderRegistry.get(effect.id)
-                if (!plugin) {
-                    pixiOverlayLog(`PixiShaderOverlay: plugin not found: ${effect.id}`)
-                    continue
-                }
-
-                const impl = effect.implementation ?? 'auto'
-                const useShaderForThis = impl === 'shader' || (impl === 'auto' && plugin.defaultImplementation === 'shader')
-
-                if (useShaderForThis) {
-                    const renderer = plugin.createRenderer(effect.params ?? {}, 'shader')
-                    if (renderer && renderer.type === 'shader') {
-                        // 更新 shader uniform
-                        if (renderer.update) {
-                            renderer.update(renderContext)
-                        }
-                        result.push(renderer.filter as Filter)
-                        pixiOverlayLog(`PixiShaderOverlay: added shader for ${effect.id}`)
-                    }
-                }
-            }
+        // 与 Canvas 位图的绘制次序一致：海水 → 陆地纵深 → 淡墨/笔触 → 效果（风格声明序）→ 晕线。
+        // 海岸线本体描边与罗盘是矢量线稿，由上层的 linework 位图承担。
+        push(style.decorations?.find(item => item.id === 'sea'))
+        push(style.decorations?.find(item => item.id === 'land-depth'))
+        push(style.decorations?.find(item => item.id === 'ink-wash'))
+        push(style.decorations?.find(item => item.id === 'brush-stroke'))
+        for (const effect of style.effects ?? []) {
+            if (effect.id === 'chromatic-ageing') continue // 独立 multiply 图层
+            push(effect)
+        }
+        if (style.coastline?.enabled) {
+            push(style.decorations?.find(item => item.id === 'coastline-outline'))
         }
 
-        pixiOverlayLog(`PixiShaderOverlay: collected ${result.length} filters`)
-        return result
-    }, [context.scene, style.decorations, style.effects, shaderContext, shaderRegistry])
+        pixiOverlayLog(`PixiShaderOverlay: collected ${items.length} meshes`)
+        setRenderItems(items)
+    }, [shapes, sceneW, sceneH, style, coastField])
 
-    if (filters.length === 0) {
-        pixiOverlayLog('PixiShaderOverlay: EXIT (no filters)')
-        return null
-    }
+    // 延迟销毁 shader（GlProgram 走 Pixi 全局缓存，不随之销毁）
+    useEffect(() => () => {
+        renderItems.forEach(item => item.renderer.destroy?.())
+    }, [renderItems])
 
-    pixiOverlayLog(`PixiShaderOverlay: RETURN pixiContainer with ${filters.length} filters`)
+    if (!geometry || renderItems.length === 0) return null
 
-    // 使用 Container + Graphics 来应用 filters
-    // Graphics 绘制一个透明矩形占位，让 filters 生效
     return (
-        <pixiContainer filters={filters}>
-            <pixiGraphics
-                draw={(g: Graphics) => {
-                    g.clear()
-                    g.rect(0, 0, context.scene.canvas.width, context.scene.canvas.height)
-                    g.fill({ color: 0x000000, alpha: 0 })
-                }}
-            />
-        </pixiContainer>
+        <>
+            {renderItems.map(({key, renderer}, index) => (
+                <pixiMesh
+                    key={`${key}-${index}`}
+                    geometry={geometry}
+                    shader={renderer.shader as TextureShader}
+                />
+            ))}
+        </>
     )
 }
 
@@ -741,55 +750,51 @@ function PixiTextureOverlay({
     style: PixiMapStyle
     shaderContext?: {
         useShader: boolean
-        distanceField?: unknown
-        landMask?: unknown
     }
 }) {
     pixiOverlayLog('PixiTextureOverlay: ENTER')
+    const sceneW = context.scene.canvas.width
+    const sceneH = context.scene.canvas.height
+    const shapes = context.scene.shapes
+
+    // 海岸场：CPU 精确 EDT（场景分辨率，一次性数十 ms），只在 shapes/尺寸变化时重算。
+    // 生成失败（无有效陆地 / 环境不支持）时整体回退 Canvas 位图路径。
+    const wantShader = Boolean(shaderContext?.useShader)
+    const coastFieldCanvas = useMemo(
+        () => (wantShader ? createCoastFieldCanvas(shapes, sceneW, sceneH) : null),
+        [wantShader, shapes, sceneW, sceneH],
+    )
+    const coastField = useCanvasTexture(coastFieldCanvas)
+    const shaderActive = wantShader && coastFieldCanvas !== null
 
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
     // createOverlayCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
     const overlayCanvas = useMemo(
-        () => {
-            // 如果使用 shader 模式，不需要生成 Canvas 叠加位图
-            if (shaderContext?.useShader && shaderContext.distanceField && shaderContext.landMask) {
-                return null
-            }
-            return createOverlayCanvas(context, style)
-        },
+        () => createOverlayCanvas(context, style, shaderActive ? 'linework' : 'full'),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [context.scene.shapes, context.scene.canvas.width, context.scene.canvas.height, style, shaderContext?.useShader],
+        [context.scene.shapes, sceneW, sceneH, style, shaderActive],
     )
-
-    pixiOverlayLog(`PixiTextureOverlay: useMemo overlayCanvas=${overlayCanvas ? 'present' : 'empty'}`)
     const texture = useCanvasTexture(overlayCanvas)
-    pixiOverlayLog(`PixiTextureOverlay: useCanvasTexture returned texture=${texture !== Texture.EMPTY ? 'loaded' : 'empty'}`)
 
-    // 如果使用 shader 模式，则返回 shader 渲染
-    if (shaderContext?.useShader && shaderContext.distanceField && shaderContext.landMask) {
-        pixiOverlayLog('PixiTextureOverlay: using shader mode')
-        return <PixiShaderOverlay context={context} style={style} shaderContext={shaderContext} />
-    }
+    pixiOverlayLog(`PixiTextureOverlay: shaderActive=${shaderActive} overlayCanvas=${overlayCanvas ? 'present' : 'empty'}`)
 
-    // 否则使用传统的 Canvas 2D 模式
-    pixiOverlayLog('PixiTextureOverlay: using canvas mode')
-
-    if (!overlayCanvas) {
-        pixiOverlayLog('PixiTextureOverlay: EXIT early (no overlayCanvas)')
-        return null
-    }
-
-    pixiOverlayLog(`PixiTextureOverlay: RETURN pixiSprite w=${context.scene.canvas.width} h=${context.scene.canvas.height}`)
     return (
-        <pixiSprite
-            texture={texture}
-            x={0}
-            y={0}
-            width={context.scene.canvas.width}
-            height={context.scene.canvas.height}
-        />
+        <>
+            {shaderActive && coastField !== Texture.EMPTY && (
+                <PixiShaderOverlay context={context} style={style} coastField={coastField}/>
+            )}
+            {overlayCanvas && texture !== Texture.EMPTY && (
+                <pixiSprite
+                    texture={texture}
+                    x={0}
+                    y={0}
+                    width={sceneW}
+                    height={sceneH}
+                />
+            )}
+        </>
     )
 }
 
@@ -894,20 +899,19 @@ export function createPixiOverlayRenderer(
     style: PixiMapStyle,
     shaderContext?: {
         useShader: boolean
-        distanceField?: unknown
-        landMask?: unknown
-    }
+    },
 ): PixiOverlayRenderer | undefined {
     const showCoastline = Boolean(style.coastline?.enabled && hasDecoration(style, 'coastline-outline'))
     const showCompass = hasDecoration(style, 'compass')
     const showEffects = Boolean(style.effects?.length)
+    const showDecorations = Boolean(style.decorations?.length)
     const showOverlayLabels = Boolean(style.labels.show && style.labels.renderer === 'overlay')
-    const showTextureOverlay = showEffects || showCoastline || showCompass
+    const showTextureOverlay = showEffects || showDecorations || showCoastline || showCompass
     const showAgeing = Boolean(style.effects?.some(effect => effect.id === 'chromatic-ageing'))
 
     pixiOverlayLog(`createPixiOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} labels=${showOverlayLabels} useShader=${shaderContext?.useShader ?? false}`)
 
-    if (!showEffects && !showCoastline && !showCompass && !showOverlayLabels) return undefined
+    if (!showTextureOverlay && !showOverlayLabels) return undefined
 
     return (context) => {
         pixiOverlayLog(`RENDER_FN: called showTextureOverlay=${showTextureOverlay} showOverlayLabels=${showOverlayLabels} sceneShapes=${context.scene.shapes.length} sceneKeyLocs=${context.scene.keyLocations.length} canvas=${context.scene.canvas.width}x${context.scene.canvas.height}`)

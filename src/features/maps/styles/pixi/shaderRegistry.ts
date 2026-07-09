@@ -7,8 +7,8 @@ import type {
 /**
  * Shader 插件注册表
  *
- * 每个插件可以有 Canvas 和 Shader 两种实现方式。
- * 内置风格可以优先使用 Shader 实现以获得更好的性能。
+ * 插件提供基于海岸场纹理的 shader 实现（场景四边形 Mesh，见 plugins/shared.ts）；
+ * 无 shader 实现的能力（罗盘、海岸线本体描边）留在 Canvas 叠加位图里。
  */
 class ShaderPluginRegistry {
     private plugins = new Map<string, PixiPluginImplementation>()
@@ -36,17 +36,21 @@ class ShaderPluginRegistry {
 
 export const shaderRegistry = new ShaderPluginRegistry()
 
+let webGLSupportCache: boolean | null = null
+
 /**
- * 检测 WebGL 支持
+ * 检测 WebGL 支持（结果缓存：每次编译都建临时 canvas/context 是纯浪费）
  */
 export function detectWebGLSupport(): boolean {
+    if (webGLSupportCache !== null) return webGLSupportCache
     try {
         const canvas = document.createElement('canvas')
-        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2')
-        return gl !== null
+        const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+        webGLSupportCache = gl !== null
     } catch {
-        return false
+        webGLSupportCache = false
     }
+    return webGLSupportCache
 }
 
 /**

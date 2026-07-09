@@ -2,7 +2,7 @@
  * Pixi 地图风格 Shader 工具函数
  */
 
-export * from './distanceField'
+export * from './coastField'
 
 /**
  * 获取数字参数，带默认值保护

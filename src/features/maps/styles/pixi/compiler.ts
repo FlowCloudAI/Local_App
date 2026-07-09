@@ -6,7 +6,6 @@ import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, 
 import {buildPixiLocationIconAsset, getPixiPaperTextureCanvas} from './assets'
 import {createPixiOverlayRenderer} from './overlays'
 import {detectWebGLSupport} from './shaderRegistry'
-import {generateDistanceFieldTexture, generateLandMaskTexture} from './utils/distanceField'
 
 function pixiLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -83,25 +82,12 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
         const {style, scene} = context
         pixiLog(`compile enter: styleId=${style.id} shapes=${scene.shapes.length} keyLocs=${scene.keyLocations.length} bgKind=${style.background.kind}`)
 
-        // 检测 WebGL 支持和是否使用 shader 优化
-        const useShader = detectWebGLSupport() && style.useShaderOptimization !== false
+        // 是否启用 shader 渲染路径。海岸场纹理与 GPU 资源的创建/销毁全部收在
+        // overlays 的 React 组件生命周期里（StrictMode 安全、无泄漏），编译期只做开关判定。
+        const useShader = detectWebGLSupport()
+            && style.useShaderOptimization !== false
+            && scene.shapes.length > 0
         pixiLog(`useShader: ${useShader}`)
-
-        // 如果使用 shader，预生成距离场和陆地遮罩纹理
-        let distanceField
-        let landMask
-        if (useShader && scene.shapes.length > 0) {
-            try {
-                const scale = mapRenderScale(scene.canvas.width, scene.canvas.height)
-                pixiLog(`generating distance field: ${scene.canvas.width}x${scene.canvas.height} scale=${scale}`)
-                distanceField = generateDistanceFieldTexture(scene.shapes, scene.canvas.width, scene.canvas.height, scale)
-                landMask = generateLandMaskTexture(scene.shapes, scene.canvas.width, scene.canvas.height, scale)
-                pixiLog(`distance field generated successfully`)
-            } catch (error) {
-                pixiLog(`distance field generation failed: ${error instanceof Error ? error.message : String(error)}`)
-                // 失败时回退到 Canvas 模式
-            }
-        }
 
         const markerStroke = style.locations.marker.stroke
         const bgResult = resolvePixiBackgroundImage(context)
@@ -138,11 +124,7 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
             }),
         }
 
-        const overlayRenderer = createPixiOverlayRenderer(style, {
-            useShader,
-            distanceField,
-            landMask,
-        })
+        const overlayRenderer = createPixiOverlayRenderer(style, {useShader})
         pixiLog(`overlayRenderer: ${overlayRenderer ? 'present' : 'undefined'}`)
 
         const result: CompiledPixiMapStyle = {
