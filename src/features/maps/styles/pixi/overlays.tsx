@@ -487,11 +487,11 @@ function isEffectPluginId(id: string): id is PixiEffectPluginId {
         || id === 'chromatic-ageing'
 }
 
-function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: PixiMapStyle): string {
-    pixiOverlayLog(`createOverlayDataUrl: canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
+function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiMapStyle): HTMLCanvasElement | null {
+    pixiOverlayLog(`createOverlayCanvas: canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
     const sceneW = context.scene.canvas.width
     const sceneH = context.scene.canvas.height
-    if (sceneW <= 0 || sceneH <= 0) return ''
+    if (sceneW <= 0 || sceneH <= 0) return null
     // 超采样：位图按 scale 放大生成，Sprite 仍按场景尺寸显示 → 放大更清晰。
     const scale = mapRenderScale(sceneW, sceneH)
     const canvas = document.createElement('canvas')
@@ -500,8 +500,8 @@ function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: Pixi
     const ctx = canvas.getContext('2d')
 
     if (!ctx) {
-        pixiOverlayLog('createOverlayDataUrl: getContext(2d) returned null')
-        return ''
+        pixiOverlayLog('createOverlayCanvas: getContext(2d) returned null')
+        return null
     }
     ctx.scale(scale, scale)
 
@@ -576,45 +576,33 @@ function createOverlayDataUrl(context: MapPixiPreviewOverlayContext, style: Pixi
         drawCompass(ctx, context, style)
     }
 
-    const dataUrl = canvas.toDataURL('image/png')
-    pixiOverlayLog(`createOverlayDataUrl: dataUrlLen=${dataUrl.length} prefix=${dataUrl.slice(0, 40)}`)
-    return dataUrl
+    pixiOverlayLog(`createOverlayCanvas: done ${canvas.width}x${canvas.height}`)
+    return canvas
 }
 
-function useImageTexture(url: string): Texture {
+/**
+ * canvas 直通纹理：跳过 toDataURL(PNG 同步编码) + new Image(异步解码) 往返——
+ * 超采样大图一次编码可达数百 ms，是风格/场景变更时叠加层重建的最大单项开销。
+ * skipCache=true（第二参）确保每次新建 TextureSource，避免 Pixi 全局缓存
+ * 返回已被 destroy 的旧纹理。
+ */
+function useCanvasTexture(canvas: HTMLCanvasElement | null): Texture {
     const [texture, setTexture] = useState<Texture>(Texture.EMPTY)
 
     useEffect(() => {
-        if (!url) {
+        if (!canvas) {
             setTexture(Texture.EMPTY)
-            return undefined
+            return
         }
 
-        let cancelled = false
-        const image = new Image()
-
-        image.onload = () => {
-            if (cancelled) return
-            try {
-                setTexture(Texture.from({resource: image}, true))
-                pixiOverlayLog(`useImageTexture: loaded ok urlLen=${url.length}`)
-            } catch (e) {
-                pixiOverlayLog(`useImageTexture: Texture.from failed ${e instanceof Error ? e.message : String(e)}`)
-                setTexture(Texture.EMPTY)
-            }
+        try {
+            setTexture(Texture.from({resource: canvas}, true))
+            pixiOverlayLog(`useCanvasTexture: created ${canvas.width}x${canvas.height}`)
+        } catch (e) {
+            pixiOverlayLog(`useCanvasTexture: Texture.from failed ${e instanceof Error ? e.message : String(e)}`)
+            setTexture(Texture.EMPTY)
         }
-        image.onerror = () => {
-            if (!cancelled) {
-                pixiOverlayLog(`useImageTexture: image.onerror urlLen=${url.length} prefix=${url.slice(0, 60)}`)
-                setTexture(Texture.EMPTY)
-            }
-        }
-        image.src = url
-
-        return () => {
-            cancelled = true
-        }
-    }, [url])
+    }, [canvas])
 
     // 纹理销毁延到它被下一张纹理替换（或组件卸载）之后再做，避免 Sprite 渲染已销毁纹理
     // 触发 Pixi applyStyleParams 读取 null.style 崩溃（详见 MapPixiPreview.usePixiImageTexture）。
@@ -759,22 +747,22 @@ function PixiTextureOverlay({
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
-    // createOverlayDataUrl（整块画布 toDataURL + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
-    const dataUrl = useMemo(
+    // createOverlayCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
+    const overlayCanvas = useMemo(
         () => {
-            // 如果使用 shader 模式，不需要生成 Canvas data URL
+            // 如果使用 shader 模式，不需要生成 Canvas 叠加位图
             if (shaderContext?.useShader && shaderContext.distanceField && shaderContext.landMask) {
                 return null
             }
-            return createOverlayDataUrl(context, style)
+            return createOverlayCanvas(context, style)
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [context.scene.shapes, context.scene.canvas.width, context.scene.canvas.height, style, shaderContext?.useShader],
     )
 
-    pixiOverlayLog(`PixiTextureOverlay: useMemo dataUrl=${dataUrl ? 'present' : 'empty'}`)
-    const texture = useImageTexture(dataUrl ?? '')
-    pixiOverlayLog(`PixiTextureOverlay: useImageTexture returned texture=${texture !== Texture.EMPTY ? 'loaded' : 'empty'}`)
+    pixiOverlayLog(`PixiTextureOverlay: useMemo overlayCanvas=${overlayCanvas ? 'present' : 'empty'}`)
+    const texture = useCanvasTexture(overlayCanvas)
+    pixiOverlayLog(`PixiTextureOverlay: useCanvasTexture returned texture=${texture !== Texture.EMPTY ? 'loaded' : 'empty'}`)
 
     // 如果使用 shader 模式，则返回 shader 渲染
     if (shaderContext?.useShader && shaderContext.distanceField && shaderContext.landMask) {
@@ -785,8 +773,8 @@ function PixiTextureOverlay({
     // 否则使用传统的 Canvas 2D 模式
     pixiOverlayLog('PixiTextureOverlay: using canvas mode')
 
-    if (!dataUrl) {
-        pixiOverlayLog('PixiTextureOverlay: EXIT early (no dataUrl)')
+    if (!overlayCanvas) {
+        pixiOverlayLog('PixiTextureOverlay: EXIT early (no overlayCanvas)')
         return null
     }
 
