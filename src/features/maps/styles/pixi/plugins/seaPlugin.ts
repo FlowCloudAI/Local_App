@@ -60,29 +60,43 @@ void main() {
         acc = vec4(uDepthColor * depthAlpha, depthAlpha);
     }
 
-    // 2) 程序化海浪：每格一段随机相位/长度/振幅的短正弦
+    // 2) 程序化海浪：每格一段随机相位/长度/振幅的短正弦。
+    //    波浪中心抖动 ±0.7 格、段长可越过本格，像素只看自己格子会把跨格波浪
+    //    切成断头（格线截断）——必须扫 3×3 邻域把邻格伸过来的波浪也画上。
+    //    覆盖保证：0.7 格抖动 + segLen/2 ≤ 1.5 格 ⇔ segLen ≤ 1.6 格（下方 min 兜底）。
     if (uWaveOpacity > 0.0 && dist > uWaveMargin) {
-        vec2 grid = floor(pos / uWaveSpacing);
-        if (hash(grid + vec2(3.1, 1.7)) < uWaveDensity) {
-            vec2 cellCenter = (grid + 0.5) * uWaveSpacing;
-            vec2 jitter = (vec2(hash(grid + vec2(11.1, 0.0)), hash(grid + vec2(0.0, 23.3))) - 0.5) * uWaveSpacing * 1.4;
-            vec2 waveCenter = cellCenter + jitter;
+        vec2 baseGrid = floor(pos / uWaveSpacing);
+        float waveMask = 0.0;
+        for (int gy = -1; gy <= 1; gy++) {
+            for (int gx = -1; gx <= 1; gx++) {
+                vec2 grid = baseGrid + vec2(float(gx), float(gy));
+                if (hash(grid + vec2(3.1, 1.7)) >= uWaveDensity) continue;
 
-            float phase = hash(grid + vec2(5.5, 0.0)) * 6.28318;
-            float segLen = uWaveSegLength * (0.55 + hash(grid + vec2(7.7, 0.0)) * 0.9);
-            float amp = uWaveAmplitude * (0.55 + hash(grid + vec2(9.9, 0.0)) * 0.9);
+                vec2 cellCenter = (grid + 0.5) * uWaveSpacing;
+                vec2 jitter = (vec2(hash(grid + vec2(11.1, 0.0)), hash(grid + vec2(0.0, 23.3))) - 0.5) * uWaveSpacing * 1.4;
+                vec2 waveCenter = cellCenter + jitter;
 
-            vec2 delta = pos - waveCenter;
-            if (abs(delta.x) < segLen * 0.5) {
+                float phase = hash(grid + vec2(5.5, 0.0)) * 6.28318;
+                float segLen = uWaveSegLength * (0.55 + hash(grid + vec2(7.7, 0.0)) * 0.9);
+                segLen = min(segLen, uWaveSpacing * 1.6);
+                float amp = uWaveAmplitude * (0.55 + hash(grid + vec2(9.9, 0.0)) * 0.9);
+
+                vec2 delta = pos - waveCenter;
+                float halfLen = segLen * 0.5;
+                if (abs(delta.x) >= halfLen) continue;
+
                 float waveY = sin((delta.x / uWaveLength) * 6.28318 + phase) * amp;
                 float distToWave = abs(delta.y - waveY);
                 float halfW = uWaveWidth * 0.5;
-                float waveAlpha = uWaveOpacity * (1.0 - smoothstep(halfW, halfW + 0.9, distToWave));
-                if (waveAlpha > 0.0) {
-                    vec4 wave = vec4(uWaveColor * waveAlpha, waveAlpha);
-                    acc = wave + acc * (1.0 - wave.a); // 预乘 over 合成
-                }
+                // 端头 1.5px 渐隐，模拟圆头笔画收尾
+                float cap = 1.0 - smoothstep(halfLen - 1.5, halfLen, abs(delta.x));
+                waveMask = max(waveMask, (1.0 - smoothstep(halfW, halfW + 0.9, distToWave)) * cap);
             }
+        }
+        if (waveMask > 0.0) {
+            float waveAlpha = uWaveOpacity * waveMask;
+            vec4 wave = vec4(uWaveColor * waveAlpha, waveAlpha);
+            acc = wave + acc * (1.0 - wave.a); // 预乘 over 合成
         }
     }
 
