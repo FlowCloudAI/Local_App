@@ -1,5 +1,5 @@
 import type {MapPreviewKeyLocationIcon, MapRgbaColor} from '../../../components/MapShapeEditor'
-import {createParchmentTexture, createRicePaperTexture, svgToDataUrl} from '../../common'
+import {createParchmentTexture, createRicePaperTexture, makeSeededRng, svgToDataUrl} from '../../common'
 import type {
     PixiEffectPluginId,
     PixiGeneratedBackgroundTexture,
@@ -52,11 +52,6 @@ function getNumberParam(value: unknown, fallback: number): number {
 
 function getStringParam(value: unknown, fallback: string): string {
     return typeof value === 'string' && value.trim() ? value : fallback
-}
-
-function pointNoise(seed: number): number {
-    const value = Math.sin(seed * 12.9898) * 43758.5453
-    return value - Math.floor(value)
 }
 
 function isMajorTolkienLocation(type: string): boolean {
@@ -326,18 +321,21 @@ export function drawPixiCompassAsset({ctx, asset, cx, cy, size, color}: CompassA
 }
 
 function drawPaperGrainEffect({ctx, width, height, params}: PixiEffectAssetInput): void {
-    const density = Math.max(80, Math.min(5000, getNumberParam(params?.density, 1300)))
+    const density = Math.max(80, Math.min(20000, getNumberParam(params?.density, 1300)))
     const opacity = Math.max(0, Math.min(1, getNumberParam(params?.opacity, 0.08)))
     const darkColor = getStringParam(params?.darkColor, 'rgba(70, 45, 22, 1)')
     const lightColor = getStringParam(params?.lightColor, 'rgba(255, 248, 220, 1)')
+    // 均匀随机撒点：原来用 fract(sin(i·k)) 哈希，对规则 i 步长会呈结构化/准周期分布，
+    // 缩放到屏幕上形成规则网格般的摩尔纹。改用 mulberry32 PRNG，分布真随机、无摩尔纹。
+    const rng = makeSeededRng(Math.round(width) * 6151 + Math.round(height) * 3079 + 101)
 
     ctx.save()
     for (let i = 0; i < density; i++) {
-        const x = pointNoise(i * 19.17) * width
-        const y = pointNoise(i * 41.71) * height
-        const radius = 0.35 + pointNoise(i * 13.11) * 1.15
-        const isLight = pointNoise(i * 7.33) > 0.58
-        ctx.globalAlpha = opacity * (0.35 + pointNoise(i * 5.9) * 0.65)
+        const x = rng() * width
+        const y = rng() * height
+        const radius = 0.35 + rng() * 1.15
+        const isLight = rng() > 0.58
+        ctx.globalAlpha = opacity * (0.35 + rng() * 0.65)
         ctx.fillStyle = isLight ? lightColor : darkColor
         ctx.fillRect(x, y, radius, radius)
     }

@@ -23,8 +23,10 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
     },
     regions: {
         fill: {
-            color: '#ead8ac',
-            opacity: 0.72,
+            // 陆地=羊皮纸本身：只上一层很淡的暖色调，让纸面的斑驳/纤维/颗粒透出来
+            //（原来 0.72 几乎把纸纹盖死）。陆海区分靠海面蓝染 + 海岸线描边。
+            color: '#e8d3a2',
+            opacity: 0.22,
         },
         stroke: {
             color: '#6f4724',
@@ -149,7 +151,7 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
                 depthBands: 4,
                 depthGap: 7,
                 depthColor: '#345d7a',
-                depthOpacity: 0.34,
+                depthOpacity: 0.5,
                 depthShallowFade: 0.9,
                 waveSpacing: 48,
                 waveAmplitude: 2.4,
