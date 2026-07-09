@@ -13,14 +13,15 @@ export function makeSeededRng(seed: number): () => number {
  * 羊皮纸纹理生成器：暖色径向基底 + 不规则做旧色斑（受潮/陈化不均）+ 边角与四边磨损 +
  * 光照 + 双向纸纤维 + 细颗粒（纸张 tooth）。用确定性 PRNG，同尺寸每次一致、不闪变。
  * 注意：本纹理按超采样尺寸生成（见 pixi/compiler 的 mapRenderScale），细节以物理像素给出。
+ * 返回 canvas 本体（供 Texture.from 直通），不做 PNG 编码。
  */
-export function createParchmentTexture(width: number, height: number): string {
+export function createParchmentTexture(width: number, height: number): HTMLCanvasElement | null {
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
 
-    if (!ctx) return ''
+    if (!ctx) return null
 
     const rng = makeSeededRng(Math.round(width) * 7919 + Math.round(height) * 104729 + 17)
     const area = width * height
@@ -118,19 +119,23 @@ export function createParchmentTexture(width: number, height: number): string {
     }
 
     ctx.globalAlpha = 1
-    return canvas.toDataURL('image/png')
+    return canvas
 }
 
 /**
  * 宣纸纹理生成器：米白底、轻噪点、短纸纤维。
+ * 确定性 PRNG：原来用 Math.random，每次重编译噪点都变，调参/改场景时纸面会肉眼可见地"闪"。
+ * 返回 canvas 本体（供 Texture.from 直通），不做 PNG 编码。
  */
-export function createRicePaperTexture(width: number, height: number): string {
+export function createRicePaperTexture(width: number, height: number): HTMLCanvasElement | null {
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
 
-    if (!ctx) return ''
+    if (!ctx) return null
+
+    const rng = makeSeededRng(Math.round(width) * 9973 + Math.round(height) * 4409 + 7)
 
     ctx.fillStyle = '#fbfaf7'
     ctx.fillRect(0, 0, width, height)
@@ -138,21 +143,23 @@ export function createRicePaperTexture(width: number, height: number): string {
     const imageData = ctx.getImageData(0, 0, width, height)
     const data = imageData.data
     for (let i = 0; i < data.length; i += 4) {
-        const noise = (Math.random() - 0.5) * 6
+        const noise = (rng() - 0.5) * 6
         data[i] = Math.min(255, Math.max(0, data[i] + noise))
         data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise))
         data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise))
     }
     ctx.putImageData(imageData, 0, 0)
 
-    for (let i = 0; i < 180; i++) {
-        const x = Math.random() * width
-        const y = Math.random() * height
-        const len = 10 + Math.random() * 40
-        const angle = (Math.random() - 0.5) * 0.4
-        ctx.globalAlpha = 0.03 + Math.random() * 0.06
+    // 纤维数量随面积缩放：原来固定 180 根，超采样大图上过于稀疏
+    const fiberCount = Math.round((width * height) / 4200) + 60
+    for (let i = 0; i < fiberCount; i++) {
+        const x = rng() * width
+        const y = rng() * height
+        const len = 10 + rng() * 40
+        const angle = (rng() - 0.5) * 0.4
+        ctx.globalAlpha = 0.03 + rng() * 0.06
         ctx.strokeStyle = '#b0a898'
-        ctx.lineWidth = 0.3 + Math.random() * 0.7
+        ctx.lineWidth = 0.3 + rng() * 0.7
         ctx.beginPath()
         ctx.moveTo(x, y)
         ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len)
@@ -160,5 +167,5 @@ export function createRicePaperTexture(width: number, height: number): string {
     }
 
     ctx.globalAlpha = 1
-    return canvas.toDataURL('image/png')
+    return canvas
 }

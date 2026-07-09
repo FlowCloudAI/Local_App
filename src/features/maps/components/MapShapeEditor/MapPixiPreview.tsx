@@ -450,10 +450,21 @@ function useImageNaturalSize(url: string | undefined): { width: number; height: 
     return naturalSize;
 }
 
-function usePixiImageTexture(url: string | undefined): Texture {
+function usePixiImageTexture(url: string | undefined, source?: HTMLCanvasElement): Texture {
     const [texture, setTexture] = useState<Texture>(Texture.EMPTY);
 
     useEffect(() => {
+        // canvas 直通：跳过 dataURL 的 PNG 编解码。skipCache 防止 Pixi 全局缓存
+        // 命中已销毁的旧纹理（本 hook 会在替换后 destroy）。
+        if (source) {
+            try {
+                setTexture(Texture.from({resource: source}, true));
+            } catch {
+                setTexture(Texture.EMPTY);
+            }
+            return undefined;
+        }
+
         if (!url) {
             setTexture(Texture.EMPTY);
             return undefined;
@@ -483,7 +494,7 @@ function usePixiImageTexture(url: string | undefined): Texture {
         return () => {
             cancelled = true;
         };
-    }, [url]);
+    }, [url, source]);
 
     // 纹理销毁延到它被下一张纹理替换（或组件卸载）之后再做：此时 React 已提交新纹理、
     // Sprite 不再引用旧纹理，才可安全 destroy。若像原来那样在加载 effect 的 cleanup 里
@@ -1423,7 +1434,7 @@ function MapPixiBackground({
     backgroundImage: MapPreviewBackgroundImage;
     bounds: BackgroundBounds;
 }) {
-    const texture = usePixiImageTexture(backgroundImage.url);
+    const texture = usePixiImageTexture(backgroundImage.url, backgroundImage.source);
 
     return (
         <pixiSprite

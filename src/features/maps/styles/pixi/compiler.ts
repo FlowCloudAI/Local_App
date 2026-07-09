@@ -1,8 +1,9 @@
 import {log_message} from '../../../../api'
 import type {MapStyleCompileContext} from '../common'
 import {isMapDebugLogEnabled, makeSolidBackgroundDataUrl, mapRenderScale, paintToRgbaColor, strokeToRgbaColor,} from '../common'
+import type {MapPreviewBackgroundImage} from '../../components/MapShapeEditor'
 import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
-import {buildPixiLocationIconAsset, createPixiPaperTextureAsset} from './assets'
+import {buildPixiLocationIconAsset, getPixiPaperTextureCanvas} from './assets'
 import {createPixiOverlayRenderer} from './overlays'
 import {detectWebGLSupport} from './shaderRegistry'
 import {generateDistanceFieldTexture, generateLandMaskTexture} from './utils/distanceField'
@@ -39,7 +40,7 @@ function resolveLocationIconRule(type: string, style: PixiMapStyle): PixiLocatio
     return style.locations.iconRules?.find(rule => matchLocationTypeRule(type, rule))
 }
 
-function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<PixiMapStyle>) {
+function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<PixiMapStyle>): MapPreviewBackgroundImage {
     const background = style.background
 
     if (background.kind === 'image' && background.url) {
@@ -52,16 +53,18 @@ function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<Pixi
 
     if (background.kind === 'generated-texture') {
         // 超采样生成，再按场景尺寸显示 → 放大时纸纹更锐利。
+        // canvas 直通 + 按 (纹理,尺寸) 缓存：免 PNG 编解码，同尺寸重编译零生成开销。
         const scale = mapRenderScale(canvas.width, canvas.height)
-        const textureUrl = createPixiPaperTextureAsset(
+        const textureCanvas = getPixiPaperTextureCanvas(
             background.texture,
             Math.round(canvas.width * scale),
             Math.round(canvas.height * scale),
         )
 
-        if (textureUrl) {
+        if (textureCanvas) {
             return {
-                url: textureUrl,
+                url: '',
+                source: textureCanvas,
                 opacity: background.opacity ?? 1,
                 fit: 'fill' as const,
             }
@@ -102,7 +105,7 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
 
         const markerStroke = style.locations.marker.stroke
         const bgResult = resolvePixiBackgroundImage(context)
-        pixiLog(`background resolved: fit=${bgResult.fit} urlLen=${bgResult.url.length} urlPrefix=${bgResult.url.slice(0, 60)}`)
+        pixiLog(`background resolved: fit=${bgResult.fit} source=${bgResult.source ? `canvas ${bgResult.source.width}x${bgResult.source.height}` : 'none'} urlLen=${bgResult.url.length}`)
 
         const compiledScene = {
             ...scene,

@@ -194,14 +194,41 @@ export function buildPixiLocationIconAsset(input: PixiLocationIconAssetInput): M
     }
 }
 
-export function createPixiPaperTextureAsset(
+/**
+ * 纸纹 canvas 按 (纹理类型, 尺寸) 缓存：生成器是确定性 PRNG，同 key 结果恒等，缓存安全。
+ * 每次编译都重新生成超采样大图（含逐像素噪声循环）是重复开销；命中缓存后编译只剩纹理上传。
+ * 少量 LRU 条目即可覆盖"同一地图反复调参"的主场景。
+ */
+const paperTextureCanvasCache = new Map<string, HTMLCanvasElement>()
+const PAPER_TEXTURE_CACHE_LIMIT = 4
+
+export function getPixiPaperTextureCanvas(
     texture: PixiGeneratedBackgroundTexture | undefined,
     width: number,
     height: number,
-): string {
-    if (texture === 'parchment') return createParchmentTexture(width, height)
-    if (texture === 'rice-paper') return createRicePaperTexture(width, height)
-    return ''
+): HTMLCanvasElement | null {
+    if (!texture || width <= 0 || height <= 0) return null
+
+    const key = `${texture}:${width}x${height}`
+    const cached = paperTextureCanvasCache.get(key)
+    if (cached) {
+        // LRU：重插使其成为最新条目
+        paperTextureCanvasCache.delete(key)
+        paperTextureCanvasCache.set(key, cached)
+        return cached
+    }
+
+    const canvas = texture === 'parchment'
+        ? createParchmentTexture(width, height)
+        : createRicePaperTexture(width, height)
+    if (!canvas) return null
+
+    paperTextureCanvasCache.set(key, canvas)
+    if (paperTextureCanvasCache.size > PAPER_TEXTURE_CACHE_LIMIT) {
+        const oldest = paperTextureCanvasCache.keys().next().value
+        if (oldest !== undefined) paperTextureCanvasCache.delete(oldest)
+    }
+    return canvas
 }
 
 export function getPixiBrushAssetProfile(asset: PixiBrushAssetId | undefined): PixiBrushAssetProfile {
@@ -396,18 +423,6 @@ function drawInkBleedEffect({ctx, shapes, params}: PixiEffectAssetInput): void {
     ctx.restore()
 }
 
-function drawChromaticAgeingEffect({ctx, width, height, params}: PixiEffectAssetInput): void {
-    const opacity = Math.max(0, Math.min(1, getNumberParam(params?.opacity, 0.08)))
-    const color = getStringParam(params?.color, 'rgba(139, 83, 28, 1)')
-
-    ctx.save()
-    ctx.globalAlpha = opacity
-    ctx.globalCompositeOperation = 'multiply'
-    ctx.fillStyle = color
-    ctx.fillRect(0, 0, width, height)
-    ctx.restore()
-}
-
 export function drawPixiEffectAsset(input: PixiEffectAssetInput): void {
     switch (input.asset) {
         case 'paper-grain':
@@ -422,8 +437,7 @@ export function drawPixiEffectAsset(input: PixiEffectAssetInput): void {
         case 'ink-bleed':
             drawInkBleedEffect(input)
             break
-        case 'chromatic-ageing':
-            drawChromaticAgeingEffect(input)
-            break
+        // chromatic-ageing 不在此绘制：multiply 对透明叠加 canvas 无混合对象，
+        // 由 overlays 的 PixiChromaticAgeingLayer 以 blendMode 图层实现。
     }
 }

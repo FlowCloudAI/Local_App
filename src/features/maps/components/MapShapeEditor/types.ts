@@ -136,6 +136,11 @@ export interface MapPreviewKeyLocationIcon extends MapShapeExtensible {
 
 export interface MapPreviewBackgroundImage {
     url: string;
+    /**
+     * 生成型纹理的 canvas 直通源：存在时优先于 url（url 可为空串），
+     * 免去 dataURL 的 PNG 编解码往返。仅 Pixi 渲染器消费；Deck 侧忽略。
+     */
+    source?: HTMLCanvasElement;
     /** 0–1，默认 1 */
     opacity?: number;
     /** 图片适配模式，默认 'fill' */
