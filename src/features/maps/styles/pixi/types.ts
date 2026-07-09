@@ -26,7 +26,7 @@ export type PixiLocationIconAsset =
     | 'tolkien-ruin'
     | 'ink-dot'
     | 'ink-seal'
-export type PixiDecorationPluginId = 'coastline-outline' | 'compass' | 'land-depth' | 'sea'
+export type PixiDecorationPluginId = 'coastline-outline' | 'compass' | 'land-depth' | 'sea' | 'brush-stroke' | 'ink-wash'
 export type PixiEffectPluginId =
     | 'paper-grain'
     | 'vignette'
@@ -116,6 +116,8 @@ export interface PixiLabelStyle {
 export interface PixiStylePluginConfig {
     id: PixiDecorationPluginId | PixiEffectPluginId
     params?: MapStyleParameterRecord
+    // 新增：指定实现方式（自动选择、强制 shader、强制 canvas）
+    implementation?: 'auto' | 'shader' | 'canvas'
 }
 
 export interface PixiMapStyle {
@@ -131,9 +133,47 @@ export interface PixiMapStyle {
     labels: PixiLabelStyle
     decorations?: PixiStylePluginConfig[]
     effects?: PixiStylePluginConfig[]
+    // 新增：是否启用 shader 优化（默认 true）
+    useShaderOptimization?: boolean
 }
 
 export interface CompiledPixiMapStyle extends MapStyleCompiledBase {
     renderer: 'pixi'
     pixiProps: Partial<MapPixiPreviewProps>
+}
+
+// ============ Shader 插件系统类型定义 ============
+
+export interface ShaderRenderContext {
+    scene: {
+        shapes: Array<{ polygon: [number, number][] }>
+        canvas: { width: number; height: number }
+    }
+    // 预计算的纹理资源
+    distanceField?: unknown  // Pixi Texture，避免循环依赖先用 unknown
+    landMask?: unknown
+}
+
+export interface ShaderRenderer {
+    type: 'shader'
+    // 创建 Pixi Filter 或自定义 Mesh
+    filter: unknown  // Pixi Filter
+    // 更新 shader uniform（场景数据、参数变化时调用）
+    update?: (context: ShaderRenderContext) => void
+}
+
+export interface CanvasRenderer {
+    type: 'canvas'
+    // Canvas 2D 渲染函数
+    render: (ctx: CanvasRenderingContext2D, context: ShaderRenderContext) => void
+}
+
+export type PluginRenderer = ShaderRenderer | CanvasRenderer
+
+export interface PixiPluginImplementation {
+    id: PixiDecorationPluginId | PixiEffectPluginId
+    pluginType: 'decoration' | 'effect'
+    defaultImplementation: 'canvas' | 'shader'
+    // 创建渲染器的工厂函数
+    createRenderer: (params: MapStyleParameterRecord, impl: 'canvas' | 'shader') => PluginRenderer | null
 }

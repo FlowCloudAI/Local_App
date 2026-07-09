@@ -8,7 +8,7 @@ pixiOverlayLog('MODULE_INIT: extend called for Container, Graphics, Sprite, Text
 import type {ReactNode} from 'react'
 import {useEffect, useMemo, useState} from 'react'
 import type {TextStyleOptions} from 'pixi.js'
-import {Texture} from 'pixi.js'
+import {Filter, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
 import type {MapPixiPreviewOverlayContext, MapPreviewKeyLocation, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {
@@ -17,6 +17,7 @@ import type {
     PixiEffectPluginId,
     PixiLabelRule,
     PixiMapStyle,
+    ShaderRenderContext,
 } from './types'
 import {hexToRgbaColor, isMapDebugLogEnabled, mapRenderScale, strokeToRgbaColor} from '../common'
 import {
@@ -26,6 +27,7 @@ import {
     type PixiBrushAssetId,
     type PixiCompassAssetId,
 } from './assets'
+import {shaderRegistry} from './shaderRegistry'
 
 function pixiOverlayLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -627,21 +629,161 @@ function useImageTexture(url: string): Texture {
     return texture
 }
 
-function PixiTextureOverlay({context, style}: { context: MapPixiPreviewOverlayContext; style: PixiMapStyle }) {
+/**
+ * Shader 模式的 Overlay 渲染
+ *
+ * 使用 Pixi Filter 渲染各种效果，避免 Canvas 2D 的性能瓶颈
+ */
+function PixiShaderOverlay({
+    context,
+    style,
+    shaderContext,
+}: {
+    context: MapPixiPreviewOverlayContext
+    style: PixiMapStyle
+    shaderContext: {
+        useShader: boolean
+        distanceField?: unknown
+        landMask?: unknown
+    }
+}) {
+    pixiOverlayLog('PixiShaderOverlay: ENTER')
+
+    // 收集所有需要渲染的插件
+    const filters = useMemo(() => {
+        const result: Filter[] = []
+
+        // 构建 ShaderRenderContext
+        const renderContext: ShaderRenderContext = {
+            scene: {
+                shapes: context.scene.shapes,
+                canvas: context.scene.canvas,
+            },
+            distanceField: shaderContext.distanceField,
+            landMask: shaderContext.landMask,
+        }
+
+        // 处理 decorations
+        if (style.decorations) {
+            for (const decoration of style.decorations) {
+                const plugin = shaderRegistry.get(decoration.id)
+                if (!plugin) {
+                    pixiOverlayLog(`PixiShaderOverlay: plugin not found: ${decoration.id}`)
+                    continue
+                }
+
+                const impl = decoration.implementation ?? 'auto'
+                const useShaderForThis = impl === 'shader' || (impl === 'auto' && plugin.defaultImplementation === 'shader')
+
+                if (useShaderForThis) {
+                    const renderer = plugin.createRenderer(decoration.params ?? {}, 'shader')
+                    if (renderer && renderer.type === 'shader') {
+                        // 更新 shader uniform
+                        if (renderer.update) {
+                            renderer.update(renderContext)
+                        }
+                        result.push(renderer.filter as Filter)
+                        pixiOverlayLog(`PixiShaderOverlay: added shader for ${decoration.id}`)
+                    }
+                }
+            }
+        }
+
+        // 处理 effects
+        if (style.effects) {
+            for (const effect of style.effects) {
+                const plugin = shaderRegistry.get(effect.id)
+                if (!plugin) {
+                    pixiOverlayLog(`PixiShaderOverlay: plugin not found: ${effect.id}`)
+                    continue
+                }
+
+                const impl = effect.implementation ?? 'auto'
+                const useShaderForThis = impl === 'shader' || (impl === 'auto' && plugin.defaultImplementation === 'shader')
+
+                if (useShaderForThis) {
+                    const renderer = plugin.createRenderer(effect.params ?? {}, 'shader')
+                    if (renderer && renderer.type === 'shader') {
+                        // 更新 shader uniform
+                        if (renderer.update) {
+                            renderer.update(renderContext)
+                        }
+                        result.push(renderer.filter as Filter)
+                        pixiOverlayLog(`PixiShaderOverlay: added shader for ${effect.id}`)
+                    }
+                }
+            }
+        }
+
+        pixiOverlayLog(`PixiShaderOverlay: collected ${result.length} filters`)
+        return result
+    }, [context.scene, style.decorations, style.effects, shaderContext, shaderRegistry])
+
+    if (filters.length === 0) {
+        pixiOverlayLog('PixiShaderOverlay: EXIT (no filters)')
+        return null
+    }
+
+    pixiOverlayLog(`PixiShaderOverlay: RETURN pixiContainer with ${filters.length} filters`)
+
+    // 使用 Container + Graphics 来应用 filters
+    // Graphics 绘制一个透明矩形占位，让 filters 生效
+    return (
+        <pixiContainer filters={filters}>
+            <pixiGraphics
+                draw={(g: Graphics) => {
+                    g.clear()
+                    g.rect(0, 0, context.scene.canvas.width, context.scene.canvas.height)
+                    g.fill({ color: 0x000000, alpha: 0 })
+                }}
+            />
+        </pixiContainer>
+    )
+}
+
+function PixiTextureOverlay({
+    context,
+    style,
+    shaderContext,
+}: {
+    context: MapPixiPreviewOverlayContext
+    style: PixiMapStyle
+    shaderContext?: {
+        useShader: boolean
+        distanceField?: unknown
+        landMask?: unknown
+    }
+}) {
     pixiOverlayLog('PixiTextureOverlay: ENTER')
+
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
     // createOverlayDataUrl（整块画布 toDataURL + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
     const dataUrl = useMemo(
-        () => createOverlayDataUrl(context, style),
+        () => {
+            // 如果使用 shader 模式，不需要生成 Canvas data URL
+            if (shaderContext?.useShader && shaderContext.distanceField && shaderContext.landMask) {
+                return null
+            }
+            return createOverlayDataUrl(context, style)
+        },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [context.scene.shapes, context.scene.canvas.width, context.scene.canvas.height, style],
+        [context.scene.shapes, context.scene.canvas.width, context.scene.canvas.height, style, shaderContext?.useShader],
     )
+
     pixiOverlayLog(`PixiTextureOverlay: useMemo dataUrl=${dataUrl ? 'present' : 'empty'}`)
-    const texture = useImageTexture(dataUrl)
+    const texture = useImageTexture(dataUrl ?? '')
     pixiOverlayLog(`PixiTextureOverlay: useImageTexture returned texture=${texture !== Texture.EMPTY ? 'loaded' : 'empty'}`)
-    pixiOverlayLog(`PixiTextureOverlay: dataUrl=${dataUrl ? 'present' : 'empty'} texture=${texture !== Texture.EMPTY ? 'loaded' : 'empty'}`)
+
+    // 如果使用 shader 模式，则返回 shader 渲染
+    if (shaderContext?.useShader && shaderContext.distanceField && shaderContext.landMask) {
+        pixiOverlayLog('PixiTextureOverlay: using shader mode')
+        return <PixiShaderOverlay context={context} style={style} shaderContext={shaderContext} />
+    }
+
+    // 否则使用传统的 Canvas 2D 模式
+    pixiOverlayLog('PixiTextureOverlay: using canvas mode')
 
     if (!dataUrl) {
         pixiOverlayLog('PixiTextureOverlay: EXIT early (no dataUrl)')
@@ -726,14 +868,21 @@ function PixiOverlayLabels({context, style}: { context: MapPixiPreviewOverlayCon
     )
 }
 
-export function createPixiOverlayRenderer(style: PixiMapStyle): PixiOverlayRenderer | undefined {
+export function createPixiOverlayRenderer(
+    style: PixiMapStyle,
+    shaderContext?: {
+        useShader: boolean
+        distanceField?: unknown
+        landMask?: unknown
+    }
+): PixiOverlayRenderer | undefined {
     const showCoastline = Boolean(style.coastline?.enabled && hasDecoration(style, 'coastline-outline'))
     const showCompass = hasDecoration(style, 'compass')
     const showEffects = Boolean(style.effects?.length)
     const showOverlayLabels = Boolean(style.labels.show && style.labels.renderer === 'overlay')
     const showTextureOverlay = showEffects || showCoastline || showCompass
 
-    pixiOverlayLog(`createPixiOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} labels=${showOverlayLabels}`)
+    pixiOverlayLog(`createPixiOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} labels=${showOverlayLabels} useShader=${shaderContext?.useShader ?? false}`)
 
     if (!showEffects && !showCoastline && !showCompass && !showOverlayLabels) return undefined
 
@@ -741,7 +890,7 @@ export function createPixiOverlayRenderer(style: PixiMapStyle): PixiOverlayRende
         pixiOverlayLog(`RENDER_FN: called showTextureOverlay=${showTextureOverlay} showOverlayLabels=${showOverlayLabels} sceneShapes=${context.scene.shapes.length} sceneKeyLocs=${context.scene.keyLocations.length} canvas=${context.scene.canvas.width}x${context.scene.canvas.height}`)
         return (
             <>
-                {showTextureOverlay && <PixiTextureOverlay context={context} style={style}/>}
+                {showTextureOverlay && <PixiTextureOverlay context={context} style={style} shaderContext={shaderContext}/>}
                 {showOverlayLabels && <PixiOverlayLabels context={context} style={style}/>}
             </>
         )
