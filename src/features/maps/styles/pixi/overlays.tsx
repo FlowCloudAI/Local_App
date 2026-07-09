@@ -6,7 +6,7 @@ extend({Container, Graphics, Sprite, Text})
 pixiOverlayLog('MODULE_INIT: extend called for Container, Graphics, Sprite, Text')
 
 import type {ReactNode} from 'react'
-import {useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useState} from 'react'
 import type {TextStyleOptions} from 'pixi.js'
 import {Filter, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
@@ -27,7 +27,7 @@ import {
     type PixiBrushAssetId,
     type PixiCompassAssetId,
 } from './assets'
-import {shaderRegistry} from './shaderRegistry'
+import {parseColorToVec3, shaderRegistry} from './shaderRegistry'
 
 function pixiOverlayLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -545,6 +545,9 @@ function createOverlayCanvas(context: MapPixiPreviewOverlayContext, style: PixiM
 
     for (const effect of style.effects ?? []) {
         if (!isEffectPluginId(effect.id)) continue
+        // 色彩老化由独立的 multiply 混合层处理（见 PixiChromaticAgeingLayer）：
+        // 在透明叠加 canvas 上画 multiply 不与下方场景发生混合，只会退化成一层平铺色纱。
+        if (effect.id === 'chromatic-ageing') continue
         drawPixiEffectAsset({
             ctx,
             asset: effect.id,
@@ -790,6 +793,37 @@ function PixiTextureOverlay({
     )
 }
 
+/**
+ * 色彩老化（chromatic-ageing）：整幅暖褐正片叠底，统一压暗提黄做旧。
+ * 必须作为独立 Pixi 图层用 blendMode='multiply' 与下方场景真正混合——
+ * 画进透明叠加 canvas 的 multiply 不会作用到场景，只会退化成一层平铺色纱。
+ * alpha 控制强度：result = dest * mix(1, color, alpha)。
+ */
+function PixiChromaticAgeingLayer({context, style}: {
+    context: MapPixiPreviewOverlayContext
+    style: PixiMapStyle
+}) {
+    const effect = style.effects?.find(item => item.id === 'chromatic-ageing')
+    const width = context.scene.canvas.width
+    const height = context.scene.canvas.height
+    const opacity = Math.max(0, Math.min(1, getNumberParam(effect?.params?.opacity, 0.08)))
+    const [r, g, b] = parseColorToVec3(
+        getStringParam(effect?.params?.color, 'rgba(139, 83, 28, 1)'),
+        [139 / 255, 83 / 255, 28 / 255],
+    )
+    const colorHex = (Math.round(r * 255) << 16) + (Math.round(g * 255) << 8) + Math.round(b * 255)
+
+    const draw = useCallback((graphics: Graphics) => {
+        graphics.clear()
+        graphics.rect(0, 0, width, height)
+        graphics.fill({color: colorHex})
+    }, [width, height, colorHex])
+
+    if (!effect || opacity <= 0 || width <= 0 || height <= 0) return null
+
+    return <pixiGraphics blendMode="multiply" alpha={opacity} draw={draw}/>
+}
+
 function PixiOverlayLabel({
                               context,
                               location,
@@ -869,6 +903,7 @@ export function createPixiOverlayRenderer(
     const showEffects = Boolean(style.effects?.length)
     const showOverlayLabels = Boolean(style.labels.show && style.labels.renderer === 'overlay')
     const showTextureOverlay = showEffects || showCoastline || showCompass
+    const showAgeing = Boolean(style.effects?.some(effect => effect.id === 'chromatic-ageing'))
 
     pixiOverlayLog(`createPixiOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} labels=${showOverlayLabels} useShader=${shaderContext?.useShader ?? false}`)
 
@@ -879,6 +914,7 @@ export function createPixiOverlayRenderer(
         return (
             <>
                 {showTextureOverlay && <PixiTextureOverlay context={context} style={style} shaderContext={shaderContext}/>}
+                {showAgeing && <PixiChromaticAgeingLayer context={context} style={style}/>}
                 {showOverlayLabels && <PixiOverlayLabels context={context} style={style}/>}
             </>
         )
