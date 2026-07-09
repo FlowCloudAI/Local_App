@@ -24,7 +24,6 @@ in vec2 vUV;
 out vec4 finalColor;
 
 uniform vec2 uCanvasSize;
-uniform float uDfRange;
 uniform float uDensity;
 uniform vec3 uDarkColor;
 uniform vec3 uLightColor;

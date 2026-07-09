@@ -8,7 +8,7 @@ pixiOverlayLog('MODULE_INIT: extend called for Container, Graphics, Mesh, Sprite
 import type {ReactNode} from 'react'
 import {useCallback, useEffect, useMemo, useState} from 'react'
 import type {TextStyleOptions, TextureShader} from 'pixi.js'
-import {MeshGeometry, Texture} from 'pixi.js'
+import {BufferImageSource, MeshGeometry, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
 import type {MapPixiPreviewOverlayContext, MapPreviewKeyLocation, MapRgbaColor} from '../../components/MapShapeEditor'
 import type {
@@ -30,7 +30,8 @@ import {
     type PixiCompassAssetId,
 } from './assets'
 import {parseColorToVec3, shaderRegistry} from './shaderRegistry'
-import {createCoastFieldCanvas} from './utils'
+import type {CoastFieldData} from './utils'
+import {createCoastFieldData} from './utils'
 
 function pixiOverlayLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -647,6 +648,50 @@ function useCanvasTexture(canvas: HTMLCanvasElement | null): Texture {
 }
 
 /**
+ * 海岸场纹理：RG16F 半浮点有符号距离（R=距离，>0 海侧 <0 陆侧）。
+ * 半浮点线性过滤是 WebGL2 核心能力；RG（4 字节/texel）保证任意宽度下
+ * 行距 4 字节对齐（Pixi 上传不改 UNPACK_ALIGNMENT，R16F 奇数宽度会错位）。
+ * 生命周期与 useCanvasTexture 同模式：替换/卸载后延迟销毁。
+ */
+function useCoastFieldTexture(field: CoastFieldData | null): Texture {
+    const [texture, setTexture] = useState<Texture>(Texture.EMPTY)
+
+    useEffect(() => {
+        if (!field) {
+            setTexture(Texture.EMPTY)
+            return
+        }
+
+        try {
+            const source = new BufferImageSource({
+                resource: field.data,
+                width: field.width,
+                height: field.height,
+                format: 'rg16float',
+                alphaMode: 'no-premultiply-alpha',
+                scaleMode: 'linear',
+                label: 'map-coast-field',
+            })
+            setTexture(new Texture({source}))
+            pixiOverlayLog(`useCoastFieldTexture: created ${field.width}x${field.height}`)
+        } catch (e) {
+            pixiOverlayLog(`useCoastFieldTexture: failed ${e instanceof Error ? e.message : String(e)}`)
+            setTexture(Texture.EMPTY)
+        }
+    }, [field])
+
+    useEffect(() => {
+        return () => {
+            if (texture !== Texture.EMPTY && !texture.destroyed) {
+                texture.destroy(true)
+            }
+        }
+    }, [texture])
+
+    return texture
+}
+
+/**
  * Shader 模式的 Overlay 渲染
  *
  * 每个插件是一个覆盖场景的 Mesh 四边形（场景坐标 + UV=场景归一化坐标），
@@ -760,12 +805,12 @@ function PixiTextureOverlay({
     // 海岸场：CPU 精确 EDT（场景分辨率，一次性数十 ms），只在 shapes/尺寸变化时重算。
     // 生成失败（无有效陆地 / 环境不支持）时整体回退 Canvas 位图路径。
     const wantShader = Boolean(shaderContext?.useShader)
-    const coastFieldCanvas = useMemo(
-        () => (wantShader ? createCoastFieldCanvas(shapes, sceneW, sceneH) : null),
+    const coastFieldData = useMemo(
+        () => (wantShader ? createCoastFieldData(shapes, sceneW, sceneH) : null),
         [wantShader, shapes, sceneW, sceneH],
     )
-    const coastField = useCanvasTexture(coastFieldCanvas)
-    const shaderActive = wantShader && coastFieldCanvas !== null
+    const coastField = useCoastFieldTexture(coastFieldData)
+    const shaderActive = wantShader && coastFieldData !== null
 
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进

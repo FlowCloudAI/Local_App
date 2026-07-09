@@ -149,7 +149,7 @@ export interface ShaderRenderContext {
     }
     /**
      * 海岸场纹理（Pixi Texture，避免循环依赖用 unknown）：
-     * R=到海岸线距离（归一到 COAST_FIELD_RANGE_PX），G=陆地遮罩。
+     * RG16F，R=有符号海岸距离（场景像素，>0 海侧 <0 陆侧），G=保留。
      */
     coastField?: unknown
 }

@@ -26,8 +26,7 @@ uniform float uEdgeOpacity;
 ${coastFieldGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    float dist = coastDistance(field); // 两侧皆为到海岸线的无符号距离
+    float dist = abs(coastSd(vUV)); // 两侧皆为到海岸线的无符号距离
 
     float halfW = uEdgeWidth * 0.5;
     float alpha = uEdgeOpacity * (1.0 - smoothstep(halfW - 0.75, halfW + 0.75, dist));

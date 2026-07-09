@@ -27,10 +27,10 @@ uniform float uShadowOpacity;
 ${coastFieldGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    if (field.g < 0.5) discard; // 只在陆地侧
+    float sd = coastSd(vUV);
+    if (sd >= 0.0) discard; // 只在陆地侧
 
-    float dist = coastDistance(field);
+    float dist = -sd;
     if (dist > uBandWidth) discard;
 
     float alpha = uShadowOpacity * (1.0 - smoothstep(0.0, uBandWidth, dist));

@@ -20,7 +20,6 @@ in vec2 vUV;
 out vec4 finalColor;
 
 uniform vec2 uCanvasSize;
-uniform float uDfRange;
 uniform vec3 uVignetteColor;
 uniform float uInner;
 uniform float uVignetteOpacity;

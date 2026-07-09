@@ -32,10 +32,10 @@ ${coastFieldGlsl}
 ${valueNoiseGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    if (field.g < 0.5) discard; // 陆地侧行笔
+    float sd = coastSd(vUV);
+    if (sd >= 0.0) discard; // 陆地侧行笔
 
-    float dist = coastDistance(field);
+    float dist = -sd;
     vec2 pos = vUV * uCanvasSize;
 
     // 提按：低频宽度扰动

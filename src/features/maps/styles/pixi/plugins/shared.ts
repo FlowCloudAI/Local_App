@@ -16,7 +16,6 @@
  */
 
 import {GlProgram, Shader, Texture, UniformGroup} from 'pixi.js'
-import {COAST_FIELD_RANGE_PX} from '../utils'
 import type {ShaderRenderContext} from '../types'
 
 /** 场景四边形顶点着色器。uProjection/uWorldTransform 由 Pixi 全局组注入，uTransform 为 Mesh 本地组。 */
@@ -58,13 +57,15 @@ float vnoise(vec2 p) {
 }
 `
 
-/** 海岸场采样声明：dist 单位为场景像素，isLand 为 0/1（边界处线性过渡）。 */
+/**
+ * 海岸场采样声明：RG16F 有符号距离（场景像素），>0 海侧，<0 陆侧。
+ * 半浮点 + 硬件双线性 → 亚像素精度；8-bit 距离场的 1px 量化是放大出块的根源。
+ */
 export const coastFieldGlsl = `
 uniform sampler2D uCoastField;
-uniform float uDfRange;
 
-float coastDistance(vec4 field) {
-    return field.r * uDfRange;
+float coastSd(vec2 uv) {
+    return texture(uCoastField, uv).r;
 }
 `
 
@@ -76,7 +77,7 @@ export interface SceneQuadShaderOptions {
     /** 程序名（进 Pixi 程序缓存 key 与调试信息） */
     name: string
     fragment: string
-    /** 插件自有 uniform；uCanvasSize / uDfRange 自动注入 */
+    /** 插件自有 uniform；uCanvasSize 自动注入 */
     uniforms?: SceneQuadUniformRecord
     /** 声明使用海岸场纹理（fragment 里需引入 coastFieldGlsl） */
     useCoastField?: boolean
@@ -91,7 +92,6 @@ export function createSceneQuadShader({name, fragment, uniforms, useCoastField}:
     const resources: Record<string, unknown> = {
         styleUniforms: new UniformGroup({
             uCanvasSize: {value: [1, 1], type: 'vec2<f32>'},
-            uDfRange: {value: COAST_FIELD_RANGE_PX, type: 'f32'},
             ...(uniforms ?? {}),
         }),
     }

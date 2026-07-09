@@ -45,10 +45,10 @@ ${coastFieldGlsl}
 ${hashGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    if (field.g > 0.5) discard; // 只处理海洋侧
+    float sd = coastSd(vUV);
+    if (sd <= 0.0) discard; // 只处理海洋侧
 
-    float dist = coastDistance(field);
+    float dist = sd;
     vec2 pos = vUV * uCanvasSize;
 
     // 1) 海水深浅：已越过 covered 条晕线 → 台阶式加深；近岸按 uShallowFade 减淡

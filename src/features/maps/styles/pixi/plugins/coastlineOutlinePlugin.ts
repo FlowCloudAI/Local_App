@@ -30,10 +30,10 @@ uniform float uHatchOpacity;
 ${coastFieldGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    if (field.g > 0.5) discard; // 只画海洋侧
+    float sd = coastSd(vUV);
+    if (sd <= 0.0) discard; // 只画海洋侧
 
-    float dist = coastDistance(field);
+    float dist = sd;
     float ring = floor(dist / uGap + 0.5); // 最近的晕线序号
     if (ring < 1.0 || ring > uRings) discard;
 

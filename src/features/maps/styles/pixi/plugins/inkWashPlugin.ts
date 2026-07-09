@@ -27,10 +27,10 @@ uniform float uLayers;
 ${coastFieldGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    if (field.g < 0.5) discard; // 只在陆地侧
+    float sd = coastSd(vUV);
+    if (sd >= 0.0) discard; // 只在陆地侧
 
-    float dist = coastDistance(field);
+    float dist = -sd;
     if (dist > uWashWidth * 1.2) discard;
 
     float totalAlpha = 0.0;

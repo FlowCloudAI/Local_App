@@ -27,8 +27,7 @@ uniform float uInkOpacity;
 ${coastFieldGlsl}
 
 void main() {
-    vec4 field = texture(uCoastField, vUV);
-    float dist = coastDistance(field);
+    float dist = abs(coastSd(vUV)); // 两侧皆为到海岸线的无符号距离
 
     // 中心浓、向外柔和衰减；总有效半径 = 半宽 + 晕开距离
     float radius = uBleedWidth * 0.5 + uBleedBlur;
