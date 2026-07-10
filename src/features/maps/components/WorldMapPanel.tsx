@@ -800,7 +800,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             return
         }
         if (draft.shapes.length > 0 && !validation.isValid) {
-            setErrorMsg('当前地图草稿存在无效图形或地点，请先补完绘制或修正关联后再保存。')
+            setErrorMsg('当前地图草稿存在无效图形或地点，请先补完绘制或修正字段后再保存。')
             return
         }
         const existing = maps.find(m => m.id === activeMapId)
@@ -859,15 +859,15 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     const requestDeleteShape = useCallback(async (shapeId: string) => {
         const target = draft.shapes.find(shape => shape.id === shapeId)
         const confirmed = await showAlert(
-            `确认删除图形“${target?.name ?? '未命名图形'}”？相关关键地点也会一并移除。`,
+            `确认删除图形“${target?.name ?? '未命名图形'}”？关键地点会保留在原位置。`,
             'warning',
             'confirm',
         )
         if (confirmed !== 'yes') return
 
         updateDraft(d => ({
+            ...d,
             shapes: d.shapes.filter(s => s.id !== shapeId),
-            keyLocations: d.keyLocations.filter(l => l.shapeId !== shapeId),
         }))
         setSelectedShapeId(id => (id === shapeId ? null : id))
     }, [draft.shapes, showAlert, updateDraft])
@@ -1030,13 +1030,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         }))
     }, [selectedLocationId, updateDraft])
 
-    const updateSelectedLocationShapeId = useCallback((shapeId: string | null) => {
-        updateDraft(d => ({
-            ...d,
-            keyLocations: d.keyLocations.map(l => (l.id === selectedLocationId ? {...l, shapeId} : l)),
-        }))
-    }, [selectedLocationId, updateDraft])
-
     const updateSelectedLocationLinkedEntryId = useCallback((entryId: string | null) => {
         const linkedEntry = entryOptions.find(entry => entry.id === entryId) ?? null
         updateDraft(d => ({
@@ -1155,7 +1148,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             type: '标记点',
             x: cx,
             y: cy,
-            shapeId: relatedShape?.id ?? null,
         }
         updateDraft(d => ({...d, keyLocations: [...d.keyLocations, loc]}))
         setSelectedLocationId(loc.id)
@@ -1814,14 +1806,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                 <label>类型</label>
                                 <input value={selectedLocation.type}
                                        onChange={e => updateSelectedLocation('type', e.target.value)}/>
-                            </div>
-                            <div className="wm-field">
-                                <label>关联图形</label>
-                                <select value={selectedLocation.shapeId ?? ''}
-                                        onChange={e => updateSelectedLocationShapeId(e.target.value || null)}>
-                                    <option value="">未关联</option>
-                                    {draft.shapes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
                             </div>
                             <div className="wm-field">
                                 <label>关联词条</label>

@@ -1,9 +1,9 @@
 use crate::settings::SearchSourceSettings;
 use anyhow::Result;
 use ego_tree::NodeRef;
-use futures::StreamExt;
 use flowcloudai_client::llm::types::ToolFunctionArg;
 use flowcloudai_client::tool::{ToolRegistry, arg_str};
+use futures::StreamExt;
 use moka::future::Cache;
 use scraper::{Html, Node, Selector};
 use serde::Deserialize;

@@ -1,4 +1,4 @@
-import {findPolygonSelfIntersections, getDistanceSquared, isPointInPolygon} from './geometry';
+import {findPolygonSelfIntersections, getDistanceSquared} from './geometry';
 import type {
     MapKeyLocationDraft,
     MapShapeDraft,
@@ -75,11 +75,9 @@ function validateShape(shape: MapShapeDraft) {
 
 function validateKeyLocation(
     location: MapKeyLocationDraft,
-    shapes: MapShapeDraft[],
 ) {
     const issues: MapValidationIssue[] = [];
     const safeName = location.name.trim() || '未命名关键地点';
-    const relatedShape = shapes.find(shape => shape.id === location.shapeId);
 
     if (!location.name.trim()) {
         issues.push(createIssue({
@@ -101,33 +99,6 @@ function validateKeyLocation(
         }));
     }
 
-    if (!location.shapeId) {
-        issues.push(createIssue({
-            code: 'key_location_shape_required',
-            severity: 'error',
-            source: 'keyLocation',
-            keyLocationId: location.id,
-            message: `关键地点「${safeName}」必须关联一个图形。`,
-        }));
-    } else if (!relatedShape) {
-        issues.push(createIssue({
-            code: 'key_location_shape_missing',
-            severity: 'error',
-            source: 'keyLocation',
-            keyLocationId: location.id,
-            message: `关键地点「${safeName}」关联的图形不存在，请重新选择关联图形。`,
-        }));
-    } else if (!isPointInPolygon({x: location.x, y: location.y}, relatedShape.vertices)) {
-        issues.push(createIssue({
-            code: 'key_location_outside_shape',
-            severity: 'error',
-            source: 'keyLocation',
-            keyLocationId: location.id,
-            shapeId: relatedShape.id,
-            message: `关键地点「${safeName}」未落在关联图形「${relatedShape.name}」内，请调整位置或关联关系。`,
-        }));
-    }
-
     return {
         keyLocationId: location.id,
         issues,
@@ -140,7 +111,7 @@ export function validateMapEditorDraft(
     options?: { hasDrawingShapeInProgress?: boolean },
 ): MapValidationResult {
     const shapeResults = draft.shapes.map(shape => validateShape(shape));
-    const keyLocationResults = draft.keyLocations.map(location => validateKeyLocation(location, draft.shapes));
+    const keyLocationResults = draft.keyLocations.map(location => validateKeyLocation(location));
     const draftIssues: MapValidationIssue[] = [];
 
     if (draft.shapes.length === 0) {

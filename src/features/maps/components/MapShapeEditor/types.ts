@@ -41,6 +41,7 @@ export interface MapKeyLocationDraft extends MapShapeExtensible {
     type: string;
     x: number;
     y: number;
+    /** @deprecated 旧数据兼容字段；关键点跟随图形现在按空间包含自动派生。 */
     shapeId?: string | null;
     bizId?: string | null;
 }
@@ -118,6 +119,7 @@ export interface MapPreviewKeyLocation extends MapShapeExtensible {
     name: string;
     type: string;
     position: [number, number];
+    /** @deprecated 旧数据兼容字段；渲染与编辑不再要求显式关联。 */
     shapeId?: string | null;
     color: MapRgbaColor;
     icon?: MapPreviewKeyLocationIcon | null;
@@ -183,9 +185,6 @@ export type MapValidationCode =
     | 'shape_self_intersection'
     | 'key_location_name_required'
     | 'key_location_type_required'
-    | 'key_location_shape_required'
-    | 'key_location_shape_missing'
-    | 'key_location_outside_shape'
     | 'draft_no_shape'
     | 'draft_shape_drawing_in_progress';
 

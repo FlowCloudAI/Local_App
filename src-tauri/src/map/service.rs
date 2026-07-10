@@ -14,7 +14,7 @@ use crate::map::types::{
     MapShapeSaveRequest, MapShapeSaveResponse, MapShapeVertex,
 };
 use chrono::Utc;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 pub fn save_map_shape_scene(
@@ -93,13 +93,6 @@ fn validate_request(
     validate_meta(request.meta.as_ref(), &mut field_errors);
     validate_id_uniqueness(request, &mut field_errors);
 
-    let shape_index = request
-        .shapes
-        .iter()
-        .enumerate()
-        .map(|(index, shape)| (shape.id.clone(), index))
-        .collect::<HashMap<_, _>>();
-
     if request.shapes.is_empty() {
         field_errors.push(field_error(
             "shapes",
@@ -113,13 +106,7 @@ fn validate_request(
     }
 
     for (location_index, location) in request.key_locations.iter().enumerate() {
-        validate_key_location(
-            location,
-            location_index,
-            &request.shapes,
-            &shape_index,
-            &mut field_errors,
-        );
+        validate_key_location(location, location_index, &mut field_errors);
     }
 
     if field_errors.is_empty() {
@@ -326,8 +313,6 @@ fn validate_shape(
 fn validate_key_location(
     location: &MapKeyLocationDraft,
     location_index: usize,
-    shapes: &[MapShapeDraft],
-    shape_index: &HashMap<String, usize>,
     field_errors: &mut Vec<MapShapeFieldError>,
 ) {
     let safe_name = safe_location_name(location);
@@ -355,41 +340,6 @@ fn validate_key_location(
             &format!("关键地点「{safe_name}」缺少类型。"),
         ));
     }
-
-    let Some(shape_id) = location.shape_id.as_deref() else {
-        field_errors.push(field_error(
-            &format!("keyLocations[{location_index}].shapeId"),
-            "key_location_shape_required",
-            &format!("关键地点「{safe_name}」必须关联一个图形。"),
-        ));
-        return;
-    };
-
-    let Some(index) = shape_index.get(shape_id) else {
-        field_errors.push(field_error(
-            &format!("keyLocations[{location_index}].shapeId"),
-            "key_location_shape_missing",
-            &format!("关键地点「{safe_name}」关联的图形不存在，请重新选择关联图形。"),
-        ));
-        return;
-    };
-
-    let related_shape = &shapes[*index];
-    let point = MapShapeVertex {
-        id: location.id.clone(),
-        x: location.x,
-        y: location.y,
-    };
-    if !is_point_in_polygon(&point, &related_shape.vertices) {
-        field_errors.push(field_error(
-            &format!("keyLocations[{location_index}].shapeId"),
-            "key_location_outside_shape",
-            &format!(
-                "关键地点「{safe_name}」未落在关联图形「{}」内，请调整位置或关联关系。",
-                safe_shape_name(related_shape)
-            ),
-        ));
-    }
 }
 
 fn build_preview_shapes(
@@ -413,7 +363,14 @@ fn build_preview_shapes(
             );
             let related_locations = key_locations
                 .iter()
-                .filter(|location| location.shape_id.as_deref() == Some(shape.id.as_str()))
+                .filter(|location| {
+                    let point = MapShapeVertex {
+                        id: location.id.clone(),
+                        x: location.x,
+                        y: location.y,
+                    };
+                    is_point_in_polygon(&point, &shape.vertices)
+                })
                 .cloned()
                 .collect::<Vec<_>>();
 
@@ -537,7 +494,7 @@ mod tests {
                 r#type: "入口".to_string(),
                 x: 260.0,
                 y: 180.0,
-                shape_id: Some("shape-1".to_string()),
+                shape_id: None,
                 biz_id: None,
                 ext: None,
             }],
@@ -565,19 +522,13 @@ mod tests {
     }
 
     #[test]
-    fn save_map_shape_scene_rejects_invalid_key_location() {
+    fn save_map_shape_scene_accepts_key_location_outside_shapes() {
         let mut request = build_request();
         request.key_locations[0].x = 50.0;
         request.key_locations[0].y = 50.0;
 
-        let error = save_map_shape_scene(request).expect_err("should fail");
-        assert_eq!(error.code, "MAP_SHAPE_VALIDATION_FAILED");
-        assert!(
-            error
-                .field_errors
-                .unwrap_or_default()
-                .iter()
-                .any(|item| item.code == "key_location_outside_shape")
-        );
+        let response = save_map_shape_scene(request).expect("should allow free key locations");
+        assert_eq!(response.scene.key_locations.len(), 1);
+        assert_eq!(response.scene.key_locations[0].position, [50.0, 50.0]);
     }
 }

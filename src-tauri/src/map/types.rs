@@ -228,6 +228,7 @@ pub struct MapKeyLocationDraft {
     pub r#type: String,
     pub x: f64,
     pub y: f64,
+    /// 旧数据兼容字段；关键地点归属图形由空间包含关系派生，不再要求显式关联。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -302,6 +303,7 @@ pub struct MapPreviewKeyLocation {
     pub name: String,
     pub r#type: String,
     pub position: [f64; 2],
+    /// 旧数据兼容字段；渲染与编辑不再要求显式关联。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape_id: Option<String>,
     pub color: DeckColor,

@@ -165,7 +165,7 @@ fn v2_keeps_key_location_inside() {
         r#type: "入口".to_string(),
         x: 200.0,
         y: 180.0,
-        shape_id: Some("shape-v2".to_string()),
+        shape_id: None,
         biz_id: None,
         ext: None,
     };

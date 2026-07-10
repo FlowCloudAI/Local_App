@@ -754,7 +754,7 @@ mod tests {
                 r#type: "入口".to_string(),
                 x: 260.0,
                 y: 180.0,
-                shape_id: Some("shape-1".to_string()),
+                shape_id: None,
                 biz_id: None,
                 ext: None,
             }],

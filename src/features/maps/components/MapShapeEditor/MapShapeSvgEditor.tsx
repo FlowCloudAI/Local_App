@@ -21,6 +21,7 @@ import {
     updateShapeTranslation,
     updateVertex,
 } from './mapShapeEditorSvgUtils';
+import {isPointInPolygon} from './geometry';
 import './MapShapeEditor.css';
 
 const LOCATION_DRAG_THRESHOLD = 4;
@@ -388,7 +389,7 @@ export function MapShapeSvgEditor({
             startPoint: toSvgPoint(svgElement, event.clientX, event.clientY, canvas),
             originVertices: shape.vertices.map(vertex => ({...vertex})),
             originLocations: draft.keyLocations
-                .filter(location => location.shapeId === shape.id)
+                .filter(location => isPointInPolygon({x: location.x, y: location.y}, shape.vertices))
                 .map(location => ({id: location.id, x: location.x, y: location.y})),
         });
     };
