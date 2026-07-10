@@ -803,7 +803,7 @@ function PixiOverlayLabel({
         <pixiText
             text={location.name}
             x={location.position[0]}
-            y={location.position[1] - offsetY / scale}
+            y={location.position[1] + offsetY / scale}
             anchor={0.5}
             alpha={colorToAlpha(color)}
             scale={inverseScale}

@@ -648,6 +648,9 @@ export function MapShapeSvgEditor({
     };
 
     const zoomPercentage = Math.round((canvas.width / Math.max(viewBox.width, 1)) * 100);
+    const locationEditorScale = viewBox.width / Math.max(canvas.width, 1);
+    const locationHitRadius = 18 * locationEditorScale;
+    const locationHitOffsetY = -10 * locationEditorScale;
     const wrapperClassName = [
         'fc-map-shape-svg-editor',
         readOnly ? 'fc-map-shape-svg-editor--readonly' : '',
@@ -814,12 +817,10 @@ export function MapShapeSvgEditor({
                         >
                             <circle
                                 className="fc-map-shape-editor__key-location-core"
-                                r={10}
-                                fill="var(--fc-color-danger)"
+                                cy={locationHitOffsetY}
+                                r={locationHitRadius}
+                                vectorEffect="non-scaling-stroke"
                             />
-                            <text className="fc-map-shape-editor__key-location-label" x={0} y={-16} textAnchor="middle">
-                                {location.name}
-                            </text>
                         </g>
                     ))}
                 </svg>

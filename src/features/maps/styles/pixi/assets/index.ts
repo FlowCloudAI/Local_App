@@ -73,9 +73,9 @@ function makeFlatMarkerIcon(markerClass: MapMarkerClass, color: string): MapPrev
             case 'event':
                 return `<path d="M16 4L27 15L16 27L5 15Z" fill="${color}"/><path d="M16 9V17" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="16" cy="21" r="1.5" fill="#fff"/>`
             case 'ruin':
-                return `<path d="M5 25H27M9 24V11M16 24V8M23 24V13M7 11H13M14 8H21M21 13H27" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`
+                return `<circle cx="16" cy="15" r="12" fill="#fff" fill-opacity="0.94" stroke="${color}" stroke-opacity="0.24"/><path d="M5 25H27M9 24V11M16 24V8M23 24V13M7 11H13M14 8H21M21 13H27" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`
             case 'harbor':
-                return `<circle cx="16" cy="7" r="2.5" fill="none" stroke="${color}" stroke-width="2"/><path d="M16 10V25M9 14H23M7 19C8 25 12 27 16 27C20 27 24 25 25 19M7 19L11 18M25 19L21 18" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
+                return `<circle cx="16" cy="15" r="12" fill="#fff" fill-opacity="0.94" stroke="${color}" stroke-opacity="0.24"/><circle cx="16" cy="7" r="2.5" fill="none" stroke="${color}" stroke-width="2"/><path d="M16 10V25M9 14H23M7 19C8 25 12 27 16 27C20 27 24 25 25 19M7 19L11 18M25 19L21 18" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
             default:
                 return `<path d="M16 3C10.5 3 6 7.5 6 13C6 20 16 29 16 29C16 29 26 20 26 13C26 7.5 21.5 3 16 3Z" fill="#fff" stroke="${color}" stroke-width="2"/><circle cx="16" cy="13" r="4" fill="${color}"/>`
         }
@@ -147,6 +147,7 @@ function makeTolkienRuinIcon(color: string): MapPreviewKeyLocationIcon {
     return {
         url: svgToDataUrl(`
             <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
+                <circle cx="17" cy="17" r="14" fill="#f7e7bc" fill-opacity="0.92" stroke="${color}" stroke-width="0.8" stroke-opacity="0.3"/>
                 <path d="M7 28H29" stroke="${color}" stroke-width="1.4"/>
                 <path d="M10 28V11M17 28V8M24 28V13" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
                 <path d="M8 11H14M15 8H22M22 13H28" stroke="${color}" stroke-width="1.2" stroke-linecap="round"/>
@@ -194,6 +195,7 @@ function makeTolkienEventIcon(color: string): MapPreviewKeyLocationIcon {
     return {
         url: svgToDataUrl(`
             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="34" viewBox="0 0 32 34">
+                <circle cx="16" cy="17" r="14" fill="#f7e7bc" fill-opacity="0.92" stroke="${color}" stroke-width="0.8" stroke-opacity="0.3"/>
                 <path d="M9 29L23 8M23 29L9 8" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
                 <path d="M20 7L27 5L25 12ZM12 7L5 5L7 12Z" fill="#f7e7bc" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>
                 <path d="M6 29H12M20 29H26" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
@@ -210,6 +212,7 @@ function makeTolkienHarborIcon(color: string): MapPreviewKeyLocationIcon {
     return {
         url: svgToDataUrl(`
             <svg xmlns="http://www.w3.org/2000/svg" width="34" height="36" viewBox="0 0 34 36">
+                <circle cx="17" cy="17" r="14" fill="#f7e7bc" fill-opacity="0.92" stroke="${color}" stroke-width="0.8" stroke-opacity="0.3"/>
                 <circle cx="17" cy="7" r="2.5" fill="#f7e7bc" stroke="${color}" stroke-width="1.5"/>
                 <path d="M17 10V29M10 14H24M7 22C8 29 12 32 17 32C22 32 26 29 27 22M7 22L12 20M27 22L22 20" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M5 33C9 31 12 34 17 32C22 30 25 34 29 32" fill="none" stroke="${color}" stroke-width="0.9" stroke-opacity="0.55"/>
@@ -260,17 +263,17 @@ function makeInkClassIcon(markerClass: MapMarkerClass, color: string): MapPrevie
     const body = (() => {
         switch (markerClass) {
             case 'city':
-                return `<circle cx="14" cy="14" r="7" fill="none" stroke="${color}" stroke-width="2.2" stroke-opacity="0.86"/><circle cx="14.5" cy="13.5" r="3.2" fill="${color}" fill-opacity="0.82"/>`
+                return `<circle cx="14" cy="14" r="12" fill="#fbfaf7" fill-opacity="0.94" stroke="${color}" stroke-width="0.8" stroke-opacity="0.28"/><circle cx="14" cy="14" r="7" fill="none" stroke="${color}" stroke-width="2.2" stroke-opacity="0.86"/><circle cx="14.5" cy="13.5" r="3.2" fill="${color}" fill-opacity="0.82"/>`
             case 'town':
                 return `<circle cx="8" cy="16" r="3.2" fill="${color}" fill-opacity="0.78"/><circle cx="14" cy="11" r="3.8" fill="${color}" fill-opacity="0.9"/><circle cx="20" cy="16" r="3" fill="${color}" fill-opacity="0.7"/><path d="M5 21C10 19 17 22 23 20" stroke="${color}" stroke-width="1.4" stroke-linecap="round" stroke-opacity="0.55"/>`
             case 'landmark':
-                return `<path d="M4 22L11 11L15 16L19 7L25 22" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 23C12 21 18 24 24 21" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.5"/>`
+                return `<circle cx="14" cy="14" r="12" fill="#fbfaf7" fill-opacity="0.94" stroke="${color}" stroke-width="0.8" stroke-opacity="0.28"/><path d="M4 22L11 11L15 16L19 7L25 22" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 23C12 21 18 24 24 21" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.5"/>`
             case 'event':
                 return `<path d="M14 3L17 10L24 7L20 14L25 19L17 18L14 25L11 18L3 20L8 14L4 8L11 10Z" fill="${color}" fill-opacity="0.78"/><circle cx="14" cy="14" r="2.2" fill="#fff7ef" fill-opacity="0.78"/>`
             case 'ruin':
-                return `<path d="M5 23H24M8 22V11M14 22V7M20 22V13M7 11H11M12 7H18M19 13H24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.82"/>`
+                return `<circle cx="14" cy="14" r="12" fill="#fbfaf7" fill-opacity="0.94" stroke="${color}" stroke-width="0.8" stroke-opacity="0.28"/><path d="M5 23H24M8 22V11M14 22V7M20 22V13M7 11H11M12 7H18M19 13H24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.82"/>`
             case 'harbor':
-                return `<path d="M14 5V21M8 10H20M5 17C7 23 11 25 14 25C18 25 22 22 23 17" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/><path d="M4 25C9 22 12 27 17 24C21 22 24 25 26 24" fill="none" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.58"/>`
+                return `<circle cx="14" cy="14" r="12" fill="#fbfaf7" fill-opacity="0.94" stroke="${color}" stroke-width="0.8" stroke-opacity="0.28"/><path d="M14 5V21M8 10H20M5 17C7 23 11 25 14 25C18 25 22 22 23 17" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/><path d="M4 25C9 22 12 27 17 24C21 22 24 25 26 24" fill="none" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.58"/>`
             default:
                 return ''
         }

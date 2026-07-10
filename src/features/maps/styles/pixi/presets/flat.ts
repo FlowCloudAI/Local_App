@@ -61,9 +61,13 @@ export const flatPixiMapStyle: PixiMapStyle = {
     },
     labels: {
         show: true,
+        renderer: 'overlay',
         color: '#262b38',
         fontFamily: '"Microsoft YaHei UI", "PingFang SC", sans-serif',
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: '600',
+        offsetY: 18,
+        haloColor: 'rgba(255, 255, 255, 0.9)',
+        haloWidth: 3,
     },
 }
