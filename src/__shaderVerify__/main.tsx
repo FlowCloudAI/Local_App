@@ -10,7 +10,7 @@ import {StrictMode, useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles/pixi'
 import type {PixiMapStyle} from '../features/maps/styles/pixi'
-import {MapShapeViewport} from '../features/maps/components/MapShapeEditor'
+import {cloneMapShapeEditorDraft, MapShapeViewport} from '../features/maps/components/MapShapeEditor'
 import type {
     MapPreviewScene,
     MapShapeEditorDraft,
@@ -125,6 +125,7 @@ window.__harnessInfo = {
     shaderOn,
     editMode,
     hasOverlay: Boolean(compiled.pixiProps.renderOverlay),
+    hasGroundOverlay: Boolean(compiled.pixiProps.renderGroundOverlay),
 }
 
 const initialDraft: MapShapeEditorDraft = {
@@ -145,6 +146,10 @@ const initialDraft: MapShapeEditorDraft = {
         y: location.position[1],
     })),
     terrainStrokes: baseScene.terrainStrokes,
+}
+const clonedDraft = cloneMapShapeEditorDraft(initialDraft)
+if (clonedDraft.terrainStrokes?.[0]?.points === initialDraft.terrainStrokes?.[0]?.points) {
+    throw new Error('草稿克隆自检失败：地形笔画未深克隆')
 }
 
 function TerrainEditorHarness() {

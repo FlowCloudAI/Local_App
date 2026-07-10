@@ -6,7 +6,7 @@ extend({Container, Graphics, Mesh, Sprite, Text})
 pixiOverlayLog('MODULE_INIT: extend called for Container, Graphics, Mesh, Sprite, Text')
 
 import type {ReactNode} from 'react'
-import {useCallback, useEffect, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import type {TextStyleOptions, TextureShader} from 'pixi.js'
 import {BufferImageSource, MeshGeometry, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
@@ -558,26 +558,50 @@ function createOverlayCanvas(
 /**
  * canvas 直通纹理：跳过 toDataURL(PNG 同步编码) + new Image(异步解码) 往返——
  * 超采样大图一次编码可达数百 ms，是风格/场景变更时叠加层重建的最大单项开销。
- * skipCache=true（第二参）确保每次新建 TextureSource，避免 Pixi 全局缓存
- * 返回已被 destroy 的旧纹理。
+ * 输入 canvas 可以更换，但同尺寸时只拷贝到持久 canvas 并原地更新 TextureSource，
+ * 避免高频涂画期间销毁/重建 GPU 纹理。
  */
 function useCanvasTexture(canvas: HTMLCanvasElement | null): Texture {
     const [texture, setTexture] = useState<Texture>(Texture.EMPTY)
+    const resourceCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
     useEffect(() => {
         if (!canvas) {
-            setTexture(Texture.EMPTY)
+            const resourceCanvas = resourceCanvasRef.current
+            if (resourceCanvas && texture !== Texture.EMPTY && !texture.destroyed) {
+                resourceCanvas.getContext('2d')?.clearRect(0, 0, resourceCanvas.width, resourceCanvas.height)
+                texture.source.update()
+            }
             return
         }
 
         try {
-            setTexture(Texture.from({resource: canvas}, true))
-            pixiOverlayLog(`useCanvasTexture: created ${canvas.width}x${canvas.height}`)
+            const currentCanvas = resourceCanvasRef.current
+            const needsNewTexture = !currentCanvas
+                || currentCanvas.width !== canvas.width
+                || currentCanvas.height !== canvas.height
+                || texture === Texture.EMPTY
+                || texture.destroyed
+
+            if (needsNewTexture) {
+                const resourceCanvas = document.createElement('canvas')
+                resourceCanvas.width = canvas.width
+                resourceCanvas.height = canvas.height
+                resourceCanvas.getContext('2d')?.drawImage(canvas, 0, 0)
+                resourceCanvasRef.current = resourceCanvas
+                setTexture(Texture.from({resource: resourceCanvas}, true))
+                pixiOverlayLog(`useCanvasTexture: created persistent ${canvas.width}x${canvas.height}`)
+                return
+            }
+
+            const ctx = currentCanvas.getContext('2d')
+            ctx?.clearRect(0, 0, currentCanvas.width, currentCanvas.height)
+            ctx?.drawImage(canvas, 0, 0)
+            texture.source.update()
         } catch (e) {
-            pixiOverlayLog(`useCanvasTexture: Texture.from failed ${e instanceof Error ? e.message : String(e)}`)
-            setTexture(Texture.EMPTY)
+            pixiOverlayLog(`useCanvasTexture: update failed ${e instanceof Error ? e.message : String(e)}`)
         }
-    }, [canvas])
+    }, [canvas, texture])
 
     // 纹理销毁延到它被下一张纹理替换（或组件卸载）之后再做，避免 Sprite 渲染已销毁纹理
     // 触发 Pixi applyStyleParams 读取 null.style 崩溃（详见 MapPixiPreview.usePixiImageTexture）。
@@ -767,15 +791,16 @@ function PixiTextureOverlay({
         [context.scene.terrainStrokes, sceneW, sceneH],
     )
     const terrainField = useCanvasTexture(terrainFieldCanvas)
+    const canvasTerrainField = shaderActive ? null : terrainFieldCanvas
 
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
     // createOverlayCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
     const overlayCanvas = useMemo(
-        () => createOverlayCanvas(context, style, shaderActive ? 'linework' : 'full', terrainFieldCanvas),
+        () => createOverlayCanvas(context, style, shaderActive ? 'linework' : 'full', canvasTerrainField),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [context.scene.shapes, context.scene.terrainStrokes, sceneW, sceneH, style, shaderActive, terrainFieldCanvas],
+        [context.scene.shapes, sceneW, sceneH, style, shaderActive, canvasTerrainField],
     )
     const texture = useCanvasTexture(overlayCanvas)
 
@@ -901,7 +926,7 @@ function PixiOverlayLabels({context, style}: { context: MapPixiPreviewOverlayCon
     )
 }
 
-export function createPixiOverlayRenderer(
+export function createPixiGroundOverlayRenderer(
     style: PixiMapStyle,
     shaderContext?: {
         useShader: boolean
@@ -909,21 +934,28 @@ export function createPixiOverlayRenderer(
 ): PixiOverlayRenderer | undefined {
     const showCoastline = Boolean(style.coastline?.enabled && hasDecoration(style, 'coastline-outline'))
     const showCompass = hasDecoration(style, 'compass')
-    const showEffects = Boolean(style.effects?.length)
+    const showEffects = Boolean(style.effects?.some(effect => effect.id !== 'chromatic-ageing'))
     const showDecorations = Boolean(style.decorations?.length)
-    const showOverlayLabels = Boolean(style.labels.show && style.labels.renderer === 'overlay')
     const showTextureOverlay = showEffects || showDecorations || showCoastline || showCompass
-    const showAgeing = Boolean(style.effects?.some(effect => effect.id === 'chromatic-ageing'))
 
-    pixiOverlayLog(`createPixiOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} labels=${showOverlayLabels} useShader=${shaderContext?.useShader ?? false}`)
+    pixiOverlayLog(`createPixiGroundOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} useShader=${shaderContext?.useShader ?? false}`)
 
-    if (!showTextureOverlay && !showOverlayLabels) return undefined
+    if (!showTextureOverlay) return undefined
 
     return (context) => {
-        pixiOverlayLog(`RENDER_FN: called showTextureOverlay=${showTextureOverlay} showOverlayLabels=${showOverlayLabels} sceneShapes=${context.scene.shapes.length} sceneKeyLocs=${context.scene.keyLocations.length} canvas=${context.scene.canvas.width}x${context.scene.canvas.height}`)
+        pixiOverlayLog(`GROUND_RENDER_FN: sceneShapes=${context.scene.shapes.length} sceneKeyLocs=${context.scene.keyLocations.length}`)
+        return <PixiTextureOverlay context={context} style={style} shaderContext={shaderContext}/>
+    }
+}
+
+export function createPixiOverlayRenderer(style: PixiMapStyle): PixiOverlayRenderer | undefined {
+    const showOverlayLabels = Boolean(style.labels.show && style.labels.renderer === 'overlay')
+    const showAgeing = Boolean(style.effects?.some(effect => effect.id === 'chromatic-ageing'))
+    if (!showAgeing && !showOverlayLabels) return undefined
+
+    return (context) => {
         return (
             <>
-                {showTextureOverlay && <PixiTextureOverlay context={context} style={style} shaderContext={shaderContext}/>}
                 {showAgeing && <PixiChromaticAgeingLayer context={context} style={style}/>}
                 {showOverlayLabels && <PixiOverlayLabels context={context} style={style}/>}
             </>

@@ -65,6 +65,10 @@ export function cloneMapShapeEditorDraft(draft: MapShapeEditorDraft): MapShapeEd
             vertices: shape.vertices.map(vertex => ({...vertex})),
         })),
         keyLocations: draft.keyLocations.map(location => ({...location})),
+        terrainStrokes: draft.terrainStrokes?.map(stroke => ({
+            ...stroke,
+            points: stroke.points.map(point => [point[0], point[1]] as [number, number]),
+        })),
     };
 }
 

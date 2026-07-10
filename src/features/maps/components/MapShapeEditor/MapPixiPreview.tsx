@@ -299,8 +299,10 @@ export interface MapPixiPreviewProps {
      * 适合承接轻量后处理；自定义 shader / geometry 建议先通过 `renderOverlay` 封装为 React Pixi 子树。
      */
     sceneFilters?: Filter[];
+    /** 在图形之后、关键地点之前渲染场景坐标系内的地面叠加层。 */
+    renderGroundOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
     /**
-     * 在内置 Pixi 图层之后渲染额外 React Pixi 子树。
+     * 在关键地点之后渲染额外 React Pixi 子树。
      * 返回内容位于场景坐标系内，可直接使用 scene.canvas 坐标。
      */
     renderOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
@@ -1779,6 +1781,7 @@ function MapPixiScene({
                           onPickMove,
                           onPickOut,
                           sceneFilters,
+                          renderGroundOverlay,
                           renderOverlay,
                           lodLevel,
                           perfRecorder,
@@ -1804,6 +1807,7 @@ function MapPixiScene({
     onPickMove: (detail: MapPreviewPickDetail, event: FederatedPointerEvent) => void;
     onPickOut: () => void;
     sceneFilters?: Filter[];
+    renderGroundOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
     renderOverlay?: (context: MapPixiPreviewOverlayContext) => ReactNode;
     lodLevel: MapPixiLodSetting;
     perfRecorder?: PixiPerfRecorder;
@@ -1913,6 +1917,11 @@ function MapPixiScene({
                     onOut={onPickOut}
                     perfRecorder={perfRecorder}
                 />
+                {renderGroundOverlay?.({
+                    scene,
+                    viewportTransform: transform,
+                    viewportSize: size,
+                })}
                 {circleKeyLocationItems.map(({location, index}) => (
                     <MapPixiKeyLocationCircle
                         key={location.id}
@@ -2062,6 +2071,7 @@ export function MapPixiPreview({
                                    disableTooltip = false,
                                    getTooltip,
                                    sceneFilters,
+                                   renderGroundOverlay,
                                    renderOverlay,
                                    lodLevel = 'auto',
                                    debugPerf = false,
@@ -2501,6 +2511,7 @@ export function MapPixiPreview({
                             onPickMove={handlePickMove}
                             onPickOut={handlePickOut}
                             sceneFilters={sceneFilters}
+                            renderGroundOverlay={renderGroundOverlay}
                             renderOverlay={renderOverlay}
                             lodLevel={lodLevel}
                             perfRecorder={perfRecorder}

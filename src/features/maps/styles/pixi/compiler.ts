@@ -4,7 +4,7 @@ import {isMapDebugLogEnabled, makeSolidBackgroundDataUrl, mapRenderScale, paintT
 import {inferMapMarkerClass, type MapMarkerClass, type MapPreviewBackgroundImage} from '../../components/MapShapeEditor'
 import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
 import {buildPixiLocationIconAsset, getPixiPaperTextureCanvas} from './assets'
-import {createPixiOverlayRenderer} from './overlays'
+import {createPixiGroundOverlayRenderer, createPixiOverlayRenderer} from './overlays'
 import {detectWebGLSupport} from './shaderRegistry'
 
 function pixiLog(msg: string) {
@@ -126,8 +126,9 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
             }),
         }
 
-        const overlayRenderer = createPixiOverlayRenderer(style, {useShader})
-        pixiLog(`overlayRenderer: ${overlayRenderer ? 'present' : 'undefined'}`)
+        const groundOverlayRenderer = createPixiGroundOverlayRenderer(style, {useShader})
+        const overlayRenderer = createPixiOverlayRenderer(style)
+        pixiLog(`overlayRenderer: ground=${groundOverlayRenderer ? 'present' : 'undefined'} top=${overlayRenderer ? 'present' : 'undefined'}`)
 
         const result: CompiledPixiMapStyle = {
             renderer: 'pixi',
@@ -162,6 +163,7 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
                 showLabels: style.labels.show && style.labels.renderer !== 'overlay',
                 keyLocationRenderMode: style.locations.renderMode,
                 emptyHint: '当前 Pixi 风格暂无可渲染的场景。',
+                renderGroundOverlay: groundOverlayRenderer,
                 renderOverlay: overlayRenderer,
             },
         }
