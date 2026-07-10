@@ -758,7 +758,6 @@
     width: 100%;
     max-width: var(--ai-chat-content-max-width);
     margin: 0 auto 220px;
-    padding-inline: 1.5rem;
 }
 
 .ai-report-context-bar + .ai-messages-list {
