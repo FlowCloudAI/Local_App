@@ -35,12 +35,38 @@ export interface MapShapeDraft extends MapShapeExtensible {
     kind?: 'coastline';
 }
 
+export const MAP_MARKER_CLASS_OPTIONS = [
+    {value: 'marker', label: '标记点'},
+    {value: 'major-city', label: '主要城市'},
+    {value: 'city', label: '次要城市'},
+    {value: 'town', label: '村镇'},
+    {value: 'landmark', label: '地标'},
+    {value: 'event', label: '事件点'},
+    {value: 'ruin', label: '遗迹'},
+    {value: 'harbor', label: '港口'},
+] as const;
+
+export type MapMarkerClass = (typeof MAP_MARKER_CLASS_OPTIONS)[number]['value'];
+
+export function inferMapMarkerClass(type: string): MapMarkerClass {
+    if (/首都|王都|都城|帝都|京/.test(type)) return 'major-city';
+    if (/港|码头|渡口/.test(type)) return 'harbor';
+    if (/村|镇|营地|聚落/.test(type)) return 'town';
+    if (/遗迹|废墟|神殿/.test(type)) return 'ruin';
+    if (/事件|战场|遭遇|任务/.test(type)) return 'event';
+    if (/城|要塞/.test(type)) return 'city';
+    if (/地标|塔|山|峰/.test(type)) return 'landmark';
+    return 'marker';
+}
+
 export interface MapKeyLocationDraft extends MapShapeExtensible {
     id: string;
     name: string;
     type: string;
     x: number;
     y: number;
+    /** 风格无关的地点显示语义；旧数据缺省时根据 type 推断。 */
+    markerClass?: MapMarkerClass | null;
     /** @deprecated 旧数据兼容字段；关键点跟随图形现在按空间包含自动派生。 */
     shapeId?: string | null;
     bizId?: string | null;
@@ -119,6 +145,7 @@ export interface MapPreviewKeyLocation extends MapShapeExtensible {
     name: string;
     type: string;
     position: [number, number];
+    markerClass?: MapMarkerClass | null;
     /** @deprecated 旧数据兼容字段；渲染与编辑不再要求显式关联。 */
     shapeId?: string | null;
     color: MapRgbaColor;

@@ -64,6 +64,7 @@ function buildPreviewKeyLocations(request: MapShapeSaveRequest): MapPreviewKeyLo
         name: location.name,
         type: location.type,
         position: [location.x, location.y],
+        markerClass: location.markerClass ?? null,
         shapeId: location.shapeId ?? null,
         color: LOCATION_COLOR_PALETTE[location.type] ?? [212, 48, 106, 255],
         bizId: location.bizId ?? null,

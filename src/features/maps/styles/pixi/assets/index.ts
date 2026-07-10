@@ -1,4 +1,9 @@
-import type {MapPreviewKeyLocationIcon, MapRgbaColor} from '../../../components/MapShapeEditor'
+import {
+    inferMapMarkerClass,
+    type MapMarkerClass,
+    type MapPreviewKeyLocationIcon,
+    type MapRgbaColor,
+} from '../../../components/MapShapeEditor'
 import {createParchmentTexture, createRicePaperTexture, makeSeededRng, svgToDataUrl} from '../../common'
 import type {
     PixiEffectPluginId,
@@ -54,20 +59,35 @@ function getStringParam(value: unknown, fallback: string): string {
     return typeof value === 'string' && value.trim() ? value : fallback
 }
 
-function isMajorTolkienLocation(type: string): boolean {
-    return /城|都|王都|京|要塞|港/.test(type)
-}
+function makeFlatMarkerIcon(markerClass: MapMarkerClass, color: string): MapPreviewKeyLocationIcon {
+    const body = (() => {
+        switch (markerClass) {
+            case 'major-city':
+                return `<circle cx="16" cy="15" r="11" fill="#fff" stroke="${color}" stroke-width="2"/><circle cx="16" cy="15" r="6.5" fill="${color}"/><path d="M16 7V23M8 15H24" stroke="#fff" stroke-width="1.6"/>`
+            case 'city':
+                return `<circle cx="16" cy="15" r="9" fill="#fff" stroke="${color}" stroke-width="2"/><rect x="11" y="10" width="10" height="10" rx="2" fill="${color}"/>`
+            case 'town':
+                return `<path d="M4 24H28" stroke="${color}" stroke-width="2"/><path d="M6 23V15L11 11L16 15V23M15 23V13L21 8L27 13V23" fill="#fff" stroke="${color}" stroke-width="1.8" stroke-linejoin="round"/>`
+            case 'landmark':
+                return `<path d="M16 4L27 15L16 27L5 15Z" fill="#fff" stroke="${color}" stroke-width="2"/><path d="M16 9L18 13L23 15L18 17L16 22L14 17L9 15L14 13Z" fill="${color}"/>`
+            case 'event':
+                return `<path d="M16 4L27 15L16 27L5 15Z" fill="${color}"/><path d="M16 9V17" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="16" cy="21" r="1.5" fill="#fff"/>`
+            case 'ruin':
+                return `<path d="M5 25H27M9 24V11M16 24V8M23 24V13M7 11H13M14 8H21M21 13H27" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/>`
+            case 'harbor':
+                return `<circle cx="16" cy="7" r="2.5" fill="none" stroke="${color}" stroke-width="2"/><path d="M16 10V25M9 14H23M7 19C8 25 12 27 16 27C20 27 24 25 25 19M7 19L11 18M25 19L21 18" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
+            default:
+                return `<path d="M16 3C10.5 3 6 7.5 6 13C6 20 16 29 16 29C16 29 26 20 26 13C26 7.5 21.5 3 16 3Z" fill="#fff" stroke="${color}" stroke-width="2"/><circle cx="16" cy="13" r="4" fill="${color}"/>`
+        }
+    })()
 
-function resolveTolkienAsset(type: string, asset?: PixiLocationIconAsset): PixiLocationIconAsset {
-    if (asset) return asset
-    if (/遗迹|神殿/.test(type)) return 'tolkien-ruin'
-    if (/村|镇|营地/.test(type)) return 'tolkien-settlement'
-    return isMajorTolkienLocation(type) ? 'tolkien-castle' : 'tolkien-tower'
-}
-
-function resolveInkStampAsset(type: string, asset?: PixiLocationIconAsset): PixiLocationIconAsset {
-    if (asset) return asset
-    return /[都京]/.test(type) ? 'ink-seal' : 'ink-dot'
+    return {
+        url: svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">${body}</svg>`),
+        width: 32,
+        height: 32,
+        anchorX: 16,
+        anchorY: 28,
+    }
 }
 
 function makeTolkienCastleIcon(color: string): MapPreviewKeyLocationIcon {
@@ -140,6 +160,68 @@ function makeTolkienRuinIcon(color: string): MapPreviewKeyLocationIcon {
     }
 }
 
+function makeTolkienMarkerIcon(color: string): MapPreviewKeyLocationIcon {
+    return {
+        url: svgToDataUrl(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="32" viewBox="0 0 28 32">
+                <path d="M14 29C14 29 5 21 5 13A9 9 0 0 1 23 13C23 21 14 29 14 29Z" fill="#f7e7bc" stroke="${color}" stroke-width="1.6"/>
+                <circle cx="14" cy="13" r="3.2" fill="${color}"/>
+            </svg>
+        `),
+        width: 28,
+        height: 32,
+        anchorX: 14,
+        anchorY: 29,
+    }
+}
+
+function makeTolkienLandmarkIcon(color: string): MapPreviewKeyLocationIcon {
+    return {
+        url: svgToDataUrl(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="36" viewBox="0 0 30 36">
+                <path d="M9 31L11 9L16 4L21 10L23 31Z" fill="#ead2a2" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M15 8L14 27M10 31H24" fill="none" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.7"/>
+            </svg>
+        `),
+        width: 30,
+        height: 36,
+        anchorX: 15,
+        anchorY: 31,
+    }
+}
+
+function makeTolkienEventIcon(color: string): MapPreviewKeyLocationIcon {
+    return {
+        url: svgToDataUrl(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="34" viewBox="0 0 32 34">
+                <path d="M9 29L23 8M23 29L9 8" stroke="${color}" stroke-width="2" stroke-linecap="round"/>
+                <path d="M20 7L27 5L25 12ZM12 7L5 5L7 12Z" fill="#f7e7bc" stroke="${color}" stroke-width="1.4" stroke-linejoin="round"/>
+                <path d="M6 29H12M20 29H26" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        `),
+        width: 32,
+        height: 34,
+        anchorX: 16,
+        anchorY: 29,
+    }
+}
+
+function makeTolkienHarborIcon(color: string): MapPreviewKeyLocationIcon {
+    return {
+        url: svgToDataUrl(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="34" height="36" viewBox="0 0 34 36">
+                <circle cx="17" cy="7" r="2.5" fill="#f7e7bc" stroke="${color}" stroke-width="1.5"/>
+                <path d="M17 10V29M10 14H24M7 22C8 29 12 32 17 32C22 32 26 29 27 22M7 22L12 20M27 22L22 20" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 33C9 31 12 34 17 32C22 30 25 34 29 32" fill="none" stroke="${color}" stroke-width="0.9" stroke-opacity="0.55"/>
+            </svg>
+        `),
+        width: 34,
+        height: 36,
+        anchorX: 17,
+        anchorY: 32,
+    }
+}
+
 function makeInkDotIcon(color: string): MapPreviewKeyLocationIcon {
     return {
         url: svgToDataUrl(`
@@ -171,26 +253,60 @@ function makeInkSealIcon(color: string): MapPreviewKeyLocationIcon {
     }
 }
 
-export function buildPixiLocationIconAsset(input: PixiLocationIconAssetInput): MapPreviewKeyLocationIcon | undefined {
-    const asset = input.iconSet === 'tolkien'
-        ? resolveTolkienAsset(input.type, input.asset)
-        : resolveInkStampAsset(input.type, input.asset)
+function makeInkClassIcon(markerClass: MapMarkerClass, color: string): MapPreviewKeyLocationIcon {
+    if (markerClass === 'marker') return makeInkDotIcon(color)
+    if (markerClass === 'major-city') return makeInkSealIcon(color)
 
-    switch (asset) {
-        case 'tolkien-castle':
+    const body = (() => {
+        switch (markerClass) {
+            case 'city':
+                return `<circle cx="14" cy="14" r="7" fill="none" stroke="${color}" stroke-width="2.2" stroke-opacity="0.86"/><circle cx="14.5" cy="13.5" r="3.2" fill="${color}" fill-opacity="0.82"/>`
+            case 'town':
+                return `<circle cx="8" cy="16" r="3.2" fill="${color}" fill-opacity="0.78"/><circle cx="14" cy="11" r="3.8" fill="${color}" fill-opacity="0.9"/><circle cx="20" cy="16" r="3" fill="${color}" fill-opacity="0.7"/><path d="M5 21C10 19 17 22 23 20" stroke="${color}" stroke-width="1.4" stroke-linecap="round" stroke-opacity="0.55"/>`
+            case 'landmark':
+                return `<path d="M4 22L11 11L15 16L19 7L25 22" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 23C12 21 18 24 24 21" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.5"/>`
+            case 'event':
+                return `<path d="M14 3L17 10L24 7L20 14L25 19L17 18L14 25L11 18L3 20L8 14L4 8L11 10Z" fill="${color}" fill-opacity="0.78"/><circle cx="14" cy="14" r="2.2" fill="#fff7ef" fill-opacity="0.78"/>`
+            case 'ruin':
+                return `<path d="M5 23H24M8 22V11M14 22V7M20 22V13M7 11H11M12 7H18M19 13H24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-opacity="0.82"/>`
+            case 'harbor':
+                return `<path d="M14 5V21M8 10H20M5 17C7 23 11 25 14 25C18 25 22 22 23 17" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"/><path d="M4 25C9 22 12 27 17 24C21 22 24 25 26 24" fill="none" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.58"/>`
+            default:
+                return ''
+        }
+    })()
+
+    return {
+        url: svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">${body}</svg>`),
+        width: 28,
+        height: 28,
+        anchorX: 14,
+        anchorY: 24,
+    }
+}
+
+export function buildPixiLocationIconAsset(input: PixiLocationIconAssetInput): MapPreviewKeyLocationIcon | undefined {
+    const markerClass = input.asset ?? inferMapMarkerClass(input.type)
+    if (input.iconSet === 'flat') return makeFlatMarkerIcon(markerClass, input.color)
+    if (input.iconSet === 'ink-stamp') return makeInkClassIcon(markerClass, input.color)
+
+    switch (markerClass) {
+        case 'marker':
+            return makeTolkienMarkerIcon(input.color)
+        case 'major-city':
             return makeTolkienCastleIcon(input.color)
-        case 'tolkien-settlement':
-            return makeTolkienSettlementIcon(input.color)
-        case 'tolkien-ruin':
-            return makeTolkienRuinIcon(input.color)
-        case 'tolkien-tower':
+        case 'city':
             return makeTolkienTowerIcon(input.color)
-        case 'ink-seal':
-            return makeInkSealIcon(input.color)
-        case 'ink-dot':
-            return makeInkDotIcon(input.color)
-        default:
-            return undefined
+        case 'town':
+            return makeTolkienSettlementIcon(input.color)
+        case 'landmark':
+            return makeTolkienLandmarkIcon(input.color)
+        case 'event':
+            return makeTolkienEventIcon(input.color)
+        case 'ruin':
+            return makeTolkienRuinIcon(input.color)
+        case 'harbor':
+            return makeTolkienHarborIcon(input.color)
     }
 }
 

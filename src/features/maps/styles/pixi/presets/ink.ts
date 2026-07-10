@@ -63,15 +63,16 @@ export const inkPixiMapStyle: PixiMapStyle = {
                 opacity: 0.72,
             },
         ],
-        iconRules: [
-            {
-                typePattern: '都|京',
-                iconSet: 'ink-stamp',
-                asset: 'ink-seal',
-                color: '#9b2323',
-                iconSize: 24,
-            },
-        ],
+        markerAssets: {
+            marker: {iconSet: 'ink-stamp', asset: 'marker', color: '#101010', iconSize: 18},
+            'major-city': {iconSet: 'ink-stamp', asset: 'major-city', color: '#9b2323', iconSize: 26},
+            city: {iconSet: 'ink-stamp', asset: 'city', color: '#101010', iconSize: 22},
+            town: {iconSet: 'ink-stamp', asset: 'town', color: '#24241f', iconSize: 22},
+            landmark: {iconSet: 'ink-stamp', asset: 'landmark', color: '#101010', iconSize: 24},
+            event: {iconSet: 'ink-stamp', asset: 'event', color: '#9b2323', iconSize: 22},
+            ruin: {iconSet: 'ink-stamp', asset: 'ruin', color: '#37372f', iconSize: 22},
+            harbor: {iconSet: 'ink-stamp', asset: 'harbor', color: '#293e43', iconSize: 24},
+        },
         iconSet: 'ink-stamp',
     },
     labels: {

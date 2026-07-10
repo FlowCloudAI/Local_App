@@ -36,7 +36,7 @@ export const flatPixiMapStyle: PixiMapStyle = {
         layers: [],
     },
     locations: {
-        renderMode: 'circle',
+        renderMode: 'auto',
         marker: {
             radius: 8,
             color: '#d4306a',
@@ -45,7 +45,19 @@ export const flatPixiMapStyle: PixiMapStyle = {
                 opacity: 1,
                 width: 2,
             },
+            iconSize: 28,
         },
+        markerAssets: {
+            marker: {iconSet: 'flat', asset: 'marker', color: '#d4306a', iconSize: 24},
+            'major-city': {iconSet: 'flat', asset: 'major-city', color: '#b51f4d', iconSize: 34},
+            city: {iconSet: 'flat', asset: 'city', color: '#2563eb', iconSize: 30},
+            town: {iconSet: 'flat', asset: 'town', color: '#16a085', iconSize: 28},
+            landmark: {iconSet: 'flat', asset: 'landmark', color: '#7c3aed', iconSize: 28},
+            event: {iconSet: 'flat', asset: 'event', color: '#d97706', iconSize: 26},
+            ruin: {iconSet: 'flat', asset: 'ruin', color: '#6b7280', iconSize: 28},
+            harbor: {iconSet: 'flat', asset: 'harbor', color: '#0f6b9e', iconSize: 30},
+        },
+        iconSet: 'flat',
     },
     labels: {
         show: true,

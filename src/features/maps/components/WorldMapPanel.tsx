@@ -11,11 +11,14 @@ import {
     createEmptyShapeDraft,
     createInitialMapShapeEditorViewBox,
     createMapShapeEditorLocalId,
+    inferMapMarkerClass,
+    MAP_MARKER_CLASS_OPTIONS,
     type MapShapeSvgEditorLocationContextMenuDetail,
     type MapShapeSvgEditorShapeContextMenuDetail,
     type MapShapeSvgEditorVertexContextMenuDetail,
     type MapEditorCanvas,
     type MapKeyLocationDraft,
+    type MapMarkerClass,
     type MapPreviewScene,
     type MapPixiLodSetting,
     type MapPixiPerfStats,
@@ -41,7 +44,7 @@ import {
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
-import {compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
+import {buildPixiLocationIconAsset, compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
 import {isMapDebugLogEnabled} from '../styles/common'
 
 function mapLog(msg: string) {
@@ -1030,6 +1033,13 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         }))
     }, [selectedLocationId, updateDraft])
 
+    const updateSelectedLocationMarkerClass = useCallback((markerClass: MapMarkerClass) => {
+        updateDraft(d => ({
+            ...d,
+            keyLocations: d.keyLocations.map(l => (l.id === selectedLocationId ? {...l, markerClass} : l)),
+        }))
+    }, [selectedLocationId, updateDraft])
+
     const updateSelectedLocationLinkedEntryId = useCallback((entryId: string | null) => {
         const linkedEntry = entryOptions.find(entry => entry.id === entryId) ?? null
         updateDraft(d => ({
@@ -1146,6 +1156,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             id: createMapShapeEditorLocalId('loc'),
             name: `地点 ${draft.keyLocations.length + 1}`,
             type: '标记点',
+            markerClass: 'marker',
             x: cx,
             y: cy,
         }
@@ -1337,6 +1348,23 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
 
     const selectedShape = draft.shapes.find(s => s.id === selectedShapeId) ?? null
     const selectedLocation = draft.keyLocations.find(l => l.id === selectedLocationId) ?? null
+    const selectedMarkerClass = selectedLocation
+        ? selectedLocation.markerClass ?? inferMapMarkerClass(selectedLocation.type)
+        : null
+    const markerClassOptions = useMemo(() => {
+        const pixiStyle = getPixiMapStyle(style)
+        return MAP_MARKER_CLASS_OPTIONS.map(option => {
+            const asset = pixiStyle.locations.markerAssets?.[option.value]
+            const iconSet = asset?.iconSet ?? pixiStyle.locations.iconSet
+            const icon = iconSet ? buildPixiLocationIconAsset({
+                iconSet,
+                asset: asset?.asset ?? option.value,
+                type: option.label,
+                color: asset?.color ?? pixiStyle.locations.marker.color,
+            }) : undefined
+            return {...option, iconUrl: icon?.url}
+        })
+    }, [style])
     const selectedLinkedEntryId = readLinkedEntryId(selectedLocation)
     const selectedLinkedEntry = entryOptions.find(entry => entry.id === selectedLinkedEntryId) ?? null
 
@@ -1806,6 +1834,27 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                 <label>类型</label>
                                 <input value={selectedLocation.type}
                                        onChange={e => updateSelectedLocation('type', e.target.value)}/>
+                            </div>
+                            <div className="wm-field">
+                                <label>显示元素</label>
+                                <div className="wm-marker-grid" role="radiogroup" aria-label="显示元素">
+                                    {markerClassOptions.map(option => (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={selectedMarkerClass === option.value}
+                                            className={`wm-marker-option${selectedMarkerClass === option.value ? ' is-active' : ''}`}
+                                            onClick={() => updateSelectedLocationMarkerClass(option.value)}
+                                            title={option.label}
+                                        >
+                                            {option.iconUrl && (
+                                                <img src={option.iconUrl} alt="" draggable={false}/>
+                                            )}
+                                            <span>{option.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             <div className="wm-field">
                                 <label>关联词条</label>

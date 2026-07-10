@@ -1,4 +1,4 @@
-import type {MapKeyLocationRenderMode, MapPixiPreviewProps} from '../../components/MapShapeEditor'
+import type {MapKeyLocationRenderMode, MapMarkerClass, MapPixiPreviewProps} from '../../components/MapShapeEditor'
 import type {
     MapStyleBackgroundImageToken,
     MapStyleCompiledBase,
@@ -18,14 +18,8 @@ export interface PixiMapStylePalette {
 }
 
 export type PixiGeneratedBackgroundTexture = 'parchment' | 'rice-paper'
-export type PixiLocationIconSet = 'tolkien' | 'ink-stamp'
-export type PixiLocationIconAsset =
-    | 'tolkien-castle'
-    | 'tolkien-tower'
-    | 'tolkien-settlement'
-    | 'tolkien-ruin'
-    | 'ink-dot'
-    | 'ink-seal'
+export type PixiLocationIconSet = 'flat' | 'tolkien' | 'ink-stamp'
+export type PixiLocationIconAsset = MapMarkerClass
 export type PixiDecorationPluginId = 'coastline-outline' | 'compass' | 'land-depth' | 'sea' | 'brush-stroke' | 'ink-wash'
 export type PixiEffectPluginId =
     | 'paper-grain'
@@ -82,6 +76,7 @@ export interface PixiLocationStyle {
     }
     colorRules?: PixiLocationColorRule[]
     iconRules?: PixiLocationIconRule[]
+    markerAssets?: Record<MapMarkerClass, PixiLocationIconRule>
     iconSet?: PixiLocationIconSet
 }
 

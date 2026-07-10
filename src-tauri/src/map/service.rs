@@ -411,6 +411,7 @@ fn build_preview_key_locations(
             name: location.name.clone(),
             r#type: location.r#type.clone(),
             position: [location.x, location.y],
+            marker_class: location.marker_class.clone(),
             shape_id: location.shape_id.clone(),
             color: location_color(&location.r#type),
             biz_id: location.biz_id.clone(),
@@ -494,6 +495,7 @@ mod tests {
                 r#type: "入口".to_string(),
                 x: 260.0,
                 y: 180.0,
+                marker_class: Some("landmark".to_string()),
                 shape_id: None,
                 biz_id: None,
                 ext: None,
@@ -515,6 +517,10 @@ mod tests {
         assert_eq!(response.scene.key_locations.len(), 1);
         assert_eq!(response.scene.shapes[0].fill_color, [216, 236, 255, 88]);
         assert_eq!(response.scene.key_locations[0].color, [226, 75, 74, 255]);
+        assert_eq!(
+            response.scene.key_locations[0].marker_class.as_deref(),
+            Some("landmark")
+        );
         assert_eq!(
             response.meta.as_ref().and_then(|meta| meta.persisted),
             Some(false)
