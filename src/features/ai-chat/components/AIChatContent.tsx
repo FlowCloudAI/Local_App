@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {openFileDialog, saveFileDialog} from '../../../api/dialog'
+import {listenNativeFileDrop, openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {Button, MessageBox, type MessageBoxBlock, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
@@ -54,9 +54,17 @@ const MAX_CHARS = 4000
 const SHOW_HINT_THRESHOLD = 3500
 const DEFAULT_ROLEPLAY_VOICE_ID = 'Ethan'
 const AI_CHAT_ENTRY_LINK_PREFIX = '#fc-entry-link?'
+const AI_CHAT_DROP_ZONE_ID = 'ai-chat-drop-zone'
 const ACTION_MENU_ESTIMATED_HEIGHT = 196
 const CONTEXT_USAGE_RING_RADIUS = 10
 const CONTEXT_USAGE_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_USAGE_RING_RADIUS
+const DOCUMENT_CONTEXT_EXTENSIONS = [
+    'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml',
+    'ini', 'log', 'js', 'ts', 'jsx', 'tsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h',
+    'hpp', 'cs', 'php', 'rb', 'swift', 'kt', 'sql', 'html', 'htm', 'css', 'scss', 'less',
+    'sh', 'bat', 'ps1', 'env', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf',
+]
+const DOCUMENT_CONTEXT_EXTENSION_SET = new Set(DOCUMENT_CONTEXT_EXTENSIONS)
 const CONVERSATION_SETTING_TOOLTIPS = {
     temperature: '温度：控制回答的随机性，越高越发散，越低越稳定。',
     topP: '回答开放度：越低越稳定严谨，越高越自由发散。',
@@ -293,6 +301,23 @@ function buildRenderableAiChatBlocks(
     })
 }
 
+const getDocumentContextFileExtension = (path: string) => {
+    const fileName = path.split(/[\\/]/).pop() ?? ''
+    const dotIndex = fileName.lastIndexOf('.')
+    return dotIndex >= 0 ? fileName.slice(dotIndex + 1).toLocaleLowerCase() : ''
+}
+
+const isWithinAiChatDropZone = (position: {x: number; y: number}) => {
+    const dropZone = document.getElementById(AI_CHAT_DROP_ZONE_ID)
+    if (!dropZone) return false
+    const rect = dropZone.getBoundingClientRect()
+    // Tauri 返回物理像素，DOM 矩形使用 CSS 像素。
+    const scale = window.devicePixelRatio || 1
+    const x = position.x / scale
+    const y = position.y / scale
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+}
+
 const attachmentFileTypeLabel = (attachment: Attachment) => {
     const extension = attachment.extension?.replace(/^\./, '').trim()
     if (extension) return extension.toUpperCase()
@@ -355,13 +380,15 @@ export default function AIChatContent({
                                            onOpenEntry,
                                            onOpenPluginManagement,
                                            onOpenWriterModeSettings,
-                                           sidePortalTarget,
-                                       }: AIChatContentProps) {
+                                       sidePortalTarget,
+                                   }: AIChatContentProps) {
     const ctx = controller
+    const {addDocumentContextFiles} = ctx
     const activeConversation = ctx.activeConversation
     const isCharacterConversation = activeConversation?.mode === 'character'
     const isReportConversation = activeConversation?.mode === 'report'
     const isArchivedConversation = Boolean(activeConversation?.archivedAt)
+    const canAttachDocuments = Boolean(activeConversation) && !isArchivedConversation
     const {showAlert} = useAlert()
 
     const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -478,6 +505,7 @@ export default function AIChatContent({
     }, [settingsDrawerOpen])
 
     const [autoScroll, setAutoScroll] = useState(true)
+    const [isNativeFileDragActive, setIsNativeFileDragActive] = useState(false)
     const [roleplayAutoPlayFallback, setRoleplayAutoPlayFallback] = useState<boolean | null>(null)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -499,7 +527,7 @@ export default function AIChatContent({
     const [hasTtsPlugin, setHasTtsPlugin] = useState(false)
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
-    const visibleDocumentContextItems = ctx.pendingDocumentAttachmentItems.filter((item) => item.status !== 'ready')
+    const visibleDocumentContextItems = ctx.documentContextItems
     const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
     const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
@@ -1020,19 +1048,40 @@ export default function AIChatContent({
         inputWikiLink.handleMarkdownCursorSync(event.currentTarget)
     }
 
+    const addDocumentPaths = useCallback(async (paths: string[]) => {
+        if (!canAttachDocuments || paths.length === 0) return
+        const supportedPaths = paths.filter((path) =>
+            DOCUMENT_CONTEXT_EXTENSION_SET.has(getDocumentContextFileExtension(path)),
+        )
+        const skippedCount = paths.length - supportedPaths.length
+        if (supportedPaths.length === 0) {
+            await showAlert('仅支持文档与文本格式，不支持图片、音视频或文件夹。', 'warning', 'nonInvasive', 2400)
+            return
+        }
+
+        try {
+            await addDocumentContextFiles(supportedPaths)
+            if (skippedCount > 0) {
+                await showAlert(`已添加 ${supportedPaths.length} 个文件，跳过 ${skippedCount} 个不支持的文件。`, 'warning', 'nonInvasive', 2200)
+            }
+        } catch (error) {
+            logger.warn('[AIChatContent] 添加文档上下文失败', error)
+            await showAlert('添加文档失败，请确认文件可读取且格式受支持。', 'error', 'nonInvasive', 2400)
+        }
+    }, [addDocumentContextFiles, canAttachDocuments, showAlert])
+
+    const setNativeFileDragActive = useCallback((next: boolean) => {
+        setIsNativeFileDragActive((current) => current === next ? current : next)
+    }, [])
+
     const handleAttachDocuments = useCallback(async () => {
-        if (!activeConversation || isArchivedConversation) return
+        if (!canAttachDocuments) return
         const selected = await openFileDialog({
             multiple: true,
             filters: [
                 {
                     name: '文档与文本',
-                    extensions: [
-                        'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml',
-                        'ini', 'log', 'js', 'ts', 'jsx', 'tsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h',
-                        'hpp', 'cs', 'php', 'rb', 'swift', 'kt', 'sql', 'html', 'htm', 'css', 'scss', 'less',
-                        'sh', 'bat', 'ps1', 'env', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf',
-                    ],
+                    extensions: DOCUMENT_CONTEXT_EXTENSIONS,
                 },
             ],
         })
@@ -1042,14 +1091,46 @@ export default function AIChatContent({
                 ? [selected]
                 : []
         if (paths.length === 0) return
+        await addDocumentPaths(paths)
+    }, [addDocumentPaths, canAttachDocuments])
 
-        try {
-            await ctx.addDocumentContextFiles(paths)
-        } catch (error) {
-            logger.warn('[AIChatContent] 添加文档上下文失败', error)
-            await showAlert('添加文档失败，请确认文件可读取且格式受支持。', 'error', 'nonInvasive', 2400)
+    useEffect(() => {
+        if (!canAttachDocuments) {
+            setNativeFileDragActive(false)
+            return
         }
-    }, [activeConversation, ctx, isArchivedConversation, showAlert])
+
+        let disposed = false
+        let unlisten: (() => void) | undefined
+        void listenNativeFileDrop((event) => {
+            if (event.type === 'leave') {
+                setNativeFileDragActive(false)
+                return
+            }
+
+            const isWithinDropZone = isWithinAiChatDropZone(event.position)
+            if (event.type === 'drop') {
+                setNativeFileDragActive(false)
+                if (isWithinDropZone) void addDocumentPaths(event.paths)
+                return
+            }
+
+            setNativeFileDragActive(isWithinDropZone)
+        }).then((release) => {
+            if (disposed) {
+                release()
+            } else {
+                unlisten = release
+            }
+        }).catch((error) => {
+            if (!disposed) logger.warn('[AIChatContent] 监听原生文件拖放失败', error)
+        })
+
+        return () => {
+            disposed = true
+            unlisten?.()
+        }
+    }, [addDocumentPaths, canAttachDocuments, setNativeFileDragActive])
 
     const handleExportConversation = useCallback(async (
         event: React.MouseEvent,
@@ -1488,7 +1569,13 @@ export default function AIChatContent({
             {sidePortalTarget ? createPortal(sidebarJsx, sidePortalTarget) : sidebarJsx}
 
             <DockPanelMain
+                id={AI_CHAT_DROP_ZONE_ID}
                 className={`ai-main${isCharacterConversation ? ' is-character' : ''}${isReportConversation ? ' is-report' : ''}`}>
+                {isNativeFileDragActive && (
+                    <div className="ai-document-drop-overlay" role="status">
+                        松开以上传文档
+                    </div>
+                )}
                 {isCharacterConversation && activeConversation?.backgroundImageUrl && (
                     <div className="ai-main-background" aria-hidden="true">
                         <img src={activeConversation.backgroundImageUrl}

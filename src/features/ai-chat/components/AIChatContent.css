@@ -492,6 +492,19 @@
     var(--fc-color-bg);
 }
 
+.ai-document-drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    border: 2px dashed var(--fc-color-border);
+    background: color-mix(in srgb, var(--fc-color-bg-overlay) 82%, transparent);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-body);
+    pointer-events: none;
+}
+
 .ai-main-background {
     position: absolute;
     inset: 0;
