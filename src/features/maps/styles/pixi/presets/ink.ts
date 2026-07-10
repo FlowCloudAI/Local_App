@@ -28,13 +28,26 @@ export const inkPixiMapStyle: PixiMapStyle = {
         },
         stroke: {
             color: '#121212',
-            opacity: 0.82,
-            width: 3,
+            opacity: 0.5,
+            width: 2,
         },
     },
     coastline: {
-        enabled: false,
-        layers: [],
+        enabled: true,
+        layers: [
+            {
+                color: '#3a3a3a',
+                opacity: 0.1,
+                width: 12,
+                jitter: 3.5,
+            },
+            {
+                color: '#121212',
+                opacity: 0.85,
+                width: 2.5,
+                jitter: 1.6,
+            },
+        ],
     },
     locations: {
         renderMode: 'auto',
@@ -80,14 +93,51 @@ export const inkPixiMapStyle: PixiMapStyle = {
             },
         ],
     },
+    decorations: [
+        {
+            id: 'coastline-outline',
+            params: {
+                brush: 'ink-boundary',
+            },
+        },
+        {
+            id: 'brush-stroke',
+            params: {
+                baseWidth: 10,
+                widthVariation: 0.65,
+                dryBrushThreshold: 0.42,
+                inkColor: '#121212',
+                inkOpacity: 0.3,
+            },
+        },
+        {
+            id: 'ink-wash',
+            params: {
+                washWidth: 46,
+                lightInk: '#5a5a52',
+                washOpacity: 0.16,
+                layers: 4,
+            },
+        },
+        {
+            id: 'sea',
+            params: {
+                depthBands: 3,
+                depthGap: 18,
+                depthColor: '#8a887e',
+                depthOpacity: 0.1,
+                depthShallowFade: 0.85,
+            },
+        },
+    ],
     effects: [
         {
             id: 'ink-bleed',
             params: {
                 color: 'rgba(16, 16, 16, 1)',
-                width: 9,
-                blur: 4,
-                opacity: 0.13,
+                width: 6,
+                blur: 16,
+                opacity: 0.22,
             },
         },
         {
