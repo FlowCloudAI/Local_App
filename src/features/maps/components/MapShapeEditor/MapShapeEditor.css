@@ -125,6 +125,30 @@
     cursor: grabbing;
 }
 
+.fc-map-shape-svg-editor--terrain-brush .fc-map-shape-editor__canvas {
+    cursor: crosshair;
+}
+
+.fc-map-shape-editor__terrain-stroke-hit {
+    fill: none;
+    stroke: transparent;
+    pointer-events: stroke;
+}
+
+.fc-map-shape-editor__terrain-stroke-hit-point {
+    fill: transparent;
+    stroke: none;
+    pointer-events: all;
+}
+
+.fc-map-shape-editor__terrain-cursor {
+    fill: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
+    stroke: var(--fc-color-primary);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+    pointer-events: none;
+}
+
 .fc-map-shape-editor__toolbar {
     display: flex;
     flex-wrap: wrap;

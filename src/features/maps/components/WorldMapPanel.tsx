@@ -1,4 +1,4 @@
-import {type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {
     RollingBox,
@@ -24,6 +24,8 @@ import {
     type MapPixiPerfStats,
     type MapShapeDraft,
     type MapShapeEditorDraft,
+    type MapTerrainBrush,
+    type MapTerrainKind,
     MapShapeViewport,
     type MapShapeViewportRenderer,
     moveShapeInOrder,
@@ -289,6 +291,16 @@ const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = buildSimpleCoastlinePar
 function emptyDraft(): MapShapeEditorDraft {
     return {shapes: [], keyLocations: [], terrainStrokes: []}
 }
+const TERRAIN_KIND_OPTIONS: Array<{value: MapTerrainKind; label: string; color: string}> = [
+    {value: 'grass', label: '草地', color: '#82b45f'},
+    {value: 'mountain', label: '高山', color: '#8a7868'},
+    {value: 'desert', label: '沙漠', color: '#d8b067'},
+]
+const DEFAULT_TERRAIN_BRUSH: MapTerrainBrush = {
+    kind: 'grass',
+    radius: 48,
+    mode: 'paint',
+}
 
 function clampNumber(value: number, min: number, max: number): number {
     if (!Number.isFinite(value)) {
@@ -513,6 +525,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
 
     // ── 编辑器交互状态 ──────────────────────────────────────────────
     const [drawingShape, setDrawingShape] = useState<MapShapeDraft | null>(null)
+    const [terrainBrush, setTerrainBrush] = useState<MapTerrainBrush | null>(null)
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null)
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
     const [viewBox, setViewBox] = useState(() => createInitialMapShapeEditorViewBox(DEFAULT_CANVAS))
@@ -620,6 +633,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         setActiveMapId(entry.id)
         setSceneDirty(false)
         setDrawingShape(null)
+        setTerrainBrush(null)
         setSelectedShapeId(null)
         setSelectedLocationId(null)
         setViewBox(createInitialMapShapeEditorViewBox(nextCanvas))
@@ -781,6 +795,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                 } else {
                     setActiveMapId(null)
                     setDraft(emptyDraft())
+                    setTerrainBrush(null)
                     setScene(null)
                     setStyle('flat')
                     setActiveCanvas(DEFAULT_CANVAS)
@@ -861,6 +876,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     const handleStyleChange = useCallback((nextStyle: MapStyle) => {
         if (style === nextStyle) return
         setStyle(nextStyle)
+        if (nextStyle !== 'flat') setTerrainBrush(null)
         markMapUnsaved()
     }, [markMapUnsaved, style])
 
@@ -987,6 +1003,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             setSelectedShapeId(null)
             setSelectedLocationId(null)
             setDrawingShape(null)
+            setTerrainBrush(null)
         } catch (e) {
             setErrorMsg(`生成海岸线失败：${e instanceof Error ? e.message : String(e)}`)
         } finally {
@@ -1012,6 +1029,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         setSelectedShapeId(null)
         setSelectedLocationId(null)
         setDrawingShape(null)
+        setTerrainBrush(null)
     }, [activeCanvas, draft])
 
     // ── 底图上传 ───────────────────────────────────────────────────────────────
@@ -1145,6 +1163,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
 
     const handleAddShape = useCallback(() => {
         const next = createEmptyShapeDraft(draft.shapes)
+        setTerrainBrush(null)
         setDrawingShape(next)
         setSelectedShapeId(next.id)
         setSelectedLocationId(null)
@@ -1181,6 +1200,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             y: cy,
         }
         updateDraft(d => ({...d, keyLocations: [...d.keyLocations, loc]}))
+        setTerrainBrush(null)
         setSelectedLocationId(loc.id)
     }, [activeCanvas, draft, selectedShapeId, updateDraft])
 
@@ -1346,6 +1366,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         selectedShapeId,
         selectedLocationId,
         drawingShape,
+        terrainBrush,
         invalidShapeIds: [] as string[],
         invalidKeyLocationIds: [] as string[],
         onDraftChange: updateDraft,
@@ -1364,7 +1385,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         onShapeContextMenu: handleShapeContextMenu,
         onVertexContextMenu: handleVertexContextMenu,
         onLocationContextMenu: handleLocationContextMenu,
-    }), [draft, selectedShapeId, selectedLocationId, drawingShape, requestDeleteShape, deleteVertex, requestDeleteLocation, handleShapeContextMenu, handleVertexContextMenu, handleLocationContextMenu, updateDraft])
+    }), [draft, selectedShapeId, selectedLocationId, drawingShape, terrainBrush, requestDeleteShape, deleteVertex, requestDeleteLocation, handleShapeContextMenu, handleVertexContextMenu, handleLocationContextMenu, updateDraft])
 
     // ── 派生数据 ───────────────────────────────────────────────────────────────
 
@@ -2108,6 +2129,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                     setSelectedShapeId(null)
                                     setSelectedLocationId(null)
                                     setDrawingShape(null)
+                                    setTerrainBrush(null)
                                 }
                                 return next
                             })
@@ -2146,6 +2168,90 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                         <button type="button" className="wm-chip" onClick={handleAddLocation} disabled={!activeMapId}>
                             新增地点
                         </button>
+                        <button
+                            type="button"
+                            className={`wm-chip${terrainBrush ? ' is-active' : ''}`}
+                            title={style === 'flat' && previewRenderer === 'pixi'
+                                ? '地形笔刷'
+                                : '阶段 1 仅在 Pixi 扁平风格下提供地形笔刷'}
+                            aria-pressed={Boolean(terrainBrush)}
+                            onClick={() => {
+                                setDrawingShape(null)
+                                setSelectedShapeId(null)
+                                setSelectedLocationId(null)
+                                setTerrainBrush(current => current ? null : {...DEFAULT_TERRAIN_BRUSH})
+                            }}
+                            disabled={!activeMapId || style !== 'flat' || previewRenderer !== 'pixi'}
+                        >
+                            地形笔刷
+                        </button>
+                        {terrainBrush && (
+                            <div className="wm-terrain-tools">
+                                <div className="wm-terrain-kinds" role="group" aria-label="地形类型">
+                                    {TERRAIN_KIND_OPTIONS.map(option => (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            className={`wm-terrain-kind${terrainBrush.kind === option.value ? ' is-active' : ''}`}
+                                            title={option.label}
+                                            aria-label={option.label}
+                                            aria-pressed={terrainBrush.kind === option.value}
+                                            onClick={() => setTerrainBrush(current => current
+                                                ? {...current, kind: option.value}
+                                                : current)}
+                                        >
+                                            <span
+                                                className="wm-terrain-kind__swatch"
+                                                style={{'--wm-terrain-color': option.color} as CSSProperties}
+                                            />
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="wm-terrain-modes" role="group" aria-label="笔刷模式">
+                                    <button
+                                        type="button"
+                                        className={terrainBrush.mode === 'paint' ? 'is-active' : ''}
+                                        aria-pressed={terrainBrush.mode === 'paint'}
+                                        onClick={() => setTerrainBrush(current => current
+                                            ? {...current, mode: 'paint'}
+                                            : current)}
+                                    >画</button>
+                                    <button
+                                        type="button"
+                                        className={terrainBrush.mode === 'erase' ? 'is-active' : ''}
+                                        aria-pressed={terrainBrush.mode === 'erase'}
+                                        onClick={() => setTerrainBrush(current => current
+                                            ? {...current, mode: 'erase'}
+                                            : current)}
+                                    >擦</button>
+                                </div>
+                                <label className="wm-terrain-radius">
+                                    <span>半径 {Math.round(terrainBrush.radius)}</span>
+                                    <Slider
+                                        min={12}
+                                        max={120}
+                                        step={4}
+                                        value={terrainBrush.radius}
+                                        tooltip
+                                        onChange={value => setTerrainBrush(current => current
+                                            ? {...current, radius: readSliderNumber(value)}
+                                            : current)}
+                                    />
+                                </label>
+                                <button
+                                    type="button"
+                                    className="wm-chip"
+                                    onClick={() => updateDraft(current => ({
+                                        ...current,
+                                        terrainStrokes: (current.terrainStrokes ?? []).slice(0, -1),
+                                    }))}
+                                    disabled={(draft.terrainStrokes?.length ?? 0) === 0}
+                                >
+                                    撤销末笔
+                                </button>
+                            </div>
+                        )}
                         <div className="wm-toolbar-sep"/>
                         <button type="button" className="wm-chip"
                                 onClick={() => imageInputRef.current?.click()} disabled={!activeMapId}>

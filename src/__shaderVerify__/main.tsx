@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * shader 层验证挂载入口（临时 harness，不进产品构建）。
  *
@@ -5,12 +6,16 @@
  * → MapShapeViewport(pixi)。通过 URL 参数切换预设与 shader 开关：
  *   ?style=tolkien|ink|flat  &shader=1|0  （配合 ?mapDebug=1 输出编译/叠加日志）
  */
-import {StrictMode} from 'react'
+import {StrictMode, useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles/pixi'
 import type {PixiMapStyle} from '../features/maps/styles/pixi'
 import {MapShapeViewport} from '../features/maps/components/MapShapeEditor'
-import type {MapPreviewScene} from '../features/maps/components/MapShapeEditor'
+import type {
+    MapPreviewScene,
+    MapShapeEditorDraft,
+    MapShapeEditorViewBox,
+} from '../features/maps/components/MapShapeEditor'
 
 function makeIsland(
     cx: number,
@@ -64,11 +69,18 @@ const baseScene: MapPreviewScene = {
         {id: 'loc-3', name: '古神殿', type: '遗迹', position: [640, 170], color: [106, 67, 37, 255]},
         {id: 'loc-4', name: '南礁港', type: '港口', position: [618, 462], color: [106, 67, 37, 255]},
     ],
+    terrainStrokes: [
+        {id: 'terrain-grass', kind: 'grass', points: [[230, 270], [300, 230], [370, 250]], radius: 58, mode: 'paint'},
+        {id: 'terrain-mountain', kind: 'mountain', points: [[275, 330], [340, 350], [400, 325]], radius: 42, mode: 'paint'},
+        {id: 'terrain-desert', kind: 'desert', points: [[355, 225], [420, 275], [470, 310]], radius: 48, mode: 'paint'},
+        {id: 'terrain-erase', kind: 'grass', points: [[292, 250], [320, 270]], radius: 18, mode: 'erase'},
+    ],
 }
 
 const params = new URLSearchParams(window.location.search)
 const styleId = params.get('style') ?? 'tolkien'
 const shaderOn = params.get('shader') !== '0'
+const editMode = params.get('edit') === '1'
 
 const preset = getPixiMapStyle(styleId)
 const style: PixiMapStyle = {
@@ -80,27 +92,85 @@ const compiled = compilePixiMapStyle({style, canvas, scene: baseScene})
 declare global {
     interface Window {
         __harnessInfo?: Record<string, unknown>
+        __terrainStrokeCount?: number
     }
 }
 window.__harnessInfo = {
     styleId: style.id,
     shaderOn,
+    editMode,
     hasOverlay: Boolean(compiled.pixiProps.renderOverlay),
+}
+
+const initialDraft: MapShapeEditorDraft = {
+    shapes: baseScene.shapes.map(shape => ({
+        id: shape.id,
+        name: shape.name,
+        vertices: shape.polygon.map((point, index) => ({
+            id: `${shape.id}-vertex-${index}`,
+            x: point[0],
+            y: point[1],
+        })),
+    })),
+    keyLocations: baseScene.keyLocations.map(location => ({
+        id: location.id,
+        name: location.name,
+        type: location.type,
+        x: location.position[0],
+        y: location.position[1],
+    })),
+    terrainStrokes: baseScene.terrainStrokes,
+}
+
+function TerrainEditorHarness() {
+    const [draft, setDraft] = useState(initialDraft)
+    const [viewBox, setViewBox] = useState<MapShapeEditorViewBox>({x: 0, y: 0, ...canvas})
+    useEffect(() => {
+        window.__terrainStrokeCount = draft.terrainStrokes?.length ?? 0
+    }, [draft.terrainStrokes])
+
+    return (
+        <MapShapeViewport
+            mode="edit"
+            renderer="pixi"
+            canvas={canvas}
+            scene={{...compiled.scene, terrainStrokes: draft.terrainStrokes}}
+            viewBox={viewBox}
+            onViewBoxChange={setViewBox}
+            shapeStyle={compiled.shapeStyle}
+            keyLocationStyle={compiled.keyLocationStyle}
+            labelStyle={compiled.labelStyle}
+            pixiProps={compiled.pixiProps}
+            svgProps={{
+                draft,
+                selectedShapeId: null,
+                selectedLocationId: null,
+                drawingShape: null,
+                terrainBrush: {kind: 'grass', radius: 32, mode: 'paint'},
+                onDraftChange: setDraft,
+                onSelectedShapeChange: () => undefined,
+                onSelectedLocationChange: () => undefined,
+                onDrawingShapeChange: () => undefined,
+            }}
+        />
+    )
 }
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <div style={{width: '100%', height: '100%', ...compiled.viewportStyle}}>
-            <MapShapeViewport
-                mode="preview"
-                renderer="pixi"
-                canvas={canvas}
-                scene={compiled.scene}
-                shapeStyle={compiled.shapeStyle}
-                keyLocationStyle={compiled.keyLocationStyle}
-                labelStyle={compiled.labelStyle}
-                pixiProps={compiled.pixiProps}
-            />
+            {editMode ? <TerrainEditorHarness/> : (
+                <MapShapeViewport
+                    mode="preview"
+                    renderer="pixi"
+                    canvas={canvas}
+                    scene={compiled.scene}
+                    shapeStyle={compiled.shapeStyle}
+                    keyLocationStyle={compiled.keyLocationStyle}
+                    labelStyle={compiled.labelStyle}
+                    pixiProps={compiled.pixiProps}
+                />
+            )}
         </div>
     </StrictMode>,
 )

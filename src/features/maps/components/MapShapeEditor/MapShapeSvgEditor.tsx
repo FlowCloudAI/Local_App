@@ -7,7 +7,13 @@ import {
     useState,
 } from 'react';
 
-import type {MapEditorCanvas, MapShapeDraft, MapShapeEditorDraft, MapShapeEditorViewBox,} from './types';
+import type {
+    MapEditorCanvas,
+    MapShapeDraft,
+    MapShapeEditorDraft,
+    MapShapeEditorViewBox,
+    MapTerrainBrush,
+} from './types';
 import type {CoordinateSnapshot} from './mapShapeEditorSvgUtils';
 import {
     buildShapePoints,
@@ -98,6 +104,7 @@ export interface MapShapeSvgEditorProps {
     selectedShapeId: string | null;
     selectedLocationId: string | null;
     drawingShape: MapShapeDraft | null;
+    terrainBrush?: MapTerrainBrush | null;
     viewBox: MapShapeEditorViewBox;
     invalidShapeIds?: Iterable<string> | null;
     invalidKeyLocationIds?: Iterable<string> | null;
@@ -130,6 +137,7 @@ export function MapShapeSvgEditor({
                                       selectedShapeId,
                                       selectedLocationId,
                                       drawingShape,
+                                      terrainBrush = null,
                                       viewBox,
                                       invalidShapeIds,
                                       invalidKeyLocationIds,
@@ -158,6 +166,8 @@ export function MapShapeSvgEditor({
     const [dragState, setDragState] = useState<DragState | null>(null);
     const [pendingPointerState, setPendingPointerState] = useState<PendingPointerState | null>(null);
     const [panState, setPanState] = useState<PanState | null>(null);
+    const [activeTerrainStrokeId, setActiveTerrainStrokeId] = useState<string | null>(null);
+    const [terrainCursorPoint, setTerrainCursorPoint] = useState<{ x: number; y: number } | null>(null);
 
     const invalidShapeIdSet = new Set(invalidShapeIds ? Array.from(invalidShapeIds) : []);
     const invalidKeyLocationIdSet = new Set(invalidKeyLocationIds ? Array.from(invalidKeyLocationIds) : []);
@@ -177,7 +187,7 @@ export function MapShapeSvgEditor({
     }, [draft.keyLocations, onSelectedLocationChange, selectedLocationId]);
 
     useEffect(() => {
-        if (!dragState && !pendingPointerState && !panState) return;
+        if (!dragState && !pendingPointerState && !panState && !activeTerrainStrokeId) return;
 
         const handlePointerMove = (event: PointerEvent) => {
             if (panState) {
@@ -208,6 +218,25 @@ export function MapShapeSvgEditor({
             if (!svgElement) return;
 
             const point = toSvgPoint(svgElement, event.clientX, event.clientY, canvas);
+            if (activeTerrainStrokeId) {
+                setTerrainCursorPoint(point);
+                const activeStroke = draft.terrainStrokes?.find(stroke => stroke.id === activeTerrainStrokeId);
+                const lastPoint = activeStroke?.points.at(-1);
+                const rect = svgElement.getBoundingClientRect();
+                const minSceneDistance = rect.width > 0 ? (viewBox.width / rect.width) * 2 : 2;
+                if (!activeStroke || !lastPoint || Math.hypot(point.x - lastPoint[0], point.y - lastPoint[1]) < minSceneDistance) {
+                    return;
+                }
+
+                onDraftChange({
+                    ...draft,
+                    terrainStrokes: (draft.terrainStrokes ?? []).map(stroke => stroke.id === activeTerrainStrokeId
+                        ? {...stroke, points: [...stroke.points, [point.x, point.y] as [number, number]]}
+                        : stroke),
+                });
+                return;
+            }
+
             if (dragState) {
                 if (dragState.kind === 'vertex') {
                     onDraftChange(updateVertex(draft, dragState.shapeId, dragState.vertexId, point));
@@ -290,6 +319,9 @@ export function MapShapeSvgEditor({
         };
 
         const handlePointerUp = () => {
+            if (activeTerrainStrokeId) {
+                suppressCanvasClickRef.current = true;
+            }
             if (panState?.hasMoved) {
                 suppressCanvasClickRef.current = true;
             }
@@ -312,6 +344,7 @@ export function MapShapeSvgEditor({
             setDragState(null);
             setPendingPointerState(null);
             setPanState(null);
+            setActiveTerrainStrokeId(null);
         };
 
         window.addEventListener('pointermove', handlePointerMove);
@@ -325,6 +358,7 @@ export function MapShapeSvgEditor({
         };
     }, [
         canvas,
+        activeTerrainStrokeId,
         dragState,
         draft,
         onDraftChange,
@@ -333,6 +367,7 @@ export function MapShapeSvgEditor({
         onViewBoxChange,
         panState,
         pendingPointerState,
+        viewBox.width,
     ]);
 
     useEffect(() => {
@@ -369,6 +404,7 @@ export function MapShapeSvgEditor({
         shape: MapShapeDraft,
     ) => {
         if (readOnly) return;
+        if (terrainBrush) return;
         const svgElement = svgRef.current;
         if (!svgElement) return;
 
@@ -400,6 +436,7 @@ export function MapShapeSvgEditor({
         vertexId: string,
     ) => {
         if (readOnly) return;
+        if (terrainBrush) return;
         event.preventDefault();
         event.stopPropagation();
         setPendingPointerState(null);
@@ -413,6 +450,7 @@ export function MapShapeSvgEditor({
         locationId: string,
     ) => {
         if (readOnly) return;
+        if (terrainBrush) return;
         event.preventDefault();
         event.stopPropagation();
         setPendingPointerState({
@@ -429,6 +467,7 @@ export function MapShapeSvgEditor({
         edgeIndex: number,
     ) => {
         if (readOnly) return;
+        if (terrainBrush) return;
         event.preventDefault();
         event.stopPropagation();
 
@@ -478,6 +517,34 @@ export function MapShapeSvgEditor({
             return;
         }
 
+        if (terrainBrush && event.button === 0) {
+            const svgElement = svgRef.current;
+            if (!svgElement) return;
+            const point = toSvgPoint(svgElement, event.clientX, event.clientY, canvas);
+            const strokeId = createMapShapeEditorLocalId('terrain');
+            event.preventDefault();
+            event.stopPropagation();
+            setPendingPointerState(null);
+            setDragState(null);
+            setPanState(null);
+            setTerrainCursorPoint(point);
+            setActiveTerrainStrokeId(strokeId);
+            onDraftChange({
+                ...draft,
+                terrainStrokes: [
+                    ...(draft.terrainStrokes ?? []),
+                    {
+                        id: strokeId,
+                        kind: terrainBrush.kind,
+                        points: [[point.x, point.y]],
+                        radius: terrainBrush.radius,
+                        mode: terrainBrush.mode,
+                    },
+                ],
+            });
+            return;
+        }
+
         const target = event.target as SVGElement | null;
         const isBackgroundTarget = target?.tagName === 'svg' || target?.tagName === 'rect';
         const targetShapeId = target?.getAttribute('data-shape-id');
@@ -507,6 +574,7 @@ export function MapShapeSvgEditor({
             suppressCanvasClickRef.current = false;
             return;
         }
+        if (terrainBrush) return;
 
         const svgElement = svgRef.current;
         if (!svgElement) return;
@@ -647,6 +715,25 @@ export function MapShapeSvgEditor({
         });
     };
 
+    const handleCanvasPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+        if (!terrainBrush || activeTerrainStrokeId) return;
+        const svgElement = svgRef.current;
+        if (!svgElement) return;
+        setTerrainCursorPoint(toSvgPoint(svgElement, event.clientX, event.clientY, canvas));
+    };
+
+    const handleTerrainStrokeContextMenu = (
+        event: ReactMouseEvent<SVGElement>,
+        strokeId: string,
+    ) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onDraftChange({
+            ...draft,
+            terrainStrokes: (draft.terrainStrokes ?? []).filter(stroke => stroke.id !== strokeId),
+        });
+    };
+
     const zoomPercentage = Math.round((canvas.width / Math.max(viewBox.width, 1)) * 100);
     const locationEditorScale = viewBox.width / Math.max(canvas.width, 1);
     const locationHitRadius = 18 * locationEditorScale;
@@ -654,6 +741,7 @@ export function MapShapeSvgEditor({
     const wrapperClassName = [
         'fc-map-shape-svg-editor',
         readOnly ? 'fc-map-shape-svg-editor--readonly' : '',
+        terrainBrush ? 'fc-map-shape-svg-editor--terrain-brush' : '',
         className,
     ].filter(Boolean).join(' ');
 
@@ -678,6 +766,10 @@ export function MapShapeSvgEditor({
                     onClick={handleCanvasClick}
                     onDoubleClick={handleFinishDrawingShape}
                     onPointerDown={handleCanvasPointerDown}
+                    onPointerMove={handleCanvasPointerMove}
+                    onPointerLeave={() => {
+                        if (!activeTerrainStrokeId) setTerrainCursorPoint(null);
+                    }}
                     onContextMenu={handleCanvasContextMenuInternal}
                 >
                     <rect x={0} y={0} width={canvas.width} height={canvas.height} fill="transparent"/>
@@ -693,7 +785,10 @@ export function MapShapeSvgEditor({
                         />
                     )}
 
-                    {draft.shapes.length === 0 && !drawingShape && draft.keyLocations.length === 0 ? (
+                    {draft.shapes.length === 0
+                    && !drawingShape
+                    && draft.keyLocations.length === 0
+                    && (draft.terrainStrokes?.length ?? 0) === 0 ? (
                         <text
                             className="fc-map-shape-editor__empty-hint"
                             x={canvas.width / 2}
@@ -823,6 +918,41 @@ export function MapShapeSvgEditor({
                             />
                         </g>
                     ))}
+
+                    {terrainBrush && (draft.terrainStrokes ?? []).map(stroke => {
+                        if (stroke.points.length === 1) {
+                            return (
+                                <circle
+                                    key={stroke.id}
+                                    className="fc-map-shape-editor__terrain-stroke-hit-point"
+                                    cx={stroke.points[0][0]}
+                                    cy={stroke.points[0][1]}
+                                    r={Math.max(6, stroke.radius)}
+                                    onContextMenu={event => handleTerrainStrokeContextMenu(event, stroke.id)}
+                                />
+                            );
+                        }
+                        if (stroke.points.length < 2) return null;
+                        return (
+                            <polyline
+                                key={stroke.id}
+                                className="fc-map-shape-editor__terrain-stroke-hit"
+                                points={stroke.points.map(point => `${point[0]},${point[1]}`).join(' ')}
+                                strokeWidth={Math.max(12, stroke.radius * 2)}
+                                onContextMenu={event => handleTerrainStrokeContextMenu(event, stroke.id)}
+                            />
+                        );
+                    })}
+
+                    {terrainBrush && terrainCursorPoint && (
+                        <circle
+                            className="fc-map-shape-editor__terrain-cursor"
+                            cx={terrainCursorPoint.x}
+                            cy={terrainCursorPoint.y}
+                            r={terrainBrush.radius}
+                            vectorEffect="non-scaling-stroke"
+                        />
+                    )}
                 </svg>
             </div>
         </div>

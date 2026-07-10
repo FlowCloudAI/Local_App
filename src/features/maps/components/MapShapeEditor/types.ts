@@ -74,6 +74,14 @@ export interface MapKeyLocationDraft extends MapShapeExtensible {
 
 export type MapTerrainStrokeMode = 'paint' | 'erase';
 
+export type MapTerrainKind = 'grass' | 'mountain' | 'desert';
+
+export interface MapTerrainBrush {
+    kind: MapTerrainKind;
+    radius: number;
+    mode: MapTerrainStrokeMode;
+}
+
 export interface MapTerrainStroke {
     id: string;
     /** 地形语义由风格插件解释，协议层保持开放字符串。 */

@@ -151,6 +151,86 @@
     border-color: var(--fc-color-primary);
 }
 
+.wm-terrain-tools,
+.wm-terrain-kinds,
+.wm-terrain-modes,
+.wm-terrain-radius {
+    display: inline-flex;
+    align-items: center;
+}
+
+.wm-terrain-tools {
+    gap: var(--fc-space-xs);
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+
+.wm-terrain-kinds,
+.wm-terrain-modes {
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-sm);
+    overflow: hidden;
+}
+
+.wm-terrain-kind,
+.wm-terrain-modes button {
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fc-space-xs);
+    border: 0;
+    border-right: 1px solid var(--fc-color-border);
+    background: var(--fc-color-bg);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    padding: 0 var(--fc-space-sm);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.wm-terrain-kind:last-child,
+.wm-terrain-modes button:last-child {
+    border-right: 0;
+}
+
+.wm-terrain-kind:hover,
+.wm-terrain-modes button:hover {
+    background: var(--fc-color-bg-secondary);
+}
+
+.wm-terrain-kind.is-active,
+.wm-terrain-modes button.is-active {
+    background: color-mix(in srgb, var(--fc-color-primary) 12%, var(--fc-color-bg));
+    color: var(--fc-color-primary);
+}
+
+.wm-terrain-kind__swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--wm-terrain-color);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fc-color-text) 20%, transparent);
+    flex-shrink: 0;
+}
+
+.wm-terrain-radius {
+    width: 150px;
+    gap: var(--fc-space-sm);
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    white-space: nowrap;
+}
+
+.wm-terrain-radius > span {
+    min-width: 48px;
+}
+
+.wm-terrain-radius > :last-child {
+    min-width: 72px;
+    flex: 1;
+}
+
 /* ── 错误横幅 ────────────────────────────────────────────────────────────── */
 
 .wm-error-banner {
