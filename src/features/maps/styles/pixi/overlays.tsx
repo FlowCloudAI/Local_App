@@ -379,7 +379,6 @@ interface TerrainParams {
     grassColor?: string
     mountainColor?: string
     desertColor?: string
-    opacity?: number
 }
 
 function drawTerrainColorBlocks(
@@ -399,7 +398,7 @@ function drawTerrainColorBlocks(
         grass: [grass[0], grass[1], grass[2]],
         mountain: [mountain[0], mountain[1], mountain[2]],
         desert: [desert[0], desert[1], desert[2]],
-    }, getNumberParam(params.opacity, 0.46))
+    })
     if (!colored) return
 
     ctx.save()
@@ -500,7 +499,6 @@ function createOverlayCanvas(
             grassColor: getStringParam(terrainPlugin.params?.grassColor, '#82b45f'),
             mountainColor: getStringParam(terrainPlugin.params?.mountainColor, '#8a7868'),
             desertColor: getStringParam(terrainPlugin.params?.desertColor, '#d8b067'),
-            opacity: getNumberParam(terrainPlugin.params?.opacity, 0.46),
         }, terrainField)
     }
 

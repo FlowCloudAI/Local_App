@@ -41,7 +41,6 @@ export const flatPixiMapStyle: PixiMapStyle = {
             grassColor: '#82b45f',
             mountainColor: '#8a7868',
             desertColor: '#d8b067',
-            opacity: 0.46,
         },
     }],
     locations: {

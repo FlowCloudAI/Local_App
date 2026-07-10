@@ -15,7 +15,9 @@ import type {
     MapPreviewScene,
     MapShapeEditorDraft,
     MapShapeEditorViewBox,
+    MapTerrainStroke,
 } from '../features/maps/components/MapShapeEditor'
+import {createTerrainFieldCanvas} from '../features/maps/styles/common'
 
 function makeIsland(
     cx: number,
@@ -37,6 +39,29 @@ function makeIsland(
 }
 
 const canvas = {width: 800, height: 600}
+
+function assertTerrainLayering() {
+    const strokes: MapTerrainStroke[] = [
+        {id: 'base', kind: 'grass', points: [[32, 32]], radius: 20, mode: 'paint'},
+        {id: 'middle', kind: 'desert', points: [[32, 32]], radius: 20, mode: 'paint'},
+        {id: 'top', kind: 'grass', points: [[32, 32]], radius: 10, mode: 'paint'},
+        {id: 'erase-top', kind: 'grass', points: [[32, 32]], radius: 6, mode: 'erase'},
+    ]
+    const field = createTerrainFieldCanvas(strokes, 64, 64)
+    const data = field?.getContext('2d')?.getImageData(0, 0, 64, 64).data
+    if (!data) throw new Error('地形场自检无法读取像素')
+
+    const center = (32 * 64 + 32) * 4
+    const topRing = (32 * 64 + 40) * 4
+    if (data[center] !== 0 || data[center + 2] !== 255) {
+        throw new Error('地形场自检失败：擦除后未露出下层地形')
+    }
+    if (data[topRing] !== 255 || data[topRing + 2] !== 0) {
+        throw new Error('地形场自检失败：最上层地形未覆盖下层')
+    }
+}
+
+assertTerrainLayering()
 
 const baseScene: MapPreviewScene = {
     canvas,
