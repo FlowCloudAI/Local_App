@@ -35,6 +35,15 @@ export const flatPixiMapStyle: PixiMapStyle = {
         enabled: false,
         layers: [],
     },
+    decorations: [{
+        id: 'terrain',
+        params: {
+            grassColor: '#82b45f',
+            mountainColor: '#8a7868',
+            desertColor: '#d8b067',
+            opacity: 0.46,
+        },
+    }],
     locations: {
         renderMode: 'auto',
         marker: {

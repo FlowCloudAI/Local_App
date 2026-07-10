@@ -81,6 +81,8 @@ export interface SceneQuadShaderOptions {
     uniforms?: SceneQuadUniformRecord
     /** 声明使用海岸场纹理（fragment 里需引入 coastFieldGlsl） */
     useCoastField?: boolean
+    /** 声明使用地形覆盖度纹理。 */
+    useTerrainField?: boolean
 }
 
 /**
@@ -88,7 +90,13 @@ export interface SceneQuadShaderOptions {
  * 纹理必须以 resources 键绑定（v8 中 sampler 不能进 UniformGroup——
  * 旧实现把纹理塞进 uniforms 记录导致从未绑定成功）。
  */
-export function createSceneQuadShader({name, fragment, uniforms, useCoastField}: SceneQuadShaderOptions): Shader {
+export function createSceneQuadShader({
+    name,
+    fragment,
+    uniforms,
+    useCoastField,
+    useTerrainField,
+}: SceneQuadShaderOptions): Shader {
     const resources: Record<string, unknown> = {
         styleUniforms: new UniformGroup({
             uCanvasSize: {value: [1, 1], type: 'vec2<f32>'},
@@ -98,6 +106,9 @@ export function createSceneQuadShader({name, fragment, uniforms, useCoastField}:
     if (useCoastField) {
         // 占位纹理，update 时换绑真正的海岸场
         resources.uCoastField = Texture.WHITE.source
+    }
+    if (useTerrainField) {
+        resources.uTerrainField = Texture.EMPTY.source
     }
 
     return new Shader({
@@ -119,5 +130,10 @@ export function updateSceneQuadShader(shader: Shader, context: ShaderRenderConte
     const coastField = context.coastField as Texture | undefined
     if (coastField && 'uCoastField' in shader.resources) {
         shader.resources.uCoastField = coastField.source
+    }
+
+    const terrainField = context.terrainField as Texture | undefined
+    if (terrainField && 'uTerrainField' in shader.resources) {
+        shader.resources.uTerrainField = terrainField.source
     }
 }

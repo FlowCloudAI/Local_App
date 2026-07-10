@@ -21,7 +21,14 @@ import type {
     ShaderRenderContext,
     ShaderRenderer,
 } from './types'
-import {hexToRgbaColor, isMapDebugLogEnabled, mapRenderScale, strokeToRgbaColor} from '../common'
+import {
+    colorizeTerrainFieldCanvas,
+    createTerrainFieldCanvas,
+    hexToRgbaColor,
+    isMapDebugLogEnabled,
+    mapRenderScale,
+    strokeToRgbaColor,
+} from '../common'
 import {
     drawPixiCompassAsset,
     drawPixiEffectAsset,
@@ -368,6 +375,40 @@ function drawSeaDepthBands(
     ctx.restore()
 }
 
+interface TerrainParams {
+    grassColor?: string
+    mountainColor?: string
+    desertColor?: string
+    opacity?: number
+}
+
+function drawTerrainColorBlocks(
+    ctx: CanvasRenderingContext2D,
+    context: MapPixiPreviewOverlayContext,
+    params: TerrainParams,
+    terrainField: HTMLCanvasElement | null,
+): void {
+    if (!terrainField) return
+    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
+    if (!shapes.length) return
+
+    const grass = hexToRgbaColor(getStringParam(params.grassColor, '#82b45f'))
+    const mountain = hexToRgbaColor(getStringParam(params.mountainColor, '#8a7868'))
+    const desert = hexToRgbaColor(getStringParam(params.desertColor, '#d8b067'))
+    const colored = colorizeTerrainFieldCanvas(terrainField, {
+        grass: [grass[0], grass[1], grass[2]],
+        mountain: [mountain[0], mountain[1], mountain[2]],
+        desert: [desert[0], desert[1], desert[2]],
+    }, getNumberParam(params.opacity, 0.46))
+    if (!colored) return
+
+    ctx.save()
+    traceLandPath(ctx, shapes)
+    ctx.clip()
+    ctx.drawImage(colored, 0, 0, context.scene.canvas.width, context.scene.canvas.height)
+    ctx.restore()
+}
+
 function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverlayContext, style: PixiMapStyle) {
     const plugin = style.decorations?.find(item => item.id === 'compass')
     const size = getNumberParam(plugin?.params?.size, 58)
@@ -410,6 +451,7 @@ function createOverlayCanvas(
     context: MapPixiPreviewOverlayContext,
     style: PixiMapStyle,
     mode: OverlayCanvasMode = 'full',
+    terrainField: HTMLCanvasElement | null = null,
 ): HTMLCanvasElement | null {
     pixiOverlayLog(`createOverlayCanvas: mode=${mode} canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
     const sceneW = context.scene.canvas.width
@@ -449,6 +491,17 @@ function createOverlayCanvas(
                 shallowFade: getNumberParam(sea?.depthShallowFade, 0.9),
             }, scale)
         }
+    }
+
+    // 阶段 1 地形以平色覆盖度呈现；后续风格纹样仍位于同一层级。
+    const terrainPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'terrain') : undefined
+    if (terrainPlugin) {
+        drawTerrainColorBlocks(ctx, context, {
+            grassColor: getStringParam(terrainPlugin.params?.grassColor, '#82b45f'),
+            mountainColor: getStringParam(terrainPlugin.params?.mountainColor, '#8a7868'),
+            desertColor: getStringParam(terrainPlugin.params?.desertColor, '#d8b067'),
+            opacity: getNumberParam(terrainPlugin.params?.opacity, 0.46),
+        }, terrainField)
     }
 
     // 陆地纵深（近岸内阴影）：画在最底层，其余效果叠加其上。opacity>0 才启用。
@@ -597,10 +650,12 @@ function PixiShaderOverlay({
     context,
     style,
     coastField,
+    terrainField,
 }: {
     context: MapPixiPreviewOverlayContext
     style: PixiMapStyle
     coastField: Texture
+    terrainField: Texture
 }) {
     const sceneW = context.scene.canvas.width
     const sceneH = context.scene.canvas.height
@@ -629,6 +684,7 @@ function PixiShaderOverlay({
         const renderContext: ShaderRenderContext = {
             scene: {shapes, canvas: {width: sceneW, height: sceneH}},
             coastField,
+            terrainField,
         }
 
         const items: Array<{key: string; renderer: ShaderRenderer}> = []
@@ -642,9 +698,12 @@ function PixiShaderOverlay({
             pixiOverlayLog(`PixiShaderOverlay: added mesh for ${config.id}`)
         }
 
-        // 与 Canvas 位图的绘制次序一致：海水 → 陆地纵深 → 淡墨/笔触 → 效果（风格声明序）→ 晕线。
+        // 与 Canvas 位图的绘制次序一致：海水 → 地形 → 陆地纵深 → 淡墨/笔触 → 效果 → 晕线。
         // 海岸线本体描边与罗盘是矢量线稿，由上层的 linework 位图承担。
         push(style.decorations?.find(item => item.id === 'sea'))
+        if (terrainField !== Texture.EMPTY) {
+            push(style.decorations?.find(item => item.id === 'terrain'))
+        }
         push(style.decorations?.find(item => item.id === 'land-depth'))
         push(style.decorations?.find(item => item.id === 'ink-wash'))
         push(style.decorations?.find(item => item.id === 'brush-stroke'))
@@ -658,7 +717,7 @@ function PixiShaderOverlay({
 
         pixiOverlayLog(`PixiShaderOverlay: collected ${items.length} meshes`)
         setRenderItems(items)
-    }, [shapes, sceneW, sceneH, style, coastField])
+    }, [shapes, sceneW, sceneH, style, coastField, terrainField])
 
     // 延迟销毁 shader（GlProgram 走 Pixi 全局缓存，不随之销毁）
     useEffect(() => () => {
@@ -705,15 +764,20 @@ function PixiTextureOverlay({
     )
     const coastField = useCoastFieldTexture(coastFieldData)
     const shaderActive = wantShader && coastFieldData !== null
+    const terrainFieldCanvas = useMemo(
+        () => createTerrainFieldCanvas(context.scene.terrainStrokes, sceneW, sceneH),
+        [context.scene.terrainStrokes, sceneW, sceneH],
+    )
+    const terrainField = useCanvasTexture(terrainFieldCanvas)
 
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
     // createOverlayCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
     const overlayCanvas = useMemo(
-        () => createOverlayCanvas(context, style, shaderActive ? 'linework' : 'full'),
+        () => createOverlayCanvas(context, style, shaderActive ? 'linework' : 'full', terrainFieldCanvas),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [context.scene.shapes, sceneW, sceneH, style, shaderActive],
+        [context.scene.shapes, context.scene.terrainStrokes, sceneW, sceneH, style, shaderActive, terrainFieldCanvas],
     )
     const texture = useCanvasTexture(overlayCanvas)
 
@@ -722,7 +786,12 @@ function PixiTextureOverlay({
     return (
         <>
             {shaderActive && coastField !== Texture.EMPTY && (
-                <PixiShaderOverlay context={context} style={style} coastField={coastField}/>
+                <PixiShaderOverlay
+                    context={context}
+                    style={style}
+                    coastField={coastField}
+                    terrainField={terrainField}
+                />
             )}
             {overlayCanvas && texture !== Texture.EMPTY && (
                 <pixiSprite

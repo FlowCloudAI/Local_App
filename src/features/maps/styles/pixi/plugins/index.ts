@@ -9,6 +9,7 @@
 export * from './shared'
 export * from './paperGrainPlugin'
 export * from './seaPlugin'
+export * from './terrainPlugin'
 export * from './coastlineOutlinePlugin'
 export * from './landDepthPlugin'
 export * from './vignettePlugin'
@@ -20,6 +21,7 @@ export * from './inkWashPlugin'
 import {shaderRegistry} from '../shaderRegistry'
 import {paperGrainPlugin} from './paperGrainPlugin'
 import {seaPlugin} from './seaPlugin'
+import {terrainPlugin} from './terrainPlugin'
 import {coastlineOutlinePlugin} from './coastlineOutlinePlugin'
 import {landDepthPlugin} from './landDepthPlugin'
 import {vignettePlugin} from './vignettePlugin'
@@ -29,6 +31,7 @@ import {brushStrokePlugin} from './brushStrokePlugin'
 import {inkWashPlugin} from './inkWashPlugin'
 
 shaderRegistry.register(seaPlugin)
+shaderRegistry.register(terrainPlugin)
 shaderRegistry.register(coastlineOutlinePlugin)
 shaderRegistry.register(landDepthPlugin)
 shaderRegistry.register(inkWashPlugin)

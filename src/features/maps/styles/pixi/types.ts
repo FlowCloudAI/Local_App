@@ -20,7 +20,7 @@ export interface PixiMapStylePalette {
 export type PixiGeneratedBackgroundTexture = 'parchment' | 'rice-paper'
 export type PixiLocationIconSet = 'flat' | 'tolkien' | 'ink-stamp'
 export type PixiLocationIconAsset = MapMarkerClass
-export type PixiDecorationPluginId = 'coastline-outline' | 'compass' | 'land-depth' | 'sea' | 'brush-stroke' | 'ink-wash'
+export type PixiDecorationPluginId = 'coastline-outline' | 'compass' | 'land-depth' | 'sea' | 'terrain' | 'brush-stroke' | 'ink-wash'
 export type PixiEffectPluginId =
     | 'paper-grain'
     | 'vignette'
@@ -147,6 +147,8 @@ export interface ShaderRenderContext {
      * RG16F，R=有符号海岸距离（场景像素，>0 海侧 <0 陆侧），G=保留。
      */
     coastField?: unknown
+    /** RGBA8 地形覆盖度纹理：R=草地、G=高山、B=沙漠。 */
+    terrainField?: unknown
 }
 
 export interface ShaderRenderer {
