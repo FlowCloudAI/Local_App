@@ -12,6 +12,7 @@ import {
     db_list_entries,
     type Entry,
     type EntryBrief,
+    type DocumentContextItem,
     type PluginInfo,
     type ConversationExportFormat,
     formatApiError,
@@ -324,6 +325,24 @@ const attachmentFileTypeLabel = (attachment: Attachment) => {
     return '文件'
 }
 
+function DocumentFileIcon() {
+    return (
+        <svg viewBox="0 0 24 24" fill="none">
+            <path d="M7 3.75h6.2L18 8.55v11.7H7z"/>
+            <path d="M13 3.75v5h5"/>
+            <path d="M9.8 13h4.4M9.8 16h3.2"/>
+        </svg>
+    )
+}
+
+function DocumentRailArrow({direction}: { direction: 'previous' | 'next' }) {
+    return (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path d={direction === 'previous' ? 'M10 3L5 8L10 13' : 'M6 3L11 8L6 13'}/>
+        </svg>
+    )
+}
+
 function AiMessageAttachments({attachments}: { attachments?: Attachment[] }) {
     const fileAttachments = (attachments ?? []).filter((attachment) => attachment.type === 'file')
     if (fileAttachments.length === 0) return null
@@ -341,11 +360,7 @@ function AiMessageAttachments({attachments}: { attachments?: Attachment[] }) {
                         title={attachment.name}
                     >
                         <span className="ai-message-attachment-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none">
-                                <path d="M7 3.75h6.2L18 8.55v11.7H7z"/>
-                                <path d="M13 3.75v5h5"/>
-                                <path d="M9.8 13h4.4M9.8 16h3.2"/>
-                            </svg>
+                            <DocumentFileIcon/>
                         </span>
                         <span className="ai-message-attachment-meta">
                             <span className="ai-message-attachment-name">{attachment.name}</span>
@@ -357,6 +372,124 @@ function AiMessageAttachments({attachments}: { attachments?: Attachment[] }) {
                 )
             })}
         </div>
+    )
+}
+
+interface DocumentContextRailProps {
+    items: DocumentContextItem[]
+    onRetry: (itemId: string) => void
+    onRemove: (itemId: string) => void
+}
+
+function DocumentContextRail({items, onRetry, onRemove}: DocumentContextRailProps) {
+    const railRef = useRef<HTMLDivElement>(null)
+    const [railScroll, setRailScroll] = useState({previous: false, next: false})
+    const syncRailScroll = useCallback(() => {
+        const rail = railRef.current
+        if (!rail) return
+        const next = {
+            previous: rail.scrollLeft > 1,
+            next: rail.scrollLeft + rail.clientWidth < rail.scrollWidth - 1,
+        }
+        setRailScroll((current) => (
+            current.previous === next.previous && current.next === next.next ? current : next
+        ))
+    }, [])
+
+    useLayoutEffect(() => {
+        const rail = railRef.current
+        if (!rail) return
+        syncRailScroll()
+        const observer = new ResizeObserver(syncRailScroll)
+        observer.observe(rail)
+        return () => observer.disconnect()
+    }, [items, syncRailScroll])
+
+    const scrollRail = (direction: -1 | 1) => {
+        const rail = railRef.current
+        if (!rail) return
+        rail.scrollBy({
+            left: direction * Math.max(rail.clientWidth * 0.8, 240),
+            behavior: 'smooth',
+        })
+    }
+
+    return (
+        <section className="ai-document-context-rail" aria-label="本对话引用文档">
+            {railScroll.previous && (
+                <button
+                    type="button"
+                    className="ai-document-context-rail-nav ai-document-context-rail-nav--previous"
+                    onClick={() => scrollRail(-1)}
+                    aria-label="查看前面的引用文档"
+                    title="查看前面的引用文档"
+                >
+                    <DocumentRailArrow direction="previous"/>
+                </button>
+            )}
+            <div
+                ref={railRef}
+                className="ai-document-context-rail-track"
+                onScroll={syncRailScroll}
+                tabIndex={0}
+            >
+                {items.map((item) => {
+                    const typeLabel = item.extension ? item.extension.toUpperCase() : '文件'
+                    const statusLabel = documentContextStatusLabel(item.status)
+                    const isPdf = typeLabel === 'PDF'
+                    return (
+                        <article
+                            key={item.id}
+                            className={`ai-document-context-card ai-document-context-card--${item.status} ${isPdf ? 'ai-document-context-card--pdf' : ''}`}
+                            title={item.error ?? item.sourcePath}
+                        >
+                            <span className="ai-message-attachment-icon ai-document-context-card-icon" aria-hidden="true">
+                                <DocumentFileIcon/>
+                            </span>
+                            <span className="ai-document-context-card-meta">
+                                <span className="ai-document-context-card-name">{item.fileName}</span>
+                                <span className={`ai-document-context-card-status ai-document-context-card-status--${item.status}`} role={statusLabel ? 'status' : undefined}>
+                                    {statusLabel ? `${typeLabel} · ${statusLabel}` : `${typeLabel} · 已引用`}
+                                </span>
+                            </span>
+                            <span className="ai-document-context-card-actions">
+                                {item.status === 'failed' && (
+                                    <button
+                                        type="button"
+                                        className="ai-document-context-card-action"
+                                        onClick={() => onRetry(item.id)}
+                                        aria-label={`重新解析 ${item.fileName}`}
+                                        title="重新解析"
+                                    >
+                                        ↻
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    className="ai-document-context-card-action"
+                                    onClick={() => onRemove(item.id)}
+                                    aria-label={`停止引用 ${item.fileName}`}
+                                    title="停止后续引用"
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        </article>
+                    )
+                })}
+            </div>
+            {railScroll.next && (
+                <button
+                    type="button"
+                    className="ai-document-context-rail-nav ai-document-context-rail-nav--next"
+                    onClick={() => scrollRail(1)}
+                    aria-label="查看后面的引用文档"
+                    title="查看后面的引用文档"
+                >
+                    <DocumentRailArrow direction="next"/>
+                </button>
+            )}
+        </section>
     )
 }
 
@@ -1962,46 +2095,11 @@ export default function AIChatContent({
                             />
                         )}
                         {visibleDocumentContextItems.length > 0 && (
-                            <div className="ai-document-context-list" aria-label="文档上下文">
-                                {visibleDocumentContextItems.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className={`ai-document-context-chip ai-document-context-chip--${item.status}`}
-                                        title={item.error ?? item.sourcePath}
-                                    >
-                                        <span className="ai-document-context-name">{item.fileName}</span>
-                                        {documentContextStatusLabel(item.status) && (
-                                            <span className="ai-document-context-status">
-                                                {documentContextStatusLabel(item.status)}
-                                            </span>
-                                        )}
-                                        {item.status === 'failed' && (
-                                            <button
-                                                type="button"
-                                                className="ai-document-context-icon-btn"
-                                                onClick={(event) => {
-                                                    event.stopPropagation()
-                                                    void ctx.retryDocumentContextItem(item.id)
-                                                }}
-                                                title="重新解析"
-                                            >
-                                                ↻
-                                            </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            className="ai-document-context-icon-btn"
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                void ctx.removeDocumentContextItem(item.id)
-                                            }}
-                                            title="移除文档"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                            <DocumentContextRail
+                                items={visibleDocumentContextItems}
+                                onRetry={(itemId) => void ctx.retryDocumentContextItem(itemId)}
+                                onRemove={(itemId) => void ctx.removeDocumentContextItem(itemId)}
+                            />
                         )}
                         <div className="ai-input-meta-row">
                             <div className="ai-input-meta-controls">
