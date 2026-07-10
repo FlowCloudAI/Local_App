@@ -13,6 +13,7 @@ import {
     createMapShapeEditorLocalId,
     inferMapMarkerClass,
     MAP_MARKER_CLASS_OPTIONS,
+    MAP_TERRAIN_KIND_COLORS,
     MAP_TERRAIN_KIND_OPTIONS,
     type MapShapeSvgEditorLocationContextMenuDetail,
     type MapShapeSvgEditorShapeContextMenuDetail,
@@ -47,7 +48,7 @@ import {FloatingPanel} from '../../../shared/ui/overlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
 import {buildPixiLocationIconAsset, compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
-import {isMapDebugLogEnabled} from '../styles/common'
+import {isMapDebugLogEnabled, resolveTerrainStrokesForViewport} from '../styles/common'
 
 function mapLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -291,6 +292,11 @@ const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = buildSimpleCoastlinePar
 function emptyDraft(): MapShapeEditorDraft {
     return {shapes: [], keyLocations: [], terrainStrokes: []}
 }
+
+function hasPendingTerrainGeneration(draft: MapShapeEditorDraft, scene: MapPreviewScene | null): boolean {
+    return JSON.stringify(draft.terrainStrokes ?? []) !== JSON.stringify(scene?.terrainStrokes ?? [])
+}
+
 // 地形类型元数据统一取自 types.ts（与编辑器活笔预览共用同一颜色来源）
 const TERRAIN_KIND_OPTIONS = MAP_TERRAIN_KIND_OPTIONS
 const DEFAULT_TERRAIN_BRUSH: MapTerrainBrush = {
@@ -602,16 +608,20 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     // ── 将地图条目加载到编辑器状态 ────────────────────────────────────
 
     const loadMapData = useCallback((entry: MapEntry) => {
+        let nextDraft = emptyDraft()
         try {
-            setDraft(JSON.parse(entry.draftJson) as MapShapeEditorDraft)
+            nextDraft = JSON.parse(entry.draftJson) as MapShapeEditorDraft
         } catch {
-            setDraft(emptyDraft())
+            // 保留空草稿
         }
+        let nextScene: MapPreviewScene | null = null
         try {
-            setScene(entry.sceneJson ? JSON.parse(entry.sceneJson) as MapPreviewScene : null)
+            nextScene = entry.sceneJson ? JSON.parse(entry.sceneJson) as MapPreviewScene : null
         } catch {
-            setScene(null)
+            // 保留空场景
         }
+        setDraft(nextDraft)
+        setScene(nextScene)
         try {
             setCoastlineParams(
                 entry.coastlineParamsJson
@@ -628,7 +638,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         setBackgroundImageUrl(entry.backgroundImageUrl)
         setActiveMapName(entry.name)
         setActiveMapId(entry.id)
-        setSceneDirty(false)
+        setSceneDirty(hasPendingTerrainGeneration(nextDraft, nextScene))
         setDrawingShape(null)
         setTerrainBrush(null)
         setSelectedShapeId(null)
@@ -691,16 +701,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             keyLocations: currentDraft.keyLocations,
             terrainStrokes: currentDraft.terrainStrokes,
         })
-        const hasContent = currentDraft.shapes.length > 0
-            || currentDraft.keyLocations.length > 0
-            || (currentDraft.terrainStrokes?.length ?? 0) > 0
         const sceneToSave = currentScene
             ? {
                 ...currentScene,
                 keyLocations: previewScene.keyLocations,
-                terrainStrokes: previewScene.terrainStrokes,
             }
-            : hasContent ? previewScene : null
+            : null
 
         const entry = buildCurrentEntry(existing, sceneToSave, currentDraft, currentStyle, currentRenderer, currentCanvas, currentBg, currentName, currentCoastlineParams)
         try {
@@ -834,16 +840,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             keyLocations: draft.keyLocations,
             terrainStrokes: draft.terrainStrokes,
         })
-        const hasContent = draft.shapes.length > 0
-            || draft.keyLocations.length > 0
-            || (draft.terrainStrokes?.length ?? 0) > 0
         const sceneToSave = scene
             ? {
                 ...scene,
                 keyLocations: previewScene.keyLocations,
-                terrainStrokes: previewScene.terrainStrokes,
             }
-            : hasContent ? previewScene : null
+            : null
 
         setSaveStatus('saving')
         setErrorMsg(null)
@@ -852,7 +854,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             const saved = await map_save_map_entry(projectId, entry)
             setMaps(prev => prev.map(m => m.id === activeMapId ? saved : m))
             setScene(sceneToSave)
-            setSceneDirty(false)
             setHasUnsavedChanges(false)
             setSaveStatus('saved')
             setTimeout(() => setSaveStatus('idle'), 2500)
@@ -975,15 +976,15 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         ])
     }, [requestDeleteLocation, showContextMenu])
 
-    // ── 生成海岸线 ────────────────────────────────────────────────────
+    // ── 生成地图 ──────────────────────────────────────────────────────
 
     const handleGenerate = useCallback(async () => {
         if (draft.shapes.length === 0) {
-            setErrorMsg('请先绘制至少一个图形再生成海岸线。')
+            setErrorMsg('请先绘制至少一个图形再生成地图。')
             return
         }
         if (!validation.isValid) {
-            setErrorMsg('当前草稿仍有未闭合图形或无效地点，暂时不能生成海岸线。')
+            setErrorMsg('当前草稿仍有未闭合图形或无效地点，暂时不能生成地图。')
             return
         }
         setIsGenerating(true)
@@ -1002,7 +1003,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             setDrawingShape(null)
             setTerrainBrush(null)
         } catch (e) {
-            setErrorMsg(`生成海岸线失败：${e instanceof Error ? e.message : String(e)}`)
+            setErrorMsg(`生成地图失败：${e instanceof Error ? e.message : String(e)}`)
         } finally {
             setIsGenerating(false)
         }
@@ -1015,19 +1016,19 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             setErrorMsg('请先绘制至少一个图形。')
             return
         }
-        setScene(buildPreviewSceneFromDraft({
+        const previewScene = buildPreviewSceneFromDraft({
             canvas: activeCanvas,
             shapes: draft.shapes,
             keyLocations: draft.keyLocations,
-            terrainStrokes: draft.terrainStrokes,
-        }))
-        setSceneDirty(false)
+            terrainStrokes: scene?.terrainStrokes,
+        })
+        setScene(previewScene)
         setViewportMode('preview')
         setSelectedShapeId(null)
         setSelectedLocationId(null)
         setDrawingShape(null)
         setTerrainBrush(null)
-    }, [activeCanvas, draft])
+    }, [activeCanvas, draft, scene?.terrainStrokes])
 
     // ── 底图上传 ───────────────────────────────────────────────────────────────
 
@@ -1217,17 +1218,17 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             keyLocations: draft.keyLocations,
             terrainStrokes: draft.terrainStrokes,
         })
-        const base: MapPreviewScene = viewportMode === 'edit' && scene
-            ? scene
-            : !sceneDirty && scene
-                ? scene
-                : previewScene
+        const base: MapPreviewScene = scene ?? previewScene
 
         const result = {
             ...base,
-            // 可直接编辑的数据始终以 draft 为准，避免旧 scene 覆盖最新地点和地形笔画。
+            // 地点始终即时更新；地形则在编辑态显示草稿语义，预览态只显示上次生成快照。
             keyLocations: previewScene.keyLocations,
-            terrainStrokes: previewScene.terrainStrokes,
+            terrainStrokes: resolveTerrainStrokesForViewport(
+                viewportMode,
+                previewScene.terrainStrokes,
+                scene?.terrainStrokes,
+            ),
         }
         mapLog(`baseScene: shapes=${result.shapes?.length ?? 0} keyLocations=${result.keyLocations?.length ?? 0} hasBg=${!!result.backgroundImage} viewportMode=${viewportMode} sceneDirty=${sceneDirty}`)
         return result
@@ -1245,24 +1246,43 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     }, [baseScene, style, backgroundImageUrl, styleTextureUrl])
 
     const pixiStyle = useMemo(() => {
-        const def = getPixiMapStyle(style)
+        const preset = getPixiMapStyle(style)
+        const def = backgroundImageUrl
+            ? {
+                ...preset,
+                background: {
+                    kind: 'image' as const,
+                    url: backgroundImageUrl,
+                    color: preset.palette.ocean,
+                    opacity: 1,
+                    fit: 'cover' as const,
+                },
+            }
+            : preset
         if (!backgroundImageUrl) {
             mapLog(`pixiStyle: style=${style} bg=none keys=${Object.keys(def).join(',')}`)
-            return def
+        } else {
+            mapLog(`pixiStyle: style=${style} bg=image(${backgroundImageUrl.slice(0, 40)}) keys=${Object.keys(def).join(',')}`)
         }
 
-        mapLog(`pixiStyle: style=${style} bg=image(${backgroundImageUrl.slice(0, 40)}) keys=${Object.keys(def).join(',')}`)
+        if (viewportMode !== 'edit') return def
+
+        // 编辑模式只显示固定语义色，不运行各风格自己的地形方案。
         return {
             ...def,
-            background: {
-                kind: 'image' as const,
-                url: backgroundImageUrl,
-                color: def.palette.ocean,
-                opacity: 1,
-                fit: 'cover' as const,
-            },
+            decorations: [
+                ...(def.decorations ?? []).filter(item => item.id !== 'terrain'),
+                {
+                    id: 'terrain' as const,
+                    params: {
+                        grassColor: MAP_TERRAIN_KIND_COLORS.grass,
+                        mountainColor: MAP_TERRAIN_KIND_COLORS.mountain,
+                        desertColor: MAP_TERRAIN_KIND_COLORS.desert,
+                    },
+                },
+            ],
         }
-    }, [style, backgroundImageUrl])
+    }, [style, backgroundImageUrl, viewportMode])
 
     const compiledPixiStyle = useMemo(() => {
         const result = compilePixiMapStyle({style: pixiStyle, canvas: activeCanvas, scene: baseScene})
@@ -1775,7 +1795,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             )}
                             {!validation.isValid && (
                                 <div className="wm-sidebar-hint wm-sidebar-hint--error">
-                                    当前草稿还没通过校验，完善图形或地点后才能生成海岸线。
+                                    当前草稿还没通过校验，完善图形或地点后才能生成地图。
                                 </div>
                             )}
                         </>
@@ -2063,7 +2083,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                         <div className="wm-sidebar-hints">
                             <div className="wm-sidebar-hint">点击「绘制图形」在画布上逐点绘制区域。</div>
                             <div className="wm-sidebar-hint">双击画布或点击侧栏「完成图形」结束绘制。</div>
-                            <div className="wm-sidebar-hint">「预览草图」显示当前草稿，「生成海岸线」会自然化图形边缘。</div>
+                            <div className="wm-sidebar-hint">编辑模式显示地形语义色，「生成地图」会更新海岸线与风格化地形。</div>
                             <div className="wm-sidebar-hint">右键图形、顶点或地点可打开对应操作菜单。</div>
                             <div className="wm-sidebar-hint">地图引擎和尺寸在创建时确定，创建后不在运行时切换。</div>
                         </div>
@@ -2104,6 +2124,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                     ))}
                 </div>
                 <div className="wm-header-actions">
+                    {sceneDirty && <span className="wm-save-status">地图待生成</span>}
                     <span className={`wm-save-status${saveStatus !== 'idle' ? ` is-${saveStatus}` : ''}`}>
                         {saveStatusLabel}
                     </span>
@@ -2269,7 +2290,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                         <button type="button" className="wm-chip"
                                 onClick={() => void handleGenerate()}
                                 disabled={!activeMapId || isGenerating || !validation.isValid || draft.shapes.length === 0}>
-                            {isGenerating ? '生成中…' : '生成海岸线'}
+                            {isGenerating ? '生成中…' : '生成地图'}
                         </button>
                     </>
                 )}

@@ -12,6 +12,15 @@ export interface TerrainFieldPalette {
     desert: [number, number, number]
 }
 
+/** 编辑态读取实时语义，预览态只读取最近一次生成快照。 */
+export function resolveTerrainStrokesForViewport(
+    mode: 'edit' | 'preview',
+    draftStrokes: MapTerrainStroke[] | undefined,
+    generatedStrokes: MapTerrainStroke[] | undefined,
+): MapTerrainStroke[] {
+    return mode === 'edit' ? draftStrokes ?? [] : generatedStrokes ?? []
+}
+
 function createMaskCanvas(width: number, height: number): HTMLCanvasElement {
     const canvas = document.createElement('canvas')
     canvas.width = width

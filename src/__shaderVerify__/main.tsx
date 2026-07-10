@@ -17,7 +17,7 @@ import type {
     MapShapeEditorViewBox,
     MapTerrainStroke,
 } from '../features/maps/components/MapShapeEditor'
-import {createTerrainFieldCanvas} from '../features/maps/styles/common'
+import {createTerrainFieldCanvas, resolveTerrainStrokesForViewport} from '../features/maps/styles/common'
 
 function makeIsland(
     cx: number,
@@ -86,6 +86,14 @@ function assertTerrainLayering() {
         if (winnerCoverage < 250) {
             throw new Error(`地形场自检失败：相邻地形拼接行覆盖度塌陷（y=${y} coverage=${winnerCoverage}）`)
         }
+    }
+
+    const generated = [strokes[0]]
+    if (resolveTerrainStrokesForViewport('edit', strokes, generated) !== strokes) {
+        throw new Error('地形快照自检失败：编辑模式未读取草稿语义')
+    }
+    if (resolveTerrainStrokesForViewport('preview', strokes, generated) !== generated) {
+        throw new Error('地形快照自检失败：预览模式未保持生成快照')
     }
 }
 
