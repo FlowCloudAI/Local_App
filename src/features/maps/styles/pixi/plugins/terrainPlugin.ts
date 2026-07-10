@@ -23,13 +23,18 @@ void main() {
     if (coastSd(vUV) >= 0.0) discard;
 
     vec3 coverage = texture(uTerrainField, vUV).rgb;
-    float total = coverage.r + coverage.g + coverage.b;
-    if (total < 0.004) discard;
+    float top = max(coverage.r, max(coverage.g, coverage.b));
+    if (top < 0.02) discard;
 
     vec3 color = coverage.r >= coverage.g && coverage.r >= coverage.b
         ? uGrassColor
         : coverage.g >= coverage.b ? uMountainColor : uDesertColor;
-    finalColor = vec4(color, 1.0);
+
+    // 覆盖度→软边：地形场保留了笔画的抗锯齿 fringe（见 terrainField 合并注释），
+    // smoothstep 把它压成约 1 场景像素的柔和过渡；内部覆盖度=1 → 完全不透明。
+    float alpha = smoothstep(0.30, 0.80, top);
+    if (alpha < 0.004) discard;
+    finalColor = vec4(color * alpha, alpha);
 }
 `
 

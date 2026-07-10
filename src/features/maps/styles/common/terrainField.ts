@@ -45,22 +45,38 @@ function paintStroke(
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
     ctx.beginPath()
-    ctx.moveTo(stroke.points[0][0], stroke.points[0][1])
-    for (let pointIndex = 1; pointIndex < stroke.points.length; pointIndex++) {
-        ctx.lineTo(stroke.points[pointIndex][0], stroke.points[pointIndex][1])
-    }
-    if (stroke.points.length === 1) {
-        ctx.arc(stroke.points[0][0], stroke.points[0][1], radius, 0, Math.PI * 2)
+
+    const points = stroke.points
+    if (points.length === 1) {
+        ctx.arc(points[0][0], points[0][1], radius, 0, Math.PI * 2)
         ctx.fill()
-    } else {
-        ctx.stroke()
+        ctx.restore()
+        return
     }
+
+    // 中点二次曲线平滑（经典手绘笔迹算法）：以相邻点中点为锚、原始点为控制点，
+    // 采样点之间走圆滑曲线而非直线段——这是"快笔不成折线"的下半场
+    //（上半场是编辑器用 getCoalescedEvents 补回帧间轨迹点）。
+    ctx.moveTo(points[0][0], points[0][1])
+    if (points.length === 2) {
+        ctx.lineTo(points[1][0], points[1][1])
+    } else {
+        for (let pointIndex = 1; pointIndex < points.length - 1; pointIndex++) {
+            const midX = (points[pointIndex][0] + points[pointIndex + 1][0]) / 2
+            const midY = (points[pointIndex][1] + points[pointIndex + 1][1]) / 2
+            ctx.quadraticCurveTo(points[pointIndex][0], points[pointIndex][1], midX, midY)
+        }
+        const last = points[points.length - 1]
+        ctx.lineTo(last[0], last[1])
+    }
+    ctx.stroke()
     ctx.restore()
 }
 
 /**
  * 将地形笔画光栅化为 RGBA8 单选场：R=草地、G=高山、B=沙漠。
- * 重叠处只保留最后一次有效绘制的类型；Alpha 固定为 255，避免纹理预乘。
+ * 重叠处只保留最后一次有效绘制的类型；胜者通道写入其抗锯齿覆盖度（而非二值 255），
+ * 消费端据此做软边——二值化是"边缘锯齿"的根源。Alpha 固定 255，避免纹理预乘。
  */
 export function createTerrainFieldCanvas(
     strokes: MapTerrainStroke[] | undefined,
@@ -75,7 +91,8 @@ export function createTerrainFieldCanvas(
     const maskContexts = masks.map(mask => mask.getContext('2d'))
     if (maskContexts.some(context => !context)) return null
 
-    // ponytail: 阶段 1 在笔画列表变化时全量重建；实际大图绘制掉帧后再做增量上传。
+    // TODO: 阶段 1 在笔画列表变化时全量重建（编辑器已改为松手才提交，重建频率=每笔一次）；
+    // 大图仍掉帧时再做脏矩形增量合并。
     let hasPaintStroke = false
     for (const [strokeIndex, stroke] of strokes.entries()) {
         const channel = TERRAIN_CHANNELS.get(stroke.kind)
@@ -93,6 +110,9 @@ export function createTerrainFieldCanvas(
     const channels = maskContexts.map(context => context!.getImageData(0, 0, fieldWidth, fieldHeight).data)
 
     for (let offset = 0; offset < output.data.length; offset += 4) {
+        // 内部像素（覆盖度≥50%）按笔画次序取胜者；纯边缘像素（0<覆盖度<50%）
+        // 取覆盖度最高的通道并保留其覆盖度——这圈 fringe 就是消费端软边的原料。
+        // 注意：次序编码在抗锯齿混合下会失真，因此只对 ≥128 的实心像素解码比较。
         let topChannel = -1
         let topOrder = 0
         for (let channel = 0; channel < channels.length; channel++) {
@@ -103,14 +123,34 @@ export function createTerrainFieldCanvas(
                 topOrder = order
             }
         }
-        if (topChannel >= 0) output.data[offset + topChannel] = 255
+
+        if (topChannel >= 0) {
+            output.data[offset + topChannel] = channels[topChannel][offset + 3]
+        } else {
+            let fringeChannel = -1
+            let fringeAlpha = 0
+            for (let channel = 0; channel < channels.length; channel++) {
+                const alpha = channels[channel][offset + 3]
+                if (alpha > fringeAlpha) {
+                    fringeChannel = channel
+                    fringeAlpha = alpha
+                }
+            }
+            if (fringeChannel >= 0) output.data[offset + fringeChannel] = fringeAlpha
+        }
         output.data[offset + 3] = 255
     }
     resultContext.putImageData(output, 0, 0)
     return result
 }
 
-/** 把三通道覆盖度转换成 Canvas 回退路径可直接合成的透明色块。 */
+/** 与 shader 版一致的覆盖度→软边映射（smoothstep 0.30..0.80），保证双路径 parity。 */
+function coverageToAlpha(coverage: number): number {
+    const t = Math.max(0, Math.min(1, (coverage / 255 - 0.30) / 0.50))
+    return Math.round(t * t * (3 - 2 * t) * 255)
+}
+
+/** 把三通道覆盖度转换成 Canvas 回退路径可直接合成的透明色块（边缘按覆盖度软化）。 */
 export function colorizeTerrainFieldCanvas(
     field: HTMLCanvasElement,
     palette: TerrainFieldPalette,
@@ -127,12 +167,21 @@ export function colorizeTerrainFieldCanvas(
     const colors = [palette.grass, palette.mountain, palette.desert]
 
     for (let offset = 0; offset < source.data.length; offset += 4) {
-        const channel = source.data[offset] > 0 ? 0 : source.data[offset + 1] > 0 ? 1 : source.data[offset + 2] > 0 ? 2 : -1
+        let channel = -1
+        let coverage = 0
+        for (let candidate = 0; candidate < 3; candidate++) {
+            if (source.data[offset + candidate] > coverage) {
+                channel = candidate
+                coverage = source.data[offset + candidate]
+            }
+        }
         if (channel < 0) continue
+        const alpha = coverageToAlpha(coverage)
+        if (alpha <= 0) continue
         for (let colorIndex = 0; colorIndex < 3; colorIndex++) {
             output.data[offset + colorIndex] = colors[channel][colorIndex]
         }
-        output.data[offset + 3] = 255
+        output.data[offset + 3] = alpha
     }
     resultContext.putImageData(output, 0, 0)
     return result
