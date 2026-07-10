@@ -82,6 +82,17 @@ export interface MapTerrainBrush {
     mode: MapTerrainStrokeMode;
 }
 
+/** 地形类型的展示元数据（工具条选项与编辑器活笔预览共用的单一来源）。 */
+export const MAP_TERRAIN_KIND_OPTIONS = [
+    {value: 'grass', label: '草地', color: '#82b45f'},
+    {value: 'mountain', label: '高山', color: '#8a7868'},
+    {value: 'desert', label: '沙漠', color: '#d8b067'},
+] as const satisfies ReadonlyArray<{value: MapTerrainKind; label: string; color: string}>;
+
+export const MAP_TERRAIN_KIND_COLORS: Record<MapTerrainKind, string> = Object.fromEntries(
+    MAP_TERRAIN_KIND_OPTIONS.map(option => [option.value, option.color]),
+) as Record<MapTerrainKind, string>;
+
 export interface MapTerrainStroke {
     id: string;
     /** 地形语义由风格插件解释，协议层保持开放字符串。 */

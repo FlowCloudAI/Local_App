@@ -141,9 +141,16 @@
     pointer-events: all;
 }
 
+.fc-map-shape-editor__terrain-active {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
 .fc-map-shape-editor__terrain-cursor {
-    fill: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
-    stroke: var(--fc-color-primary);
+    /* 回退值：脱离主题 Provider 的环境（如渲染验证 harness）取不到变量时，
+       SVG 会退成默认黑色实心圆，看起来像渲染 bug。 */
+    fill: color-mix(in srgb, var(--fc-color-primary, #2563eb) 12%, transparent);
+    stroke: var(--fc-color-primary, #2563eb);
     stroke-width: 1.5;
     stroke-dasharray: 5 4;
     pointer-events: none;

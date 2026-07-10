@@ -13,7 +13,10 @@ import type {
     MapShapeEditorDraft,
     MapShapeEditorViewBox,
     MapTerrainBrush,
+    MapTerrainKind,
+    MapTerrainStroke,
 } from './types';
+import {MAP_TERRAIN_KIND_COLORS} from './types';
 import type {CoordinateSnapshot} from './mapShapeEditorSvgUtils';
 import {
     buildShapePoints,
@@ -167,6 +170,11 @@ export function MapShapeSvgEditor({
     const [pendingPointerState, setPendingPointerState] = useState<PendingPointerState | null>(null);
     const [panState, setPanState] = useState<PanState | null>(null);
     const [activeTerrainStrokeId, setActiveTerrainStrokeId] = useState<string | null>(null);
+    // 活动地形笔画不进 draft：每个采样点都写 draft 会导致整个面板重渲 + 地形场全量重光栅化，
+    // 这是涂画卡顿的根源。ref 供事件处理器读写（避免 effect 因笔画数据重订阅），
+    // state 镜像只驱动本组件的 SVG 活笔预览，松手时一次性提交进 draft。
+    const activeTerrainStrokeRef = useRef<MapTerrainStroke | null>(null);
+    const [activeTerrainStroke, setActiveTerrainStroke] = useState<MapTerrainStroke | null>(null);
     const [terrainCursorPoint, setTerrainCursorPoint] = useState<{ x: number; y: number } | null>(null);
 
     const invalidShapeIdSet = new Set(invalidShapeIds ? Array.from(invalidShapeIds) : []);
@@ -220,20 +228,28 @@ export function MapShapeSvgEditor({
             const point = toSvgPoint(svgElement, event.clientX, event.clientY, canvas);
             if (activeTerrainStrokeId) {
                 setTerrainCursorPoint(point);
-                const activeStroke = draft.terrainStrokes?.find(stroke => stroke.id === activeTerrainStrokeId);
-                const lastPoint = activeStroke?.points.at(-1);
+                const activeStroke = activeTerrainStrokeRef.current;
+                if (!activeStroke) return;
+
+                // 高速运笔时浏览器只按帧率派发 pointermove，原始事件间距可达几十像素，
+                // 直线连点就是"快笔成折线"的来源——getCoalescedEvents 取回帧间被合并的轨迹点。
                 const rect = svgElement.getBoundingClientRect();
                 const minSceneDistance = rect.width > 0 ? (viewBox.width / rect.width) * 2 : 2;
-                if (!activeStroke || !lastPoint || Math.hypot(point.x - lastPoint[0], point.y - lastPoint[1]) < minSceneDistance) {
-                    return;
-                }
+                const coalesced = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+                const sourceEvents = coalesced.length > 0 ? coalesced : [event];
 
-                onDraftChange({
-                    ...draft,
-                    terrainStrokes: (draft.terrainStrokes ?? []).map(stroke => stroke.id === activeTerrainStrokeId
-                        ? {...stroke, points: [...stroke.points, [point.x, point.y] as [number, number]]}
-                        : stroke),
-                });
+                const points = [...activeStroke.points];
+                for (const sourceEvent of sourceEvents) {
+                    const scenePoint = toSvgPoint(svgElement, sourceEvent.clientX, sourceEvent.clientY, canvas);
+                    const lastPoint = points.at(-1);
+                    if (lastPoint && Math.hypot(scenePoint.x - lastPoint[0], scenePoint.y - lastPoint[1]) < minSceneDistance) continue;
+                    points.push([scenePoint.x, scenePoint.y]);
+                }
+                if (points.length === activeStroke.points.length) return;
+
+                const nextStroke = {...activeStroke, points};
+                activeTerrainStrokeRef.current = nextStroke;
+                setActiveTerrainStroke(nextStroke);
                 return;
             }
 
@@ -321,6 +337,16 @@ export function MapShapeSvgEditor({
         const handlePointerUp = () => {
             if (activeTerrainStrokeId) {
                 suppressCanvasClickRef.current = true;
+                // 松手一次性提交：涂画全程 draft 不变，地形场只在此刻重建一次
+                const stroke = activeTerrainStrokeRef.current;
+                activeTerrainStrokeRef.current = null;
+                setActiveTerrainStroke(null);
+                if (stroke && stroke.points.length > 0) {
+                    onDraftChange({
+                        ...draft,
+                        terrainStrokes: [...(draft.terrainStrokes ?? []), stroke],
+                    });
+                }
             }
             if (panState?.hasMoved) {
                 suppressCanvasClickRef.current = true;
@@ -521,27 +547,22 @@ export function MapShapeSvgEditor({
             const svgElement = svgRef.current;
             if (!svgElement) return;
             const point = toSvgPoint(svgElement, event.clientX, event.clientY, canvas);
-            const strokeId = createMapShapeEditorLocalId('terrain');
+            const stroke: MapTerrainStroke = {
+                id: createMapShapeEditorLocalId('terrain'),
+                kind: terrainBrush.kind,
+                points: [[point.x, point.y]],
+                radius: terrainBrush.radius,
+                mode: terrainBrush.mode,
+            };
             event.preventDefault();
             event.stopPropagation();
             setPendingPointerState(null);
             setDragState(null);
             setPanState(null);
             setTerrainCursorPoint(point);
-            setActiveTerrainStrokeId(strokeId);
-            onDraftChange({
-                ...draft,
-                terrainStrokes: [
-                    ...(draft.terrainStrokes ?? []),
-                    {
-                        id: strokeId,
-                        kind: terrainBrush.kind,
-                        points: [[point.x, point.y]],
-                        radius: terrainBrush.radius,
-                        mode: terrainBrush.mode,
-                    },
-                ],
-            });
+            activeTerrainStrokeRef.current = stroke;
+            setActiveTerrainStroke(stroke);
+            setActiveTerrainStrokeId(stroke.id);
             return;
         }
 
@@ -943,6 +964,35 @@ export function MapShapeSvgEditor({
                             />
                         );
                     })}
+
+                    {/* 活笔预览：涂画期间 draft 不更新，可见反馈由这条彩色轨迹承担 */}
+                    {terrainBrush && activeTerrainStroke && (() => {
+                        const previewColor = activeTerrainStroke.mode === 'erase'
+                            ? '#f6f4ee'
+                            : MAP_TERRAIN_KIND_COLORS[activeTerrainStroke.kind as MapTerrainKind] ?? '#8a8a8a';
+                        if (activeTerrainStroke.points.length === 1) {
+                            return (
+                                <circle
+                                    className="fc-map-shape-editor__terrain-active"
+                                    cx={activeTerrainStroke.points[0][0]}
+                                    cy={activeTerrainStroke.points[0][1]}
+                                    r={activeTerrainStroke.radius}
+                                    fill={previewColor}
+                                />
+                            );
+                        }
+                        return (
+                            <polyline
+                                className="fc-map-shape-editor__terrain-active"
+                                points={activeTerrainStroke.points.map(point => `${point[0]},${point[1]}`).join(' ')}
+                                fill="none"
+                                stroke={previewColor}
+                                strokeWidth={activeTerrainStroke.radius * 2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        );
+                    })()}
 
                     {terrainBrush && terrainCursorPoint && (
                         <circle

@@ -13,6 +13,7 @@ import {
     createMapShapeEditorLocalId,
     inferMapMarkerClass,
     MAP_MARKER_CLASS_OPTIONS,
+    MAP_TERRAIN_KIND_OPTIONS,
     type MapShapeSvgEditorLocationContextMenuDetail,
     type MapShapeSvgEditorShapeContextMenuDetail,
     type MapShapeSvgEditorVertexContextMenuDetail,
@@ -25,7 +26,6 @@ import {
     type MapShapeDraft,
     type MapShapeEditorDraft,
     type MapTerrainBrush,
-    type MapTerrainKind,
     MapShapeViewport,
     type MapShapeViewportRenderer,
     moveShapeInOrder,
@@ -291,11 +291,8 @@ const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = buildSimpleCoastlinePar
 function emptyDraft(): MapShapeEditorDraft {
     return {shapes: [], keyLocations: [], terrainStrokes: []}
 }
-const TERRAIN_KIND_OPTIONS: Array<{value: MapTerrainKind; label: string; color: string}> = [
-    {value: 'grass', label: '草地', color: '#82b45f'},
-    {value: 'mountain', label: '高山', color: '#8a7868'},
-    {value: 'desert', label: '沙漠', color: '#d8b067'},
-]
+// 地形类型元数据统一取自 types.ts（与编辑器活笔预览共用同一颜色来源）
+const TERRAIN_KIND_OPTIONS = MAP_TERRAIN_KIND_OPTIONS
 const DEFAULT_TERRAIN_BRUSH: MapTerrainBrush = {
     kind: 'grass',
     radius: 48,
