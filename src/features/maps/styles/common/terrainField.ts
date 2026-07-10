@@ -75,8 +75,9 @@ function paintStroke(
 
 /**
  * 将地形笔画光栅化为 RGBA8 单选场：R=草地、G=高山、B=沙漠。
- * 重叠处只保留最后一次有效绘制的类型；胜者通道沿用各层最大覆盖度，避免内部交界露底，
- * 外缘仍保留抗锯齿覆盖度供消费端做软边。Alpha 固定 255，避免纹理预乘。
+ * 重叠处只保留最后一次有效绘制的类型；胜者通道写入并集覆盖度（Σ各通道覆盖度，封顶 255）——
+ * 异种笔画交界两侧的抗锯齿量互补，相加即恢复满覆盖，交界处不露底；
+ * 单一笔画的外缘无邻居，仍是原始抗锯齿覆盖度，供消费端做软边。Alpha 固定 255，避免纹理预乘。
  */
 export function createTerrainFieldCanvas(
     strokes: MapTerrainStroke[] | undefined,
@@ -110,15 +111,21 @@ export function createTerrainFieldCanvas(
     const channels = maskContexts.map(context => context!.getImageData(0, 0, fieldWidth, fieldHeight).data)
 
     for (let offset = 0; offset < output.data.length; offset += 4) {
-        // 内部像素（覆盖度≥50%）按笔画次序取胜者；纯边缘像素（0<覆盖度<50%）
-        // 取覆盖度最高的通道并保留其覆盖度——这圈 fringe 就是消费端软边的原料。
-        // 注意：次序编码在抗锯齿混合下会失真，因此只对 ≥128 的实心像素解码比较。
+        // 胜者选择：实心像素（覆盖度≥50%）按笔画次序取最后绘制者；纯边缘像素
+        // 退回覆盖度最高的通道。注意：次序编码在抗锯齿混合下会失真，
+        // 因此只对 ≥128 的实心像素解码比较。
         let topChannel = -1
         let topOrder = 0
-        let maxCoverage = 0
+        let fringeChannel = -1
+        let fringeCoverage = 0
+        let totalCoverage = 0
         for (let channel = 0; channel < channels.length; channel++) {
             const coverage = channels[channel][offset + 3]
-            maxCoverage = Math.max(maxCoverage, coverage)
+            totalCoverage += coverage
+            if (coverage > fringeCoverage) {
+                fringeChannel = channel
+                fringeCoverage = coverage
+            }
             if (coverage < 128) continue
             const order = decodeStrokeOrder(channels[channel], offset)
             if (order > topOrder) {
@@ -127,20 +134,11 @@ export function createTerrainFieldCanvas(
             }
         }
 
-        if (topChannel >= 0) {
-            // 顶层类型的抗锯齿边缘若落在完整下层之上，沿用下层覆盖度，避免露出白缝。
-            output.data[offset + topChannel] = maxCoverage
-        } else {
-            let fringeChannel = -1
-            let fringeAlpha = 0
-            for (let channel = 0; channel < channels.length; channel++) {
-                const alpha = channels[channel][offset + 3]
-                if (alpha > fringeAlpha) {
-                    fringeChannel = channel
-                    fringeAlpha = alpha
-                }
-            }
-            if (fringeChannel >= 0) output.data[offset + fringeChannel] = fringeAlpha
+        // 胜者通道写入并集覆盖度：异种笔画的抗锯齿边缘互相拼接/叠压时，
+        // 交界像素两侧覆盖度互补，只保留胜者自身覆盖度会留下半透明缝。
+        const winner = topChannel >= 0 ? topChannel : fringeChannel
+        if (winner >= 0) {
+            output.data[offset + winner] = Math.min(255, totalCoverage)
         }
         output.data[offset + 3] = 255
     }

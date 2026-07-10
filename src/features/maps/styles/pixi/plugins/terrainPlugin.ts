@@ -23,16 +23,20 @@ void main() {
     if (coastSd(vUV) >= 0.0) discard;
 
     vec3 coverage = texture(uTerrainField, vUV).rgb;
-    float top = max(coverage.r, max(coverage.g, coverage.b));
-    if (top < 0.02) discard;
+    // 透明度必须由三通道总覆盖度决定，不能用胜者通道：场内异种地形交界是
+    // (1,0,0)|(0,1,0) 的单热像素，双线性插值会把每个通道都压到 ~0.5，
+    // max 通道随之跌进 smoothstep 低段 → 交界处露出底色白缝；而总和在
+    // 线性插值下保持 1，交界处始终完全不透明。
+    float total = coverage.r + coverage.g + coverage.b;
+    if (total < 0.02) discard;
 
-    vec3 color = coverage.r >= coverage.g && coverage.r >= coverage.b
-        ? uGrassColor
-        : coverage.g >= coverage.b ? uMountainColor : uDesertColor;
+    // 颜色按通道覆盖度加权：交界处在 1 个场像素内平滑过渡，
+    // 与 Canvas 回退（逐 texel 单选色 + drawImage 放大插值）观感一致。
+    vec3 color = (coverage.r * uGrassColor + coverage.g * uMountainColor + coverage.b * uDesertColor) / total;
 
-    // 覆盖度→软边：地形场保留了笔画的抗锯齿 fringe（见 terrainField 合并注释），
+    // 覆盖度→软边：地形场外缘保留了笔画的抗锯齿 fringe（见 terrainField 合并注释），
     // smoothstep 把它压成约 1 场景像素的柔和过渡；内部覆盖度=1 → 完全不透明。
-    float alpha = smoothstep(0.30, 0.80, top);
+    float alpha = smoothstep(0.30, 0.80, total);
     if (alpha < 0.004) discard;
     finalColor = vec4(color * alpha, alpha);
 }

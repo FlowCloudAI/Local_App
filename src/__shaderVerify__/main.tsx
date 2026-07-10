@@ -71,6 +71,22 @@ function assertTerrainLayering() {
             throw new Error('地形场自检失败：不同地形交界处露出半透明空隙')
         }
     }
+
+    // 相邻异种笔画恰好拼接（半像素对齐）：交界行两侧各只有 ~50% 抗锯齿覆盖度，
+    // 并集合并后胜者通道应恢复满覆盖——只保留胜者自身覆盖度会在交界行留下半透明缝。
+    const seamField = createTerrainFieldCanvas([
+        {id: 'seam-grass', kind: 'grass', points: [[8, 20.5], [56, 20.5]], radius: 10, mode: 'paint'},
+        {id: 'seam-mountain', kind: 'mountain', points: [[8, 40.5], [56, 40.5]], radius: 10, mode: 'paint'},
+    ], 64, 64)
+    const seamData = seamField?.getContext('2d')?.getImageData(0, 0, 64, 64).data
+    if (!seamData) throw new Error('地形场拼接自检无法读取像素')
+    for (let y = 15; y <= 45; y++) {
+        const offset = (y * 64 + 32) * 4
+        const winnerCoverage = Math.max(seamData[offset], seamData[offset + 1], seamData[offset + 2])
+        if (winnerCoverage < 250) {
+            throw new Error(`地形场自检失败：相邻地形拼接行覆盖度塌陷（y=${y} coverage=${winnerCoverage}）`)
+        }
+    }
 }
 
 assertTerrainLayering()
