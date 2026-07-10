@@ -402,6 +402,7 @@ function isEffectPluginId(id: string): id is PixiEffectPluginId {
  * - full：全部效果（Canvas 回退路径）；
  * - linework：只画矢量线稿（海岸线本体描边 + 罗盘）。shader 路径下距离场类
  *   效果都交给 Mesh 插件，线稿位图叠在它们之上，重绘开销只剩轻量笔画。
+ * 水墨的 brush-stroke / ink-wash 只保证 shader 路径效果；Canvas 回退不补等价笔触。
  */
 type OverlayCanvasMode = 'full' | 'linework'
 
