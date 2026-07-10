@@ -69,27 +69,11 @@ const baseScene: MapPreviewScene = {
 const params = new URLSearchParams(window.location.search)
 const styleId = params.get('style') ?? 'tolkien'
 const shaderOn = params.get('shader') !== '0'
-// waveBoost=1：把海浪调密调长，专供检查波浪完整性（跨格截断问题）
-const waveBoost = params.get('waveBoost') === '1'
 
 const preset = getPixiMapStyle(styleId)
 const style: PixiMapStyle = {
     ...preset,
     useShaderOptimization: shaderOn,
-    decorations: preset.decorations?.map(item => (
-        waveBoost && item.id === 'sea'
-            ? {
-                ...item,
-                params: {
-                    ...item.params,
-                    waveDensity: 1,
-                    waveOpacity: 0.55,
-                    waveSegLength: 40,
-                    waveSpacing: 44,
-                },
-            }
-            : item
-    )),
 }
 const compiled = compilePixiMapStyle({style, canvas, scene: baseScene})
 
