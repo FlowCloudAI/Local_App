@@ -59,6 +59,18 @@ function assertTerrainLayering() {
     if (data[topRing] !== 255 || data[topRing + 2] !== 0) {
         throw new Error('地形场自检失败：最上层地形未覆盖下层')
     }
+
+    const overlapField = createTerrainFieldCanvas([
+        {id: 'overlap-base', kind: 'grass', points: [[32, 32]], radius: 20, mode: 'paint'},
+        {id: 'overlap-top', kind: 'mountain', points: [[32, 32]], radius: 10, mode: 'paint'},
+    ], 64, 64)
+    const overlapData = overlapField?.getContext('2d')?.getImageData(0, 0, 64, 64).data
+    if (!overlapData) throw new Error('地形场重叠自检无法读取像素')
+    for (let offset = 0; offset < overlapData.length; offset += 4) {
+        if (overlapData[offset + 1] > 0 && overlapData[offset + 1] < 255) {
+            throw new Error('地形场自检失败：不同地形交界处露出半透明空隙')
+        }
+    }
 }
 
 assertTerrainLayering()

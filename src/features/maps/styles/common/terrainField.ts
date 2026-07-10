@@ -75,8 +75,8 @@ function paintStroke(
 
 /**
  * 将地形笔画光栅化为 RGBA8 单选场：R=草地、G=高山、B=沙漠。
- * 重叠处只保留最后一次有效绘制的类型；胜者通道写入其抗锯齿覆盖度（而非二值 255），
- * 消费端据此做软边——二值化是"边缘锯齿"的根源。Alpha 固定 255，避免纹理预乘。
+ * 重叠处只保留最后一次有效绘制的类型；胜者通道沿用各层最大覆盖度，避免内部交界露底，
+ * 外缘仍保留抗锯齿覆盖度供消费端做软边。Alpha 固定 255，避免纹理预乘。
  */
 export function createTerrainFieldCanvas(
     strokes: MapTerrainStroke[] | undefined,
@@ -115,8 +115,11 @@ export function createTerrainFieldCanvas(
         // 注意：次序编码在抗锯齿混合下会失真，因此只对 ≥128 的实心像素解码比较。
         let topChannel = -1
         let topOrder = 0
+        let maxCoverage = 0
         for (let channel = 0; channel < channels.length; channel++) {
-            if (channels[channel][offset + 3] < 128) continue
+            const coverage = channels[channel][offset + 3]
+            maxCoverage = Math.max(maxCoverage, coverage)
+            if (coverage < 128) continue
             const order = decodeStrokeOrder(channels[channel], offset)
             if (order > topOrder) {
                 topChannel = channel
@@ -125,7 +128,8 @@ export function createTerrainFieldCanvas(
         }
 
         if (topChannel >= 0) {
-            output.data[offset + topChannel] = channels[topChannel][offset + 3]
+            // 顶层类型的抗锯齿边缘若落在完整下层之上，沿用下层覆盖度，避免露出白缝。
+            output.data[offset + topChannel] = maxCoverage
         } else {
             let fringeChannel = -1
             let fringeAlpha = 0

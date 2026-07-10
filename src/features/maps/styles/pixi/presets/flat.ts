@@ -32,17 +32,31 @@ export const flatPixiMapStyle: PixiMapStyle = {
         },
     },
     coastline: {
-        enabled: false,
-        layers: [],
+        enabled: true,
+        layers: [{
+            color: '#185fa5',
+            opacity: 1,
+            width: 2,
+            jitter: 0,
+        }],
     },
-    decorations: [{
-        id: 'terrain',
-        params: {
-            grassColor: '#82b45f',
-            mountainColor: '#8a7868',
-            desertColor: '#d8b067',
+    decorations: [
+        {
+            id: 'terrain',
+            params: {
+                grassColor: '#82b45f',
+                mountainColor: '#8a7868',
+                desertColor: '#d8b067',
+            },
         },
-    }],
+        {
+            id: 'coastline-outline',
+            params: {
+                brush: 'tolkien-coastline',
+                hatchRings: 0,
+            },
+        },
+    ],
     locations: {
         renderMode: 'auto',
         marker: {
