@@ -66,6 +66,7 @@ pub fn save_map_shape_scene(
             coastline_v2_params.as_ref(),
         ),
         key_locations: build_preview_key_locations(&request.key_locations),
+        terrain_strokes: request.terrain_strokes.clone(),
         ext: None,
     };
 
@@ -450,7 +451,7 @@ fn safe_location_name(location: &MapKeyLocationDraft) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map::types::{MapEditorCanvas, MapShapeVertex};
+    use crate::map::types::{MapEditorCanvas, MapShapeVertex, MapTerrainStroke};
 
     fn build_request() -> MapShapeSaveRequest {
         MapShapeSaveRequest {
@@ -500,6 +501,13 @@ mod tests {
                 biz_id: None,
                 ext: None,
             }],
+            terrain_strokes: vec![MapTerrainStroke {
+                id: "terrain-1".to_string(),
+                kind: "grass".to_string(),
+                points: vec![[220.0, 180.0], [280.0, 220.0]],
+                radius: 32.0,
+                mode: "paint".to_string(),
+            }],
             meta: Some(MapSaveMeta {
                 protocol_version: Some(MapProtocolVersion::MapShapeMvpV1),
                 scenario: Some(MapScenario::CoastlineMvp),
@@ -515,6 +523,8 @@ mod tests {
         let response = save_map_shape_scene(build_request()).expect("should succeed");
         assert_eq!(response.scene.shapes.len(), 1);
         assert_eq!(response.scene.key_locations.len(), 1);
+        assert_eq!(response.scene.terrain_strokes.len(), 1);
+        assert_eq!(response.scene.terrain_strokes[0].kind, "grass");
         assert_eq!(response.scene.shapes[0].fill_color, [216, 236, 255, 88]);
         assert_eq!(response.scene.key_locations[0].color, [226, 75, 74, 255]);
         assert_eq!(

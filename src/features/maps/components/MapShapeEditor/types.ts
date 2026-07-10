@@ -72,9 +72,21 @@ export interface MapKeyLocationDraft extends MapShapeExtensible {
     bizId?: string | null;
 }
 
+export type MapTerrainStrokeMode = 'paint' | 'erase';
+
+export interface MapTerrainStroke {
+    id: string;
+    /** 地形语义由风格插件解释，协议层保持开放字符串。 */
+    kind: string;
+    points: [number, number][];
+    radius: number;
+    mode: MapTerrainStrokeMode;
+}
+
 export interface MapShapeEditorDraft {
     shapes: MapShapeDraft[];
     keyLocations: MapKeyLocationDraft[];
+    terrainStrokes?: MapTerrainStroke[];
 }
 
 export interface MapShapeRequestMeta extends MapShapeExtensible {
@@ -87,6 +99,7 @@ export interface MapShapeSaveRequest {
     canvas: MapEditorCanvas;
     shapes: MapShapeDraft[];
     keyLocations: MapKeyLocationDraft[];
+    terrainStrokes?: MapTerrainStroke[];
     meta?: MapShapeRequestMeta;
 }
 
@@ -180,6 +193,7 @@ export interface MapPreviewScene extends MapShapeExtensible {
     canvas: MapEditorCanvas;
     shapes: MapPreviewShape[];
     keyLocations: MapPreviewKeyLocation[];
+    terrainStrokes?: MapTerrainStroke[];
     backgroundImage?: MapPreviewBackgroundImage;
 }
 

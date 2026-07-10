@@ -77,6 +77,7 @@ export function buildPreviewSceneFromDraft(request: MapShapeSaveRequest): MapPre
         canvas: request.canvas,
         shapes: buildPreviewShapes(request),
         keyLocations: buildPreviewKeyLocations(request),
+        terrainStrokes: request.terrainStrokes ?? [],
         ext: request.meta?.ext,
     };
 }

@@ -287,7 +287,7 @@ const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = buildSimpleCoastlinePar
 // ── 辅助函数 ───────────────────────────────────────────────────────────────────
 
 function emptyDraft(): MapShapeEditorDraft {
-    return {shapes: [], keyLocations: []}
+    return {shapes: [], keyLocations: [], terrainStrokes: []}
 }
 
 function clampNumber(value: number, min: number, max: number): number {
@@ -677,11 +677,18 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         const previewScene = buildPreviewSceneFromDraft({
             canvas: currentCanvas,
             shapes: currentDraft.shapes,
-            keyLocations: currentDraft.keyLocations
+            keyLocations: currentDraft.keyLocations,
+            terrainStrokes: currentDraft.terrainStrokes,
         })
-        const hasContent = currentDraft.shapes.length > 0 || currentDraft.keyLocations.length > 0
+        const hasContent = currentDraft.shapes.length > 0
+            || currentDraft.keyLocations.length > 0
+            || (currentDraft.terrainStrokes?.length ?? 0) > 0
         const sceneToSave = currentScene
-            ? {...currentScene, keyLocations: previewScene.keyLocations}
+            ? {
+                ...currentScene,
+                keyLocations: previewScene.keyLocations,
+                terrainStrokes: previewScene.terrainStrokes,
+            }
             : hasContent ? previewScene : null
 
         const entry = buildCurrentEntry(existing, sceneToSave, currentDraft, currentStyle, currentRenderer, currentCanvas, currentBg, currentName, currentCoastlineParams)
@@ -812,11 +819,18 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         const previewScene = buildPreviewSceneFromDraft({
             canvas: activeCanvas,
             shapes: draft.shapes,
-            keyLocations: draft.keyLocations
+            keyLocations: draft.keyLocations,
+            terrainStrokes: draft.terrainStrokes,
         })
-        const hasContent = draft.shapes.length > 0 || draft.keyLocations.length > 0
+        const hasContent = draft.shapes.length > 0
+            || draft.keyLocations.length > 0
+            || (draft.terrainStrokes?.length ?? 0) > 0
         const sceneToSave = scene
-            ? {...scene, keyLocations: previewScene.keyLocations}
+            ? {
+                ...scene,
+                keyLocations: previewScene.keyLocations,
+                terrainStrokes: previewScene.terrainStrokes,
+            }
             : hasContent ? previewScene : null
 
         setSaveStatus('saving')
@@ -966,6 +980,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                 canvas: activeCanvas,
                 shapes: draft.shapes,
                 keyLocations: draft.keyLocations,
+                terrainStrokes: draft.terrainStrokes,
             }, coastlineParams)
             setScene(response.scene)
             setSceneDirty(false)
@@ -986,7 +1001,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             setErrorMsg('请先绘制至少一个图形。')
             return
         }
-        setScene(buildPreviewSceneFromDraft({canvas: activeCanvas, shapes: draft.shapes, keyLocations: draft.keyLocations}))
+        setScene(buildPreviewSceneFromDraft({
+            canvas: activeCanvas,
+            shapes: draft.shapes,
+            keyLocations: draft.keyLocations,
+            terrainStrokes: draft.terrainStrokes,
+        }))
         setSceneDirty(false)
         setViewportMode('preview')
         setSelectedShapeId(null)
@@ -1177,7 +1197,8 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         const previewScene = buildPreviewSceneFromDraft({
             canvas: activeCanvas,
             shapes: draft.shapes,
-            keyLocations: draft.keyLocations
+            keyLocations: draft.keyLocations,
+            terrainStrokes: draft.terrainStrokes,
         })
         const base: MapPreviewScene = viewportMode === 'edit' && scene
             ? scene
@@ -1187,8 +1208,9 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
 
         const result = {
             ...base,
-            // 关键地点属于编辑草稿数据，预览时始终以 draft 为准，避免旧 scene 覆盖最新地点。
+            // 可直接编辑的数据始终以 draft 为准，避免旧 scene 覆盖最新地点和地形笔画。
             keyLocations: previewScene.keyLocations,
+            terrainStrokes: previewScene.terrainStrokes,
         }
         mapLog(`baseScene: shapes=${result.shapes?.length ?? 0} keyLocations=${result.keyLocations?.length ?? 0} hasBg=${!!result.backgroundImage} viewportMode=${viewportMode} sceneDirty=${sceneDirty}`)
         return result

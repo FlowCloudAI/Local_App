@@ -242,6 +242,16 @@ pub struct MapKeyLocationDraft {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct MapTerrainStroke {
+    pub id: String,
+    pub kind: String,
+    pub points: Vec<[f64; 2]>,
+    pub radius: f64,
+    pub mode: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct MapSaveMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protocol_version: Option<MapProtocolVersion>,
@@ -261,6 +271,8 @@ pub struct MapShapeSaveRequest {
     pub canvas: MapEditorCanvas,
     pub shapes: Vec<MapShapeDraft>,
     pub key_locations: Vec<MapKeyLocationDraft>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub terrain_strokes: Vec<MapTerrainStroke>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<MapSaveMeta>,
 }
@@ -324,6 +336,8 @@ pub struct MapPreviewScene {
     pub canvas: MapEditorCanvas,
     pub shapes: Vec<MapPreviewShape>,
     pub key_locations: Vec<MapPreviewKeyLocation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub terrain_strokes: Vec<MapTerrainStroke>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ext: Option<serde_json::Value>,
 }
