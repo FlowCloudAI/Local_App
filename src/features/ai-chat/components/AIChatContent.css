@@ -757,7 +757,7 @@
     gap: 16px;
     width: 100%;
     max-width: var(--ai-chat-content-max-width);
-    margin: 0 auto 220px;
+    margin: 0 auto var(--ai-messages-bottom-space, 220px);
 }
 
 .ai-report-context-bar + .ai-messages-list {

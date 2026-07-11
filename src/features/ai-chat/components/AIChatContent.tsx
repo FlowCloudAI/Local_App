@@ -989,6 +989,20 @@ export default function AIChatContent({
         })
     }, [ctx.messages.length, ctx.streamingBlocks, autoScroll])
 
+    useLayoutEffect(() => {
+        const input = inputWikiContainerRef.current
+        const messages = messagesContainerRef.current
+        if (!input || !messages) return
+        const syncInputClearance = () => {
+            messages.style.setProperty('--ai-messages-bottom-space', `${input.offsetHeight + 72}px`)
+            if (autoScroll) messages.scrollTop = messages.scrollHeight
+        }
+        syncInputClearance()
+        const observer = new ResizeObserver(syncInputClearance)
+        observer.observe(input)
+        return () => observer.disconnect()
+    }, [autoScroll])
+
     const handleMessagesScroll = useCallback(() => {
         const container = messagesContainerRef.current
         if (!container) return
