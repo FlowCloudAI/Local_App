@@ -415,7 +415,10 @@ function DocumentContextRail({items, onRetry, onRemove}: DocumentContextRailProp
     }
 
     return (
-        <section className="ai-document-context-rail" aria-label="本对话引用文档">
+        <section
+            className={`ai-document-context-rail${railScroll.previous ? ' has-previous' : ''}${railScroll.next ? ' has-next' : ''}`}
+            aria-label="本对话引用文档"
+        >
             {railScroll.previous && (
                 <button
                     type="button"

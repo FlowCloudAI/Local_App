@@ -1078,7 +1078,6 @@
 .ai-floating-input-wrapper {
     --ai-conversation-settings-input-overlap: 1.1rem;
     --ai-floating-input-bottom-gap: 24px;
-    --ai-floating-input-bg: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     position: absolute;
     bottom: var(--ai-floating-input-bottom-gap);
     left: 50%;
@@ -1108,7 +1107,7 @@
 
 .ai-floating-input-inner {
     position: relative;
-    background: var(--ai-floating-input-bg);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     border-radius: var(--fc-radius-xl);
@@ -1261,10 +1260,7 @@
     line-height: 1.5;
 }
 
-.ai-main.is-character .ai-floating-input-wrapper {
-    --ai-floating-input-bg: color-mix(in srgb, var(--fc-color-bg) 82%, rgba(14, 16, 26, 0.72));
-}
-
+.ai-main.is-character .ai-floating-input-inner,
 .ai-main.is-character .ai-scroll-to-bottom-btn,
 .ai-main.is-character .ai-conversation-settings-panel,
 .ai-main.is-character .ai-topbar {
@@ -1368,10 +1364,25 @@
 }
 
 .ai-document-context-rail-track {
+    --ai-document-context-mask: none;
     height: auto;
     min-width: 0;
     scroll-behavior: smooth;
     scroll-snap-type: x proximity;
+    -webkit-mask-image: var(--ai-document-context-mask);
+    mask-image: var(--ai-document-context-mask);
+}
+
+.ai-document-context-rail.has-previous .ai-document-context-rail-track {
+    --ai-document-context-mask: linear-gradient(90deg, transparent 0, var(--fc-color-text) 3rem, var(--fc-color-text) 100%);
+}
+
+.ai-document-context-rail.has-next .ai-document-context-rail-track {
+    --ai-document-context-mask: linear-gradient(90deg, var(--fc-color-text) 0, var(--fc-color-text) calc(100% - 3rem), transparent 100%);
+}
+
+.ai-document-context-rail.has-previous.has-next .ai-document-context-rail-track {
+    --ai-document-context-mask: linear-gradient(90deg, transparent 0, var(--fc-color-text) 3rem, var(--fc-color-text) calc(100% - 3rem), transparent 100%);
 }
 
 .ai-document-context-rail-track.fc-roll--horizontal > .fc-roll__content {
@@ -1487,6 +1498,7 @@
     place-items: center;
     border: 0;
     border-radius: 0;
+    background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
     transition: color 0.15s ease;
@@ -1498,12 +1510,10 @@
 
 .ai-document-context-rail-nav--previous {
     left: 0;
-    background: linear-gradient(90deg, var(--ai-floating-input-bg) 20%, transparent 100%);
 }
 
 .ai-document-context-rail-nav--next {
     right: 0;
-    background: linear-gradient(270deg, var(--ai-floating-input-bg) 20%, transparent 100%);
 }
 
 .ai-conversation-settings-toggle {
