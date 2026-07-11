@@ -28,8 +28,12 @@ function createMaskCanvas(width: number, height: number): HTMLCanvasElement {
     return canvas
 }
 
+function encodeStrokeOrderValue(order: number, strokeCount: number): number {
+    return Math.max(1, Math.round(order / Math.max(1, strokeCount) * 0xffffff))
+}
+
 function encodeStrokeOrder(order: number, strokeCount: number): string {
-    const value = Math.max(1, Math.round(order / Math.max(1, strokeCount) * 0xffffff))
+    const value = encodeStrokeOrderValue(order, strokeCount)
     return `rgb(${value & 0xff}, ${(value >> 8) & 0xff}, ${(value >> 16) & 0xff})`
 }
 
@@ -109,10 +113,11 @@ function paintStroke(
  * 异种笔画交界两侧的抗锯齿量互补，相加即恢复满覆盖，交界处不露底；
  * 单一笔画的外缘无邻居，仍是原始抗锯齿覆盖度，供消费端做软边。
  */
-export function createTerrainFieldData(
+function buildTerrainFieldData(
     strokes: MapTerrainStroke[] | undefined,
     width: number,
     height: number,
+    winningStrokeIndexes?: Set<number>,
 ): TerrainFieldData | null {
     const fieldWidth = Math.round(width)
     const fieldHeight = Math.round(height)
@@ -123,6 +128,7 @@ export function createTerrainFieldData(
     const maskContexts = masks.map(mask => mask.getContext('2d'))
     if (maskContexts.some(context => !context)) return null
     const maskIndexByKind = new Map<string, number>(fieldKinds.map((definition, index) => [definition.id, index]))
+    const strokeIndexByOrder = new Map<number, number>()
 
     // TODO: 阶段 1 在笔画列表变化时全量重建（编辑器已改为松手才提交，重建频率=每笔一次）；
     // 大图仍掉帧时再做脏矩形增量合并。
@@ -136,6 +142,7 @@ export function createTerrainFieldData(
         }
         const maskIndex = maskIndexByKind.get(stroke.kind)
         if (maskIndex === undefined) continue
+        strokeIndexByOrder.set(encodeStrokeOrderValue(strokeIndex + 1, strokes.length), strokeIndex)
         paintStroke(maskContexts[maskIndex]!, stroke, strokeIndex + 1, strokes.length)
         hasPaintStroke = true
     }
@@ -171,9 +178,66 @@ export function createTerrainFieldData(
         // 胜者通道写入并集覆盖度：异种笔画的抗锯齿边缘互相拼接/叠压时，
         // 交界像素两侧覆盖度互补，只保留胜者自身覆盖度会留下半透明缝。
         const winner = topChannel >= 0 ? topChannel : fringeChannel
+        if (topChannel >= 0) {
+            const strokeIndex = strokeIndexByOrder.get(topOrder)
+            if (strokeIndex !== undefined) winningStrokeIndexes?.add(strokeIndex)
+        }
         output[offset] = winner >= 0 ? fieldKinds[winner].order : TERRAIN_FIELD_EMPTY_INDEX
         output[offset + 1] = winner >= 0 ? Math.min(255, totalCoverage) : 0
         output[offset + 3] = 255
     }
     return {width: fieldWidth, height: fieldHeight, data: output}
+}
+
+export function createTerrainFieldData(
+    strokes: MapTerrainStroke[] | undefined,
+    width: number,
+    height: number,
+): TerrainFieldData | null {
+    return buildTerrainFieldData(strokes, width, height)
+}
+
+/** 保存前移除长期被覆盖的笔画；最近 50 条 paint 保留，供用户继续撤销和调整。 */
+export function compactTerrainStrokes(
+    strokes: MapTerrainStroke[] | undefined,
+    width: number,
+    height: number,
+): MapTerrainStroke[] {
+    if (!strokes?.length || width <= 0 || height <= 0) return strokes ?? []
+
+    const fieldKindIds = new Set<string>(
+        MAP_TERRAIN_KINDS.filter(definition => definition.renderLayer === 'field')
+            .map(definition => definition.id),
+    )
+    const paintIndexes = strokes.flatMap((stroke, index) => stroke.mode === 'paint' ? [index] : [])
+    const firstFieldPaintIndex = strokes.findIndex(
+        stroke => stroke.mode === 'paint' && fieldKindIds.has(stroke.kind),
+    )
+    const hasObsoleteLeadingErase = strokes.some((stroke, index) => (
+        stroke.mode === 'erase' && (firstFieldPaintIndex < 0 || index < firstFieldPaintIndex)
+    ))
+    if (paintIndexes.length <= 50 && !hasObsoleteLeadingErase) return strokes
+
+    const recentPaintIndexes = new Set(paintIndexes.slice(-50))
+    const winningStrokeIndexes = new Set<number>()
+    buildTerrainFieldData(strokes, width, height, winningStrokeIndexes)
+
+    const keptPaintIndexes = new Set<number>()
+    for (const index of paintIndexes) {
+        const stroke = strokes[index]
+        if (!fieldKindIds.has(stroke.kind)
+            || recentPaintIndexes.has(index)
+            || winningStrokeIndexes.has(index)) {
+            keptPaintIndexes.add(index)
+        }
+    }
+    const oldestFieldPaintIndex = Math.min(
+        ...Array.from(keptPaintIndexes).filter(index => fieldKindIds.has(strokes[index].kind)),
+    )
+
+    const compacted = strokes.filter((stroke, index) => {
+        if (stroke.mode === 'paint') return keptPaintIndexes.has(index)
+        return Number.isFinite(oldestFieldPaintIndex) && index >= oldestFieldPaintIndex
+    })
+    return compacted.length === strokes.length ? strokes : compacted
 }

@@ -24,6 +24,7 @@ import {
     createMapShapeEditorLocalId,
     getClampedShapeDelta,
     getShapeEdge,
+    simplifyTerrainStroke,
     projectPointToSegment,
     toSvgPoint,
     updateKeyLocation,
@@ -342,9 +343,10 @@ export function MapShapeSvgEditor({
                 activeTerrainStrokeRef.current = null;
                 setActiveTerrainStroke(null);
                 if (stroke && stroke.points.length > 0) {
+                    const simplifiedStroke = simplifyTerrainStroke(stroke);
                     onDraftChange({
                         ...draft,
-                        terrainStrokes: [...(draft.terrainStrokes ?? []), stroke],
+                        terrainStrokes: [...(draft.terrainStrokes ?? []), simplifiedStroke],
                     });
                 }
             }

@@ -4,6 +4,7 @@ import type {
     MapShapeDraft,
     MapShapeEditorDraft,
     MapShapeEditorViewBox,
+    MapTerrainStroke,
     MapShapeVertex,
 } from './types';
 
@@ -99,6 +100,60 @@ export function createMapShapeEditorLocalId(prefix: string): string {
         : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
     return `${prefix}-${randomPart}`;
+}
+
+function distanceToSegmentSquared(
+    point: [number, number],
+    start: [number, number],
+    end: [number, number],
+): number {
+    const dx = end[0] - start[0];
+    const dy = end[1] - start[1];
+    if (dx === 0 && dy === 0) return (point[0] - start[0]) ** 2 + (point[1] - start[1]) ** 2;
+    const ratio = clamp(
+        ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (dx * dx + dy * dy),
+        0,
+        1,
+    );
+    const x = start[0] + dx * ratio;
+    const y = start[1] + dy * ratio;
+    return (point[0] - x) ** 2 + (point[1] - y) ** 2;
+}
+
+/** Douglas-Peucker 抽稀，默认误差小于一个场景像素。 */
+export function simplifyTerrainStroke(
+    stroke: MapTerrainStroke,
+    tolerance = 0.75,
+): MapTerrainStroke {
+    if (stroke.points.length <= 2) return stroke;
+    const keep = new Uint8Array(stroke.points.length);
+    keep[0] = 1;
+    keep[keep.length - 1] = 1;
+    const toleranceSquared = tolerance * tolerance;
+
+    const simplifyRange = (startIndex: number, endIndex: number) => {
+        let farthestIndex = -1;
+        let farthestDistance = toleranceSquared;
+        for (let index = startIndex + 1; index < endIndex; index++) {
+            const distance = distanceToSegmentSquared(
+                stroke.points[index],
+                stroke.points[startIndex],
+                stroke.points[endIndex],
+            );
+            if (distance > farthestDistance) {
+                farthestDistance = distance;
+                farthestIndex = index;
+            }
+        }
+        if (farthestIndex < 0) return;
+        keep[farthestIndex] = 1;
+        simplifyRange(startIndex, farthestIndex);
+        simplifyRange(farthestIndex, endIndex);
+    };
+
+    simplifyRange(0, stroke.points.length - 1);
+    const points = stroke.points.filter((_, index) => keep[index]);
+    return points.length === stroke.points.length ? stroke : {...stroke, points};
 }
 
 export function buildDefaultShapeName(shapes: MapShapeDraft[]): string {

@@ -10,7 +10,11 @@ import {StrictMode, useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles/pixi'
 import type {PixiMapStyle} from '../features/maps/styles/pixi'
-import {cloneMapShapeEditorDraft, MapShapeViewport} from '../features/maps/components/MapShapeEditor'
+import {
+    cloneMapShapeEditorDraft,
+    MapShapeViewport,
+    simplifyTerrainStroke,
+} from '../features/maps/components/MapShapeEditor'
 import type {
     MapPreviewScene,
     MapShapeEditorDraft,
@@ -19,6 +23,7 @@ import type {
 } from '../features/maps/components/MapShapeEditor'
 import {
     createTerrainFieldData,
+    compactTerrainStrokes,
     resolveTerrainStrokesForViewport,
     TERRAIN_FIELD_EMPTY_INDEX,
 } from '../features/maps/styles/common'
@@ -45,6 +50,17 @@ function makeIsland(
 const canvas = {width: 800, height: 600}
 
 function assertTerrainLayering() {
+    const simplified = simplifyTerrainStroke({
+        id: 'simplify',
+        kind: 'grass',
+        points: [[0, 0], [1, 0.1], [2, -0.1], [3, 0]],
+        radius: 4,
+        mode: 'paint',
+    })
+    if (simplified.points.length !== 2) {
+        throw new Error('地形笔画自检失败：近直线轨迹未被抽稀')
+    }
+
     const strokes: MapTerrainStroke[] = [
         {id: 'base', kind: 'grass', points: [[32, 32]], radius: 20, mode: 'paint'},
         {id: 'middle', kind: 'desert', points: [[32, 32]], radius: 20, mode: 'paint'},
@@ -99,6 +115,30 @@ function assertTerrainLayering() {
     const squareCorner = (21 * 32 + 21) * 4
     if (!squareData || squareData[squareCorner] !== 0 || squareData[squareCorner + 1] < 250) {
         throw new Error('地形场自检失败：方形笔刷未覆盖轴对齐角部')
+    }
+
+    const gcStrokes: MapTerrainStroke[] = [
+        {id: 'old-erase', kind: 'grass', points: [[16, 16]], radius: 8, mode: 'erase'},
+        ...Array.from({length: 52}, (_, index): MapTerrainStroke => ({
+            id: `gc-${index}`,
+            kind: index % 2 === 0 ? 'grass' : 'mountain',
+            points: [[16, 16]],
+            radius: 8,
+            mode: 'paint',
+        })),
+    ]
+    const compacted = compactTerrainStrokes(gcStrokes, 32, 32)
+    if (compacted.length !== 50 || compacted[0].id !== 'gc-2') {
+        throw new Error('地形笔画自检失败：保存 GC 未按最近 50 笔回收无贡献记录')
+    }
+    const beforeGc = createTerrainFieldData(gcStrokes, 32, 32)?.data
+    const afterGc = createTerrainFieldData(compacted, 32, 32)?.data
+    if (!beforeGc || !afterGc || beforeGc.some((value, index) => value !== afterGc[index])) {
+        throw new Error('地形笔画自检失败：保存 GC 改变了最终地形场')
+    }
+    const unknown = [{id: 'future', kind: 'future-kind', points: [[1, 1]] as [number, number][], radius: 2, mode: 'paint' as const}]
+    if (compactTerrainStrokes(unknown, 32, 32) !== unknown) {
+        throw new Error('地形笔画自检失败：未知类型未被保守保留')
     }
 
     const generated = [strokes[0]]

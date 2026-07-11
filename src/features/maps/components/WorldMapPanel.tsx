@@ -47,7 +47,7 @@ import {FloatingPanel} from '../../../shared/ui/overlay'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
 import {buildPixiLocationIconAsset, compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
-import {isMapDebugLogEnabled, resolveTerrainStrokesForViewport} from '../styles/common'
+import {compactTerrainStrokes, isMapDebugLogEnabled, resolveTerrainStrokesForViewport} from '../styles/common'
 
 function mapLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -290,6 +290,11 @@ const DEFAULT_COASTLINE_PARAMS: CoastlineParamsPayload = buildSimpleCoastlinePar
 
 function emptyDraft(): MapShapeEditorDraft {
     return {shapes: [], keyLocations: [], terrainStrokes: []}
+}
+
+function compactDraftTerrain(draft: MapShapeEditorDraft, canvas: MapEditorCanvas): MapShapeEditorDraft {
+    const terrainStrokes = compactTerrainStrokes(draft.terrainStrokes, canvas.width, canvas.height)
+    return terrainStrokes === draft.terrainStrokes ? draft : {...draft, terrainStrokes}
 }
 
 function hasPendingTerrainGeneration(draft: MapShapeEditorDraft, scene: MapPreviewScene | null): boolean {
@@ -669,8 +674,15 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     ): MapEntry => ({
         ...existingEntry,
         name: currentName,
-        draftJson: JSON.stringify(currentDraft),
-        sceneJson: currentScene ? JSON.stringify(currentScene) : existingEntry.sceneJson,
+        draftJson: JSON.stringify(compactDraftTerrain(currentDraft, currentCanvas)),
+        sceneJson: currentScene ? JSON.stringify({
+            ...currentScene,
+            terrainStrokes: compactTerrainStrokes(
+                currentScene.terrainStrokes,
+                currentCanvas.width,
+                currentCanvas.height,
+            ),
+        }) : existingEntry.sceneJson,
         coastlineParamsJson: JSON.stringify(currentCoastlineParams),
         style: currentStyle,
         renderer: currentRenderer,
@@ -820,12 +832,14 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         [draft, drawingShape],
     )
 
-    const generateMapScene = useCallback(async (): Promise<MapPreviewScene> => {
+    const generateMapScene = useCallback(async (sourceDraft = draft): Promise<MapPreviewScene> => {
+        const generatedDraft = compactDraftTerrain(sourceDraft, activeCanvas)
+        if (generatedDraft !== sourceDraft) setDraft(generatedDraft)
         const response = await map_save_scene({
             canvas: activeCanvas,
-            shapes: draft.shapes,
-            keyLocations: draft.keyLocations,
-            terrainStrokes: draft.terrainStrokes,
+            shapes: generatedDraft.shapes,
+            keyLocations: generatedDraft.keyLocations,
+            terrainStrokes: generatedDraft.terrainStrokes,
         }, coastlineParams)
         setScene(response.scene)
         setSceneDirty(false)
@@ -845,12 +859,14 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         }
         const existing = maps.find(m => m.id === activeMapId)
         if (!existing) return
+        const draftToSave = compactDraftTerrain(draft, activeCanvas)
+        if (draftToSave !== draft) setDraft(draftToSave)
 
         const previewScene = buildPreviewSceneFromDraft({
             canvas: activeCanvas,
-            shapes: draft.shapes,
-            keyLocations: draft.keyLocations,
-            terrainStrokes: draft.terrainStrokes,
+            shapes: draftToSave.shapes,
+            keyLocations: draftToSave.keyLocations,
+            terrainStrokes: draftToSave.terrainStrokes,
         })
         let sceneToSave = scene
             ? {
@@ -860,13 +876,13 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             : null
 
         setSaveStatus('saving')
-        setIsGenerating(draft.shapes.length > 0)
+        setIsGenerating(draftToSave.shapes.length > 0)
         setErrorMsg(null)
         try {
-            if (draft.shapes.length > 0) {
-                sceneToSave = await generateMapScene()
+            if (draftToSave.shapes.length > 0) {
+                sceneToSave = await generateMapScene(draftToSave)
             }
-            const entry = buildCurrentEntry(existing, sceneToSave, draft, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
+            const entry = buildCurrentEntry(existing, sceneToSave, draftToSave, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
             const saved = await map_save_map_entry(projectId, entry)
             setMaps(prev => prev.map(m => m.id === activeMapId ? saved : m))
             setScene(sceneToSave)
