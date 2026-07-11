@@ -1377,15 +1377,15 @@
 }
 
 .ai-document-context-rail.has-previous .ai-document-context-rail-track {
-    --ai-document-context-mask: linear-gradient(90deg, transparent 0, var(--fc-color-text) 3rem, var(--fc-color-text) 100%);
+    --ai-document-context-mask: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--fc-color-text) 20%, transparent) 1.5rem, var(--fc-color-text) 3rem, var(--fc-color-text) 100%);
 }
 
 .ai-document-context-rail.has-next .ai-document-context-rail-track {
-    --ai-document-context-mask: linear-gradient(90deg, var(--fc-color-text) 0, var(--fc-color-text) calc(100% - 3rem), transparent 100%);
+    --ai-document-context-mask: linear-gradient(90deg, var(--fc-color-text) 0, var(--fc-color-text) calc(100% - 3rem), color-mix(in srgb, var(--fc-color-text) 20%, transparent) calc(100% - 1.5rem), transparent 100%);
 }
 
 .ai-document-context-rail.has-previous.has-next .ai-document-context-rail-track {
-    --ai-document-context-mask: linear-gradient(90deg, transparent 0, var(--fc-color-text) 3rem, var(--fc-color-text) calc(100% - 3rem), transparent 100%);
+    --ai-document-context-mask: linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--fc-color-text) 20%, transparent) 1.5rem, var(--fc-color-text) 3rem, var(--fc-color-text) calc(100% - 3rem), color-mix(in srgb, var(--fc-color-text) 20%, transparent) calc(100% - 1.5rem), transparent 100%);
 }
 
 .ai-document-context-rail-track.fc-roll--horizontal > .fc-roll__content {
