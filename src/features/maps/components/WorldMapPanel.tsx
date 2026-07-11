@@ -820,6 +820,18 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         [draft, drawingShape],
     )
 
+    const generateMapScene = useCallback(async (): Promise<MapPreviewScene> => {
+        const response = await map_save_scene({
+            canvas: activeCanvas,
+            shapes: draft.shapes,
+            keyLocations: draft.keyLocations,
+            terrainStrokes: draft.terrainStrokes,
+        }, coastlineParams)
+        setScene(response.scene)
+        setSceneDirty(false)
+        return response.scene
+    }, [activeCanvas, coastlineParams, draft])
+
     // ── 保存当前地图 ──────────────────────────────────────────────────────
 
     const handleSave = useCallback(async () => {
@@ -827,7 +839,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             setErrorMsg('请先新建或选择一个地图。')
             return
         }
-        if (draft.shapes.length > 0 && !validation.isValid) {
+        if (!validation.isValid) {
             setErrorMsg('当前地图草稿存在无效图形或地点，请先补完绘制或修正字段后再保存。')
             return
         }
@@ -840,7 +852,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             keyLocations: draft.keyLocations,
             terrainStrokes: draft.terrainStrokes,
         })
-        const sceneToSave = scene
+        let sceneToSave = scene
             ? {
                 ...scene,
                 keyLocations: previewScene.keyLocations,
@@ -848,8 +860,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             : null
 
         setSaveStatus('saving')
+        setIsGenerating(draft.shapes.length > 0)
         setErrorMsg(null)
         try {
+            if (draft.shapes.length > 0) {
+                sceneToSave = await generateMapScene()
+            }
             const entry = buildCurrentEntry(existing, sceneToSave, draft, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
             const saved = await map_save_map_entry(projectId, entry)
             setMaps(prev => prev.map(m => m.id === activeMapId ? saved : m))
@@ -860,8 +876,10 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         } catch (e) {
             setSaveStatus('error')
             setErrorMsg(`保存失败：${e instanceof Error ? e.message : String(e)}`)
+        } finally {
+            setIsGenerating(false)
         }
-    }, [activeCanvas, activeMapId, draft, scene, style, previewRenderer, backgroundImageUrl, activeMapName, coastlineParams, maps, projectId, buildCurrentEntry, validation.isValid])
+    }, [activeCanvas, activeMapId, draft, scene, style, previewRenderer, backgroundImageUrl, activeMapName, coastlineParams, maps, projectId, buildCurrentEntry, generateMapScene, validation.isValid])
 
     // ── 重命名当前地图 ─────────────────────────────────────────────────────
 
@@ -978,57 +996,40 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
 
     // ── 生成地图 ──────────────────────────────────────────────────────
 
-    const handleGenerate = useCallback(async () => {
+    const handleGenerate = useCallback(async (): Promise<boolean> => {
         if (draft.shapes.length === 0) {
             setErrorMsg('请先绘制至少一个图形再生成地图。')
-            return
+            return false
         }
         if (!validation.isValid) {
             setErrorMsg('当前草稿仍有未闭合图形或无效地点，暂时不能生成地图。')
-            return
+            return false
         }
         setIsGenerating(true)
         setErrorMsg(null)
         try {
-            const response = await map_save_scene({
-                canvas: activeCanvas,
-                shapes: draft.shapes,
-                keyLocations: draft.keyLocations,
-                terrainStrokes: draft.terrainStrokes,
-            }, coastlineParams)
-            setScene(response.scene)
-            setSceneDirty(false)
+            await generateMapScene()
             setSelectedShapeId(null)
             setSelectedLocationId(null)
             setDrawingShape(null)
             setTerrainBrush(null)
+            return true
         } catch (e) {
             setErrorMsg(`生成地图失败：${e instanceof Error ? e.message : String(e)}`)
+            return false
         } finally {
             setIsGenerating(false)
         }
-    }, [activeCanvas, draft, validation.isValid, coastlineParams])
+    }, [draft.shapes.length, generateMapScene, validation.isValid])
 
-    // ── 快速预览 ─────────────────────────────────────────────────────────
-
-    const handleQuickPreview = useCallback(() => {
-        if (draft.shapes.length === 0) {
-            setErrorMsg('请先绘制至少一个图形。')
+    const handleToggleViewportMode = useCallback(async () => {
+        if (viewportMode === 'preview') {
+            setViewportMode('edit')
             return
         }
-        const previewScene = buildPreviewSceneFromDraft({
-            canvas: activeCanvas,
-            shapes: draft.shapes,
-            keyLocations: draft.keyLocations,
-            terrainStrokes: scene?.terrainStrokes,
-        })
-        setScene(previewScene)
-        setViewportMode('preview')
-        setSelectedShapeId(null)
-        setSelectedLocationId(null)
-        setDrawingShape(null)
-        setTerrainBrush(null)
-    }, [activeCanvas, draft, scene?.terrainStrokes])
+
+        if (await handleGenerate()) setViewportMode('preview')
+    }, [handleGenerate, viewportMode])
 
     // ── 底图上传 ───────────────────────────────────────────────────────────────
 
@@ -2130,7 +2131,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                     </span>
                     <button type="button" className="wm-chip"
                             onClick={() => void handleSave()}
-                            disabled={saveStatus === 'saving' || !activeMapId}>
+                            disabled={saveStatus === 'saving' || isGenerating || !activeMapId}>
                         保存地图
                     </button>
                 </div>
@@ -2140,18 +2141,8 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             <div className="wm-toolbar">
                 <button type="button"
                         className={`wm-chip${viewportMode === 'preview' ? ' is-active' : ''}`}
-                        onClick={() => {
-                            setViewportMode(m => {
-                                const next = m === 'edit' ? 'preview' : 'edit'
-                                if (next === 'preview') {
-                                    setSelectedShapeId(null)
-                                    setSelectedLocationId(null)
-                                    setDrawingShape(null)
-                                    setTerrainBrush(null)
-                                }
-                                return next
-                            })
-                        }}>
+                        onClick={() => void handleToggleViewportMode()}
+                        disabled={isGenerating || saveStatus === 'saving'}>
                     {viewportMode === 'edit' ? '切换预览' : '切换编辑'}
                 </button>
                 <div className="wm-toolbar-sep"/>
@@ -2281,9 +2272,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             </button>
                         )}
                         <div className="wm-toolbar-sep"/>
-                        <button type="button" className="wm-chip" onClick={handleQuickPreview}
-                                disabled={!activeMapId || draft.shapes.length === 0}>预览草图
-                        </button>
                         <button type="button" className="wm-chip" onClick={() => setUtilityPanel('coastline')} disabled={!activeMapId}>
                             生成参数
                         </button>
