@@ -94,6 +94,24 @@ export const MAP_TERRAIN_KINDS = [
     {id: 'desert', label: '沙漠', semanticColor: '#d8b067', renderLayer: 'field', order: 2},
 ] as const satisfies ReadonlyArray<MapTerrainKindDef>;
 
+function assertMapTerrainKindRegistry(definitions: ReadonlyArray<MapTerrainKindDef>): void {
+    const ids = new Set<string>();
+    const orders = new Set<number>();
+    for (const definition of definitions) {
+        if (!definition.id.trim() || ids.has(definition.id)) {
+            throw new Error(`地形类型注册失败：id 为空或重复（${definition.id}）`);
+        }
+        if (!Number.isInteger(definition.order) || definition.order < 0 || definition.order >= 255
+            || orders.has(definition.order)) {
+            throw new Error(`地形类型注册失败：order 必须是 0-254 的唯一整数（${definition.id}: ${definition.order}）`);
+        }
+        ids.add(definition.id);
+        orders.add(definition.order);
+    }
+}
+
+assertMapTerrainKindRegistry(MAP_TERRAIN_KINDS);
+
 export interface MapTerrainBrush {
     kind: MapTerrainKind;
     radius: number;
