@@ -1078,6 +1078,7 @@
 .ai-floating-input-wrapper {
     --ai-conversation-settings-input-overlap: 1.1rem;
     --ai-floating-input-bottom-gap: 24px;
+    --ai-floating-input-bg: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     position: absolute;
     bottom: var(--ai-floating-input-bottom-gap);
     left: 50%;
@@ -1107,7 +1108,7 @@
 
 .ai-floating-input-inner {
     position: relative;
-    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+    background: var(--ai-floating-input-bg);
     backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
     border-radius: var(--fc-radius-xl);
@@ -1260,7 +1261,10 @@
     line-height: 1.5;
 }
 
-.ai-main.is-character .ai-floating-input-inner,
+.ai-main.is-character .ai-floating-input-wrapper {
+    --ai-floating-input-bg: color-mix(in srgb, var(--fc-color-bg) 82%, rgba(14, 16, 26, 0.72));
+}
+
 .ai-main.is-character .ai-scroll-to-bottom-btn,
 .ai-main.is-character .ai-conversation-settings-panel,
 .ai-main.is-character .ai-topbar {
@@ -1494,12 +1498,12 @@
 
 .ai-document-context-rail-nav--previous {
     left: 0;
-    background: linear-gradient(90deg, var(--fc-color-bg-elevated) 20%, transparent 100%);
+    background: linear-gradient(90deg, var(--ai-floating-input-bg) 20%, transparent 100%);
 }
 
 .ai-document-context-rail-nav--next {
     right: 0;
-    background: linear-gradient(270deg, var(--fc-color-bg-elevated) 20%, transparent 100%);
+    background: linear-gradient(270deg, var(--ai-floating-input-bg) 20%, transparent 100%);
 }
 
 .ai-conversation-settings-toggle {
