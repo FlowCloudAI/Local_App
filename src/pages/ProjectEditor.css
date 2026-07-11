@@ -2,9 +2,6 @@
 
 .pe-layout {
     --pe-content-min-width: 40rem;
-    --pe-divider-width: 8px;
-    --pe-divider-handle-gap-height: 48px;
-    --pe-divider-handle-gap-half: 24px;
     display: flex;
     height: 100%;
     overflow: hidden;
@@ -36,12 +33,12 @@
     transition: none;
 }
 
-.pe-layout.is-divider-dragging.is-divider-collapse-preview .pe-tree-panel {
+.pe-layout.is-divider-dragging.is-sidebar-collapse-preview .pe-tree-panel {
     transition: width 0.14s ease, border-color 0.15s ease;
 }
 
 /* 从收起预览拖回普通宽度时，短暂恢复宽度过渡，避免展开跳变 */
-.pe-layout.is-divider-dragging.is-divider-collapse-restoring .pe-tree-panel {
+.pe-layout.is-divider-dragging.is-sidebar-collapse-restoring .pe-tree-panel {
     transition: width 0.14s ease, border-color 0.15s ease;
 }
 
@@ -167,94 +164,6 @@
 
 .pe-tree-toggle:active {
     transform: translateY(1px);
-}
-
-/* ── 分隔条 ──────────────────────────────────────────────────────────────── */
-
-.pe-divider {
-    width: var(--pe-divider-width);
-    flex-shrink: 0;
-    cursor: col-resize;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    transition: background 0.1s ease;
-    user-select: none;
-}
-
-.pe-divider::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 2px;
-    transform: translateX(-50%);
-    background: linear-gradient(
-            180deg,
-            transparent 0%,
-            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 12%,
-            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 24%,
-            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% - var(--pe-divider-handle-gap-height)),
-            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% - var(--pe-divider-handle-gap-half)),
-            transparent calc(50% - var(--pe-divider-handle-gap-half)),
-            transparent calc(50% + var(--pe-divider-handle-gap-half)),
-            color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% + var(--pe-divider-handle-gap-half)),
-            color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% + var(--pe-divider-handle-gap-height)),
-            color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 76%,
-            color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 88%,
-            transparent 100%
-    );
-    opacity: 0;
-    transition: opacity 0.14s ease, width 0.1s ease;
-}
-
-.pe-divider-handle {
-    position: relative;
-    z-index: 1;
-    width: var(--pe-divider-width);
-    height: var(--pe-divider-handle-gap-height);
-    border-radius: 999px;
-    border: 1px solid transparent;
-    background: transparent;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    transition:
-        border-color 0.1s ease,
-        background 0.1s ease,
-        transform 0.1s ease;
-}
-
-.pe-divider-dot {
-    width: 3px;
-    height: 3px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--fc-color-text) 38%, transparent);
-    transition: background 0.1s ease;
-}
-
-
-.pe-divider:hover::before,
-.pe-divider.is-dragging::before {
-    width: 2px;
-    opacity: 1;
-}
-
-.pe-divider:hover .pe-divider-handle,
-.pe-divider.is-dragging .pe-divider-handle {
-    transform: none;
-    border-color: transparent;
-    background: transparent;
-}
-
-.pe-divider:hover .pe-divider-dot,
-.pe-divider.is-dragging .pe-divider-dot {
-    background: color-mix(in srgb, var(--fc-color-primary) 55%, var(--fc-color-text));
 }
 
 /* ── 右侧内容区 ───────────────────────────────────────────────────── */

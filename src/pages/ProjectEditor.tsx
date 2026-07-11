@@ -1,5 +1,5 @@
 import {logger} from '../shared/logger'
-import React, {memo, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import React, {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     type CategoryTreeNode,
     DeleteDialog,
@@ -62,6 +62,8 @@ import ProjectOverview from '../features/project-editor/components/ProjectOvervi
 import type {ProjectRiskSummary} from '../features/project-editor/components/ProjectOverview.types'
 import ProjectCoverPickerModal from '../features/project-editor/components/ProjectCoverPickerModal'
 import type {AiMissingPluginKind} from '../shared/ui/AiPluginMissingOverlay'
+import {SidebarResizeHandle} from '../shared/ui/layout/SidebarResizeHandle'
+import {useResizableSidebar} from '../shared/ui/layout/useResizableSidebar'
 import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
 import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
@@ -214,17 +216,25 @@ function ProjectEditorInner({
                                  onDeleteProject,
                                  onDeleteEntry,
                              }: Props) {
-    const [treeWidth, setTreeWidth] = useState(TREE_DEFAULT_PX)
-    const [treeCollapsed, setTreeCollapsed] = useState(false)
+    const {
+        width: treeWidth,
+        collapsed: treeCollapsed,
+        dragging: dividerDragging,
+        layoutRef,
+        expand: expandTree,
+        collapse: collapseTree,
+        handleMouseDown: handleDividerMouseDown,
+    } = useResizableSidebar({
+        widthVariable: '--pe-tree-width',
+        minWidth: TREE_MIN_WIDTH,
+        maxWidth: TREE_MAX_WIDTH,
+        defaultWidth: TREE_DEFAULT_PX,
+        collapseThresholdRatio: TREE_COLLAPSE_THRESHOLD_RATIO,
+    })
     const [worldMapSidebarHost, setWorldMapSidebarHost] = useState<HTMLDivElement | null>(null)
     const [relationGraphSidebarHost, setRelationGraphSidebarHost] = useState<HTMLDivElement | null>(null)
     const [contradictionSidebarHost, setContradictionSidebarHost] = useState<HTMLDivElement | null>(null)
     const [timelineSidebarHost, setTimelineSidebarHost] = useState<HTMLDivElement | null>(null)
-    const [dividerDragging, setDividerDragging] = useState(false)
-    const isDragging = useRef(false)
-    const layoutRef = useRef<HTMLDivElement>(null)
-    const lastExpandedWidthRef = useRef(TREE_DEFAULT_PX)
-    const collapseRestoreTimerRef = useRef<number | null>(null)
 
     const [project, setProject] = useState<Project | null>(null)
     const [categories, setCategories] = useState<Category[]>([])
@@ -495,12 +505,6 @@ function ProjectEditorInner({
     }, [projectId, loadAll, adjustEntryCount])
 
     useEffect(() => {
-        if (!treeCollapsed) {
-            lastExpandedWidthRef.current = treeWidth
-        }
-    }, [treeCollapsed, treeWidth])
-
-    useEffect(() => {
         setExpandedKeys([ROOT_ID])
         setPrefetchedCategoryEntries({})
         prefetchingCategoryKeysRef.current.clear()
@@ -510,103 +514,6 @@ function ProjectEditorInner({
         setPrefetchedCategoryEntries({})
         prefetchingCategoryKeysRef.current.clear()
     }, [categoryEntryRefreshToken])
-
-    const expandTree = useCallback(() => {
-        const nextWidth = lastExpandedWidthRef.current || TREE_DEFAULT_PX
-        setTreeCollapsed(false)
-        setTreeWidth(nextWidth)
-        layoutRef.current?.style.setProperty('--pe-tree-width', `${nextWidth}px`)
-    }, [])
-
-    const collapseTree = useCallback(() => {
-        setTreeCollapsed(true)
-        layoutRef.current?.style.setProperty('--pe-tree-width', '0px')
-    }, [])
-
-    const clearCollapseRestore = useCallback(() => {
-        if (collapseRestoreTimerRef.current !== null) {
-            window.clearTimeout(collapseRestoreTimerRef.current)
-            collapseRestoreTimerRef.current = null
-        }
-        layoutRef.current?.classList.remove('is-divider-collapse-restoring')
-    }, [])
-
-    useEffect(() => () => {
-        clearCollapseRestore()
-    }, [clearCollapseRestore])
-
-    const handleDividerMouseDown = (e: ReactMouseEvent) => {
-        e.preventDefault()
-        isDragging.current = true
-        setDividerDragging(!treeCollapsed)
-        const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
-        const minPx = rootFontSize * parseFloat(TREE_MIN_WIDTH)
-        const maxPx = rootFontSize * parseFloat(TREE_MAX_WIDTH)
-        const startX = e.clientX
-        const startWidth = treeCollapsed ? (lastExpandedWidthRef.current || TREE_DEFAULT_PX) : treeWidth
-        const collapseThreshold = startWidth * TREE_COLLAPSE_THRESHOLD_RATIO
-        let currentWidth = startWidth
-        let shouldCollapse = false
-        let pendingExpand = treeCollapsed
-        let dragStartX = startX
-        const pendingExpandHandleX = startX + startWidth
-        const layout = layoutRef.current
-        const collapsePreviewClassName = 'is-divider-collapse-preview'
-        const collapseRestoreClassName = 'is-divider-collapse-restoring'
-
-        if (treeCollapsed) {
-            setTreeCollapsed(false)
-            layout?.style.setProperty('--pe-tree-width', `${startWidth}px`)
-        }
-        layout?.classList.remove(collapsePreviewClassName)
-        clearCollapseRestore()
-
-        const onMove = (ev: MouseEvent) => {
-            if (pendingExpand) {
-                if (ev.clientX < pendingExpandHandleX) return
-                pendingExpand = false
-                dragStartX = pendingExpandHandleX
-                setDividerDragging(true)
-            }
-            const wasCollapsePreview = shouldCollapse
-            const rawWidth = startWidth + ev.clientX - dragStartX
-            currentWidth = Math.min(maxPx, Math.max(minPx, rawWidth))
-            shouldCollapse = rawWidth <= collapseThreshold
-            if (wasCollapsePreview && !shouldCollapse) {
-                layout?.classList.add(collapseRestoreClassName)
-                if (collapseRestoreTimerRef.current !== null) {
-                    window.clearTimeout(collapseRestoreTimerRef.current)
-                }
-                collapseRestoreTimerRef.current = window.setTimeout(() => {
-                    layout?.classList.remove(collapseRestoreClassName)
-                    collapseRestoreTimerRef.current = null
-                }, 160)
-            } else if (shouldCollapse) {
-                clearCollapseRestore()
-            }
-            layout?.classList.toggle(collapsePreviewClassName, shouldCollapse)
-            // 直接写 CSS 变量，完全绕过 React 渲染
-            layout?.style.setProperty('--pe-tree-width', shouldCollapse ? '0px' : `${currentWidth}px`)
-        }
-        const onUp = () => {
-            isDragging.current = false
-            layout?.classList.remove(collapsePreviewClassName)
-            clearCollapseRestore()
-            if (shouldCollapse) {
-                setDividerDragging(false)
-                setTreeCollapsed(true)
-                layout?.style.setProperty('--pe-tree-width', '0px')
-            } else {
-                setDividerDragging(false)
-                setTreeCollapsed(false)
-                setTreeWidth(currentWidth)
-            }
-            document.removeEventListener('mousemove', onMove)
-            document.removeEventListener('mouseup', onUp)
-        }
-        document.addEventListener('mousemove', onMove)
-        document.addEventListener('mouseup', onUp)
-    }
 
     const handleSelect = (key: string) => {
         if (key === ROOT_ID) {
@@ -1292,16 +1199,10 @@ function ProjectEditorInner({
                 </div>
             </div>
 
-            <div
-                className={`pe-divider ${dividerDragging ? 'is-dragging' : ''}`}
+            <SidebarResizeHandle
+                dragging={dividerDragging}
                 onMouseDown={handleDividerMouseDown}
-            >
-                <div className="pe-divider-handle" aria-hidden="true">
-                    <span className="pe-divider-dot"/>
-                    <span className="pe-divider-dot"/>
-                    <span className="pe-divider-dot"/>
-                </div>
-            </div>
+            />
 
             <div className="pe-content">
                 <div className="pe-content__rail">
