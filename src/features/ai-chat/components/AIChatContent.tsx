@@ -661,8 +661,8 @@ export default function AIChatContent({
     const charCount = ctx.inputValue.length
     const showCharHint = charCount >= SHOW_HINT_THRESHOLD
     const visibleDocumentContextItems = ctx.documentContextItems
-    const selectedPluginInfo = ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)
     const activeLlmPluginId = activeConversation?.pluginId || ctx.selectedPlugin
+    const modelPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
     const activeLlmPluginInfo = ctx.plugins.find((plugin) => plugin.id === activeLlmPluginId)
     const activeLlmPluginName = activeLlmPluginInfo?.name || activeLlmPluginId || '当前 AI 对话插件'
     const contextPluginInfo = ctx.plugins.find((plugin) => plugin.id === (activeConversation?.pluginId ?? ctx.selectedPlugin))
@@ -1739,9 +1739,12 @@ export default function AIChatContent({
                                     {ctx.plugins.map((plugin) => (
                                         <button
                                             key={plugin.id}
-                                            className={`ai-plugin-menu-item ${plugin.id === ctx.selectedPlugin ? 'active' : ''}`}
+                                            className={`ai-plugin-menu-item ${plugin.id === activeLlmPluginId ? 'active' : ''}`}
                                             onClick={() => {
-                                                ctx.setSelectedPlugin(plugin.id)
+                                                const model = plugin.default_model && plugin.models.includes(plugin.default_model)
+                                                    ? plugin.default_model
+                                                    : (plugin.models[0] ?? '')
+                                                void ctx.switchActiveConversationModel(plugin.id, model)
                                                 setIsPluginMenuOpen(false)
                                             }}
                                         >
@@ -1758,7 +1761,7 @@ export default function AIChatContent({
                                 }}
                                 title="切换插件"
                             >
-                                <span>{ctx.plugins.find((plugin) => plugin.id === ctx.selectedPlugin)?.name || '选择插件'}</span>
+                                <span>{activeLlmPluginInfo?.name || '选择插件'}</span>
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
                                      strokeWidth="1.5">
                                     <path d={isPluginMenuOpen ? 'M1 7l4-4 4 4' : 'M1 3l4 4 4-4'}/>
@@ -2118,14 +2121,14 @@ export default function AIChatContent({
                                     <span>对话属性</span>
                                 </button>
                                 <div className="ai-model-switcher ai-model-switcher--meta" ref={modelSwitcherRef}>
-                                    {isModelMenuOpen && selectedPluginInfo && (
+                                    {isModelMenuOpen && modelPluginInfo && (
                                         <div className="ai-model-menu">
-                                            {selectedPluginInfo.models.map((model) => (
+                                            {modelPluginInfo.models.map((model) => (
                                                 <button
                                                     key={model}
-                                                    className={`ai-model-menu-item ${model === ctx.selectedModel ? 'active' : ''}`}
+                                                    className={`ai-model-menu-item ${model === contextModelId ? 'active' : ''}`}
                                                     onClick={() => {
-                                                        ctx.setSelectedModel(model)
+                                                        void ctx.switchActiveConversationModel(activeLlmPluginId, model)
                                                         setIsModelMenuOpen(false)
                                                     }}
                                                 >
@@ -2147,7 +2150,7 @@ export default function AIChatContent({
                                         <svg viewBox="0 0 16 16" aria-hidden="true">
                                             <path d="M6 3.5 10.5 8 6 12.5"/>
                                         </svg>
-                                        <span>{ctx.selectedModel || '选择模型'}</span>
+                                        <span>{contextModelId || '选择模型'}</span>
                                     </button>
                                 </div>
                             </div>
