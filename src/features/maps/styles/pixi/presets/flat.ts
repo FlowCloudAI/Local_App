@@ -1,4 +1,5 @@
 import type {PixiMapStyle} from '../types'
+import {MAP_TERRAIN_KINDS} from '../../../components/MapShapeEditor'
 
 export const flatPixiMapStyle: PixiMapStyle = {
     version: 1,
@@ -44,9 +45,7 @@ export const flatPixiMapStyle: PixiMapStyle = {
         {
             id: 'terrain',
             params: {
-                grassColor: '#82b45f',
-                mountainColor: '#8a7868',
-                desertColor: '#d8b067',
+                terrainColors: MAP_TERRAIN_KINDS.map(definition => definition.semanticColor),
             },
         },
         {

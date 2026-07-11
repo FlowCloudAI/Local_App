@@ -10,7 +10,12 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import type {TextStyleOptions, TextureShader} from 'pixi.js'
 import {BufferImageSource, MeshGeometry, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
-import type {MapPixiPreviewOverlayContext, MapPreviewKeyLocation, MapRgbaColor} from '../../components/MapShapeEditor'
+import {
+    MAP_TERRAIN_KINDS,
+    type MapPixiPreviewOverlayContext,
+    type MapPreviewKeyLocation,
+    type MapRgbaColor,
+} from '../../components/MapShapeEditor'
 import type {
     PixiCoastlineLayerStyle,
     PixiDecorationPluginId,
@@ -23,11 +28,12 @@ import type {
 } from './types'
 import {
     colorizeTerrainFieldCanvas,
-    createTerrainFieldCanvas,
+    createTerrainFieldData,
     hexToRgbaColor,
     isMapDebugLogEnabled,
     mapRenderScale,
     strokeToRgbaColor,
+    type TerrainFieldData,
 } from '../common'
 import {
     drawPixiCompassAsset,
@@ -376,29 +382,25 @@ function drawSeaDepthBands(
 }
 
 interface TerrainParams {
-    grassColor?: string
-    mountainColor?: string
-    desertColor?: string
+    colors: string[]
 }
 
 function drawTerrainColorBlocks(
     ctx: CanvasRenderingContext2D,
     context: MapPixiPreviewOverlayContext,
     params: TerrainParams,
-    terrainField: HTMLCanvasElement | null,
+    terrainField: TerrainFieldData | null,
 ): void {
     if (!terrainField) return
     const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
     if (!shapes.length) return
 
-    const grass = hexToRgbaColor(getStringParam(params.grassColor, '#82b45f'))
-    const mountain = hexToRgbaColor(getStringParam(params.mountainColor, '#8a7868'))
-    const desert = hexToRgbaColor(getStringParam(params.desertColor, '#d8b067'))
-    const colored = colorizeTerrainFieldCanvas(terrainField, {
-        grass: [grass[0], grass[1], grass[2]],
-        mountain: [mountain[0], mountain[1], mountain[2]],
-        desert: [desert[0], desert[1], desert[2]],
-    })
+    const palette: Array<[number, number, number]> = []
+    for (const definition of MAP_TERRAIN_KINDS) {
+        const rgba = hexToRgbaColor(params.colors[definition.order] ?? definition.semanticColor)
+        palette[definition.order] = [rgba[0], rgba[1], rgba[2]]
+    }
+    const colored = colorizeTerrainFieldCanvas(terrainField, palette)
     if (!colored) return
 
     ctx.save()
@@ -450,7 +452,7 @@ function createOverlayCanvas(
     context: MapPixiPreviewOverlayContext,
     style: PixiMapStyle,
     mode: OverlayCanvasMode = 'full',
-    terrainField: HTMLCanvasElement | null = null,
+    terrainField: TerrainFieldData | null = null,
 ): HTMLCanvasElement | null {
     pixiOverlayLog(`createOverlayCanvas: mode=${mode} canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
     const sceneW = context.scene.canvas.width
@@ -495,10 +497,11 @@ function createOverlayCanvas(
     // 阶段 1 地形以平色覆盖度呈现；后续风格纹样仍位于同一层级。
     const terrainPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'terrain') : undefined
     if (terrainPlugin) {
+        const terrainColors = terrainPlugin.params?.terrainColors
         drawTerrainColorBlocks(ctx, context, {
-            grassColor: getStringParam(terrainPlugin.params?.grassColor, '#82b45f'),
-            mountainColor: getStringParam(terrainPlugin.params?.mountainColor, '#8a7868'),
-            desertColor: getStringParam(terrainPlugin.params?.desertColor, '#d8b067'),
+            colors: Array.isArray(terrainColors)
+                ? terrainColors.map(color => typeof color === 'string' ? color : '')
+                : [],
         }, terrainField)
     }
 
@@ -660,6 +663,51 @@ function useCoastFieldTexture(field: CoastFieldData | null): Texture {
     return texture
 }
 
+function useTerrainFieldTexture(field: TerrainFieldData | null): Texture {
+    const [texture, setTexture] = useState<Texture>(Texture.EMPTY)
+    const sourceRef = useRef<BufferImageSource | null>(null)
+
+    useEffect(() => {
+        if (!field) {
+            sourceRef.current = null
+            setTexture(Texture.EMPTY)
+            return
+        }
+
+        const current = sourceRef.current
+        if (current && current.width === field.width && current.height === field.height
+            && texture !== Texture.EMPTY && !texture.destroyed) {
+            ;(current.resource as Uint8Array).set(field.data)
+            current.update()
+            return
+        }
+
+        try {
+            const source = new BufferImageSource({
+                resource: field.data.slice(),
+                width: field.width,
+                height: field.height,
+                format: 'rgba8unorm',
+                alphaMode: 'no-premultiply-alpha',
+                scaleMode: 'nearest',
+                label: 'map-terrain-field',
+            })
+            sourceRef.current = source
+            setTexture(new Texture({source}))
+        } catch (e) {
+            pixiOverlayLog(`useTerrainFieldTexture: failed ${e instanceof Error ? e.message : String(e)}`)
+            sourceRef.current = null
+            setTexture(Texture.EMPTY)
+        }
+    }, [field, texture])
+
+    useEffect(() => () => {
+        if (texture !== Texture.EMPTY && !texture.destroyed) texture.destroy(true)
+    }, [texture])
+
+    return texture
+}
+
 /**
  * Shader 模式的 Overlay 渲染
  *
@@ -786,12 +834,12 @@ function PixiTextureOverlay({
     )
     const coastField = useCoastFieldTexture(coastFieldData)
     const shaderActive = wantShader && coastFieldData !== null
-    const terrainFieldCanvas = useMemo(
-        () => createTerrainFieldCanvas(context.scene.terrainStrokes, sceneW, sceneH),
+    const terrainFieldData = useMemo(
+        () => createTerrainFieldData(context.scene.terrainStrokes, sceneW, sceneH),
         [context.scene.terrainStrokes, sceneW, sceneH],
     )
-    const terrainField = useCanvasTexture(terrainFieldCanvas)
-    const canvasTerrainField = shaderActive ? null : terrainFieldCanvas
+    const terrainField = useTerrainFieldTexture(shaderActive ? terrainFieldData : null)
+    const canvasTerrainField = shaderActive ? null : terrainFieldData
 
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进

@@ -1,16 +1,18 @@
-import type {MapTerrainStroke} from '../../components/MapShapeEditor'
+import {
+    MAP_TERRAIN_KINDS,
+    type MapTerrainStroke,
+} from '../../components/MapShapeEditor'
 
-const TERRAIN_CHANNELS = new Map([
-    ['grass', 0],
-    ['mountain', 1],
-    ['desert', 2],
-])
+export const TERRAIN_FIELD_EMPTY_INDEX = 255
 
-export interface TerrainFieldPalette {
-    grass: [number, number, number]
-    mountain: [number, number, number]
-    desert: [number, number, number]
+export interface TerrainFieldData {
+    width: number
+    height: number
+    /** RGBA8：R=类型索引，G=覆盖度，B/A 预留。 */
+    data: Uint8Array
 }
+
+export type TerrainFieldPalette = ReadonlyArray<readonly [number, number, number]>
 
 /** 编辑态读取实时语义，预览态只读取最近一次生成快照。 */
 export function resolveTerrainStrokesForViewport(
@@ -83,43 +85,47 @@ function paintStroke(
 }
 
 /**
- * 将地形笔画光栅化为 RGBA8 单选场：R=草地、G=高山、B=沙漠。
- * 重叠处只保留最后一次有效绘制的类型；胜者通道写入并集覆盖度（Σ各通道覆盖度，封顶 255）——
+ * 将地形笔画光栅化为 RGBA8 单选场：R=类型索引、G=覆盖度，255=空。
+ * 重叠处只保留最后一次有效绘制的类型；覆盖度写入各类型并集（Σ覆盖度，封顶 255）——
  * 异种笔画交界两侧的抗锯齿量互补，相加即恢复满覆盖，交界处不露底；
- * 单一笔画的外缘无邻居，仍是原始抗锯齿覆盖度，供消费端做软边。Alpha 固定 255，避免纹理预乘。
+ * 单一笔画的外缘无邻居，仍是原始抗锯齿覆盖度，供消费端做软边。
  */
-export function createTerrainFieldCanvas(
+export function createTerrainFieldData(
     strokes: MapTerrainStroke[] | undefined,
     width: number,
     height: number,
-): HTMLCanvasElement | null {
+): TerrainFieldData | null {
     const fieldWidth = Math.round(width)
     const fieldHeight = Math.round(height)
     if (!strokes?.length || fieldWidth <= 0 || fieldHeight <= 0) return null
 
-    const masks = [0, 1, 2].map(() => createMaskCanvas(fieldWidth, fieldHeight))
+    const fieldKinds = MAP_TERRAIN_KINDS.filter(definition => definition.renderLayer === 'field')
+    const masks = fieldKinds.map(() => createMaskCanvas(fieldWidth, fieldHeight))
     const maskContexts = masks.map(mask => mask.getContext('2d'))
     if (maskContexts.some(context => !context)) return null
+    const maskIndexByKind = new Map<string, number>(fieldKinds.map((definition, index) => [definition.id, index]))
 
     // TODO: 阶段 1 在笔画列表变化时全量重建（编辑器已改为松手才提交，重建频率=每笔一次）；
     // 大图仍掉帧时再做脏矩形增量合并。
     let hasPaintStroke = false
     for (const [strokeIndex, stroke] of strokes.entries()) {
-        const channel = TERRAIN_CHANNELS.get(stroke.kind)
-        const context = channel === undefined ? null : maskContexts[channel]
-        if (!context) continue
-        paintStroke(context, stroke, strokeIndex + 1, strokes.length)
-        if (stroke.mode === 'paint') hasPaintStroke = true
+        if (stroke.mode === 'erase') {
+            for (const context of maskContexts) {
+                paintStroke(context!, stroke, strokeIndex + 1, strokes.length)
+            }
+            continue
+        }
+        const maskIndex = maskIndexByKind.get(stroke.kind)
+        if (maskIndex === undefined) continue
+        paintStroke(maskContexts[maskIndex]!, stroke, strokeIndex + 1, strokes.length)
+        hasPaintStroke = true
     }
     if (!hasPaintStroke) return null
 
-    const result = createMaskCanvas(fieldWidth, fieldHeight)
-    const resultContext = result.getContext('2d')
-    if (!resultContext) return null
-    const output = resultContext.createImageData(fieldWidth, fieldHeight)
+    const output = new Uint8Array(fieldWidth * fieldHeight * 4)
     const channels = maskContexts.map(context => context!.getImageData(0, 0, fieldWidth, fieldHeight).data)
 
-    for (let offset = 0; offset < output.data.length; offset += 4) {
+    for (let offset = 0; offset < output.length; offset += 4) {
         // 胜者选择：实心像素（覆盖度≥50%）按笔画次序取最后绘制者；纯边缘像素
         // 退回覆盖度最高的通道。注意：次序编码在抗锯齿混合下会失真，
         // 因此只对 ≥128 的实心像素解码比较。
@@ -146,13 +152,11 @@ export function createTerrainFieldCanvas(
         // 胜者通道写入并集覆盖度：异种笔画的抗锯齿边缘互相拼接/叠压时，
         // 交界像素两侧覆盖度互补，只保留胜者自身覆盖度会留下半透明缝。
         const winner = topChannel >= 0 ? topChannel : fringeChannel
-        if (winner >= 0) {
-            output.data[offset + winner] = Math.min(255, totalCoverage)
-        }
-        output.data[offset + 3] = 255
+        output[offset] = winner >= 0 ? fieldKinds[winner].order : TERRAIN_FIELD_EMPTY_INDEX
+        output[offset + 1] = winner >= 0 ? Math.min(255, totalCoverage) : 0
+        output[offset + 3] = 255
     }
-    resultContext.putImageData(output, 0, 0)
-    return result
+    return {width: fieldWidth, height: fieldHeight, data: output}
 }
 
 /** 与 shader 版一致的覆盖度→软边映射（smoothstep 0.30..0.80），保证双路径 parity。 */
@@ -161,36 +165,26 @@ function coverageToAlpha(coverage: number): number {
     return Math.round(t * t * (3 - 2 * t) * 255)
 }
 
-/** 把三通道覆盖度转换成 Canvas 回退路径可直接合成的透明色块（边缘按覆盖度软化）。 */
+/** 把索引场转换成 Canvas 回退路径可直接合成的透明色块。 */
 export function colorizeTerrainFieldCanvas(
-    field: HTMLCanvasElement,
+    field: TerrainFieldData,
     palette: TerrainFieldPalette,
 ): HTMLCanvasElement | null {
-    const sourceContext = field.getContext('2d')
-    if (!sourceContext) return null
-
     const result = createMaskCanvas(field.width, field.height)
     const resultContext = result.getContext('2d')
     if (!resultContext) return null
 
-    const source = sourceContext.getImageData(0, 0, field.width, field.height)
     const output = resultContext.createImageData(field.width, field.height)
-    const colors = [palette.grass, palette.mountain, palette.desert]
 
-    for (let offset = 0; offset < source.data.length; offset += 4) {
-        let channel = -1
-        let coverage = 0
-        for (let candidate = 0; candidate < 3; candidate++) {
-            if (source.data[offset + candidate] > coverage) {
-                channel = candidate
-                coverage = source.data[offset + candidate]
-            }
-        }
-        if (channel < 0) continue
+    for (let offset = 0; offset < field.data.length; offset += 4) {
+        const typeIndex = field.data[offset]
+        const coverage = field.data[offset + 1]
+        const color = palette[typeIndex]
+        if (!color || typeIndex === TERRAIN_FIELD_EMPTY_INDEX) continue
         const alpha = coverageToAlpha(coverage)
         if (alpha <= 0) continue
         for (let colorIndex = 0; colorIndex < 3; colorIndex++) {
-            output.data[offset + colorIndex] = colors[channel][colorIndex]
+            output.data[offset + colorIndex] = color[colorIndex]
         }
         output.data[offset + 3] = alpha
     }

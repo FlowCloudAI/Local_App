@@ -13,7 +13,6 @@ import {
     createMapShapeEditorLocalId,
     inferMapMarkerClass,
     MAP_MARKER_CLASS_OPTIONS,
-    MAP_TERRAIN_KIND_COLORS,
     MAP_TERRAIN_KIND_OPTIONS,
     type MapShapeSvgEditorLocationContextMenuDetail,
     type MapShapeSvgEditorShapeContextMenuDetail,
@@ -1277,9 +1276,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                 {
                     id: 'terrain' as const,
                     params: {
-                        grassColor: MAP_TERRAIN_KIND_COLORS.grass,
-                        mountainColor: MAP_TERRAIN_KIND_COLORS.mountain,
-                        desertColor: MAP_TERRAIN_KIND_COLORS.desert,
+                        terrainColors: MAP_TERRAIN_KIND_OPTIONS.map(option => option.color),
                     },
                 },
             ],

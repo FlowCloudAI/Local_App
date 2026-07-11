@@ -94,10 +94,6 @@ export const MAP_TERRAIN_KINDS = [
     {id: 'desert', label: '沙漠', semanticColor: '#d8b067', renderLayer: 'field', order: 2},
 ] as const satisfies ReadonlyArray<MapTerrainKindDef>;
 
-export const MAP_TERRAIN_KIND_BY_ID = new Map<string, MapTerrainKindDef>(
-    MAP_TERRAIN_KINDS.map(definition => [definition.id, definition]),
-);
-
 export interface MapTerrainBrush {
     kind: MapTerrainKind;
     radius: number;

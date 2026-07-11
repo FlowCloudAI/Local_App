@@ -1,8 +1,8 @@
-import type {Shader} from 'pixi.js'
+import {BufferImageSource, Texture} from 'pixi.js'
+import {MAP_TERRAIN_KINDS} from '../../../components/MapShapeEditor'
 import type {MapStyleParameterRecord} from '../../common'
 import type {PixiPluginImplementation, ShaderRenderer} from '../types'
 import {parseColorToVec3} from '../shaderRegistry'
-import {getStringParam} from '../utils'
 import {coastFieldGlsl, createSceneQuadShader, updateSceneQuadShader} from './shared'
 
 const terrainFragment = `
@@ -13,26 +13,35 @@ out vec4 finalColor;
 
 uniform vec2 uCanvasSize;
 uniform sampler2D uTerrainField;
-uniform vec3 uGrassColor;
-uniform vec3 uMountainColor;
-uniform vec3 uDesertColor;
+uniform sampler2D uTerrainPalette;
 
 ${coastFieldGlsl}
 
 void main() {
     if (coastSd(vUV) >= 0.0) discard;
 
-    vec3 coverage = texture(uTerrainField, vUV).rgb;
-    // 透明度必须由三通道总覆盖度决定，不能用胜者通道：场内异种地形交界是
-    // (1,0,0)|(0,1,0) 的单热像素，双线性插值会把每个通道都压到 ~0.5，
-    // max 通道随之跌进 smoothstep 低段 → 交界处露出底色白缝；而总和在
-    // 线性插值下保持 1，交界处始终完全不透明。
-    float total = coverage.r + coverage.g + coverage.b;
+    vec2 fieldPosition = vUV * uCanvasSize - 0.5;
+    vec2 fieldBase = floor(fieldPosition);
+    vec2 fieldMix = fract(fieldPosition);
+    vec4 terrain = vec4(0.0);
+
+    for (int y = 0; y < 2; y++) {
+        for (int x = 0; x < 2; x++) {
+            vec2 texel = clamp(fieldBase + vec2(float(x), float(y)), vec2(0.0), uCanvasSize - 1.0);
+            vec2 encoded = texture(uTerrainField, (texel + 0.5) / uCanvasSize).rg;
+            float typeIndex = floor(encoded.r * 255.0 + 0.5);
+            float weight = mix(1.0 - fieldMix.x, fieldMix.x, float(x))
+                * mix(1.0 - fieldMix.y, fieldMix.y, float(y));
+            vec3 color = texture(uTerrainPalette, vec2((typeIndex + 0.5) / 256.0, 0.5)).rgb;
+            terrain += vec4(color * encoded.g, encoded.g) * weight;
+        }
+    }
+
+    float total = terrain.a;
     if (total < 0.02) discard;
 
-    // 颜色按通道覆盖度加权：交界处在 1 个场像素内平滑过渡，
-    // 与 Canvas 回退（逐 texel 单选色 + drawImage 放大插值）观感一致。
-    vec3 color = (coverage.r * uGrassColor + coverage.g * uMountainColor + coverage.b * uDesertColor) / total;
+    // 类型索引本身不能线性插值；先取四邻域各自的调色板颜色，再手工混色。
+    vec3 color = terrain.rgb / total;
 
     // 覆盖度→软边：地形场外缘保留了笔画的抗锯齿 fringe（见 terrainField 合并注释），
     // smoothstep 把它压成约 1 场景像素的柔和过渡；内部覆盖度=1 → 完全不透明。
@@ -42,24 +51,53 @@ void main() {
 }
 `
 
+function createTerrainPalette(params: MapStyleParameterRecord): Texture {
+    const configured = Array.isArray(params.terrainColors) ? params.terrainColors : []
+    const data = new Uint8Array(256 * 4)
+    for (let index = 0; index < 256; index++) data[index * 4 + 3] = 255
+    for (const definition of MAP_TERRAIN_KINDS) {
+        const fallback = parseColorToVec3(definition.semanticColor, [0, 0, 0])
+        const configuredColor = configured[definition.order]
+        const color = parseColorToVec3(
+            typeof configuredColor === 'string' ? configuredColor : definition.semanticColor,
+            fallback,
+        )
+        const offset = definition.order * 4
+        data[offset] = Math.round(color[0] * 255)
+        data[offset + 1] = Math.round(color[1] * 255)
+        data[offset + 2] = Math.round(color[2] * 255)
+    }
+    return new Texture({
+        source: new BufferImageSource({
+            resource: data,
+            width: 256,
+            height: 1,
+            format: 'rgba8unorm',
+            alphaMode: 'no-premultiply-alpha',
+            scaleMode: 'nearest',
+            label: 'map-terrain-palette',
+        }),
+    })
+}
+
 function createTerrainShaderRenderer(params: MapStyleParameterRecord): ShaderRenderer | null {
+    const palette = createTerrainPalette(params)
     const shader = createSceneQuadShader({
         name: 'map-terrain',
         fragment: terrainFragment,
         useCoastField: true,
         useTerrainField: true,
-        uniforms: {
-            uGrassColor: {value: parseColorToVec3(getStringParam(params.grassColor, '#82b45f'), [130 / 255, 180 / 255, 95 / 255]), type: 'vec3<f32>'},
-            uMountainColor: {value: parseColorToVec3(getStringParam(params.mountainColor, '#8a7868'), [138 / 255, 120 / 255, 104 / 255]), type: 'vec3<f32>'},
-            uDesertColor: {value: parseColorToVec3(getStringParam(params.desertColor, '#d8b067'), [216 / 255, 176 / 255, 103 / 255]), type: 'vec3<f32>'},
-        },
+        textureResources: {uTerrainPalette: palette.source},
     })
 
     return {
         type: 'shader',
         shader,
         update: context => updateSceneQuadShader(shader, context),
-        destroy: () => (shader as Shader).destroy(),
+        destroy: () => {
+            shader.destroy()
+            palette.destroy(true)
+        },
     }
 }
 

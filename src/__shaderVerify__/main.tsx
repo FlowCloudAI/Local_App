@@ -17,7 +17,11 @@ import type {
     MapShapeEditorViewBox,
     MapTerrainStroke,
 } from '../features/maps/components/MapShapeEditor'
-import {createTerrainFieldCanvas, resolveTerrainStrokesForViewport} from '../features/maps/styles/common'
+import {
+    createTerrainFieldData,
+    resolveTerrainStrokesForViewport,
+    TERRAIN_FIELD_EMPTY_INDEX,
+} from '../features/maps/styles/common'
 
 function makeIsland(
     cx: number,
@@ -47,42 +51,42 @@ function assertTerrainLayering() {
         {id: 'top', kind: 'grass', points: [[32, 32]], radius: 10, mode: 'paint'},
         {id: 'erase-top', kind: 'grass', points: [[32, 32]], radius: 6, mode: 'erase'},
     ]
-    const field = createTerrainFieldCanvas(strokes, 64, 64)
-    const data = field?.getContext('2d')?.getImageData(0, 0, 64, 64).data
+    const field = createTerrainFieldData(strokes, 64, 64)
+    const data = field?.data
     if (!data) throw new Error('地形场自检无法读取像素')
 
     const center = (32 * 64 + 32) * 4
     const topRing = (32 * 64 + 40) * 4
-    if (data[center] !== 0 || data[center + 2] !== 255) {
-        throw new Error('地形场自检失败：擦除后未露出下层地形')
+    if (data[center] !== TERRAIN_FIELD_EMPTY_INDEX || data[center + 1] !== 0) {
+        throw new Error('地形场自检失败：擦除未清空全部地形')
     }
-    if (data[topRing] !== 255 || data[topRing + 2] !== 0) {
+    if (data[topRing] !== 0 || data[topRing + 1] !== 255) {
         throw new Error('地形场自检失败：最上层地形未覆盖下层')
     }
 
-    const overlapField = createTerrainFieldCanvas([
+    const overlapField = createTerrainFieldData([
         {id: 'overlap-base', kind: 'grass', points: [[32, 32]], radius: 20, mode: 'paint'},
         {id: 'overlap-top', kind: 'mountain', points: [[32, 32]], radius: 10, mode: 'paint'},
     ], 64, 64)
-    const overlapData = overlapField?.getContext('2d')?.getImageData(0, 0, 64, 64).data
+    const overlapData = overlapField?.data
     if (!overlapData) throw new Error('地形场重叠自检无法读取像素')
     for (let offset = 0; offset < overlapData.length; offset += 4) {
-        if (overlapData[offset + 1] > 0 && overlapData[offset + 1] < 255) {
+        if (overlapData[offset] === 1 && overlapData[offset + 1] < 255) {
             throw new Error('地形场自检失败：不同地形交界处露出半透明空隙')
         }
     }
 
     // 相邻异种笔画恰好拼接（半像素对齐）：交界行两侧各只有 ~50% 抗锯齿覆盖度，
     // 并集合并后胜者通道应恢复满覆盖——只保留胜者自身覆盖度会在交界行留下半透明缝。
-    const seamField = createTerrainFieldCanvas([
+    const seamField = createTerrainFieldData([
         {id: 'seam-grass', kind: 'grass', points: [[8, 20.5], [56, 20.5]], radius: 10, mode: 'paint'},
         {id: 'seam-mountain', kind: 'mountain', points: [[8, 40.5], [56, 40.5]], radius: 10, mode: 'paint'},
     ], 64, 64)
-    const seamData = seamField?.getContext('2d')?.getImageData(0, 0, 64, 64).data
+    const seamData = seamField?.data
     if (!seamData) throw new Error('地形场拼接自检无法读取像素')
     for (let y = 15; y <= 45; y++) {
         const offset = (y * 64 + 32) * 4
-        const winnerCoverage = Math.max(seamData[offset], seamData[offset + 1], seamData[offset + 2])
+        const winnerCoverage = seamData[offset + 1]
         if (winnerCoverage < 250) {
             throw new Error(`地形场自检失败：相邻地形拼接行覆盖度塌陷（y=${y} coverage=${winnerCoverage}）`)
         }

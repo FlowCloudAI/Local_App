@@ -83,6 +83,8 @@ export interface SceneQuadShaderOptions {
     useCoastField?: boolean
     /** 声明使用地形覆盖度纹理。 */
     useTerrainField?: boolean
+    /** 插件自有纹理资源。 */
+    textureResources?: Record<string, unknown>
 }
 
 /**
@@ -96,6 +98,7 @@ export function createSceneQuadShader({
     uniforms,
     useCoastField,
     useTerrainField,
+    textureResources,
 }: SceneQuadShaderOptions): Shader {
     const resources: Record<string, unknown> = {
         styleUniforms: new UniformGroup({
@@ -110,6 +113,7 @@ export function createSceneQuadShader({
     if (useTerrainField) {
         resources.uTerrainField = Texture.EMPTY.source
     }
+    Object.assign(resources, textureResources)
 
     return new Shader({
         glProgram: GlProgram.from({
