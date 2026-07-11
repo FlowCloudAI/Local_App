@@ -50,6 +50,27 @@ function paintStroke(
     ctx.globalCompositeOperation = stroke.mode === 'erase' ? 'destination-out' : 'source-over'
     ctx.fillStyle = encodeStrokeOrder(order, strokeCount)
     ctx.strokeStyle = encodeStrokeOrder(order, strokeCount)
+
+    if (stroke.shape === 'square') {
+        const stamp = (x: number, y: number) => ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2)
+        stamp(stroke.points[0][0], stroke.points[0][1])
+        for (let pointIndex = 1; pointIndex < stroke.points.length; pointIndex++) {
+            const previous = stroke.points[pointIndex - 1]
+            const current = stroke.points[pointIndex]
+            const distance = Math.hypot(current[0] - previous[0], current[1] - previous[1])
+            const steps = Math.max(1, Math.ceil(distance))
+            for (let step = 1; step <= steps; step++) {
+                const progress = step / steps
+                stamp(
+                    previous[0] + (current[0] - previous[0]) * progress,
+                    previous[1] + (current[1] - previous[1]) * progress,
+                )
+            }
+        }
+        ctx.restore()
+        return
+    }
+
     ctx.lineWidth = radius * 2
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'

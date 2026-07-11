@@ -2233,6 +2233,24 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                             : current)}
                                     >擦</button>
                                 </div>
+                                <div className="wm-terrain-modes" role="group" aria-label="笔刷形状">
+                                    <button
+                                        type="button"
+                                        className={terrainBrush.shape === 'round' ? 'is-active' : ''}
+                                        aria-pressed={terrainBrush.shape === 'round'}
+                                        onClick={() => setTerrainBrush(current => current
+                                            ? {...current, shape: 'round'}
+                                            : current)}
+                                    >圆</button>
+                                    <button
+                                        type="button"
+                                        className={terrainBrush.shape === 'square' ? 'is-active' : ''}
+                                        aria-pressed={terrainBrush.shape === 'square'}
+                                        onClick={() => setTerrainBrush(current => current
+                                            ? {...current, shape: 'square'}
+                                            : current)}
+                                    >方</button>
+                                </div>
                                 <label className="wm-terrain-radius">
                                     <span>半径 {Math.round(terrainBrush.radius)}</span>
                                     <Slider

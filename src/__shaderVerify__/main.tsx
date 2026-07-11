@@ -92,6 +92,15 @@ function assertTerrainLayering() {
         }
     }
 
+    const squareField = createTerrainFieldData([
+        {id: 'square', kind: 'grass', points: [[16, 16]], radius: 6, mode: 'paint', shape: 'square'},
+    ], 32, 32)
+    const squareData = squareField?.data
+    const squareCorner = (21 * 32 + 21) * 4
+    if (!squareData || squareData[squareCorner] !== 0 || squareData[squareCorner + 1] < 250) {
+        throw new Error('地形场自检失败：方形笔刷未覆盖轴对齐角部')
+    }
+
     const generated = [strokes[0]]
     if (resolveTerrainStrokesForViewport('edit', strokes, generated) !== strokes) {
         throw new Error('地形快照自检失败：编辑模式未读取草稿语义')

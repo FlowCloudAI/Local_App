@@ -972,6 +972,18 @@ export function MapShapeSvgEditor({
                             ? '#f6f4ee'
                             : MAP_TERRAIN_KIND_COLORS[activeTerrainStroke.kind as MapTerrainKind] ?? '#8a8a8a';
                         if (activeTerrainStroke.points.length === 1) {
+                            if (activeTerrainStroke.shape === 'square') {
+                                return (
+                                    <rect
+                                        className="fc-map-shape-editor__terrain-active"
+                                        x={activeTerrainStroke.points[0][0] - activeTerrainStroke.radius}
+                                        y={activeTerrainStroke.points[0][1] - activeTerrainStroke.radius}
+                                        width={activeTerrainStroke.radius * 2}
+                                        height={activeTerrainStroke.radius * 2}
+                                        fill={previewColor}
+                                    />
+                                );
+                            }
                             return (
                                 <circle
                                     className="fc-map-shape-editor__terrain-active"
@@ -989,13 +1001,22 @@ export function MapShapeSvgEditor({
                                 fill="none"
                                 stroke={previewColor}
                                 strokeWidth={activeTerrainStroke.radius * 2}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
+                                strokeLinecap={activeTerrainStroke.shape === 'square' ? 'square' : 'round'}
+                                strokeLinejoin={activeTerrainStroke.shape === 'square' ? 'miter' : 'round'}
                             />
                         );
                     })()}
 
-                    {terrainBrush && terrainCursorPoint && (
+                    {terrainBrush && terrainCursorPoint && (terrainBrush.shape === 'square' ? (
+                        <rect
+                            className="fc-map-shape-editor__terrain-cursor"
+                            x={terrainCursorPoint.x - terrainBrush.radius}
+                            y={terrainCursorPoint.y - terrainBrush.radius}
+                            width={terrainBrush.radius * 2}
+                            height={terrainBrush.radius * 2}
+                            vectorEffect="non-scaling-stroke"
+                        />
+                    ) : (
                         <circle
                             className="fc-map-shape-editor__terrain-cursor"
                             cx={terrainCursorPoint.x}
@@ -1003,7 +1024,7 @@ export function MapShapeSvgEditor({
                             r={terrainBrush.radius}
                             vectorEffect="non-scaling-stroke"
                         />
-                    )}
+                    ))}
                 </svg>
             </div>
         </div>
