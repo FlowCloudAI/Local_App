@@ -137,7 +137,6 @@ export interface CompiledPixiMapStyle extends MapStyleCompiledBase {
 
 export interface ShaderRenderContext {
     scene: {
-        shapes: Array<{ polygon: [number, number][] }>
         canvas: { width: number; height: number }
     }
     /**
@@ -145,7 +144,7 @@ export interface ShaderRenderContext {
      * RG16F，R=有符号海岸距离（场景像素，>0 海侧 <0 陆侧），G=保留。
      */
     coastField?: unknown
-    /** RGBA8 地形覆盖度纹理：R=草地、G=高山、B=沙漠。 */
+    /** RGBA8 地形场纹理：R=类型索引、G=覆盖度，B/A 保留。 */
     terrainField?: unknown
 }
 

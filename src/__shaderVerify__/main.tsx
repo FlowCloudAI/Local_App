@@ -6,12 +6,14 @@
  * → MapShapeViewport(pixi)。通过 URL 参数切换预设：
  *   ?style=tolkien|ink|flat（配合 ?mapDebug=1 输出编译/叠加日志）
  */
-import {StrictMode, useEffect, useState} from 'react'
+import {StrictMode, useEffect, useMemo, useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles/pixi'
 import type {PixiMapStyle} from '../features/maps/styles/pixi'
+import {retainShapesWhenPolygonsMatch} from '../features/maps/styles/pixi/overlays'
 import {
     cloneMapShapeEditorDraft,
+    buildPreviewKeyLocations,
     MapShapeViewport,
     simplifyTerrainStroke,
 } from '../features/maps/components/MapShapeEditor'
@@ -50,6 +52,23 @@ function makeIsland(
 const canvas = {width: 800, height: 600}
 
 function assertTerrainLayering() {
+    const polygon: [number, number][] = [[0, 0], [10, 0], [0, 10]]
+    const previousShapes: MapPreviewScene['shapes'] = [{
+        id: 'stable-shape',
+        name: '稳定多边形',
+        polygon,
+        fillColor: [0, 0, 0, 255],
+        lineColor: [0, 0, 0, 255],
+    }]
+    const rebuiltShapes = previousShapes.map(shape => ({...shape}))
+    if (retainShapesWhenPolygonsMatch(previousShapes, rebuiltShapes) !== previousShapes) {
+        throw new Error('海岸场缓存自检失败：相同 polygon 引用未复用 shapes 数组')
+    }
+    const changedShapes = previousShapes.map(shape => ({...shape, polygon: [...shape.polygon]}))
+    if (retainShapesWhenPolygonsMatch(previousShapes, changedShapes) !== changedShapes) {
+        throw new Error('海岸场缓存自检失败：polygon 变化后错误复用 shapes 数组')
+    }
+
     const simplified = simplifyTerrainStroke({
         id: 'simplify',
         kind: 'grass',
@@ -239,6 +258,15 @@ if (clonedDraft.terrainStrokes?.[0]?.points === initialDraft.terrainStrokes?.[0]
 function TerrainEditorHarness() {
     const [draft, setDraft] = useState(initialDraft)
     const [viewBox, setViewBox] = useState<MapShapeEditorViewBox>({x: 0, y: 0, ...canvas})
+    const liveScene = useMemo<MapPreviewScene>(() => ({
+        ...baseScene,
+        keyLocations: buildPreviewKeyLocations(draft.keyLocations),
+        terrainStrokes: draft.terrainStrokes,
+    }), [draft.keyLocations, draft.terrainStrokes])
+    const liveCompiled = useMemo(
+        () => compilePixiMapStyle({style, canvas, scene: liveScene}),
+        [liveScene],
+    )
     useEffect(() => {
         window.__terrainStrokeCount = draft.terrainStrokes?.length ?? 0
     }, [draft.terrainStrokes])
@@ -248,13 +276,13 @@ function TerrainEditorHarness() {
             mode="edit"
             renderer="pixi"
             canvas={canvas}
-            scene={{...compiled.scene, terrainStrokes: draft.terrainStrokes}}
+            scene={liveCompiled.scene}
             viewBox={viewBox}
             onViewBoxChange={setViewBox}
-            shapeStyle={compiled.shapeStyle}
-            keyLocationStyle={compiled.keyLocationStyle}
-            labelStyle={compiled.labelStyle}
-            pixiProps={compiled.pixiProps}
+            shapeStyle={liveCompiled.shapeStyle}
+            keyLocationStyle={liveCompiled.keyLocationStyle}
+            labelStyle={liveCompiled.labelStyle}
+            pixiProps={liveCompiled.pixiProps}
             svgProps={{
                 draft,
                 selectedShapeId: null,

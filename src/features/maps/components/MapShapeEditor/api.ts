@@ -3,6 +3,8 @@ import type {
     MapPreviewScene,
     MapPreviewShape,
     MapRgbaColor,
+    MapKeyLocationDraft,
+    MapShapeDraft,
     MapShapeEditorApi,
     MapShapeSaveRequest,
     MapShapeSaveResponse,
@@ -45,8 +47,8 @@ function hexToRgbaColor(value: string | undefined, fallback: MapRgbaColor): MapR
     ];
 }
 
-function buildPreviewShapes(request: MapShapeSaveRequest): MapPreviewShape[] {
-    return request.shapes.map((shape, index) => ({
+export function buildPreviewShapes(shapes: MapShapeDraft[]): MapPreviewShape[] {
+    return shapes.map((shape, index) => ({
         id: shape.id,
         name: shape.name,
         polygon: shape.vertices.map(vertex => [vertex.x, vertex.y] as [number, number]),
@@ -58,8 +60,8 @@ function buildPreviewShapes(request: MapShapeSaveRequest): MapPreviewShape[] {
     }));
 }
 
-function buildPreviewKeyLocations(request: MapShapeSaveRequest): MapPreviewKeyLocation[] {
-    return request.keyLocations.map(location => ({
+export function buildPreviewKeyLocations(keyLocations: MapKeyLocationDraft[]): MapPreviewKeyLocation[] {
+    return keyLocations.map(location => ({
         id: location.id,
         name: location.name,
         type: location.type,
@@ -75,8 +77,8 @@ function buildPreviewKeyLocations(request: MapShapeSaveRequest): MapPreviewKeyLo
 export function buildPreviewSceneFromDraft(request: MapShapeSaveRequest): MapPreviewScene {
     return {
         canvas: request.canvas,
-        shapes: buildPreviewShapes(request),
-        keyLocations: buildPreviewKeyLocations(request),
+        shapes: buildPreviewShapes(request.shapes),
+        keyLocations: buildPreviewKeyLocations(request.keyLocations),
         terrainStrokes: request.terrainStrokes ?? [],
         ext: request.meta?.ext,
     };

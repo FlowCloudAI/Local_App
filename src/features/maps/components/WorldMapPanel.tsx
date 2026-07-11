@@ -8,6 +8,8 @@ import {
 } from 'flowcloudai-ui'
 import {
     buildPreviewSceneFromDraft,
+    buildPreviewKeyLocations,
+    buildPreviewShapes,
     createEmptyShapeDraft,
     createInitialMapShapeEditorViewBox,
     createMapShapeEditorLocalId,
@@ -1228,28 +1230,33 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         return def.createBackgroundTexture?.(activeCanvas) ?? null
     }, [previewRenderer, style, backgroundImageUrl, activeCanvas])
 
+    const previewShapes = useMemo(() => buildPreviewShapes(draft.shapes), [draft.shapes])
+    const previewKeyLocations = useMemo(
+        () => buildPreviewKeyLocations(draft.keyLocations),
+        [draft.keyLocations],
+    )
+
     const baseScene = useMemo(() => {
-        const previewScene = buildPreviewSceneFromDraft({
+        const base: MapPreviewScene = scene ?? {
             canvas: activeCanvas,
-            shapes: draft.shapes,
-            keyLocations: draft.keyLocations,
-            terrainStrokes: draft.terrainStrokes,
-        })
-        const base: MapPreviewScene = scene ?? previewScene
+            shapes: previewShapes,
+            keyLocations: previewKeyLocations,
+            terrainStrokes: draft.terrainStrokes ?? [],
+        }
 
         const result = {
             ...base,
             // 地点始终即时更新；地形则在编辑态显示草稿语义，预览态只显示上次生成快照。
-            keyLocations: previewScene.keyLocations,
+            keyLocations: previewKeyLocations,
             terrainStrokes: resolveTerrainStrokesForViewport(
                 viewportMode,
-                previewScene.terrainStrokes,
+                draft.terrainStrokes,
                 scene?.terrainStrokes,
             ),
         }
-        mapLog(`baseScene: shapes=${result.shapes?.length ?? 0} keyLocations=${result.keyLocations?.length ?? 0} hasBg=${!!result.backgroundImage} viewportMode=${viewportMode} sceneDirty=${sceneDirty}`)
+        mapLog(`baseScene: shapes=${result.shapes?.length ?? 0} keyLocations=${result.keyLocations?.length ?? 0} hasBg=${!!result.backgroundImage} viewportMode=${viewportMode}`)
         return result
-    }, [activeCanvas, scene, sceneDirty, draft, viewportMode])
+    }, [activeCanvas, scene, previewShapes, previewKeyLocations, draft.terrainStrokes, viewportMode])
 
     const deckScene = useMemo(() => {
         const def = deckStyleApi.getStyleDefinition(style)

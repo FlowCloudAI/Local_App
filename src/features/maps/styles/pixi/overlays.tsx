@@ -11,8 +11,10 @@ import type {TextStyleOptions, TextureShader} from 'pixi.js'
 import {BufferImageSource, MeshGeometry, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
 import {
+    type MapEditorCanvas,
     type MapPixiPreviewOverlayContext,
     type MapPreviewKeyLocation,
+    type MapPreviewShape,
     type MapRgbaColor,
 } from '../../components/MapShapeEditor'
 import type {
@@ -47,9 +49,34 @@ function pixiOverlayLog(msg: string) {
     void log_message('info', `[PixiOverlay] ${msg}`)
 }
 
+function markOverlayBuild(name: 'coast-field' | 'linework' | 'shader-renderers'): void {
+    if (isMapDebugLogEnabled() && typeof performance !== 'undefined') {
+        performance.mark(`map:${name}-build`)
+    }
+}
+
 pixiOverlayLog('MODULE_INIT: overlays.tsx loaded, extend already called')
 
 type PixiOverlayRenderer = (context: MapPixiPreviewOverlayContext) => ReactNode
+
+export function retainShapesWhenPolygonsMatch(
+    previous: MapPreviewShape[],
+    next: MapPreviewShape[],
+): MapPreviewShape[] {
+    return previous.length === next.length
+        && previous.every((shape, index) => shape.polygon === next[index].polygon)
+        ? previous
+        : next
+}
+
+function useShapesStableByPolygon(shapes: MapPreviewShape[]): MapPreviewShape[] {
+    const [baseline, setBaseline] = useState(shapes)
+    const stableShapes = retainShapesWhenPolygonsMatch(baseline, shapes)
+    useEffect(() => {
+        if (stableShapes !== baseline) setBaseline(stableShapes)
+    }, [baseline, stableShapes])
+    return stableShapes
+}
 
 function colorToCss(color: MapRgbaColor, alphaMultiplier = 1): string {
     return `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${Math.max(0, Math.min(1, (color[3] / 255) * alphaMultiplier))})`
@@ -127,7 +154,7 @@ function drawPolygonStroke(
 
 function drawCoastlineLayer(
     ctx: CanvasRenderingContext2D,
-    context: MapPixiPreviewOverlayContext,
+    shapes: MapPreviewShape[],
     layer: PixiCoastlineLayerStyle,
     layerIndex: number,
     brushAsset: PixiBrushAssetId,
@@ -139,7 +166,7 @@ function drawCoastlineLayer(
     ctx.lineJoin = 'round'
     ctx.lineCap = 'round'
 
-    context.scene.shapes.forEach((shape, shapeIndex) => {
+    shapes.forEach((shape, shapeIndex) => {
         drawPolygonStroke(
             ctx,
             shape.polygon,
@@ -151,7 +178,7 @@ function drawCoastlineLayer(
     ctx.restore()
 }
 
-function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverlayContext, style: PixiMapStyle) {
+function drawCompass(ctx: CanvasRenderingContext2D, canvas: MapEditorCanvas, style: PixiMapStyle) {
     const plugin = style.decorations?.find(item => item.id === 'compass')
     const size = getNumberParam(plugin?.params?.size, 58)
     const margin = getNumberParam(plugin?.params?.margin, 72)
@@ -161,7 +188,7 @@ function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverl
     drawPixiCompassAsset({
         ctx,
         asset,
-        cx: context.scene.canvas.width - margin,
+        cx: canvas.width - margin,
         cy: margin,
         size,
         color,
@@ -174,12 +201,13 @@ function hasDecoration(style: PixiMapStyle, id: PixiDecorationPluginId): boolean
 
 /** Canvas 只生成无法由距离场表达的矢量线稿：海岸描边与罗盘。 */
 function createLineworkCanvas(
-    context: MapPixiPreviewOverlayContext,
+    shapes: MapPreviewShape[],
+    sceneCanvas: MapEditorCanvas,
     style: PixiMapStyle,
 ): HTMLCanvasElement | null {
-    pixiOverlayLog(`createLineworkCanvas: canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
-    const sceneW = context.scene.canvas.width
-    const sceneH = context.scene.canvas.height
+    pixiOverlayLog(`createLineworkCanvas: canvas=${sceneCanvas.width}x${sceneCanvas.height} shapes=${shapes.length}`)
+    const sceneW = sceneCanvas.width
+    const sceneH = sceneCanvas.height
     if (sceneW <= 0 || sceneH <= 0) return null
 
     const showCoastStrokes = Boolean(
@@ -205,11 +233,11 @@ function createLineworkCanvas(
     const coastlinePlugin = style.decorations?.find(item => item.id === 'coastline-outline')
     if (style.coastline?.enabled && coastlinePlugin) {
         const brushAsset = getStringParam(coastlinePlugin.params?.brush, 'tolkien-coastline') as PixiBrushAssetId
-        style.coastline.layers.forEach((layer, index) => drawCoastlineLayer(ctx, context, layer, index, brushAsset))
+        style.coastline.layers.forEach((layer, index) => drawCoastlineLayer(ctx, shapes, layer, index, brushAsset))
     }
 
     if (showCompass) {
-        drawCompass(ctx, context, style)
+        drawCompass(ctx, sceneCanvas, style)
     }
 
     pixiOverlayLog(`createLineworkCanvas: done ${canvas.width}x${canvas.height}`)
@@ -387,8 +415,6 @@ function PixiShaderOverlay({
 }) {
     const sceneW = context.scene.canvas.width
     const sceneH = context.scene.canvas.height
-    const shapes = context.scene.shapes
-
     // GPU 资源统一走"effect 内创建 + setState、被替换后在 cleanup 里销毁旧值"的模式
     //（与 useCanvasTexture 一致）。不能在 useMemo 里建资源、在 cleanup 里销毁：
     // StrictMode 会保留 useMemo 缓存并重放 effect 的 cleanup/setup，重放后 Mesh
@@ -409,8 +435,9 @@ function PixiShaderOverlay({
 
     const [renderItems, setRenderItems] = useState<Array<{key: string; renderer: ShaderRenderer}>>([])
     useEffect(() => {
+        markOverlayBuild('shader-renderers')
         const renderContext: ShaderRenderContext = {
-            scene: {shapes, canvas: {width: sceneW, height: sceneH}},
+            scene: {canvas: {width: sceneW, height: sceneH}},
             coastField,
             terrainField,
         }
@@ -445,7 +472,7 @@ function PixiShaderOverlay({
 
         pixiOverlayLog(`PixiShaderOverlay: collected ${items.length} meshes`)
         setRenderItems(items)
-    }, [shapes, sceneW, sceneH, style, coastField, terrainField])
+    }, [sceneW, sceneH, style, coastField, terrainField])
 
     // 延迟销毁 shader（GlProgram 走 Pixi 全局缓存，不随之销毁）
     useEffect(() => () => {
@@ -478,11 +505,15 @@ function PixiTextureOverlay({
     const sceneW = context.scene.canvas.width
     const sceneH = context.scene.canvas.height
     const shapes = context.scene.shapes
+    const stableShapes = useShapesStableByPolygon(shapes)
 
     // 海岸场：CPU 精确 EDT（场景分辨率，一次性数十 ms），只在 shapes/尺寸变化时重算。
     const coastFieldData = useMemo(
-        () => createCoastFieldData(shapes, sceneW, sceneH),
-        [shapes, sceneW, sceneH],
+        () => {
+            markOverlayBuild('coast-field')
+            return createCoastFieldData(stableShapes, sceneW, sceneH)
+        },
+        [stableShapes, sceneW, sceneH],
     )
     const coastField = useCoastFieldTexture(coastFieldData)
     const terrainFieldData = useMemo(
@@ -496,9 +527,11 @@ function PixiTextureOverlay({
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
     // createLineworkCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
     const overlayCanvas = useMemo(
-        () => createLineworkCanvas(context, style),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [context.scene.shapes, sceneW, sceneH, style],
+        () => {
+            markOverlayBuild('linework')
+            return createLineworkCanvas(stableShapes, {width: sceneW, height: sceneH}, style)
+        },
+        [stableShapes, sceneW, sceneH, style],
     )
     const texture = useCanvasTexture(overlayCanvas)
 

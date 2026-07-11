@@ -81,6 +81,7 @@ function resolvePixiBackgroundImage({style, canvas}: MapStyleCompileContext<Pixi
 export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle>): CompiledPixiMapStyle {
     try {
         const {style, scene} = context
+        if (isMapDebugLogEnabled() && typeof performance !== 'undefined') performance.mark('map:pixi-compile')
         pixiLog(`compile enter: styleId=${style.id} shapes=${scene.shapes.length} keyLocs=${scene.keyLocations.length} bgKind=${style.background.kind}`)
 
         const markerStroke = style.locations.marker.stroke
