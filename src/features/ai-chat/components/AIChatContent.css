@@ -1359,12 +1359,15 @@
 
 .ai-document-context-rail {
     position: relative;
+    isolation: isolate;
     min-width: 0;
     margin-bottom: var(--fc-space-xs);
 }
 
 .ai-document-context-rail-track {
     --ai-document-context-mask: none;
+    position: relative;
+    z-index: 0;
     height: auto;
     min-width: 0;
     scroll-behavior: smooth;
@@ -1489,7 +1492,7 @@
 
 .ai-document-context-rail-nav {
     position: absolute;
-    z-index: 2;
+    z-index: 1;
     top: 0;
     bottom: 0;
     display: grid;
@@ -1501,6 +1504,7 @@
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
+    pointer-events: auto;
     transition: color 0.15s ease;
 }
 
