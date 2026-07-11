@@ -1,5 +1,5 @@
 import {logger} from '../shared/logger'
-import {type CSSProperties, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
     Button,
     type CategoryTreeNode,
@@ -105,6 +105,10 @@ const LLM_COMPACT_DETAIL_OPTIONS: Array<{ value: LlmCompactDetail; label: string
 ]
 const DEFAULT_ENABLED_FREQUENCY_PENALTY = 1.1
 const DEFAULT_ENABLED_PRESENCE_PENALTY = 0.5
+const SETTINGS_SIDEBAR_MIN_WIDTH = '15rem'
+const SETTINGS_SIDEBAR_MAX_WIDTH = '22rem'
+const SETTINGS_SIDEBAR_DEFAULT_WIDTH = 256
+const SETTINGS_SIDEBAR_COLLAPSE_THRESHOLD_RATIO = 1 / 5
 const DEFAULT_SEARCH_SOURCE_SETTINGS: SearchSourceSettings = {
     wikimedia: true,
     technical_wiki: true,
@@ -354,36 +358,52 @@ interface SettingsSidebarProps {
     activeTab: SettingsTab
     onTabChange: (tab: SettingsTab) => void
     onBack?: () => void
+    collapsed: boolean
+    onCollapseToggle: () => void
 }
 
-function SettingsSidebar({activeTab, onTabChange, onBack}: SettingsSidebarProps) {
+function SettingsSidebar({activeTab, onTabChange, onBack, collapsed, onCollapseToggle}: SettingsSidebarProps) {
     return (
         <aside className="settings-sidebar">
-            {onBack && (
+            <div className="settings-sidebar__header">
+                {onBack && (
+                    <Button
+                        type="button"
+                        className="settings-back-button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={onBack}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        <span>返回</span>
+                    </Button>
+                )}
                 <Button
                     type="button"
-                    className="settings-back-button"
+                    className="settings-sidebar-toggle"
                     variant="ghost"
                     size="sm"
-                    onClick={onBack}
+                    onClick={onCollapseToggle}
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M19 12H5M12 19l-7-7 7-7"/>
-                    </svg>
-                    <span>返回</span>
+                    {collapsed ? '展开' : '收起'}
                 </Button>
-            )}
-            {SETTINGS_TABS.map(tab => (
-                <button
-                    key={tab.value}
-                    type="button"
-                    className={`settings-sidebar-item ${activeTab === tab.value ? 'active' : ''}`}
-                    onClick={() => onTabChange(tab.value)}
-                >
-                    {tab.label}
-                </button>
-            ))}
+            </div>
+            <nav className="settings-sidebar__nav" aria-label="设置项">
+                {SETTINGS_TABS.map(tab => (
+                    <button
+                        key={tab.value}
+                        type="button"
+                        className={`settings-sidebar-item ${activeTab === tab.value ? 'active' : ''}`}
+                        aria-current={activeTab === tab.value ? 'page' : undefined}
+                        onClick={() => onTabChange(tab.value)}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </nav>
         </aside>
     )
 }
@@ -1112,10 +1132,152 @@ export default function Settings({
     const handledFocusRequestIdRef = useRef<number | null>(null)
     const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
     const [focusedSetting, setFocusedSetting] = useState<SettingsFocusTarget | null>(null)
+    const [settingsSidebarWidth, setSettingsSidebarWidth] = useState(SETTINGS_SIDEBAR_DEFAULT_WIDTH)
+    const [settingsSidebarCollapsed, setSettingsSidebarCollapsed] = useState(false)
+    const [settingsSidebarDragging, setSettingsSidebarDragging] = useState(false)
+    const settingsLayoutRef = useRef<HTMLDivElement>(null)
+    const settingsSidebarLastExpandedWidthRef = useRef(SETTINGS_SIDEBAR_DEFAULT_WIDTH)
+    const settingsSidebarCollapseRestoreTimerRef = useRef<number | null>(null)
 
     useEffect(() => {
         showAlertRef.current = showAlert
     }, [showAlert])
+
+    const getSettingsSidebarBounds = useCallback(() => {
+        const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+        return {
+            min: rootFontSize * parseFloat(SETTINGS_SIDEBAR_MIN_WIDTH),
+            max: rootFontSize * parseFloat(SETTINGS_SIDEBAR_MAX_WIDTH),
+        }
+    }, [])
+
+    const updateSettingsSidebarWidth = useCallback((nextWidth: number) => {
+        const {min, max} = getSettingsSidebarBounds()
+        const width = Math.min(max, Math.max(min, nextWidth))
+        settingsLayoutRef.current?.style.setProperty('--settings-sidebar-width', `${width}px`)
+        setSettingsSidebarCollapsed(false)
+        setSettingsSidebarWidth(width)
+    }, [getSettingsSidebarBounds])
+
+    useEffect(() => {
+        if (!settingsSidebarCollapsed) {
+            settingsSidebarLastExpandedWidthRef.current = settingsSidebarWidth
+        }
+    }, [settingsSidebarCollapsed, settingsSidebarWidth])
+
+    const expandSettingsSidebar = useCallback(() => {
+        const nextWidth = settingsSidebarLastExpandedWidthRef.current || SETTINGS_SIDEBAR_DEFAULT_WIDTH
+        setSettingsSidebarCollapsed(false)
+        setSettingsSidebarWidth(nextWidth)
+        settingsLayoutRef.current?.style.setProperty('--settings-sidebar-width', `${nextWidth}px`)
+    }, [])
+
+    const collapseSettingsSidebar = useCallback(() => {
+        setSettingsSidebarCollapsed(true)
+        settingsLayoutRef.current?.style.setProperty('--settings-sidebar-width', '0px')
+    }, [])
+
+    const clearSettingsSidebarCollapseRestore = useCallback(() => {
+        if (settingsSidebarCollapseRestoreTimerRef.current !== null) {
+            window.clearTimeout(settingsSidebarCollapseRestoreTimerRef.current)
+            settingsSidebarCollapseRestoreTimerRef.current = null
+        }
+        settingsLayoutRef.current?.classList.remove('is-sidebar-collapse-restoring')
+    }, [])
+
+    useEffect(() => () => {
+        clearSettingsSidebarCollapseRestore()
+    }, [clearSettingsSidebarCollapseRestore])
+
+    const handleSettingsSidebarResizeStart = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+        event.preventDefault()
+        const {min, max} = getSettingsSidebarBounds()
+        const startX = event.clientX
+        const startWidth = settingsSidebarCollapsed
+            ? settingsSidebarLastExpandedWidthRef.current || SETTINGS_SIDEBAR_DEFAULT_WIDTH
+            : settingsSidebarWidth
+        const collapseThreshold = startWidth * SETTINGS_SIDEBAR_COLLAPSE_THRESHOLD_RATIO
+        const layout = settingsLayoutRef.current
+        let currentWidth = startWidth
+        let shouldCollapse = false
+        let pendingExpand = settingsSidebarCollapsed
+        let dragStartX = startX
+        const pendingExpandHandleX = startX + startWidth
+        const collapsePreviewClassName = 'is-sidebar-collapse-preview'
+        const collapseRestoreClassName = 'is-sidebar-collapse-restoring'
+
+        setSettingsSidebarDragging(!settingsSidebarCollapsed)
+        if (settingsSidebarCollapsed) {
+            setSettingsSidebarCollapsed(false)
+            layout?.style.setProperty('--settings-sidebar-width', `${startWidth}px`)
+        }
+        layout?.classList.remove(collapsePreviewClassName)
+        clearSettingsSidebarCollapseRestore()
+
+        const onMove = (moveEvent: MouseEvent) => {
+            if (pendingExpand) {
+                if (moveEvent.clientX < pendingExpandHandleX) return
+                pendingExpand = false
+                dragStartX = pendingExpandHandleX
+                setSettingsSidebarDragging(true)
+            }
+            const wasCollapsePreview = shouldCollapse
+            const rawWidth = startWidth + moveEvent.clientX - dragStartX
+            currentWidth = Math.min(max, Math.max(min, rawWidth))
+            shouldCollapse = rawWidth <= collapseThreshold
+            if (wasCollapsePreview && !shouldCollapse) {
+                layout?.classList.add(collapseRestoreClassName)
+                if (settingsSidebarCollapseRestoreTimerRef.current !== null) {
+                    window.clearTimeout(settingsSidebarCollapseRestoreTimerRef.current)
+                }
+                settingsSidebarCollapseRestoreTimerRef.current = window.setTimeout(() => {
+                    layout?.classList.remove(collapseRestoreClassName)
+                    settingsSidebarCollapseRestoreTimerRef.current = null
+                }, 160)
+            } else if (shouldCollapse) {
+                clearSettingsSidebarCollapseRestore()
+            }
+            layout?.classList.toggle(collapsePreviewClassName, shouldCollapse)
+            layout?.style.setProperty(
+                '--settings-sidebar-width',
+                shouldCollapse ? '0px' : `${currentWidth}px`,
+            )
+        }
+        const onUp = () => {
+            layout?.classList.remove(collapsePreviewClassName)
+            clearSettingsSidebarCollapseRestore()
+            document.removeEventListener('mousemove', onMove)
+            document.removeEventListener('mouseup', onUp)
+            if (shouldCollapse) {
+                setSettingsSidebarDragging(false)
+                setSettingsSidebarCollapsed(true)
+                layout?.style.setProperty('--settings-sidebar-width', '0px')
+            } else {
+                setSettingsSidebarDragging(false)
+                setSettingsSidebarCollapsed(false)
+                setSettingsSidebarWidth(currentWidth)
+            }
+        }
+
+        document.addEventListener('mousemove', onMove)
+        document.addEventListener('mouseup', onUp)
+    }, [clearSettingsSidebarCollapseRestore, getSettingsSidebarBounds, settingsSidebarCollapsed, settingsSidebarWidth])
+
+    const handleSettingsSidebarDividerKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+        const {min, max} = getSettingsSidebarBounds()
+        const nextWidth = event.key === 'ArrowLeft'
+            ? settingsSidebarWidth - 16
+            : event.key === 'ArrowRight'
+                ? settingsSidebarWidth + 16
+                : event.key === 'Home'
+                    ? min
+                    : event.key === 'End'
+                        ? max
+                        : null
+        if (nextWidth === null) return
+        event.preventDefault()
+        updateSettingsSidebarWidth(nextWidth)
+    }, [getSettingsSidebarBounds, settingsSidebarWidth, updateSettingsSidebarWidth])
 
     // ── 系统配置状态 ──
     const [loading, setLoading] = useState(true)
@@ -1818,9 +1980,34 @@ export default function Settings({
     if (loading || !settings) {
         return (
             <div className="settings-outer">
-                <div className="settings-page-layout">
-                    <SettingsSidebar activeTab={activeTab} onTabChange={setActiveTab}/>
-                    <div className="settings-content" style={{padding: '20px'}}>加载中...</div>
+                <div
+                    ref={settingsLayoutRef}
+                    className={`settings-page-layout ${settingsSidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${settingsSidebarDragging ? 'is-sidebar-dragging' : ''}`}
+                    style={{'--settings-sidebar-width': `${settingsSidebarCollapsed ? 0 : settingsSidebarWidth}px`} as CSSProperties}
+                >
+                    <SettingsSidebar
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                        onBack={onBack}
+                        collapsed={settingsSidebarCollapsed}
+                        onCollapseToggle={settingsSidebarCollapsed ? expandSettingsSidebar : collapseSettingsSidebar}
+                    />
+                    <div
+                        className={`settings-sidebar-divider ${settingsSidebarDragging ? 'is-dragging' : ''}`}
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label="调整设置导航宽度"
+                        tabIndex={0}
+                        onMouseDown={handleSettingsSidebarResizeStart}
+                        onKeyDown={handleSettingsSidebarDividerKeyDown}
+                    >
+                        <div className="settings-sidebar-divider__handle" aria-hidden="true">
+                            <span className="settings-sidebar-divider__dot"/>
+                            <span className="settings-sidebar-divider__dot"/>
+                            <span className="settings-sidebar-divider__dot"/>
+                        </div>
+                    </div>
+                    <div className="settings-content settings-loading-shell" style={{padding: '20px'}}>加载中...</div>
                 </div>
             </div>
         )
@@ -1865,8 +2052,33 @@ export default function Settings({
 
     return (
         <div className="settings-outer">
-            <div className="settings-page-layout">
-                <SettingsSidebar activeTab={activeTab} onTabChange={setActiveTab} onBack={onBack}/>
+            <div
+                ref={settingsLayoutRef}
+                className={`settings-page-layout ${settingsSidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${settingsSidebarDragging ? 'is-sidebar-dragging' : ''}`}
+                style={{'--settings-sidebar-width': `${settingsSidebarCollapsed ? 0 : settingsSidebarWidth}px`} as CSSProperties}
+            >
+                <SettingsSidebar
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    onBack={onBack}
+                    collapsed={settingsSidebarCollapsed}
+                    onCollapseToggle={settingsSidebarCollapsed ? expandSettingsSidebar : collapseSettingsSidebar}
+                />
+                <div
+                    className={`settings-sidebar-divider ${settingsSidebarDragging ? 'is-dragging' : ''}`}
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="调整设置导航宽度"
+                    tabIndex={0}
+                    onMouseDown={handleSettingsSidebarResizeStart}
+                    onKeyDown={handleSettingsSidebarDividerKeyDown}
+                >
+                    <div className="settings-sidebar-divider__handle" aria-hidden="true">
+                        <span className="settings-sidebar-divider__dot"/>
+                        <span className="settings-sidebar-divider__dot"/>
+                        <span className="settings-sidebar-divider__dot"/>
+                    </div>
+                </div>
                 <RollingBox axis="y" className="settings-scroll-area" thumbSize={'thin'}>
                     <div className="settings-content">
                     {activeTab === 'system' && (

@@ -5,77 +5,219 @@
 }
 
 .settings-page-layout {
+  --settings-sidebar-width: 16rem;
+  --settings-sidebar-divider-width: 8px;
+  --settings-sidebar-divider-handle-gap-height: 48px;
+  --settings-sidebar-divider-handle-gap-half: 24px;
   display: flex;
   width: 100%;
-  max-width: 88rem;
   height: 100%;
-  margin: 0 auto;
   min-height: 0;
 }
 
 .settings-sidebar {
-  width: 180px;
+  width: var(--settings-sidebar-width);
   flex-shrink: 0;
-  padding: var(--fc-space-lg) var(--fc-space-sm);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  min-width: 0;
   background: transparent;
   user-select: none;
   align-self: stretch;
+  overflow: hidden;
+  transition: width 0.05s ease;
+}
+
+.settings-page-layout.is-sidebar-dragging .settings-sidebar {
+  transition: none;
+}
+
+.settings-page-layout.is-sidebar-dragging.is-sidebar-collapse-preview .settings-sidebar,
+.settings-page-layout.is-sidebar-dragging.is-sidebar-collapse-restoring .settings-sidebar {
+  transition: width 0.14s ease;
+}
+
+.settings-sidebar__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 3.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
+  gap: 0.75rem;
+}
+
+.settings-sidebar__nav {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.625rem 0.75rem;
   overflow-y: auto;
+}
+
+.settings-sidebar-item {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--fc-radius-md);
+  background: transparent;
+  color: var(--fc-color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+  font-size: var(--fc-font-size-sm);
+  font-weight: var(--fc-font-weight-medium);
+}
+
+.settings-back-button,
+.settings-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fc-space-sm);
+  padding: 0.38rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, var(--fc-color-bg-secondary));
+  color: var(--fc-color-text);
+  font-size: var(--fc-font-size-caption, 0.75rem);
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+
+.settings-back-button:hover,
+.settings-sidebar-toggle:hover {
+  border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
+  background: color-mix(in srgb, var(--fc-color-primary) 14%, var(--fc-color-bg-secondary));
+  color: var(--fc-color-primary);
+}
+
+.settings-back-button:active,
+.settings-sidebar-toggle:active {
+  transform: translateY(1px);
+}
+
+.settings-sidebar-item:hover {
+  border-color: color-mix(in srgb, var(--fc-color-border) 88%, transparent);
+  background: color-mix(in srgb, var(--fc-color-bg-elevated) 90%, var(--fc-color-bg-secondary));
+}
+
+.settings-sidebar-item.active {
+  border-color: color-mix(in srgb, var(--fc-color-primary) 70%, var(--fc-color-border));
+  background: var(--fc-color-primary-subtle);
+  color: var(--fc-color-primary);
+  font-weight: var(--fc-font-weight-semibold);
+}
+
+.settings-sidebar-divider {
+  width: var(--settings-sidebar-divider-width);
+  flex-shrink: 0;
+  cursor: col-resize;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: background 0.1s ease;
+  user-select: none;
+  outline: none;
+}
+
+.settings-sidebar-divider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 12%,
+    color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 24%,
+    color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% - var(--settings-sidebar-divider-handle-gap-height)),
+    color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% - var(--settings-sidebar-divider-handle-gap-half)),
+    transparent calc(50% - var(--settings-sidebar-divider-handle-gap-half)),
+    transparent calc(50% + var(--settings-sidebar-divider-handle-gap-half)),
+    color-mix(in srgb, var(--fc-color-primary) 68%, transparent) calc(50% + var(--settings-sidebar-divider-handle-gap-half)),
+    color-mix(in srgb, var(--fc-color-primary) 58%, transparent) calc(50% + var(--settings-sidebar-divider-handle-gap-height)),
+    color-mix(in srgb, var(--fc-color-primary) 36%, transparent) 76%,
+    color-mix(in srgb, var(--fc-color-primary) 12%, transparent) 88%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.14s ease, width 0.1s ease;
+}
+
+.settings-sidebar-divider__handle {
+  position: relative;
+  z-index: 1;
+  width: var(--settings-sidebar-divider-width);
+  height: var(--settings-sidebar-divider-handle-gap-height);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: border-color 0.1s ease, background 0.1s ease, transform 0.1s ease;
+}
+
+.settings-sidebar-divider__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fc-color-text) 38%, transparent);
+  transition: background 0.1s ease;
+}
+
+.settings-sidebar-divider:hover::before,
+.settings-sidebar-divider.is-dragging::before,
+.settings-sidebar-divider:focus-visible::before {
+  width: 2px;
+  opacity: 1;
+}
+
+.settings-sidebar-divider:hover .settings-sidebar-divider__handle,
+.settings-sidebar-divider.is-dragging .settings-sidebar-divider__handle,
+.settings-sidebar-divider:focus-visible .settings-sidebar-divider__handle {
+  transform: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+.settings-sidebar-divider:hover .settings-sidebar-divider__dot,
+.settings-sidebar-divider.is-dragging .settings-sidebar-divider__dot,
+.settings-sidebar-divider:focus-visible .settings-sidebar-divider__dot {
+  background: color-mix(in srgb, var(--fc-color-primary) 55%, var(--fc-color-text));
 }
 
 .settings-scroll-area {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-xl);
+  background: var(--fc-color-bg);
+  box-sizing: border-box;
 }
 
 .settings-scroll-area > .fc-roll__content {
   height: 100%;
 }
 
-.settings-sidebar-item {
-  width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: none;
-  border-radius: var(--fc-radius-md);
-  background: transparent;
-  color: var(--fc-color-text);
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
-
-.settings-back-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--fc-space-sm);
-    padding: 0.375rem 0.625rem;
-    margin-bottom: var(--fc-space-sm);
-    border: none;
-    border-radius: var(--fc-radius-md);
-    background: transparent;
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-sm);
-    cursor: pointer;
-    transition: background var(--fc-transition), color var(--fc-transition);
-}
-
-.settings-back-button:hover {
-    color: var(--fc-color-text);
-}
-
-.settings-sidebar-item:hover {
-  background: var(--fc-color-bg-tertiary);
-}
-
-.settings-sidebar-item.active {
-  background: var(--fc-color-bg-tertiary);
-  color: var(--fc-color-text);
+.settings-loading-shell {
+  overflow: hidden;
+  border: 1px solid var(--fc-color-border);
+  border-radius: var(--fc-radius-xl);
+  background: var(--fc-color-bg);
+  box-sizing: border-box;
 }
 
 .settings-content {

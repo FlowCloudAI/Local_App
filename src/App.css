@@ -218,7 +218,8 @@ body {
     outline-offset: -1px;
 }
 
-.page-container--project-editor {
+.page-container--project-editor,
+.page-container--settings {
     border-color: transparent;
     border-radius: 0;
     outline: none;
