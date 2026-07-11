@@ -96,6 +96,48 @@ export const inkPixiMapStyle: PixiMapStyle = {
     },
     decorations: [
         {
+            id: 'terrain',
+            params: {
+                terrainKinds: {
+                    grass: {
+                        color: '#71806a',
+                        detailColor: '#4f6250',
+                        baseOpacity: 0.09,
+                        pattern: 'ink-grass',
+                        patternOpacity: 0.34,
+                        patternScale: 24,
+                    },
+                    mountain: {
+                        color: '#596767',
+                        detailColor: '#455454',
+                        baseOpacity: 0.07,
+                        pattern: 'none',
+                        patternOpacity: 0,
+                        patternScale: 30,
+                    },
+                    desert: {
+                        color: '#9a8462',
+                        detailColor: '#766044',
+                        baseOpacity: 0.1,
+                        pattern: 'ink-desert',
+                        patternOpacity: 0.32,
+                        patternScale: 28,
+                    },
+                },
+                symbols: {
+                    mountain: {
+                        asset: 'ink-mountain',
+                        color: '#47585a',
+                        size: 58,
+                        spacing: 58,
+                        opacity: 0.76,
+                        jitter: 0.48,
+                        variants: 3,
+                    },
+                },
+            },
+        },
+        {
             id: 'coastline-outline',
             params: {
                 brush: 'ink-boundary',

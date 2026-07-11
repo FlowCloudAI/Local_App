@@ -910,7 +910,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     const handleStyleChange = useCallback((nextStyle: MapStyle) => {
         if (style === nextStyle) return
         setStyle(nextStyle)
-        if (nextStyle !== 'flat') setTerrainBrush(null)
         markMapUnsaved()
     }, [markMapUnsaved, style])
 
@@ -2204,9 +2203,9 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                         <button
                             type="button"
                             className={`wm-chip${terrainBrush ? ' is-active' : ''}`}
-                            title={style === 'flat' && previewRenderer === 'pixi'
+                            title={previewRenderer === 'pixi'
                                 ? '地形笔刷'
-                                : '阶段 1 仅在 Pixi 扁平风格下提供地形笔刷'}
+                                : '地形笔刷目前仅支持 Pixi 渲染器'}
                             aria-pressed={Boolean(terrainBrush)}
                             onClick={() => {
                                 setDrawingShape(null)
@@ -2214,7 +2213,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                 setSelectedLocationId(null)
                                 setTerrainBrush(current => current ? null : {...DEFAULT_TERRAIN_BRUSH})
                             }}
-                            disabled={!activeMapId || style !== 'flat' || previewRenderer !== 'pixi'}
+                            disabled={!activeMapId || previewRenderer !== 'pixi'}
                         >
                             地形笔刷
                         </button>

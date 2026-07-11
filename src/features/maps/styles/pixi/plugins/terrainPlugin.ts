@@ -3,7 +3,18 @@ import {MAP_TERRAIN_KINDS} from '../../../components/MapShapeEditor'
 import type {MapStyleParameterRecord} from '../../common'
 import type {PixiPluginImplementation, ShaderRenderer} from '../types'
 import {parseColorToVec3} from '../shaderRegistry'
-import {coastFieldGlsl, createSceneQuadShader, updateSceneQuadShader} from './shared'
+import {coastFieldGlsl, createSceneQuadShader, updateSceneQuadShader, valueNoiseGlsl} from './shared'
+
+const TERRAIN_PATTERN_CODES: Readonly<Record<string, number>> = {
+    none: 0,
+    'flat-grass': 1,
+    'flat-mountain': 2,
+    'flat-desert': 3,
+    'tolkien-grass': 4,
+    'tolkien-desert': 5,
+    'ink-grass': 6,
+    'ink-desert': 7,
+}
 
 const terrainFragment = `
 precision highp float;
@@ -13,9 +24,71 @@ out vec4 finalColor;
 
 uniform vec2 uCanvasSize;
 uniform sampler2D uTerrainField;
-uniform sampler2D uTerrainPalette;
+uniform sampler2D uTerrainBasePalette;
+uniform sampler2D uTerrainDetailPalette;
+uniform sampler2D uTerrainRecipePalette;
 
 ${coastFieldGlsl}
+${valueNoiseGlsl}
+
+float sdSegment(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 0.0001), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+
+float bladeGlyph(vec2 local, float width) {
+    float left = sdSegment(local, vec2(0.0, 0.35), vec2(-0.16, -0.12));
+    float middle = sdSegment(local, vec2(0.0, 0.35), vec2(0.01, -0.28));
+    float right = sdSegment(local, vec2(0.0, 0.35), vec2(0.18, -0.08));
+    return 1.0 - smoothstep(width, width + 0.035, min(left, min(middle, right)));
+}
+
+float chevronGlyph(vec2 local, float width) {
+    float left = sdSegment(local, vec2(-0.34, 0.22), vec2(0.0, -0.26));
+    float right = sdSegment(local, vec2(0.0, -0.26), vec2(0.34, 0.22));
+    float ridge = sdSegment(local, vec2(-0.22, 0.12), vec2(0.22, 0.12));
+    return 1.0 - smoothstep(width, width + 0.035, min(min(left, right), ridge));
+}
+
+float terrainPattern(float code, vec2 position, float scale) {
+    vec2 grid = position / max(scale, 4.0);
+    vec2 cell = floor(grid);
+    vec2 local = fract(grid) - 0.5;
+    float random = hash(cell + vec2(code * 13.7, code * 7.9));
+    local += vec2(hash(cell + 17.3), hash(cell + 39.1)) * 0.24 - 0.12;
+
+    if (code < 0.5) return 0.0;
+    if (code < 1.5) {
+        return bladeGlyph(local, 0.045) * step(0.18, random);
+    }
+    if (code < 2.5) {
+        return chevronGlyph(local, 0.045) * step(0.12, random);
+    }
+    if (code < 3.5) {
+        float dotMark = 1.0 - smoothstep(0.065, 0.1, length(local));
+        return dotMark * step(0.24, random);
+    }
+    if (code < 4.5) {
+        return bladeGlyph(local, 0.032) * step(0.46, random);
+    }
+    if (code < 5.5) {
+        float stipple = (1.0 - smoothstep(0.035, 0.07, length(local))) * step(0.32, random);
+        float dune = 1.0 - smoothstep(0.025, 0.055, abs(length(local - vec2(0.0, 0.18)) - 0.28));
+        dune *= step(0.72, random) * step(local.y, 0.22);
+        return max(stipple, dune);
+    }
+    if (code < 6.5) {
+        float stroke = 1.0 - smoothstep(0.028, 0.065, sdSegment(local, vec2(-0.30, 0.18), vec2(0.28, -0.12)));
+        float dry = smoothstep(0.36, 0.62, vnoise(position / 3.4));
+        return stroke * dry * step(0.38, random);
+    }
+
+    float band = 1.0 - smoothstep(0.035, 0.085, abs(local.y + 0.12 * sin(local.x * 8.0 + random * 5.0)));
+    float dry = smoothstep(0.48, 0.70, vnoise(position * vec2(0.10, 0.28)));
+    return band * dry * step(0.28, random);
+}
 
 void main() {
     if (coastSd(vUV) >= 0.0) discard;
@@ -24,6 +97,7 @@ void main() {
     vec2 fieldBase = floor(fieldPosition);
     vec2 fieldMix = fract(fieldPosition);
     vec4 terrain = vec4(0.0);
+    float baseOpacitySum = 0.0;
 
     for (int y = 0; y < 2; y++) {
         for (int x = 0; x < 2; x++) {
@@ -32,45 +106,59 @@ void main() {
             float typeIndex = floor(encoded.r * 255.0 + 0.5);
             float weight = mix(1.0 - fieldMix.x, fieldMix.x, float(x))
                 * mix(1.0 - fieldMix.y, fieldMix.y, float(y));
-            vec3 color = texture(uTerrainPalette, vec2((typeIndex + 0.5) / 256.0, 0.5)).rgb;
-            terrain += vec4(color * encoded.g, encoded.g) * weight;
+            vec4 base = texture(uTerrainBasePalette, vec2((typeIndex + 0.5) / 256.0, 0.5));
+            terrain += vec4(base.rgb * encoded.g, encoded.g) * weight;
+            baseOpacitySum += base.a * encoded.g * weight;
         }
     }
 
     float total = terrain.a;
     if (total < 0.02) discard;
 
-    // 类型索引本身不能线性插值；先取四邻域各自的调色板颜色，再手工混色。
-    vec3 color = terrain.rgb / total;
+    vec3 baseColor = terrain.rgb / total;
+    float edgeAlpha = smoothstep(0.30, 0.80, total);
+    float baseAlpha = edgeAlpha * clamp(baseOpacitySum / total, 0.0, 1.0);
 
-    // 覆盖度→软边：地形场外缘保留了笔画的抗锯齿 fringe（见 terrainField 合并注释），
-    // smoothstep 把它压成约 1 场景像素的柔和过渡；内部覆盖度=1 → 完全不透明。
-    float alpha = smoothstep(0.30, 0.80, total);
+    vec2 centerTexel = clamp(floor(fieldPosition + 0.5), vec2(0.0), uCanvasSize - 1.0);
+    vec2 centerEncoded = texture(uTerrainField, (centerTexel + 0.5) / uCanvasSize).rg;
+    float centerIndex = floor(centerEncoded.r * 255.0 + 0.5);
+    vec4 detail = texture(uTerrainDetailPalette, vec2((centerIndex + 0.5) / 256.0, 0.5));
+    vec4 recipe = texture(uTerrainRecipePalette, vec2((centerIndex + 0.5) / 256.0, 0.5));
+    float patternCode = floor(recipe.r * 255.0 + 0.5);
+    float patternScale = max(4.0, recipe.g * 128.0);
+    float pattern = terrainPattern(patternCode, vUV * uCanvasSize, patternScale);
+    float detailAlpha = edgeAlpha * detail.a * pattern;
+
+    float alpha = detailAlpha + baseAlpha * (1.0 - detailAlpha);
     if (alpha < 0.004) discard;
-    finalColor = vec4(color * alpha, alpha);
+    vec3 premultiplied = detail.rgb * detailAlpha + baseColor * baseAlpha * (1.0 - detailAlpha);
+    finalColor = vec4(premultiplied, alpha);
 }
 `
 
-function createTerrainPalette(params: MapStyleParameterRecord): Texture {
+function getTerrainKindConfig(params: MapStyleParameterRecord, kind: string): MapStyleParameterRecord | null {
     const configured = params.terrainKinds
+    if (!configured || typeof configured !== 'object' || Array.isArray(configured)) return null
+    const value = configured[kind]
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+}
+
+function getNumber(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function getString(value: unknown, fallback: string): string {
+    return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function createPaletteTexture(
+    label: string,
+    writeDefinition: (data: Uint8Array, offset: number, definition: (typeof MAP_TERRAIN_KINDS)[number]) => void,
+): Texture {
     const data = new Uint8Array(256 * 4)
     for (let index = 0; index < 256; index++) data[index * 4 + 3] = 255
     for (const definition of MAP_TERRAIN_KINDS) {
-        const fallback = parseColorToVec3(definition.semanticColor, [0, 0, 0])
-        const kindConfig = configured && typeof configured === 'object' && !Array.isArray(configured)
-            ? configured[definition.id]
-            : null
-        const configuredColor = kindConfig && typeof kindConfig === 'object' && !Array.isArray(kindConfig)
-            ? kindConfig.color
-            : null
-        const color = parseColorToVec3(
-            typeof configuredColor === 'string' ? configuredColor : definition.semanticColor,
-            fallback,
-        )
-        const offset = definition.order * 4
-        data[offset] = Math.round(color[0] * 255)
-        data[offset + 1] = Math.round(color[1] * 255)
-        data[offset + 2] = Math.round(color[2] * 255)
+        writeDefinition(data, definition.order * 4, definition)
     }
     return new Texture({
         source: new BufferImageSource({
@@ -80,19 +168,49 @@ function createTerrainPalette(params: MapStyleParameterRecord): Texture {
             format: 'rgba8unorm',
             alphaMode: 'no-premultiply-alpha',
             scaleMode: 'nearest',
-            label: 'map-terrain-palette',
+            label,
         }),
     })
 }
 
+function writeColor(data: Uint8Array, offset: number, color: [number, number, number]): void {
+    data[offset] = Math.round(color[0] * 255)
+    data[offset + 1] = Math.round(color[1] * 255)
+    data[offset + 2] = Math.round(color[2] * 255)
+}
+
 function createTerrainShaderRenderer(params: MapStyleParameterRecord): ShaderRenderer | null {
-    const palette = createTerrainPalette(params)
+    const basePalette = createPaletteTexture('map-terrain-base-palette', (data, offset, definition) => {
+        const config = getTerrainKindConfig(params, definition.id)
+        writeColor(data, offset, parseColorToVec3(
+            getString(config?.color, definition.semanticColor),
+            parseColorToVec3(definition.semanticColor),
+        ))
+        data[offset + 3] = Math.round(Math.max(0, Math.min(1, getNumber(config?.baseOpacity, 1))) * 255)
+    })
+    const detailPalette = createPaletteTexture('map-terrain-detail-palette', (data, offset, definition) => {
+        const config = getTerrainKindConfig(params, definition.id)
+        const fallbackColor = parseColorToVec3(definition.semanticColor)
+        writeColor(data, offset, parseColorToVec3(getString(config?.detailColor, definition.semanticColor), fallbackColor))
+        data[offset + 3] = Math.round(Math.max(0, Math.min(1, getNumber(config?.patternOpacity, 0))) * 255)
+    })
+    const recipePalette = createPaletteTexture('map-terrain-recipe-palette', (data, offset, definition) => {
+        const config = getTerrainKindConfig(params, definition.id)
+        const pattern = TERRAIN_PATTERN_CODES[getString(config?.pattern, 'none')] ?? 0
+        data[offset] = pattern
+        data[offset + 1] = Math.round(Math.max(4, Math.min(128, getNumber(config?.patternScale, 24))) / 128 * 255)
+        data[offset + 2] = 0
+    })
     const shader = createSceneQuadShader({
         name: 'map-terrain',
         fragment: terrainFragment,
         useCoastField: true,
         useTerrainField: true,
-        textureResources: {uTerrainPalette: palette.source},
+        textureResources: {
+            uTerrainBasePalette: basePalette.source,
+            uTerrainDetailPalette: detailPalette.source,
+            uTerrainRecipePalette: recipePalette.source,
+        },
     })
 
     return {
@@ -101,7 +219,9 @@ function createTerrainShaderRenderer(params: MapStyleParameterRecord): ShaderRen
         update: context => updateSceneQuadShader(shader, context),
         destroy: () => {
             shader.destroy()
-            palette.destroy(true)
+            basePalette.destroy(true)
+            detailPalette.destroy(true)
+            recipePalette.destroy(true)
         },
     }
 }

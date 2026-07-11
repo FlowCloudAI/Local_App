@@ -41,6 +41,7 @@ import {
     type PixiCompassAssetId,
 } from './assets'
 import {parseColorToVec3, shaderRegistry} from './shaderRegistry'
+import {PixiTerrainSymbolLayer} from './terrainSymbols'
 import type {CoastFieldData} from './utils'
 import {createCoastFieldData} from './utils'
 
@@ -547,6 +548,11 @@ function PixiTextureOverlay({
                     terrainField={terrainField}
                 />
             )}
+            <PixiTerrainSymbolLayer
+                field={terrainFieldData}
+                shapes={stableShapes}
+                style={style}
+            />
             {overlayCanvas && texture !== Texture.EMPTY && (
                 <pixiSprite
                     texture={texture}

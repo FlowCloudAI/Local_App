@@ -95,6 +95,48 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
     },
     decorations: [
         {
+            id: 'terrain',
+            params: {
+                terrainKinds: {
+                    grass: {
+                        color: '#788551',
+                        detailColor: '#5f5a34',
+                        baseOpacity: 0.16,
+                        pattern: 'tolkien-grass',
+                        patternOpacity: 0.38,
+                        patternScale: 25,
+                    },
+                    mountain: {
+                        color: '#756454',
+                        detailColor: '#5a4633',
+                        baseOpacity: 0.11,
+                        pattern: 'none',
+                        patternOpacity: 0,
+                        patternScale: 28,
+                    },
+                    desert: {
+                        color: '#b98745',
+                        detailColor: '#76502c',
+                        baseOpacity: 0.18,
+                        pattern: 'tolkien-desert',
+                        patternOpacity: 0.34,
+                        patternScale: 20,
+                    },
+                },
+                symbols: {
+                    mountain: {
+                        asset: 'tolkien-mountain',
+                        color: '#5a3a1c',
+                        size: 48,
+                        spacing: 50,
+                        opacity: 0.9,
+                        jitter: 0.42,
+                        variants: 3,
+                    },
+                },
+            },
+        },
+        {
             id: 'coastline-outline',
             params: {
                 brush: 'tolkien-coastline',

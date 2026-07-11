@@ -14,6 +14,15 @@ import type {
 
 export type PixiCompassAssetId = 'tolkien-compass' | 'ink-minimal-compass'
 export type PixiBrushAssetId = 'tolkien-coastline' | 'ink-boundary'
+export type PixiTerrainSymbolAssetId = 'flat-mountain' | 'tolkien-mountain' | 'ink-mountain'
+
+export interface PixiTerrainSymbolAsset {
+    url: string
+    width: number
+    height: number
+    anchorX: number
+    anchorY: number
+}
 
 interface PixiLocationIconAssetInput {
     iconSet: PixiLocationIconSet
@@ -57,6 +66,69 @@ function getNumberParam(value: unknown, fallback: number): number {
 
 function getStringParam(value: unknown, fallback: string): string {
     return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+export function buildPixiTerrainSymbolAsset(
+    asset: PixiTerrainSymbolAssetId,
+    color: string,
+    variant: number,
+): PixiTerrainSymbolAsset {
+    const normalizedVariant = Math.abs(Math.round(variant)) % 3
+
+    if (asset === 'flat-mountain') {
+        const peaks = [
+            'M3 29L15 9L23 20L29 11L43 29Z',
+            'M3 29L12 14L20 22L28 7L43 29Z',
+            'M3 29L17 6L27 21L33 13L43 29Z',
+        ][normalizedVariant]
+        return {
+            url: svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="46" height="32" viewBox="0 0 46 32">
+                <path d="${peaks}" fill="#ffffff" fill-opacity="0.72" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M10 29L16 20L20 24M23 20L29 13L34 22" fill="none" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.58"/>
+            </svg>`),
+            width: 46,
+            height: 32,
+            anchorX: 23,
+            anchorY: 29,
+        }
+    }
+
+    if (asset === 'tolkien-mountain') {
+        const peaks = [
+            'M3 37L14 22L20 10L28 24L34 16L47 37',
+            'M3 37L12 26L19 15L25 24L32 8L47 37',
+            'M3 37L13 19L21 27L29 12L36 23L47 37',
+        ][normalizedVariant]
+        return {
+            url: svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="50" height="40" viewBox="0 0 50 40">
+                <path d="${peaks}" fill="#ead8ac" fill-opacity="0.58" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M6 37C14 34 18 38 25 35C33 32 39 38 46 35" fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" stroke-opacity="0.62"/>
+                <path d="M15 22L20 10L24 22M27 24L34 16L38 28" fill="none" stroke="${color}" stroke-width="0.85" stroke-linecap="round" stroke-opacity="0.48"/>
+            </svg>`),
+            width: 50,
+            height: 40,
+            anchorX: 25,
+            anchorY: 36,
+        }
+    }
+
+    const ridges = [
+        'M2 37C8 30 12 22 18 13C22 21 26 28 29 31C34 25 37 19 42 10C46 22 50 31 56 37',
+        'M2 37C9 29 14 18 20 8C25 21 29 29 32 32C38 24 42 17 47 12C51 23 54 31 58 37',
+        'M2 37C8 31 13 24 17 16C22 24 26 29 30 33C35 28 39 18 44 7C49 22 53 31 58 37',
+    ][normalizedVariant]
+    return {
+        url: svgToDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="60" height="42" viewBox="0 0 60 42">
+            <path d="${ridges}" fill="${color}" fill-opacity="0.13"/>
+            <path d="${ridges}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.72"/>
+            <path d="M5 35C17 31 23 38 34 34C43 31 49 36 57 33" fill="none" stroke="${color}" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.32"/>
+            <path d="M9 28C18 25 24 29 31 27C39 25 45 28 52 25" fill="none" stroke="#fbfaf7" stroke-width="4.5" stroke-linecap="round" stroke-opacity="0.68"/>
+        </svg>`),
+        width: 60,
+        height: 42,
+        anchorX: 30,
+        anchorY: 37,
+    }
 }
 
 function makeFlatMarkerIcon(markerClass: MapMarkerClass, color: string): MapPreviewKeyLocationIcon {

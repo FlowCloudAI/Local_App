@@ -11,6 +11,7 @@ import {createRoot} from 'react-dom/client'
 import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles/pixi'
 import type {PixiMapStyle} from '../features/maps/styles/pixi'
 import {retainShapesWhenPolygonsMatch} from '../features/maps/styles/pixi/overlays'
+import {buildTerrainSymbolPlacements} from '../features/maps/styles/pixi/terrainSymbols'
 import {
     cloneMapShapeEditorDraft,
     buildPreviewKeyLocations,
@@ -166,6 +167,28 @@ function assertTerrainLayering() {
     }
     if (resolveTerrainStrokesForViewport('preview', strokes, generated) !== generated) {
         throw new Error('地形快照自检失败：预览模式未保持生成快照')
+    }
+
+    for (const styleName of ['flat', 'tolkien', 'ink']) {
+        const terrainConfig = getPixiMapStyle(styleName).decorations?.find(item => item.id === 'terrain')
+        if (!terrainConfig) throw new Error(`地形预设自检失败：${styleName} 未启用 terrain`)
+    }
+
+    const symbolField = createTerrainFieldData([
+        {id: 'symbol-mountain', kind: 'mountain', points: [[64, 64]], radius: 54, mode: 'paint'},
+    ], 128, 128)
+    const symbolShapes: MapPreviewScene['shapes'] = [{
+        id: 'symbol-land',
+        name: '符号陆地',
+        polygon: [[0, 0], [128, 0], [128, 128], [0, 128]],
+        fillColor: [255, 255, 255, 255],
+        lineColor: [0, 0, 0, 255],
+    }]
+    const symbolStyle = getPixiMapStyle('tolkien')
+    const firstPlacements = buildTerrainSymbolPlacements(symbolField, symbolShapes, symbolStyle)
+    const secondPlacements = buildTerrainSymbolPlacements(symbolField, symbolShapes, symbolStyle)
+    if (firstPlacements.length === 0 || JSON.stringify(firstPlacements) !== JSON.stringify(secondPlacements)) {
+        throw new Error('地形符号自检失败：山地 SVG 放置为空或不确定')
     }
 }
 
