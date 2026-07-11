@@ -1180,7 +1180,7 @@ function ProjectEditorInner({
                                     expandedKeys={expandedKeys}
                                     onExpandedKeysChange={setExpandedKeys}
                                     onViewportRowsChange={handleViewportRowsChange}
-                                    onSelect={handleSelect}
+                                    onSelectedKeyChange={handleSelect}
                                     onRename={handleRename}
                                     onCreate={handleCreate}
                                     onDeleteRequest={(node) => {

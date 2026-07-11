@@ -96,7 +96,7 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
                     <span>范围</span>
                     <Select
                         value={projectFilter}
-                        onChange={value => handleProjectFilterChange(String(value ?? 'all'))}
+                        onValueChange={value => handleProjectFilterChange(String(value ?? 'all'))}
                         options={projectFilterOptions}
                         placeholder="筛选范围"
                         searchable={projectFilterOptions.length > 6}

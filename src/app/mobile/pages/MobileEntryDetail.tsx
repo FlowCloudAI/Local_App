@@ -875,7 +875,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             <span>类型</span>
                             <Select
                                 value={entryType ?? ''}
-                                onChange={v => setEntryType(v ? String(v) : null)}
+                                onValueChange={v => setEntryType(v ? String(v) : null)}
                                 options={typeOptions}
                                 placeholder="类型"
                                 className="mobile-entry-detail__meta-select"
@@ -885,7 +885,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                             <span>分类</span>
                             <Select
                                 value={categoryId ?? ''}
-                                onChange={v => setCategoryId(v ? String(v) : null)}
+                                onValueChange={v => setCategoryId(v ? String(v) : null)}
                                 options={categoryOptions}
                                 placeholder="分类"
                                 className="mobile-entry-detail__meta-select"

@@ -279,7 +279,7 @@ export function MobileSettingsAiSection({
                     <div className="mobile-settings-field-label">插件</div>
                     <Select
                         value={selectedPlugin}
-                        onChange={v => onSelectedPluginChange(String(v ?? ''))}
+                        onValueChange={v => onSelectedPluginChange(String(v ?? ''))}
                         options={pluginOptions}
                         placeholder="选择插件"
                     />
@@ -288,7 +288,7 @@ export function MobileSettingsAiSection({
                     <div className="mobile-settings-field-label">模型</div>
                     <Select
                         value={selectedModel}
-                        onChange={v => onSelectedModelChange(String(v ?? ''))}
+                        onValueChange={v => onSelectedModelChange(String(v ?? ''))}
                         options={modelOptions}
                         placeholder="选择模型"
                     />
@@ -518,7 +518,7 @@ export function MobileSettingsAppearanceSection({
                     <div className="mobile-settings-field-label">主题</div>
                     <Select
                         value={theme}
-                        onChange={v => onThemeChange(String(v ?? 'system') as 'system' | 'light' | 'dark')}
+                        onValueChange={v => onThemeChange(String(v ?? 'system') as 'system' | 'light' | 'dark')}
                         options={themeOptions}
                         placeholder="选择主题"
                     />
@@ -527,7 +527,7 @@ export function MobileSettingsAppearanceSection({
                     <div className="mobile-settings-field-label">语言</div>
                     <Select
                         value={language}
-                        onChange={v => onLanguageChange(String(v ?? 'zh-CN'))}
+                        onValueChange={v => onLanguageChange(String(v ?? 'zh-CN'))}
                         options={languageOptions}
                         placeholder="选择语言"
                     />
@@ -541,7 +541,7 @@ export function MobileSettingsAppearanceSection({
                             step={1}
                             value={editorFontSize}
                             tooltip
-                            onChange={value => onEditorFontSizeChange(readSliderNumber(value))}
+                            onValueChange={value => onEditorFontSizeChange(readSliderNumber(value))}
                         />
                         <span>{editorFontSize}px</span>
                         {editorFontSize !== 14 && (

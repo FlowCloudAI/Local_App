@@ -241,7 +241,7 @@ export default function MobileIdea({
                             <span>项目</span>
                             <Select
                                 value={controller.draftProjectId}
-                                onChange={value => controller.setDraftProjectId(String(value ?? ''))}
+                                onValueChange={value => controller.setDraftProjectId(String(value ?? ''))}
                                 options={projectOptions}
                                 placeholder="所属项目"
                                 searchable={projectOptions.length > 6}
@@ -253,7 +253,7 @@ export default function MobileIdea({
                             <span>状态</span>
                             <Select
                                 value={controller.draftStatus}
-                                onChange={value => controller.setDraftStatus(String(value ?? 'inbox') as typeof controller.draftStatus)}
+                                onValueChange={value => controller.setDraftStatus(String(value ?? 'inbox') as typeof controller.draftStatus)}
                                 options={statusOptions}
                                 placeholder="状态"
                                 radius="xl"

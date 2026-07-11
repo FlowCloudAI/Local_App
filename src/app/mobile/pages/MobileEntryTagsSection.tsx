@@ -38,7 +38,7 @@ export function MobileEntryTagsSection({
                     {availableTagSchemaOptions.length > 0 && (
                         <Select
                             value={tagSchemaPickerValue}
-                            onChange={(value) => {
+                            onValueChange={(value) => {
                                 if (typeof value !== 'string') return
                                 onAddVisibleTagSchema(value)
                             }}

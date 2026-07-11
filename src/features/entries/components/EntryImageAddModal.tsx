@@ -355,7 +355,7 @@ export default function EntryImageAddModal({
                                     <Select
                                         className="entry-image-add-ai__select"
                                         value={selectedPlugin}
-                                        onChange={(v) => setSelectedPlugin(String(v))}
+                                        onValueChange={(v) => setSelectedPlugin(String(v))}
                                         placeholder="选择插件"
                                         options={plugins.map((p) => ({value: p.id, label: p.name}))}
                                     />
@@ -365,7 +365,7 @@ export default function EntryImageAddModal({
                                     <Select
                                         className="entry-image-add-ai__select"
                                         value={selectedModel}
-                                        onChange={(v) => setSelectedModel(String(v))}
+                                        onValueChange={(v) => setSelectedModel(String(v))}
                                         placeholder="选择模型"
                                         options={selectedPluginInfo?.models.map((m) => ({value: m, label: m})) ?? []}
                                     />
@@ -375,7 +375,7 @@ export default function EntryImageAddModal({
                                     <Select
                                         className="entry-image-add-ai__select"
                                         value={selectedSize}
-                                        onChange={(v) => setSelectedSize(String(v))}
+                                        onValueChange={(v) => setSelectedSize(String(v))}
                                         placeholder="选择尺寸"
                                         options={selectedPluginInfo?.supported_sizes.map((size) => ({
                                             value: size,

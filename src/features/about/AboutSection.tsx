@@ -384,7 +384,7 @@ export default function AboutSection({configDir, onOpenDir}: AboutSectionProps) 
                                 {value: 'suggestion', label: '建议'},
                                 {value: 'issue', label: '问题'},
                             ]}
-                            onChange={value => setFeedbackKind(value === 'issue' ? 'issue' : 'suggestion')}
+                            onValueChange={value => setFeedbackKind(value === 'issue' ? 'issue' : 'suggestion')}
                         />
                     </label>
                     <label className="about-section-field">

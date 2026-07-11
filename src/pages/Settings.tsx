@@ -704,7 +704,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                                     selectedKey={templateSelectedKey}
                                                     expandedKeys={templateExpandedKeys}
                                                     onExpandedKeysChange={setTemplateExpandedKeys}
-                                                    onSelect={handleTemplateTreeSelect}
+                                                    onSelectedKeyChange={handleTemplateTreeSelect}
                                                     searchable
                                                     searchPlaceholder="搜索名称"
                                                     collapseDuration={0.13}
@@ -871,7 +871,7 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
                                                             </div>
                                                             <TeraEditor
                                                                 value={templateDraft}
-                                                                onChange={(value) => {
+                                                                onValueChange={(value) => {
                                                                     setTemplateDraft(value)
                                                                     if (templatePageError) {
                                                                         setTemplatePageError(null)
@@ -2093,7 +2093,7 @@ export default function Settings({
                                     <Select
                                         options={languageOptions}
                                         value={settings.language}
-                                        onChange={(value) => setSettings(prev => prev ? {
+                                        onValueChange={(value) => setSettings(prev => prev ? {
                                             ...prev,
                                             language: String(value)
                                         } : null)}
@@ -2107,7 +2107,7 @@ export default function Settings({
                                         max={24}
                                         step={1}
                                         value={settings.editor_font_size}
-                                        onChange={(value) => setSettings(prev => prev ? {
+                                        onValueChange={(value) => setSettings(prev => prev ? {
                                             ...prev,
                                             editor_font_size: value as number
                                         } : null)}
@@ -2213,7 +2213,7 @@ export default function Settings({
                                             <Select
                                                 options={getPluginOptions('llm')}
                                                 value={settings.llm.plugin_id || ''}
-                                                onChange={(value) => handleAiConfigChange('llm', 'plugin_id', value ? String(value) : null)}
+                                                onValueChange={(value) => handleAiConfigChange('llm', 'plugin_id', value ? String(value) : null)}
                                             />
                                         </div>
                                     </div>
@@ -2223,7 +2223,7 @@ export default function Settings({
                                             <Select
                                                 options={getModelOptions('llm')}
                                                 value={settings.llm.default_model || ''}
-                                                onChange={(value) => handleAiConfigChange('llm', 'default_model', value ? String(value) : null)}
+                                                onValueChange={(value) => handleAiConfigChange('llm', 'default_model', value ? String(value) : null)}
                                                 disabled={!settings.llm.plugin_id}
                                             />
                                         </div>
@@ -2237,7 +2237,7 @@ export default function Settings({
                                             <Select
                                                 options={getPluginOptions('image')}
                                                 value={settings.image.plugin_id || ''}
-                                                onChange={(value) => handleAiConfigChange('image', 'plugin_id', value ? String(value) : null)}
+                                                onValueChange={(value) => handleAiConfigChange('image', 'plugin_id', value ? String(value) : null)}
                                             />
                                         </div>
                                     </div>
@@ -2247,7 +2247,7 @@ export default function Settings({
                                             <Select
                                                 options={getModelOptions('image')}
                                                 value={settings.image.default_model || ''}
-                                                onChange={(value) => handleAiConfigChange('image', 'default_model', value ? String(value) : null)}
+                                                onValueChange={(value) => handleAiConfigChange('image', 'default_model', value ? String(value) : null)}
                                                 disabled={!settings.image.plugin_id}
                                             />
                                         </div>
@@ -2261,7 +2261,7 @@ export default function Settings({
                                             <Select
                                                 options={getPluginOptions('tts')}
                                                 value={settings.tts.plugin_id || ''}
-                                                onChange={(value) => handleAiConfigChange('tts', 'plugin_id', value ? String(value) : null)}
+                                                onValueChange={(value) => handleAiConfigChange('tts', 'plugin_id', value ? String(value) : null)}
                                             />
                                         </div>
                                     </div>
@@ -2271,7 +2271,7 @@ export default function Settings({
                                             <Select
                                                 options={getModelOptions('tts')}
                                                 value={settings.tts.default_model || ''}
-                                                onChange={(value) => handleAiConfigChange('tts', 'default_model', value ? String(value) : null)}
+                                                onValueChange={(value) => handleAiConfigChange('tts', 'default_model', value ? String(value) : null)}
                                                 disabled={!settings.tts.plugin_id}
                                             />
                                         </div>
@@ -2282,7 +2282,7 @@ export default function Settings({
                                             <Select
                                                 options={ttsVoiceOptions}
                                                 value={settings.tts.voice_id || ''}
-                                                onChange={(value) => setSettings(prev => prev ? {
+                                                onValueChange={(value) => setSettings(prev => prev ? {
                                                     ...prev,
                                                     tts: {
                                                         ...prev.tts,
@@ -2554,7 +2554,7 @@ export default function Settings({
                                                     max={95}
                                                     step={5}
                                                     value={Math.round(settings.llm.auto_compact_threshold_ratio * 100)}
-                                                    onChange={handleLlmCompactThresholdChange}
+                                                    onValueChange={handleLlmCompactThresholdChange}
                                                 />
                                             </div>
                                             <span className="settings-span">
@@ -2580,7 +2580,7 @@ export default function Settings({
                                                 <Select
                                                     options={LLM_COMPACT_DETAIL_OPTIONS}
                                                     value={settings.llm.auto_compact_detail}
-                                                    onChange={(value) => updateLlmDefaults({
+                                                    onValueChange={(value) => updateLlmDefaults({
                                                         auto_compact_detail: String(value) as LlmCompactDetail,
                                                     })}
                                                 />
@@ -2598,7 +2598,7 @@ export default function Settings({
                                                 {value: 'duckduckgo', label: 'DuckDuckGo'},
                                             ]}
                                             value={settings.search_engine}
-                                            onChange={(value) => setSettings(prev => prev ? {
+                                            onValueChange={(value) => setSettings(prev => prev ? {
                                                 ...prev,
                                                 search_engine: String(value)
                                             } : null)}

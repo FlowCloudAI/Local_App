@@ -745,13 +745,15 @@ function ProjectContradictionPanel({
                                 <Select
                                     options={CHECK_KIND_OPTIONS}
                                     value={checkKind}
-                                    onChange={(v) => setCheckKind(String(v) as WorldCheckKind)}
+                                    onValueChange={(v) => setCheckKind(String(v) as WorldCheckKind)}
                                     placeholder="检测类型"
                                     radius="md"
-                                    triggerBackground="var(--fc-color-bg)"
-                                    triggerBorderColor="var(--fc-color-border)"
-                                    selectedColor="var(--fc-color-primary)"
-                                    selectedBackground="var(--fc-color-primary-subtle)"
+                                    tokens={{
+                                        triggerBackground: 'var(--fc-color-bg)',
+                                        triggerBorderColor: 'var(--fc-color-border)',
+                                        selectedColor: 'var(--fc-color-primary)',
+                                        selectedBackground: 'var(--fc-color-primary-subtle)',
+                                    }}
                                 />
                             </label>
                             {checkKind === 'entry_alignment' && (
@@ -806,16 +808,18 @@ function ProjectContradictionPanel({
                                 <Select
                                     options={plugins.map((p) => ({value: p.id, label: p.name}))}
                                     value={effectivePluginId ?? ''}
-                                    onChange={(v) => {
+                                    onValueChange={(v) => {
                                         setLocalPluginId(String(v))
                                         setLocalModel(null)
                                     }}
                                     placeholder="选择插件"
                                     radius="md"
-                                    triggerBackground="var(--fc-color-bg)"
-                                    triggerBorderColor="var(--fc-color-border)"
-                                    selectedColor="var(--fc-color-primary)"
-                                    selectedBackground="var(--fc-color-primary-subtle)"
+                                    tokens={{
+                                        triggerBackground: 'var(--fc-color-bg)',
+                                        triggerBorderColor: 'var(--fc-color-border)',
+                                        selectedColor: 'var(--fc-color-primary)',
+                                        selectedBackground: 'var(--fc-color-primary-subtle)',
+                                    }}
                                 />
                             </label>
                             <label className="pe-contradiction-field">
@@ -823,13 +827,15 @@ function ProjectContradictionPanel({
                                 <Select
                                     options={(selectedPluginInfo?.models ?? []).map((m) => ({value: m, label: m}))}
                                     value={effectiveModel ?? ''}
-                                    onChange={(v) => setLocalModel(String(v))}
+                                    onValueChange={(v) => setLocalModel(String(v))}
                                     placeholder="选择模型"
                                     radius="md"
-                                    triggerBackground="var(--fc-color-bg)"
-                                    triggerBorderColor="var(--fc-color-border)"
-                                    selectedColor="var(--fc-color-primary)"
-                                    selectedBackground="var(--fc-color-primary-subtle)"
+                                    tokens={{
+                                        triggerBackground: 'var(--fc-color-bg)',
+                                        triggerBorderColor: 'var(--fc-color-border)',
+                                        selectedColor: 'var(--fc-color-primary)',
+                                        selectedBackground: 'var(--fc-color-primary-subtle)',
+                                    }}
                                 />
                             </label>
                         </div>

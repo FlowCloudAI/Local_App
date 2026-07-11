@@ -419,7 +419,7 @@ export function useSnapshotPanel({
                     <Select
                         options={branchOptions}
                         value={activeBranch}
-                        onChange={(value) => void handleSwitchBranch(String(value))}
+                        onValueChange={(value) => void handleSwitchBranch(String(value))}
                         style={{flex: 1}}
                         disabled={!projectId || loading || branchSwitching || branches.length === 0}
                     />

@@ -421,7 +421,7 @@ export default function ProjectCoverPickerModal({
                                     <label className="pe-cover-picker__label">插件</label>
                                     <Select
                                         value={selectedPlugin}
-                                        onChange={(value) => setSelectedPlugin(value ? String(value) : '')}
+                                        onValueChange={(value) => setSelectedPlugin(value ? String(value) : '')}
                                         placeholder="选择插件"
                                         options={plugins.map((plugin) => ({value: plugin.id, label: plugin.name}))}
                                     />
@@ -430,7 +430,7 @@ export default function ProjectCoverPickerModal({
                                     <label className="pe-cover-picker__label">模型</label>
                                     <Select
                                         value={selectedModel}
-                                        onChange={(value) => setSelectedModel(value ? String(value) : '')}
+                                        onValueChange={(value) => setSelectedModel(value ? String(value) : '')}
                                         placeholder="选择模型"
                                         options={selectedPluginInfo?.models.map((model) => ({
                                             value: model,
@@ -442,7 +442,7 @@ export default function ProjectCoverPickerModal({
                                     <label className="pe-cover-picker__label">尺寸</label>
                                     <Select
                                         value={selectedSize}
-                                        onChange={(value) => setSelectedSize(value ? String(value) : '')}
+                                        onValueChange={(value) => setSelectedSize(value ? String(value) : '')}
                                         placeholder="选择尺寸"
                                         options={selectedPluginInfo?.supported_sizes.map((size) => ({
                                             value: size,

@@ -267,7 +267,7 @@ export default function EntryEditorMetaPanel({
                                 <Select
                                     options={ttsVoiceOptions}
                                     value={characterVoiceConfig.voiceId ?? ''}
-                                    onChange={(value) => onDraftChange((current) => {
+                                    onValueChange={(value) => onDraftChange((current) => {
                                         const nextVoiceId = value ? normalizeComparableText(String(value)) : ''
                                         const nextTags = {...current.tags}
                                         if (nextVoiceId) {
@@ -402,7 +402,7 @@ export default function EntryEditorMetaPanel({
                                         className="entry-editor-select"
                                         options={customTypeOptions}
                                         value={draft.type && customTypeOptions.some(option => option.value === draft.type) ? draft.type : undefined}
-                                        onChange={(value) => onDraftChange((current) => {
+                                        onValueChange={(value) => onDraftChange((current) => {
                                             const nextType = normalizeComparableType(typeof value === 'string' ? value : null)
                                             return normalizeComparableType(current.type) === nextType
                                                 ? current
@@ -430,7 +430,7 @@ export default function EntryEditorMetaPanel({
                                             className="entry-editor-select"
                                             options={availableTagSchemaOptions}
                                             value={tagSchemaPickerValue}
-                                            onChange={(value) => {
+                                            onValueChange={(value) => {
                                                 if (typeof value !== 'string') return
                                                 onAddVisibleTagSchema(value)
                                             }}
@@ -577,7 +577,7 @@ export default function EntryEditorMetaPanel({
                                         ...categories.map((c) => ({value: c.id, label: c.name})),
                                     ]}
                                     value={draft.categoryId ?? ''}
-                                    onChange={(value) => onDraftChange((current) => {
+                                    onValueChange={(value) => onDraftChange((current) => {
                                         const nextCategoryId = typeof value === 'string' && value ? value : null
                                         return current.categoryId === nextCategoryId
                                             ? current

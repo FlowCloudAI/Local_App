@@ -1533,7 +1533,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             step={0.05}
                             value={coastlineSimpleConfig.scaleFactor}
                             tooltip
-                            onChange={value => updateCoastlineSimpleConfig({scaleFactor: readSliderNumber(value)})}
+                            onValueChange={value => updateCoastlineSimpleConfig({scaleFactor: readSliderNumber(value)})}
                         />
                     </div>
                     <div className="wm-range-field">
@@ -1544,7 +1544,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             step={0.05}
                             value={coastlineSimpleConfig.macroNoise}
                             tooltip
-                            onChange={value => updateCoastlineSimpleConfig({macroNoise: readSliderNumber(value)})}
+                            onValueChange={value => updateCoastlineSimpleConfig({macroNoise: readSliderNumber(value)})}
                         />
                     </div>
                     <div className="wm-range-field">
@@ -1555,7 +1555,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             step={0.05}
                             value={coastlineSimpleConfig.midNoise}
                             tooltip
-                            onChange={value => updateCoastlineSimpleConfig({midNoise: readSliderNumber(value)})}
+                            onValueChange={value => updateCoastlineSimpleConfig({midNoise: readSliderNumber(value)})}
                         />
                     </div>
                     <div className="wm-range-field">
@@ -1566,7 +1566,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             step={0.05}
                             value={coastlineSimpleConfig.microNoise}
                             tooltip
-                            onChange={value => updateCoastlineSimpleConfig({microNoise: readSliderNumber(value)})}
+                            onValueChange={value => updateCoastlineSimpleConfig({microNoise: readSliderNumber(value)})}
                         />
                     </div>
                 </>
@@ -2284,7 +2284,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                         step={4}
                                         value={terrainBrush.radius}
                                         tooltip
-                                        onChange={value => setTerrainBrush(current => current
+                                        onValueChange={value => setTerrainBrush(current => current
                                             ? {...current, radius: readSliderNumber(value)}
                                             : current)}
                                     />

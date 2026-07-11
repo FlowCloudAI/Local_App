@@ -78,7 +78,7 @@ export function EntryRelationDraftForm({
                         className="entry-relation-editor__select"
                         options={entryOptions}
                         value={draft.otherEntryId ?? undefined}
-                        onChange={(value) => {
+                        onValueChange={(value) => {
                             onChange({
                                 ...draft,
                                 otherEntryId: typeof value === 'string' ? value : null,
@@ -101,7 +101,7 @@ export function EntryRelationDraftForm({
                             label: option.label
                         }))}
                         value={draft.direction}
-                        onChange={(value) => {
+                        onValueChange={(value) => {
                             if (value !== 'outgoing' && value !== 'incoming' && value !== 'two_way') return
                             onChange({
                                 ...draft,

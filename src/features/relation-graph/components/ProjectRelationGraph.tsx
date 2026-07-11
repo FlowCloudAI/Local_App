@@ -637,7 +637,7 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
                                         max={1.8}
                                         step={0.05}
                                         tooltip
-                                        onChange={handleLayoutLoosenessChange}
+                                        onValueChange={handleLayoutLoosenessChange}
                                     />
                                 </div>
                             </div>

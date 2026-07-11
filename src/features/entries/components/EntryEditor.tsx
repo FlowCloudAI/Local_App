@@ -1263,12 +1263,12 @@ export default function EntryEditor({
                                             ref={editorRef}
                                             key={entryId}
                                             value={draft.content}
-                                            onChange={(value) => setDraft((current) => (
+                                            onValueChange={(value) => setDraft((current) => (
                                                 current.content === value
                                                     ? current
                                                     : {...current, content: value}
                                             ))}
-                                            fontSizeScale={editorFontSize / 14}
+                                            tokens={{fontSizeScale: editorFontSize / 14}}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
                                             previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
@@ -1363,10 +1363,12 @@ export default function EntryEditor({
                                     <MarkdownEditor
                                         mode="preview"
                                         value={previewContent}
-                                        onChange={() => {
+                                        onValueChange={() => {
                                         }}
-                                        background={"transparent"}
-                                        fontSizeScale={editorFontSize / 14}
+                                        tokens={{
+                                            background: 'transparent',
+                                            fontSizeScale: editorFontSize / 14,
+                                        }}
                                         autoHeight
                                         previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
                                     />

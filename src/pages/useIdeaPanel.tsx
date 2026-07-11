@@ -752,7 +752,7 @@ export function useIdeaPanel({
                             className="idea-page__project-select"
                             value={projectFilter}
                             options={projectFilterOptions}
-                            onChange={(value) => setProjectFilter(String(value))}
+                            onValueChange={(value) => setProjectFilter(String(value))}
                         />
                     </div>
                     <DockPanelSearchInput
@@ -886,7 +886,7 @@ export function useIdeaPanel({
                                     className="idea-page__meta-select"
                                     value={draftProjectId ?? 'global'}
                                     options={ideaProjectOptions}
-                                    onChange={handleProjectChange}
+                                    onValueChange={handleProjectChange}
                                 />
                             </div>
                             {selectedIdea ? (
@@ -907,7 +907,7 @@ export function useIdeaPanel({
                                             className="idea-page__meta-select"
                                             value={convertCategoryId ?? ''}
                                             options={categoryOptions}
-                                            onChange={(value) => setConvertCategoryId(value ? String(value) : null)}
+                                            onValueChange={(value) => setConvertCategoryId(value ? String(value) : null)}
                                             disabled={converting || Boolean(selectedIdea.converted_entry_id)}
                                         />
                                     </div>
@@ -917,7 +917,7 @@ export function useIdeaPanel({
                                             className="idea-page__meta-select"
                                             value={convertEntryType ?? ''}
                                             options={entryTypeOptions}
-                                            onChange={(value) => setConvertEntryType(value ? String(value) : null)}
+                                            onValueChange={(value) => setConvertEntryType(value ? String(value) : null)}
                                             disabled={converting || Boolean(selectedIdea.converted_entry_id)}
                                         />
                                     </div>
