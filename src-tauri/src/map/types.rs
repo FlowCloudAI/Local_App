@@ -248,6 +248,8 @@ pub struct MapTerrainStroke {
     pub points: Vec<[f64; 2]>,
     pub radius: f64,
     pub mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

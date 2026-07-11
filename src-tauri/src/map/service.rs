@@ -507,6 +507,7 @@ mod tests {
                 points: vec![[220.0, 180.0], [280.0, 220.0]],
                 radius: 32.0,
                 mode: "paint".to_string(),
+                shape: Some("square".to_string()),
             }],
             meta: Some(MapSaveMeta {
                 protocol_version: Some(MapProtocolVersion::MapShapeMvpV1),
@@ -525,6 +526,10 @@ mod tests {
         assert_eq!(response.scene.key_locations.len(), 1);
         assert_eq!(response.scene.terrain_strokes.len(), 1);
         assert_eq!(response.scene.terrain_strokes[0].kind, "grass");
+        assert_eq!(
+            response.scene.terrain_strokes[0].shape.as_deref(),
+            Some("square")
+        );
         assert_eq!(response.scene.shapes[0].fill_color, [216, 236, 255, 88]);
         assert_eq!(response.scene.key_locations[0].color, [226, 75, 74, 255]);
         assert_eq!(

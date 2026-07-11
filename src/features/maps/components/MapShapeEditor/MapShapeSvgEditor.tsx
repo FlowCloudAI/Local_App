@@ -553,6 +553,7 @@ export function MapShapeSvgEditor({
                 points: [[point.x, point.y]],
                 radius: terrainBrush.radius,
                 mode: terrainBrush.mode,
+                shape: terrainBrush.shape,
             };
             event.preventDefault();
             event.stopPropagation();

@@ -74,24 +74,47 @@ export interface MapKeyLocationDraft extends MapShapeExtensible {
 
 export type MapTerrainStrokeMode = 'paint' | 'erase';
 
-export type MapTerrainKind = 'grass' | 'mountain' | 'desert';
+/** 地形类型保持开放；已知类型及其渲染索引统一由注册表声明。 */
+export type MapTerrainKind = string;
+
+export type MapTerrainStrokeShape = 'round' | 'square';
+
+export interface MapTerrainKindDef {
+    id: string;
+    label: string;
+    semanticColor: string;
+    renderLayer: 'field' | 'path';
+    /** 持久化场中的稳定索引；0-254 可用，255 保留为空值。 */
+    order: number;
+}
+
+export const MAP_TERRAIN_KINDS = [
+    {id: 'grass', label: '草地', semanticColor: '#82b45f', renderLayer: 'field', order: 0},
+    {id: 'mountain', label: '高山', semanticColor: '#8a7868', renderLayer: 'field', order: 1},
+    {id: 'desert', label: '沙漠', semanticColor: '#d8b067', renderLayer: 'field', order: 2},
+] as const satisfies ReadonlyArray<MapTerrainKindDef>;
+
+export const MAP_TERRAIN_KIND_BY_ID = new Map<string, MapTerrainKindDef>(
+    MAP_TERRAIN_KINDS.map(definition => [definition.id, definition]),
+);
 
 export interface MapTerrainBrush {
     kind: MapTerrainKind;
     radius: number;
     mode: MapTerrainStrokeMode;
+    shape: MapTerrainStrokeShape;
 }
 
 /** 地形类型的展示元数据（工具条选项与编辑器活笔预览共用的单一来源）。 */
-export const MAP_TERRAIN_KIND_OPTIONS = [
-    {value: 'grass', label: '草地', color: '#82b45f'},
-    {value: 'mountain', label: '高山', color: '#8a7868'},
-    {value: 'desert', label: '沙漠', color: '#d8b067'},
-] as const satisfies ReadonlyArray<{value: MapTerrainKind; label: string; color: string}>;
+export const MAP_TERRAIN_KIND_OPTIONS = MAP_TERRAIN_KINDS.map(definition => ({
+    value: definition.id,
+    label: definition.label,
+    color: definition.semanticColor,
+}));
 
-export const MAP_TERRAIN_KIND_COLORS: Record<MapTerrainKind, string> = Object.fromEntries(
-    MAP_TERRAIN_KIND_OPTIONS.map(option => [option.value, option.color]),
-) as Record<MapTerrainKind, string>;
+export const MAP_TERRAIN_KIND_COLORS: Readonly<Record<string, string>> = Object.fromEntries(
+    MAP_TERRAIN_KINDS.map(definition => [definition.id, definition.semanticColor]),
+);
 
 export interface MapTerrainStroke {
     id: string;
@@ -100,6 +123,8 @@ export interface MapTerrainStroke {
     points: [number, number][];
     radius: number;
     mode: MapTerrainStrokeMode;
+    /** 缺省为 round，兼容旧地图。 */
+    shape?: MapTerrainStrokeShape;
 }
 
 export interface MapShapeEditorDraft {

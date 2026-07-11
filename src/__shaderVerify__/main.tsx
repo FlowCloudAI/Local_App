@@ -212,7 +212,7 @@ function TerrainEditorHarness() {
                 selectedShapeId: null,
                 selectedLocationId: null,
                 drawingShape: null,
-                terrainBrush: {kind: 'grass', radius: 32, mode: 'paint'},
+                terrainBrush: {kind: 'grass', radius: 32, mode: 'paint', shape: 'round'},
                 onDraftChange: setDraft,
                 onSelectedShapeChange: () => undefined,
                 onSelectedLocationChange: () => undefined,

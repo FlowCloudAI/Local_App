@@ -303,6 +303,7 @@ const DEFAULT_TERRAIN_BRUSH: MapTerrainBrush = {
     kind: 'grass',
     radius: 48,
     mode: 'paint',
+    shape: 'round',
 }
 
 function clampNumber(value: number, min: number, max: number): number {
