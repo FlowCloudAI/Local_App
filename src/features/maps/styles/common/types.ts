@@ -8,8 +8,10 @@ import type {
     MapRgbaColor,
 } from '../../components/MapShapeEditor'
 
-export type MapStyleParameterValue = string | number | boolean | null
-export type MapStyleParameterRecord = Record<string, MapStyleParameterValue | MapStyleParameterValue[]>
+export type MapStyleParameterValue = string | number | boolean | null | MapStyleParameterValue[] | MapStyleParameterRecord
+export interface MapStyleParameterRecord {
+    [key: string]: MapStyleParameterValue
+}
 
 export interface MapStylePaintToken {
     color: string

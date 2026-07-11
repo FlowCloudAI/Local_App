@@ -1292,7 +1292,10 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                 {
                     id: 'terrain' as const,
                     params: {
-                        terrainColors: MAP_TERRAIN_KIND_OPTIONS.map(option => option.color),
+                        terrainKinds: Object.fromEntries(MAP_TERRAIN_KIND_OPTIONS.map(option => [
+                            option.value,
+                            {color: option.color},
+                        ])),
                     },
                 },
             ],

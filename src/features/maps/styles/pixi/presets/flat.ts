@@ -45,7 +45,10 @@ export const flatPixiMapStyle: PixiMapStyle = {
         {
             id: 'terrain',
             params: {
-                terrainColors: MAP_TERRAIN_KINDS.map(definition => definition.semanticColor),
+                terrainKinds: Object.fromEntries(MAP_TERRAIN_KINDS.map(definition => [
+                    definition.id,
+                    {color: definition.semanticColor},
+                ])),
             },
         },
         {

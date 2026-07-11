@@ -52,12 +52,17 @@ void main() {
 `
 
 function createTerrainPalette(params: MapStyleParameterRecord): Texture {
-    const configured = Array.isArray(params.terrainColors) ? params.terrainColors : []
+    const configured = params.terrainKinds
     const data = new Uint8Array(256 * 4)
     for (let index = 0; index < 256; index++) data[index * 4 + 3] = 255
     for (const definition of MAP_TERRAIN_KINDS) {
         const fallback = parseColorToVec3(definition.semanticColor, [0, 0, 0])
-        const configuredColor = configured[definition.order]
+        const kindConfig = configured && typeof configured === 'object' && !Array.isArray(configured)
+            ? configured[definition.id]
+            : null
+        const configuredColor = kindConfig && typeof kindConfig === 'object' && !Array.isArray(kindConfig)
+            ? kindConfig.color
+            : null
         const color = parseColorToVec3(
             typeof configuredColor === 'string' ? configuredColor : definition.semanticColor,
             fallback,
