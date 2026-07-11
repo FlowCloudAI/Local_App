@@ -996,13 +996,13 @@
 /* ========== 滚动到底部按钮 ========== */
 .ai-scroll-to-bottom-sticky {
     position: absolute;
-    bottom: 196px;
+    top: calc(-2rem - var(--fc-space-sm));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     justify-content: center;
     pointer-events: none;
-    z-index: 80;
+    z-index: 130;
 }
 
 .ai-scroll-to-bottom-btn {
@@ -1364,17 +1364,16 @@
 }
 
 .ai-document-context-rail-track {
-    display: flex;
-    gap: var(--fc-space-sm);
+    height: auto;
     min-width: 0;
-    overflow-x: auto;
     scroll-behavior: smooth;
     scroll-snap-type: x proximity;
-    scrollbar-width: none;
 }
 
-.ai-document-context-rail-track::-webkit-scrollbar {
-    display: none;
+.ai-document-context-rail-track.fc-roll--horizontal > .fc-roll__content {
+    display: flex;
+    gap: var(--fc-space-sm);
+    min-height: 0;
 }
 
 .ai-document-context-rail-track:focus-visible {
@@ -1450,8 +1449,7 @@
     opacity: 1;
 }
 
-.ai-document-context-card-action,
-.ai-document-context-rail-nav {
+.ai-document-context-card-action {
     display: inline-grid;
     width: 1.75rem;
     height: 1.75rem;
@@ -1463,8 +1461,7 @@
     cursor: pointer;
 }
 
-.ai-document-context-card-action:hover,
-.ai-document-context-rail-nav:hover {
+.ai-document-context-card-action:hover {
     border-color: var(--fc-color-primary);
     color: var(--fc-color-primary);
 }
@@ -1477,17 +1474,32 @@
 
 .ai-document-context-rail-nav {
     position: absolute;
-    z-index: 1;
-    top: 50%;
-    transform: translateY(-50%);
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    display: grid;
+    width: 3rem;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    color: var(--fc-color-text-secondary);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.ai-document-context-rail-nav:hover {
+    color: var(--fc-color-primary);
 }
 
 .ai-document-context-rail-nav--previous {
-    left: var(--fc-space-xs);
+    left: 0;
+    background: linear-gradient(90deg, var(--fc-color-bg-elevated) 20%, transparent 100%);
 }
 
 .ai-document-context-rail-nav--next {
-    right: var(--fc-space-xs);
+    right: 0;
+    background: linear-gradient(270deg, var(--fc-color-bg-elevated) 20%, transparent 100%);
 }
 
 .ai-conversation-settings-toggle {

@@ -427,9 +427,11 @@ function DocumentContextRail({items, onRetry, onRemove}: DocumentContextRailProp
                     <DocumentRailArrow direction="previous"/>
                 </button>
             )}
-            <div
+            <RollingBox
                 ref={railRef}
                 className="ai-document-context-rail-track"
+                axis="x"
+                showThumb="hide"
                 onScroll={syncRailScroll}
                 tabIndex={0}
             >
@@ -477,7 +479,7 @@ function DocumentContextRail({items, onRetry, onRemove}: DocumentContextRailProp
                         </article>
                     )
                 })}
-            </div>
+            </RollingBox>
             {railScroll.next && (
                 <button
                     type="button"
@@ -1942,18 +1944,17 @@ export default function AIChatContent({
                     )}
                 </RollingBox>
 
-                {ctx.activeConversationId && ctx.messages.length > 0 && !autoScroll && (
-                    <div className="ai-scroll-to-bottom-sticky">
-                        <button className="ai-scroll-to-bottom-btn" onClick={scrollToBottom} title="滚动到底部">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                 strokeWidth="1.8">
-                                <path d="M3 6l5 5 5-5"/>
-                            </svg>
-                        </button>
-                    </div>
-                )}
-
                 <div className="ai-floating-input-wrapper ai-floating-input-wrapper--full">
+                    {ctx.activeConversationId && ctx.messages.length > 0 && !autoScroll && (
+                        <div className="ai-scroll-to-bottom-sticky">
+                            <button className="ai-scroll-to-bottom-btn" onClick={scrollToBottom} title="滚动到底部">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                     strokeWidth="1.8">
+                                    <path d="M3 6l5 5 5-5"/>
+                                </svg>
+                            </button>
+                        </div>
+                    )}
                     {activeConversation && settingsDrawerMounted && (
                         <div
                             ref={settingsDrawerRef}
