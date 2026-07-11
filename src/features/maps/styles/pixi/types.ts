@@ -126,8 +126,6 @@ export interface PixiMapStyle {
     labels: PixiLabelStyle
     decorations?: PixiStylePluginConfig[]
     effects?: PixiStylePluginConfig[]
-    // 新增：是否启用 shader 优化（默认 true）
-    useShaderOptimization?: boolean
 }
 
 export interface CompiledPixiMapStyle extends MapStyleCompiledBase {

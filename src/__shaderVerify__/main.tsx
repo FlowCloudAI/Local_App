@@ -3,8 +3,8 @@
  * shader 层验证挂载入口（临时 harness，不进产品构建）。
  *
  * 复刻 WorldMapPanel 的真实调用路径：getPixiMapStyle → compilePixiMapStyle
- * → MapShapeViewport(pixi)。通过 URL 参数切换预设与 shader 开关：
- *   ?style=tolkien|ink|flat  &shader=1|0  （配合 ?mapDebug=1 输出编译/叠加日志）
+ * → MapShapeViewport(pixi)。通过 URL 参数切换预设：
+ *   ?style=tolkien|ink|flat（配合 ?mapDebug=1 输出编译/叠加日志）
  */
 import {StrictMode, useEffect, useState} from 'react'
 import {createRoot} from 'react-dom/client'
@@ -144,14 +144,10 @@ const baseScene: MapPreviewScene = {
 
 const params = new URLSearchParams(window.location.search)
 const styleId = params.get('style') ?? 'tolkien'
-const shaderOn = params.get('shader') !== '0'
 const editMode = params.get('edit') === '1'
 
 const preset = getPixiMapStyle(styleId)
-const style: PixiMapStyle = {
-    ...preset,
-    useShaderOptimization: shaderOn,
-}
+const style: PixiMapStyle = preset
 const compiled = compilePixiMapStyle({style, canvas, scene: baseScene})
 
 declare global {
@@ -162,7 +158,6 @@ declare global {
 }
 window.__harnessInfo = {
     styleId: style.id,
-    shaderOn,
     editMode,
     hasOverlay: Boolean(compiled.pixiProps.renderOverlay),
     hasGroundOverlay: Boolean(compiled.pixiProps.renderGroundOverlay),

@@ -5,7 +5,6 @@ import {inferMapMarkerClass, type MapMarkerClass, type MapPreviewBackgroundImage
 import type {CompiledPixiMapStyle, PixiLocationColorRule, PixiLocationIconRule, PixiMapStyle} from './types'
 import {buildPixiLocationIconAsset, getPixiPaperTextureCanvas} from './assets'
 import {createPixiGroundOverlayRenderer, createPixiOverlayRenderer} from './overlays'
-import {detectWebGLSupport} from './shaderRegistry'
 
 function pixiLog(msg: string) {
     if (!isMapDebugLogEnabled()) return
@@ -84,13 +83,6 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
         const {style, scene} = context
         pixiLog(`compile enter: styleId=${style.id} shapes=${scene.shapes.length} keyLocs=${scene.keyLocations.length} bgKind=${style.background.kind}`)
 
-        // 是否启用 shader 渲染路径。海岸场纹理与 GPU 资源的创建/销毁全部收在
-        // overlays 的 React 组件生命周期里（StrictMode 安全、无泄漏），编译期只做开关判定。
-        const useShader = detectWebGLSupport()
-            && style.useShaderOptimization !== false
-            && scene.shapes.length > 0
-        pixiLog(`useShader: ${useShader}`)
-
         const markerStroke = style.locations.marker.stroke
         const bgResult = resolvePixiBackgroundImage(context)
         pixiLog(`background resolved: fit=${bgResult.fit} source=${bgResult.source ? `canvas ${bgResult.source.width}x${bgResult.source.height}` : 'none'} urlLen=${bgResult.url.length}`)
@@ -126,7 +118,7 @@ export function compilePixiMapStyle(context: MapStyleCompileContext<PixiMapStyle
             }),
         }
 
-        const groundOverlayRenderer = createPixiGroundOverlayRenderer(style, {useShader})
+        const groundOverlayRenderer = createPixiGroundOverlayRenderer(style)
         const overlayRenderer = createPixiOverlayRenderer(style)
         pixiLog(`overlayRenderer: ground=${groundOverlayRenderer ? 'present' : 'undefined'} top=${overlayRenderer ? 'present' : 'undefined'}`)
 

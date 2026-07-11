@@ -12,8 +12,6 @@ export interface TerrainFieldData {
     data: Uint8Array
 }
 
-export type TerrainFieldPalette = ReadonlyArray<readonly [number, number, number]>
-
 /** 编辑态读取实时语义，预览态只读取最近一次生成快照。 */
 export function resolveTerrainStrokesForViewport(
     mode: 'edit' | 'preview',
@@ -157,37 +155,4 @@ export function createTerrainFieldData(
         output[offset + 3] = 255
     }
     return {width: fieldWidth, height: fieldHeight, data: output}
-}
-
-/** 与 shader 版一致的覆盖度→软边映射（smoothstep 0.30..0.80），保证双路径 parity。 */
-function coverageToAlpha(coverage: number): number {
-    const t = Math.max(0, Math.min(1, (coverage / 255 - 0.30) / 0.50))
-    return Math.round(t * t * (3 - 2 * t) * 255)
-}
-
-/** 把索引场转换成 Canvas 回退路径可直接合成的透明色块。 */
-export function colorizeTerrainFieldCanvas(
-    field: TerrainFieldData,
-    palette: TerrainFieldPalette,
-): HTMLCanvasElement | null {
-    const result = createMaskCanvas(field.width, field.height)
-    const resultContext = result.getContext('2d')
-    if (!resultContext) return null
-
-    const output = resultContext.createImageData(field.width, field.height)
-
-    for (let offset = 0; offset < field.data.length; offset += 4) {
-        const typeIndex = field.data[offset]
-        const coverage = field.data[offset + 1]
-        const color = palette[typeIndex]
-        if (!color || typeIndex === TERRAIN_FIELD_EMPTY_INDEX) continue
-        const alpha = coverageToAlpha(coverage)
-        if (alpha <= 0) continue
-        for (let colorIndex = 0; colorIndex < 3; colorIndex++) {
-            output.data[offset + colorIndex] = color[colorIndex]
-        }
-        output.data[offset + 3] = alpha
-    }
-    resultContext.putImageData(output, 0, 0)
-    return result
 }

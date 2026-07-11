@@ -11,7 +11,6 @@ import type {TextStyleOptions, TextureShader} from 'pixi.js'
 import {BufferImageSource, MeshGeometry, Texture} from 'pixi.js'
 import {log_message} from '../../../../api'
 import {
-    MAP_TERRAIN_KINDS,
     type MapPixiPreviewOverlayContext,
     type MapPreviewKeyLocation,
     type MapRgbaColor,
@@ -19,7 +18,6 @@ import {
 import type {
     PixiCoastlineLayerStyle,
     PixiDecorationPluginId,
-    PixiEffectPluginId,
     PixiLabelRule,
     PixiMapStyle,
     PixiStylePluginConfig,
@@ -27,7 +25,6 @@ import type {
     ShaderRenderer,
 } from './types'
 import {
-    colorizeTerrainFieldCanvas,
     createTerrainFieldData,
     hexToRgbaColor,
     isMapDebugLogEnabled,
@@ -37,7 +34,6 @@ import {
 } from '../common'
 import {
     drawPixiCompassAsset,
-    drawPixiEffectAsset,
     getPixiBrushAssetProfile,
     type PixiBrushAssetId,
     type PixiCompassAssetId,
@@ -155,261 +151,6 @@ function drawCoastlineLayer(
     ctx.restore()
 }
 
-interface CoastlineHatchParams {
-    rings?: number
-    gap?: number
-    width?: number
-    color?: string
-    opacity?: number
-}
-
-/** 在给定 ctx 上把所有陆地描成一条闭合路径（不描边不填充），供膨胀遮罩复用。 */
-function traceLandPath(
-    maskCtx: CanvasRenderingContext2D,
-    shapes: { polygon: [number, number][] }[],
-): void {
-    maskCtx.beginPath()
-    for (const shape of shapes) {
-        const polygon = shape.polygon
-        maskCtx.moveTo(polygon[0][0], polygon[0][1])
-        for (let i = 1; i < polygon.length; i++) {
-            maskCtx.lineTo(polygon[i][0], polygon[i][1])
-        }
-        maskCtx.closePath()
-    }
-}
-
-/**
- * 把所有陆地按距离 d 做形态学膨胀（圆形结构元 = 填充 + 半径 d 的圆头描边），画成实心遮罩。
- * 圆形结构元让尖角/小碎边被"磨圆"，深湾处相邻边界平滑合并，从根本上避免顶点外扩会产生的自交。
- */
-function paintDilatedLand(
-    maskCtx: CanvasRenderingContext2D,
-    shapes: { polygon: [number, number][] }[],
-    width: number,
-    height: number,
-    distance: number,
-): void {
-    maskCtx.clearRect(0, 0, width, height)
-    maskCtx.fillStyle = '#000'
-    maskCtx.strokeStyle = '#000'
-    maskCtx.lineJoin = 'round'
-    maskCtx.lineCap = 'round'
-    maskCtx.lineWidth = Math.max(0.01, distance * 2)
-    traceLandPath(maskCtx, shapes)
-    maskCtx.fill()
-    if (distance > 0) maskCtx.stroke()
-}
-
-/**
- * 海岸线晕线：向海侧一圈圈逐渐变淡的等距轮廓（古地图/托尔金标志性的"海里一圈圈线"）。
- * 做法：对"陆地膨胀 d"与"陆地膨胀 d−线宽"求差，得到偏移 d 处的一条细环。圆形结构元
- * 天然避免尖角自交，深湾/小碎边处相邻晕线会平滑合并而非乱交叠。绘制在场景坐标里。
- */
-function drawCoastlineHatching(
-    ctx: CanvasRenderingContext2D,
-    context: MapPixiPreviewOverlayContext,
-    hatch: CoastlineHatchParams,
-    scale: number,
-): void {
-    const rings = Math.max(1, Math.min(12, Math.round(getNumberParam(hatch.rings, 4))))
-    const gap = Math.max(1, getNumberParam(hatch.gap, 7))
-    const lineWidth = Math.max(0.4, getNumberParam(hatch.width, 0.9))
-    const opacity = Math.max(0, Math.min(1, getNumberParam(hatch.opacity, 0.5)))
-    const rgba = hexToRgbaColor(getStringParam(hatch.color, '#6a4a26'))
-    const sceneW = context.scene.canvas.width
-    const sceneH = context.scene.canvas.height
-    const physW = Math.round(sceneW * scale)
-    const physH = Math.round(sceneH * scale)
-    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
-    if (!shapes.length || physW <= 0 || physH <= 0) return
-
-    const maskCanvas = document.createElement('canvas')
-    maskCanvas.width = physW
-    maskCanvas.height = physH
-    const maskCtx = maskCanvas.getContext('2d')
-    const ringCanvas = document.createElement('canvas')
-    ringCanvas.width = physW
-    ringCanvas.height = physH
-    const ringCtx = ringCanvas.getContext('2d')
-    if (!maskCtx || !ringCtx) return
-    // 遮罩按场景坐标绘制到物理分辨率（超采样）。
-    maskCtx.scale(scale, scale)
-
-    for (let ring = 1; ring <= rings; ring++) {
-        const ringOpacity = opacity * (1 - (ring - 1) / rings)
-        if (ringOpacity <= 0.01) continue
-        const distance = ring * gap
-
-        // 外圈：陆地膨胀 distance
-        paintDilatedLand(maskCtx, shapes, sceneW, sceneH, distance)
-        ringCtx.globalCompositeOperation = 'source-over'
-        ringCtx.clearRect(0, 0, physW, physH)
-        ringCtx.drawImage(maskCanvas, 0, 0)
-
-        // 减去内圈：陆地膨胀 distance − lineWidth，剩下一条细环
-        paintDilatedLand(maskCtx, shapes, sceneW, sceneH, Math.max(0, distance - lineWidth))
-        ringCtx.globalCompositeOperation = 'destination-out'
-        ringCtx.drawImage(maskCanvas, 0, 0)
-
-        // 用晕线颜色给细环上色（source-in：只在细环 alpha 处着色）
-        ringCtx.globalCompositeOperation = 'source-in'
-        ringCtx.fillStyle = colorToCss(rgba, 1)
-        ringCtx.fillRect(0, 0, physW, physH)
-        ringCtx.globalCompositeOperation = 'source-over'
-
-        // ringCanvas 是物理分辨率；主 ctx 处于 scale 变换下，这里清空变换按 1:1 贴回。
-        ctx.save()
-        ctx.setTransform(1, 0, 0, 1, 0, 0)
-        ctx.globalAlpha = ringOpacity
-        ctx.drawImage(ringCanvas, 0, 0)
-        ctx.restore()
-    }
-}
-
-interface LandDepthParams {
-    width?: number
-    color?: string
-    opacity?: number
-}
-
-/**
- * 陆地纵深：沿海岸向陆地内侧画一条又宽又柔的暗边（裁剪到陆地内部），形成"近岸略深、
- * 内陆渐亮"的内阴影，让陆地不再是纯色剪纸。绘制在场景坐标里（随主 ctx 的超采样一起变清晰）。
- */
-function drawLandDepth(
-    ctx: CanvasRenderingContext2D,
-    context: MapPixiPreviewOverlayContext,
-    depth: LandDepthParams,
-): void {
-    const bandWidth = Math.max(2, getNumberParam(depth.width, 26))
-    const opacity = Math.max(0, Math.min(1, getNumberParam(depth.opacity, 0.16)))
-    const rgba = hexToRgbaColor(getStringParam(depth.color, '#5a3a1c'))
-    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
-    if (!shapes.length) return
-
-    ctx.save()
-    traceLandPath(ctx, shapes)
-    ctx.clip()
-    ctx.lineJoin = 'round'
-    ctx.lineCap = 'round'
-    ctx.lineWidth = bandWidth * 2
-    ctx.strokeStyle = colorToCss(rgba, opacity)
-    ctx.filter = `blur(${Math.max(1, bandWidth * 0.5)}px)`
-    traceLandPath(ctx, shapes)
-    ctx.stroke()
-    ctx.restore()
-}
-
-interface SeaDepthParams {
-    bands?: number
-    gap?: number
-    color?: string
-    /** 深海（远岸）蓝的不透明度上限。 */
-    opacity?: number
-    /** 近岸减淡强度 0~1：越大近岸越浅、深浅对比越强。 */
-    shallowFade?: number
-}
-
-/**
- * 海水深浅：整片海面铺深蓝，再按"到海岸的距离"在近岸逐渐减淡 → 离岸越远越深、越靠岸越浅。
- * 用陆地逐层形态学膨胀累积出一张"近岸=强、离岸→0"的 fade 遮罩，再以它 destination-out 减淡深蓝。
- * 过渡宽度 = bands×gap；圆形结构元保证近岸减淡带平滑、无尖角自交。最后挖掉陆地只留海侧。
- */
-function drawSeaDepthBands(
-    ctx: CanvasRenderingContext2D,
-    context: MapPixiPreviewOverlayContext,
-    params: SeaDepthParams,
-    scale: number,
-): void {
-    const bands = Math.max(1, Math.min(24, Math.round(getNumberParam(params.bands, 6))))
-    const gap = Math.max(1, getNumberParam(params.gap, 10))
-    const deepOpacity = Math.max(0, Math.min(1, getNumberParam(params.opacity, 0.22)))
-    const shallowFade = Math.max(0, Math.min(1, getNumberParam(params.shallowFade, 0.9)))
-    const rgba = hexToRgbaColor(getStringParam(params.color, '#3f6f8f'))
-    if (deepOpacity <= 0) return
-    const sceneW = context.scene.canvas.width
-    const sceneH = context.scene.canvas.height
-    const physW = Math.round(sceneW * scale)
-    const physH = Math.round(sceneH * scale)
-    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
-    if (!shapes.length || physW <= 0 || physH <= 0) return
-
-    const maskCanvas = document.createElement('canvas')
-    maskCanvas.width = physW
-    maskCanvas.height = physH
-    const maskCtx = maskCanvas.getContext('2d')
-    const fadeCanvas = document.createElement('canvas')
-    fadeCanvas.width = physW
-    fadeCanvas.height = physH
-    const fadeCtx = fadeCanvas.getContext('2d')
-    const bandCanvas = document.createElement('canvas')
-    bandCanvas.width = physW
-    bandCanvas.height = physH
-    const bandCtx = bandCanvas.getContext('2d')
-    if (!maskCtx || !fadeCtx || !bandCtx) return
-    maskCtx.scale(scale, scale)
-
-    // fade 遮罩：陆地逐层膨胀累积，越靠岸被覆盖层数越多 → alpha 越高；离岸 bands×gap 外→0。
-    const perLayer = 1 / bands
-    fadeCtx.globalCompositeOperation = 'source-over'
-    for (let k = 1; k <= bands; k++) {
-        paintDilatedLand(maskCtx, shapes, sceneW, sceneH, k * gap)
-        fadeCtx.globalAlpha = perLayer
-        fadeCtx.drawImage(maskCanvas, 0, 0)
-    }
-    fadeCtx.globalAlpha = 1
-
-    // 深蓝铺满整片，再用 fade 在近岸 destination-out 减淡（离岸保持深蓝）。
-    bandCtx.fillStyle = colorToCss(rgba, deepOpacity)
-    bandCtx.fillRect(0, 0, physW, physH)
-    bandCtx.globalCompositeOperation = 'destination-out'
-    bandCtx.globalAlpha = shallowFade
-    bandCtx.drawImage(fadeCanvas, 0, 0)
-    bandCtx.globalAlpha = 1
-    bandCtx.globalCompositeOperation = 'source-over'
-
-    // 挖掉陆地本体，只保留海侧
-    paintDilatedLand(maskCtx, shapes, sceneW, sceneH, 0)
-    bandCtx.globalCompositeOperation = 'destination-out'
-    bandCtx.drawImage(maskCanvas, 0, 0)
-    bandCtx.globalCompositeOperation = 'source-over'
-
-    ctx.save()
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-    ctx.drawImage(bandCanvas, 0, 0)
-    ctx.restore()
-}
-
-interface TerrainParams {
-    colors: string[]
-}
-
-function drawTerrainColorBlocks(
-    ctx: CanvasRenderingContext2D,
-    context: MapPixiPreviewOverlayContext,
-    params: TerrainParams,
-    terrainField: TerrainFieldData | null,
-): void {
-    if (!terrainField) return
-    const shapes = context.scene.shapes.filter(shape => shape.polygon.length >= 3)
-    if (!shapes.length) return
-
-    const palette: Array<[number, number, number]> = []
-    for (const definition of MAP_TERRAIN_KINDS) {
-        const rgba = hexToRgbaColor(params.colors[definition.order] ?? definition.semanticColor)
-        palette[definition.order] = [rgba[0], rgba[1], rgba[2]]
-    }
-    const colored = colorizeTerrainFieldCanvas(terrainField, palette)
-    if (!colored) return
-
-    ctx.save()
-    traceLandPath(ctx, shapes)
-    ctx.clip()
-    ctx.drawImage(colored, 0, 0, context.scene.canvas.width, context.scene.canvas.height)
-    ctx.restore()
-}
-
 function drawCompass(ctx: CanvasRenderingContext2D, context: MapPixiPreviewOverlayContext, style: PixiMapStyle) {
     const plugin = style.decorations?.find(item => item.id === 'compass')
     const size = getNumberParam(plugin?.params?.size, 58)
@@ -431,30 +172,12 @@ function hasDecoration(style: PixiMapStyle, id: PixiDecorationPluginId): boolean
     return Boolean(style.decorations?.some(plugin => plugin.id === id))
 }
 
-function isEffectPluginId(id: string): id is PixiEffectPluginId {
-    return id === 'paper-grain'
-        || id === 'vignette'
-        || id === 'edge-darken'
-        || id === 'ink-bleed'
-        || id === 'chromatic-ageing'
-}
-
-/**
- * 叠加位图绘制模式：
- * - full：全部效果（Canvas 回退路径）；
- * - linework：只画矢量线稿（海岸线本体描边 + 罗盘）。shader 路径下距离场类
- *   效果都交给 Mesh 插件，线稿位图叠在它们之上，重绘开销只剩轻量笔画。
- * 水墨的 brush-stroke / ink-wash 只保证 shader 路径效果；Canvas 回退不补等价笔触。
- */
-type OverlayCanvasMode = 'full' | 'linework'
-
-function createOverlayCanvas(
+/** Canvas 只生成无法由距离场表达的矢量线稿：海岸描边与罗盘。 */
+function createLineworkCanvas(
     context: MapPixiPreviewOverlayContext,
     style: PixiMapStyle,
-    mode: OverlayCanvasMode = 'full',
-    terrainField: TerrainFieldData | null = null,
 ): HTMLCanvasElement | null {
-    pixiOverlayLog(`createOverlayCanvas: mode=${mode} canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
+    pixiOverlayLog(`createLineworkCanvas: canvas=${context.scene.canvas.width}x${context.scene.canvas.height} shapes=${context.scene.shapes.length}`)
     const sceneW = context.scene.canvas.width
     const sceneH = context.scene.canvas.height
     if (sceneW <= 0 || sceneH <= 0) return null
@@ -465,7 +188,7 @@ function createOverlayCanvas(
         && style.decorations?.some(item => item.id === 'coastline-outline'),
     )
     const showCompass = hasDecoration(style, 'compass')
-    if (mode === 'linework' && !showCoastStrokes && !showCompass) return null
+    if (!showCoastStrokes && !showCompass) return null
     // 超采样：位图按 scale 放大生成，Sprite 仍按场景尺寸显示 → 放大更清晰。
     const scale = mapRenderScale(sceneW, sceneH)
     const canvas = document.createElement('canvas')
@@ -479,73 +202,8 @@ function createOverlayCanvas(
     }
     ctx.scale(scale, scale)
 
-    // 海洋处理（近岸蓝色水深带），画在最底层。
-    const seaPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'sea') : undefined
-    if (seaPlugin) {
-        const sea = seaPlugin.params
-        if (getNumberParam(sea?.depthOpacity, 0) > 0) {
-            drawSeaDepthBands(ctx, context, {
-                bands: getNumberParam(sea?.depthBands, 6),
-                gap: getNumberParam(sea?.depthGap, 10),
-                color: getStringParam(sea?.depthColor, '#3f6f8f'),
-                opacity: getNumberParam(sea?.depthOpacity, 0.22),
-                shallowFade: getNumberParam(sea?.depthShallowFade, 0.9),
-            }, scale)
-        }
-    }
-
-    // 阶段 1 地形以平色覆盖度呈现；后续风格纹样仍位于同一层级。
-    const terrainPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'terrain') : undefined
-    if (terrainPlugin) {
-        const terrainColors = terrainPlugin.params?.terrainColors
-        drawTerrainColorBlocks(ctx, context, {
-            colors: Array.isArray(terrainColors)
-                ? terrainColors.map(color => typeof color === 'string' ? color : '')
-                : [],
-        }, terrainField)
-    }
-
-    // 陆地纵深（近岸内阴影）：画在最底层，其余效果叠加其上。opacity>0 才启用。
-    const landDepthPlugin = mode === 'full' ? style.decorations?.find(item => item.id === 'land-depth') : undefined
-    if (landDepthPlugin && getNumberParam(landDepthPlugin.params?.opacity, 0) > 0) {
-        drawLandDepth(ctx, context, {
-            width: getNumberParam(landDepthPlugin.params?.width, 26),
-            color: getStringParam(landDepthPlugin.params?.color, '#5a3a1c'),
-            opacity: getNumberParam(landDepthPlugin.params?.opacity, 0.16),
-        })
-    }
-
-    if (mode === 'full') {
-        for (const effect of style.effects ?? []) {
-            if (!isEffectPluginId(effect.id)) continue
-            // 色彩老化由独立的 multiply 混合层处理（见 PixiChromaticAgeingLayer）：
-            // 在透明叠加 canvas 上画 multiply 不与下方场景发生混合，只会退化成一层平铺色纱。
-            if (effect.id === 'chromatic-ageing') continue
-            drawPixiEffectAsset({
-                ctx,
-                asset: effect.id,
-                width: context.scene.canvas.width,
-                height: context.scene.canvas.height,
-                shapes: context.scene.shapes,
-                params: effect.params,
-            })
-        }
-    }
-
     const coastlinePlugin = style.decorations?.find(item => item.id === 'coastline-outline')
     if (style.coastline?.enabled && coastlinePlugin) {
-        // 先画向海侧的等距晕线（在下），再叠陆地边界描边（在上）。hatchRings>0 才启用。
-        // linework 模式下晕线由 shader 插件绘制，这里只留矢量描边。
-        const hatchParams = coastlinePlugin.params
-        if (mode === 'full' && getNumberParam(hatchParams?.hatchRings, 0) > 0) {
-            drawCoastlineHatching(ctx, context, {
-                rings: getNumberParam(hatchParams?.hatchRings, 4),
-                gap: getNumberParam(hatchParams?.hatchGap, 7),
-                width: getNumberParam(hatchParams?.hatchWidth, 0.9),
-                color: getStringParam(hatchParams?.hatchColor, '#6a4a26'),
-                opacity: getNumberParam(hatchParams?.hatchOpacity, 0.5),
-            }, scale)
-        }
         const brushAsset = getStringParam(coastlinePlugin.params?.brush, 'tolkien-coastline') as PixiBrushAssetId
         style.coastline.layers.forEach((layer, index) => drawCoastlineLayer(ctx, context, layer, index, brushAsset))
     }
@@ -554,7 +212,7 @@ function createOverlayCanvas(
         drawCompass(ctx, context, style)
     }
 
-    pixiOverlayLog(`createOverlayCanvas: done ${canvas.width}x${canvas.height}`)
+    pixiOverlayLog(`createLineworkCanvas: done ${canvas.width}x${canvas.height}`)
     return canvas
 }
 
@@ -812,13 +470,9 @@ function PixiShaderOverlay({
 function PixiTextureOverlay({
     context,
     style,
-    shaderContext,
 }: {
     context: MapPixiPreviewOverlayContext
     style: PixiMapStyle
-    shaderContext?: {
-        useShader: boolean
-    }
 }) {
     pixiOverlayLog('PixiTextureOverlay: ENTER')
     const sceneW = context.scene.canvas.width
@@ -826,37 +480,33 @@ function PixiTextureOverlay({
     const shapes = context.scene.shapes
 
     // 海岸场：CPU 精确 EDT（场景分辨率，一次性数十 ms），只在 shapes/尺寸变化时重算。
-    // 生成失败（无有效陆地 / 环境不支持）时整体回退 Canvas 位图路径。
-    const wantShader = Boolean(shaderContext?.useShader)
     const coastFieldData = useMemo(
-        () => (wantShader ? createCoastFieldData(shapes, sceneW, sceneH) : null),
-        [wantShader, shapes, sceneW, sceneH],
+        () => createCoastFieldData(shapes, sceneW, sceneH),
+        [shapes, sceneW, sceneH],
     )
     const coastField = useCoastFieldTexture(coastFieldData)
-    const shaderActive = wantShader && coastFieldData !== null
     const terrainFieldData = useMemo(
         () => createTerrainFieldData(context.scene.terrainStrokes, sceneW, sceneH),
         [context.scene.terrainStrokes, sceneW, sceneH],
     )
-    const terrainField = useTerrainFieldTexture(shaderActive ? terrainFieldData : null)
-    const canvasTerrainField = shaderActive ? null : terrainFieldData
+    const terrainField = useTerrainFieldTexture(terrainFieldData)
 
     // overlay 内容只依赖 scene.shapes / 画布尺寸 / style，与 viewportTransform 无关
     //（它在场景坐标里绘制，平移缩放由父容器 transform 承担）。绝不能把整个 context 放进
     // 依赖：context 每帧都是新对象（带 viewportTransform），会导致平移缩放的每一帧都重跑
-    // createOverlayCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
+    // createLineworkCanvas（整块画布重绘 + 重新上传纹理），是风格化渲染卡成个位数帧的主因。
     const overlayCanvas = useMemo(
-        () => createOverlayCanvas(context, style, shaderActive ? 'linework' : 'full', canvasTerrainField),
+        () => createLineworkCanvas(context, style),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [context.scene.shapes, sceneW, sceneH, style, shaderActive, canvasTerrainField],
+        [context.scene.shapes, sceneW, sceneH, style],
     )
     const texture = useCanvasTexture(overlayCanvas)
 
-    pixiOverlayLog(`PixiTextureOverlay: shaderActive=${shaderActive} overlayCanvas=${overlayCanvas ? 'present' : 'empty'}`)
+    pixiOverlayLog(`PixiTextureOverlay: coastField=${coastFieldData ? 'present' : 'empty'} overlayCanvas=${overlayCanvas ? 'present' : 'empty'}`)
 
     return (
         <>
-            {shaderActive && coastField !== Texture.EMPTY && (
+            {coastField !== Texture.EMPTY && (
                 <PixiShaderOverlay
                     context={context}
                     style={style}
@@ -976,9 +626,6 @@ function PixiOverlayLabels({context, style}: { context: MapPixiPreviewOverlayCon
 
 export function createPixiGroundOverlayRenderer(
     style: PixiMapStyle,
-    shaderContext?: {
-        useShader: boolean
-    },
 ): PixiOverlayRenderer | undefined {
     const showCoastline = Boolean(style.coastline?.enabled && hasDecoration(style, 'coastline-outline'))
     const showCompass = hasDecoration(style, 'compass')
@@ -986,13 +633,13 @@ export function createPixiGroundOverlayRenderer(
     const showDecorations = Boolean(style.decorations?.length)
     const showTextureOverlay = showEffects || showDecorations || showCoastline || showCompass
 
-    pixiOverlayLog(`createPixiGroundOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass} useShader=${shaderContext?.useShader ?? false}`)
+    pixiOverlayLog(`createPixiGroundOverlayRenderer: effects=${showEffects} coastline=${showCoastline} compass=${showCompass}`)
 
     if (!showTextureOverlay) return undefined
 
     return (context) => {
         pixiOverlayLog(`GROUND_RENDER_FN: sceneShapes=${context.scene.shapes.length} sceneKeyLocs=${context.scene.keyLocations.length}`)
-        return <PixiTextureOverlay context={context} style={style} shaderContext={shaderContext}/>
+        return <PixiTextureOverlay context={context} style={style}/>
     }
 }
 

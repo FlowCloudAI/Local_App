@@ -36,24 +36,6 @@ class ShaderPluginRegistry {
 
 export const shaderRegistry = new ShaderPluginRegistry()
 
-let webGLSupportCache: boolean | null = null
-
-/**
- * 检测 shader 路径所需的 WebGL2 支持（结果缓存：每次编译都建临时 context 是纯浪费）。
- * 插件 GLSL 按 ES 3.00 编写，海岸场是 RG16F 半浮点纹理（线性过滤是 WebGL2
- * 核心能力）——两者都不做 WebGL1 降级，WebGL1-only 环境直接走 Canvas 回退路径。
- */
-export function detectWebGLSupport(): boolean {
-    if (webGLSupportCache !== null) return webGLSupportCache
-    try {
-        const canvas = document.createElement('canvas')
-        webGLSupportCache = canvas.getContext('webgl2') !== null
-    } catch {
-        webGLSupportCache = false
-    }
-    return webGLSupportCache
-}
-
 /**
  * 工具函数：将十六进制颜色转换为 vec3 (0-1 范围)
  */
