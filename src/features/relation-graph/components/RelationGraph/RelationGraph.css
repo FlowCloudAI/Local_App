@@ -122,7 +122,7 @@
     position: absolute;
     pointer-events: all;
     padding: 2px 8px;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background-color: color-mix(in srgb, var(--fc-rg-node-bg) 78%, transparent);
     border: 1px solid color-mix(in srgb, var(--fc-rg-node-border) 70%, transparent);
     backdrop-filter: blur(3px);

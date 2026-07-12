@@ -22,7 +22,7 @@
 .upload-plugin-body {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
     padding: 1.1rem 1.4rem;
 }
 
@@ -34,7 +34,7 @@
 
 .upload-plugin-label {
     font-size: var(--fc-font-size-sm);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text-secondary, var(--fc-color-text));
 }
 
@@ -45,7 +45,7 @@
 .upload-plugin-file-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .upload-plugin-file-input {
@@ -55,7 +55,7 @@
 .upload-plugin-api-error {
     margin: 0;
     padding: 0.55rem 0.8rem;
-    border-radius: 0.5rem;
+    border-radius: var(--fc-radius-md);
     border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e53e3e) 28%, transparent);
     background: color-mix(in srgb, var(--fc-color-danger, #e53e3e) 8%, transparent);
     font-size: var(--fc-font-size-sm);
@@ -65,7 +65,7 @@
 .upload-plugin-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     padding: 0 1.4rem 1.2rem;
 }
 

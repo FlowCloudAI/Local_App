@@ -305,7 +305,7 @@ function BackendStartupScreen({status}: { status: BackendStartupStatus }) {
             fontSize: 'var(--fc-font-size-sm)',
             userSelect: 'none',
             textAlign: 'center',
-            padding: 24,
+            padding: 'var(--fc-space-xl)',
         }}>
             <div>
                 <div style={{

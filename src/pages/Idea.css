@@ -156,14 +156,14 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .idea-page__editor-header-bottom {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
     flex-wrap: wrap;
 }
 
@@ -185,7 +185,7 @@
 .idea-page__sidebar-list-meta {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     min-width: 0;
 }
 
@@ -202,7 +202,7 @@
     min-width: 1.5rem;
     min-height: 1.5rem;
     padding: 0 0.45rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: var(--dock-panel-bg);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
@@ -302,7 +302,7 @@
 .idea-page__item-pin {
     flex-shrink: 0;
     padding: 0.14rem 0.45rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-xs);
@@ -313,7 +313,7 @@
     margin-top: 0.45rem;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -343,10 +343,10 @@
 .idea-page__meta-field {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     min-width: min(100%, 16rem);
     padding: 0.35rem 0.45rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: var(--dock-panel-bg);
 }
 
@@ -373,7 +373,7 @@
     align-items: center;
     min-height: 1.7rem;
     padding: 0 0.6rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: var(--dock-panel-bg);
     border: 1px solid var(--dock-panel-border-color);
     color: var(--fc-color-text-secondary);
@@ -394,7 +394,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .idea-page__title-input,
@@ -418,7 +418,7 @@
     flex: 1;
     min-height: 20rem;
     resize: none;
-    padding: 1rem;
+    padding: var(--fc-space-lg);
     font-size: var(--fc-font-size-md);
     line-height: 1.75;
     white-space: pre-wrap;
@@ -519,7 +519,7 @@
     }
 
     .idea-page__meta-field {
-        border-radius: 1rem;
+        border-radius: var(--fc-radius-xl);
         align-items: stretch;
         flex-direction: column;
     }

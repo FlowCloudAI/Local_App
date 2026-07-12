@@ -94,7 +94,7 @@
     margin-top: var(--fc-space-xs);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 400;
+    font-weight: var(--fc-font-weight-normal);
 }
 
 .mobile-settings-section {
@@ -363,7 +363,7 @@
     overflow: hidden;
     place-items: center;
     border: var(--mobile-border);
-    border-radius: 0.75rem;
+    border-radius: var(--fc-radius-lg);
     background: color-mix(in srgb, var(--fc-color-primary) 10%, var(--mobile-surface-raised));
     color: var(--fc-color-primary);
 }

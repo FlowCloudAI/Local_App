@@ -24,7 +24,7 @@
 .fc-rename-dialog__input .fc-input__wrapper {
     min-height: 3rem;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
-    border-radius: 1rem;
+    border-radius: var(--fc-radius-xl);
     background: var(--fc-color-bg-elevated);
 }
 

@@ -97,7 +97,7 @@
     background: var(--dock-panel-bg);
     color: var(--fc-color-text);
     font: inherit;
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     resize: vertical;
     outline: none;
     transition: border-color 0.16s ease, box-shadow 0.16s ease;
@@ -164,7 +164,7 @@
     max-width: 22rem;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
 }
 
 .snapshot-main__graph {
@@ -175,7 +175,7 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding-right: 4px;
+    padding-right: var(--fc-space-xs);
 }
 
 .snapshot-main__graph-row {
@@ -227,7 +227,7 @@
 .snapshot-main__item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--fc-space-sm);
     min-width: 0;
 }
 
@@ -253,7 +253,7 @@
     display: flex;
     align-items: center;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     flex-shrink: 0;
     opacity: 0;
     pointer-events: none;
@@ -312,7 +312,7 @@
     margin: 0;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
 }
 
 .snapshot-branch-dialog__meta {

@@ -58,7 +58,7 @@
     display: flex;
     gap: 0;
     margin-bottom: 1.1rem;
-    padding: 0.25rem;
+    padding: var(--fc-space-xs);
     border: var(--mobile-border-bold);
     border-radius: var(--mobile-radius-floating);
     background: var(--mobile-surface-muted);
@@ -205,7 +205,7 @@
 .mobile-entry-card__tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--fc-space-xs);
     max-width: 100%;
     padding: 0.28rem 0.55rem;
     border: 1px solid color-mix(in srgb, var(--mobile-entry-card-color) 18%, var(--fc-color-border));

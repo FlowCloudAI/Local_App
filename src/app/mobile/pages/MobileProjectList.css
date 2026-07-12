@@ -84,7 +84,7 @@
 .mobile-project-list__import.fc-btn {
     min-height: 2.9rem;
     border-radius: var(--fc-radius-full);
-    padding-inline: 1rem;
+    padding-inline: var(--fc-space-lg);
 }
 
 .mobile-project-list__cards {

@@ -72,7 +72,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--fc-space-xs);
 }
 
 .flag-tick-mark {
@@ -136,7 +136,7 @@
 }
 
 .flag-desc {
-    margin: 4px 0 0;
+    margin: var(--fc-space-xs) 0 0;
     font-size: var(--fc-font-size-xs);
     color: var(--fc-color-text-secondary);
     line-height: var(--fc-line-height-normal);
@@ -148,7 +148,7 @@
 .flag-pole-container {
     position: relative;
     width: 2px;
-    margin-left: 8px;
+    margin-left: var(--fc-space-sm);
     display: flex;
     flex-direction: column;
     align-items: center;

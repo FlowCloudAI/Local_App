@@ -342,7 +342,7 @@
     padding: 10px 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fc-space-sm);
     overflow: hidden;
     overscroll-behavior: contain;
 }
@@ -350,7 +350,7 @@
 .fc-op-sidebar__list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     min-height: 0;
     overflow-y: auto;
     padding: 6px;
@@ -450,7 +450,7 @@
 .fc-op-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     background: var(--fc-color-bg);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-sm);
@@ -590,7 +590,7 @@
     justify-content: center;
     min-width: 1.5rem;
     padding: 0.1rem 0.5rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-xs);
@@ -603,7 +603,7 @@
     align-items: center;
     min-height: 1.7rem;
     padding: 0 0.65rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-bg);
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 90%, transparent);
     color: var(--fc-color-text-secondary);

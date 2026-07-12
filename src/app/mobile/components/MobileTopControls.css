@@ -194,7 +194,7 @@
     width: min(15.75rem, calc(100% - 2rem));
     max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-top) - 1rem));
     box-sizing: border-box;
-    padding: 0.75rem 0;
+    padding: var(--fc-space-md) 0;
     overflow-y: auto;
     border: var(--mobile-glass-border);
     border-radius: var(--mobile-radius-floating);

@@ -26,7 +26,7 @@
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
     transition: color 0.15s;
-    padding: 8px 4px;
+    padding: var(--fc-space-sm) var(--fc-space-xs);
     border-radius: var(--mobile-radius-card);
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;

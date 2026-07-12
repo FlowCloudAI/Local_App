@@ -48,7 +48,7 @@
     color: var(--fc-color-text-tertiary);
     font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-semibold);
-    line-height: 1.3;
+    line-height: var(--fc-line-height-tight);
 }
 
 .mobile-type-tag__section-toggle {
@@ -64,7 +64,7 @@
     font: inherit;
     font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-semibold);
-    line-height: 1.3;
+    line-height: var(--fc-line-height-tight);
     text-align: left;
     cursor: pointer;
     touch-action: manipulation;

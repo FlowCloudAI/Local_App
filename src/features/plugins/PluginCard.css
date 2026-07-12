@@ -1,7 +1,7 @@
 .plugin-card {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
     padding: 1rem 1.2rem;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
@@ -54,8 +54,8 @@
 
 .plugin-card-meta {
     display: flex;
-    gap: 1rem;
-    margin-top: 0.25rem;
+    gap: var(--fc-space-lg);
+    margin-top: var(--fc-space-xs);
     font-size: var(--fc-font-size-sm);
     color: var(--fc-color-text-secondary, #888);
 }
@@ -73,17 +73,17 @@
 .plugin-card-kind {
     display: inline-block;
     padding: 0 0.4rem;
-    border-radius: 0.25rem;
+    border-radius: var(--fc-radius-sm);
     background: var(--fc-color-primary-subtle, rgba(0, 0, 0, 0.06));
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     text-transform: uppercase;
     letter-spacing: 0.02em;
 }
 
 .plugin-card-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     flex-shrink: 0;
 }

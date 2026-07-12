@@ -33,7 +33,7 @@
 .rg-sidebar__stats {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: var(--fc-space-sm);
     padding: 10px 12px;
     border-bottom: 1px solid var(--fc-color-border);
 }
@@ -42,7 +42,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 8px;
+    padding: var(--fc-space-sm);
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 86%, transparent);
     border-radius: var(--fc-radius-sm);
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
@@ -81,7 +81,7 @@
     gap: 6px;
     min-height: 0;
     overflow-y: auto;
-    padding: 8px;
+    padding: var(--fc-space-sm);
 }
 
 .rg-sidebar__empty {
@@ -94,9 +94,9 @@
 .rg-sidebar__relation {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     width: 100%;
-    padding: 8px;
+    padding: var(--fc-space-sm);
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 80%, transparent);
     border-radius: var(--fc-radius-sm);
     background: var(--fc-color-bg);
@@ -116,7 +116,7 @@
 .rg-sidebar__relation-main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    gap: 4px;
+    gap: var(--fc-space-xs);
     align-items: center;
     min-width: 0;
     color: var(--fc-color-text);
@@ -237,7 +237,7 @@
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md, 14px);
     font-weight: 600;
-    line-height: 1.3;
+    line-height: var(--fc-line-height-tight);
 }
 
 .rg-node__summary {
@@ -275,7 +275,7 @@
     margin: 0;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-lg, 16px);
-    line-height: 1.3;
+    line-height: var(--fc-line-height-tight);
 }
 
 .rg-layout-dialog__close {
@@ -324,7 +324,7 @@
     gap: var(--fc-space-sm, 8px);
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm, 13px);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
 }
 
 .rg-layout-slider label span {
@@ -362,7 +362,7 @@
 
 .rg-layout-field {
     display: grid;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     min-width: 0;
 }
 

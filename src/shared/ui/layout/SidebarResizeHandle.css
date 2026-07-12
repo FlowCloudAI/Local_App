@@ -48,20 +48,20 @@
     width: var(--fc-sidebar-resize-handle-width);
     height: var(--fc-sidebar-resize-handle-gap-height);
     border: 1px solid transparent;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: transparent;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: var(--fc-space-xs);
     transition: border-color 0.1s ease, background 0.1s ease, transform 0.1s ease;
 }
 
 .fc-sidebar-resize-handle__dot {
     width: 3px;
     height: 3px;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-text) 38%, transparent);
     transition: background 0.1s ease;
 }

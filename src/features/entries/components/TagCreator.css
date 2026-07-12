@@ -46,7 +46,7 @@
 .tag-creator-body {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
     padding: 1.1rem 1.4rem;
     overflow-y: auto;
 }
@@ -61,12 +61,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .tag-creator-label {
     font-size: var(--fc-font-size-sm);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text-secondary, var(--fc-color-text));
 }
 
@@ -76,7 +76,7 @@
 
 .tag-creator-mini-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
 }
 
 .tag-creator-mini-action {
@@ -130,7 +130,7 @@
 }
 
 .tag-creator-textarea {
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     resize: vertical;
     min-height: 4.8rem;
 }
@@ -189,7 +189,7 @@
 .tag-creator-target-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
 }
 
 .tag-creator-target-chip,
@@ -198,7 +198,7 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.42rem 0.7rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     border: 1px solid var(--fc-color-border);
     background: transparent;
     color: var(--fc-color-text);
@@ -249,7 +249,7 @@
 .tag-creator-bool-options {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
 }
 
 /* ── 范围行 ─────────────────────────────────────────────────────────────── */
@@ -282,7 +282,7 @@
 .tag-creator-api-error {
     margin: 0;
     padding: 0.55rem 0.8rem;
-    border-radius: 0.5rem;
+    border-radius: var(--fc-radius-md);
     border: 1px solid color-mix(in srgb, var(--fc-color-danger, #e53e3e) 28%, transparent);
     background: color-mix(in srgb, var(--fc-color-danger, #e53e3e) 8%, transparent);
     font-size: var(--fc-font-size-sm);
@@ -295,14 +295,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     padding: 0 1.4rem 1.2rem;
 }
 
 .tag-creator-footer__actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     margin-left: auto;
 }
 

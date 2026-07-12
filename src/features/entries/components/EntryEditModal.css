@@ -32,7 +32,7 @@
 .eem-body {
     overflow-y: auto;
     flex: 1;
-    padding: 12px 0;
+    padding: var(--fc-space-md) 0;
 }
 
 .eem-diff {
@@ -43,7 +43,7 @@
 
 .eem-diff-line {
     display: flex;
-    gap: 8px;
+    gap: var(--fc-space-sm);
     padding: 1px 18px;
 }
 

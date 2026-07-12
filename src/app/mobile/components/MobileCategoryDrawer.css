@@ -287,7 +287,7 @@
 }
 
 .mobile-category-drawer__empty {
-    padding: 1.5rem 0.75rem;
+    padding: var(--fc-space-xl) var(--fc-space-md);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
     text-align: center;

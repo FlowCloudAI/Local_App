@@ -100,7 +100,7 @@
 }
 
 .ai-empty-history {
-    padding: 2rem 0.5rem;
+    padding: var(--fc-space-2xl) var(--fc-space-sm);
     text-align: center;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
@@ -284,7 +284,7 @@
 .ai-conversation-info {
     flex: 1;
     min-width: 0;
-    margin-right: 0.25rem;
+    margin-right: var(--fc-space-xs);
     overflow: hidden;
 }
 
@@ -365,7 +365,7 @@
     z-index: 70;
     width: 8.8rem;
     max-width: min(8.8rem, calc(100% - 0.7rem));
-    padding: 4px;
+    padding: var(--fc-space-xs);
     border: 1px solid var(--dock-panel-border-color);
     border-radius: var(--dock-panel-control-radius);
     background: var(--fc-color-bg-elevated);
@@ -419,7 +419,7 @@
     color: var(--fc-color-text);
     background: var(--dock-panel-bg);
     border: 1px solid var(--fc-color-primary);
-    border-radius: 4px;
+    border-radius: var(--fc-radius-sm);
     padding: 1px 4px;
     outline: none;
     font-family: inherit;
@@ -661,7 +661,7 @@
     min-width: 0;
     flex-shrink: 1;
     padding: 0.22rem 0.5rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     border: 1px solid var(--dock-panel-border-color);
     background: var(--dock-panel-hover-bg);
     color: var(--fc-color-text-secondary);
@@ -697,7 +697,7 @@
 }
 
 .ai-messages-container > .fc-roll__content {
-    padding: 1rem 1.5rem;
+    padding: var(--fc-space-lg) var(--fc-space-xl);
 }
 
 /* 空状态 */
@@ -746,7 +746,7 @@
     max-width: 24rem;
     margin: 0;
     font-size: var(--fc-font-size-sm);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     color: color-mix(in srgb, var(--fc-color-text-secondary) 76%, transparent);
 }
 
@@ -754,18 +754,18 @@
 .ai-messages-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--fc-space-lg);
     width: 100%;
     max-width: var(--ai-chat-content-max-width);
     margin: 0 auto var(--ai-messages-bottom-space, 220px);
 }
 
 .ai-report-context-bar + .ai-messages-list {
-    margin-top: 1rem;
+    margin-top: var(--fc-space-lg);
 }
 
 .ai-messages-list .message-box-item--assistant {
-    padding-inline: 1.5rem;
+    padding-inline: var(--fc-space-xl);
 }
 
 .ai-message-frame {
@@ -800,7 +800,7 @@
     min-height: 3.6rem;
     padding: 0.5rem 0.75rem 0.5rem 0.55rem;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
-    border-radius: 8px;
+    border-radius: var(--fc-radius-md);
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 86%, transparent);
     color: var(--fc-color-text);
 }
@@ -812,7 +812,7 @@
 .ai-message-attachment-icon {
     width: 2.45rem;
     height: 2.45rem;
-    border-radius: 8px;
+    border-radius: var(--fc-radius-md);
     display: grid;
     place-items: center;
     background: var(--fc-color-primary);
@@ -866,7 +866,7 @@
     overflow: hidden;
     user-select: text;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    border-radius: 1rem;
+    border-radius: var(--fc-radius-xl);
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 3%);
     box-shadow: 0 18px 48px color-mix(in srgb, var(--fc-color-bg) 30%, transparent);
 }
@@ -875,7 +875,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
     padding: 0.7rem 0.8rem;
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     font-size: var(--fc-font-size-caption, 0.75rem);
@@ -885,14 +885,14 @@
 .ai-messages-list .entry-editor-link-preview__body {
     display: grid;
     grid-template-columns: 4.5rem minmax(0, 1fr);
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
     padding: 0.8rem;
 }
 
 .ai-messages-list .entry-editor-link-preview__media {
     width: 100%;
     aspect-ratio: 4 / 5;
-    border-radius: 0.75rem;
+    border-radius: var(--fc-radius-lg);
     overflow: hidden;
     background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
 }
@@ -1040,14 +1040,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
     margin-bottom: 0.45rem;
     padding: 0.32rem 0.5rem;
     font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
     background: color-mix(in srgb, var(--fc-color-bg) 45%, transparent);
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
-    border-radius: 8px;
+    border-radius: var(--fc-radius-md);
 }
 
 .ai-edit-indicator button {
@@ -1055,7 +1055,7 @@
     padding: 0.14rem 0.45rem;
     font-size: var(--fc-font-size-caption, 0.75rem);
     border: 1px solid transparent;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: transparent;
     color: var(--fc-color-text-secondary);
     cursor: pointer;
@@ -1070,7 +1070,7 @@
 
 .ai-edit-indicator span {
     min-width: 0;
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     line-height: 1.35;
 }
 
@@ -1527,7 +1527,7 @@
 .ai-context-usage-indicator {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: var(--fc-space-xs);
     flex: 0 0 auto;
     height: 1.05rem;
     margin-left: auto;
@@ -1623,7 +1623,7 @@
     overflow: hidden;
     user-select: text;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    border-radius: 1rem;
+    border-radius: var(--fc-radius-xl);
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 96%, white 3%);
     box-shadow: 0 18px 48px color-mix(in srgb, var(--fc-color-bg) 30%, transparent);
 }
@@ -1632,7 +1632,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
     padding: 0.7rem 0.8rem;
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
     font-size: var(--fc-font-size-caption, 0.75rem);
@@ -1687,8 +1687,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    margin-top: 8px;
+    gap: var(--fc-space-sm);
+    margin-top: var(--fc-space-sm);
     pointer-events: auto;
 }
 
@@ -1925,13 +1925,13 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--fc-space-sm);
 }
 
 .ai-floating-char-count {
     font-size: var(--fc-font-size-caption, 0.75rem);
     color: var(--fc-color-text-secondary);
-    margin-right: 4px;
+    margin-right: var(--fc-space-xs);
 }
 
 .ai-floating-send-btn {

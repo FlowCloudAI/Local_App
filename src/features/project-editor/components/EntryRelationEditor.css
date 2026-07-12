@@ -21,7 +21,7 @@
     justify-content: center;
     min-width: 2.1rem;
     padding: 0.2rem 0.6rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-primary) 14%, transparent);
     color: var(--fc-color-primary);
     white-space: nowrap;
@@ -34,7 +34,7 @@
     background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
 }
 
 .entry-relation-editor__error {
@@ -51,7 +51,7 @@
 .entry-relation-editor__item,
 .entry-relation-editor__viewer-item {
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 92%, transparent);
-    border-radius: 1rem;
+    border-radius: var(--fc-radius-xl);
     background: color-mix(in srgb, var(--fc-color-bg) 94%, white 2%);
 }
 
@@ -125,7 +125,7 @@
 
 .entry-relation-editor__viewer-item {
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: var(--fc-space-md) var(--fc-space-lg);
     text-align: left;
     cursor: pointer;
     color: inherit;
@@ -159,7 +159,7 @@
     flex-direction: column;
     overflow: visible;
     border: 1px solid color-mix(in srgb, var(--fc-color-border) 88%, transparent);
-    border-radius: 1rem;
+    border-radius: var(--fc-radius-xl);
     background: var(--fc-color-bg-elevated);
     color: var(--fc-color-text);
     box-shadow: 0 24px 64px color-mix(in srgb, black 28%, transparent);
@@ -169,7 +169,7 @@
 .entry-relation-panel__footer {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
     padding: 0.95rem 1rem;
     border-bottom: 1px solid var(--fc-color-border);
 }
@@ -192,7 +192,7 @@
 .entry-relation-panel__body {
     min-height: 0;
     overflow: visible;
-    padding: 1rem;
+    padding: var(--fc-space-lg);
 }
 
 .entry-relation-panel__body .entry-relation-editor__item {
@@ -207,7 +207,7 @@
 
 @media (max-width: 720px) {
     .entry-relation-editor {
-        padding: 0.75rem 1rem 1rem;
+        padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-lg);
     }
 
     .entry-relation-editor__row,

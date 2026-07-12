@@ -384,7 +384,7 @@
     gap: var(--fc-space-xs);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
-    line-height: 1.3;
+    line-height: var(--fc-line-height-tight);
 }
 
 .pe-dashboard-pie-chart__swatch {

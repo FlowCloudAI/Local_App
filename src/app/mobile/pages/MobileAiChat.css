@@ -42,7 +42,7 @@
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
     overflow-x: hidden;
     padding: calc(env(safe-area-inset-top, 0) + 1.05rem) 1.05rem calc(env(safe-area-inset-bottom, 0) + 1.1rem);
 }
@@ -53,7 +53,7 @@
     flex: 0 0 auto;
     align-items: center;
     gap: 0.7rem;
-    padding: 0 1rem;
+    padding: 0 var(--fc-space-lg);
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: var(--mobile-surface-translucent);
@@ -500,7 +500,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
     padding: 1rem 0 4rem;
     color: var(--fc-color-text-secondary);
     text-align: center;
@@ -572,7 +572,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .mobile-ai-composer-card__chips,
@@ -687,8 +687,8 @@
 .mobile-ai-more-sheet__quick {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    gap: var(--fc-space-sm);
+    margin-bottom: var(--fc-space-md);
 }
 
 .mobile-ai-more-sheet__quick button {

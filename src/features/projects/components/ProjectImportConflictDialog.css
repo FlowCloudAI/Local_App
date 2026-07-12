@@ -25,7 +25,7 @@
 .project-import-conflict-message {
     margin: 0;
     font-size: var(--fc-font-size-reading, 0.9rem);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     color: var(--fc-color-text-secondary);
 }
 
@@ -34,7 +34,7 @@
     flex-direction: column;
     gap: 0.4rem;
     font-size: var(--fc-font-size-sm);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     color: var(--fc-color-text-secondary);
 }
 
@@ -42,7 +42,7 @@
     width: 100%;
     padding: 0.55rem 0.75rem;
     border: 1px solid var(--fc-color-border);
-    border-radius: 0.5rem;
+    border-radius: var(--fc-radius-md);
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
     font-family: var(--fc-font-family), sans-serif;
@@ -72,7 +72,7 @@
 .project-import-conflict-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     padding: 0 1.35rem 1.2rem;
 }
 

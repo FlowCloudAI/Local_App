@@ -39,7 +39,7 @@
 .highlight-tag-item__badge,
 .highlight-tag-item__type {
     padding: 0.18rem 0.48rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     font-size: var(--fc-font-size-caption, 0.75rem);
     line-height: 1.2;
     white-space: nowrap;
@@ -81,13 +81,13 @@
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-control, 0.875rem);
     line-height: 1.5;
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     user-select: text;
 }
 
 .highlight-tag-item__value.is-empty {
     color: var(--fc-color-text-secondary);
-    font-weight: 400;
+    font-weight: var(--fc-font-weight-normal);
 }
 
 .highlight-tag-item__editor {
@@ -144,7 +144,7 @@
     padding: 0.56rem 0.68rem;
     border-radius: 0.78rem;
     font-size: var(--fc-font-size-sm);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
 }
 
 .highlight-tag-item__bool-chip.active,

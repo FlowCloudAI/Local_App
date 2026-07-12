@@ -85,7 +85,7 @@
 .ai-plugin-missing__description {
     margin: var(--fc-space-xs) 0 0;
     font-size: var(--fc-font-size-control);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
     color: var(--fc-color-text-secondary);
 }
 

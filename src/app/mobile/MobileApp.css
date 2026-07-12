@@ -210,7 +210,7 @@
     height: 100%;
     color: var(--fc-color-danger);
     font-size: var(--fc-font-size-sm);
-    padding: 24px;
+    padding: var(--fc-space-xl);
     text-align: center;
 }
 
@@ -220,10 +220,10 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    gap: 12px;
+    gap: var(--fc-space-md);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-sm);
-    padding: 24px;
+    padding: var(--fc-space-xl);
     text-align: center;
 }
 
@@ -276,7 +276,7 @@
 }
 
 .mobile-list-card__description {
-    margin-top: 4px;
+    margin-top: var(--fc-space-xs);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -326,7 +326,7 @@
 /* 底部操作栏 (固定) */
 .mobile-bottom-bar {
     display: flex;
-    gap: 8px;
+    gap: var(--fc-space-sm);
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
     background: var(--mobile-surface-translucent-strong);

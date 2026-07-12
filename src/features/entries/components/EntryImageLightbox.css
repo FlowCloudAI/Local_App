@@ -18,8 +18,8 @@
     min-height: 0;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    gap: 0.75rem;
-    padding: 1rem;
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-lg);
     border-radius: 1.2rem;
     background: color-mix(in srgb, var(--fc-color-bg-elevated) 95%, black 5%);
 }
@@ -34,7 +34,7 @@
 
 .entry-editor-lightbox__toolbar {
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
 }
 
 .entry-editor-lightbox__meta,
@@ -45,7 +45,7 @@
 
 .entry-editor-lightbox__badge {
     padding: 0.14rem 0.5rem;
-    border-radius: 999px;
+    border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-primary) 18%, transparent);
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-caption, 0.75rem);
@@ -141,7 +141,7 @@
     width: 7rem;
     flex: 0 0 auto;
     border: 1px solid var(--fc-color-border);
-    border-radius: 0.75rem;
+    border-radius: var(--fc-radius-lg);
     background: color-mix(in srgb, var(--fc-color-bg) 92%, white 2%);
     cursor: pointer;
     overflow: hidden;

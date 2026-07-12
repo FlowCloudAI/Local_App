@@ -150,7 +150,7 @@
     gap: 0.35rem;
     width: 100%;
     min-height: 8.75rem;
-    padding: 1rem;
+    padding: var(--fc-space-lg);
     border: var(--mobile-border-strong);
     border-radius: var(--mobile-radius-card);
     background:
@@ -429,7 +429,7 @@
     width: min(16.75rem, calc(100% - var(--mobile-home-x) * 2));
     max-height: min(31rem, calc(100% - var(--mobile-home-filter-top, 2.25rem) - 1rem));
     box-sizing: border-box;
-    padding: 0.75rem 0;
+    padding: var(--fc-space-md) 0;
     overflow-y: auto;
     border: var(--mobile-glass-border);
     border-radius: var(--mobile-radius-floating);
@@ -555,7 +555,7 @@
 
 @media (max-height: 44rem) {
     .mobile-home__panel {
-        padding-top: 0.75rem;
+        padding-top: var(--fc-space-md);
     }
 
     .mobile-home__dashboard {

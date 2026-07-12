@@ -28,19 +28,19 @@
 
 .entry-image-add-tabs {
     display: flex;
-    gap: 0.25rem;
+    gap: var(--fc-space-xs);
     padding: 0.8rem 1.4rem 0;
     border-bottom: 1px solid var(--fc-color-border);
 }
 
 .entry-image-add-tab {
-    padding: 0.5rem 1rem;
+    padding: var(--fc-space-sm) var(--fc-space-lg);
     border: none;
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-control, 0.875rem);
-    font-weight: 500;
+    font-weight: var(--fc-font-weight-medium);
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
     margin-bottom: -1px;
@@ -71,23 +71,23 @@
 .entry-image-add-existing {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .entry-image-add-existing__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-    gap: 0.75rem;
+    gap: var(--fc-space-md);
 }
 
 .entry-image-add-existing__item {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     min-width: 0;
-    padding: 0.5rem;
+    padding: var(--fc-space-sm);
     border: 1px solid var(--fc-color-border);
-    border-radius: 0.5rem;
+    border-radius: var(--fc-radius-md);
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
     cursor: pointer;
@@ -146,17 +146,17 @@
 .entry-image-add-existing__empty {
     padding: 1.4rem;
     border: 1px dashed var(--fc-color-border);
-    border-radius: 0.5rem;
+    border-radius: var(--fc-radius-md);
     text-align: center;
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
 }
 
 .entry-image-add-local {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1rem;
-    padding: 2rem 1rem;
+    gap: var(--fc-space-lg);
+    padding: var(--fc-space-2xl) var(--fc-space-lg);
     text-align: center;
 }
 
@@ -164,7 +164,7 @@
     margin: 0;
     font-size: var(--fc-font-size-control, 0.875rem);
     color: var(--fc-color-text-secondary);
-    line-height: 1.6;
+    line-height: var(--fc-line-height-normal);
 }
 
 /* ── AI 标签 ────────────────────────────────────────────────────────────────── */
@@ -177,7 +177,7 @@
 
 .entry-image-add-ai__field-row {
     display: flex;
-    gap: 1rem;
+    gap: var(--fc-space-lg);
     flex-wrap: wrap;
 }
 
@@ -248,7 +248,7 @@
 }
 
 .entry-image-add-ai__error {
-    padding: 0.75rem 1rem;
+    padding: var(--fc-space-md) var(--fc-space-lg);
     background: var(--fc-color-danger-bg);
     color: var(--fc-color-danger);
     border: 1px solid var(--fc-color-danger-border);
@@ -261,8 +261,8 @@
 .entry-image-add-ai__results {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.75rem;
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-md);
     background: var(--fc-color-bg-secondary);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
@@ -317,5 +317,5 @@
 .entry-image-add-ai__results-footer {
     display: flex;
     justify-content: flex-end;
-    padding-top: 0.25rem;
+    padding-top: var(--fc-space-xs);
 }

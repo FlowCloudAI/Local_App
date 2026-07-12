@@ -45,14 +45,14 @@
 }
 
 .license-modal-intro {
-    margin: 0 0 1rem;
+    margin: 0 0 var(--fc-space-lg);
     font-size: var(--fc-font-size-control, 0.875rem);
     line-height: 1.7;
     color: var(--fc-color-text);
 }
 
 .license-modal-section + .license-modal-section {
-    margin-top: 1rem;
+    margin-top: var(--fc-space-lg);
 }
 
 .license-modal-section-title {
@@ -73,7 +73,7 @@
 .license-modal-footer {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: var(--fc-space-sm);
     padding: 0.8rem 1.4rem 1.2rem;
     border-top: 1px solid var(--fc-color-border);
 }
