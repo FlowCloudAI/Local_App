@@ -77,7 +77,7 @@
 }
 
 .mobile-project-list__search .fc-input__field {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body);
     font-weight: var(--fc-font-weight-medium);
 }
 

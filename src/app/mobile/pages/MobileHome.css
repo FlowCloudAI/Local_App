@@ -106,7 +106,7 @@
 
 .mobile-home__search .fc-input__field,
 .mobile-home-worlds__search .fc-input__field {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body);
     font-weight: var(--fc-font-weight-medium);
 }
 
@@ -170,7 +170,7 @@
 
 .mobile-home__continue-title {
     color: var(--fc-color-text);
-    font-size: 1.25rem;
+    font-size: var(--fc-font-size-title-sm);
     font-weight: 740;
     line-height: 1.18;
 }

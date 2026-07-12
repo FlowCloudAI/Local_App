@@ -281,7 +281,7 @@
 .rg-layout-dialog__close {
     width: 28px;
     height: 28px;
-    font-size: 20px;
+    font-size: var(--fc-font-size-icon-xl);
     line-height: 1;
 }
 

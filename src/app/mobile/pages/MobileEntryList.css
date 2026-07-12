@@ -50,7 +50,7 @@
 }
 
 .mobile-entry-list__search .fc-input__field {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body);
     font-weight: var(--fc-font-weight-medium);
 }
 
@@ -253,7 +253,7 @@
 }
 
 .mobile-entry-card .fc-card__title {
-    font-size: 1rem;
+    font-size: var(--fc-font-size-body);
     font-weight: 720;
     line-height: 1.16;
 }
