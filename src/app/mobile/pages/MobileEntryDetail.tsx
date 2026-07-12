@@ -13,7 +13,7 @@ import {
     useRef,
     useState,
 } from 'react'
-import {Input, MarkdownEditor, type MarkdownEditorRef, Select, useAlert, useTheme} from 'flowcloudai-ui'
+import {type MarkdownEditorRef, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -41,16 +41,7 @@ import {
     entryTypeKey,
     type TagSchema,
 } from '../../../api'
-import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
-import TagCreator from '../../../features/entries/components/TagCreator'
-import {type MobileEntryDetailPageParams, type MobilePage} from '../usePageStack'
-import {type MobileTab} from '../MobileNav'
-import {
-    MobileBackIcon,
-    MobilePageTopBar,
-    MobileTopActionPill,
-} from '../components/MobileTopControls'
-import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import type {MobileEntryDetailProps as Props} from './MobileEntryDetailPageProps'
 import {
     findCategoryDuplicatedEntry,
     normalizeEntryLookupTitle,
@@ -79,10 +70,7 @@ import {
 } from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
-import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
-import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
 import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
-import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {type MobileMarkdownTool} from './MobileEntryMarkdownToolModel'
 import {transformMarkdownContent} from './MobileEntryMarkdownTransforms'
 import {
@@ -94,32 +82,10 @@ import {
     type TagValueMap,
 } from './MobileEntryDetailUtils'
 import {MobileEntryDetailView} from './MobileEntryDetailView'
-import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
-import {MobileEntryImagesSection} from './MobileEntryImagesSection'
-import {MobileEntryRelationsSection} from './MobileEntryRelationsSection'
-import {MobileEntryTagsSection} from './MobileEntryTagsSection'
+import MobileEntryDetailEditView, {type MobileWikiDraft, type MobileWikiOption} from './MobileEntryDetailEditView'
 import './MobileEntryDetail.css'
-
-interface Props {
-    push: (page: MobilePage) => void
-    pop: () => void
-    replace: (page: MobilePage) => void
-    navigateToTab: (tab: MobileTab, page?: MobilePage) => void
-    setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
-    setAiFocus: (focus: AiFocus) => void
-    params: MobileEntryDetailPageParams
-}
-
 type Mode = 'view' | 'edit'
-type MobileWikiDraft = { start: number; end: number; query: string }
-type MobileWikiOption =
-    | { kind: 'entry'; id: string; title: string; categoryId: string | null }
-    | { kind: 'create'; title: string }
 
-/**
- * 词条页：查看 / 编辑同屏（mode 切换），避免「详情 → 编辑」再多压一级。
- * params.mode === 'edit' 时（如新建词条后）直接进入编辑态。
- */
 export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeBack, setAiFocus, params}: Props) {
     const projectId = params.projectId
     const entryId = params.entryId ?? ''
@@ -758,288 +724,32 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     // ---------- 编辑态 ----------
     if (mode === 'edit') {
-        const categoryOptions = [
-            {value: '', label: '无分类'},
-            ...categories.map(c => ({value: c.id, label: c.name})),
-        ]
-        const typeOptions = [
-            {value: '', label: '无类型'},
-            ...entryTypes.map(et => ({value: entryTypeKey(et), label: et.name})),
-        ]
-        const editTagSchemas = entryTags.visibleTagSchemas
-        const wikiPanel = wikiDraft ? (
-            <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
-                <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
-                {wikiLinkOptions.length > 0 ? (
-                    <div className="mobile-entry-detail__wiki-options">
-                        {wikiLinkOptions.map((option, index) => {
-                            const active = index === activeWikiOptionIndex
-                            const isCreatingOption = option.kind === 'create'
-                            const optionKey = option.kind === 'entry'
-                                ? `entry-${option.id}`
-                                : `create-${option.title}`
-                            const categoryName = option.kind === 'entry' && option.categoryId
-                                ? categoryNameById.get(option.categoryId)
-                                : null
-                            return (
-                                <button
-                                    type="button"
-                                    key={optionKey}
-                                    role="option"
-                                    aria-selected={active}
-                                    className={`mobile-entry-detail__wiki-option${active ? ' is-active' : ''}${isCreatingOption ? ' mobile-entry-detail__wiki-option--create' : ''}`}
-                                    disabled={isCreatingOption && creatingLinkedEntry}
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onMouseEnter={() => setActiveWikiOptionIndex(index)}
-                                    onFocus={() => setActiveWikiOptionIndex(index)}
-                                    onClick={() => handleWikiOptionCommit(option)}
-                                >
-                                    <span className="mobile-entry-detail__wiki-option-title">
-                                        {option.kind === 'entry' ? option.title : `创建「${option.title}」`}
-                                    </span>
-                                    <span className="mobile-entry-detail__wiki-option-meta">
-                                        {option.kind === 'entry'
-                                            ? (categoryName ?? '未分类')
-                                            : (creatingLinkedEntry ? '创建中…' : '新词条')}
-                                    </span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                ) : (
-                    <div className="mobile-entry-detail__wiki-empty">没有匹配词条</div>
-                )}
-            </div>
-        ) : null
-        const markdownTextareaProps = {
+        const textareaProps = {
             onKeyDown: handleContentKeyDown,
             onKeyUp: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
             onClick: (event: ReactMouseEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
             onSelect: (event: ReactSyntheticEvent<HTMLTextAreaElement>) => syncWikiDraftFromTextarea(event.currentTarget),
-            onFocus: handleContentFocus,
-            onBlur: handleContentBlur,
+            onFocus: handleContentFocus, onBlur: handleContentBlur,
         }
-        return (
-            <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
-                <MobilePageTopBar
-                    className="mobile-entry-detail__edit-topbar"
-                    sticky
-                    edgeToEdge
-                    ariaLabel="词条编辑操作"
-                    left={<MobileTopActionPill
-                        actions={[{
-                            key: 'cancel',
-                            label: '取消编辑',
-                            icon: <MobileBackIcon/>,
-                            disabled: saving,
-                            onClick: () => void handleCancel(),
-                        }]}
-                    />}
-                    center={<div className="mobile-entry-detail__edit-heading">
-                        <span>编辑词条</span>
-                        <small>{saving ? '保存中…' : isDirty ? '有未保存修改' : '已同步'}</small>
-                    </div>}
-                    right={<MobileTopActionPill
-                        actions={[{
-                            key: 'save',
-                            label: saving ? '保存中' : '保存词条',
-                            icon: saving ? <MobileEntryDetailActionIcon type="more"/> : <MobileEntryDetailActionIcon type="save"/>,
-                            kind: 'add',
-                            disabled: saving,
-                            onClick: () => void handleSave(),
-                        }]}
-                    />}
-                />
-
-                <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--identity">
-                    <div className="mobile-entry-detail__section-header">
-                        <span>基础信息</span>
-                    </div>
-                    <Input
-                        placeholder="词条标题"
-                        value={title}
-                        onValueChange={setTitle}
-                        className="mobile-entry-detail__title-input"
-                    />
-
-                    <textarea
-                        placeholder="摘要（可选）"
-                        value={summary}
-                        onChange={event => setSummary(event.target.value)}
-                        className="mobile-entry-detail__summary-input"
-                        rows={3}
-                    />
-
-                    <div className="mobile-entry-detail__meta-row">
-                        <label className="mobile-entry-detail__field">
-                            <span>类型</span>
-                            <Select
-                                value={entryType ?? ''}
-                                onValueChange={v => setEntryType(v ? String(v) : null)}
-                                options={typeOptions}
-                                placeholder="类型"
-                                className="mobile-entry-detail__meta-select"
-                            />
-                        </label>
-                        <label className="mobile-entry-detail__field">
-                            <span>分类</span>
-                            <Select
-                                value={categoryId ?? ''}
-                                onValueChange={v => setCategoryId(v ? String(v) : null)}
-                                options={categoryOptions}
-                                placeholder="分类"
-                                className="mobile-entry-detail__meta-select"
-                            />
-                        </label>
-                    </div>
-
-                    <button
-                        type="button"
-                        className="mobile-entry-detail__add-type"
-                        onClick={() => setTypeCreatorOpen(true)}
-                    >
-                        + 新建类型
-                    </button>
-                </section>
-
-                <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
-                    <div className="mobile-entry-detail__section-header">
-                        <span>正文</span>
-                        <button
-                            type="button"
-                            className="mobile-entry-detail__section-action"
-                            onClick={() => setImmersiveEditorOpen(true)}
-                        >
-                            沉浸
-                        </button>
-                    </div>
-                    <div className="mobile-entry-detail__content-field">
-                        <MarkdownEditor
-                            ref={contentEditorRef}
-                            value={content}
-                            onValueChange={handleContentChange}
-                            placeholder="正文内容…输入 [[ 插入词条双链"
-                            minHeight={260}
-                            maxHeight={560}
-                            showSplitToggle={false}
-                            showAiButton={false}
-                            hideFullscreen
-                            toolbarCommands={[]}
-                            extraCommands={[]}
-                            textareaProps={markdownTextareaProps}
-                            tokens={{
-                                background: 'transparent',
-                                toolbarBackground: 'transparent',
-                                borderColor: 'transparent',
-                                editorTextBackground: 'transparent',
-                                previewBackground: 'transparent',
-                                textColor: 'var(--fc-color-text)',
-                                mutedTextColor: 'var(--fc-color-text-secondary)',
-                            }}
-                            className="mobile-entry-detail__content-input"
-                        />
-                        {!immersiveEditorOpen && wikiPanel}
-                    </div>
-                </section>
-
-                <MobileEntryImagesSection
-                    images={images}
-                    onAddImage={() => setImageAddModalOpen(true)}
-                    onOpenImage={(index) => {
-                        setLightboxIndex(index)
-                        setLightboxOpen(true)
-                    }}
-                />
-
-                <MobileEntryTagsSection
-                    hasTagDefinitions={entryTags.localTagSchemas.length > 0}
-                    availableTagSchemaOptions={entryTags.availableTagSchemaOptions}
-                    tagSchemaPickerValue={entryTags.tagSchemaPickerValue}
-                    editTagSchemas={editTagSchemas}
-                    tagDraft={tagDraft}
-                    onAddVisibleTagSchema={entryTags.handleAddVisibleTagSchema}
-                    onTagDraftChange={setTagDraft}
-                    onOpenTagCreator={() => setTagCreatorOpen(true)}
-                />
-
-                <MobileEntryRelationsSection
-                    relationDrafts={relationDrafts}
-                    entries={projectEntries}
-                    categories={categories}
-                    currentEntryId={entryId}
-                    disabled={saving}
-                    onChange={setRelationDrafts}
-                    onOpenEntry={(target) => {
-                        void (async () => {
-                            if (!await confirmDiscard()) return
-                            handleOpenLinkedEntry(target.id)
-                        })()
-                    }}
-                />
-
-                {immersiveEditorOpen && (
-                    <MobileEntryImmersiveEditor
-                        editorRef={immersiveContentEditorRef}
-                        content={content}
-                        textareaProps={markdownTextareaProps}
-                        wikiPanel={wikiPanel}
-                        isDirty={isDirty}
-                        saving={saving}
-                        onContentChange={handleContentChange}
-                        onClose={() => setImmersiveEditorOpen(false)}
-                        onSave={() => void handleSave()}
-                        onMarkdownTool={handleMarkdownTool}
-                    />
-                )}
-
-                <EntryTypeCreator
-                    open={typeCreatorOpen}
-                    projectId={projectId}
-                    existingNames={entryTypes.map(et => et.name)}
-                    onClose={() => setTypeCreatorOpen(false)}
-                    onSaved={(created) => void handleTypeCreated(created)}
-                />
-                <TagCreator
-                    open={tagCreatorOpen}
-                    projectId={projectId}
-                    entryTypes={entryTypes}
-                    existingNames={entryTags.localTagSchemas.map(s => s.name)}
-                    existingCount={entryTags.localTagSchemas.length}
-                    onClose={() => setTagCreatorOpen(false)}
-                    onSaved={handleTagSchemaSaved}
-                />
-                <EntryImageLightbox
-                    open={lightboxOpen}
-                    images={lightboxImages}
-                    currentIndex={lightboxIndex}
-                    infoTitle={title || entry.title || '未命名词条'}
-                    onClose={() => setLightboxOpen(false)}
-                    onIndexChange={setLightboxIndex}
-                    onSetCover={handleSetCover}
-                    onRemove={handleRemoveImage}
-                    onAddImage={() => {
-                        setLightboxOpen(false)
-                        setImageAddModalOpen(true)
-                    }}
-                    onInsertMarkdown={handleInsertImageMarkdown}
-                />
-                <EntryImageAddModal
-                    open={imageAddModalOpen}
-                    projectId={projectId}
-                    entryTitle={title || entry.title || null}
-                    entrySummary={summary || entry.summary || null}
-                    entryType={entryType || entry.type || null}
-                    existingImages={images}
-                    onClose={() => setImageAddModalOpen(false)}
-                    onUploadLocal={handleUploadImages}
-                    onAddAiImages={handleAddAiImages}
-                    onInsertImage={(image) => {
-                        const nextIndex = images.findIndex(item => item.path === image.path && item.url === image.url)
-                        handleInsertImageMarkdown(nextIndex >= 0 ? nextIndex : images.length)
-                    }}
-                />
-            </div>
-        )
+        return <MobileEntryDetailEditView
+            saving={saving} isDirty={isDirty} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
+            title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
+            entryType={entryType} onEntryType={setEntryType} categoryId={categoryId} onCategory={setCategoryId}
+            categories={categories} entryTypes={entryTypes} onOpenTypeCreator={() => setTypeCreatorOpen(true)}
+            content={content} editorRef={contentEditorRef} onContentChange={handleContentChange} textareaProps={textareaProps}
+            immersiveOpen={immersiveEditorOpen} onOpenImmersive={() => setImmersiveEditorOpen(true)}
+            wikiDraft={wikiDraft} wikiOptions={wikiLinkOptions} activeWikiIndex={activeWikiOptionIndex}
+            categoryNameById={categoryNameById} creatingLinkedEntry={creatingLinkedEntry}
+            onWikiIndex={setActiveWikiOptionIndex} onWikiCommit={handleWikiOptionCommit}
+            imagesProps={{images, onAddImage: () => setImageAddModalOpen(true), onOpenImage: index => { setLightboxIndex(index); setLightboxOpen(true) }}}
+            tagsProps={{hasTagDefinitions: entryTags.localTagSchemas.length > 0, availableTagSchemaOptions: entryTags.availableTagSchemaOptions, tagSchemaPickerValue: entryTags.tagSchemaPickerValue, editTagSchemas: entryTags.visibleTagSchemas, tagDraft, onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema, onTagDraftChange: setTagDraft, onOpenTagCreator: () => setTagCreatorOpen(true)}}
+            relationsProps={{relationDrafts, entries: projectEntries, categories, currentEntryId: entryId, disabled: saving, onChange: setRelationDrafts, onOpenEntry: target => void (async () => { if (await confirmDiscard()) handleOpenLinkedEntry(target.id) })()}}
+            immersiveProps={{editorRef: immersiveContentEditorRef, content, textareaProps, isDirty, saving, onContentChange: handleContentChange, onClose: () => setImmersiveEditorOpen(false), onSave: () => void handleSave(), onMarkdownTool: handleMarkdownTool}}
+            typeCreatorProps={{open: typeCreatorOpen, projectId, existingNames: entryTypes.map(type => type.name), onClose: () => setTypeCreatorOpen(false), onSaved: created => void handleTypeCreated(created)}}
+            tagCreatorProps={{open: tagCreatorOpen, projectId, entryTypes, existingNames: entryTags.localTagSchemas.map(schema => schema.name), existingCount: entryTags.localTagSchemas.length, onClose: () => setTagCreatorOpen(false), onSaved: handleTagSchemaSaved}}
+            lightboxProps={{open: lightboxOpen, images: lightboxImages, currentIndex: lightboxIndex, infoTitle: title || entry.title || '未命名词条', onClose: () => setLightboxOpen(false), onIndexChange: setLightboxIndex, onSetCover: handleSetCover, onRemove: handleRemoveImage, onAddImage: () => { setLightboxOpen(false); setImageAddModalOpen(true) }, onInsertMarkdown: handleInsertImageMarkdown}}
+            imageAddProps={{open: imageAddModalOpen, projectId, entryTitle: title || entry.title || null, entrySummary: summary || entry.summary || null, entryType: entryType || entry.type || null, existingImages: images, onClose: () => setImageAddModalOpen(false), onUploadLocal: handleUploadImages, onAddAiImages: handleAddAiImages, onInsertImage: image => { const index = images.findIndex(item => item.path === image.path && item.url === image.url); handleInsertImageMarkdown(index >= 0 ? index : images.length) }}}
+        />
     }
 
     // ---------- 查看态 ----------

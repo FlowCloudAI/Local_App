@@ -16,13 +16,11 @@ import {
     subscribeAppSettings,
 } from '../../../features/settings/appSettingsStore'
 import {
-    CONVERSATION_TEMPERATURE_MAX,
     normalizeConversationSettings,
     type AiToolAccessMode,
     type Conversation,
     type ConversationSettings,
 } from '../../../features/ai-chat/model/AiControllerTypes'
-import AiToolAccessIcon from '../../../features/ai-chat/components/AiToolAccessIcon'
 import {
     ai_export_conversation,
     type ConversationExportFormat,
@@ -31,267 +29,42 @@ import {
     toApiError,
 } from '../../../api'
 import {logger} from '../../../shared/logger'
-import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import {type MobileTab} from '../MobileNav'
 import {
-    MobileAnchoredMenu,
-    MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
     MobilePageTopBar,
     MobileTopActionPill,
     MobileTopIconButton,
 } from '../components/MobileTopControls'
-import MobileBottomSheet from '../components/MobileBottomSheet'
+import MobileAiConversationControls from './MobileAiConversationControls'
+import MobileAiConversationDrawer from './MobileAiConversationDrawer'
+import MobileAiComposer from './MobileAiComposer'
+import {
+    AI_DOCUMENT_CONTEXT_EXTENSIONS,
+    AI_DOCUMENT_CONTEXT_EXTENSION_SET,
+    AI_TOOL_ACCESS_DETAILS,
+    AI_TOOL_ACCESS_LABELS,
+    AI_TOOL_ACCESS_OPTIONS,
+    buildConversationExportFileName,
+    buildConversationSearchText,
+    CONVERSATION_LONG_PRESS_DELAY,
+    CONVERSATION_LONG_PRESS_MOVE_TOLERANCE,
+    getSelectedFileExtension,
+    matchesConversationFilter,
+    MobileAiIcon,
+    sortConversations,
+    type AiConversationFilter,
+    type AiConversationStatusFilter,
+    type ApiKeyAvailability,
+    type ConversationLongPressState,
+} from './MobileAiChatUi'
 import './MobileAiChat.css'
-
 interface Props {
     aiFocus: AiFocus
     navigateToTab: (tab: MobileTab) => void
     conversationDrawerOpen?: boolean
     onOpenConversationDrawer?: () => void
     onCloseConversationDrawer?: () => void
-}
-
-type ApiKeyAvailability = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
-type AiConversationFilter = 'all' | 'default' | 'character' | 'report'
-type AiConversationStatusFilter = 'active' | 'archived'
-
-interface ConversationLongPressState {
-    conversation: Conversation
-    ready: boolean
-    timerId: number | null
-}
-
-const CONVERSATION_LONG_PRESS_DELAY = 430
-const CONVERSATION_LONG_PRESS_MOVE_TOLERANCE = 12
-const AI_DOCUMENT_CONTEXT_EXTENSIONS = [
-    'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml',
-    'ini', 'log', 'js', 'ts', 'jsx', 'tsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h',
-    'hpp', 'cs', 'php', 'rb', 'swift', 'kt', 'sql', 'html', 'htm', 'css', 'scss', 'less',
-    'sh', 'bat', 'ps1', 'env', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf',
-]
-const AI_DOCUMENT_CONTEXT_EXTENSION_SET = new Set(AI_DOCUMENT_CONTEXT_EXTENSIONS)
-
-function getSelectedFileExtension(path: string): string {
-    const decoded = (() => {
-        try {
-            return decodeURIComponent(path)
-        } catch {
-            return path
-        }
-    })()
-    const cleanPath = decoded.split(/[?#]/, 1)[0]
-    const fileName = cleanPath.split(/[\\/]/).pop() ?? cleanPath
-    const dotIndex = fileName.lastIndexOf('.')
-    return dotIndex >= 0 ? fileName.slice(dotIndex + 1).toLocaleLowerCase() : ''
-}
-
-function formatConversationDate(timestamp: number): string {
-    if (!timestamp) return '时间未知'
-    return new Intl.DateTimeFormat('zh-CN', {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(new Date(timestamp))
-}
-
-function sortConversations(first: Conversation, second: Conversation): number {
-    const pinnedDiff = Number(Boolean(second.pinnedAt)) - Number(Boolean(first.pinnedAt))
-    if (pinnedDiff !== 0) return pinnedDiff
-    if (first.pinnedAt && second.pinnedAt) return second.pinnedAt.localeCompare(first.pinnedAt)
-    return (second.timestamp ?? 0) - (first.timestamp ?? 0)
-}
-
-const AI_TOOL_ACCESS_LABELS: Record<AiToolAccessMode, string> = {
-    reader: '读者模式',
-    assistant: '助手模式',
-    writer: '作家模式',
-}
-
-const AI_TOOL_ACCESS_DETAILS: Record<AiToolAccessMode, string> = {
-    reader: '只读取资料',
-    assistant: '写入前确认',
-    writer: '常规写入跳过确认',
-}
-
-const AI_TOOL_ACCESS_OPTIONS: AiToolAccessMode[] = ['reader', 'assistant', 'writer']
-
-const AI_CONVERSATION_FILTER_OPTIONS: Array<{key: AiConversationFilter; label: string}> = [
-    {key: 'all', label: '全部'},
-    {key: 'default', label: '通用'},
-    {key: 'character', label: '角色聊天'},
-    {key: 'report', label: '矛盾检测'},
-]
-
-const AI_CONVERSATION_STATUS_OPTIONS: Array<{key: AiConversationStatusFilter; label: string}> = [
-    {key: 'active', label: '当前'},
-    {key: 'archived', label: '归档'},
-]
-
-function matchesConversationFilter(conversation: Conversation, filter: AiConversationFilter): boolean {
-    if (filter === 'all') return true
-    if (filter === 'default') return !conversation.mode || conversation.mode === 'default'
-    if (filter === 'character') return conversation.mode === 'character'
-    if (filter === 'report') return conversation.mode === 'report'
-    return false
-}
-
-function buildConversationSearchText(conversation: Conversation): string {
-    return [
-        conversation.title,
-        conversation.characterName,
-        conversation.reportContext?.projectName,
-        conversation.reportContext?.scopeSummary,
-    ].filter(Boolean).join(' ').toLocaleLowerCase()
-}
-
-function buildConversationExportFileName(conversation: Conversation, format: ConversationExportFormat): string {
-    const extension = format === 'json' ? 'json' : 'md'
-    const safeTitle = conversation.title
-        .split('')
-        .map(char => (char.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(char) ? '_' : char))
-        .join('')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 80)
-    return `${safeTitle || 'AI会话'}.${extension}`
-}
-
-function MobileAiIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking' | AiToolAccessMode}) {
-    if (type === 'menu') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M5 7h14"/>
-                <path d="M5 12h14"/>
-                <path d="M5 17h14"/>
-            </svg>
-        )
-    }
-    if (type === 'pin') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M12 17v5"/>
-                <path d="M8.5 10.8 6.2 13.1A1.7 1.7 0 0 0 7.4 16h9.2a1.7 1.7 0 0 0 1.2-2.9l-2.3-2.3V6.5l1.5-1.5H7l1.5 1.5Z"/>
-            </svg>
-        )
-    }
-    if (type === 'archive') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M5 7.5h14"/>
-                <path d="M7 8.5v10h10v-10"/>
-                <path d="M9.5 12h5"/>
-                <path d="M6.5 4.5h11l1.5 3h-13Z"/>
-            </svg>
-        )
-    }
-    if (type === 'rename') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M4.5 16.5 15.8 5.2a2.1 2.1 0 0 1 3 3L7.5 19.5h-3Z"/>
-                <path d="m14 7 3 3"/>
-            </svg>
-        )
-    }
-    if (type === 'delete') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M5.5 7h13"/>
-                <path d="M9 7V5.5h6V7"/>
-                <path d="M8 10v8"/>
-                <path d="M12 10v8"/>
-                <path d="M16 10v8"/>
-                <path d="M7 7.5 8 20h8l1-12.5"/>
-            </svg>
-        )
-    }
-    if (type === 'plugin') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M8.5 4.5h7v5.5h4v6h-4v5.5h-7V16h-4v-6h4Z"/>
-            </svg>
-        )
-    }
-    if (type === 'camera') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M8.5 7 10 5h4l1.5 2H18a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/>
-                <circle cx="12" cy="13" r="3.2"/>
-            </svg>
-        )
-    }
-    if (type === 'image') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <rect x="4" y="5" width="16" height="14" rx="2.5"/>
-                <path d="m7 16 3.5-3.5 2.5 2.5 2-2 3 3"/>
-                <path d="M8.5 9.5h.1"/>
-            </svg>
-        )
-    }
-    if (type === 'file') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M7 4.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V6A1.5 1.5 0 0 1 7.5 4.5Z"/>
-                <path d="M14 4.5V9h4"/>
-                <path d="M8.5 13h7"/>
-                <path d="M8.5 16h5"/>
-            </svg>
-        )
-    }
-    if (type === 'web') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <circle cx="12" cy="12" r="8.5"/>
-                <path d="M4.5 12h17"/>
-                <path d="M12 3.5c2.2 2.4 3.2 5.3 3.2 8.5s-1 6.1-3.2 8.5"/>
-                <path d="M12 3.5C9.8 5.9 8.8 8.8 8.8 12s1 6.1 3.2 8.5"/>
-            </svg>
-        )
-    }
-    if (type === 'thinking') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M12 3.5 9 11h4l-1 9.5 4-11h-4Z"/>
-            </svg>
-        )
-    }
-    if (type === 'reader' || type === 'assistant' || type === 'writer') {
-        return <AiToolAccessIcon mode={type} className="mobile-ai-svg"/>
-    }
-    if (type === 'stop') {
-        return (
-            <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-                <rect x="8" y="8" width="8" height="8" rx="1.5"/>
-            </svg>
-        )
-    }
-    return (
-        <svg className="mobile-ai-svg" viewBox="0 0 24 24" focusable="false">
-            <path d="M12 20V4"/>
-            <path d="M4.5 11.5L12 4l7.5 7.5"/>
-        </svg>
-    )
-}
-
-function MoreDotsIcon() {
-    return (
-        <svg className="mobile-ai-drawer__more-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <circle cx="6" cy="12" r="1.55"/>
-            <circle cx="12" cy="12" r="1.55"/>
-            <circle cx="18" cy="12" r="1.55"/>
-        </svg>
-    )
-}
-
-function SearchIcon() {
-    return (
-        <svg className="mobile-ai-drawer__search-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="5.8"/>
-            <path d="m15 15 4.5 4.5"/>
-        </svg>
-    )
 }
 
 export default function MobileAiChat({
@@ -880,192 +653,27 @@ export default function MobileAiChat({
         },
     ] : []
 
-    const conversationControls = (
-        <div className="mobile-ai-settings-card" aria-label="对话设置">
-            <div className="mobile-ai-settings-grid">
-                <label className="mobile-ai-setting-field">
-                    <span>温度</span>
-                    <input
-                        type="number"
-                        min={0}
-                        max={CONVERSATION_TEMPERATURE_MAX}
-                        step={0.1}
-                        value={conversationSettings.temperature}
-                        disabled={!activeConversation}
-                        onChange={event => updateConversationSetting('temperature', Number(event.currentTarget.value))}
-                    />
-                </label>
-                <label className="mobile-ai-setting-field">
-                    <span>回答开放度</span>
-                    <input
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        value={conversationSettings.topP}
-                        disabled={!activeConversation}
-                        onChange={event => updateConversationSetting('topP', Number(event.currentTarget.value))}
-                    />
-                </label>
-            </div>
-            <div className="mobile-ai-setting-penalty-grid">
-                <div className="mobile-ai-setting-penalty-card">
-                    <label className="mobile-ai-setting-field mobile-ai-setting-penalty-field">
-                        <span>
-                            <strong>重复惩罚</strong>
-                            <small>0 为关闭</small>
-                        </span>
-                        <input
-                            type="number"
-                            min={-2}
-                            max={2}
-                            step={0.1}
-                            value={conversationSettings.frequencyPenalty}
-                            disabled={!activeConversation}
-                            onChange={event => updatePenaltySetting('frequencyPenalty', Number(event.currentTarget.value))}
-                        />
-                    </label>
-                </div>
-                <div className="mobile-ai-setting-penalty-card">
-                    <label className="mobile-ai-setting-field mobile-ai-setting-penalty-field">
-                        <span>
-                            <strong>存在惩罚</strong>
-                            <small>0 为关闭</small>
-                        </span>
-                        <input
-                            type="number"
-                            min={-2}
-                            max={2}
-                            step={0.1}
-                            value={conversationSettings.presencePenalty}
-                            disabled={!activeConversation}
-                            onChange={event => updatePenaltySetting('presencePenalty', Number(event.currentTarget.value))}
-                        />
-                    </label>
-                </div>
-            </div>
-            <label className="mobile-ai-setting-prompt">
-                <span>当前对话独有提示词</span>
-                <textarea
-                    value={conversationSettings.systemPrompt}
-                    disabled={!activeConversation}
-                    onChange={event => updateConversationSetting('systemPrompt', event.currentTarget.value)}
-                    placeholder="例如：保持回答简洁，优先延续当前世界观设定。"
-                />
-            </label>
-        </div>
-    )
+    const conversationControls = <MobileAiConversationControls
+        disabled={!activeConversation}
+        settings={conversationSettings}
+        onTemperature={value => updateConversationSetting('temperature', value)}
+        onTopP={value => updateConversationSetting('topP', value)}
+        onFrequencyPenalty={value => updatePenaltySetting('frequencyPenalty', value)}
+        onPresencePenalty={value => updatePenaltySetting('presencePenalty', value)}
+        onSystemPrompt={value => updateConversationSetting('systemPrompt', value)}
+    />
+    const conversationDrawer = <MobileAiConversationDrawer
+        search={conversationSearch} onSearch={setConversationSearch}
+        statusFilter={conversationStatusFilter} onStatusFilter={setConversationStatusFilter}
+        filter={conversationFilter} onFilter={setConversationFilter}
+        creationDisabled={conversationCreationDisabled} onNew={() => void handleNewConv()}
+        conversations={conversations} visibleConversations={visibleConversations} hasSearch={hasConversationSearch}
+        runtime={conversationRuntime} activeConversationId={activeConversationId}
+        getLongPressProps={bindConversationLongPress} onOpen={handleConversationItemClick}
+        onContextMenu={handleConversationContextMenu} actionTarget={conversationActionTarget}
+        onActionTarget={setConversationActionTarget}
+    />
 
-    const conversationDrawer = (
-        <aside className="mobile-ai-drawer" aria-label="对话列表">
-            <label className="mobile-ai-drawer__search">
-                <SearchIcon/>
-                <input
-                    value={conversationSearch}
-                    onChange={event => setConversationSearch(event.currentTarget.value)}
-                    placeholder="搜索对话..."
-                />
-            </label>
-            <div className="mobile-ai-drawer__filter-groups">
-                <div className="mobile-ai-drawer__filter-group">
-                    <span>状态</span>
-                    <div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话状态">
-                        {AI_CONVERSATION_STATUS_OPTIONS.map(option => (
-                            <button
-                                key={option.key}
-                                type="button"
-                                className={conversationStatusFilter === option.key ? 'active' : ''}
-                                aria-pressed={conversationStatusFilter === option.key}
-                                onClick={() => setConversationStatusFilter(option.key)}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                <div className="mobile-ai-drawer__filter-group">
-                    <span>类型</span>
-                    <div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话类型">
-                        {AI_CONVERSATION_FILTER_OPTIONS.map(option => (
-                            <button
-                                key={option.key}
-                                type="button"
-                                className={conversationFilter === option.key ? 'active' : ''}
-                                aria-pressed={conversationFilter === option.key}
-                                onClick={() => setConversationFilter(option.key)}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                <button
-                    type="button"
-                    className="mobile-ai-drawer__new"
-                    disabled={conversationCreationDisabled}
-                    onClick={() => void handleNewConv()}
-                >
-                    <span aria-hidden="true">+</span>
-                    <span>新对话</span>
-                </button>
-            </div>
-            <div className="mobile-ai-drawer__list">
-                {visibleConversations.length === 0 ? (
-                    <div className="mobile-ai-drawer__empty">
-                        {conversations.length === 0
-                            ? '暂无历史对话'
-                            : hasConversationSearch
-                                ? '没有匹配的对话'
-                                : conversationStatusFilter === 'archived'
-                                    ? '暂无归档对话'
-                                    : '当前类型下没有对话'}
-                    </div>
-                ) : visibleConversations.map(conversation => {
-                    const runtime = conversationRuntime[conversation.id]
-                    const isConversationStreaming = Boolean(runtime?.isStreaming)
-                    const hasUnreadReply = Boolean(runtime?.hasUnreadReply)
-                    const tags = [
-                        conversation.pinnedAt ? '已顶置' : null,
-                        conversation.archivedAt ? '已归档' : null,
-                        conversation.mode === 'character' ? '角色对话' : null,
-                        conversation.mode === 'report' ? '矛盾检测' : null,
-                    ].filter(Boolean).join(' · ')
-                    return (
-                        <div
-                            key={conversation.id}
-                            className={`mobile-ai-drawer__item${conversation.id === activeConversationId ? ' active' : ''}${conversation.mode === 'character' ? ' is-character' : ''}${conversation.mode === 'report' ? ' is-report' : ''}${conversation.pinnedAt ? ' is-pinned' : ''}${conversation.archivedAt ? ' is-archived' : ''}${isConversationStreaming ? ' is-streaming' : ''}${hasUnreadReply ? ' has-unread-reply' : ''}`}
-                        >
-                            <button
-                                type="button"
-                                className="mobile-ai-drawer__item-content"
-                                {...bindConversationLongPress(conversation)}
-                                onClick={() => handleConversationItemClick(conversation.id)}
-                                onContextMenu={event => handleConversationContextMenu(conversation, event)}
-                            >
-                                <span className="mobile-ai-drawer__item-main">
-                                    <strong>{conversation.title}</strong>
-                                    {tags ? <small>{tags}</small> : null}
-                                </span>
-                                <span className="mobile-ai-drawer__item-meta">
-                                    {formatConversationDate(conversation.timestamp)}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                className="mobile-ai-drawer__item-more"
-                                aria-label={`打开「${conversation.title}」的操作菜单`}
-                                aria-haspopup="menu"
-                                aria-expanded={conversationActionTarget?.id === conversation.id}
-                                onClick={() => setConversationActionTarget(conversation)}
-                            >
-                                <MoreDotsIcon/>
-                            </button>
-                        </div>
-                    )
-                })}
-            </div>
-        </aside>
-    )
 
     return (
         <div ref={pageRef} className="mobile-ai-chat">
@@ -1165,278 +773,27 @@ export default function MobileAiChat({
                 <div ref={messagesEndRef}/>
             </main>
 
-            <footer className="mobile-ai-chat__composer">
-                <div className="mobile-ai-composer-card">
-                    <textarea
-                        value={inputValue}
-                        onChange={event => setInputValue(event.target.value)}
-                        onKeyDown={event => {
-                            if (event.key === 'Enter' && !event.shiftKey) {
-                                event.preventDefault()
-                                void handleSend()
-                            }
-                        }}
-                        placeholder={inputPlaceholder}
-                        rows={1}
-                        disabled={inputDisabled && !isStreaming}
-                    />
-                    <div className="mobile-ai-composer-card__bar">
-                        <div className="mobile-ai-composer-card__chips">
-                            <button
-                                type="button"
-                                className={`mobile-ai-composer-card__chip${sessionParams.thinking ? ' active' : ''}`}
-                                disabled={isStreaming}
-                                onClick={() => setSessionParams(current => ({...current, thinking: !current.thinking}))}
-                            >
-                                <MobileAiIcon type="thinking"/>
-                                <span>思考</span>
-                            </button>
-                            <button
-                                ref={toolModeMenuRef}
-                                type="button"
-                                className={`mobile-ai-composer-card__chip mobile-ai-composer-card__chip--mode active${toolAccessMode === 'reader' ? ' is-reader' : ''}${toolAccessMode === 'writer' ? ' is-writer' : ''}${toolModeMenuOpen ? ' is-menu-open' : ''}`}
-                                aria-haspopup="menu"
-                                aria-expanded={toolModeMenuOpen}
-                                aria-label={`切换写入模式，当前为${AI_TOOL_ACCESS_LABELS[toolAccessMode]}`}
-                                disabled={isStreaming}
-                                onClick={() => {
-                                    closeModelMenu()
-                                    setTopMenuOpen(false)
-                                    setToolModeMenuOpen(open => !open)
-                                }}
-                            >
-                                <MobileAiIcon type={toolAccessMode}/>
-                                <span>{activeToolModeShortLabel}</span>
-                            </button>
-                        </div>
-                        <div className="mobile-ai-composer-card__actions">
-                            <button
-                                type="button"
-                                className="mobile-ai-composer-card__icon-btn"
-                                aria-label="更多"
-                                aria-expanded={morePanelOpen}
-                                onClick={morePanelOpen ? closeMorePanel : openMorePanel}
-                            >
-                                +
-                            </button>
-                            <button
-                                type="button"
-                                className="mobile-ai-composer-card__icon-btn mobile-ai-composer-card__icon-btn--send"
-                                aria-label={isStreaming ? '停止生成' : '发送'}
-                                onClick={isStreaming ? stopStreaming : () => void handleSend()}
-                                disabled={!isStreaming && (!inputValue.trim() || inputDisabled)}
-                            >
-                                <MobileAiIcon type={isStreaming ? 'stop' : 'send'}/>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </footer>
-
-            <MobileAnchoredMenu
-                open={toolModeMenuOpen}
-                onClose={() => setToolModeMenuOpen(false)}
-                anchorRef={toolModeMenuRef}
-                containerRef={pageRef}
-                ariaLabel="切换写入模式"
-                className="mobile-ai-tool-mode-menu"
-                align="left"
-                placement="top"
-            >
-                <div className="mobile-anchored-menu__group">
-                    {toolModeOptions.map(option => (
-                        <button
-                            key={option.mode}
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={toolAccessMode === option.mode}
-                            className={`mobile-anchored-menu__row mobile-ai-tool-mode-menu__row mobile-ai-tool-mode-menu__row--${option.mode}${toolAccessMode === option.mode ? ' active' : ''}`}
-                            disabled={isStreaming}
-                            onClick={() => {
-                                setToolModeMenuOpen(false)
-                                void handleToolModeChange(option.mode)
-                            }}
-                        >
-                            <span className="mobile-anchored-menu__icon" aria-hidden="true">
-                                <MobileAiIcon type={option.mode}/>
-                            </span>
-                            <span className="mobile-anchored-menu__text">
-                                <span>{option.label}</span>
-                                <small>{option.description}</small>
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            </MobileAnchoredMenu>
-
-            <MobileAnchoredMenu
-                open={modelMenuOpen}
-                onClose={closeModelMenu}
-                anchorRef={modelMenuRef}
-                containerRef={pageRef}
-                ariaLabel={modelMenuMode === 'plugins' ? '切换 AI 插件' : '切换 AI 模型'}
-                className="mobile-ai-model-menu"
-                align="left"
-                rightBoundaryRef={topActionsRef}
-                rightBoundaryGap={8}
-            >
-                {modelMenuMode === 'models' ? (
-                    <div className="mobile-anchored-menu__group">
-                        <button
-                            type="button"
-                            role="menuitem"
-                            className="mobile-anchored-menu__row mobile-ai-model-menu__row"
-                            disabled={plugins.length === 0}
-                            onClick={() => setModelMenuMode('plugins')}
-                        >
-                            <span className="mobile-anchored-menu__check" aria-hidden="true"/>
-                            <span className="mobile-anchored-menu__icon" aria-hidden="true">
-                                <MobileAiIcon type="plugin"/>
-                            </span>
-                            <span className="mobile-anchored-menu__text">
-                                <span>切换插件</span>
-                                <small>{activeLlmPluginName}</small>
-                            </span>
-                        </button>
-                        <div className="mobile-ai-model-menu__divider" role="presentation"/>
-                        {activeModelOptions.length === 0 ? (
-                            <button
-                                type="button"
-                                role="menuitem"
-                                className="mobile-anchored-menu__row mobile-ai-model-menu__row"
-                                disabled
-                            >
-                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__text">
-                                    <span>没有可用模型</span>
-                                    <small>请先在设置中配置插件</small>
-                                </span>
-                            </button>
-                        ) : activeModelOptions.map(model => (
-                            <button
-                                key={model.id}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={model.id === activeModelId}
-                                className={`mobile-anchored-menu__row mobile-ai-model-menu__row${model.id === activeModelId ? ' active' : ''}`}
-                                disabled={isStreaming}
-                                onClick={() => void handleSelectModel(model.id)}
-                            >
-                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__text">
-                                    <span>{model.label}</span>
-                                    {model.description ? <small>{model.description}</small> : null}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="mobile-anchored-menu__group">
-                        {plugins.length === 0 ? (
-                            <button
-                                type="button"
-                                role="menuitem"
-                                className="mobile-anchored-menu__row mobile-ai-model-menu__row"
-                                disabled
-                            >
-                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__text">
-                                    <span>没有可用插件</span>
-                            <small>请先在设置中安装 AI 对话插件</small>
-                                </span>
-                            </button>
-                        ) : plugins.map(plugin => {
-                            const nextModel = plugin.default_model && plugin.models.includes(plugin.default_model)
-                                ? plugin.default_model
-                                : (plugin.models[0] ?? '')
-                            return (
-                                <button
-                                    key={plugin.id}
-                                    type="button"
-                                    role="menuitemradio"
-                                    aria-checked={plugin.id === activeLlmPluginId}
-                                    className={`mobile-anchored-menu__row mobile-ai-model-menu__row${plugin.id === activeLlmPluginId ? ' active' : ''}`}
-                                    disabled={isStreaming || !nextModel}
-                                    onClick={() => void handleSelectPlugin(plugin.id)}
-                                >
-                                    <span className="mobile-anchored-menu__check" aria-hidden="true"/>
-                                    <span className="mobile-anchored-menu__icon" aria-hidden="true">
-                                        <MobileAiIcon type="plugin"/>
-                                    </span>
-                                    <span className="mobile-anchored-menu__text">
-                                        <span>{plugin.name}</span>
-                                        <small>{nextModel || '没有可用模型'}</small>
-                                    </span>
-                                </button>
-                            )
-                        })}
-                    </div>
-                )}
-            </MobileAnchoredMenu>
-
-            <MobileAnchoredActionMenu
-                open={topMenuOpen}
-                onClose={() => setTopMenuOpen(false)}
-                anchorRef={topActionsRef}
-                containerRef={pageRef}
-                ariaLabel="对话操作"
-                items={activeConversationMenuItems}
-            />
-
-            <MobileBottomSheet
-                open={morePanelOpen}
-                onClose={closeMorePanel}
-                ariaLabel="更多对话设置"
-                className="mobile-ai-more-sheet"
-            >
-                <div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
-                    <button type="button" onClick={() => handleUnavailableMobileAiTool('相机')}>
-                        <MobileAiIcon type="camera"/>
-                        <span>相机</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => void showAlert('当前 AI 对话还不支持图片作为模型输入。', 'info', 'nonInvasive', 1800)}
-                    >
-                        <MobileAiIcon type="image"/>
-                        <span>图库</span>
-                    </button>
-                    <button type="button" onClick={() => void handleAttachDocuments()}>
-                        <MobileAiIcon type="file"/>
-                        <span>文件</span>
-                    </button>
-                    <button
-                        type="button"
-                        className={webSearchEnabled ? 'active' : ''}
-                        aria-pressed={webSearchEnabled}
-                        onClick={() => void toggleWebSearch()}
-                    >
-                        <MobileAiIcon type="web"/>
-                        <span>联网搜索</span>
-                    </button>
-                </div>
-                {conversationControls}
-            </MobileBottomSheet>
-
-            <ActionMenu
-                open={!!conversationActionTarget}
-                onClose={() => setConversationActionTarget(null)}
-                title={conversationActionTarget?.title}
-                ariaLabel="对话操作菜单"
-                items={conversationActionMenuItems}
-            />
-
-            <RenameDialog
-                open={!!renameTarget}
-                title="重命名对话"
-                initialValue={renameTarget?.title ?? ''}
-                placeholder="对话名称"
-                busy={renaming}
-                onClose={() => setRenameTarget(null)}
-                onConfirm={(title) => void handleRenameConfirm(title)}
+            <MobileAiComposer
+                pageRef={pageRef} topActionsRef={topActionsRef} toolModeMenuRef={toolModeMenuRef} modelMenuRef={modelMenuRef}
+                inputValue={inputValue} onInput={setInputValue} onSend={() => void handleSend()} inputPlaceholder={inputPlaceholder} inputDisabled={inputDisabled}
+                isStreaming={isStreaming} onStop={stopStreaming} thinking={sessionParams.thinking}
+                onToggleThinking={() => setSessionParams(current => ({...current, thinking: !current.thinking}))}
+                toolAccessMode={toolAccessMode} activeToolModeShortLabel={activeToolModeShortLabel}
+                toolModeMenuOpen={toolModeMenuOpen} onToolModeMenuOpen={setToolModeMenuOpen}
+                onBeforeToolModeMenuOpen={() => { closeModelMenu(); setTopMenuOpen(false) }}
+                toolModeOptions={toolModeOptions} onToolModeChange={mode => void handleToolModeChange(mode)}
+                morePanelOpen={morePanelOpen} onOpenMore={openMorePanel} onCloseMore={closeMorePanel}
+                modelMenuOpen={modelMenuOpen} onCloseModelMenu={closeModelMenu} modelMenuMode={modelMenuMode} onModelMenuMode={setModelMenuMode}
+                plugins={plugins} activeLlmPluginName={activeLlmPluginName} activeLlmPluginId={activeLlmPluginId}
+                activeModelOptions={activeModelOptions} activeModelId={activeModelId}
+                onSelectModel={modelId => void handleSelectModel(modelId)} onSelectPlugin={pluginId => void handleSelectPlugin(pluginId)}
+                topMenuOpen={topMenuOpen} onCloseTopMenu={() => setTopMenuOpen(false)} activeConversationMenuItems={activeConversationMenuItems}
+                onUnavailable={handleUnavailableMobileAiTool}
+                onGallery={() => void showAlert('当前 AI 对话还不支持图片作为模型输入。', 'info', 'nonInvasive', 1800)}
+                onAttachDocuments={() => void handleAttachDocuments()} webSearchEnabled={webSearchEnabled} onToggleWebSearch={() => void toggleWebSearch()}
+                conversationControls={conversationControls} conversationActionTarget={conversationActionTarget}
+                onCloseConversationAction={() => setConversationActionTarget(null)} conversationActionMenuItems={conversationActionMenuItems}
+                renameTarget={renameTarget} renaming={renaming} onCloseRename={() => setRenameTarget(null)} onRename={title => void handleRenameConfirm(title)}
             />
         </div>
     )

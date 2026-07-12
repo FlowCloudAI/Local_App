@@ -8,7 +8,7 @@ import {
     useState,
 } from 'react'
 import {useDrag} from '@use-gesture/react'
-import {Button, Input, useAlert} from 'flowcloudai-ui'
+import {Input, useAlert} from 'flowcloudai-ui'
 import {logger} from '../../../shared/logger'
 import {
     db_cascade_delete_category,
@@ -20,10 +20,33 @@ import {
     type CategoryCascadeDeleteResult,
     type ProjectStats,
 } from '../../../api'
-import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import MobileCategoryDrawerDialogs from './MobileCategoryDrawerDialogs'
+import {
+    buildAllRows,
+    buildChildrenMap,
+    buildVisibleRows,
+    collectDescendantIds,
+    DragHandleIcon,
+    dropTargetSignature,
+    getEntryCountMap,
+    getGesturePointerId,
+    getGesturePointerType,
+    getSortedSiblings,
+    HomeIcon,
+    parentKey,
+    ROW_DRAG_START_DISTANCE,
+    ROW_DRAG_VERTICAL_DOMINANCE,
+    SearchIcon,
+    TreeIcon,
+    type CategoryDragSource,
+    type CategoryDragState,
+    type CategoryDropTarget,
+    type DeleteMode,
+    type DragDropPosition,
+    type RenameTarget,
+    type SiblingDirection,
+} from './mobileCategoryTree'
 import './MobileCategoryDrawer.css'
-
-const ROOT_PARENT_KEY = '__root__'
 
 export type MobileCategoryDrawerSelection =
     | {kind: 'projectHome'}
@@ -38,201 +61,6 @@ interface Props {
     selected: MobileCategoryDrawerSelection
     onSelect: (selection: MobileCategoryDrawerSelection, label: string) => void
     onChanged?: () => void | Promise<void>
-}
-
-interface CategoryRow {
-    category: Category
-    depth: number
-}
-
-type RenameTarget =
-    | {mode: 'create'; parentId: string | null}
-    | {mode: 'rename'; category: Category}
-
-type DeleteMode = 'empty' | 'lift' | 'cascade'
-type SiblingDirection = 'up' | 'down'
-type DragDropPosition = 'before' | 'after' | 'into'
-type CategoryDragSource = 'row' | 'handle'
-
-const ROW_DRAG_START_DISTANCE = 10
-const ROW_DRAG_VERTICAL_DOMINANCE = 1.12
-
-interface CategoryDragState {
-    pointerId: number | string
-    categoryId: string
-    source: CategoryDragSource
-    active: boolean
-}
-
-interface CategoryDropTarget {
-    targetId: string
-    position: DragDropPosition
-}
-
-function dropTargetSignature(target: CategoryDropTarget | null): string {
-    return target ? `${target.targetId}:${target.position}` : 'none'
-}
-
-function getGesturePointerId(event: Event): number | string {
-    return 'pointerId' in event && typeof event.pointerId === 'number' ? event.pointerId : 'gesture'
-}
-
-function getGesturePointerType(event: Event): string {
-    return 'pointerType' in event && typeof event.pointerType === 'string' ? event.pointerType : event.type
-}
-
-function parentKey(parentId: string | null | undefined): string {
-    return parentId ?? ROOT_PARENT_KEY
-}
-
-function sortCategories(a: Category, b: Category): number {
-    return (a.sort_order - b.sort_order) || a.name.localeCompare(b.name, 'zh-Hans-CN')
-}
-
-function buildChildrenMap(categories: Category[]): Map<string, Category[]> {
-    const map = new Map<string, Category[]>()
-    for (const category of categories) {
-        const key = parentKey(category.parent_id)
-        const siblings = map.get(key)
-        if (siblings) {
-            siblings.push(category)
-        } else {
-            map.set(key, [category])
-        }
-    }
-    for (const siblings of map.values()) {
-        siblings.sort(sortCategories)
-    }
-    return map
-}
-
-function buildVisibleRows(
-    childrenMap: Map<string, Category[]>,
-    expandedIds: Set<string>,
-    query: string,
-): CategoryRow[] {
-    const rows: CategoryRow[] = []
-    const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN')
-
-    if (normalizedQuery) {
-        const categoryById = new Map<string, Category>()
-        for (const siblings of childrenMap.values()) {
-            for (const category of siblings) {
-                categoryById.set(category.id, category)
-            }
-        }
-
-        const visibleIds = new Set<string>()
-        for (const category of categoryById.values()) {
-            if (!category.name.toLocaleLowerCase('zh-CN').includes(normalizedQuery)) continue
-            visibleIds.add(category.id)
-            let parentId = category.parent_id ?? null
-            while (parentId) {
-                visibleIds.add(parentId)
-                parentId = categoryById.get(parentId)?.parent_id ?? null
-            }
-        }
-
-        const visitSearch = (parentId: string | null, depth: number) => {
-            const children = childrenMap.get(parentKey(parentId)) ?? []
-            for (const category of children) {
-                if (!visibleIds.has(category.id)) continue
-                rows.push({category, depth})
-                visitSearch(category.id, depth + 1)
-            }
-        }
-        visitSearch(null, 0)
-        return rows
-    }
-
-    const visit = (parentId: string | null, depth: number) => {
-        const children = childrenMap.get(parentKey(parentId)) ?? []
-        for (const category of children) {
-            rows.push({category, depth})
-            if (expandedIds.has(category.id)) {
-                visit(category.id, depth + 1)
-            }
-        }
-    }
-    visit(null, 0)
-    return rows
-}
-
-function buildAllRows(childrenMap: Map<string, Category[]>): CategoryRow[] {
-    const rows: CategoryRow[] = []
-    const visit = (parentId: string | null, depth: number) => {
-        const children = childrenMap.get(parentKey(parentId)) ?? []
-        for (const category of children) {
-            rows.push({category, depth})
-            visit(category.id, depth + 1)
-        }
-    }
-    visit(null, 0)
-    return rows
-}
-
-function collectDescendantIds(categoryId: string, childrenMap: Map<string, Category[]>): string[] {
-    const result: string[] = []
-    const visit = (parentId: string) => {
-        const children = childrenMap.get(parentKey(parentId)) ?? []
-        for (const child of children) {
-            result.push(child.id)
-            visit(child.id)
-        }
-    }
-    visit(categoryId)
-    return result
-}
-
-function getEntryCountMap(stats: ProjectStats | null): Map<string, number> {
-    const map = new Map<string, number>()
-    for (const row of stats?.entriesByCategory ?? []) {
-        if (row.categoryId) map.set(row.categoryId, row.count)
-    }
-    return map
-}
-
-function getSortedSiblings(categories: Category[], parentId: string | null): Category[] {
-    return categories
-        .filter(category => (category.parent_id ?? null) === parentId)
-        .sort(sortCategories)
-}
-
-function TreeIcon({expanded}: {expanded: boolean}) {
-    return (
-        <svg className="mobile-category-drawer__toggle-icon" viewBox="0 0 20 20" focusable="false">
-            <path d={expanded ? 'M5.5 8 10 12.5 14.5 8' : 'M8 5.5 12.5 10 8 14.5'}/>
-        </svg>
-    )
-}
-
-function SearchIcon() {
-    return (
-        <svg className="mobile-category-drawer__search-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="5.8"/>
-            <path d="m15 15 4.5 4.5"/>
-        </svg>
-    )
-}
-
-function HomeIcon() {
-    return (
-        <svg className="mobile-category-drawer__row-icon mobile-category-drawer__home-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <path d="M4.5 11.2 12 5l7.5 6.2"/>
-            <path d="M6.5 10.5v8h11v-8"/>
-            <path d="M10 18.5v-4h4v4"/>
-        </svg>
-    )
-}
-
-function DragHandleIcon() {
-    return (
-        <svg className="mobile-category-drawer__drag-icon" viewBox="0 0 24 24" focusable="false">
-            <path d="M7 8h10"/>
-            <path d="M7 12h10"/>
-            <path d="M7 16h10"/>
-        </svg>
-    )
 }
 
 export default function MobileCategoryDrawer({projectId, categories, stats, selected, onSelect, onChanged}: Props) {
@@ -934,161 +762,34 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 ) : null}
             </div>
 
-            <ActionMenu
-                open={!!menuTarget}
-                onClose={() => setMenuTarget(null)}
-                title={menuTarget?.name}
-                items={[
-                    {
-                        key: 'open',
-                        label: '浏览词条',
-                        onSelect: () => menuTarget && onSelect({kind: 'category', categoryId: menuTarget.id}, menuTarget.name),
-                    },
-                    {
-                        key: 'create-child',
-                        label: '新建子分类',
-                        onSelect: () => menuTarget && setRenameTarget({mode: 'create', parentId: menuTarget.id}),
-                    },
-                    {
-                        key: 'rename',
-                        label: '重命名',
-                        onSelect: () => menuTarget && setRenameTarget({mode: 'rename', category: menuTarget}),
-                    },
-                    {
-                        key: 'move',
-                        label: '移动到…',
-                        onSelect: () => menuTarget && setMoveTarget(menuTarget),
-                    },
-                    {
-                        key: 'move-up',
-                        label: '上移一位',
-                        disabled: !menuTargetSiblingState.canMoveUp || busy,
-                        onSelect: () => menuTarget && void handleMoveWithinSiblings(menuTarget, 'up'),
-                    },
-                    {
-                        key: 'move-down',
-                        label: '下移一位',
-                        disabled: !menuTargetSiblingState.canMoveDown || busy,
-                        onSelect: () => menuTarget && void handleMoveWithinSiblings(menuTarget, 'down'),
-                    },
-                    {
-                        key: 'delete',
-                        label: '删除分类',
-                        danger: true,
-                        onSelect: () => menuTarget && setDeleteTarget(menuTarget),
-                    },
-                ]}
-            />
-
-            <RenameDialog
-                open={!!renameTarget}
-                title={renameTitle}
-                label={renameTarget?.mode === 'create' && renameTarget.parentId
-                    ? `父分类：${categoryById.get(renameTarget.parentId)?.name ?? '未知分类'}`
-                    : undefined}
-                initialValue={renameInitialValue}
-                placeholder="分类名称"
-                confirmText={renameTarget?.mode === 'create' ? '新建' : '保存'}
+            <MobileCategoryDrawerDialogs
                 busy={busy}
-                onClose={() => setRenameTarget(null)}
-                onConfirm={(name) => void handleConfirmName(name)}
+                menuTarget={menuTarget}
+                onCloseMenu={() => setMenuTarget(null)}
+                onOpenCategory={category => onSelect({kind: 'category', categoryId: category.id}, category.name)}
+                onCreateChild={category => setRenameTarget({mode: 'create', parentId: category.id})}
+                onRenameCategory={category => setRenameTarget({mode: 'rename', category})}
+                onChooseMove={setMoveTarget}
+                canMoveUp={menuTargetSiblingState.canMoveUp}
+                canMoveDown={menuTargetSiblingState.canMoveDown}
+                onMoveSibling={(category, direction) => void handleMoveWithinSiblings(category, direction)}
+                onChooseDelete={setDeleteTarget}
+                renameOpen={!!renameTarget}
+                renameTitle={renameTitle}
+                renameLabel={renameTarget?.mode === 'create' && renameTarget.parentId ? `父分类：${categoryById.get(renameTarget.parentId)?.name ?? '未知分类'}` : undefined}
+                renameInitialValue={renameInitialValue}
+                renameConfirmText={renameTarget?.mode === 'create' ? '新建' : '保存'}
+                onCloseRename={() => setRenameTarget(null)}
+                onConfirmRename={name => void handleConfirmName(name)}
+                moveTarget={moveTarget}
+                moveCandidates={moveCandidates}
+                onCloseMove={() => setMoveTarget(null)}
+                onMove={parentId => void handleMoveToParent(parentId)}
+                deleteTarget={deleteTarget}
+                deleteImpact={deleteImpact}
+                onCloseDelete={() => setDeleteTarget(null)}
+                onDelete={mode => void handleDelete(mode)}
             />
-
-            <FloatingPanel
-                open={!!moveTarget}
-                onClose={() => setMoveTarget(null)}
-                dismissible={!busy}
-                title="移动分类"
-                ariaLabel="移动分类"
-                className="mobile-category-drawer-dialog"
-            >
-                <div className="mobile-category-drawer-dialog__summary">
-                    将「{moveTarget?.name ?? ''}」移动到新的父分类。
-                </div>
-                <div className="mobile-category-drawer-parent-list">
-                    <button
-                        type="button"
-                        className={`mobile-category-drawer-parent-list__item${(moveTarget?.parent_id ?? null) === null ? ' is-current' : ''}`}
-                        disabled={busy}
-                        onClick={() => void handleMoveToParent(null)}
-                    >
-                        根级分类
-                    </button>
-                    {moveCandidates.map(row => (
-                        <button
-                            type="button"
-                            key={row.category.id}
-                            className={`mobile-category-drawer-parent-list__item${moveTarget?.parent_id === row.category.id ? ' is-current' : ''}`}
-                            style={{'--mobile-category-drawer-depth': row.depth} as CSSProperties}
-                            disabled={busy}
-                            onClick={() => void handleMoveToParent(row.category.id)}
-                        >
-                            {row.category.name}
-                        </button>
-                    ))}
-                </div>
-                <div className="mobile-category-drawer-dialog__actions">
-                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setMoveTarget(null)}>
-                        取消
-                    </Button>
-                </div>
-            </FloatingPanel>
-
-            <FloatingPanel
-                open={!!deleteTarget}
-                onClose={() => setDeleteTarget(null)}
-                dismissible={!busy}
-                title="删除分类"
-                ariaLabel="删除分类"
-                className="mobile-category-drawer-dialog"
-            >
-                <div className="mobile-category-drawer-dialog__summary">
-                    「{deleteTarget?.name ?? ''}」包含 {deleteImpact?.categoryCount ?? 0} 个分类节点、
-                    {deleteImpact?.entryCount ?? 0} 个词条。
-                </div>
-                <div className="mobile-category-drawer-delete-options">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        block
-                        disabled={busy}
-                        onClick={() => void handleDelete('empty')}
-                    >
-                        仅删除空分类
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        block
-                        disabled={busy}
-                        onClick={() => void handleDelete('lift')}
-                    >
-                        子项上移保留
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="danger"
-                        size="sm"
-                        block
-                        disabled={busy}
-                        onClick={() => void handleDelete('cascade')}
-                    >
-                        连同子分类和词条删除
-                    </Button>
-                </div>
-                {deleteImpact && deleteImpact.childCount > 0 && (
-                    <div className="mobile-category-drawer-dialog__hint">
-                        “子项上移保留”会把直接子分类和词条移动到当前分类的父级。
-                    </div>
-                )}
-                <div className="mobile-category-drawer-dialog__actions">
-                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setDeleteTarget(null)}>
-                        取消
-                    </Button>
-                </div>
-            </FloatingPanel>
         </aside>
     )
 }
