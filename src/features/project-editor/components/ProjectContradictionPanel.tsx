@@ -1,7 +1,7 @@
 import {logger} from '../../../shared/logger'
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import {Button, RollingBox, Select, useAlert} from 'flowcloudai-ui'
+import {Button, Input, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {
     ai_delete_world_check_report,
     ai_get_world_check_report_entry,
@@ -759,12 +759,13 @@ function ProjectContradictionPanel({
                             {checkKind === 'entry_alignment' && (
                                 <div className="pe-contradiction-field">
                                     <span>目标词条</span>
-                                    <input
-                                        className="pe-contradiction-target-input"
+                                    <Input
+                                        size="sm"
+                                        radius="md"
                                         value={targetEntryQuery}
-                                        onChange={(event) => {
-                                            setTargetEntryQuery(event.target.value)
-                                            if (selectedTargetEntry?.title !== event.target.value) {
+                                        onValueChange={(value) => {
+                                            setTargetEntryQuery(value)
+                                            if (selectedTargetEntry?.title !== value) {
                                                 setTargetEntryId('')
                                             }
                                         }}
