@@ -22,8 +22,8 @@ import {
     entryTypeKey,
     type EntryTypeView,
     setting_get_settings,
-    setting_update_settings,
 } from '../../../api'
+import {saveAppSettings} from '../../settings/appSettingsStore'
 import EntryCoverImage from '../../entries/components/EntryCoverImage'
 import {buildInternalEntryMarkdown} from '../../entries/lib/entryMarkdown'
 import {RenameDialog} from '../../../shared/ui/overlay'
@@ -613,8 +613,7 @@ function CategoryView({
         const nextIds = normalizeStarredEntryIds(entryIds)
         const settings = await setting_get_settings()
         const nextSettings = {...settings, starred_entry_ids: nextIds}
-        await setting_update_settings(nextSettings)
-        window.dispatchEvent(new CustomEvent('fc:settings-updated', {detail: nextSettings}))
+        await saveAppSettings(nextSettings)
         return nextIds
     }, [])
 

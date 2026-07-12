@@ -1,33 +1,32 @@
 import {logger} from '../../../shared/logger'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useMemo, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
-    ai_close_all_sessions,
     ai_get_usage_by_model,
     ai_get_usage_summary,
-    ai_list_plugins,
     exit_app,
-    plugin_install_from_file,
-    plugin_list_local,
-    plugin_market_install,
-    plugin_market_list,
     read_app_log,
-    setting_delete_api_key,
-    setting_get_settings,
-    setting_has_api_key,
-    setting_set_api_key,
-    setting_update_settings,
     type AppLogSnapshot,
     type AppSettings,
     type ApiUsageByModel,
     type ApiUsageSummary,
-    type LocalPluginInfo,
-    type PluginInfo,
-    type RemotePluginInfo,
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
 import {openUrl} from '../../../api/opener'
+import {
+    deleteAppApiKey,
+    saveAppApiKey,
+    saveAppSettings,
+    useAppSettingsStore,
+} from '../../../features/settings/appSettingsStore'
+import {
+    installLocalPlugin,
+    installMarketPlugin,
+    refreshLocalPlugins,
+    refreshMarketPlugins,
+    usePluginCatalogStore,
+} from '../../../features/settings/pluginCatalogStore'
 import {MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import MobileSettingsAboutSection from './MobileSettingsAboutSection'
@@ -120,25 +119,27 @@ function BackIcon() {
 export default function MobileSettings({push, pop, page}: Props) {
     const {showAlert} = useAlert()
     const {theme, setTheme} = useTheme()
-    const [plugins, setPlugins] = useState<PluginInfo[]>([])
+    const appSettingsStore = useAppSettingsStore()
+    const pluginCatalog = usePluginCatalogStore()
+    const plugins = appSettingsStore.llmPlugins
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
     const [apiKeyDraft, setApiKeyDraft] = useState('')
     const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unknown')
     const [apiKeyBusy, setApiKeyBusy] = useState(false)
-    const [localPlugins, setLocalPlugins] = useState<LocalPluginInfo[]>([])
-    const [marketPlugins, setMarketPlugins] = useState<RemotePluginInfo[]>([])
+    const localPlugins = pluginCatalog.localPlugins
+    const marketPlugins = pluginCatalog.marketPlugins
     const [pluginSearch, setPluginSearch] = useState('')
     const [pluginKindFilter, setPluginKindFilter] = useState<PluginKindFilter>('all')
-    const [localPluginError, setLocalPluginError] = useState<string | null>(null)
-    const [marketPluginError, setMarketPluginError] = useState<string | null>(null)
-    const [loadingLocalPlugins, setLoadingLocalPlugins] = useState(false)
-    const [loadingMarketPlugins, setLoadingMarketPlugins] = useState(false)
-    const [installingLocalFile, setInstallingLocalFile] = useState(false)
-    const [installingPluginIds, setInstallingPluginIds] = useState<Set<string>>(new Set())
+    const localPluginError = pluginCatalog.localError
+    const marketPluginError = pluginCatalog.marketError
+    const loadingLocalPlugins = pluginCatalog.loadingLocal
+    const loadingMarketPlugins = pluginCatalog.loadingMarket
+    const installingLocalFile = pluginCatalog.installingLocalFile
+    const installingPluginIds = pluginCatalog.installingIds
     const [settings, setSettings] = useState<AppSettings | null>(null)
     const [version, setVersion] = useState('')
-    const [loading, setLoading] = useState(true)
+    const loading = appSettingsStore.loading && !settings
     const [logViewerOpen, setLogViewerOpen] = useState(false)
     const [logSnapshot, setLogSnapshot] = useState<AppLogSnapshot | null>(null)
     const [logLoading, setLogLoading] = useState(false)
@@ -147,111 +148,15 @@ export default function MobileSettings({push, pop, page}: Props) {
     const [usageByModel, setUsageByModel] = useState<ApiUsageByModel[]>([])
     const [usageLoading, setUsageLoading] = useState(false)
     const [usageError, setUsageError] = useState('')
-    const marketLoadSeqRef = useRef(0)
-    const pluginRefreshSeqRef = useRef(0)
-    const pluginRefreshInFlightRef = useRef(false)
 
     useEffect(() => {
         getVersion().then(setVersion).catch(() => {
         })
-        Promise.all([
-            ai_list_plugins('llm'),
-            setting_get_settings().catch(() => null),
-        ]).then(([plugs, s]) => {
-            setPlugins(plugs)
-            setSettings(s)
-            setSelectedPlugin(current => current || s?.llm?.plugin_id || plugs[0]?.id || '')
-        }).catch(logger.error).finally(() => setLoading(false))
-    }, [])
-
-    const loadLocalPlugins = useCallback(async () => {
-        const startedAt = Date.now()
-        logger.info('[MobileSettings] 开始加载本地插件列表')
-        setLoadingLocalPlugins(true)
-        setLocalPluginError(null)
-        try {
-            const nextLocalPlugins = await plugin_list_local()
-            logger.info('[MobileSettings] 本地插件列表加载成功', {
-                count: nextLocalPlugins.length,
-                elapsedMs: Date.now() - startedAt,
-            })
-            setLocalPlugins(nextLocalPlugins)
-        } catch (error) {
-            const message = formatUnknownError(error)
-            logger.error('[MobileSettings] 加载本地插件失败', error)
-            setLocalPluginError(message)
-        } finally {
-            logger.info('[MobileSettings] 本地插件列表加载结束', {
-                elapsedMs: Date.now() - startedAt,
-            })
-            setLoadingLocalPlugins(false)
-        }
-    }, [])
-
-    const loadMarketPlugins = useCallback(async () => {
-        const requestId = marketLoadSeqRef.current + 1
-        marketLoadSeqRef.current = requestId
-        const startedAt = Date.now()
-        logger.info('[MobileSettings] 开始加载插件库列表', {requestId})
-        const slowTimer = window.setTimeout(() => {
-            logger.warn('[MobileSettings] 插件库列表加载超过 15 秒仍未完成', {
-                requestId,
-                elapsedMs: Date.now() - startedAt,
-            })
-        }, 15000)
-
-        setLoadingMarketPlugins(true)
-        setMarketPluginError(null)
-        try {
-            const nextMarketPlugins = await plugin_market_list()
-            logger.info('[MobileSettings] 插件库列表加载成功', {
-                requestId,
-                count: nextMarketPlugins.length,
-                elapsedMs: Date.now() - startedAt,
-            })
-            setMarketPlugins(nextMarketPlugins)
-        } catch (error) {
-            const message = formatUnknownError(error)
-            logger.error('[MobileSettings] 加载插件库失败', {
-                requestId,
-                elapsedMs: Date.now() - startedAt,
-                error: message,
-            })
-            setMarketPluginError(message)
-        } finally {
-            window.clearTimeout(slowTimer)
-            logger.info('[MobileSettings] 插件库列表加载结束', {
-                requestId,
-                elapsedMs: Date.now() - startedAt,
-            })
-            setLoadingMarketPlugins(false)
-        }
     }, [])
 
     const refreshPluginInstallSources = useCallback(async () => {
-        if (pluginRefreshInFlightRef.current) {
-            logger.warn('[MobileSettings] 已有插件安装来源刷新进行中，跳过重复请求')
-            return
-        }
-
-        const refreshId = pluginRefreshSeqRef.current + 1
-        pluginRefreshSeqRef.current = refreshId
-        const startedAt = Date.now()
-        pluginRefreshInFlightRef.current = true
-        logger.info('[MobileSettings] 开始刷新插件安装来源', {refreshId})
-        try {
-            await Promise.all([
-                loadLocalPlugins(),
-                loadMarketPlugins(),
-            ])
-        } finally {
-            pluginRefreshInFlightRef.current = false
-            logger.info('[MobileSettings] 插件安装来源刷新结束', {
-                refreshId,
-                elapsedMs: Date.now() - startedAt,
-            })
-        }
-    }, [loadLocalPlugins, loadMarketPlugins])
+        await Promise.all([refreshLocalPlugins(), refreshMarketPlugins()])
+    }, [])
 
     useEffect(() => {
         void refreshPluginInstallSources()
@@ -264,34 +169,16 @@ export default function MobileSettings({push, pop, page}: Props) {
         }
     }, [selectedPlugin, selectedModel, plugins])
 
-    const refreshLlmPluginSelection = useCallback(async (preferredPluginId?: string) => {
-        const [nextPlugins, nextSettings] = await Promise.all([
-            ai_list_plugins('llm'),
-            setting_get_settings().catch(() => null),
-        ])
-        setPlugins(nextPlugins)
-        if (nextSettings) setSettings(nextSettings)
-        setSelectedPlugin(current => {
-            const hasCurrent = current && nextPlugins.some(plugin => plugin.id === current)
-            if (hasCurrent) return current
-
-            const preferredKey = preferredPluginId ? normalizePluginKey(preferredPluginId) : ''
-            const preferredPlugin = preferredKey
-                ? nextPlugins.find(plugin => normalizePluginKey(plugin.id) === preferredKey)
-                : null
-            return preferredPlugin?.id || nextSettings?.llm?.plugin_id || nextPlugins[0]?.id || ''
-        })
-    }, [])
-
-    const upsertLocalPlugin = useCallback((plugin: LocalPluginInfo) => {
-        setLocalPlugins(current => {
-            const nextKey = normalizePluginKey(plugin.id)
-            const exists = current.some(item => normalizePluginKey(item.id) === nextKey)
-            return exists
-                ? current.map(item => normalizePluginKey(item.id) === nextKey ? plugin : item)
-                : [...current, plugin]
-        })
-    }, [])
+    useEffect(() => {
+        const nextSettings = appSettingsStore.settings
+        if (!nextSettings) return
+        setSettings(nextSettings)
+        setSelectedPlugin(current => (
+            current && plugins.some(plugin => plugin.id === current)
+                ? current
+                : nextSettings.llm.plugin_id || plugins[0]?.id || ''
+        ))
+    }, [appSettingsStore.settings, plugins])
 
     useEffect(() => {
         if (!selectedPlugin) {
@@ -300,24 +187,11 @@ export default function MobileSettings({push, pop, page}: Props) {
             return
         }
 
-        let cancelled = false
         setApiKeyDraft('')
-        setApiKeyStatus('checking')
-
-        setting_has_api_key(selectedPlugin)
-            .then(hasApiKey => {
-                if (cancelled) return
-                setApiKeyStatus(hasApiKey ? 'configured' : 'missing')
-            })
-            .catch(error => {
-                logger.error('[MobileSettings] API Key 状态检查失败', error)
-                if (!cancelled) setApiKeyStatus('error')
-            })
-
-        return () => {
-            cancelled = true
-        }
-    }, [selectedPlugin])
+        setApiKeyStatus(appSettingsStore.loading
+            ? 'checking'
+            : appSettingsStore.apiKeyStatus[selectedPlugin] ? 'configured' : 'missing')
+    }, [appSettingsStore.apiKeyStatus, appSettingsStore.loading, selectedPlugin])
 
     const handleSave = useCallback(async () => {
         if (!settings) return
@@ -331,11 +205,8 @@ export default function MobileSettings({push, pop, page}: Props) {
             },
         }
         try {
-            await setting_update_settings(merged)
-            setSettings(merged)
-            window.dispatchEvent(new CustomEvent('fc:settings-updated', {
-                detail: merged,
-            }))
+            const saved = await saveAppSettings(merged)
+            setSettings(saved.settings)
             await showAlert('设置已保存', 'success', 'nonInvasive', 1500)
         } catch (e) {
             await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
@@ -355,12 +226,9 @@ export default function MobileSettings({push, pop, page}: Props) {
 
         try {
             setApiKeyBusy(true)
-            await setting_set_api_key(selectedPlugin, nextApiKey)
+            await saveAppApiKey(selectedPlugin, nextApiKey)
             setApiKeyDraft('')
             setApiKeyStatus('configured')
-            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {
-                detail: {pluginId: selectedPlugin, hasApiKey: true},
-            }))
             await showAlert('访问密钥已保存', 'success', 'nonInvasive', 1500)
         } catch (error) {
             await showAlert(`访问密钥保存失败：${String(error)}`, 'error', 'nonInvasive', 3000)
@@ -376,12 +244,9 @@ export default function MobileSettings({push, pop, page}: Props) {
 
         try {
             setApiKeyBusy(true)
-            await setting_delete_api_key(selectedPlugin)
+            await deleteAppApiKey(selectedPlugin)
             setApiKeyDraft('')
             setApiKeyStatus('missing')
-            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {
-                detail: {pluginId: selectedPlugin, hasApiKey: false},
-            }))
             await showAlert('访问密钥已删除', 'success', 'nonInvasive', 1500)
         } catch (error) {
             await showAlert(`访问密钥删除失败：${String(error)}`, 'error', 'nonInvasive', 3000)
@@ -408,42 +273,24 @@ export default function MobileSettings({push, pop, page}: Props) {
         })
         if (!selected || Array.isArray(selected)) return
 
-        setInstallingLocalFile(true)
         try {
-            await ai_close_all_sessions()
-            const info = await plugin_install_from_file(selected)
-            upsertLocalPlugin(info)
-            await refreshLlmPluginSelection(info.kind.includes('llm') ? info.id : undefined)
-            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
+            const info = await installLocalPlugin(selected)
             await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 本地插件安装失败', error)
             await showAlert(`本地插件安装失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
-        } finally {
-            setInstallingLocalFile(false)
         }
-    }, [refreshLlmPluginSelection, showAlert, upsertLocalPlugin])
+    }, [showAlert])
 
     const handleInstallMarketPlugin = useCallback(async (pluginId: string) => {
-        setInstallingPluginIds(current => new Set([...current, pluginId]))
         try {
-            await ai_close_all_sessions()
-            const info = await plugin_market_install(pluginId)
-            upsertLocalPlugin(info)
-            await refreshLlmPluginSelection(info.kind.includes('llm') ? info.id : undefined)
-            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
+            const info = await installMarketPlugin(pluginId)
             await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 插件安装失败', error)
             await showAlert(`插件安装失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
-        } finally {
-            setInstallingPluginIds(current => {
-                const next = new Set(current)
-                next.delete(pluginId)
-                return next
-            })
         }
-    }, [refreshLlmPluginSelection, showAlert, upsertLocalPlugin])
+    }, [showAlert])
 
     const installedPluginMap = useMemo(() => {
         return new Map(localPlugins.map(plugin => [normalizePluginKey(plugin.id), plugin]))

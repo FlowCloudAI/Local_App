@@ -1,5 +1,4 @@
-import {useEffect, useSyncExternalStore} from 'react'
-import {logger} from '../../../shared/logger'
+import {useSyncExternalStore} from 'react'
 import {
     ai_list_plugins,
     setting_get_settings,
@@ -137,21 +136,9 @@ export function setAiWriterModeAvailable(writerModeAvailable: boolean) {
 }
 
 export function useAiPluginStore() {
-    const current = useSyncExternalStore(
+    return useSyncExternalStore(
         subscribeAiPluginStore,
         getAiPluginSnapshot,
         getAiPluginSnapshot,
     )
-
-    useEffect(() => {
-        const handler = () => {
-            void refreshAiPluginStore().catch((error) => {
-                logger.error('插件变更后刷新 AI 插件列表失败', error)
-            })
-        }
-        window.addEventListener('fc:plugins-changed', handler)
-        return () => window.removeEventListener('fc:plugins-changed', handler)
-    }, [])
-
-    return current
 }

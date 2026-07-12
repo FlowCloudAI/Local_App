@@ -8,8 +8,8 @@ import {
     type FcworldImportResult,
     type Project,
     setting_get_settings,
-    setting_update_settings,
 } from '../api'
+import {saveAppSettings} from '../features/settings/appSettingsStore'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
@@ -395,8 +395,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         const nextIds = normalizeStarredProjectIds(projectIds)
         const settings = await setting_get_settings()
         const nextSettings = {...settings, starred_project_ids: nextIds}
-        await setting_update_settings(nextSettings)
-        window.dispatchEvent(new CustomEvent('fc:settings-updated', {detail: nextSettings}))
+        await saveAppSettings(nextSettings)
         return nextIds
     }, [])
 

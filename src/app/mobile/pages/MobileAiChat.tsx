@@ -12,6 +12,10 @@ import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
+    getAppSettingsSnapshot,
+    subscribeAppSettings,
+} from '../../../features/settings/appSettingsStore'
+import {
     CONVERSATION_TEMPERATURE_MAX,
     normalizeConversationSettings,
     type AiToolAccessMode,
@@ -471,23 +475,12 @@ export default function MobileAiChat({
     }, [activeLlmPluginId, apiKeyRefreshTick, llmUnavailable, pluginsReady])
 
     useEffect(() => {
-        const refreshApiKeyState = () => setApiKeyRefreshTick(tick => tick + 1)
-        const handleApiKeyChanged = (event: Event) => {
-            const detail = (event as CustomEvent<{ pluginId?: string, hasApiKey?: boolean }>).detail
-            if (detail?.pluginId && detail.pluginId !== activeLlmPluginId) return
-            if (typeof detail?.hasApiKey === 'boolean') {
-                setLlmApiKeyAvailability(detail.hasApiKey ? 'configured' : 'missing')
-                return
-            }
-            refreshApiKeyState()
+        const refreshApiKeyState = () => {
+            const hasApiKey = getAppSettingsSnapshot().apiKeyStatus[activeLlmPluginId]
+            setLlmApiKeyAvailability(hasApiKey ? 'configured' : 'missing')
+            setApiKeyRefreshTick(tick => tick + 1)
         }
-
-        window.addEventListener('fc:api-key-changed', handleApiKeyChanged as EventListener)
-        window.addEventListener('fc:plugins-changed', refreshApiKeyState)
-        return () => {
-            window.removeEventListener('fc:api-key-changed', handleApiKeyChanged as EventListener)
-            window.removeEventListener('fc:plugins-changed', refreshApiKeyState)
-        }
+        return subscribeAppSettings(refreshApiKeyState)
     }, [activeLlmPluginId])
 
     const handleToolModeChange = useCallback(async (mode: AiToolAccessMode) => {

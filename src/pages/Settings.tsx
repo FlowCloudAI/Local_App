@@ -29,25 +29,12 @@ import {
     type ApiUsageDaily,
     type ApiUsageSummary,
     type AppSettings,
-    type DefaultPaths,
     type LlmCompactDetail,
     type LocalPluginInfo,
     open_in_file_manager,
-    plugin_install_from_file,
-    plugin_list_local,
-    plugin_market_install,
-    plugin_market_list,
-    plugin_uninstall,
-    type PluginInfo,
     type RemotePluginInfo,
     type SearchSourceSettings,
-    setting_delete_api_key,
-    setting_get_media_dir,
-    setting_get_settings,
-    setting_get_settings_bootstrap,
     setting_open_backup_dir,
-    setting_set_api_key,
-    setting_update_settings,
     template_get,
     template_get_default,
     template_get_effective_path,
@@ -63,6 +50,21 @@ import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
 import UploadPlugin from '../features/plugins/UploadPlugin'
 import {CONVERSATION_TEMPERATURE_MAX} from '../features/ai-chat/model/AiControllerTypes'
+import {
+    deleteAppApiKey,
+    refreshAppSettings,
+    saveAppApiKey,
+    saveAppSettings,
+    useAppSettingsStore,
+} from '../features/settings/appSettingsStore'
+import {
+    installLocalPlugin,
+    installMarketPlugin,
+    refreshLocalPlugins,
+    refreshMarketPlugins,
+    uninstallPlugin,
+    usePluginCatalogStore,
+} from '../features/settings/pluginCatalogStore'
 import {SidebarResizeHandle} from '../shared/ui/layout/SidebarResizeHandle'
 import {useResizableSidebar} from '../shared/ui/layout/useResizableSidebar'
 import '../shared/ui/layout/WorkspaceScaffold.css'
@@ -1156,33 +1158,35 @@ export default function Settings({
     }, [showAlert])
 
     // ── 系统配置状态 ──
+    const appSettingsStore = useAppSettingsStore()
+    const pluginCatalog = usePluginCatalogStore()
     const [loading, setLoading] = useState(true)
     const [settings, setSettings] = useState<AppSettings | null>(null)
-    const [mediaDir, setMediaDir] = useState<string>('')
-    const [defaultPaths, setDefaultPaths] = useState<DefaultPaths | null>(null)
+    const mediaDir = appSettingsStore.mediaDir
+    const defaultPaths = appSettingsStore.defaultPaths
     const [configDir, setConfigDir] = useState<string>('')
     const settingsSaveSuccessNoticeEnabledRef = useRef(false)
 
     // ── AI 配置状态 ──
-    const [llmPlugins, setLlmPlugins] = useState<PluginInfo[]>([])
-    const [imagePlugins, setImagePlugins] = useState<PluginInfo[]>([])
-    const [ttsPlugins, setTtsPlugins] = useState<PluginInfo[]>([])
-    const [apiKeyStatus, setApiKeyStatus] = useState<Record<string, boolean>>({})
+    const llmPlugins = appSettingsStore.llmPlugins
+    const imagePlugins = appSettingsStore.imagePlugins
+    const ttsPlugins = appSettingsStore.ttsPlugins
+    const apiKeyStatus = appSettingsStore.apiKeyStatus
     const [expandedApiKeyPluginId, setExpandedApiKeyPluginId] = useState<string | null>(null)
     const [apiKeyDraft, setApiKeyDraft] = useState('')
     const [savingApiKeyPluginId, setSavingApiKeyPluginId] = useState<string | null>(null)
 
     // ── 插件管理状态 ──
-    const [localPlugins, setLocalPlugins] = useState<LocalPluginInfo[]>([])
-    const [marketPlugins, setMarketPlugins] = useState<RemotePluginInfo[]>([])
-    const [loadingLocal, setLoadingLocal] = useState(false)
-    const [loadingMarket, setLoadingMarket] = useState(false)
-    const [installingLocalFile, setInstallingLocalFile] = useState(false)
+    const localPlugins = pluginCatalog.localPlugins
+    const marketPlugins = pluginCatalog.marketPlugins
+    const loadingLocal = pluginCatalog.loadingLocal
+    const loadingMarket = pluginCatalog.loadingMarket
+    const installingLocalFile = pluginCatalog.installingLocalFile
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
-    const [localError, setLocalError] = useState<string | null>(null)
-    const [marketError, setMarketError] = useState<string | null>(null)
-    const [installingIds, setInstallingIds] = useState<Set<string>>(new Set())
-    const [uninstallingId, setUninstallingId] = useState<string | null>(null)
+    const localError = pluginCatalog.localError
+    const marketError = pluginCatalog.marketError
+    const installingIds = pluginCatalog.installingIds
+    const uninstallingId = pluginCatalog.uninstallingId
     const [searchText, setSearchText] = useState('')
     const [kindFilter, setKindFilter] = useState<PluginKindFilter>(initialPluginKind)
     const [pluginDirectoryLoaded, setPluginDirectoryLoaded] = useState(false)
@@ -1281,24 +1285,18 @@ export default function Settings({
                 bootstrap,
                 configDirData,
             ] = await Promise.all([
-                setting_get_settings_bootstrap(),
+                refreshAppSettings(),
                 appConfigDir(),
             ])
 
             logger.info('[Settings] 加载设置完成', {
                 source,
-                theme: bootstrap.settings.theme,
-                themeColorRecipeId: bootstrap.settings.theme_color_config?.recipeId ?? null,
+                theme: bootstrap.settings?.theme,
+                themeColorRecipeId: bootstrap.settings?.theme_color_config?.recipeId ?? null,
                 mediaDir: bootstrap.mediaDir,
             })
             setSettings(bootstrap.settings)
-            setLlmPlugins(bootstrap.llmPlugins)
-            setImagePlugins(bootstrap.imagePlugins)
-            setTtsPlugins(bootstrap.ttsPlugins)
-            setMediaDir(current => current === bootstrap.mediaDir ? current : bootstrap.mediaDir)
-            setDefaultPaths(bootstrap.defaultPaths)
             setConfigDir(configDirData)
-            setApiKeyStatus(bootstrap.apiKeyStatus)
         } catch (error) {
             const errStr = String(error)
             logger.error('[Settings] 加载设置失败', {source, error})
@@ -1311,35 +1309,11 @@ export default function Settings({
     }, [])
 
     const loadLocal = useCallback(async () => {
-        setLoadingLocal(true)
-        setLocalError(null)
-        try {
-            setLocalPlugins(await plugin_list_local())
-        } catch (e) {
-            setLocalError(String(e))
-        } finally {
-            setLoadingLocal(false)
-        }
+        await refreshLocalPlugins()
     }, [])
 
     const loadMarket = useCallback(async () => {
-        setLoadingMarket(true)
-        setMarketError(null)
-        try {
-            setMarketPlugins(await plugin_market_list())
-        } catch (e) {
-            setMarketError(String(e))
-        } finally {
-            setLoadingMarket(false)
-        }
-    }, [])
-
-    const refreshPluginConfigState = useCallback(async () => {
-        const bootstrap = await setting_get_settings_bootstrap()
-        setLlmPlugins(bootstrap.llmPlugins)
-        setImagePlugins(bootstrap.imagePlugins)
-        setTtsPlugins(bootstrap.ttsPlugins)
-        setApiKeyStatus(bootstrap.apiKeyStatus)
+        await refreshMarketPlugins()
     }, [])
 
     useEffect(() => {
@@ -1441,21 +1415,15 @@ export default function Settings({
                 showSuccessNotice,
             })
             // 新 API 返回迁移摘要字符串（路径变更时自动复制文件），非空则弹窗提示
-            const migrationMsg = await setting_update_settings(nextSettings)
-            const newMediaDir = await setting_get_media_dir()
-            const savedSettings = await setting_get_settings()
+            const {migrationMessage: migrationMsg, settings: savedSettings} = await saveAppSettings(nextSettings)
             logger.info('[Settings] 设置保存完成', {
                 requestTheme: nextSettings.theme,
                 savedTheme: savedSettings.theme,
                 requestThemeColorRecipeId: nextSettings.theme_color_config?.recipeId ?? null,
                 savedThemeColorRecipeId: savedSettings.theme_color_config?.recipeId ?? null,
                 migrationMsg,
-                newMediaDir,
+                newMediaDir: appSettingsStore.mediaDir,
             })
-            window.dispatchEvent(new CustomEvent('fc:settings-updated', {
-                detail: savedSettings,
-            }))
-            setMediaDir(current => current === newMediaDir ? current : newMediaDir)
             const shouldShowSuccessNotice = showSuccessNotice && settingsSaveSuccessNoticeEnabledRef.current
             settingsSaveSuccessNoticeEnabledRef.current = true
             if (migrationMsg) {
@@ -1468,7 +1436,7 @@ export default function Settings({
             logger.error('设置保存失败:', error)
             void showAlertRef.current(`设置保存失败：${message}`, 'error')
         }
-    }, [])
+    }, [appSettingsStore.mediaDir])
 
     const handleThemeChange = useCallback((value: SelectValue) => {
         if (!settings) return
@@ -1720,9 +1688,7 @@ export default function Settings({
 
         try {
             setSavingApiKeyPluginId(pluginId)
-            await setting_set_api_key(pluginId, nextApiKey)
-            setApiKeyStatus(prev => ({...prev, [pluginId]: true}))
-            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: true}}))
+            await saveAppApiKey(pluginId, nextApiKey)
             setExpandedApiKeyPluginId(null)
             setApiKeyDraft('')
             void showAlert('访问密钥已保存', 'success', 'nonInvasive', 2000)
@@ -1735,9 +1701,7 @@ export default function Settings({
 
     const handleDeleteApiKey = async (pluginId: string) => {
         try {
-            await setting_delete_api_key(pluginId)
-            setApiKeyStatus(prev => ({...prev, [pluginId]: false}))
-            window.dispatchEvent(new CustomEvent('fc:api-key-changed', {detail: {pluginId, hasApiKey: false}}))
+            await deleteAppApiKey(pluginId)
             if (expandedApiKeyPluginId === pluginId) {
                 setExpandedApiKeyPluginId(null)
                 setApiKeyDraft('')
@@ -1750,28 +1714,11 @@ export default function Settings({
 
     // 插件管理操作
     const handleInstall = async (pluginId: string) => {
-        setInstallingIds(prev => new Set([...prev, pluginId]))
         try {
-            await closeIdleAiSessions()
-            const info = await plugin_market_install(pluginId)
-            setLocalPlugins(prev => {
-                const nextKey = normalizePluginKey(info.id)
-                const exists = prev.some(p => normalizePluginKey(p.id) === nextKey)
-                return exists
-                    ? prev.map(p => (normalizePluginKey(p.id) === nextKey ? info : p))
-                    : [...prev, info]
-            })
-            await refreshPluginConfigState()
-            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
+            const info = await installMarketPlugin(pluginId)
             void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
         } catch (e) {
             void showAlert('安装失败: ' + e, 'error')
-        } finally {
-            setInstallingIds(prev => {
-                const next = new Set(prev)
-                next.delete(pluginId)
-                return next
-            })
         }
     }
 
@@ -1789,24 +1736,11 @@ export default function Settings({
         })
         if (!selected || Array.isArray(selected)) return
 
-        setInstallingLocalFile(true)
         try {
-            await closeIdleAiSessions()
-            const info = await plugin_install_from_file(selected)
-            setLocalPlugins(prev => {
-                const nextKey = normalizePluginKey(info.id)
-                const exists = prev.some(p => normalizePluginKey(p.id) === nextKey)
-                return exists
-                    ? prev.map(p => (normalizePluginKey(p.id) === nextKey ? info : p))
-                    : [...prev, info]
-            })
-            await refreshPluginConfigState()
-            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
+            const info = await installLocalPlugin(selected)
             void showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 2000)
         } catch (e) {
             void showAlert('本地插件安装失败: ' + e, 'error')
-        } finally {
-            setInstallingLocalFile(false)
         }
     }
 
@@ -1817,18 +1751,10 @@ export default function Settings({
     const handleUninstall = async (pluginId: string) => {
         const res = await showAlert('确认删除', 'warning', 'confirm')
         if (res !== 'yes') return
-        setUninstallingId(pluginId)
         try {
-            await closeIdleAiSessions()
-            await plugin_uninstall(pluginId)
-            const removedKey = normalizePluginKey(pluginId)
-            setLocalPlugins(prev => prev.filter(p => normalizePluginKey(p.id) !== removedKey))
-            await refreshPluginConfigState()
-            window.dispatchEvent(new CustomEvent('fc:plugins-changed'))
+            await uninstallPlugin(pluginId)
         } catch (e) {
             void showAlert('卸载失败: ' + e, 'error')
-        } finally {
-            setUninstallingId(null)
         }
     }
 

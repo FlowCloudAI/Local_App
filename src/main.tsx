@@ -3,7 +3,8 @@ import {StrictMode} from 'react'
 import {createRoot} from 'react-dom/client'
 
 import AppShell from './app/index/AppShell'
-import {get_platform_info, type AppSettings, type PlatformInfo, setting_get_settings} from './api'
+import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
+import {getAppSettingsSnapshot, subscribeAppSettings} from './features/settings/appSettingsStore'
 import {getFormFactorOverride, isTauriRuntime} from './shared/devPreview'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
@@ -95,8 +96,8 @@ const initApp = async () => {
     }
 
     syncShellBackdrop(platformInfo, shellAcrylicEnabled)
-    window.addEventListener('fc:settings-updated', (event) => {
-        const nextSettings = (event as CustomEvent<AppSettings>).detail
+    subscribeAppSettings(() => {
+        const nextSettings = getAppSettingsSnapshot().settings
         if (!nextSettings) return
         syncShellBackdrop(platformInfo, nextSettings.shell_acrylic_enabled)
     })

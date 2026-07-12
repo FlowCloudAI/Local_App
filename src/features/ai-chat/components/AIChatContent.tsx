@@ -47,6 +47,7 @@ import {
     resolveMarkdownAnchor,
 } from '../../entries/lib/entryMarkdown'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
+import {subscribeAppSettings} from '../../settings/appSettingsStore'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../../shared/ui/layout/DockPanelScaffold.css'
 import './AIChatContent.css'
@@ -845,9 +846,9 @@ export default function AIChatContent({
             void refreshTtsPluginAvailability()
         }
         const unlistenBackendReady = listen('backend-ready', handler)
-        window.addEventListener('fc:plugins-changed', handler)
+        const unsubscribeSettings = subscribeAppSettings(handler)
         return () => {
-            window.removeEventListener('fc:plugins-changed', handler)
+            unsubscribeSettings()
             unlistenBackendReady.then((fn) => fn())
         }
     }, [refreshTtsPluginAvailability])
@@ -858,11 +859,9 @@ export default function AIChatContent({
             refreshTick: state.refreshTick + 1,
         }))
         const unlistenBackendReady = listen('backend-ready', handler)
-        window.addEventListener('fc:api-key-changed', handler)
-        window.addEventListener('fc:plugins-changed', handler)
+        const unsubscribeSettings = subscribeAppSettings(handler)
         return () => {
-            window.removeEventListener('fc:api-key-changed', handler)
-            window.removeEventListener('fc:plugins-changed', handler)
+            unsubscribeSettings()
             unlistenBackendReady.then((fn) => fn())
         }
     }, [])

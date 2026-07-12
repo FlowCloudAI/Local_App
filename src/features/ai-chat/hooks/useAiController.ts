@@ -59,6 +59,10 @@ import {
     useAiPluginStore,
 } from '../stores/aiPluginStore'
 import {
+    getAppSettingsSnapshot,
+    subscribeAppSettings,
+} from '../../settings/appSettingsStore'
+import {
     setAiActiveConversationId,
     setAiConversationMetaLoaded,
     setAiConversations,
@@ -2452,8 +2456,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [session])
 
     useEffect(() => {
-        const handleSettingsUpdated = (event: Event) => {
-            const nextSettings = (event as CustomEvent<AppSettings>).detail
+        const handleSettingsUpdated = () => {
+            const nextSettings = getAppSettingsSnapshot().settings
             if (!nextSettings) return
             appSettingsRef.current = nextSettings
             const writerEnabled = Boolean(nextSettings.llm?.writer_mode_enabled)
@@ -2467,8 +2471,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 void resetActiveBackendSessionForToolAccess()
             }
         }
-        window.addEventListener('fc:settings-updated', handleSettingsUpdated)
-        return () => window.removeEventListener('fc:settings-updated', handleSettingsUpdated)
+        return subscribeAppSettings(handleSettingsUpdated)
     }, [resetActiveBackendSessionForToolAccess, toolAccessMode, webSearchEnabled])
 
     const toggleWebSearch = useCallback(async () => {
