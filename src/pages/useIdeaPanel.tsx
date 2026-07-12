@@ -4,28 +4,35 @@ import {type ReactNode, useCallback, useEffect, useMemo, useRef, useState} from 
 import {
     type Category,
     db_create_entry,
-    db_create_idea_note,
-    db_delete_idea_note,
     db_get_entry,
     db_list_all_entry_types,
     db_list_categories,
-    db_list_idea_notes,
-    db_list_projects,
-    db_update_idea_note,
     entryTypeKey,
     type EntryTypeView,
     type IdeaNote,
     type IdeaNoteStatus,
-    type Project,
 } from '../api'
+import {
+    deleteSelectedIdea,
+    flushIdeaDraft,
+    getIdeaSnapshot,
+    patchIdeaDraft,
+    selectIdea,
+    setIdeaProjectFilter,
+    setIdeaFeedback,
+    setIdeaSearchText,
+    setIdeaStatusFilter,
+    startNewIdea,
+    updateIdeaNote,
+    updateSelectedIdea,
+    useIdeaStore,
+} from '../features/ideas/ideaStore'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../shared/ui/layout/DockPanelScaffold'
 import '../shared/ui/layout/DockPanelScaffold.css'
 import './Idea.css'
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type IdeaViewMode = 'inbox' | 'all' | 'processed' | 'archived'
-type ProjectFilterMode = 'all' | 'global' | string
 
 interface UseIdeaPanelOptions {
     contextProjectId?: string | null
@@ -40,8 +47,6 @@ export interface IdeaPanelSlots {
     main: ReactNode
 }
 
-const IDEA_LIST_LIMIT = 100
-const AUTOSAVE_DELAY = 700
 const PREVIEW_LENGTH = 28
 
 const IDEA_VIEW_OPTIONS: Array<{ key: IdeaViewMode; label: string; status?: IdeaNoteStatus }> = [
@@ -56,13 +61,6 @@ const IDEA_STATUS_OPTIONS: Array<{ key: IdeaNoteStatus; label: string }> = [
     {key: 'processed', label: '已处理'},
     {key: 'archived', label: '已归档'},
 ]
-
-function sortIdeaNotes(notes: IdeaNote[]) {
-    return [...notes].sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    })
-}
 
 function buildIdeaPreview(note: Pick<IdeaNote, 'title' | 'content'>) {
     const source = note.title?.trim() || note.content.trim()
@@ -111,63 +109,39 @@ export function useIdeaPanel({
                              }: UseIdeaPanelOptions = {}): IdeaPanelSlots {
     const {showAlert} = useAlert()
     const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-    const createRequestIdRef = useRef(0)
     const layoutRef = useRef<HTMLDivElement | null>(null)
     const layoutObserverRef = useRef<ResizeObserver | null>(null)
-    const selectedIdeaIdRef = useRef<string | null>(null)
-
-    const [ideaNotes, setIdeaNotes] = useState<IdeaNote[]>([])
-    const [projects, setProjects] = useState<Project[]>([])
+    const ideaStore = useIdeaStore()
+    const projects = ideaStore.projects
+    const selectedIdeaId = ideaStore.selectedIdeaId
+    const selectedIdea = ideaStore.selectedIdea
+    const draftTitle = ideaStore.draft.title
+    const draftContent = ideaStore.draft.content
+    const draftProjectId = ideaStore.draft.projectId
+    const initialized = ideaStore.hasLoaded
+    const loading = ideaStore.loading
+    const saveState = ideaStore.saveState
+    const statusMessage = ideaStore.statusMessage
+    const viewMode = ideaStore.statusFilter as IdeaViewMode
+    const projectFilter = ideaStore.projectFilter
+    const ideaSearch = ideaStore.searchText
+    const visibleIdeaNotes = ideaStore.visibleIdeas
+    const setViewMode = (mode: IdeaViewMode) => setIdeaStatusFilter(mode)
+    const setProjectFilter = (filter: string) => setIdeaProjectFilter(filter)
+    const setIdeaSearch = setIdeaSearchText
+    const setDraftTitle = (title: string) => patchIdeaDraft({title})
+    const setDraftContent = (content: string) => patchIdeaDraft({content})
     const [categories, setCategories] = useState<Category[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
-    const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
-    const [draftTitle, setDraftTitle] = useState('')
-    const [draftContent, setDraftContent] = useState('')
-    const [draftProjectId, setDraftProjectId] = useState<string | null>(contextProjectId)
     const [convertCategoryId, setConvertCategoryId] = useState<string | null>(null)
     const [convertEntryType, setConvertEntryType] = useState<string | null>(null)
     const [openAfterConvert, setOpenAfterConvert] = useState(true)
     const [converting, setConverting] = useState(false)
-    const [initialized, setInitialized] = useState(false)
-    const [loading, setLoading] = useState(true)
-    const [saveState, setSaveState] = useState<SaveState>('idle')
-    const [statusMessage, setStatusMessage] = useState('输入内容后会自动保存')
-    const [viewMode, setViewMode] = useState<IdeaViewMode>('all')
-    const [projectFilter, setProjectFilter] = useState<ProjectFilterMode>('all')
-    const [ideaSearch, setIdeaSearch] = useState('')
     const [compactLayout, setCompactLayout] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
-    const selectedIdea = useMemo(
-        () => ideaNotes.find((item) => item.id === selectedIdeaId) ?? null,
-        [ideaNotes, selectedIdeaId],
-    )
     const selectedIdeaProjectId = selectedIdea?.project_id ?? null
-    const projectNameById = useMemo(
-        () => new Map(projects.map((project) => [project.id, project.name])),
-        [projects],
-    )
-    const visibleIdeaNotes = useMemo(() => {
-        const keyword = ideaSearch.trim().toLocaleLowerCase()
-        if (!keyword) return ideaNotes
-
-        return ideaNotes.filter((idea) => {
-            const projectName = idea.project_id ? projectNameById.get(idea.project_id) : '未归属'
-            const searchableText = [
-                idea.title,
-                idea.content,
-                getIdeaStatusLabel(idea.status),
-                projectName,
-            ].filter(Boolean).join(' ').toLocaleLowerCase()
-
-            return searchableText.includes(keyword)
-        })
-    }, [ideaNotes, ideaSearch, projectNameById])
     const hasIdeaSearch = ideaSearch.trim().length > 0
-
-    useEffect(() => {
-        selectedIdeaIdRef.current = selectedIdeaId
-    }, [selectedIdeaId])
 
     const projectFilterOptions = useMemo(() => ([
         {value: 'all', label: '全部项目'},
@@ -193,114 +167,11 @@ export function useIdeaPanel({
         })),
     ]), [entryTypes])
 
-    const syncDraftFromIdea = useCallback((idea: IdeaNote | null) => {
-        setDraftTitle(idea?.title ?? '')
-        setDraftContent(idea?.content ?? '')
-        setDraftProjectId(idea?.project_id ?? contextProjectId ?? null)
-        setSaveState('idle')
-        setStatusMessage('输入内容后会自动保存')
-    }, [contextProjectId])
-
-    const buildIdeaListParams = useCallback(() => {
-        const activeView = IDEA_VIEW_OPTIONS.find((item) => item.key === viewMode)
-        const params: {
-            limit: number
-            offset: number
-            status?: IdeaNoteStatus
-            projectId?: string
-            onlyGlobal?: boolean
-        } = {
-            limit: IDEA_LIST_LIMIT,
-            offset: 0,
-        }
-
-        if (activeView?.status) {
-            params.status = activeView.status
-        }
-
-        if (projectFilter === 'global') {
-            params.onlyGlobal = true
-        } else if (projectFilter !== 'all') {
-            params.projectId = projectFilter
-        }
-
-        return params
-    }, [projectFilter, viewMode])
-
-    const matchesCurrentFilters = useCallback((idea: IdeaNote) => {
-        const currentParams = buildIdeaListParams()
-
-        if (currentParams.status && idea.status !== currentParams.status) {
-            return false
-        }
-
-        if (currentParams.onlyGlobal) {
-            return !idea.project_id
-        }
-
-        if (currentParams.projectId) {
-            return idea.project_id === currentParams.projectId
-        }
-
-        return true
-    }, [buildIdeaListParams])
-
-    const loadIdeaNotes = useCallback(async (preferredIdeaId?: string | null) => {
-        setLoading(true)
-        try {
-            const list = sortIdeaNotes(await db_list_idea_notes(buildIdeaListParams()))
-            const nextSelectedIdeaId = (() => {
-                const targetId = preferredIdeaId ?? selectedIdeaIdRef.current
-                if (targetId && list.some((item) => item.id === targetId)) return targetId
-                return null
-            })()
-
-            setIdeaNotes(list)
-            setSelectedIdeaId(nextSelectedIdeaId)
-
-            if (!nextSelectedIdeaId) {
-                syncDraftFromIdea(null)
-            }
-
-            setStatusMessage(
-                nextSelectedIdeaId
-                    ? '输入内容后会自动保存'
-                    : '空白便签，开始输入后会自动创建',
-            )
-        } catch (error) {
-            logger.error('加载灵感便签失败', error)
-            setStatusMessage(error instanceof Error ? error.message : '加载灵感便签失败')
-            setSaveState('error')
-        } finally {
-            setLoading(false)
-            setInitialized(true)
-        }
-    }, [buildIdeaListParams, syncDraftFromIdea])
-
-    const loadProjects = useCallback(async () => {
-        try {
-            setProjects(await db_list_projects())
-        } catch (error) {
-            logger.error('加载项目列表失败', error)
-        }
-    }, [])
-
-    useEffect(() => {
-        void loadIdeaNotes()
-    }, [loadIdeaNotes])
-
-    useEffect(() => {
-        void loadProjects()
-    }, [loadProjects])
-
-    useEffect(() => {
-        syncDraftFromIdea(selectedIdea)
-    }, [selectedIdea, syncDraftFromIdea])
-
     useEffect(() => {
         if (selectedIdea) return
-        setDraftProjectId(contextProjectId ?? null)
-    }, [contextProjectId, selectedIdea])
+        if (draftProjectId === (contextProjectId ?? null)) return
+        patchIdeaDraft({projectId: contextProjectId ?? null})
+    }, [contextProjectId, draftProjectId, selectedIdea])
 
     useEffect(() => {
         if (!initialized) return
@@ -401,143 +272,37 @@ export function useIdeaPanel({
         layoutObserverRef.current = null
     }, [])
 
-    useEffect(() => {
-        if (!initialized || loading) return
-
-        const trimmedContent = draftContent.trim()
-        const sourceIdea = selectedIdea
-
-        if (!sourceIdea && trimmedContent.length === 0) {
-            setSaveState('idle')
-            setStatusMessage('输入内容后会自动创建便签')
-            return
-        }
-
-        if (sourceIdea) {
-            const currentTitle = sourceIdea.title ?? ''
-            const currentContent = sourceIdea.content
-            const currentProjectId = sourceIdea.project_id ?? null
-            if (currentTitle === draftTitle && currentContent === draftContent && currentProjectId === draftProjectId) {
-                setSaveState('saved')
-                setStatusMessage(sourceIdea.updated_at ? `已保存于 ${formatIdeaTime(sourceIdea.updated_at)}` : '已保存')
-                return
-            }
-        }
-
-        setSaveState('saving')
-        setStatusMessage(sourceIdea ? '正在自动保存…' : '正在创建便签…')
-
-        const timer = window.setTimeout(() => {
-            if (sourceIdea) {
-                void (async () => {
-                    try {
-                        const currentProjectId = sourceIdea.project_id ?? null
-                        const updated = await db_update_idea_note({
-                            id: sourceIdea.id,
-                            projectId: currentProjectId === draftProjectId ? undefined : draftProjectId,
-                            title: draftTitle.trim() ? draftTitle : null,
-                            content: draftContent,
-                        })
-                        setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === updated.id ? updated : item)))
-                        setSaveState('saved')
-                        setStatusMessage(`已保存于 ${formatIdeaTime(updated.updated_at)}`)
-                    } catch (error) {
-                        logger.error('更新灵感便签失败', error)
-                        setSaveState('error')
-                        setStatusMessage(error instanceof Error ? error.message : '自动保存失败')
-                    }
-                })()
-                return
-            }
-
-            const requestId = createRequestIdRef.current + 1
-            createRequestIdRef.current = requestId
-
-            void (async () => {
-                try {
-                    const createdIdea = await db_create_idea_note({
-                        projectId: draftProjectId,
-                        title: draftTitle.trim() ? draftTitle : null,
-                        content: draftContent,
-                    })
-
-                    const targetStatus = IDEA_VIEW_OPTIONS.find((item) => item.key === viewMode)?.status
-                    const created = targetStatus && targetStatus !== createdIdea.status
-                        ? await db_update_idea_note({
-                            id: createdIdea.id,
-                            status: targetStatus,
-                        })
-                        : createdIdea
-
-                    if (createRequestIdRef.current !== requestId) return
-
-                    setSelectedIdeaId(created.id)
-                    setSaveState('saved')
-                    setStatusMessage(`已创建并保存于 ${formatIdeaTime(created.updated_at)}`)
-
-                    if (matchesCurrentFilters(created)) {
-                        setIdeaNotes((prev) => sortIdeaNotes([created, ...prev.filter((item) => item.id !== created.id)]))
-                    } else {
-                        await loadIdeaNotes(created.id)
-                    }
-                } catch (error) {
-                    logger.error('创建灵感便签失败', error)
-                    setSaveState('error')
-                    setStatusMessage(error instanceof Error ? error.message : '创建便签失败')
-                }
-            })()
-        }, AUTOSAVE_DELAY)
-
-        return () => window.clearTimeout(timer)
-    }, [draftContent, draftProjectId, draftTitle, initialized, loadIdeaNotes, loading, matchesCurrentFilters, selectedIdea, viewMode])
-
     const handleSelectIdea = useCallback((ideaId: string) => {
-        setSelectedIdeaId(ideaId)
+        void selectIdea(ideaId, contextProjectId)
         if (compactLayout) {
             setSidebarCollapsed(true)
         }
-    }, [compactLayout])
+    }, [compactLayout, contextProjectId])
 
     const handleCreateBlankIdea = useCallback(() => {
-        setSelectedIdeaId(null)
-        syncDraftFromIdea(null)
-        setStatusMessage('空白便签，开始输入后会自动创建')
+        void startNewIdea(contextProjectId)
         if (compactLayout) {
             setSidebarCollapsed(true)
         }
-    }, [compactLayout, syncDraftFromIdea])
+    }, [compactLayout, contextProjectId])
 
     const handleChangeIdeaStatus = useCallback(async (status: IdeaNoteStatus) => {
         if (!selectedIdea) return
 
         try {
-            const updated = await db_update_idea_note({
-                id: selectedIdea.id,
-                status,
-            })
-            setStatusMessage(`状态已更新为「${getIdeaStatusLabel(updated.status)}」`)
-            await loadIdeaNotes(updated.id)
+            await updateSelectedIdea({status})
         } catch (error) {
             logger.error('更新便签状态失败', error)
-            setSaveState('error')
-            setStatusMessage(error instanceof Error ? error.message : '更新状态失败')
         }
-    }, [loadIdeaNotes, selectedIdea])
+    }, [selectedIdea])
 
     const handleTogglePinned = useCallback(async () => {
         if (!selectedIdea) return
 
         try {
-            const updated = await db_update_idea_note({
-                id: selectedIdea.id,
-                pinned: !selectedIdea.pinned,
-            })
-            setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === updated.id ? updated : item)))
-            setStatusMessage(updated.pinned ? '已置顶当前便签' : '已取消置顶')
+            await updateSelectedIdea({pinned: !selectedIdea.pinned})
         } catch (error) {
             logger.error('更新置顶状态失败', error)
-            setSaveState('error')
-            setStatusMessage(error instanceof Error ? error.message : '更新置顶状态失败')
         }
     }, [selectedIdea])
 
@@ -545,33 +310,8 @@ export function useIdeaPanel({
         const singleValue = Array.isArray(value) ? value[0] : value
         if (singleValue === undefined) return
         const nextProjectId = singleValue === 'global' ? null : String(singleValue)
-
-        if (!selectedIdea) {
-            setDraftProjectId(nextProjectId)
-            setStatusMessage(nextProjectId ? '已设置新便签的所属项目' : '已设置新便签为未归属')
-            return
-        }
-
-        void (async () => {
-            try {
-                const updated = await db_update_idea_note({
-                    id: selectedIdea.id,
-                    projectId: nextProjectId,
-                })
-                setStatusMessage(nextProjectId ? '已更新便签所属项目' : '已将便签设为未归属')
-
-                if (matchesCurrentFilters(updated)) {
-                    setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === updated.id ? updated : item)))
-                } else {
-                    await loadIdeaNotes(updated.id)
-                }
-            } catch (error) {
-                logger.error('更新便签所属项目失败', error)
-                setSaveState('error')
-                setStatusMessage(error instanceof Error ? error.message : '更新所属项目失败')
-            }
-        })()
-    }, [loadIdeaNotes, matchesCurrentFilters, selectedIdea])
+        patchIdeaDraft({projectId: nextProjectId})
+    }, [])
 
     const handleOpenConvertedEntry = useCallback(async () => {
         if (!selectedIdea?.converted_entry_id || !selectedIdea.project_id) return
@@ -582,12 +322,10 @@ export function useIdeaPanel({
                 id: entry.id,
                 title: entry.title,
             })
-            setSaveState('saved')
-            setStatusMessage('已打开关联词条')
+            setIdeaFeedback('saved', '已打开关联词条')
         } catch (error) {
             logger.error('打开关联词条失败', error)
-            setSaveState('error')
-            setStatusMessage(error instanceof Error ? error.message : '打开关联词条失败')
+            setIdeaFeedback('error', error instanceof Error ? error.message : '打开关联词条失败')
         }
     }, [onOpenEntry, selectedIdea])
 
@@ -616,30 +354,15 @@ export function useIdeaPanel({
         }
 
         setConverting(true)
-        setSaveState('saving')
-        setStatusMessage('正在转为词条…')
+        setIdeaFeedback('saving', '正在转为词条…')
 
         try {
-            let latestIdea = selectedIdea
-            const currentProjectId = selectedIdea.project_id ?? null
-            if (
-                selectedIdea.title !== draftTitle
-                || selectedIdea.content !== draftContent
-                || currentProjectId !== draftProjectId
-            ) {
-                latestIdea = await db_update_idea_note({
-                    id: selectedIdea.id,
-                    projectId: currentProjectId === draftProjectId ? undefined : draftProjectId,
-                    title: draftTitle.trim() ? draftTitle : null,
-                    content: draftContent,
-                })
-                setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === latestIdea.id ? latestIdea : item)))
-            }
+            await flushIdeaDraft()
+            const latestIdea = getIdeaSnapshot().ideas.find(item => item.id === selectedIdea.id) ?? selectedIdea
 
             if (!latestIdea.project_id) {
                 await showAlert('请先为这条便签选择所属项目，再转为词条。', 'warning', 'nonInvasive', 1800)
-                setSaveState('idle')
-                setStatusMessage('请先为便签设置所属项目')
+                setIdeaFeedback('idle', '请先为便签设置所属项目')
                 return
             }
 
@@ -654,21 +377,14 @@ export function useIdeaPanel({
                 images: null,
             })
 
-            const convertedIdea = await db_update_idea_note({
+            await updateIdeaNote({
                 id: latestIdea.id,
                 status: 'processed',
                 lastReviewedAt: new Date().toISOString(),
                 convertedEntryId: createdEntry.id,
             })
 
-            setSaveState('saved')
-            setStatusMessage(`已转为词条「${createdEntry.title}」`)
-
-            if (matchesCurrentFilters(convertedIdea)) {
-                setIdeaNotes((prev) => sortIdeaNotes(prev.map((item) => item.id === convertedIdea.id ? convertedIdea : item)))
-            } else {
-                await loadIdeaNotes(convertedIdea.id)
-            }
+            setIdeaFeedback('saved', `已转为词条「${createdEntry.title}」`)
 
             if (openAfterConvert) {
                 onOpenEntry?.(latestIdea.project_id, {
@@ -678,8 +394,7 @@ export function useIdeaPanel({
             }
         } catch (error) {
             logger.error('转为词条失败', error)
-            setSaveState('error')
-            setStatusMessage(error instanceof Error ? error.message : '转为词条失败')
+            setIdeaFeedback('error', error instanceof Error ? error.message : '转为词条失败')
         } finally {
             setConverting(false)
         }
@@ -687,11 +402,8 @@ export function useIdeaPanel({
         convertCategoryId,
         convertEntryType,
         draftContent,
-        draftProjectId,
         draftTitle,
         handleOpenConvertedEntry,
-        loadIdeaNotes,
-        matchesCurrentFilters,
         onOpenEntry,
         openAfterConvert,
         selectedIdea,
@@ -705,15 +417,13 @@ export function useIdeaPanel({
         if (confirmed !== 'yes') return
 
         try {
-            await db_delete_idea_note(selectedIdea.id)
-            await loadIdeaNotes()
-            setStatusMessage('便签已删除，输入内容后会自动创建新的便签')
+            await deleteSelectedIdea()
+            setIdeaFeedback('idle', '便签已删除，输入内容后会自动创建新的便签')
         } catch (error) {
             logger.error('删除灵感便签失败', error)
-            setSaveState('error')
-            setStatusMessage(error instanceof Error ? error.message : '删除便签失败')
+            setIdeaFeedback('error', error instanceof Error ? error.message : '删除便签失败')
         }
-    }, [loadIdeaNotes, selectedIdea, showAlert])
+    }, [selectedIdea, showAlert])
 
     // ===== JSX 拆分：sideContent / mainContent / backdrop =====
 
