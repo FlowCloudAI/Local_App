@@ -56,6 +56,7 @@
 
 .pe-contradiction-layout--single {
     grid-template-columns: minmax(0, 1fr);
+    padding: 0;
 }
 
 .pe-contradiction-sidebar {
@@ -81,10 +82,6 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-xs);
     overflow: hidden;
 }
 
@@ -185,7 +182,11 @@
 
 .pe-contradiction-report__scroll {
     height: 100%;
-    padding: 0.85rem;
+    padding: var(--fc-space-md);
+}
+
+.pe-contradiction-layout--single .pe-contradiction-report__scroll {
+    padding-inline: var(--fc-space-lg);
 }
 
 .pe-contradiction-report__content {
@@ -242,7 +243,7 @@
     padding: 0.6rem 0.7rem;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg);
+    background: var(--fc-color-bg-elevated);
 }
 
 .pe-contradiction-stat-card__value {
@@ -323,10 +324,15 @@
     padding: 0.75rem 0.85rem;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg);
+}
+
+.pe-contradiction-issue-card,
+.pe-contradiction-list__item {
+    background: var(--fc-color-bg-elevated);
 }
 
 .pe-contradiction-empty {
+    background: var(--fc-color-bg);
     font-size: var(--fc-font-size-sm);
     line-height: 1.6;
     color: var(--fc-color-text-secondary);
@@ -480,7 +486,7 @@ button.pe-contradiction-chip--entry:hover {
     padding: 0.6rem 0.7rem;
     border: 1px solid var(--fc-color-border-light);
     border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg-secondary);
+    background: var(--fc-color-bg);
 }
 
 .pe-contradiction-evidence-card__quote {
