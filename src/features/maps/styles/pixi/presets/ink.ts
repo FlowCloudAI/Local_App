@@ -98,6 +98,7 @@ export const inkPixiMapStyle: PixiMapStyle = {
         {
             id: 'terrain',
             params: {
+                organicStrength: 0.86,
                 terrainKinds: {
                     grass: {
                         color: '#71806a',

@@ -97,6 +97,7 @@ export const tolkienPixiMapStyle: PixiMapStyle = {
         {
             id: 'terrain',
             params: {
+                organicStrength: 0.68,
                 terrainKinds: {
                     grass: {
                         color: '#788551',

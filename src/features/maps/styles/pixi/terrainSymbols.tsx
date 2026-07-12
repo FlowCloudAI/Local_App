@@ -122,9 +122,19 @@ export function buildTerrainSymbolPlacements(
                     || !sampleTerrain(field, x, y - margin * 0.85, definition.order)
                     || !sampleTerrain(field, x, y + margin * 0.25, definition.order)) continue
 
+                const densityRadius = spacing * 0.58
+                const interiorSamples = [
+                    sampleTerrain(field, x - densityRadius, y, definition.order),
+                    sampleTerrain(field, x + densityRadius, y, definition.order),
+                    sampleTerrain(field, x, y - densityRadius, definition.order),
+                    sampleTerrain(field, x, y + densityRadius, definition.order),
+                ].filter(Boolean).length
+                const density = 0.30 + interiorSamples / 4 * 0.70
+                if (hashUnit(gridX, gridY, salt + 23) > density) continue
+
                 const variant = Math.min(variants - 1, Math.floor(hashUnit(gridX, gridY, salt + 31) * variants))
                 const asset = variantAssets[variant]
-                const width = targetSize * (0.88 + hashUnit(gridX, gridY, salt + 47) * 0.24)
+                const width = targetSize * (0.70 + hashUnit(gridX, gridY, salt + 47) * 0.60)
                 const height = width * asset.height / asset.width
                 const assetKey = `${assetId}:${color}:${variant}`
                 placements.push({

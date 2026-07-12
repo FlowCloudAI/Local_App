@@ -27,6 +27,7 @@ uniform sampler2D uTerrainField;
 uniform sampler2D uTerrainBasePalette;
 uniform sampler2D uTerrainDetailPalette;
 uniform sampler2D uTerrainRecipePalette;
+uniform float uOrganicStrength;
 
 ${coastFieldGlsl}
 ${valueNoiseGlsl}
@@ -57,11 +58,16 @@ float terrainPattern(float code, vec2 position, float scale) {
     vec2 cell = floor(grid);
     vec2 local = fract(grid) - 0.5;
     float random = hash(cell + vec2(code * 13.7, code * 7.9));
-    local += vec2(hash(cell + 17.3), hash(cell + 39.1)) * 0.24 - 0.12;
+    local += vec2(hash(cell + 17.3), hash(cell + 39.1)) * 0.44 - 0.22;
+    float glyphScale = 0.70 + hash(cell + 53.7) * 0.60;
+    float glyphAngle = (hash(cell + 71.9) - 0.5) * 0.72;
+    float cosine = cos(glyphAngle);
+    float sine = sin(glyphAngle);
+    vec2 grassLocal = mat2(cosine, -sine, sine, cosine) * local / glyphScale;
 
     if (code < 0.5) return 0.0;
     if (code < 1.5) {
-        return bladeGlyph(local, 0.045) * step(0.18, random);
+        return bladeGlyph(grassLocal, 0.045) * step(0.18, random);
     }
     if (code < 2.5) {
         return chevronGlyph(local, 0.045) * step(0.12, random);
@@ -71,7 +77,7 @@ float terrainPattern(float code, vec2 position, float scale) {
         return dotMark * step(0.24, random);
     }
     if (code < 4.5) {
-        return bladeGlyph(local, 0.032) * step(0.46, random);
+        return bladeGlyph(grassLocal, 0.032) * step(0.46, random);
     }
     if (code < 5.5) {
         float stipple = (1.0 - smoothstep(0.035, 0.07, length(local))) * step(0.32, random);
@@ -80,7 +86,7 @@ float terrainPattern(float code, vec2 position, float scale) {
         return max(stipple, dune);
     }
     if (code < 6.5) {
-        float stroke = 1.0 - smoothstep(0.028, 0.065, sdSegment(local, vec2(-0.30, 0.18), vec2(0.28, -0.12)));
+        float stroke = 1.0 - smoothstep(0.028, 0.065, sdSegment(grassLocal, vec2(-0.30, 0.18), vec2(0.28, -0.12)));
         float dry = smoothstep(0.36, 0.62, vnoise(position / 3.4));
         return stroke * dry * step(0.38, random);
     }
@@ -93,7 +99,12 @@ float terrainPattern(float code, vec2 position, float scale) {
 void main() {
     if (coastSd(vUV) >= 0.0) discard;
 
-    vec2 fieldPosition = vUV * uCanvasSize - 0.5;
+    vec2 scenePosition = vUV * uCanvasSize;
+    vec2 fieldWarp = (vec2(
+        vnoise(scenePosition / 23.0),
+        vnoise((scenePosition + vec2(47.0, 113.0)) / 23.0)
+    ) - 0.5) * 4.0 * uOrganicStrength;
+    vec2 fieldPosition = scenePosition + fieldWarp - 0.5;
     vec2 fieldBase = floor(fieldPosition);
     vec2 fieldMix = fract(fieldPosition);
     vec4 terrain = vec4(0.0);
@@ -115,9 +126,19 @@ void main() {
     float total = terrain.a;
     if (total < 0.02) discard;
 
-    vec3 baseColor = terrain.rgb / total;
-    float edgeAlpha = smoothstep(0.30, 0.80, total);
-    float baseAlpha = edgeAlpha * clamp(baseOpacitySum / total, 0.0, 1.0);
+    float broadNoise = vnoise(scenePosition / 68.0);
+    float edgeNoise = vnoise(scenePosition / 7.0);
+    float organicCoverage = total + (edgeNoise - 0.5) * 0.25 * uOrganicStrength;
+    float edgeAlpha = smoothstep(0.30, 0.80, organicCoverage);
+    float washVariation = mix(1.0, 0.70 + broadNoise * 0.30, uOrganicStrength);
+    vec2 edgeProbe = 3.0 / uCanvasSize;
+    float nearbyCoverage = min(
+        min(texture(uTerrainField, vUV - vec2(edgeProbe.x, 0.0)).g,
+            texture(uTerrainField, vUV + vec2(edgeProbe.x, 0.0)).g),
+        min(texture(uTerrainField, vUV - vec2(0.0, edgeProbe.y)).g,
+            texture(uTerrainField, vUV + vec2(0.0, edgeProbe.y)).g)
+    );
+    float sediment = uOrganicStrength * edgeAlpha * (1.0 - nearbyCoverage);
 
     vec2 centerTexel = clamp(floor(fieldPosition + 0.5), vec2(0.0), uCanvasSize - 1.0);
     vec2 centerEncoded = texture(uTerrainField, (centerTexel + 0.5) / uCanvasSize).rg;
@@ -128,6 +149,10 @@ void main() {
     float patternScale = max(4.0, recipe.g * 128.0);
     float pattern = terrainPattern(patternCode, vUV * uCanvasSize, patternScale);
     float detailAlpha = edgeAlpha * detail.a * pattern;
+
+    vec3 baseColor = mix(terrain.rgb / total, detail.rgb, sediment * 0.24);
+    float baseAlpha = edgeAlpha * clamp(baseOpacitySum / total, 0.0, 1.0)
+        * washVariation * (1.0 + sediment * 0.18);
 
     float alpha = detailAlpha + baseAlpha * (1.0 - detailAlpha);
     if (alpha < 0.004) discard;
@@ -210,6 +235,12 @@ function createTerrainShaderRenderer(params: MapStyleParameterRecord): ShaderRen
             uTerrainBasePalette: basePalette.source,
             uTerrainDetailPalette: detailPalette.source,
             uTerrainRecipePalette: recipePalette.source,
+        },
+        uniforms: {
+            uOrganicStrength: {
+                value: Math.max(0, Math.min(1, getNumber(params.organicStrength, 0))),
+                type: 'f32',
+            },
         },
     })
 
