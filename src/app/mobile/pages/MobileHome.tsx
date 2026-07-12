@@ -8,32 +8,30 @@ import {
 } from 'react'
 import {useDrag, useWheel} from '@use-gesture/react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
-import {openFileDialog} from '../../../api/dialog'
 import {
     db_count_entries,
     db_get_entry,
     db_get_project,
-    db_import_project_fcworld,
-    db_preview_project_fcworld,
-    type FcworldImportPreview,
     type FcworldImportResult,
     type Project,
 } from '../../../api'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
 import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
-import {useFcworldProgress} from '../../../features/projects/hooks/useFcworldProgress'
+import {useProjectImportController} from '../../../features/projects/hooks/useProjectImportController'
 import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {
     getHomeActivityTargetKey,
-    HOME_ACTIVITY_CHANGED_EVENT,
-    loadHomeDashboardData,
+    getHomeTargetEntryId,
+    getHomeTargetProjectId,
+    isHomeProjectBackedTarget,
     removeHomeActivityTarget,
     removeHomeEntryActivity,
     removeHomeProjectActivity,
     type HomeActivityRecord,
     type HomeActivityTarget,
     type HomeDashboardData,
+    useHomeDashboard,
 } from '../../../features/home/homeActivity'
 import {type MobilePage} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
@@ -181,18 +179,6 @@ function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
     }
 }
 
-function isProjectBackedTarget(target: HomeActivityTarget) {
-    return target.type === 'project' || target.type === 'entry' || target.type === 'tool'
-}
-
-function getDashboardProjectId(target: HomeActivityTarget) {
-    return target.type === 'project' ? target.projectId ?? target.id : target.projectId ?? null
-}
-
-function getDashboardEntryId(target: HomeActivityTarget) {
-    return target.type === 'entry' ? target.entryId ?? target.id : null
-}
-
 function collectDashboardTargets(dashboard: HomeDashboardData) {
     const targets: HomeActivityTarget[] = [
         ...dashboard.recentItems,
@@ -218,13 +204,12 @@ export default function MobileHome({
         hasLoaded: hasLoadedProjects,
         refresh: refreshProjects,
     } = useProjectListStore()
-    const {progress: fcworldProgress, startProgress, closeProgress, finishProgress} = useFcworldProgress()
     const homeRef = useRef<HTMLDivElement | null>(null)
     const worldPanelRef = useRef<HTMLElement | null>(null)
     const worldActionsRef = useRef<HTMLDivElement | null>(null)
     const touchWorldScrollTopRef = useRef(0)
 
-    const [dashboard, setDashboard] = useState<HomeDashboardData>(() => loadHomeDashboardData())
+    const dashboard = useHomeDashboard()
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [countsError, setCountsError] = useState<string | null>(null)
     const [validEntryTargetKeys, setValidEntryTargetKeys] = useState<Set<string>>(() => new Set())
@@ -236,8 +221,6 @@ export default function MobileHome({
     const [filterOpen, setFilterOpen] = useState(false)
     const [filterAnchor, setFilterAnchor] = useState<{top: number; right: number} | null>(null)
     const [creatorOpen, setCreatorOpen] = useState(false)
-    const [importing, setImporting] = useState(false)
-    const [importConflict, setImportConflict] = useState<FcworldImportPreview | null>(null)
 
     const updateFilterAnchor = useCallback(() => {
         const homeElement = homeRef.current
@@ -280,16 +263,6 @@ export default function MobileHome({
     }, [filterOpen, setBeforeBack])
 
     useEffect(() => {
-        const refreshDashboard = () => setDashboard(loadHomeDashboardData())
-        window.addEventListener(HOME_ACTIVITY_CHANGED_EVENT, refreshDashboard)
-        window.addEventListener('storage', refreshDashboard)
-        return () => {
-            window.removeEventListener(HOME_ACTIVITY_CHANGED_EVENT, refreshDashboard)
-            window.removeEventListener('storage', refreshDashboard)
-        }
-    }, [])
-
-    useEffect(() => {
         if (projects.length === 0) {
             setEntryCounts({})
             setCountsError(null)
@@ -330,9 +303,9 @@ export default function MobileHome({
 
         for (const target of collectDashboardTargets(dashboard)) {
             const key = getHomeActivityTargetKey(target)
-            const projectId = getDashboardProjectId(target)
+            const projectId = getHomeTargetProjectId(target)
 
-            if (isProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
+            if (isHomeProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
                 invalidKeys.add(key)
                 if (projectId) {
                     missingProjectIds.add(projectId)
@@ -343,7 +316,7 @@ export default function MobileHome({
             }
 
             if (target.type === 'entry') {
-                const entryId = getDashboardEntryId(target)
+                const entryId = getHomeTargetEntryId(target)
                 if (!projectId || !entryId) {
                     invalidKeys.add(key)
                     removeHomeActivityTarget(target)
@@ -414,8 +387,8 @@ export default function MobileHome({
         const key = getHomeActivityTargetKey(target)
         if (invalidHomeTargetKeys.has(key)) return false
 
-        if (hasLoadedProjects && isProjectBackedTarget(target)) {
-            const projectId = getDashboardProjectId(target)
+        if (hasLoadedProjects && isHomeProjectBackedTarget(target)) {
+            const projectId = getHomeTargetProjectId(target)
             if (!projectId || !projectIdSet.has(projectId)) return false
         }
 
@@ -478,8 +451,8 @@ export default function MobileHome({
     }, [push, setAiFocus])
 
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
-        const projectId = getDashboardProjectId(target)
-        if (hasLoadedProjects && isProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
+        const projectId = getHomeTargetProjectId(target)
+        if (hasLoadedProjects && isHomeProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
             if (projectId) {
                 removeHomeProjectActivity(projectId)
             } else {
@@ -499,8 +472,8 @@ export default function MobileHome({
         }
 
         if (target.type === 'entry') {
-            const targetProjectId = getDashboardProjectId(target)
-            const targetEntryId = getDashboardEntryId(target)
+            const targetProjectId = getHomeTargetProjectId(target)
+            const targetEntryId = getHomeTargetEntryId(target)
             if (targetProjectId && targetEntryId) {
                 setAiFocus({projectId: targetProjectId, entryId: targetEntryId})
                 push({
@@ -543,95 +516,30 @@ export default function MobileHome({
         handleOpenProject(project)
     }, [handleOpenProject])
 
-    const handleImportProject = useCallback(async () => {
-        if (importing) return
-        const selectedPath = await openFileDialog({
-            multiple: false,
-            filters: [{
-                name: '流云AI World',
-                extensions: ['fcworld'],
-            }],
-        })
-        if (!selectedPath || Array.isArray(selectedPath)) return
-
-        setImporting(true)
-        try {
-            const previewOperationId = startProgress('import', '检查导入包')
-            const preview = await db_preview_project_fcworld(selectedPath, previewOperationId)
-            if (preview.duplicateProject) {
-                closeProgress()
-                setImportConflict(preview)
-                return
-            }
-            closeProgress()
-            const importOperationId = startProgress('import', '导入世界')
-            const result = await db_import_project_fcworld(selectedPath, {
-                mode: 'rename',
-                projectName: preview.projectName,
-            }, importOperationId)
-            finishProgress()
-            await openImportedProject(result)
-        } catch (e) {
-            closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
-        } finally {
-            setImporting(false)
-        }
-    }, [closeProgress, finishProgress, importing, openImportedProject, showAlert, startProgress])
-
-    const handleImportConflictCancel = useCallback(() => {
-        if (!importing) setImportConflict(null)
-    }, [importing])
-
-    const handleImportConflictRename = useCallback(async (projectName: string) => {
-        if (!importConflict || importing) return
-        const inputPath = importConflict.inputPath
-        setImportConflict(null)
-        setImporting(true)
-        try {
-            const operationId = startProgress('import', '导入世界')
-            const result = await db_import_project_fcworld(inputPath, {
-                mode: 'rename',
-                projectName,
-            }, operationId)
-            finishProgress()
-            await openImportedProject(result)
-        } catch (e) {
-            closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
-        } finally {
-            setImporting(false)
-        }
-    }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+    const handleImportError = useCallback(
+        (error: unknown) => showAlert(`导入世界失败：${String(error)}`, 'error', 'nonInvasive', 3200),
+        [showAlert],
+    )
+    const {
+        importing,
+        conflict: importConflict,
+        progress: fcworldProgress,
+        selectAndImport: handleImportProject,
+        rename: handleImportConflictRename,
+        overwrite: importConflictOverwrite,
+        cancelConflict: handleImportConflictCancel,
+    } = useProjectImportController({onImported: openImportedProject, onError: handleImportError})
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
-        const inputPath = importConflict.inputPath
-        const overwriteProjectId = importConflict.duplicateProject.projectId
         const confirmed = await showAlert(
             '选择覆盖后，原世界观的数据会丢失。确定覆盖吗？',
             'warning',
             'confirm',
         )
         if (confirmed !== 'yes') return
-
-        setImportConflict(null)
-        setImporting(true)
-        try {
-            const operationId = startProgress('import', '导入世界')
-            const result = await db_import_project_fcworld(inputPath, {
-                mode: 'overwrite',
-                overwriteProjectId,
-            }, operationId)
-            finishProgress()
-            await openImportedProject(result)
-        } catch (e) {
-            closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
-        } finally {
-            setImporting(false)
-        }
-    }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
+        await importConflictOverwrite()
+    }, [importConflict, importConflictOverwrite, importing, showAlert])
 
     const handleHelp = useCallback(() => {
         void showAlert('首页展示桌面端同一套继续创作和最近内容；向上滑动即可进入世界观列表。', 'info', 'nonInvasive', 2800)

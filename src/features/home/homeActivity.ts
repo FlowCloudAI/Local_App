@@ -1,10 +1,9 @@
+import {useEffect, useSyncExternalStore} from 'react'
 import {buildHelpTargetId, HELP_HOME_LINKS} from '../../shared/help/helpCatalog'
 
 const HOME_ACTIVITY_STORAGE_KEY = 'flowcloudai.home.activity.v1'
 const HOME_SESSION_STORAGE_KEY = 'flowcloudai.home.last-session.v1'
 const MAX_ACTIVITY_RECORDS = 80
-
-export const HOME_ACTIVITY_CHANGED_EVENT = 'fc:home-activity-changed'
 
 export type HomeActivityTargetType = 'project' | 'entry' | 'tool' | 'idea' | 'conversation' | 'snapshot' | 'help'
 export type HomeProjectToolPanel = 'relation-graph' | 'timeline' | 'contradiction' | 'world-map'
@@ -71,13 +70,11 @@ const HOME_HELP_LINKS: HomeHelpLink[] = HELP_HOME_LINKS.map(link => ({
     },
 }))
 
+const dashboardListeners = new Set<() => void>()
+let dashboardSnapshot: HomeDashboardData | null = null
+
 function canUseStorage() {
     return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
-}
-
-function dispatchHomeActivityChanged() {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent(HOME_ACTIVITY_CHANGED_EVENT))
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -106,22 +103,26 @@ export function getHomeActivityTargetKey(target: Pick<HomeActivityTarget, 'type'
     return `${target.type}:${projectPart}:${target.id}:${panelPart}`
 }
 
-function getTargetProjectId(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId'>) {
+export function getHomeTargetProjectId(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId'>) {
     return target.type === 'project' ? target.projectId ?? target.id : target.projectId ?? null
 }
 
-function getTargetEntryId(target: Pick<HomeActivityTarget, 'type' | 'id' | 'entryId'>) {
+export function getHomeTargetEntryId(target: Pick<HomeActivityTarget, 'type' | 'id' | 'entryId'>) {
     return target.type === 'entry' ? target.entryId ?? target.id : null
 }
 
+export function isHomeProjectBackedTarget(target: Pick<HomeActivityTarget, 'type'>) {
+    return target.type === 'project' || target.type === 'entry' || target.type === 'tool'
+}
+
 function isProjectScopedTarget(target: HomeActivityTarget, projectId: string) {
-    return getTargetProjectId(target) === projectId
+    return getHomeTargetProjectId(target) === projectId
 }
 
 function isEntryTarget(target: HomeActivityTarget, projectId: string, entryId: string) {
     return target.type === 'entry'
-        && getTargetProjectId(target) === projectId
-        && getTargetEntryId(target) === entryId
+        && getHomeTargetProjectId(target) === projectId
+        && getHomeTargetEntryId(target) === entryId
 }
 
 function sortByRecentActivity(records: HomeActivityRecord[]) {
@@ -170,7 +171,7 @@ export function recordHomeActivity(target: HomeActivityTarget) {
     ].slice(0, MAX_ACTIVITY_RECORDS)
 
     writeJson(HOME_ACTIVITY_STORAGE_KEY, nextRecords)
-    dispatchHomeActivityChanged()
+    refreshHomeDashboard()
 }
 
 export function setHomeActivityPinned(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId' | 'panel'>, pinned: boolean) {
@@ -180,7 +181,7 @@ export function setHomeActivityPinned(target: Pick<HomeActivityTarget, 'type' | 
         record.key === key ? {...record, pinned} : record
     ))
     writeJson(HOME_ACTIVITY_STORAGE_KEY, nextRecords)
-    dispatchHomeActivityChanged()
+    refreshHomeDashboard()
 }
 
 function pruneStoredHomeActivity(
@@ -199,7 +200,7 @@ function pruneStoredHomeActivity(
         })
     }
 
-    dispatchHomeActivityChanged()
+    refreshHomeDashboard()
 }
 
 export function removeHomeActivityTarget(target: Pick<HomeActivityTarget, 'type' | 'id' | 'projectId' | 'entryId' | 'panel'>) {
@@ -239,7 +240,7 @@ export function saveHomeLastSession(session: Omit<HomeLastSession, 'savedAt'>) {
         ...session,
         savedAt: new Date().toISOString(),
     })
-    dispatchHomeActivityChanged()
+    refreshHomeDashboard()
 }
 
 export function loadHomeLastSession() {
@@ -267,4 +268,39 @@ export function loadHomeDashboardData(): HomeDashboardData {
         helpLinks: HOME_HELP_LINKS,
         updatedAt: new Date().toISOString(),
     }
+}
+
+function subscribeHomeDashboard(listener: () => void) {
+    dashboardListeners.add(listener)
+    return () => dashboardListeners.delete(listener)
+}
+
+function getHomeDashboardSnapshot() {
+    dashboardSnapshot ??= loadHomeDashboardData()
+    return dashboardSnapshot
+}
+
+export function refreshHomeDashboard() {
+    dashboardSnapshot = loadHomeDashboardData()
+    for (const listener of dashboardListeners) listener()
+}
+
+export function useHomeDashboard() {
+    const dashboard = useSyncExternalStore(
+        subscribeHomeDashboard,
+        getHomeDashboardSnapshot,
+        getHomeDashboardSnapshot,
+    )
+
+    useEffect(() => {
+        const handleStorage = (event: StorageEvent) => {
+            if (event.key === HOME_ACTIVITY_STORAGE_KEY || event.key === HOME_SESSION_STORAGE_KEY) {
+                refreshHomeDashboard()
+            }
+        }
+        window.addEventListener('storage', handleStorage)
+        return () => window.removeEventListener('storage', handleStorage)
+    }, [])
+
+    return dashboard
 }
