@@ -186,13 +186,10 @@
 }
 
 /*
- * Android WebView(Chromium 148 实测)光栅化 bug:页面首次渲染时若存在嵌套滚动容器,
- * 其前方同层内容会被按 1/DPR 纵向压扁,且与滚动容器的 display(flex/grid/block)无关。
- * 强制横滑区独立合成层可绕过。新增横滑区必须挂 data-mobile-horizontal-scroll。
+ * 2026-07-13 暂停横滑区强制独立合成：Chromium 148 模拟器会持续触发 tile 内存超限，
+ * 最终可能由 lowmemorykiller 杀死 WebView renderer；真机暂未复现原纵向压扁问题。
+ * 仅在真机重新稳定复现压扁且确认不会增加 tile 内存后，才恢复合成层规避。
  */
-[data-mobile-horizontal-scroll="true"] {
-    transform: translateZ(0);
-}
 
 .mobile-page__loading {
     display: flex;

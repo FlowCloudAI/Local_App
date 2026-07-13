@@ -484,10 +484,6 @@
     scrollbar-width: none;
     scroll-padding-top: var(--mobile-ai-topbar-space);
     scroll-padding-bottom: var(--mobile-ai-composer-space);
-    contain: layout paint;
-    isolation: isolate;
-    transform: translateZ(0);
-    backface-visibility: hidden;
 }
 
 .mobile-ai-chat__messages::-webkit-scrollbar {
