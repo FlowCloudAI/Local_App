@@ -14,7 +14,7 @@ pub async fn plugin_list_local(
         .map(|p| p.join("images"))
         .unwrap_or_else(|| std::env::temp_dir().join("flowcloudai_images"));
     let client = ai_state.client.lock().await;
-    let plugins = client.list_all_plugins();
+    let plugins = client.list_plugins();
     let result = plugins
         .iter()
         .map(|meta| {

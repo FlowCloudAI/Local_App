@@ -42,7 +42,7 @@ pub async fn plugin_check_updates(
 
     let client = ai_state.client.lock().await;
     let result = client
-        .list_all_plugins()
+        .list_plugins()
         .into_iter()
         .filter_map(|meta| {
             let latest = remote_map.get(&meta.id)?;
