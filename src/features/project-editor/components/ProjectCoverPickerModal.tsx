@@ -6,11 +6,15 @@ import {
     ai_list_plugins,
     ai_text_to_image,
     db_list_entries,
+    ErrorCode,
+    formatApiError,
     type EntryBrief,
     type ImageData,
     import_entry_images,
     import_remote_images,
     type PluginInfo,
+    setting_has_api_key,
+    toApiError,
 } from '../../../api'
 import type {EntryImage} from '../../entries/lib/entryImage'
 import {toEntryImageSrc} from '../../entries/lib/entryImage'
@@ -40,6 +44,7 @@ interface ProjectCoverPickerModalProps {
     onClose: () => void
     onSelectCover: (coverPath: string | null) => Promise<void> | void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
+    onOpenAiSettings?: (pluginId: string) => void
 }
 
 function extractEntryCoverImage(entry: EntryBrief): CoverLibraryItem | null {
@@ -70,6 +75,7 @@ export default function ProjectCoverPickerModal({
                                                     onClose,
                                                     onSelectCover,
                                                     onOpenPluginManagement,
+                                                    onOpenAiSettings,
                                                 }: ProjectCoverPickerModalProps) {
     const [activeTab, setActiveTab] = useState<Tab>('existing')
     const [loadingLibrary, setLoadingLibrary] = useState(false)
@@ -87,6 +93,7 @@ export default function ProjectCoverPickerModal({
     const [results, setResults] = useState<ImageData[]>([])
     const [selectedResultIndex, setSelectedResultIndex] = useState(0)
     const [errorMessage, setErrorMessage] = useState('')
+    const [missingApiKeyPluginId, setMissingApiKeyPluginId] = useState('')
     const [applying, setApplying] = useState(false)
     const {showAlert} = useAlert()
 
@@ -110,6 +117,7 @@ export default function ProjectCoverPickerModal({
         setResults([])
         setSelectedResultIndex(0)
         setErrorMessage('')
+        setMissingApiKeyPluginId('')
         setApplying(false)
 
         void (async () => {
@@ -137,7 +145,7 @@ export default function ProjectCoverPickerModal({
             } catch (error) {
                 if (!cancelled) {
                     setPluginsLoaded(true)
-                    const message = error instanceof Error ? error.message : String(error)
+                    const message = formatApiError(toApiError(error))
                     setPluginLoadError(message)
                     setErrorMessage(message)
                     void showAlert(message, 'error', 'nonInvasive', 3000)
@@ -196,7 +204,7 @@ export default function ProjectCoverPickerModal({
             await onSelectCover(coverPath)
             onClose()
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
+            const message = formatApiError(toApiError(error))
             void showAlert(message, 'error', 'nonInvasive', 3000)
         } finally {
             setApplying(false)
@@ -222,7 +230,7 @@ export default function ProjectCoverPickerModal({
             }
             await handleApplyCover(firstImage.path)
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
+            const message = formatApiError(toApiError(error))
             void showAlert(message, 'error', 'nonInvasive', 3000)
         }
     }
@@ -232,7 +240,16 @@ export default function ProjectCoverPickerModal({
 
         setGenerateState('generating')
         setErrorMessage('')
+        setMissingApiKeyPluginId('')
         try {
+            if (!await setting_has_api_key(selectedPlugin)) {
+                const message = `${selectedPluginInfo?.name ?? selectedPlugin} 未配置访问密钥`
+                setMissingApiKeyPluginId(selectedPlugin)
+                setErrorMessage(message)
+                setGenerateState('error')
+                void showAlert(message, 'warning', 'nonInvasive', 2200)
+                return
+            }
             const images = await ai_text_to_image({
                 pluginId: selectedPlugin,
                 model: selectedModel,
@@ -243,7 +260,11 @@ export default function ProjectCoverPickerModal({
             setSelectedResultIndex(0)
             setGenerateState('success')
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
+            const apiError = toApiError(error)
+            const message = formatApiError(apiError)
+            if (apiError.code === ErrorCode.AuthApiKeyMissing) {
+                setMissingApiKeyPluginId(selectedPlugin)
+            }
             setErrorMessage(message)
             setGenerateState('error')
             void showAlert(message, 'error', 'nonInvasive', 3000)
@@ -259,6 +280,7 @@ export default function ProjectCoverPickerModal({
 
         setFillingPrompt(true)
         setErrorMessage('')
+        setMissingApiKeyPluginId('')
         try {
             const result = await ai_fill_image_prompt({
                 pluginId: aiPluginId,
@@ -270,7 +292,11 @@ export default function ProjectCoverPickerModal({
             setPrompt(result.prompt)
             void showAlert('已填充绘图提示词', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
+            const apiError = toApiError(error)
+            const message = formatApiError(apiError)
+            if (apiError.code === ErrorCode.AuthApiKeyMissing) {
+                setMissingApiKeyPluginId(aiPluginId)
+            }
             setErrorMessage(message)
             void showAlert(message, 'error', 'nonInvasive', 3000)
         } finally {
@@ -290,7 +316,7 @@ export default function ProjectCoverPickerModal({
             }
             await handleApplyCover(firstImage.path)
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
+            const message = formatApiError(toApiError(error))
             setErrorMessage(message)
             setGenerateState('error')
             void showAlert(message, 'error', 'nonInvasive', 3000)
@@ -307,6 +333,12 @@ export default function ProjectCoverPickerModal({
     const handleOpenPluginManagement = () => {
         onClose()
         onOpenPluginManagement?.('image')
+    }
+
+    const handleOpenAiSettings = () => {
+        if (!missingApiKeyPluginId) return
+        onClose()
+        onOpenAiSettings?.(missingApiKeyPluginId)
     }
 
     return (
@@ -421,7 +453,10 @@ export default function ProjectCoverPickerModal({
                                     <label className="pe-cover-picker__label">插件</label>
                                     <Select
                                         value={selectedPlugin}
-                                        onValueChange={(value) => setSelectedPlugin(value ? String(value) : '')}
+                                        onValueChange={(value) => {
+                                            setSelectedPlugin(value ? String(value) : '')
+                                            setMissingApiKeyPluginId('')
+                                        }}
                                         placeholder="选择插件"
                                         options={plugins.map((plugin) => ({value: plugin.id, label: plugin.name}))}
                                     />
@@ -488,7 +523,20 @@ export default function ProjectCoverPickerModal({
                             </div>
 
                             {generateState === 'error' && (
-                                <div className="pe-cover-picker__error">生成失败：{errorMessage}</div>
+                                <div className="pe-cover-picker__error" role="alert">
+                                    <span>生成失败：{errorMessage}</span>
+                                    {missingApiKeyPluginId && onOpenAiSettings && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="pe-cover-picker__error-action"
+                                            onClick={handleOpenAiSettings}
+                                        >
+                                            去配置
+                                        </Button>
+                                    )}
+                                </div>
                             )}
 
                             {results.length > 0 && (

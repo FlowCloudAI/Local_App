@@ -234,9 +234,18 @@
 }
 
 .pe-cover-picker__error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
     color: var(--fc-color-danger);
     border: 1px solid var(--fc-color-danger-border);
     background: var(--fc-color-danger-bg);
+    text-align: left;
+}
+
+.pe-cover-picker__error-action {
+    flex: 0 0 auto;
 }
 
 .pe-cover-picker__result-section {

@@ -17,6 +17,10 @@ export interface MobileEntryDetailPageParams extends MobileProjectPageParams {
 
 export type MobileProjectScopedPageParams = MobileProjectPageParams
 
+export interface MobileAiSettingsPageParams {
+    pluginId?: string
+}
+
 export interface MobilePageParamsMap {
     projectList: undefined
     projectHome: MobileProjectPageParams
@@ -25,7 +29,7 @@ export interface MobilePageParamsMap {
     typeManager: MobileProjectScopedPageParams
     tagManager: MobileProjectScopedPageParams
     categoryManager: MobileProjectScopedPageParams
-    settingsAi: undefined
+    settingsAi: MobileAiSettingsPageParams
     settingsPlugins: undefined
     settingsAppearance: undefined
     settingsUsage: undefined

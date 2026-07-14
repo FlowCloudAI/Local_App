@@ -5,10 +5,14 @@ import {
     ai_fill_image_prompt,
     ai_list_plugins,
     ai_text_to_image,
+    ErrorCode,
+    formatApiError,
     type FCImage,
     type ImageData,
     import_remote_images,
     type PluginInfo,
+    setting_has_api_key,
+    toApiError,
 } from '../../../api'
 import {buildEntryImageMarkdownRef, type EntryImage, toEntryImageSrc} from '../lib/entryImage'
 import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
@@ -35,6 +39,7 @@ interface EntryImageAddModalProps {
     onAddAiImages: (images: EntryImage[]) => void
     onInsertImage?: (image: EntryImage) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
+    onOpenAiSettings?: (pluginId: string) => void
 }
 
 export default function EntryImageAddModal({
@@ -53,6 +58,7 @@ export default function EntryImageAddModal({
                                                onAddAiImages,
                                                onInsertImage,
                                                onOpenPluginManagement,
+                                               onOpenAiSettings,
                                            }: EntryImageAddModalProps) {
     const insertMode = mode === 'insert'
     const [activeTab, setActiveTab] = useState<Tab>(insertMode ? 'existing' : 'local')
@@ -69,6 +75,7 @@ export default function EntryImageAddModal({
     const [generateState, setGenerateState] = useState<GenerateState>('idle')
     const [results, setResults] = useState<ImageData[]>([])
     const [errorMessage, setErrorMessage] = useState('')
+    const [missingApiKeyPluginId, setMissingApiKeyPluginId] = useState('')
     const {showAlert} = useAlert()
 
     useEffect(() => {
@@ -80,6 +87,7 @@ export default function EntryImageAddModal({
             setGenerateState('idle')
             setResults([])
             setErrorMessage('')
+            setMissingApiKeyPluginId('')
             setPlugins([])
             setPluginLoadError('')
             setSelectedPlugin('')
@@ -104,7 +112,7 @@ export default function EntryImageAddModal({
             })
             .catch((err) => {
                 logger.error('[EntryImageAddModal] 插件加载失败:', err)
-                setPluginLoadError(err instanceof Error ? err.message : String(err))
+                setPluginLoadError(formatApiError(toApiError(err)))
                 setPluginsLoaded(true)
             })
     }, [open, insertMode])
@@ -144,6 +152,7 @@ export default function EntryImageAddModal({
 
         setFillingPrompt(true)
         setErrorMessage('')
+        setMissingApiKeyPluginId('')
         try {
             const result = await ai_fill_image_prompt({
                 pluginId: aiPluginId,
@@ -158,7 +167,11 @@ export default function EntryImageAddModal({
             setPrompt(result.prompt)
             void showAlert('已填充绘图提示词', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
+            const apiError = toApiError(error)
+            const msg = formatApiError(apiError)
+            if (apiError.code === ErrorCode.AuthApiKeyMissing) {
+                setMissingApiKeyPluginId(aiPluginId)
+            }
             setErrorMessage(msg)
             void showAlert(msg, 'error', 'nonInvasive', 3000)
         } finally {
@@ -171,8 +184,17 @@ export default function EntryImageAddModal({
 
         setGenerateState('generating')
         setErrorMessage('')
+        setMissingApiKeyPluginId('')
 
         try {
+            if (!await setting_has_api_key(selectedPlugin)) {
+                const msg = `${selectedPluginInfo?.name ?? selectedPlugin} 未配置访问密钥`
+                setMissingApiKeyPluginId(selectedPlugin)
+                setErrorMessage(msg)
+                setGenerateState('error')
+                void showAlert(msg, 'warning', 'nonInvasive', 2200)
+                return
+            }
             const images = await ai_text_to_image({
                 pluginId: selectedPlugin,
                 model: selectedModel,
@@ -182,7 +204,11 @@ export default function EntryImageAddModal({
             setResults(images)
             setGenerateState('success')
         } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e)
+            const apiError = toApiError(e)
+            const msg = formatApiError(apiError)
+            if (apiError.code === ErrorCode.AuthApiKeyMissing) {
+                setMissingApiKeyPluginId(selectedPlugin)
+            }
             setErrorMessage(msg)
             setGenerateState('error')
             void showAlert(msg, 'error', 'nonInvasive', 3000)
@@ -220,7 +246,7 @@ export default function EntryImageAddModal({
             }
             onClose()
         } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e)
+            const msg = formatApiError(toApiError(e))
             setErrorMessage(`下载图片失败: ${msg}`)
             setGenerateState('error')
             void showAlert(msg, 'error', 'nonInvasive', 3000)
@@ -235,7 +261,7 @@ export default function EntryImageAddModal({
             }
             onClose()
         } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e)
+            const msg = formatApiError(toApiError(e))
             setErrorMessage(`上传图片失败: ${msg}`)
             void showAlert(msg, 'error', 'nonInvasive', 3000)
         }
@@ -253,6 +279,12 @@ export default function EntryImageAddModal({
     const handleOpenPluginManagement = () => {
         onClose()
         onOpenPluginManagement?.('image')
+    }
+
+    const handleOpenAiSettings = () => {
+        if (!missingApiKeyPluginId) return
+        onClose()
+        onOpenAiSettings?.(missingApiKeyPluginId)
     }
 
     return (
@@ -355,7 +387,10 @@ export default function EntryImageAddModal({
                                     <Select
                                         className="entry-image-add-ai__select"
                                         value={selectedPlugin}
-                                        onValueChange={(v) => setSelectedPlugin(String(v))}
+                                        onValueChange={(v) => {
+                                            setSelectedPlugin(String(v))
+                                            setMissingApiKeyPluginId('')
+                                        }}
                                         placeholder="选择插件"
                                         options={plugins.map((p) => ({value: p.id, label: p.name}))}
                                     />
@@ -422,8 +457,19 @@ export default function EntryImageAddModal({
                             </div>
 
                             {generateState === 'error' && (
-                                <div className="entry-image-add-ai__error">
-                                    生成失败：{errorMessage}
+                                <div className="entry-image-add-ai__error" role="alert">
+                                    <span>生成失败：{errorMessage}</span>
+                                    {missingApiKeyPluginId && onOpenAiSettings && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="entry-image-add-ai__error-action"
+                                            onClick={handleOpenAiSettings}
+                                        >
+                                            去配置
+                                        </Button>
+                                    )}
                                 </div>
                             )}
 

@@ -5,11 +5,13 @@ import {
     ai_get_usage_by_model,
     ai_get_usage_summary,
     exit_app,
+    formatApiError,
     read_app_log,
     type AppLogSnapshot,
     type AppSettings,
     type ApiUsageByModel,
     type ApiUsageSummary,
+    toApiError,
 } from '../../../api'
 import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
@@ -20,6 +22,7 @@ import {
     saveAppSettings,
     useAppSettingsStore,
 } from '../../../features/settings/appSettingsStore'
+import {resolveApiKeyPluginId} from '../../../features/settings/aiSettingsSelection'
 import {
     installLocalPlugin,
     installMarketPlugin,
@@ -76,18 +79,6 @@ function clampEditorFontSize(value: number): number {
     return Math.min(24, Math.max(10, Math.round(value)))
 }
 
-function formatUnknownError(error: unknown): string {
-    if (error instanceof Error) return error.message || error.name
-    if (typeof error === 'string') return error
-    try {
-        const text = JSON.stringify(error)
-        if (text && text !== '{}') return text
-    } catch {
-        // 失败时回退到 String，避免错误格式化自身中断流程。
-    }
-    return String(error)
-}
-
 function getSettingsSection(page?: MobilePage | null): SettingsSection {
     switch (page?.type) {
         case 'settingsAi': return 'ai'
@@ -122,8 +113,14 @@ export default function MobileSettings({push, pop, page}: Props) {
     const appSettingsStore = useAppSettingsStore()
     const pluginCatalog = usePluginCatalogStore()
     const plugins = appSettingsStore.llmPlugins
+    const apiKeyPlugins = useMemo(() => [
+        ...appSettingsStore.llmPlugins,
+        ...appSettingsStore.imagePlugins,
+        ...appSettingsStore.ttsPlugins,
+    ], [appSettingsStore.imagePlugins, appSettingsStore.llmPlugins, appSettingsStore.ttsPlugins])
     const [selectedPlugin, setSelectedPlugin] = useState('')
     const [selectedModel, setSelectedModel] = useState('')
+    const [selectedApiKeyPlugin, setSelectedApiKeyPlugin] = useState('')
     const [apiKeyDraft, setApiKeyDraft] = useState('')
     const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus>('unknown')
     const [apiKeyBusy, setApiKeyBusy] = useState(false)
@@ -178,10 +175,17 @@ export default function MobileSettings({push, pop, page}: Props) {
                 ? current
                 : nextSettings.llm.plugin_id || plugins[0]?.id || ''
         ))
-    }, [appSettingsStore.settings, plugins])
+        const requestedPluginId = page?.type === 'settingsAi' ? page.params.pluginId : undefined
+        setSelectedApiKeyPlugin(current => resolveApiKeyPluginId(
+            requestedPluginId,
+            current,
+            apiKeyPlugins,
+            nextSettings.llm.plugin_id || '',
+        ))
+    }, [apiKeyPlugins, appSettingsStore.settings, page, plugins])
 
     useEffect(() => {
-        if (!selectedPlugin) {
+        if (!selectedApiKeyPlugin) {
             setApiKeyDraft('')
             setApiKeyStatus('unknown')
             return
@@ -190,8 +194,8 @@ export default function MobileSettings({push, pop, page}: Props) {
         setApiKeyDraft('')
         setApiKeyStatus(appSettingsStore.loading
             ? 'checking'
-            : appSettingsStore.apiKeyStatus[selectedPlugin] ? 'configured' : 'missing')
-    }, [appSettingsStore.apiKeyStatus, appSettingsStore.loading, selectedPlugin])
+            : appSettingsStore.apiKeyStatus[selectedApiKeyPlugin] ? 'configured' : 'missing')
+    }, [appSettingsStore.apiKeyStatus, appSettingsStore.loading, selectedApiKeyPlugin])
 
     const handleSave = useCallback(async () => {
         if (!settings) return
@@ -209,13 +213,13 @@ export default function MobileSettings({push, pop, page}: Props) {
             setSettings(saved.settings)
             await showAlert('设置已保存', 'success', 'nonInvasive', 1500)
         } catch (e) {
-            await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`保存失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
     }, [selectedPlugin, selectedModel, theme, settings, showAlert])
 
     const handleSaveApiKey = useCallback(async () => {
-        if (!selectedPlugin) {
-            await showAlert('请先选择 AI 对话插件', 'warning', 'nonInvasive', 1800)
+        if (!selectedApiKeyPlugin) {
+            await showAlert('请先选择插件', 'warning', 'nonInvasive', 1800)
             return
         }
         const nextApiKey = apiKeyDraft.trim()
@@ -226,34 +230,34 @@ export default function MobileSettings({push, pop, page}: Props) {
 
         try {
             setApiKeyBusy(true)
-            await saveAppApiKey(selectedPlugin, nextApiKey)
+            await saveAppApiKey(selectedApiKeyPlugin, nextApiKey)
             setApiKeyDraft('')
             setApiKeyStatus('configured')
             await showAlert('访问密钥已保存', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            await showAlert(`访问密钥保存失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`访问密钥保存失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         } finally {
             setApiKeyBusy(false)
         }
-    }, [apiKeyDraft, selectedPlugin, showAlert])
+    }, [apiKeyDraft, selectedApiKeyPlugin, showAlert])
 
     const handleDeleteApiKey = useCallback(async () => {
-        if (!selectedPlugin) return
+        if (!selectedApiKeyPlugin) return
         const result = await showAlert('确认删除当前插件的访问密钥？', 'warning', 'confirm')
         if (result !== 'yes') return
 
         try {
             setApiKeyBusy(true)
-            await deleteAppApiKey(selectedPlugin)
+            await deleteAppApiKey(selectedApiKeyPlugin)
             setApiKeyDraft('')
             setApiKeyStatus('missing')
             await showAlert('访问密钥已删除', 'success', 'nonInvasive', 1500)
         } catch (error) {
-            await showAlert(`访问密钥删除失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`访问密钥删除失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         } finally {
             setApiKeyBusy(false)
         }
-    }, [selectedPlugin, showAlert])
+    }, [selectedApiKeyPlugin, showAlert])
 
     const handleInstallFromFile = useCallback(async () => {
         const selected = await openFileDialog({
@@ -268,7 +272,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             ],
         }).catch(error => {
             logger.error('[MobileSettings] 打开本地插件选择器失败', error)
-            void showAlert(`打开文件选择器失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            void showAlert(`打开文件选择器失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
             return null
         })
         if (!selected || Array.isArray(selected)) return
@@ -278,7 +282,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 本地插件安装失败', error)
-            await showAlert(`本地插件安装失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`本地插件安装失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         }
     }, [showAlert])
 
@@ -288,7 +292,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             await showAlert(`${info.name} 安装成功`, 'success', 'nonInvasive', 1800)
         } catch (error) {
             logger.error('[MobileSettings] 插件安装失败', error)
-            await showAlert(`插件安装失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`插件安装失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         }
     }, [showAlert])
 
@@ -344,7 +348,7 @@ export default function MobileSettings({push, pop, page}: Props) {
         try {
             setLogSnapshot(await read_app_log())
         } catch (error) {
-            const message = formatUnknownError(error)
+            const message = formatApiError(toApiError(error))
             logger.error('[MobileSettings] 读取应用日志失败', error)
             setLogError(message)
             await showAlert(`读取日志失败：${message}`, 'error', 'nonInvasive', 3000)
@@ -365,14 +369,14 @@ export default function MobileSettings({push, pop, page}: Props) {
             await showAlert('日志内容已复制', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('[MobileSettings] 复制日志失败', error)
-            await showAlert(`复制日志失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`复制日志失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         }
     }, [logSnapshot, showAlert])
 
     const handleOpenOfficialUrl = useCallback((url: string) => {
         void openUrl(url).catch(error => {
             logger.error('[MobileSettings] 打开官方链接失败', error)
-            void showAlert(`打开链接失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            void showAlert(`打开链接失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         })
     }, [showAlert])
 
@@ -382,11 +386,15 @@ export default function MobileSettings({push, pop, page}: Props) {
             await showAlert('邮箱已复制', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('[MobileSettings] 复制官方邮箱失败', error)
-            await showAlert(`复制邮箱失败：${formatUnknownError(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`复制邮箱失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
         }
     }, [showAlert])
 
     const openSettingsPage = useCallback((type: MobileSettingsPageType) => {
+        if (type === 'settingsAi') {
+            push?.({type, params: {}})
+            return
+        }
         push?.({type})
     }, [push])
 
@@ -405,7 +413,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             setUsageSummary(summary)
             setUsageByModel(byModel)
         } catch (error) {
-            const message = formatUnknownError(error)
+            const message = formatApiError(toApiError(error))
             logger.error('[MobileSettings] 加载用量统计失败', error)
             setUsageError(message)
         } finally {
@@ -423,12 +431,22 @@ export default function MobileSettings({push, pop, page}: Props) {
     if (loading) return <div className="mobile-page__loading">加载中…</div>
 
     const pluginOptions = plugins.map(p => ({value: p.id, label: p.name}))
+    const apiKeyPluginOptions = apiKeyPlugins.map(plugin => {
+        const kind = getPluginKindFilterValue(plugin.kind)
+        const kindLabel = kind === 'image' ? '图片' : kind === 'tts' ? '语音' : '对话'
+        return {value: plugin.id, label: `${plugin.name} · ${kindLabel}`}
+    })
     const currentPlugin = plugins.find(p => p.id === selectedPlugin)
     const modelOptions = (currentPlugin?.models ?? []).map(m => ({value: m, label: m}))
     const apiKeyStatusLabel = getApiKeyStatusLabel(apiKeyStatus)
+    const defaultPluginApiKeyStatusLabel = getApiKeyStatusLabel(!selectedPlugin
+        ? 'unknown'
+        : appSettingsStore.loading
+            ? 'checking'
+            : appSettingsStore.apiKeyStatus[selectedPlugin] ? 'configured' : 'missing')
     const apiKeyPlaceholder = apiKeyStatus === 'configured'
         ? '已配置，输入新密钥可覆盖'
-        : '输入当前 AI 对话插件的访问密钥'
+        : '输入当前插件的访问密钥'
 
     const themeOptions = [
         {value: 'system', label: '跟随系统'},
@@ -463,7 +481,7 @@ export default function MobileSettings({push, pop, page}: Props) {
                     marketSummary={marketSummary}
                     localPluginCount={localPlugins.length}
                     currentPluginName={currentPlugin?.name}
-                    apiKeyStatusLabel={apiKeyStatusLabel}
+                    apiKeyStatusLabel={defaultPluginApiKeyStatusLabel}
                     version={version}
                     onOpenPage={openSettingsPage}
                 />
@@ -478,8 +496,10 @@ export default function MobileSettings({push, pop, page}: Props) {
                 <MobileSettingsAiSection
                     selectedPlugin={selectedPlugin}
                     selectedModel={selectedModel}
+                    selectedApiKeyPlugin={selectedApiKeyPlugin}
                     pluginOptions={pluginOptions}
                     modelOptions={modelOptions}
+                    apiKeyPluginOptions={apiKeyPluginOptions}
                     apiKeyStatus={apiKeyStatus}
                     apiKeyStatusLabel={apiKeyStatusLabel}
                     apiKeyDraft={apiKeyDraft}
@@ -487,6 +507,7 @@ export default function MobileSettings({push, pop, page}: Props) {
                     apiKeyPlaceholder={apiKeyPlaceholder}
                     onSelectedPluginChange={setSelectedPlugin}
                     onSelectedModelChange={setSelectedModel}
+                    onSelectedApiKeyPluginChange={setSelectedApiKeyPlugin}
                     onApiKeyDraftChange={setApiKeyDraft}
                     onSaveSettings={handleSave}
                     onSaveApiKey={handleSaveApiKey}

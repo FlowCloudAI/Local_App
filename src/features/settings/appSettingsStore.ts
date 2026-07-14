@@ -94,8 +94,12 @@ export function saveAppSettings(settings: AppSettings) {
     const task = saveQueue.then(async () => {
         const migrationMessage = await setting_update_settings(settings)
         const next = await refreshAppSettings()
-        await refreshAiPluginStore()
-        return {migrationMessage, settings: next.settings ?? settings}
+        const savedSettings = next.settings ?? settings
+        await refreshAiPluginStore({
+            preferredPluginId: savedSettings.llm.plugin_id,
+            preferredModel: savedSettings.llm.default_model,
+        })
+        return {migrationMessage, settings: savedSettings}
     })
     saveQueue = task.catch(() => undefined)
     return task

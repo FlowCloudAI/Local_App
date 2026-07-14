@@ -248,12 +248,20 @@
 }
 
 .entry-image-add-ai__error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
     padding: var(--fc-space-md) var(--fc-space-lg);
     background: var(--fc-color-danger-bg);
     color: var(--fc-color-danger);
     border: 1px solid var(--fc-color-danger-border);
     border-radius: var(--fc-radius-md);
     font-size: var(--fc-font-size-control, 0.875rem);
+}
+
+.entry-image-add-ai__error-action {
+    flex: 0 0 auto;
 }
 
 /* ── 结果 ───────────────────────────────────────────────────────────────── */

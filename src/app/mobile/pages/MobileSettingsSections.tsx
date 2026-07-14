@@ -29,8 +29,10 @@ interface MenuSectionProps {
 interface AiSectionProps {
     selectedPlugin: string
     selectedModel: string
+    selectedApiKeyPlugin: string
     pluginOptions: SelectOption[]
     modelOptions: SelectOption[]
+    apiKeyPluginOptions: SelectOption[]
     apiKeyStatus: ApiKeyStatus
     apiKeyStatusLabel: string
     apiKeyDraft: string
@@ -38,6 +40,7 @@ interface AiSectionProps {
     apiKeyPlaceholder: string
     onSelectedPluginChange: (value: string) => void
     onSelectedModelChange: (value: string) => void
+    onSelectedApiKeyPluginChange: (value: string) => void
     onApiKeyDraftChange: (value: string) => void
     onSaveSettings: () => void | Promise<void>
     onSaveApiKey: () => void | Promise<void>
@@ -258,8 +261,10 @@ export function MobileSettingsMenuSection({
 export function MobileSettingsAiSection({
     selectedPlugin,
     selectedModel,
+    selectedApiKeyPlugin,
     pluginOptions,
     modelOptions,
+    apiKeyPluginOptions,
     apiKeyStatus,
     apiKeyStatusLabel,
     apiKeyDraft,
@@ -267,6 +272,7 @@ export function MobileSettingsAiSection({
     apiKeyPlaceholder,
     onSelectedPluginChange,
     onSelectedModelChange,
+    onSelectedApiKeyPluginChange,
     onApiKeyDraftChange,
     onSaveSettings,
     onSaveApiKey,
@@ -276,7 +282,7 @@ export function MobileSettingsAiSection({
         <div className="mobile-settings-section">
             <div className="mobile-settings-form-stack">
                 <div>
-                    <div className="mobile-settings-field-label">插件</div>
+                    <div className="mobile-settings-field-label">默认对话插件</div>
                     <Select
                         value={selectedPlugin}
                         onValueChange={v => onSelectedPluginChange(String(v ?? ''))}
@@ -285,7 +291,7 @@ export function MobileSettingsAiSection({
                     />
                 </div>
                 <div>
-                    <div className="mobile-settings-field-label">模型</div>
+                    <div className="mobile-settings-field-label">默认对话模型</div>
                     <Select
                         value={selectedModel}
                         onValueChange={v => onSelectedModelChange(String(v ?? ''))}
@@ -305,12 +311,19 @@ export function MobileSettingsAiSection({
                             {apiKeyStatusLabel}
                         </span>
                     </div>
+                    <div className="mobile-settings-field-label">密钥所属插件</div>
+                    <Select
+                        value={selectedApiKeyPlugin}
+                        onValueChange={v => onSelectedApiKeyPluginChange(String(v ?? ''))}
+                        options={apiKeyPluginOptions}
+                        placeholder="选择需要配置密钥的插件"
+                    />
                     <Input
                         type="password"
                         value={apiKeyDraft}
                         onValueChange={onApiKeyDraftChange}
                         placeholder={apiKeyPlaceholder}
-                        disabled={!selectedPlugin || apiKeyBusy}
+                        disabled={!selectedApiKeyPlugin || apiKeyBusy}
                         autoComplete="off"
                         className="mobile-settings-api-key__input"
                     />
@@ -319,7 +332,7 @@ export function MobileSettingsAiSection({
                             type="button"
                             size="sm"
                             onClick={() => void onSaveApiKey()}
-                            disabled={!selectedPlugin || apiKeyBusy || !apiKeyDraft.trim()}
+                            disabled={!selectedApiKeyPlugin || apiKeyBusy || !apiKeyDraft.trim()}
                         >
                             {apiKeyBusy ? '处理中…' : '保存访问密钥'}
                         </Button>
@@ -328,7 +341,7 @@ export function MobileSettingsAiSection({
                             size="sm"
                             variant="ghost"
                             onClick={() => void onDeleteApiKey()}
-                            disabled={!selectedPlugin || apiKeyBusy || apiKeyStatus !== 'configured'}
+                            disabled={!selectedApiKeyPlugin || apiKeyBusy || apiKeyStatus !== 'configured'}
                         >
                             删除
                         </Button>

@@ -484,6 +484,7 @@ export default function MobileProjectHome({
                 currentCoverPath={project.cover_path}
                 onClose={() => setCoverOpen(false)}
                 onSelectCover={(coverPath) => handleChangeCover(coverPath)}
+                onOpenAiSettings={(pluginId) => navigateToTab('settings', {type: 'settingsAi', params: {pluginId}})}
             />
             <FcworldProgressDialog progress={fcworldProgress} />
         </div>
