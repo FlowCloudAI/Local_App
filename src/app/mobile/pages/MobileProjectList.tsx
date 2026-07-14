@@ -6,9 +6,11 @@ import {
     db_get_project,
     db_import_project_fcworld,
     db_preview_project_fcworld,
+    formatApiError,
     type FcworldImportPreview,
     type FcworldImportResult,
     type Project,
+    toApiError,
 } from '../../../api'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
@@ -27,7 +29,7 @@ interface Props {
 
 export default function MobileProjectList({push, setAiFocus}: Props) {
     const {showAlert} = useAlert()
-    const {projects, loading: projectsLoading, error: projectError} = useProjectListStore()
+    const {projects, loading: projectsLoading, error: projectError, refresh: refreshProjects} = useProjectListStore()
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [countsLoading, setCountsLoading] = useState(false)
     const [importing, setImporting] = useState(false)
@@ -58,7 +60,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                 )
                 if (!cancelled) setEntryCounts(Object.fromEntries(counts))
             } catch (e) {
-                if (!cancelled) setCountsError(String(e))
+                if (!cancelled) setCountsError(formatApiError(toApiError(e)))
             } finally {
                 if (!cancelled) setCountsLoading(false)
             }
@@ -72,6 +74,9 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
 
     const loading = projectsLoading || countsLoading
     const error = projectError ?? countsError
+    const retryProjects = useCallback(() => {
+        void refreshProjects()
+    }, [refreshProjects])
 
     const query = searchText.trim().toLowerCase()
     const filtered = projects
@@ -127,7 +132,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
+            await showAlert(`导入世界失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -152,7 +157,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
+            await showAlert(`导入世界失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -181,7 +186,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
             await openImportedProject(result)
         } catch (e) {
             closeProgress()
-            await showAlert(`导入世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
+            await showAlert(`导入世界失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3200)
         } finally {
             setImporting(false)
         }
@@ -192,7 +197,10 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
     }
 
     if (error && projects.length === 0) {
-        return <div className="mobile-page__error">加载失败：{error}</div>
+        return <div className="mobile-page__error" role="alert">
+            <span>加载失败：{error}</span>
+            <Button type="button" size="sm" variant="outline" onClick={retryProjects}>重试</Button>
+        </div>
     }
 
     return (
@@ -252,6 +260,13 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
                     {importing ? '导入中…' : '导入'}
                 </Button>
             </div>
+
+            {error && projects.length > 0 && (
+                <div className="mobile-page__error-banner" role="alert">
+                    <span>部分项目信息刷新失败：{error}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={retryProjects}>重试</Button>
+                </div>
+            )}
 
             {projects.length === 0 && !loading ? (
                 <div className="mobile-page__empty">

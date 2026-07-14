@@ -2,8 +2,10 @@ import {useCallback, useEffect, useSyncExternalStore} from 'react'
 import {
     db_get_project_stats,
     db_list_categories,
+    formatApiError,
     type Category,
     type ProjectStats,
+    toApiError,
 } from '../../api'
 
 export interface ProjectContextSnapshot {
@@ -84,7 +86,7 @@ export async function refreshProjectContext(projectId: string): Promise<ProjectC
         const current = getSnapshot(projectId)
         setProjectSnapshot(projectId, {
             loading: false,
-            error: String(error),
+            error: formatApiError(toApiError(error)),
             hasLoaded: true,
         })
         return {

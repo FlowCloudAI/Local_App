@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
-import {db_create_project, type Project} from '../../../api'
+import {db_create_project, formatApiError, type Project, toApiError} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import {invalidateProjectList} from '../projectListStore'
 import './ProjectCreator.css'
@@ -52,7 +52,7 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
             onCreated?.(project)
             onClose()
         } catch (e) {
-            setApiError(String(e))
+            setApiError(formatApiError(toApiError(e)))
             setSubmitting(false)
         }
     }

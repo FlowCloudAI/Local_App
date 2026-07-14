@@ -12,8 +12,10 @@ import {
     db_count_entries,
     db_get_entry,
     db_get_project,
+    formatApiError,
     type FcworldImportResult,
     type Project,
+    toApiError,
 } from '../../../api'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCreator from '../../../features/projects/components/ProjectCreator'
@@ -44,6 +46,7 @@ import {
     FilterRefreshIcon,
     formatRelativeTime,
     getTargetTypeLabel,
+    MobileHomeContinueCard,
     PANEL_SWITCH_THRESHOLD,
     renderDisplayIcon,
     WORLD_DISPLAY_OPTIONS,
@@ -155,7 +158,7 @@ export default function MobileHome({
                 )
                 if (!cancelled) setEntryCounts(Object.fromEntries(counts))
             } catch (e) {
-                if (!cancelled) setCountsError(String(e))
+                if (!cancelled) setCountsError(formatApiError(toApiError(e)))
             }
         }
         void loadCounts()
@@ -321,6 +324,9 @@ export default function MobileHome({
 
     const loadingWorlds = loading && projects.length === 0
     const worldError = error ?? countsError
+    const retryWorlds = useCallback(() => {
+        void refreshProjects()
+    }, [refreshProjects])
 
     const handleOpenProject = useCallback((project: Project) => {
         setAiFocus({projectId: project.id, entryId: null})
@@ -394,7 +400,7 @@ export default function MobileHome({
     }, [handleOpenProject])
 
     const handleImportError = useCallback(
-        (error: unknown) => showAlert(`导入世界失败：${String(error)}`, 'error', 'nonInvasive', 3200),
+        (error: unknown) => showAlert(`导入世界失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3200),
         [showAlert],
     )
     const {
@@ -562,29 +568,17 @@ export default function MobileHome({
                         <div className="mobile-home__section-head">
                             <h3 className="mobile-home__section-title">继续创作</h3>
                         </div>
-                        {continueItem ? (
-                            <button
-                                type="button"
-                                className="mobile-home__continue"
-                                onClick={() => openDashboardTarget(continueItem)}
-                            >
-                                <span className="mobile-home__eyebrow">上次停在这里</span>
-                                <span className="mobile-home__continue-title">{continueItem.title}</span>
-                                <span className="mobile-home__continue-desc">
-                                    {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
-                                    {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
-                                </span>
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                className="mobile-home__continue mobile-home__continue--empty"
-                                onClick={() => setCreatorOpen(true)}
-                            >
-                                <span className="mobile-home__continue-title">创建你的第一个世界</span>
-                                <span className="mobile-home__continue-desc">从世界观容器开始，再补词条、关系和图片。</span>
-                            </button>
-                        )}
+                        <MobileHomeContinueCard
+                            continueItem={continueItem}
+                            lastSavedAt={dashboard.lastSession?.savedAt}
+                            hasLoadedProjects={hasLoadedProjects}
+                            projectError={error}
+                            projectCount={projects.length}
+                            onOpenTarget={openDashboardTarget}
+                            onOpenWorlds={() => onActivePanelChange('worlds')}
+                            onCreateWorld={() => setCreatorOpen(true)}
+                            onRetry={retryWorlds}
+                        />
                     </section>
 
                     <section className="mobile-home__section mobile-home__section--recent">
@@ -655,7 +649,10 @@ export default function MobileHome({
                     />
 
                     {worldError && projects.length === 0 ? (
-                        <div className="mobile-page__error">加载失败：{worldError}</div>
+                        <div className="mobile-page__error" role="alert">
+                            <span>加载失败：{worldError}</span>
+                            <Button type="button" size="sm" variant="outline" onClick={retryWorlds}>重试</Button>
+                        </div>
                     ) : loadingWorlds ? (
                         <div className="mobile-page__loading mobile-home__state-panel">加载中…</div>
                     ) : projects.length === 0 ? (
@@ -666,9 +663,17 @@ export default function MobileHome({
                     ) : worldProjects.length === 0 ? (
                         <div className="mobile-page__empty mobile-home__state-panel">没有匹配的世界观</div>
                     ) : (
-                        <div className={`mobile-home-worlds__grid mobile-home-worlds__grid--${displayMode}`}>
-                            {worldProjects.map(renderWorldCard)}
-                        </div>
+                        <>
+                            {worldError && (
+                                <div className="mobile-page__error-banner" role="alert">
+                                    <span>部分世界信息刷新失败：{worldError}</span>
+                                    <Button type="button" size="sm" variant="outline" onClick={retryWorlds}>重试</Button>
+                                </div>
+                            )}
+                            <div className={`mobile-home-worlds__grid mobile-home-worlds__grid--${displayMode}`}>
+                                {worldProjects.map(renderWorldCard)}
+                            </div>
+                        </>
                     )}
                 </section>
             </div>

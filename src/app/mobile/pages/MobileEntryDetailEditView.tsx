@@ -18,7 +18,7 @@ export type MobileWikiDraft = {start: number; end: number; query: string}
 export type MobileWikiOption = {kind: 'entry'; id: string; title: string; categoryId: string | null} | {kind: 'create'; title: string}
 
 interface Props {
-    saving: boolean; isDirty: boolean; onCancel: () => void; onSave: () => void
+    saving: boolean; isDirty: boolean; error: string | null; onCancel: () => void; onSave: () => void
     title: string; onTitle: (value: string) => void; summary: string; onSummary: (value: string) => void
     entryType: string | null; onEntryType: (value: string | null) => void; categoryId: string | null; onCategory: (value: string | null) => void
     categories: Category[]; entryTypes: EntryTypeView[]; onOpenTypeCreator: () => void
@@ -52,6 +52,7 @@ export default function MobileEntryDetailEditView(p: Props) {
     return <div className="mobile-page mobile-entry-detail mobile-entry-detail--edit">
         <MobilePageTopBar className="mobile-entry-detail__edit-topbar" sticky edgeToEdge ariaLabel="词条编辑操作"
             left={<MobileTopActionPill actions={[{key: 'cancel', label: '取消编辑', icon: <MobileBackIcon/>, disabled: p.saving, onClick: p.onCancel}]}/>} center={<div className="mobile-entry-detail__edit-heading"><span>编辑词条</span><small>{p.saving ? '保存中…' : p.isDirty ? '有未保存修改' : '已同步'}</small></div>} right={<MobileTopActionPill actions={[{key: 'save', label: p.saving ? '保存中' : '保存词条', icon: <MobileEntryDetailActionIcon type={p.saving ? 'more' : 'save'}/>, kind: 'add', disabled: p.saving, onClick: p.onSave}]}/>}/>
+        {p.error && <div className="mobile-page__error-banner" role="alert"><span>{p.error}</span></div>}
         <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--identity">
             <div className="mobile-entry-detail__section-header"><span>基础信息</span></div>
             <Input placeholder="词条标题" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>

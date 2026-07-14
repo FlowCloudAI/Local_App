@@ -1,4 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
+import {Button} from 'flowcloudai-ui'
 import type {HomeActivityTarget, HomeDashboardData} from '../../../features/home/homeActivity'
 import {formatProjectDate, parseProjectDateMs} from '../../../features/projects/projectDisplay'
 
@@ -6,6 +7,60 @@ export type WorldSortMode = 'updated-desc' | 'created-desc' | 'name-asc' | 'size
 export type WorldDisplayMode = 'card' | 'list'
 
 export const PANEL_SWITCH_THRESHOLD = 72
+
+interface MobileHomeContinueCardProps {
+    continueItem: HomeActivityTarget | null
+    lastSavedAt?: string | null
+    hasLoadedProjects: boolean
+    projectError: string | null
+    projectCount: number
+    onOpenTarget: (target: HomeActivityTarget) => void
+    onOpenWorlds: () => void
+    onCreateWorld: () => void
+    onRetry: () => void
+}
+
+export function MobileHomeContinueCard({
+    continueItem,
+    lastSavedAt,
+    hasLoadedProjects,
+    projectError,
+    projectCount,
+    onOpenTarget,
+    onOpenWorlds,
+    onCreateWorld,
+    onRetry,
+}: MobileHomeContinueCardProps) {
+    if (continueItem) return <button type="button" className="mobile-home__continue" onClick={() => onOpenTarget(continueItem)}>
+        <span className="mobile-home__eyebrow">上次停在这里</span>
+        <span className="mobile-home__continue-title">{continueItem.title}</span>
+        <span className="mobile-home__continue-desc">
+            {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
+            {lastSavedAt ? ` · ${formatRelativeTime(lastSavedAt)}` : ''}
+        </span>
+    </button>
+
+    if (!hasLoadedProjects) return <div className="mobile-home__continue mobile-home__continue--empty" role="status">
+        <span className="mobile-home__continue-title">正在加载世界列表</span>
+        <span className="mobile-home__continue-desc">请稍候…</span>
+    </div>
+
+    if (projectError && projectCount === 0) return <div className="mobile-home__continue mobile-home__continue--empty" role="alert">
+        <span className="mobile-home__continue-title">世界列表加载失败</span>
+        <span className="mobile-home__continue-desc">{projectError}</span>
+        <Button type="button" size="sm" variant="outline" onClick={onRetry}>重试</Button>
+    </div>
+
+    if (projectCount > 0) return <button type="button" className="mobile-home__continue mobile-home__continue--empty" onClick={onOpenWorlds}>
+        <span className="mobile-home__continue-title">选择一个世界继续</span>
+        <span className="mobile-home__continue-desc">已有 {projectCount} 个世界，打开后继续创作。</span>
+    </button>
+
+    return <button type="button" className="mobile-home__continue mobile-home__continue--empty" onClick={onCreateWorld}>
+        <span className="mobile-home__continue-title">创建你的第一个世界</span>
+        <span className="mobile-home__continue-desc">从世界观容器开始，再补词条、关系和图片。</span>
+    </button>
+}
 
 export const WORLD_DISPLAY_OPTIONS: Array<{key: WorldDisplayMode; label: string; desc: string}> = [
     {key: 'card', label: '卡片', desc: '两列封面卡片'},

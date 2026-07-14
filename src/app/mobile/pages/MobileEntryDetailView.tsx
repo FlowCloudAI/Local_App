@@ -27,6 +27,7 @@ interface MobileEntryDetailViewProps {
     pageRef: RefObject<HTMLDivElement | null>
     topActionsRef: RefObject<HTMLDivElement | null>
     entry: Entry
+    error: string | null
     entryType: EntryTypeView | null
     typeBadgeStyle?: CSSProperties
     viewTagSchemas: TagSchema[]
@@ -53,6 +54,7 @@ export function MobileEntryDetailView({
     pageRef,
     topActionsRef,
     entry,
+    error,
     entryType,
     typeBadgeStyle,
     viewTagSchemas,
@@ -128,6 +130,8 @@ export function MobileEntryDetailView({
                     ]}
                 />}
             />
+
+            {error && <div className="mobile-page__error-banner" role="alert"><span>词条刷新失败：{error}</span></div>}
 
             <h1 className="mobile-entry-detail__title">
                 {entry.title}

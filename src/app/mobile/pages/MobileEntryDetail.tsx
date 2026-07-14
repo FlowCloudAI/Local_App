@@ -13,7 +13,7 @@ import {
     useRef,
     useState,
 } from 'react'
-import {type MarkdownEditorRef, useAlert, useTheme} from 'flowcloudai-ui'
+import {Button, type MarkdownEditorRef, useAlert, useTheme} from 'flowcloudai-ui'
 import {
     type Category,
     type CustomEntryType,
@@ -39,7 +39,9 @@ import {
     type EntryUpdatedEvent,
     type EntryTypeView,
     entryTypeKey,
+    formatApiError,
     type TagSchema,
+    toApiError,
 } from '../../../api'
 import type {MobileEntryDetailProps as Props} from './MobileEntryDetailPageProps'
 import {
@@ -83,6 +85,7 @@ import {
 } from './MobileEntryDetailUtils'
 import {MobileEntryDetailView} from './MobileEntryDetailView'
 import MobileEntryDetailEditView, {type MobileWikiDraft, type MobileWikiOption} from './MobileEntryDetailEditView'
+import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import './MobileEntryDetail.css'
 type Mode = 'view' | 'edit'
 
@@ -100,7 +103,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [entry, setEntry] = useState<Entry | null>(null)
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [categories, setCategories] = useState<Category[]>([])
-    const [loading, setLoading] = useState(true)
     const [mode, setMode] = useState<Mode>(params.mode === 'edit' ? 'edit' : 'view')
 
     // 编辑表单字段
@@ -110,6 +112,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [entryType, setEntryType] = useState<string | null>(null)
     const [categoryId, setCategoryId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
+    const [saveError, setSaveError] = useState<string | null>(null)
     const [menuOpen, setMenuOpen] = useState(false)
     const [typeCreatorOpen, setTypeCreatorOpen] = useState(false)
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
@@ -196,11 +199,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         || !areRelationDraftsEqual(relationDrafts, initialRelationDrafts)
     )
 
-    useEffect(() => {
-        if (!entryId) return
-        setLoading(true)
-        reloadEntryState().catch(logger.error).finally(() => setLoading(false))
-    }, [entryId, reloadEntryState])
+    const {loading, loadError, reload: loadEntry, setLoadError} = useMobileEntryDetailLoader(entryId, reloadEntryState)
 
     const enterEdit = useCallback(() => {
         if (entry) syncForm(entry)
@@ -237,6 +236,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             }
             void reloadEntryState()
                 .then((updatedEntry) => {
+                    setLoadError(null)
                     replace({
                         type: 'entryDetail',
                         params: {
@@ -251,6 +251,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 })
                 .catch((error) => {
                     logger.error('刷新后台更新的词条失败', error)
+                    setLoadError(formatApiError(toApiError(error)))
                     void showAlert('词条已更新，但页面刷新失败，请重新打开词条。', 'warning', 'nonInvasive', 2200)
                 })
         })
@@ -260,11 +261,8 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             pop()
         })
 
-        return () => {
-            updatedListener.then((fn) => fn())
-            deletedListener.then((fn) => fn())
-        }
-    }, [entryId, isDirty, mode, params, pop, projectId, reloadEntryState, replace, showAlert])
+        return () => { updatedListener.then((fn) => fn()); deletedListener.then((fn) => fn()) }
+    }, [entryId, isDirty, mode, params, pop, projectId, reloadEntryState, replace, setLoadError, showAlert])
 
     // 取消：已有可回退的查看态则回查看；否则（极端情况无 entry）回退页面。
     const handleCancel = useCallback(async () => {
@@ -352,6 +350,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             return
         }
         setSaving(true)
+        setSaveError(null)
         const tags = buildEntryTagsPayload(tagDraft, entryTags.localTagSchemas, entry.tags)
         try {
             const savedBundle = await db_save_entry_bundle({
@@ -376,7 +375,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             // 同步页面标题（顶部标题取自 params.displayName），保存后继续停留在编辑态。
             replace({type: 'entryDetail', params: {...params, projectId, entryId, displayName: title.trim(), mode: 'edit'}})
         } catch (e) {
-            await showAlert(`保存失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            setSaveError(`保存失败：${formatApiError(toApiError(e))}`)
         } finally {
             setSaving(false)
         }
@@ -389,7 +388,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             await db_delete_entry(entryId, projectId)
             pop()
         } catch (e) {
-            await showAlert(`删除失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`删除失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
     }, [entry, entryId, pop, projectId, showAlert])
 
@@ -550,7 +549,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             await showAlert('已创建并插入双链', 'success', 'nonInvasive', 1500)
         } catch (error) {
             logger.error('创建双链词条失败', error)
-            await showAlert(`创建词条失败：${String(error)}`, 'error', 'nonInvasive', 2200)
+            await showAlert(`创建词条失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 2200)
         } finally {
             setCreatingLinkedEntry(false)
         }
@@ -665,7 +664,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             setImages(current => appendImages(current, nextImportedImages))
             return nextImportedImages
         } catch (error) {
-            await showAlert(`导入图片失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`导入图片失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3000)
             return []
         }
     }, [projectId, showAlert])
@@ -720,6 +719,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     }, [content, entry?.title, getContentTextarea, images, projectId, showAlert, title])
 
     if (loading) return <div className="mobile-page__loading">加载中…</div>
+    if (!entry && loadError) return <div className="mobile-page__error" role="alert"><span>词条加载失败：{loadError}</span><Button type="button" size="sm" variant="outline" onClick={() => void loadEntry()}>重试</Button></div>
     if (!entry) return <div className="mobile-page__error">词条不存在</div>
 
     // ---------- 编辑态 ----------
@@ -732,7 +732,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             onFocus: handleContentFocus, onBlur: handleContentBlur,
         }
         return <MobileEntryDetailEditView
-            saving={saving} isDirty={isDirty} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
+            saving={saving} isDirty={isDirty} error={saveError} onCancel={() => void handleCancel()} onSave={() => void handleSave()}
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
             entryType={entryType} onEntryType={setEntryType} categoryId={categoryId} onCategory={setCategoryId}
             categories={categories} entryTypes={entryTypes} onOpenTypeCreator={() => setTypeCreatorOpen(true)}
@@ -774,7 +774,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         <MobileEntryDetailView
             pageRef={pageRef}
             topActionsRef={topActionsRef}
-            entry={entry}
+            entry={entry} error={loadError}
             entryType={et}
             typeBadgeStyle={typeBadgeStyle}
             viewTagSchemas={viewTagSchemas}

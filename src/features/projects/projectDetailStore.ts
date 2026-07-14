@@ -3,9 +3,11 @@ import {
     db_get_project,
     db_list_all_entry_types,
     db_list_tag_schemas,
+    formatApiError,
     type EntryTypeView,
     type Project,
     type TagSchema,
+    toApiError,
 } from '../../api'
 
 export interface ProjectDetailSnapshot {
@@ -90,7 +92,7 @@ export async function refreshProjectDetail(projectId: string): Promise<ProjectDe
         const current = getSnapshot(projectId)
         setProjectSnapshot(projectId, {
             loading: false,
-            error: String(error),
+            error: formatApiError(toApiError(error)),
             hasLoaded: true,
         })
         return {

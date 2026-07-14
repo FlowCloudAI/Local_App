@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useSyncExternalStore} from 'react'
-import {db_list_projects, type Project} from '../../api'
+import {db_list_projects, formatApiError, type Project, toApiError} from '../../api'
 
 export interface ProjectListSnapshot {
     projects: Project[]
@@ -62,7 +62,7 @@ export async function refreshProjectList(): Promise<Project[]> {
         .catch((error) => {
             setSnapshot({
                 loading: false,
-                error: String(error),
+                error: formatApiError(toApiError(error)),
                 hasLoaded: true,
             })
             return snapshot.projects

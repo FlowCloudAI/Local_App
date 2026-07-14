@@ -9,6 +9,8 @@ import {
     type EntryBrief,
     entryTypeKey,
     type EntryTypeView,
+    formatApiError,
+    toApiError,
 } from '../../../api'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
@@ -60,12 +62,16 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
     const [loading, setLoading] = useState(false)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [entryTypesError, setEntryTypesError] = useState<string | null>(null)
+    const [actionError, setActionError] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
     const [typeFilter, setTypeFilter] = useState<string | null>(null)
     const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const load = useCallback(async (query: string, type: string | null) => {
         setLoading(true)
+        setLoadError(null)
         try {
             let result: EntryBrief[]
             if (query.trim()) {
@@ -88,6 +94,7 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
             setEntries(uncategorizedOnly ? result.filter(entry => !entry.category_id) : result)
         } catch (e) {
             logger.error('加载词条失败', e)
+            setLoadError(formatApiError(toApiError(e)))
         } finally {
             setLoading(false)
         }
@@ -98,10 +105,19 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categoryId, typeFilter])
 
-    useEffect(() => {
-        db_list_all_entry_types(projectId).then(setEntryTypes).catch(() => {
-        })
+    const loadEntryTypes = useCallback(async () => {
+        setEntryTypesError(null)
+        try {
+            setEntryTypes(await db_list_all_entry_types(projectId))
+        } catch (error) {
+            logger.error('加载词条类型失败', error)
+            setEntryTypesError(formatApiError(toApiError(error)))
+        }
     }, [projectId])
+
+    useEffect(() => {
+        void loadEntryTypes()
+    }, [loadEntryTypes])
 
     const handleSearch = (value: string) => {
         setSearchText(value)
@@ -110,14 +126,21 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
     }
 
     const handleCreateEntry = async () => {
+        setActionError(null)
         try {
             const created = await db_create_entry({projectId, categoryId, title: '未命名词条'})
             setAiFocus({projectId, entryId: created.id})
             push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit'}})
         } catch (e) {
             logger.error('新建词条失败', e)
+            setActionError(formatApiError(toApiError(e)))
         }
     }
+
+    const retryLoad = useCallback(() => {
+        void load(searchText, typeFilter)
+        void loadEntryTypes()
+    }, [load, loadEntryTypes, searchText, typeFilter])
 
     const handleOpenEntry = (entry: EntryBrief) => {
         setAiFocus({projectId, entryId: entry.id})
@@ -160,6 +183,26 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                     ]}
                 />}
             />
+
+            {(actionError || (loadError && entries.length > 0) || entryTypesError) && (
+                <div className="mobile-page__error-banner" role="alert">
+                    <span>
+                        {actionError
+                            ? `新建词条失败：${actionError}`
+                            : loadError
+                                ? `词条列表刷新失败：${loadError}`
+                                : `词条类型加载失败：${entryTypesError}`}
+                    </span>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => actionError ? void handleCreateEntry() : retryLoad()}
+                    >
+                        重试
+                    </Button>
+                </div>
+            )}
 
             <div className="mobile-entry-list__hero">
                 <span className="mobile-entry-list__eyebrow">{loading ? '正在同步' : `${entries.length} 个词条`}</span>
@@ -207,8 +250,13 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
                 </div>
             )}
 
-            {loading ? (
+            {loading && entries.length === 0 ? (
                 <div className="mobile-page__loading">加载中…</div>
+            ) : loadError && entries.length === 0 ? (
+                <div className="mobile-page__error" role="alert">
+                    <span>词条加载失败：{loadError}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={retryLoad}>重试</Button>
+                </div>
             ) : entries.length === 0 ? (
                 <div className="mobile-page__empty">
                     <p>暂无词条</p>

@@ -7,6 +7,8 @@ import {
     db_delete_project,
     db_export_project_fcworld,
     db_update_project,
+    formatApiError,
+    toApiError,
 } from '../../../api'
 import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
 import {type MobileTab} from '../MobileNav'
@@ -131,6 +133,8 @@ export default function MobileProjectHome({
     const [descriptionOpen, setDescriptionOpen] = useState(false)
     const [descriptionDraft, setDescriptionDraft] = useState('')
     const [descriptionSaving, setDescriptionSaving] = useState(false)
+    const [descriptionError, setDescriptionError] = useState<string | null>(null)
+    const [actionError, setActionError] = useState<string | null>(null)
     const [exporting, setExporting] = useState(false)
     const projectDetail = useProjectDetailStore(projectId)
     const project = projectDetail.project
@@ -139,8 +143,13 @@ export default function MobileProjectHome({
     const projectContext = useProjectContextStore(projectId)
     const categories = projectContext.categories
     const stats = projectContext.stats
+    const loadError = projectDetail.error ?? projectContext.error
+    const retryLoad = useCallback(() => {
+        void Promise.all([projectDetail.refresh(), projectContext.refresh()])
+    }, [projectContext, projectDetail])
 
     const handleCreateEntry = useCallback(async (categoryId: string | null) => {
+        setActionError(null)
         try {
             const created = await db_create_entry({
                 projectId,
@@ -152,6 +161,7 @@ export default function MobileProjectHome({
             push({type: 'entryDetail', params: {projectId, entryId: created.id, displayName: '未命名词条', mode: 'edit'}})
         } catch (e) {
             logger.error('新建词条失败', e)
+            setActionError(`新建词条失败：${formatApiError(toApiError(e))}`)
         }
     }, [projectId, push, setAiFocus])
 
@@ -176,7 +186,7 @@ export default function MobileProjectHome({
             invalidateProjectList()
             setRenameOpen(false)
         } catch (e) {
-            await showAlert(`重命名失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`重命名失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         } finally {
             setRenaming(false)
         }
@@ -189,17 +199,19 @@ export default function MobileProjectHome({
             invalidateProjectList()
             setCoverOpen(false)
         } catch (e) {
-            await showAlert(`更换封面失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`更换封面失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
     }, [projectId, showAlert])
 
     const handleOpenDescription = useCallback(() => {
         setDescriptionDraft(project?.description ?? '')
+        setDescriptionError(null)
         setDescriptionOpen(true)
     }, [project?.description])
 
     const handleSaveDescription = useCallback(async () => {
         setDescriptionSaving(true)
+        setDescriptionError(null)
         try {
             const description = descriptionDraft.trim() || null
             const updated = await db_update_project({id: projectId, description})
@@ -207,11 +219,11 @@ export default function MobileProjectHome({
             invalidateProjectList()
             setDescriptionOpen(false)
         } catch (e) {
-            await showAlert(`保存描述失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            setDescriptionError(`保存描述失败：${formatApiError(toApiError(e))}`)
         } finally {
             setDescriptionSaving(false)
         }
-    }, [descriptionDraft, projectId, showAlert])
+    }, [descriptionDraft, projectId])
 
     const handleExportProject = useCallback(async () => {
         if (!project || exporting) return
@@ -231,7 +243,7 @@ export default function MobileProjectHome({
             finishProgress()
         } catch (e) {
             closeProgress()
-            await showAlert(`导出世界失败：${String(e)}`, 'error', 'nonInvasive', 3200)
+            await showAlert(`导出世界失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3200)
         } finally {
             setExporting(false)
         }
@@ -249,14 +261,17 @@ export default function MobileProjectHome({
             invalidateProjectList()
             pop()
         } catch (e) {
-            await showAlert(`删除项目失败：${String(e)}`, 'error', 'nonInvasive', 3000)
+            await showAlert(`删除项目失败：${formatApiError(toApiError(e))}`, 'error', 'nonInvasive', 3000)
         }
     }, [project, projectId, pop, showAlert])
 
     if ((projectDetail.loading && !projectDetail.hasLoaded) || (projectContext.loading && !projectContext.hasLoaded)) {
         return <div className="mobile-page__loading">加载中…</div>
     }
-    if (!project && projectDetail.error) return <div className="mobile-page__error">项目加载失败：{projectDetail.error}</div>
+    if (!project && loadError) return <div className="mobile-page__error" role="alert">
+        <span>项目加载失败：{loadError}</span>
+        <Button type="button" size="sm" variant="outline" onClick={retryLoad}>重试</Button>
+    </div>
     if (!project) return <div className="mobile-page__error">项目不存在</div>
 
     const image = toProjectImageSrc(project.cover_path)
@@ -368,6 +383,19 @@ export default function MobileProjectHome({
                 />}
             />
 
+            {loadError && (
+                <div className="mobile-page__error-banner" role="alert">
+                    <span>部分项目信息刷新失败：{loadError}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={retryLoad}>重试</Button>
+                </div>
+            )}
+            {actionError && (
+                <div className="mobile-page__error-banner" role="alert">
+                    <span>{actionError}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void handleCreateEntry(null)}>重试</Button>
+                </div>
+            )}
+
             <ProjectHomeHero
                 projectName={project.name}
                 description={project.description}
@@ -438,6 +466,9 @@ export default function MobileProjectHome({
                     rows={5}
                     className="mobile-project-home__description-input"
                 />
+                {descriptionError && (
+                    <div className="mobile-page__error-banner" role="alert">{descriptionError}</div>
+                )}
                 <div className="fc-rename-dialog__actions">
                     <Button type="button" variant="ghost" size="sm" onClick={() => setDescriptionOpen(false)} disabled={descriptionSaving}>取消</Button>
                     <Button type="button" size="sm" onClick={() => void handleSaveDescription()} disabled={descriptionSaving}>

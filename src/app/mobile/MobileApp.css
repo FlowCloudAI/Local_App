@@ -202,13 +202,34 @@
 
 .mobile-page__error {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: var(--fc-space-md);
     height: 100%;
     color: var(--fc-color-danger);
     font-size: var(--fc-font-size-sm);
     padding: var(--fc-space-xl);
     text-align: center;
+}
+
+.mobile-page__error-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+    margin: 0 var(--fc-space-lg) var(--fc-space-md);
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    border: 1px solid var(--fc-color-danger-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-danger-bg);
+    color: var(--fc-color-danger);
+    font-size: var(--fc-font-size-sm);
+}
+
+.mobile-page__error-banner > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .mobile-page__empty {

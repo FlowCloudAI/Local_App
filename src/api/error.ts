@@ -92,7 +92,25 @@ export function toApiError(value: unknown): ApiError {
         return { code: ErrorCode.CoreClientInternalError, message: value.message || value.name }
     }
 
-    return { code: ErrorCode.CoreClientInternalError, message: String(value) }
+    if (value && typeof value === 'object') {
+        const message = (value as Record<string, unknown>).message
+        if (typeof message === 'string' && message.trim()) {
+            return { code: ErrorCode.CoreClientInternalError, message: message.trim() }
+        }
+
+        try {
+            const serialized = JSON.stringify(value)
+            if (serialized && serialized !== '{}') {
+                return { code: ErrorCode.CoreClientInternalError, message: serialized }
+            }
+        } catch {
+            // 循环引用等对象无法序列化时，统一回退为可读文案。
+        }
+        return { code: ErrorCode.CoreClientInternalError, message: '未知错误' }
+    }
+
+    const message = String(value).trim()
+    return { code: ErrorCode.CoreClientInternalError, message: message || '未知错误' }
 }
 
 /** 取 message，用于直接展示；错误码仅留给调用方日志。 */
