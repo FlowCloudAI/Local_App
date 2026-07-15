@@ -5,7 +5,7 @@ import {createRoot} from 'react-dom/client'
 import AppShell from './app/index/AppShell'
 import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
 import {getAppSettingsSnapshot, subscribeAppSettings} from './features/settings/appSettingsStore'
-import {getFormFactorOverride, isTauriRuntime} from './shared/devPreview'
+import {getFormFactorOverride, isDevPreviewBackendEnabled, isTauriRuntime} from './shared/devPreview'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
 import './glassEffect.css'
@@ -60,6 +60,13 @@ const initApp = async () => {
     let initialTheme = 'system'
     let platformInfo = getFallbackPlatformInfo()
     let shellAcrylicEnabled = true
+
+    // 开发期浏览器预览：装上内存 mock 后端，让预览能走真实数据流而不是每页「加载失败」。
+    // 必须在首个 IPC 之前装。动态 import 且整体在 DEV 分支内 → 生产构建不会打进产物。
+    if (import.meta.env.DEV && isDevPreviewBackendEnabled()) {
+        const {installDevPreviewBackend} = await import('./shared/devPreviewBackend')
+        installDevPreviewBackend()
+    }
 
     // 并行发起两个 IPC，节省一个往返延迟
     const [settingsResult, platformResult] = await Promise.allSettled([

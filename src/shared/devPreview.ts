@@ -5,12 +5,15 @@
  * 无需每次起 Tauri / 安卓，加速 UI 迭代。
  *
  * 重要边界：浏览器没有 Tauri 运行时，后端 IPC（db_* / ai_* / setting_* 等）
- * 全部不可用，因此预览仅验证布局、手势与动画手感；数据加载与 AI 不会工作，
- * 词条/项目等页面会停在加载失败或空态，属正常现象。
+ * 本身不可用。为此预览默认会装上内存 mock 后端（见 shared/devPreviewBackend），
+ * 让核心创作闭环（项目 → 词条 → 编辑 → 保存）可以真跑；`?mock=off` 可关掉它，
+ * 回到「每页加载失败」的裸预览，用于走查错误态。
+ * mock 未覆盖的领域（AI、插件、地图等）仍会失败，属正常现象。
  */
 import type {PlatformFormFactor} from '../api/platform'
 
 const PREVIEW_FORM_FACTOR_KEY = 'fc:preview-form-factor'
+const PREVIEW_MOCK_KEY = 'fc:preview-mock'
 
 /** 当前是否运行在 Tauri 运行时（注入了 __TAURI_INTERNALS__ / __TAURI__）。 */
 export function isTauriRuntime(): boolean {
@@ -31,18 +34,31 @@ export function isBrowserPreview(): boolean {
  */
 export function getFormFactorOverride(): PlatformFormFactor | null {
     if (!import.meta.env.DEV || typeof window === 'undefined') return null
-    let raw: string | null = null
+    const raw = readPreviewFlag('ff', 'formFactor', PREVIEW_FORM_FACTOR_KEY)
+    return raw === 'mobile' || raw === 'desktop' ? raw : null
+}
+
+/**
+ * 浏览器预览是否启用内存 mock 后端。默认开，`?mock=off` 关闭。
+ * 与 `?ff` 一样写入 localStorage 保持。仅 dev + 非 Tauri 下为 true。
+ */
+export function isDevPreviewBackendEnabled(): boolean {
+    if (!isBrowserPreview()) return false
+    return readPreviewFlag('mock', null, PREVIEW_MOCK_KEY) !== 'off'
+}
+
+/** 读取预览开关：URL 参数优先并写入 localStorage，无参数时回读 localStorage。 */
+function readPreviewFlag(param: string, altParam: string | null, storageKey: string): string | null {
+    if (typeof window === 'undefined') return null
     try {
         const params = new URLSearchParams(window.location.search)
-        const fromUrl = params.get('ff') ?? params.get('formFactor')
+        const fromUrl = params.get(param) ?? (altParam ? params.get(altParam) : null)
         if (fromUrl) {
-            raw = fromUrl
-            window.localStorage.setItem(PREVIEW_FORM_FACTOR_KEY, fromUrl)
-        } else {
-            raw = window.localStorage.getItem(PREVIEW_FORM_FACTOR_KEY)
+            window.localStorage.setItem(storageKey, fromUrl)
+            return fromUrl
         }
+        return window.localStorage.getItem(storageKey)
     } catch {
         return null
     }
-    return raw === 'mobile' || raw === 'desktop' ? raw : null
 }
