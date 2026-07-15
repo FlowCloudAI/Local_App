@@ -39,6 +39,11 @@ interface MobileEntryDetailViewProps {
     outgoingLinks: EntryLink[]
     incomingLinks: EntryLink[]
     entryBriefById: Map<string, EntryBrief>
+    /**
+     * 关联卡的标题还在按需拉取中（见 MobileEntryDetail 的 ensureProjectEntries）。
+     * 用于区分「还没解析出来」和「真的被删了」——否则列表到达前每张卡都会诬告词条已删除。
+     */
+    connectionsResolving: boolean
     colorMode: 'light' | 'dark'
     menuOpen: boolean
     setMenuOpen: Dispatch<SetStateAction<boolean>>
@@ -66,6 +71,7 @@ export function MobileEntryDetailView({
     outgoingLinks,
     incomingLinks,
     entryBriefById,
+    connectionsResolving,
     colorMode,
     menuOpen,
     setMenuOpen,
@@ -216,7 +222,7 @@ export function MobileEntryDetailView({
                                         onClick={() => relation.otherEntryId && onOpenLinkedEntry(relation.otherEntryId)}
                                     >
                                         <span className="mobile-entry-detail__connection-title">
-                                            {target?.title ?? '词条不存在或已删除'}
+                                            {target?.title ?? (connectionsResolving ? '载入中…' : '词条不存在或已删除')}
                                         </span>
                                         <span className="mobile-entry-detail__connection-meta">
                                             {directionLabel}{relation.content ? ` · ${relation.content}` : ''}
@@ -245,7 +251,7 @@ export function MobileEntryDetailView({
                                         onClick={() => onOpenLinkedEntry(link.b_id)}
                                     >
                                         <span className="mobile-entry-detail__connection-title">
-                                            {target?.title ?? '词条不存在或已删除'}
+                                            {target?.title ?? (connectionsResolving ? '载入中…' : '词条不存在或已删除')}
                                         </span>
                                         {target?.summary && (
                                             <span className="mobile-entry-detail__connection-excerpt">
@@ -271,7 +277,7 @@ export function MobileEntryDetailView({
                                         onClick={() => onOpenLinkedEntry(link.a_id)}
                                     >
                                         <span className="mobile-entry-detail__connection-title">
-                                            {source?.title ?? '词条不存在或已删除'}
+                                            {source?.title ?? (connectionsResolving ? '载入中…' : '词条不存在或已删除')}
                                         </span>
                                         {source?.summary && (
                                             <span className="mobile-entry-detail__connection-excerpt">

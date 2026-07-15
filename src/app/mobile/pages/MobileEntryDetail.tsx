@@ -89,6 +89,9 @@ import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import './MobileEntryDetail.css'
 type Mode = 'view' | 'edit'
 
+/** 双链候选/关系选择器的查表上限。仅在真正需要时才拉（见 ensureProjectEntries）。 */
+const PROJECT_ENTRY_LOOKUP_LIMIT = 1000
+
 export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeLeave, setAiFocus, params}: Props) {
     const projectId = params.projectId
     const entryId = params.entryId ?? ''
@@ -99,6 +102,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const contentEditorRef = useRef<MarkdownEditorRef>(null)
     const immersiveContentEditorRef = useRef<MarkdownEditorRef>(null)
     const wikiDraftRetainTimerRef = useRef<number | null>(null)
+    const projectEntriesRequestRef = useRef<Promise<EntryBrief[]> | null>(null)
 
     const [entry, setEntry] = useState<Entry | null>(null)
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
@@ -123,6 +127,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const [lightboxOpen, setLightboxOpen] = useState(false)
     const [lightboxIndex, setLightboxIndex] = useState(0)
     const [projectEntries, setProjectEntries] = useState<EntryBrief[]>([])
+    const [projectEntriesLoaded, setProjectEntriesLoaded] = useState(false)
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [entryRelations, setEntryRelations] = useState<EntryRelation[]>([])
@@ -164,13 +169,36 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setImages(normalizeEntryImages(e.images))
     }, [])
 
+    /**
+     * 全量词条列表只有三处要用：正文 `[[` 双链候选、编辑态的关系选择器、
+     * 以及查看态解析关联卡上的标题。它原先挂在 reloadEntryState 的 Promise.all 里，
+     * 于是**每开一个词条都要把整个项目的词条拉过 IPC，且卡在首屏渲染的关键路径上**——
+     * 千条词条的世界观在低端安卓机上这一发就是主要开销。改为按需加载：
+     * 没有关联、也不进编辑态的词条，一行都不拉。
+     */
+    const ensureProjectEntries = useCallback(() => {
+        if (projectEntriesRequestRef.current) return projectEntriesRequestRef.current
+        const request = db_list_entries({projectId, limit: PROJECT_ENTRY_LOOKUP_LIMIT, offset: 0})
+            .then((briefs) => {
+                setProjectEntries(briefs)
+                setProjectEntriesLoaded(true)
+                return briefs
+            })
+            .catch((error) => {
+                logger.error('加载项目词条列表失败', error)
+                projectEntriesRequestRef.current = null // 允许后续重试
+                return [] as EntryBrief[]
+            })
+        projectEntriesRequestRef.current = request
+        return request
+    }, [projectId])
+
     const reloadEntryState = useCallback(async () => {
-        const [e, types, cats, schemas, briefs, outgoing, incoming, relations] = await Promise.all([
+        const [e, types, cats, schemas, outgoing, incoming, relations] = await Promise.all([
             db_get_entry(entryId, projectId),
             db_list_all_entry_types(projectId),
             db_list_categories(projectId),
             db_list_tag_schemas(projectId),
-            db_list_entries({projectId, limit: 1000, offset: 0}),
             db_list_outgoing_links(entryId, projectId).catch(() => [] as EntryLink[]),
             db_list_incoming_links(entryId, projectId).catch(() => [] as EntryLink[]),
             db_list_relations_for_entry(entryId, projectId).catch(() => [] as EntryRelation[]),
@@ -179,7 +207,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setEntryTypes(types)
         setCategories(cats)
         setTagSchemas(schemas)
-        setProjectEntries(briefs)
         setOutgoingLinks(outgoing)
         setIncomingLinks(incoming)
         setEntryRelations(relations)
@@ -200,6 +227,15 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     )
 
     const {loading, loadError, reload: loadEntry, setLoadError} = useMobileEntryDetailLoader(entryId, reloadEntryState)
+
+    const hasConnectionData = entryRelations.length > 0 || outgoingLinks.length > 0 || incomingLinks.length > 0
+
+    useEffect(() => {
+        // 编辑态必然要全量列表（双链候选 + 关系选择器）；
+        // 查看态只有存在关联卡、需要把 id 解析成标题时才要。两者都在首屏渲染之后才发。
+        if (mode !== 'edit' && !hasConnectionData) return
+        void ensureProjectEntries()
+    }, [ensureProjectEntries, hasConnectionData, mode])
 
     const enterEdit = useCallback(() => {
         if (entry) syncForm(entry)
@@ -316,13 +352,17 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 handleOpenLinkedEntry(targetProjectId, internalLink.entryId, internalLink.title)
                 return
             }
+            // 只有标题、没有 entryId 的旧版链接才需要全量列表查表——按需拉，别为它拖慢开屏。
             const targetTitle = internalLink.title.trim()
-            const target = projectEntries.find(item => item.title.trim() === targetTitle)
-            if (!target) {
-                void showAlert(`未找到词条「${targetTitle}」`, 'warning', 'nonInvasive', 1800)
-                return
-            }
-            handleOpenLinkedEntry(projectId, target.id, target.title)
+            void (async () => {
+                const entries = await ensureProjectEntries()
+                const target = entries.find(item => item.title.trim() === targetTitle)
+                if (!target) {
+                    void showAlert(`未找到词条「${targetTitle}」`, 'warning', 'nonInvasive', 1800)
+                    return
+                }
+                handleOpenLinkedEntry(projectId, target.id, target.title)
+            })()
             return
         }
 
@@ -339,7 +379,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             event.preventDefault()
             void showAlert('无效链接，已阻止跳转', 'warning', 'nonInvasive', 1500)
         }
-    }, [handleOpenLinkedEntry, projectEntries, projectId, showAlert])
+    }, [ensureProjectEntries, handleOpenLinkedEntry, projectId, showAlert])
 
     const handleSave = useCallback(async () => {
         if (!title.trim()) {
@@ -788,6 +828,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             outgoingLinks={outgoingLinks}
             incomingLinks={incomingLinks}
             entryBriefById={entryBriefById}
+            connectionsResolving={hasConnectionData && !projectEntriesLoaded}
             colorMode={colorMode}
             menuOpen={menuOpen}
             setMenuOpen={setMenuOpen}
