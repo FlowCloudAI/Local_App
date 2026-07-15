@@ -64,6 +64,8 @@ export interface PageStack {
     pop: () => void
     back: (fallback: () => void) => void
     replace: (page: MobilePage) => void
+    /** 清空整个栈回到 Tab 根页。用于「再点一次当前 Tab」。 */
+    popToRoot: () => void
     /** 切 Tab 时调用，避免回到本 Tab 时重放上一次 push/pop 的方向动画。 */
     resetNavigation: () => void
     lastNavigation: MobilePageNavigation
@@ -133,6 +135,13 @@ export function usePageStack(): PageStack {
         setLastNavigation('replace')
     }, [])
 
+    const popToRoot = useCallback(() => {
+        if (entriesRef.current.length === 0) return
+        entriesRef.current = []
+        setEntries([])
+        setLastNavigation('pop')
+    }, [])
+
     const resetNavigation = useCallback(() => {
         setLastNavigation('none')
     }, [])
@@ -145,6 +154,7 @@ export function usePageStack(): PageStack {
         pop,
         back,
         replace,
+        popToRoot,
         resetNavigation,
         lastNavigation,
         currentPage: currentEntry?.page ?? null,

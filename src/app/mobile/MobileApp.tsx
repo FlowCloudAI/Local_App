@@ -273,7 +273,17 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [activeStack, categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
     const handleTabChange = useCallback((tab: MobileTab) => {
-        if (tab === activeTab) return
+        // 再点一次当前 Tab = 回到该 Tab 根页（移动端通用约定）。
+        // 深在词条详情里点「首页」原本毫无反应，用户没有快速逃生口。
+        if (tab === activeTab) {
+            if (!activeStack.canGoBack) return
+            void (async () => {
+                if (!await runLeaveGuard('leave')) return
+                closeCategoryDrawer()
+                activeStack.popToRoot()
+            })()
+            return
+        }
         void (async () => {
             if (!await runLeaveGuard('leave')) return
             closeCategoryDrawer()
@@ -281,7 +291,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             // 切 Tab 是横向跳转，不该重放目标 Tab 上一次 push/pop 的方向动画。
             stacks[tab].resetNavigation()
         })()
-    }, [activeTab, closeCategoryDrawer, runLeaveGuard, stacks])
+    }, [activeStack, activeTab, closeCategoryDrawer, runLeaveGuard, stacks])
 
     const setBeforeLeave = useCallback((handler: MobileBeforeLeave | null) => {
         beforeLeaveRef.current = handler
