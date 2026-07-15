@@ -70,11 +70,31 @@
 
 - M2-1 ⬜ 主页/列表合并（Tab 根页=列表 + "继续上次"strip）。
 - M2-2 ✅ 词条详情/编辑合并为一屏：`MobileEntryDetail` 内 `mode: view|edit` 切换；删除 `MobileEntryEditor`；新建词条改 push `entryDetail` + `mode:'edit'`。主线压到 3 级（列表→项目→词条）。
-- M2-3 ⬜ 手势语法落地（边缘右划=返回 / 内容横划=抽屉）。"抽屉"半需项目页分类树抽屉，留待项目页改造一起做。
+- M2-3 ✅ 手势语法落地（边缘右划=返回 / 内容横划=抽屉），见 `useMobileSideDrawerGesture`：
+  起手区 24px、方向锁、fling 速度结算、滑后 click 抑制、`data-mobile-horizontal-scroll` 豁免。
+  - 2026-07-15 修正：边缘返回原先把 `enabled` 接成 `mobileSideDrawerEnabled`，
+    而 `useDrag({enabled: false})` 会整个停摆 → 返回手势只在 projectHome/entryList/ai/ideas 四个页面活着，
+    **词条详情这种最深的页面反而没有**。现已拆成「有抽屉 || 有返回」两个独立开关，恢复为真正的全局手势。
 - M2-4 ✅ 顶部标题收口：新增 `getHeaderTitle`（栈内页用 `getPageTitle`，Tab 根回退到 Tab 名），去掉 header 内联 fallback 双轨。
 - 已验证：`tsc -b` + eslint 通过；浏览器预览四个 Tab 标题正确、外壳无回归。
 - 待办（需安卓/有数据环境）：查看↔编辑切换、保存落库、新建直达编辑的真实数据流。
-- 已知小坑：编辑态点顶部返回键会直接回退页面（丢弃未保存编辑），后续可加 dirty 确认（参考桌面 `entryDirtyMap`）。
+
+### 阶段 2.5 · 导航层缺陷修复（2026-07-15 UI/UX 审计产出）— 🚧 已实现，待安卓验收
+
+一轮移动端 UI/UX 详审的结论：移动端基本功（安全区、`interactive-widget=resizes-content`、
+`touch-action`、`overscroll-behavior`、触控高度）都在线，问题集中在**导航层**：
+
+- ✅ **切 Tab 静默丢弃未保存编辑（P0，会丢用户数据）**：dirty 守卫只挂在返回键上，
+  而 `handleTabChange` / `navigateToTab` 不查守卫 + 条件渲染直接卸载子树 →
+  编辑态点底部 Tab，编辑内容无提示消失。已把 `beforeBack` 升级为 `beforeLeave(intent)`，
+  `back|leave` 两种意图分流：back 可被页面吃掉去关子层，leave 必定卸载、只做未保存确认。
+- ✅ **边缘返回手势覆盖不全**：见 M2-3 修正。
+- ✅ **栈内页面缺 key**：词条 A→双链→词条 B 复用同一实例，mode 残留 + 一帧陈旧内容。
+  `usePageStack` 内部改存 `{page, key}`，push 发新 key、replace 沿用原 key。
+
+浏览器预览已验证：leave 意图不拦截切 Tab、back 意图仍收起筛选菜单、
+无抽屉页面边缘右划触发返回、非边缘横滑静默放过、有抽屉页面抽屉照常开合。
+**待安卓验收**：编辑态切 Tab 的未保存确认弹窗（需真实词条数据，浏览器预览无后端拿不到）。
 
 ### 阶段 3 · 核心读写体验
 
@@ -114,4 +134,10 @@ AI 浮动面板、角色对话、插件安装/配置、版本管理/快照、关
 
 ## 当前结论
 
-移动端不缺页面，缺的是"最后一公里 + 正确的移动心智"。**Step 0 + 阶段 1（浮层地基 + AI 写入 P0）已实现；阶段 2 进行中**（M2-2 词条合一屏 + M2-4 标题收口已落地，剩 M2-1 继续上次条 / M2-3 手势）。重功能一律押后，避免战线拉长。早前工程版里"单独挂 AiConfirmModal"的做法，已并入"浮层容器的首个真实用例"。
+移动端不缺页面，缺的是"最后一公里 + 正确的移动心智"。**Step 0 + 阶段 1（浮层地基 + AI 写入 P0）已实现；阶段 2 除 M2-1 外已落地；阶段 2.5 导航层缺陷已修**（切 Tab 丢编辑 / 边缘返回覆盖不全 / 栈内页面缺 key），剩 M2-1 继续上次条。重功能一律押后，避免战线拉长。早前工程版里"单独挂 AiConfirmModal"的做法，已并入"浮层容器的首个真实用例"。
+
+2026-07-15 审计中**尚未动手**的项（按性价比排，均非 bug）：页面转场动画（感知质量最大单项）、
+返回列表时的滚动位置恢复、再点当前 Tab 回根/回顶、haptics、下拉刷新与卡片左划操作；
+性能上还有两处和"低端安卓机"约束打架：词条详情每次开都 `db_list_entries({limit: 1000})`
+（只为 `[[` 双链补全，应改懒加载）、词条列表 200 条不虚拟化且每次 render 重排
+（`flowcloudai-ui` 已导出 `VirtualList`）。
