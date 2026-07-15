@@ -11,6 +11,7 @@ import {
     toApiError,
 } from '../../../api'
 import {type MobilePage, type MobileProjectPageParams} from '../usePageStack'
+import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
@@ -44,6 +45,7 @@ interface Props {
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
+    pageKey: string
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
     params: MobileProjectPageParams
@@ -117,11 +119,13 @@ export default function MobileProjectHome({
     pop,
     navigateToTab,
     setAiFocus,
+    pageKey,
     categoryDrawerOpen = false,
     onOpenCategoryDrawer,
     params,
 }: Props) {
     const projectId = params.projectId
+    // 复用已有的 pageRef（它同时作为浮层的 containerRef），不另挂一个 ref。
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
     const {showAlert} = useAlert()
@@ -265,7 +269,13 @@ export default function MobileProjectHome({
         }
     }, [project, projectId, pop, showAlert])
 
-    if ((projectDetail.loading && !projectDetail.hasLoaded) || (projectContext.loading && !projectContext.hasLoaded)) {
+    // 加载态返回的是 .mobile-page__loading，此时 pageRef 还没挂上真正的滚动容器，
+    // 所以滚动记忆要等它就绪后再接（hook 必须无条件调用，故放在提前 return 之前）。
+    const pageIsLoading = (projectDetail.loading && !projectDetail.hasLoaded)
+        || (projectContext.loading && !projectContext.hasLoaded)
+    useMobilePageScrollMemory(pageKey, pageRef, !pageIsLoading)
+
+    if (pageIsLoading) {
         return <div className="mobile-page__loading">加载中…</div>
     }
     if (!project && loadError) return <div className="mobile-page__error" role="alert">

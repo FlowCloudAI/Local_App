@@ -54,6 +54,8 @@ type PageProps = {
     replace: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setBeforeLeave: (handler: MobileBeforeLeave | null) => void
+    /** 栈内页面身份，用于滚动位置记忆（见 useMobilePageScrollMemory）。Tab 根页为空串。 */
+    pageKey: string
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
 }
@@ -189,7 +191,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [])
 
-    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave'>>(() => ({
+    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave' | 'pageKey'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
         replace: (page: MobilePage) => stacks[activeTab].replace(page),
@@ -332,9 +334,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const pageProps: PageProps = useMemo(() => ({
         ...navigation,
         setBeforeLeave,
+        pageKey: activeStack.currentPageKey,
         aiFocus,
         setAiFocus,
-    }), [navigation, setBeforeLeave, aiFocus])
+    }), [activeStack.currentPageKey, navigation, setBeforeLeave, aiFocus])
 
     if (!backendReady) {
         return (

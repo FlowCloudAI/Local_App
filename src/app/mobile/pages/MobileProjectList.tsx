@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {openFileDialog} from '../../../api/dialog'
 import {
@@ -20,14 +20,17 @@ import {invalidateProjectList, useProjectListStore} from '../../../features/proj
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {formatProjectDate, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileProjectList.css'
 
 interface Props {
     push: (page: MobilePage) => void
     setAiFocus: (focus: AiFocus) => void
+    pageKey: string
 }
 
-export default function MobileProjectList({push, setAiFocus}: Props) {
+export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
+    const pageRef = useRef<HTMLDivElement>(null)
     const {showAlert} = useAlert()
     const {projects, loading: projectsLoading, error: projectError, refresh: refreshProjects} = useProjectListStore()
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
@@ -192,6 +195,9 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
         }
     }, [closeProgress, finishProgress, importConflict, importing, openImportedProject, showAlert, startProgress])
 
+    // 同 MobileProjectHome：加载态没有 .mobile-page，滚动记忆要等容器就绪。
+    useMobilePageScrollMemory(pageKey, pageRef, !(loading && projects.length === 0))
+
     if (loading && projects.length === 0) {
         return <div className="mobile-page__loading">加载中…</div>
     }
@@ -204,7 +210,7 @@ export default function MobileProjectList({push, setAiFocus}: Props) {
     }
 
     return (
-        <div className="mobile-page mobile-project-list">
+        <div ref={pageRef} className="mobile-page mobile-project-list">
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}

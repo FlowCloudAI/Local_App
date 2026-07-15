@@ -17,12 +17,14 @@ import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import EntryCoverImage from '../../../features/entries/components/EntryCoverImage'
 import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileEntryList.css'
 
 interface Props {
     push: (page: MobilePage) => void
     pop: () => void
     setAiFocus: (focus: AiFocus) => void
+    pageKey: string
     categoryDrawerOpen?: boolean
     onOpenCategoryDrawer?: () => void
     params: MobileEntryListPageParams
@@ -53,7 +55,9 @@ function CategoryDrawerIcon() {
     )
 }
 
-export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
+export default function MobileEntryList({push, pop, setAiFocus, pageKey, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
+    const pageRef = useRef<HTMLDivElement>(null)
+    useMobilePageScrollMemory(pageKey, pageRef)
     const projectId = params.projectId
     const uncategorizedOnly = Boolean(params.uncategorizedOnly)
     const categoryId = params.categoryId || null
@@ -148,7 +152,7 @@ export default function MobileEntryList({push, pop, setAiFocus, categoryDrawerOp
     }
 
     return (
-        <div className="mobile-page mobile-entry-list">
+        <div ref={pageRef} className="mobile-page mobile-entry-list">
             <MobilePageTopBar
                 className="mobile-entry-list__topbar"
                 sticky
