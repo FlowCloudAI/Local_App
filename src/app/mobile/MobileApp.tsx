@@ -34,6 +34,7 @@ import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileSettings from './pages/MobileSettings'
 import MobileTagManager from './pages/MobileTagManager'
+import {resolveMobileBackTarget} from './mobileBackNavigation'
 import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 
@@ -100,23 +101,29 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 const allowed = await beforeBack()
                 if (!allowed) return
             }
-            if (activeStack.canGoBack) {
+            const target = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
+            if (target === 'page') {
                 activeStack.pop()
-            } else {
-                const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
-                if (result === 'yes') {
-                    if (closingRef.current) return
-                    closingRef.current = true
-                    try {
-                        await exit_app()
-                    } catch (error) {
-                        closingRef.current = false
-                        logger.error('关闭移动端窗口失败', error)
-                    }
+                return
+            }
+            if (target === 'home') {
+                setActiveTab('home')
+                return
+            }
+
+            const result = await showAlert('确定要退出当前移动端应用吗？', 'warning', 'confirm')
+            if (result === 'yes') {
+                if (closingRef.current) return
+                closingRef.current = true
+                try {
+                    await exit_app()
+                } catch (error) {
+                    closingRef.current = false
+                    logger.error('关闭移动端窗口失败', error)
                 }
             }
         })()
-    }, [activeStack, showAlert])
+    }, [activeStack, activeTab, showAlert])
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -282,8 +289,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     useEffect(() => {
         if (platformInfo.os !== 'android') return
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key !== 'Escape' && e.key !== 'Backspace') return
-            // 焦点在可编辑元素内时，退格/Esc 应由该元素自己处理
+            if (e.key !== 'Escape') return
+            // Esc 仅作为开发预览/外接键盘兜底；系统返回由原生事件处理。
             const t = e.target as HTMLElement
             if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return
             e.preventDefault()
