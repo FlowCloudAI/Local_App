@@ -1,4 +1,5 @@
 import type {AiFocus} from '../../../features/ai-chat/hooks/useAiController'
+import type {MobileBeforeLeave} from '../mobileBackNavigation'
 import type {MobileTab} from '../MobileNav'
 import type {MobileEntryDetailPageParams, MobilePage} from '../usePageStack'
 
@@ -7,7 +8,7 @@ export interface MobileEntryDetailProps {
     pop: () => void
     replace: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
-    setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
+    setBeforeLeave: (handler: MobileBeforeLeave | null) => void
     setAiFocus: (focus: AiFocus) => void
     params: MobileEntryDetailPageParams
 }

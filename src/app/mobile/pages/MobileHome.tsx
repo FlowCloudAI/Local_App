@@ -35,6 +35,7 @@ import {
     useHomeDashboard,
 } from '../../../features/home/homeActivity'
 import {type MobilePage} from '../usePageStack'
+import {type MobileBeforeLeave} from '../mobileBackNavigation'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {MobileTopActionPill} from '../components/MobileTopControls'
@@ -61,7 +62,7 @@ interface Props {
     push: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setAiFocus: (focus: AiFocus) => void
-    setBeforeBack: (handler: (() => boolean | Promise<boolean>) | null) => void
+    setBeforeLeave: (handler: MobileBeforeLeave | null) => void
     activePanel: MobileHomePanel
     onActivePanelChange: (panel: MobileHomePanel) => void
 }
@@ -72,7 +73,7 @@ export default function MobileHome({
     push,
     navigateToTab,
     setAiFocus,
-    setBeforeBack,
+    setBeforeLeave,
     activePanel,
     onActivePanelChange,
 }: Props) {
@@ -135,12 +136,14 @@ export default function MobileHome({
 
     useEffect(() => {
         if (!filterOpen) return undefined
-        setBeforeBack(() => {
+        setBeforeLeave((intent) => {
+            // 返回键收起筛选菜单并留在原地；切 Tab 时本页会整体卸载，不拦。
+            if (intent !== 'back') return true
             setFilterOpen(false)
             return false
         })
-        return () => setBeforeBack(null)
-    }, [filterOpen, setBeforeBack])
+        return () => setBeforeLeave(null)
+    }, [filterOpen, setBeforeLeave])
 
     useEffect(() => {
         if (projects.length === 0) {

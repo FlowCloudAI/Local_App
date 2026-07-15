@@ -34,7 +34,11 @@ import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileSettings from './pages/MobileSettings'
 import MobileTagManager from './pages/MobileTagManager'
-import {resolveMobileBackTarget} from './mobileBackNavigation'
+import {
+    type MobileBeforeLeave,
+    type MobileNavigationIntent,
+    resolveMobileBackTarget,
+} from './mobileBackNavigation'
 import {type MobilePage, usePageStack} from './usePageStack'
 import {getMobileSideDrawerWidth, useMobileSideDrawerGesture} from './useMobileSideDrawerGesture'
 
@@ -43,14 +47,13 @@ interface MobileAppProps {
 }
 
 let mobileWindowShown = false
-type MobileBeforeBack = () => boolean | Promise<boolean>
 
 type PageProps = {
     push: (page: MobilePage) => void
     pop: () => void
     replace: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
-    setBeforeBack: (handler: MobileBeforeBack | null) => void
+    setBeforeLeave: (handler: MobileBeforeLeave | null) => void
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
 }
@@ -58,7 +61,7 @@ type PageProps = {
 export default function MobileApp({platformInfo}: MobileAppProps) {
     const {showAlert} = useAlert()
     const closingRef = useRef(false)
-    const beforeBackRef = useRef<MobileBeforeBack | null>(null)
+    const beforeLeaveRef = useRef<MobileBeforeLeave | null>(null)
     const [activeTab, setActiveTab] = useState<MobileTab>('home')
     const [homePanel, setHomePanel] = useState<MobileHomePanel>('dashboard')
 
@@ -94,13 +97,17 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     const ideaDrawerEnabled = activeTab === 'ideas'
     const mobileSideDrawerEnabled = categoryDrawerEnabled || aiConversationDrawerEnabled || ideaDrawerEnabled
     const mobileSideDrawerKind = categoryDrawerEnabled ? 'category' : aiConversationDrawerEnabled ? 'ai' : ideaDrawerEnabled ? 'idea' : null
+    // 当前页离开前的统一闸门：返回键、边缘返回手势、切 Tab 都必须先过它，
+    // 否则未保存内容会随页面卸载静默丢失。
+    const runLeaveGuard = useCallback(async (intent: MobileNavigationIntent) => {
+        const beforeLeave = beforeLeaveRef.current
+        if (!beforeLeave) return true
+        return await beforeLeave(intent)
+    }, [])
+
     const runBackNavigation = useCallback(() => {
         void (async () => {
-            const beforeBack = beforeBackRef.current
-            if (beforeBack) {
-                const allowed = await beforeBack()
-                if (!allowed) return
-            }
+            if (!await runLeaveGuard('back')) return
             const target = resolveMobileBackTarget(activeTab, activeStack.canGoBack)
             if (target === 'page') {
                 activeStack.pop()
@@ -123,7 +130,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 }
             }
         })()
-    }, [activeStack, activeTab, showAlert])
+    }, [activeStack, activeTab, runLeaveGuard, showAlert])
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -182,17 +189,20 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [])
 
-    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeBack'>>(() => ({
+    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
         replace: (page: MobilePage) => stacks[activeTab].replace(page),
         navigateToTab: (tab: MobileTab, page?: MobilePage) => {
-            setActiveTab(tab)
-            if (page) {
-                stacks[tab].push(page)
-            }
+            void (async () => {
+                if (!await runLeaveGuard('leave')) return
+                setActiveTab(tab)
+                if (page) {
+                    stacks[tab].push(page)
+                }
+            })()
         },
-    }), [activeTab, stacks])
+    }), [activeTab, runLeaveGuard, stacks])
 
     const closeCategoryDrawer = useCallback(() => {
         closeSideDrawer()
@@ -260,12 +270,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     }, [activeStack, categoryDrawerProjectId, closeCategoryDrawer, navigation, pageType])
 
     const handleTabChange = useCallback((tab: MobileTab) => {
-        closeCategoryDrawer()
-        setActiveTab(tab)
-    }, [closeCategoryDrawer])
+        if (tab === activeTab) return
+        void (async () => {
+            if (!await runLeaveGuard('leave')) return
+            closeCategoryDrawer()
+            setActiveTab(tab)
+        })()
+    }, [activeTab, closeCategoryDrawer, runLeaveGuard])
 
-    const setBeforeBack = useCallback((handler: MobileBeforeBack | null) => {
-        beforeBackRef.current = handler
+    const setBeforeLeave = useCallback((handler: MobileBeforeLeave | null) => {
+        beforeLeaveRef.current = handler
     }, [])
 
     const handleBack = useCallback(() => {
@@ -302,10 +316,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
 
     const pageProps: PageProps = useMemo(() => ({
         ...navigation,
-        setBeforeBack,
+        setBeforeLeave,
         aiFocus,
         setAiFocus,
-    }), [navigation, setBeforeBack, aiFocus])
+    }), [navigation, setBeforeLeave, aiFocus])
 
     if (!backendReady) {
         return (

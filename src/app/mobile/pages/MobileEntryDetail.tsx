@@ -89,7 +89,7 @@ import useMobileEntryDetailLoader from './useMobileEntryDetailLoader'
 import './MobileEntryDetail.css'
 type Mode = 'view' | 'edit'
 
-export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeBack, setAiFocus, params}: Props) {
+export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeLeave, setAiFocus, params}: Props) {
     const projectId = params.projectId
     const entryId = params.entryId ?? ''
     const {showAlert} = useAlert()
@@ -214,18 +214,20 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
 
     useEffect(() => {
         if (mode !== 'edit') {
-            setBeforeBack(null)
+            setBeforeLeave(null)
             return
         }
-        setBeforeBack(async () => {
-            if (immersiveEditorOpen) {
+        setBeforeLeave(async (intent) => {
+            // 返回键可以先“吃掉”一次，只收起沉浸编辑；切 Tab 会直接卸载本页，
+            // 收起沉浸编辑没有意义，必须直奔未保存确认。
+            if (intent === 'back' && immersiveEditorOpen) {
                 setImmersiveEditorOpen(false)
                 return false
             }
             return confirmDiscard()
         })
-        return () => setBeforeBack(null)
-    }, [confirmDiscard, immersiveEditorOpen, mode, setBeforeBack])
+        return () => setBeforeLeave(null)
+    }, [confirmDiscard, immersiveEditorOpen, mode, setBeforeLeave])
 
     useEffect(() => {
         const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
