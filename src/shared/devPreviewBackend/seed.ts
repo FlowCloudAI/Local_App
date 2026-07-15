@@ -268,6 +268,32 @@ export function createMockDb(): MockDb {
         },
     ]
 
+    // 手写的 6 条撑不起分页 / 长列表滚动 / 性能走查，补一批「路人」词条。
+    // 时间戳逐条递减且都早于手写词条，保证 updated_at DESC 下顺序确定、可断言。
+    const fillerTypes = ['character', 'location', 'item', 'event', 'concept']
+    const fillerCategories = ['cat-people', 'cat-places', 'cat-lore', null]
+    const filler: Entry[] = Array.from({length: 50}, (_, index) => {
+        const seq = index + 1
+        const at = new Date(Date.UTC(2026, 5, 14, 12, 0, 0) - index * 60_000)
+            .toISOString()
+            .replace('T', ' ')
+            .slice(0, 19)
+        return {
+            id: `ent-filler-${String(seq).padStart(2, '0')}`,
+            project_id: 'prj-lumen',
+            category_id: fillerCategories[index % fillerCategories.length],
+            title: `流明居民 ${String(seq).padStart(2, '0')}`,
+            summary: `第 ${seq} 位登记在册的居民，用于预览分页与长列表走查。`,
+            content: `编号 ${seq}。`,
+            type: fillerTypes[index % fillerTypes.length],
+            tags: null,
+            images: null,
+            created_at: at,
+            updated_at: at,
+        }
+    })
+    entries.push(...filler)
+
     const relations: EntryRelation[] = [
         {
             id: 'rel-kael-mira',

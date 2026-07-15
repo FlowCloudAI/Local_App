@@ -105,6 +105,13 @@
     gap: 0.95rem 0.75rem;
 }
 
+/* 列表底部的「加载更多」兜底按钮（滚到底会自动预取，这里是可发现的按钮通道）。 */
+.mobile-entry-list__more {
+    display: flex;
+    justify-content: center;
+    padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-xl);
+}
+
 .mobile-entry-card {
     --mobile-entry-card-color: var(--fc-color-primary);
 

@@ -2,6 +2,7 @@ import {logger} from '../../../shared/logger'
 import {type CSSProperties, useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Card, Input} from 'flowcloudai-ui'
 import {
+    db_count_entries,
     db_create_entry,
     db_list_all_entry_types,
     db_list_entries,
@@ -45,6 +46,29 @@ function placeholderMark(title: string): string {
     return trimmed ? trimmed[0] : '词'
 }
 
+/** 首屏与每次「加载更多」的页大小。 */
+const PAGE_SIZE = 30
+
+/**
+ * 两个降级路径的一次性上限。它们**无法分页**，原因在后端能力而非前端：
+ * - 搜索：`db_search_entries` 只有 limit、没有 offset（SQL 是 `ORDER BY updated_at DESC LIMIT ?`）。
+ * - 未分类：`EntryFilter.category_id` 语义是「等于某分类」，没有「IS NULL」，
+ *   所以只能全量取回来在客户端筛。
+ * 要真正分页需要先改 core_world_data（给 search 加 offset、给 filter 加 uncategorized），
+ * 属跨仓改动，不在移动端这轮范围内。
+ */
+const SEARCH_RESULT_LIMIT = 100
+const UNCATEGORIZED_SCAN_LIMIT = 500
+
+/** 距底多少像素开始预取下一页。 */
+const LOAD_MORE_THRESHOLD_PX = 320
+
+/**
+ * 记住每个列表页已加载多少条。pop 回来时一次取回同样多的内容，
+ * 否则用户翻了 3 页再返回，只剩第 1 页，滚动记忆会因内容不够高而放弃恢复。
+ */
+const loadedCountMemory = new Map<string, number>()
+
 function CategoryDrawerIcon() {
     return (
         <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
@@ -65,7 +89,10 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
 
     const [entries, setEntries] = useState<EntryBrief[]>([])
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
+    const [total, setTotal] = useState<number | null>(null)
+    const [hasMore, setHasMore] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [loadingMore, setLoadingMore] = useState(false)
     const [loadError, setLoadError] = useState<string | null>(null)
     const [entryTypesError, setEntryTypesError] = useState<string | null>(null)
     const [actionError, setActionError] = useState<string | null>(null)
@@ -77,37 +104,103 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
         setLoading(true)
         setLoadError(null)
         try {
-            let result: EntryBrief[]
+            // ── 搜索：后端无 offset，一次取上限，不分页 ────────────────────────
             if (query.trim()) {
-                result = await db_search_entries({
+                const result = await db_search_entries({
                     projectId,
                     query: query.trim(),
                     categoryId: uncategorizedOnly ? null : categoryId,
                     entryType: type,
-                    limit: 200
+                    limit: SEARCH_RESULT_LIMIT,
                 })
-            } else {
-                result = await db_list_entries({
+                const visible = uncategorizedOnly ? result.filter(entry => !entry.category_id) : result
+                setEntries(visible)
+                setTotal(visible.length)
+                setHasMore(false)
+                return
+            }
+
+            // ── 未分类：后端没有「category IS NULL」过滤，只能全取回来客户端筛 ──
+            if (uncategorizedOnly) {
+                const result = await db_list_entries({
                     projectId,
-                    categoryId: uncategorizedOnly ? null : categoryId,
+                    categoryId: null,
                     entryType: type,
-                    limit: 200,
+                    limit: UNCATEGORIZED_SCAN_LIMIT,
                     offset: 0,
                 })
+                const visible = result.filter(entry => !entry.category_id)
+                setEntries(visible)
+                setTotal(visible.length)
+                setHasMore(false)
+                return
             }
-            setEntries(uncategorizedOnly ? result.filter(entry => !entry.category_id) : result)
+
+            // ── 常规浏览：真正分页。返回本页时取回上次已加载的条数，别把人打回第一页 ──
+            const limit = Math.max(PAGE_SIZE, loadedCountMemory.get(pageKey) ?? 0)
+            const [result, count] = await Promise.all([
+                db_list_entries({projectId, categoryId, entryType: type, limit, offset: 0}),
+                db_count_entries({projectId, categoryId, entryType: type}),
+            ])
+            setEntries(result)
+            setTotal(count)
+            setHasMore(result.length < count)
         } catch (e) {
             logger.error('加载词条失败', e)
             setLoadError(formatApiError(toApiError(e)))
         } finally {
             setLoading(false)
         }
-    }, [projectId, categoryId, uncategorizedOnly])
+    }, [projectId, categoryId, pageKey, uncategorizedOnly])
+
+    const loadMore = useCallback(async () => {
+        if (!hasMore || loading || loadingMore) return
+        setLoadingMore(true)
+        try {
+            const next = await db_list_entries({
+                projectId,
+                categoryId,
+                entryType: typeFilter,
+                limit: PAGE_SIZE,
+                offset: entries.length,
+            })
+            // 后端是 ORDER BY updated_at DESC + OFFSET：翻页途中若有词条被改动会重排，
+            // 可能带回已有的条目。按 id 去重，避免 React key 冲突和重复卡片。
+            const seen = new Set(entries.map(entry => entry.id))
+            const merged = [...entries, ...next.filter(entry => !seen.has(entry.id))]
+            setEntries(merged)
+            setHasMore(next.length > 0 && (total === null || merged.length < total))
+        } catch (e) {
+            logger.error('加载更多词条失败', e)
+            setLoadError(formatApiError(toApiError(e)))
+            setHasMore(false)
+        } finally {
+            setLoadingMore(false)
+        }
+    }, [categoryId, entries, hasMore, loading, loadingMore, projectId, total, typeFilter])
 
     useEffect(() => {
         void load(searchText, typeFilter)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categoryId, typeFilter])
+
+    // 记住已加载条数，供下次回到本页时一次取回（见 loadedCountMemory 注释）。
+    useEffect(() => {
+        if (!pageKey || entries.length === 0) return
+        loadedCountMemory.set(pageKey, entries.length)
+    }, [entries.length, pageKey])
+
+    // 滚到接近底部时预取下一页。
+    useEffect(() => {
+        const element = pageRef.current
+        if (!element || !hasMore) return
+        const handleScroll = () => {
+            const remaining = element.scrollHeight - element.scrollTop - element.clientHeight
+            if (remaining <= LOAD_MORE_THRESHOLD_PX) void loadMore()
+        }
+        element.addEventListener('scroll', handleScroll, {passive: true})
+        return () => element.removeEventListener('scroll', handleScroll)
+    }, [hasMore, loadMore])
 
     const loadEntryTypes = useCallback(async () => {
         setEntryTypesError(null)
@@ -209,7 +302,17 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
             )}
 
             <div className="mobile-entry-list__hero">
-                <span className="mobile-entry-list__eyebrow">{loading ? '正在同步' : `${entries.length} 个词条`}</span>
+                {/*
+                  * 显示后端 count 的真实总数，而不是已加载条数——分页后两者不再相等，
+                  * 拿 entries.length 当总数会在大项目里直接谎报（原先固定 limit:200 时同理）。
+                  */}
+                <span className="mobile-entry-list__eyebrow">
+                    {loading
+                        ? '正在同步'
+                        : total !== null && total > entries.length
+                            ? `${total} 个词条 · 已加载 ${entries.length}`
+                            : `${total ?? entries.length} 个词条`}
+                </span>
                 <h2 className="mobile-entry-list__title">{listTitle}</h2>
             </div>
 
@@ -324,6 +427,21 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                                 />
                             )
                         })}
+                </div>
+            )}
+
+            {/* 手势是加速器、按钮是基线：滚到底自动预取，同时给一个可点的兜底入口。 */}
+            {hasMore && !loading && (
+                <div className="mobile-entry-list__more">
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={loadingMore}
+                        onClick={() => void loadMore()}
+                    >
+                        {loadingMore ? '加载中…' : '加载更多'}
+                    </Button>
                 </div>
             )}
         </div>
