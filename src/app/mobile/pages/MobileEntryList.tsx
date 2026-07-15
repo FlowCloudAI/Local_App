@@ -268,13 +268,13 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                 </div>
             ) : (
                 <div className="mobile-entry-list__grid">
-                    {[...entries]
-                        .sort((a, b) => {
-                            const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0
-                            const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0
-                            return tb - ta
-                        })
-                        .map(entry => {
+                    {/*
+                      * 不在这里排序：db_list_entries / db_search_entries 的 SQL 都是
+                      * `ORDER BY updated_at DESC`，后端已按同一个键排好。原先这里每次 render
+                      * 都 [...entries].sort() 复制并重排，比较器里还对每个元素 new Date()，
+                      * 纯属把后端做过的事再做一遍。
+                      */}
+                    {entries.map(entry => {
                             const et = entry.type ? entryTypes.find(t => entryTypeKey(t) === entry.type) : null
                             const coverFallback = (
                                 <span className="mobile-entry-card__placeholder">

@@ -77,15 +77,22 @@ function listEntryTypes(projectId: string): EntryTypeView[] {
     return [...MOCK_BUILTIN_ENTRY_TYPES, ...custom]
 }
 
+/**
+ * 与真实后端保持一致：`list_entries` / `search_entries` 的 SQL 都是
+ * `ORDER BY updated_at DESC`。mock 若按种子顺序返回，前端就会在一个「后端没排序」的
+ * 假象上做决策（比如误以为客户端那次 sort 是必要的）。
+ */
 function filterEntries(args: Args): Entry[] {
     const projectId = readString(args, 'projectId')
     const categoryId = readOptString(args, 'categoryId')
     const entryType = readOptString(args, 'entryType')
-    return db.entries.filter(entry => (
-        entry.project_id === projectId
-        && (!categoryId || (entry.category_id ?? null) === categoryId)
-        && (!entryType || (entry.type ?? null) === entryType)
-    ))
+    return db.entries
+        .filter(entry => (
+            entry.project_id === projectId
+            && (!categoryId || (entry.category_id ?? null) === categoryId)
+            && (!entryType || (entry.type ?? null) === entryType)
+        ))
+        .sort((left, right) => (right.updated_at ?? '').localeCompare(left.updated_at ?? ''))
 }
 
 function requireEntry(id: string): Entry {
