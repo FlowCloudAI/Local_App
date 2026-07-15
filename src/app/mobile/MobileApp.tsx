@@ -386,11 +386,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                         onActivePanelChange={setHomePanel}
                                     />
                                 )}
+                                {/*
+                                  * key 用栈内页面身份：同类型页面互相 push（词条 A→双链→词条 B）时
+                                  * 类型不变，没有 key 会复用同一个实例，mode / 表单 / 滚动会串页。
+                                  */}
                                 {currentPage?.type === 'projectList' && (
-                                    <MobileProjectList {...pageProps}/>
+                                    <MobileProjectList key={activeStack.currentPageKey} {...pageProps}/>
                                 )}
                                 {currentPage?.type === 'projectHome' && (
                                     <MobileProjectHome
+                                        key={activeStack.currentPageKey}
                                         {...pageProps}
                                         params={currentPage.params}
                                         categoryDrawerOpen={sideDrawerOpen}
@@ -399,6 +404,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 )}
                                 {currentPage?.type === 'entryList' && (
                                     <MobileEntryList
+                                        key={activeStack.currentPageKey}
                                         {...pageProps}
                                         params={currentPage.params}
                                         categoryDrawerOpen={sideDrawerOpen}
@@ -406,16 +412,16 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     />
                                 )}
                                 {currentPage?.type === 'entryDetail' && (
-                                    <MobileEntryDetail {...pageProps} params={currentPage.params}/>
+                                    <MobileEntryDetail key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
                                 )}
                                 {currentPage?.type === 'typeManager' && (
-                                    <MobileEntryTypeManager {...pageProps} params={currentPage.params}/>
+                                    <MobileEntryTypeManager key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
                                 )}
                                 {currentPage?.type === 'tagManager' && (
-                                    <MobileTagManager {...pageProps} params={currentPage.params}/>
+                                    <MobileTagManager key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
                                 )}
                                 {currentPage?.type === 'categoryManager' && (
-                                    <MobileCategoryManager {...pageProps} params={currentPage.params}/>
+                                    <MobileCategoryManager key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
                                 )}
                             </>
                         )}

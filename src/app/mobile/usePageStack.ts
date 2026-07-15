@@ -1,4 +1,4 @@
-import {useCallback, useRef, useState} from 'react'
+import {useCallback, useMemo, useRef, useState} from 'react'
 
 export interface MobileProjectPageParams {
     projectId: string
@@ -59,52 +59,77 @@ export interface PageStack {
     back: (fallback: () => void) => void
     replace: (page: MobilePage) => void
     currentPage: MobilePage | null
+    /**
+     * 栈顶页面的身份标识，用作页面组件的 React key。
+     * 同类型页面互相 push（词条 A→点双链→词条 B）时类型不变，
+     * 没有它 React 会复用同一个实例，本地 state（mode / 表单 / 滚动）会串页。
+     */
+    currentPageKey: string
     canGoBack: boolean
     stack: MobilePage[]
 }
 
+interface PageStackEntry {
+    page: MobilePage
+    key: string
+}
+
+let pageKeySeq = 0
+
+function nextPageKey(): string {
+    pageKeySeq += 1
+    return `page-${pageKeySeq}`
+}
+
 export function usePageStack(): PageStack {
-    const [stack, setStack] = useState<MobilePage[]>([])
-    const stackRef = useRef<MobilePage[]>([])
+    const [entries, setEntries] = useState<PageStackEntry[]>([])
+    const entriesRef = useRef<PageStackEntry[]>([])
 
     const push = useCallback((page: MobilePage) => {
-        stackRef.current = [...stackRef.current, page]
-        setStack(stackRef.current)
+        entriesRef.current = [...entriesRef.current, {page, key: nextPageKey()}]
+        setEntries(entriesRef.current)
     }, [])
 
     const pop = useCallback(() => {
-        if (stackRef.current.length <= 1) {
-            stackRef.current = []
-            setStack([])
+        if (entriesRef.current.length <= 1) {
+            entriesRef.current = []
+            setEntries([])
             return
         }
-        stackRef.current = stackRef.current.slice(0, -1)
-        setStack(stackRef.current)
+        entriesRef.current = entriesRef.current.slice(0, -1)
+        setEntries(entriesRef.current)
     }, [])
 
     const back = useCallback((fallback: () => void) => {
-        if (stackRef.current.length > 0) {
+        if (entriesRef.current.length > 0) {
             pop()
         } else {
             fallback()
         }
     }, [pop])
 
+    // replace 沿用栈顶原 key：它表达的是「同一个页面换参数」（如词条保存后回写标题），
+    // 换 key 会重挂载并丢掉正在编辑的内容。真正的换页请用 push / pop。
     const replace = useCallback((page: MobilePage) => {
-        const next = stackRef.current.length > 0
-            ? [...stackRef.current.slice(0, -1), page]
-            : [page]
-        stackRef.current = next
-        setStack(next)
+        const current = entriesRef.current
+        const next = current.length > 0
+            ? [...current.slice(0, -1), {page, key: current[current.length - 1].key}]
+            : [{page, key: nextPageKey()}]
+        entriesRef.current = next
+        setEntries(next)
     }, [])
+
+    const stack = useMemo(() => entries.map(entry => entry.page), [entries])
+    const currentEntry = entries.length > 0 ? entries[entries.length - 1] : null
 
     return {
         push,
         pop,
         back,
         replace,
-        currentPage: stack.length > 0 ? stack[stack.length - 1] : null,
-        canGoBack: stack.length > 0,
+        currentPage: currentEntry?.page ?? null,
+        currentPageKey: currentEntry?.key ?? '',
+        canGoBack: entries.length > 0,
         stack,
     }
 }
