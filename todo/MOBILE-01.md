@@ -162,12 +162,24 @@ AI 浮动面板、角色对话、插件安装/配置、版本管理/快照、关
 ✅ 2026-07-15 已修：再点当前 Tab 回该 Tab 根页；栈内页面记住滚动位置
 （`useMobilePageScrollMemory`，已接 entryList / projectList / projectHome）。
 
+✅ 2026-07-15 已修：词条列表分页（首屏 30 + 滚到底预取 + 加载更多按钮）、
+总数取 `db_count_entries` 不再谎报、删掉每帧重跑的客户端排序（后端 SQL 本就
+`ORDER BY updated_at DESC`）。原 `limit:200` 会让第 201 条起直接不可见。
+
+> **仍需后端配合才能分页的两条路径**（已在代码注释写明，非前端可解）：
+> - 搜索：`db_search_entries` 只有 limit 没有 offset。
+> - 未分类：`EntryFilter.category_id` 只有「等于某分类」、没有「IS NULL」，只能全取回来客户端筛。
+>
+> 要根治需改 `core_world_data`（search 加 offset、filter 加 uncategorized），
+> 属跨仓 + API 变更，按 AGENTS.md 需补兼容说明并跑默认 + sqlite 双链路。
+> 顺带：现有 API 也没有「按 id 批量取 brief」，那是词条详情查看态仍要全量拉列表的原因。
+
 2026-07-15 审计中**尚未动手**的项（按性价比排，均非 bug）：
 haptics、下拉刷新与卡片左划操作、设置 Tab 子页转场、再点当前 Tab 时的「回到顶部」
-（现只做了回根页；回顶需各页自报滚动容器，MobileHome 的还是嵌套的）；
-性能上还剩词条列表一次 `limit:200` 不分页、且每次 render 都 `[...entries].sort()` 重排。
-> 虚拟化**不要找库**：`flowcloudai-ui` 的 `VirtualList` 已被移除（抽象收益不足），
-> 需要时在使用处按该列表实际情况自行实现。
+（现只做了回根页；回顶需各页自报滚动容器，MobileHome 的还是嵌套的）。
+> 长列表虚拟化**不要找库**：`flowcloudai-ui` 的 `VirtualList` 已被移除（抽象收益不足），
+> 需要时在使用处按该列表实际情况自行实现。分页落地后，56/页级别的量暂不需要虚拟化，
+> 真要上再按实际卡片高度做。
 
 > **haptics 为何没做**：`navigator.vibrate` 需要安卓清单里的 VIBRATE 权限，
 > 且浏览器预览下必然静默无效——本机完全无法验证，属于「只能写、不能验」的改动，
