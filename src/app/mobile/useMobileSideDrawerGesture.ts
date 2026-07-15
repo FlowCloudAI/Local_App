@@ -10,6 +10,10 @@ import {
 import {logger} from '../../shared/logger'
 
 interface UseMobileSideDrawerGestureOptions {
+    /**
+     * 本页是否有侧边抽屉。只控制抽屉部分的横滑；
+     * 左边缘返回手势独立于它，由 onEdgeBackGesture 决定（见下）。
+     */
     enabled: boolean
     width: number
     logLabel?: string
@@ -20,7 +24,9 @@ interface UseMobileSideDrawerGestureOptions {
     allowTextEditingTargetGestures?: boolean
     /**
      * 从屏幕左边缘向右滑时触发返回，而不是打开侧边抽屉。
-     * 不传则保留纯抽屉行为，适合没有页面返回语义的嵌入场景。
+     * 传了就一直生效，**不受 enabled 影响**——「边缘右划 = 返回」是全局手势语法，
+     * 不能因为本页恰好没有抽屉就消失。不传则保留纯抽屉行为，
+     * 适合没有页面返回语义的嵌入场景。
      */
     onEdgeBackGesture?: () => void
 }
@@ -162,6 +168,11 @@ export function useMobileSideDrawerGesture({
     allowTextEditingTargetGestures = false,
     onEdgeBackGesture,
 }: UseMobileSideDrawerGestureOptions): MobileSideDrawerGesture {
+    // 抽屉不在的页面（词条详情、世界观列表、各管理页、设置…）仍然要能边缘右划返回，
+    // 所以整个手势的开关是「有抽屉」或「有返回」，不能只看 enabled。
+    const edgeBackEnabled = Boolean(onEdgeBackGesture)
+    const gestureEnabled = enabled || edgeBackEnabled
+
     const [open, setOpen] = useState(false)
     const [offset, setOffset] = useState<number | null>(null)
     const [dragging, setDragging] = useState(false)
@@ -223,7 +234,7 @@ export function useMobileSideDrawerGesture({
         offset: [nextOffset],
         velocity: [velocityX],
     }) => {
-        if (!enabled) return
+        if (!gestureEnabled) return
 
         const pointerId = getPointerId(event)
         if (first) {
@@ -232,6 +243,14 @@ export function useMobileSideDrawerGesture({
                 && onEdgeBackGesture
                 && startX <= MOBILE_SIDE_DRAWER_GESTURE_TUNING.edgeBackStartWidth,
             )
+
+            // 本页没有抽屉、这一划又不是边缘返回：不归我们管，静默放过。
+            // 这在词条详情等无抽屉页面是常态，记日志只会淹掉真正有用的手势日志。
+            if (!enabled && !edgeBackCandidate) {
+                dragRuntimeRef.current = null
+                cancel()
+                return
+            }
 
             const ignoredReason = !allowTextEditingTargetGestures && isTextEditingTarget(event.target)
                 ? '文本编辑区域'
@@ -362,7 +381,7 @@ export function useMobileSideDrawerGesture({
     }, {
         axis: 'x',
         bounds: {left: 0, right: width},
-        enabled,
+        enabled: gestureEnabled,
         filterTaps: true,
         from: () => [open ? width : 0, 0],
         pointer: {capture: false, keys: false, touch: true},
