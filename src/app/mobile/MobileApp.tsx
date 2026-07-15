@@ -199,6 +199,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                 setActiveTab(tab)
                 if (page) {
                     stacks[tab].push(page)
+                } else {
+                    // 切 Tab 是横向跳转，不该重放目标 Tab 上一次 push/pop 的方向动画。
+                    stacks[tab].resetNavigation()
                 }
             })()
         },
@@ -275,8 +278,10 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             if (!await runLeaveGuard('leave')) return
             closeCategoryDrawer()
             setActiveTab(tab)
+            // 切 Tab 是横向跳转，不该重放目标 Tab 上一次 push/pop 的方向动画。
+            stacks[tab].resetNavigation()
         })()
-    }, [activeTab, closeCategoryDrawer, runLeaveGuard])
+    }, [activeTab, closeCategoryDrawer, runLeaveGuard, stacks])
 
     const setBeforeLeave = useCallback((handler: MobileBeforeLeave | null) => {
         beforeLeaveRef.current = handler
@@ -376,9 +381,20 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         onClick={closeCategoryDrawer}
                     />
                     <div className="mobile-app__content">
-                        {/* 首页 Tab */}
+                        {/*
+                          * 首页 Tab。外层 key 用栈内页面身份，一件事解决两个问题：
+                          * 1. 页面身份：同类型页面互相 push（词条 A→双链→词条 B）时类型不变，
+                          *    没有 key 会复用同一个实例，mode / 表单 / 滚动会串页。
+                          * 2. 转场动画：重挂载才会重放 CSS animation；动画挂在这层而不是各页的
+                          *    `.mobile-page`，因为详情/项目页要先过 loading 态才渲染 `.mobile-page`，
+                          *    挂在那里会变成「数据到了才滑」，与点击脱节。
+                          */}
                         {activeTab === 'home' && (
-                            <>
+                            <div
+                                className="mobile-app__page"
+                                key={activeStack.currentPageKey}
+                                data-mobile-nav={activeStack.lastNavigation}
+                            >
                                 {!currentPage && (
                                     <MobileHome
                                         {...pageProps}
@@ -386,16 +402,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                         onActivePanelChange={setHomePanel}
                                     />
                                 )}
-                                {/*
-                                  * key 用栈内页面身份：同类型页面互相 push（词条 A→双链→词条 B）时
-                                  * 类型不变，没有 key 会复用同一个实例，mode / 表单 / 滚动会串页。
-                                  */}
                                 {currentPage?.type === 'projectList' && (
-                                    <MobileProjectList key={activeStack.currentPageKey} {...pageProps}/>
+                                    <MobileProjectList {...pageProps}/>
                                 )}
                                 {currentPage?.type === 'projectHome' && (
                                     <MobileProjectHome
-                                        key={activeStack.currentPageKey}
                                         {...pageProps}
                                         params={currentPage.params}
                                         categoryDrawerOpen={sideDrawerOpen}
@@ -404,7 +415,6 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 )}
                                 {currentPage?.type === 'entryList' && (
                                     <MobileEntryList
-                                        key={activeStack.currentPageKey}
                                         {...pageProps}
                                         params={currentPage.params}
                                         categoryDrawerOpen={sideDrawerOpen}
@@ -412,18 +422,18 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                     />
                                 )}
                                 {currentPage?.type === 'entryDetail' && (
-                                    <MobileEntryDetail key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
+                                    <MobileEntryDetail {...pageProps} params={currentPage.params}/>
                                 )}
                                 {currentPage?.type === 'typeManager' && (
-                                    <MobileEntryTypeManager key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
+                                    <MobileEntryTypeManager {...pageProps} params={currentPage.params}/>
                                 )}
                                 {currentPage?.type === 'tagManager' && (
-                                    <MobileTagManager key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
+                                    <MobileTagManager {...pageProps} params={currentPage.params}/>
                                 )}
                                 {currentPage?.type === 'categoryManager' && (
-                                    <MobileCategoryManager key={activeStack.currentPageKey} {...pageProps} params={currentPage.params}/>
+                                    <MobileCategoryManager {...pageProps} params={currentPage.params}/>
                                 )}
-                            </>
+                            </div>
                         )}
 
                         {/* AI Tab */}

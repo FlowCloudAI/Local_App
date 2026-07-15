@@ -172,6 +172,60 @@
     background: var(--fc-color-bg);
 }
 
+/*
+ * 栈内页面容器：承载 push/pop 转场动画。
+ * 布局必须和 .mobile-app__content 的内层保持一致，否则 .mobile-page 的 flex:1 + 滚动会塌。
+ */
+.mobile-app__page {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+/*
+ * 转场只用 transform + opacity，且**不加 will-change / translateZ(0)**：
+ * 合成层只在动画运行的 ~200ms 内临时存在，动画结束即回收，
+ * 不会留下常驻层（见本文件下方 2026-07-13 的 tile 内存说明）。
+ */
+@keyframes mobile-page-enter-push {
+    from {
+        opacity: 0;
+        transform: translateX(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes mobile-page-enter-pop {
+    from {
+        opacity: 0;
+        transform: translateX(-18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* push = 往里走，新页从右侧进；pop = 往回走，上一页从左侧回来。replace / none 不动。 */
+.mobile-app__page[data-mobile-nav="push"] {
+    animation: mobile-page-enter-push 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-app__page[data-mobile-nav="pop"] {
+    animation: mobile-page-enter-pop 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-app__page[data-mobile-nav="push"],
+    .mobile-app__page[data-mobile-nav="pop"] {
+        animation: none;
+    }
+}
+
 /* 移动端页面通用样式 */
 .mobile-page {
     flex: 1;

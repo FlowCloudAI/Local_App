@@ -53,11 +53,20 @@ export type MobilePageOf<T extends MobilePageType = MobilePageType> = {
 
 export type MobilePage = MobilePageOf
 
+/**
+ * 上一次栈操作，决定页面转场动画的方向。
+ * `replace` 不换 key、页面不重挂载，不会触发转场；`none` 用于初次挂载和切 Tab（横向跳转不该滑）。
+ */
+export type MobilePageNavigation = 'none' | 'push' | 'pop' | 'replace'
+
 export interface PageStack {
     push: (page: MobilePage) => void
     pop: () => void
     back: (fallback: () => void) => void
     replace: (page: MobilePage) => void
+    /** 切 Tab 时调用，避免回到本 Tab 时重放上一次 push/pop 的方向动画。 */
+    resetNavigation: () => void
+    lastNavigation: MobilePageNavigation
     currentPage: MobilePage | null
     /**
      * 栈顶页面的身份标识，用作页面组件的 React key。
@@ -83,21 +92,25 @@ function nextPageKey(): string {
 
 export function usePageStack(): PageStack {
     const [entries, setEntries] = useState<PageStackEntry[]>([])
+    const [lastNavigation, setLastNavigation] = useState<MobilePageNavigation>('none')
     const entriesRef = useRef<PageStackEntry[]>([])
 
     const push = useCallback((page: MobilePage) => {
         entriesRef.current = [...entriesRef.current, {page, key: nextPageKey()}]
         setEntries(entriesRef.current)
+        setLastNavigation('push')
     }, [])
 
     const pop = useCallback(() => {
         if (entriesRef.current.length <= 1) {
             entriesRef.current = []
             setEntries([])
+            setLastNavigation('pop')
             return
         }
         entriesRef.current = entriesRef.current.slice(0, -1)
         setEntries(entriesRef.current)
+        setLastNavigation('pop')
     }, [])
 
     const back = useCallback((fallback: () => void) => {
@@ -117,6 +130,11 @@ export function usePageStack(): PageStack {
             : [{page, key: nextPageKey()}]
         entriesRef.current = next
         setEntries(next)
+        setLastNavigation('replace')
+    }, [])
+
+    const resetNavigation = useCallback(() => {
+        setLastNavigation('none')
     }, [])
 
     const stack = useMemo(() => entries.map(entry => entry.page), [entries])
@@ -127,6 +145,8 @@ export function usePageStack(): PageStack {
         pop,
         back,
         replace,
+        resetNavigation,
+        lastNavigation,
         currentPage: currentEntry?.page ?? null,
         currentPageKey: currentEntry?.key ?? '',
         canGoBack: entries.length > 0,
