@@ -280,6 +280,25 @@ const handlers: Record<string, (args: Args) => unknown> = {
     },
 }
 
+/**
+ * 预览期的 IPC 调用记录，装载时挂到 `window.__fcPreviewCommands`。
+ * 用来回答「这个页面打开时到底发了哪些命令、各几次、拉了多少行」——
+ * 本轮性能走查反复需要它（例：词条详情是否还在开屏就拉全量词条列表）。
+ * 控制台用法：`__fcPreviewCommands.reset()` → 操作一遍 → `__fcPreviewCommands.summary()`。
+ */
+export interface PreviewCommandCall {
+    name: string
+    args?: Record<string, unknown>
+    rows: number | null
+    at: number
+}
+
+const commandCalls: PreviewCommandCall[] = []
+
+function countRows(result: unknown): number | null {
+    return Array.isArray(result) ? result.length : null
+}
+
 async function dispatch<T>(name: string, args?: Record<string, unknown>): Promise<T> {
     const handler = handlers[name]
     if (!handler) {
@@ -287,18 +306,46 @@ async function dispatch<T>(name: string, args?: Record<string, unknown>): Promis
         throw new Error(`[devPreviewBackend] 未实现的命令：${name}（预览 mock 只覆盖核心创作闭环）`)
     }
     await new Promise(resolve => setTimeout(resolve, LATENCY_MS))
-    return handler(args) as T
+    const result = handler(args)
+    if (name !== 'log_message') {
+        commandCalls.push({name, args, rows: countRows(result), at: Date.now()})
+    }
+    return result as T
+}
+
+function installCommandLog(): void {
+    const log = {
+        calls: commandCalls,
+        reset: () => {
+            commandCalls.length = 0
+        },
+        /** 每个命令调用了几次、累计返回多少行。 */
+        summary: () => {
+            const byName: Record<string, {calls: number; rows: number}> = {}
+            for (const call of commandCalls) {
+                const stat = byName[call.name] ?? {calls: 0, rows: 0}
+                stat.calls += 1
+                stat.rows += call.rows ?? 0
+                byName[call.name] = stat
+            }
+            return byName
+        },
+    }
+    ;(window as unknown as Record<string, unknown>).__fcPreviewCommands = log
 }
 
 /** 装上 mock 后端。仅应在 `isBrowserPreview()` 为真时调用。 */
 export function installDevPreviewBackend(): void {
     db = createMockDb()
     settings = createMockSettings()
+    commandCalls.length = 0
     setDevCommandHandler(dispatch)
+    installCommandLog()
     logger.info('[devPreviewBackend] 已装载内存 mock 后端（仅开发预览）', {
         projects: db.projects.length,
         entries: db.entries.length,
         commands: Object.keys(handlers).length,
+        调用记录: 'window.__fcPreviewCommands.summary()',
     })
 }
 
