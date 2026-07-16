@@ -294,6 +294,30 @@ fn csv_data_row_count(table: WorldflowCsvTable, content: &str) -> Result<usize, 
     Ok(count)
 }
 
+/// 允许导入的最旧 worldflow schema 版本。
+/// schema_version 随迁移编号自增，但 .fcworld 的真实交换契约是 CSV 文件集与列结构；
+/// 仅当 CSV 交换格式实际变化时才抬高此下限，只动触发器/索引的迁移不必抬
+/// （v6→v7 的 0007 仅重建 FTS 触发器，包格式逐字节一致）。
+const MIN_COMPATIBLE_SCHEMA_VERSION: u32 = 6;
+
+fn validate_schema_version(
+    label: &str,
+    package_version: u32,
+    current_schema_version: u32,
+) -> Result<(), String> {
+    if package_version > current_schema_version {
+        return Err(format!(
+            "{label}: 包内 {package_version} 高于当前 {current_schema_version}，请升级应用后再导入"
+        ));
+    }
+    if package_version < MIN_COMPATIBLE_SCHEMA_VERSION {
+        return Err(format!(
+            "{label}: 包内 {package_version} 低于最低兼容版本 {MIN_COMPATIBLE_SCHEMA_VERSION}"
+        ));
+    }
+    Ok(())
+}
+
 fn validate_manifest(
     manifest_json: &str,
     current_schema_version: u32,
@@ -309,18 +333,16 @@ fn validate_manifest(
             manifest.format_version
         ));
     }
-    if manifest.generator.worldflow_schema_version != current_schema_version {
-        return Err(format!(
-            "worldflow schema 版本不匹配: 包内 {}，当前 {}",
-            manifest.generator.worldflow_schema_version, current_schema_version
-        ));
-    }
-    if manifest.contents.worldflow.schema_version != current_schema_version {
-        return Err(format!(
-            "CSV schema 版本不匹配: 包内 {}，当前 {}",
-            manifest.contents.worldflow.schema_version, current_schema_version
-        ));
-    }
+    validate_schema_version(
+        "worldflow schema 版本不兼容",
+        manifest.generator.worldflow_schema_version,
+        current_schema_version,
+    )?;
+    validate_schema_version(
+        "CSV schema 版本不兼容",
+        manifest.contents.worldflow.schema_version,
+        current_schema_version,
+    )?;
     if manifest.contents.worldflow.path != WORLD_DATA_DIR {
         return Err(format!(
             "worldflow 数据目录不匹配: {}",
@@ -1737,6 +1759,22 @@ pub(super) fn prepare_fcworld_import(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn schema_version_accepts_compatible_range() {
+        let current = 7;
+        assert!(validate_schema_version("测试", 7, current).is_ok());
+        assert!(
+            validate_schema_version("测试", 6, current).is_ok(),
+            "v6 包与 v7 交换格式一致，应允许导入"
+        );
+
+        let too_old = validate_schema_version("测试", 5, current).unwrap_err();
+        assert!(too_old.contains("最低兼容版本"), "错误信息: {too_old}");
+
+        let too_new = validate_schema_version("测试", 8, current).unwrap_err();
+        assert!(too_new.contains("请升级应用"), "错误信息: {too_new}");
+    }
 
     #[test]
     fn collect_id_map_preserves_entity_ids() {
