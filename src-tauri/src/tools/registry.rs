@@ -86,5 +86,44 @@ pub fn register_worldflow_tools(
         },
     );
 
+    // ── 读写标注（read_only 会话据此拦截，未标注默认按写禁止） ──
+    // 读集合必须覆盖 AppSense::reader_tool_whitelist 与 world_check_tool_whitelist
+    // 的并集，遗漏会打断 read_only 检测链路（world_check / contradiction）。
+    registry.mark_read(&[
+        "list_projects",
+        "search_entries",
+        "get_entry",
+        "get_entry_content_by_line",
+        "list_all_entries",
+        "list_categories",
+        "list_entries_by_type",
+        "query_categories",
+        "list_tag_schemas",
+        "get_entry_relations",
+        "get_project_summary",
+        "list_entry_types",
+        "list_entries_dev",
+        "report_progress",
+        "web_search",
+        "open_url",
+    ]);
+    registry.mark_write(&[
+        "create_entry",
+        "update_entry",
+        "update_entry_tags",
+        "add_entry_tag",
+        "remove_entry_tag",
+        "edit_entry_content_lines",
+        "replace_entry_content",
+        "delete_entry",
+        "move_entry",
+        "create_relation",
+        "update_relation",
+        "delete_relation",
+        "create_category",
+        "delete_category",
+        "create_project",
+    ]);
+
     Ok(())
 }
