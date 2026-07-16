@@ -393,7 +393,12 @@ struct ManifestContents {
 #[serde(rename_all = "camelCase")]
 struct ManifestWorldflowContents {
     path: String,
+    /// 数据库迁移版本，仅作诊断信息；兼容性判断以 `bundle_format_version` 为准。
     schema_version: u32,
+    /// CSV 交换格式版本。旧版本导出的包没有此字段（None），导入时回退到
+    /// schema_version 区间校验。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bundle_format_version: Option<u32>,
     tables: Vec<ManifestCsvTable>,
 }
 
@@ -1569,6 +1574,7 @@ fn build_manifest(
             worldflow: ManifestWorldflowContents {
                 path: WORLD_DATA_DIR.to_string(),
                 schema_version: export.schema_version,
+                bundle_format_version: Some(export.bundle_format_version),
                 tables,
             },
             assets_index: ManifestFile {
@@ -2597,6 +2603,7 @@ pub async fn db_export_project_fcworld(
             let export = ProjectCsvExport {
                 project_id,
                 schema_version: db.worldflow_schema_version(),
+                bundle_format_version: worldflow_core::CSV_BUNDLE_FORMAT_VERSION,
                 items,
             };
             (project, export)

@@ -295,10 +295,15 @@ fn csv_data_row_count(table: WorldflowCsvTable, content: &str) -> Result<usize, 
 }
 
 /// 允许导入的最旧 worldflow schema 版本。
-/// schema_version 随迁移编号自增，但 .fcworld 的真实交换契约是 CSV 文件集与列结构；
-/// 仅当 CSV 交换格式实际变化时才抬高此下限，只动触发器/索引的迁移不必抬
-/// （v6→v7 的 0007 仅重建 FTS 触发器，包格式逐字节一致）。
+/// 仅用于校验**没有** `bundleFormatVersion` 字段的旧版本包；新包的兼容性
+/// 以 CSV 交换格式版本为准，schema_version 降级为纯诊断信息。
+/// （v6→v7 的 0007 仅重建 FTS 触发器，包格式逐字节一致。）
 const MIN_COMPATIBLE_SCHEMA_VERSION: u32 = 6;
+
+/// 允许导入的最旧 CSV 交换格式版本。当前只有 v1；将来格式变化时在
+/// `validate_bundle_format_version` 中为旧版本挂 per-version 升级器，
+/// 只有确实无法升级的版本才抬高此下限。
+const MIN_COMPATIBLE_BUNDLE_FORMAT_VERSION: u32 = 1;
 
 fn validate_schema_version(
     label: &str,
@@ -313,6 +318,21 @@ fn validate_schema_version(
     if package_version < MIN_COMPATIBLE_SCHEMA_VERSION {
         return Err(format!(
             "{label}: 包内 {package_version} 低于最低兼容版本 {MIN_COMPATIBLE_SCHEMA_VERSION}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_bundle_format_version(package_version: u32) -> Result<(), String> {
+    if package_version > worldflow_core::CSV_BUNDLE_FORMAT_VERSION {
+        return Err(format!(
+            "CSV 交换格式版本过新: 包内 {package_version}，当前支持 {}，请升级应用后再导入",
+            worldflow_core::CSV_BUNDLE_FORMAT_VERSION
+        ));
+    }
+    if package_version < MIN_COMPATIBLE_BUNDLE_FORMAT_VERSION {
+        return Err(format!(
+            "CSV 交换格式版本过旧: 包内 {package_version}，最低兼容 {MIN_COMPATIBLE_BUNDLE_FORMAT_VERSION}"
         ));
     }
     Ok(())
@@ -333,16 +353,23 @@ fn validate_manifest(
             manifest.format_version
         ));
     }
-    validate_schema_version(
-        "worldflow schema 版本不兼容",
-        manifest.generator.worldflow_schema_version,
-        current_schema_version,
-    )?;
-    validate_schema_version(
-        "CSV schema 版本不兼容",
-        manifest.contents.worldflow.schema_version,
-        current_schema_version,
-    )?;
+    match manifest.contents.worldflow.bundle_format_version {
+        // 新包：CSV 交换格式版本是唯一兼容性契约，schema_version 仅作诊断。
+        Some(bundle_version) => validate_bundle_format_version(bundle_version)?,
+        // 旧包（无该字段）：回退到 schema_version 区间校验。
+        None => {
+            validate_schema_version(
+                "worldflow schema 版本不兼容",
+                manifest.generator.worldflow_schema_version,
+                current_schema_version,
+            )?;
+            validate_schema_version(
+                "CSV schema 版本不兼容",
+                manifest.contents.worldflow.schema_version,
+                current_schema_version,
+            )?;
+        }
+    }
     if manifest.contents.worldflow.path != WORLD_DATA_DIR {
         return Err(format!(
             "worldflow 数据目录不匹配: {}",
@@ -1759,6 +1786,93 @@ pub(super) fn prepare_fcworld_import(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn manifest_json(bundle_format_version: Option<u32>, schema_version: u32) -> String {
+        let tables: Vec<serde_json::Value> = WorldflowCsvTable::ordered()
+            .iter()
+            .map(|table| {
+                serde_json::json!({
+                    "name": table_name(*table),
+                    "path": format!("{WORLD_DATA_DIR}{}", table.file_name()),
+                    "rowCount": 0,
+                    "sha256": "0",
+                })
+            })
+            .collect();
+
+        let mut worldflow = serde_json::json!({
+            "path": WORLD_DATA_DIR,
+            "schemaVersion": schema_version,
+            "tables": tables,
+        });
+        if let Some(version) = bundle_format_version {
+            worldflow["bundleFormatVersion"] = serde_json::json!(version);
+        }
+
+        serde_json::json!({
+            "format": "com.flowcloudai.fcworld",
+            "formatVersion": 1,
+            "packageId": "pkg-test",
+            "createdAt": "2026-07-17T00:00:00Z",
+            "generator": {
+                "app": "FlowCloudAI",
+                "appVersion": "0.0.0",
+                "platform": "test",
+                "worldflowSchemaVersion": schema_version,
+            },
+            "compatibility": { "minAppVersion": "0.1.0", "features": [] },
+            "world": {
+                "sourceProjectId": "018f5fbb-0f3b-7c6d-8c4f-2a4a0b8f9c01",
+                "name": "测试世界",
+                "description": null,
+                "coverAssetId": null,
+                "createdAt": "2026-07-17",
+                "updatedAt": "2026-07-17",
+                "language": "zh-CN",
+            },
+            "contents": {
+                "worldflow": worldflow,
+                "assetsIndex": { "path": ASSETS_INDEX_PATH, "count": 0, "sha256": "0" },
+                "maps": { "path": MAPS_PATH, "count": 0, "sha256": "0" },
+                "counts": {
+                    "categories": 0, "entries": 0, "tagSchemas": 0, "entryTypes": 0,
+                    "relations": 0, "entryLinks": 0, "ideaNotes": 0, "images": 0, "maps": 0,
+                },
+            },
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn manifest_with_bundle_version_ignores_schema_version() {
+        // 带交换格式版本的新包：schema_version 与当前差异再大也应通过，
+        // 它只是诊断信息，不参与兼容性判断。
+        let json = manifest_json(Some(1), 999);
+        assert!(
+            validate_manifest(&json, 7).is_ok(),
+            "bundleFormatVersion=1 应通过: {:?}",
+            validate_manifest(&json, 7).err()
+        );
+    }
+
+    #[test]
+    fn manifest_with_newer_bundle_version_requires_upgrade() {
+        let json = manifest_json(Some(2), 7);
+        let err = validate_manifest(&json, 7).unwrap_err();
+        assert!(err.contains("请升级应用"), "错误信息: {err}");
+    }
+
+    #[test]
+    fn legacy_manifest_falls_back_to_schema_range() {
+        assert!(validate_manifest(&manifest_json(None, 6), 7).is_ok());
+        assert!(validate_manifest(&manifest_json(None, 7), 7).is_ok());
+
+        let too_old = validate_manifest(&manifest_json(None, 5), 7).unwrap_err();
+        assert!(too_old.contains("最低兼容版本"), "错误信息: {too_old}");
+
+        let too_new = validate_manifest(&manifest_json(None, 8), 7).unwrap_err();
+        assert!(too_new.contains("请升级应用"), "错误信息: {too_new}");
+    }
 
     #[test]
     fn schema_version_accepts_compatible_range() {
