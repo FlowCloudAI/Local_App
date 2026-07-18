@@ -7,13 +7,6 @@
     background: var(--fc-color-bg);
 }
 
-.mobile-project-home__topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 2.55rem;
-}
-
 .mobile-project-home__hero {
     display: flex;
     flex-direction: column;

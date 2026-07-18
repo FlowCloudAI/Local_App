@@ -37,7 +37,6 @@ import {
     MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
-    MobileTopIconButton,
 } from '../components/MobileTopControls'
 import MobileAiConversationControls from './MobileAiConversationControls'
 import MobileAiConversationDrawer from './MobileAiConversationDrawer'
@@ -685,13 +684,13 @@ export default function MobileAiChat({
             <MobilePageTopBar
                 className="mobile-ai-chat__topbar"
                 ariaLabel="AI 对话操作"
-                left={<MobileTopIconButton
-                    type="button"
-                    icon={<MobileMenuIcon className="mobile-ai-svg"/>}
-                    aria-label="打开对话列表"
-                    aria-expanded={conversationDrawerOpen}
-                    onClick={onOpenConversationDrawer}
-                />}
+                left={<MobileTopActionPill actions={[{
+                    key: 'conversations',
+                    label: '打开对话列表',
+                    icon: <MobileMenuIcon/>,
+                    ariaExpanded: conversationDrawerOpen,
+                    onClick: () => onOpenConversationDrawer?.(),
+                }]}/>}
                 center={<button
                     ref={modelMenuRef}
                     type="button"

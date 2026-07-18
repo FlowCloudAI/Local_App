@@ -20,12 +20,6 @@
     white-space: nowrap;
 }
 
-.mobile-settings-topbar-spacer {
-    display: block;
-    width: 2.45rem;
-    height: 2.45rem;
-}
-
 .mobile-settings-menu {
     display: flex;
     flex-direction: column;

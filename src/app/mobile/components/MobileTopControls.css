@@ -71,7 +71,6 @@
     justify-content: center;
 }
 
-.mobile-top-icon-button,
 .mobile-top-action-pill__button {
     border: 0;
     font: inherit;
@@ -80,19 +79,6 @@
     touch-action: manipulation;
 }
 
-.mobile-top-icon-button {
-    display: inline-grid;
-    width: var(--mobile-top-surface-size);
-    height: var(--mobile-top-surface-size);
-    padding: 0;
-    place-items: center;
-    border: var(--mobile-border);
-    border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
-    color: var(--fc-color-primary);
-}
-
-.mobile-top-icon-button__icon,
 .mobile-top-action-pill__icon {
     display: inline-grid;
     width: 100%;
@@ -178,7 +164,6 @@
     font-weight: var(--mobile-font-weight-heading);
 }
 
-.mobile-top-icon-button:active,
 .mobile-top-action-pill__button:active {
     transform: scale(0.98);
 }

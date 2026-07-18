@@ -210,7 +210,7 @@
     display: inline-flex;
     width: min(11.75rem, 42vw);
     min-width: 0;
-    height: 2.45rem;
+    height: var(--mobile-top-surface-size);
     box-sizing: border-box;
     align-items: center;
     justify-content: center;

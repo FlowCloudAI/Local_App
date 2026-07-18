@@ -54,23 +54,6 @@ export function MobilePageTopBar({
     )
 }
 
-export interface MobileTopIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    icon: ReactNode
-}
-
-export function MobileTopIconButton({icon, className, ...props}: MobileTopIconButtonProps) {
-    return (
-        <button
-            {...props}
-            className={`mobile-top-icon-button${className ? ` ${className}` : ''}`}
-        >
-            <span className="mobile-top-icon-button__icon" aria-hidden="true">
-                {icon}
-            </span>
-        </button>
-    )
-}
-
 export interface MobileTopAction {
     key: string
     label: string

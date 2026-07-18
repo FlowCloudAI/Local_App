@@ -16,7 +16,6 @@ import {
     MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
-    MobileTopIconButton,
 } from '../components/MobileTopControls'
 import {type MobilePage} from '../usePageStack'
 import './MobileIdea.css'
@@ -184,13 +183,13 @@ export default function MobileIdea({
             <MobilePageTopBar
                 className="mobile-idea__topbar"
                 ariaLabel="灵感操作"
-                left={<MobileTopIconButton
-                    type="button"
-                    icon={<MobileMenuIcon className="mobile-idea-svg"/>}
-                    aria-label="打开灵感列表"
-                    aria-expanded={ideaDrawerOpen}
-                    onClick={onOpenIdeaDrawer}
-                />}
+                left={<MobileTopActionPill actions={[{
+                    key: 'ideas',
+                    label: '打开灵感列表',
+                    icon: <MobileMenuIcon/>,
+                    ariaExpanded: ideaDrawerOpen,
+                    onClick: () => onOpenIdeaDrawer?.(),
+                }]}/>}
                 center={<div className="mobile-idea__title-text">
                     <span>{controller.selectedIdea ? '编辑灵感' : '新灵感'}</span>
                     <small>{getSaveStateText(controller)}</small>

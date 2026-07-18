@@ -30,7 +30,7 @@ import {
     refreshMarketPlugins,
     usePluginCatalogStore,
 } from '../../../features/settings/pluginCatalogStore'
-import {MobileBackIcon, MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
+import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import MobileSettingsAboutSection from './MobileSettingsAboutSection'
 import {
@@ -454,11 +454,13 @@ export default function MobileSettings({push, pop, page}: Props) {
             sticky
             edgeToEdge
             ariaLabel="设置页顶栏"
-            left={section === 'menu'
-                ? <span className="mobile-settings-topbar-spacer" aria-hidden="true"/>
-                : <MobileTopIconButton aria-label="返回设置" icon={<MobileBackIcon/>} onClick={pop}/>}
+            left={section === 'menu' ? undefined : <MobileTopActionPill actions={[{
+                key: 'back',
+                label: '返回设置',
+                icon: <MobileBackIcon/>,
+                onClick: () => pop?.(),
+            }]}/>}
             center={<h1 className="mobile-settings-topbar-title">{getSettingsSectionTitle(section)}</h1>}
-            right={<span className="mobile-settings-topbar-spacer" aria-hidden="true"/>}
         />
     )
 
