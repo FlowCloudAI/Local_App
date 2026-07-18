@@ -109,13 +109,6 @@
     margin-bottom: var(--fc-space-sm);
 }
 
-.mobile-settings-section__title {
-    margin: 0;
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-sm);
-    font-weight: 600;
-}
-
 .mobile-settings-form-stack {
     display: flex;
     flex-direction: column;
@@ -677,11 +670,6 @@
 
 .mobile-settings-menu-item:active {
     background: color-mix(in srgb, var(--fc-color-primary) 8%, transparent);
-}
-
-.mobile-settings-section__title {
-    color: var(--fc-color-text);
-    font-weight: 700;
 }
 
 .mobile-settings-api-key,

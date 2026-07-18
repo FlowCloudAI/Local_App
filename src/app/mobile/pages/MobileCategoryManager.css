@@ -136,13 +136,6 @@
     backdrop-filter: var(--mobile-chrome-filter);
 }
 
-.mobile-category-dialog__title {
-    margin-bottom: var(--fc-space-xs);
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-lg);
-    font-weight: 720;
-}
-
 .mobile-category-dialog__summary,
 .mobile-category-dialog__hint {
     color: var(--fc-color-text-secondary);

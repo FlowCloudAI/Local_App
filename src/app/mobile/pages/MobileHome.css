@@ -54,9 +54,7 @@
     line-height: 0.98;
 }
 
-.mobile-home__help,
-.mobile-home-worlds__icon-btn,
-.mobile-home-worlds__filter {
+.mobile-home__help {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -81,8 +79,6 @@
 }
 
 .mobile-home__help:active,
-.mobile-home-worlds__icon-btn:active,
-.mobile-home-worlds__filter:active,
 .mobile-home__continue:active,
 .mobile-home-recent-item:active,
 .mobile-home__project-list-button:active {
@@ -280,42 +276,6 @@
 
 .mobile-home-worlds__copy {
     min-width: 0;
-}
-
-.mobile-home-worlds__actions {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    flex: 0 0 auto;
-    gap: 0;
-    padding: 0.12rem;
-    border: var(--mobile-border-medium);
-    border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-control);
-}
-
-.mobile-home-worlds__icon-btn,
-.mobile-home-worlds__filter {
-    position: relative;
-    z-index: 1;
-    width: 2.5rem;
-    height: 2.35rem;
-    padding: 0;
-    background: transparent;
-    color: var(--fc-color-primary);
-    line-height: 1;
-    box-shadow: none;
-}
-
-.mobile-home-worlds__icon-btn {
-    font-size: 1.75rem;
-    font-weight: var(--fc-font-weight-medium);
-}
-
-.mobile-home-worlds__filter {
-    font-size: 1.45rem;
-    font-weight: 720;
 }
 
 .mobile-home-worlds__grid {

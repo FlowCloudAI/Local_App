@@ -302,12 +302,6 @@
     box-shadow: var(--mobile-shadow-dialog);
 }
 
-.mobile-category-drawer-dialog__title {
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-lg);
-    font-weight: var(--fc-font-weight-semibold);
-}
-
 .mobile-category-drawer-dialog__summary,
 .mobile-category-drawer-dialog__hint {
     margin-top: var(--fc-space-xs);

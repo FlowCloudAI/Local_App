@@ -14,14 +14,6 @@
     min-height: 2.55rem;
 }
 
-.mobile-project-home__section-action {
-    border: 0;
-    font: inherit;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-}
-
 .mobile-project-home__hero {
     display: flex;
     flex-direction: column;
@@ -172,15 +164,6 @@
     font-weight: 740;
 }
 
-.mobile-project-home__section-action {
-    padding: 0.35rem 0.65rem;
-    border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--fc-color-primary) 9%, transparent);
-    color: var(--fc-color-primary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-semibold);
-}
-
 .mobile-project-home__list {
     display: flex;
     flex-direction: column;
@@ -276,8 +259,7 @@
 
 .mobile-project-home__description:active,
 .mobile-project-home__cell:active,
-.mobile-project-home__tool:active,
-.mobile-project-home__section-action:active {
+.mobile-project-home__tool:active {
     transform: scale(0.98);
 }
 

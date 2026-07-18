@@ -34,7 +34,6 @@
     --mobile-surface-translucent: var(--fc-color-bg-elevated);
     --mobile-surface-translucent-strong: var(--fc-color-bg-elevated);
     --mobile-surface-glass: var(--fc-color-bg-elevated);
-    --mobile-surface-glass-strong: var(--fc-color-bg-elevated);
     --mobile-surface-panel: var(--fc-color-bg-elevated);
     --mobile-surface-dialog: var(--fc-color-bg-elevated);
 }
