@@ -17,7 +17,7 @@ import EntryTypeIcon from '../../../features/project-editor/components/EntryType
 import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import EntryCoverImage from '../../../features/entries/components/EntryCoverImage'
-import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileEntryList.css'
 
@@ -273,7 +273,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                         {
                             key: 'create',
                             label: '新建词条',
-                            icon: '+',
+                            icon: <MobileAddIcon/>,
                             kind: 'add',
                             onClick: () => void handleCreateEntry(),
                         },

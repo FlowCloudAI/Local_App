@@ -8,7 +8,7 @@ import {
 } from '../../../api'
 import EntryTypeCreator from '../../../features/entries/components/EntryTypeCreator'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
-import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileTypeTagManager.css'
 
@@ -72,7 +72,7 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                     actions={[{
                         key: 'create',
                         label: '新建类型',
-                        icon: '+',
+                        icon: <MobileAddIcon/>,
                         kind: 'add',
                         onClick: () => openCreator(null),
                     }]}

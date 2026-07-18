@@ -38,7 +38,7 @@ import {type MobilePage} from '../usePageStack'
 import {type MobileBeforeLeave} from '../mobileBackNavigation'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileMoreIcon, MobileTopActionPill} from '../components/MobileTopControls'
 import {formatProjectDate, parseProjectDateMs, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import {
     collectDashboardTargets,
@@ -624,14 +624,14 @@ export default function MobileHome({
                                 {
                                     key: 'create',
                                     label: '新建世界观',
-                                    icon: '+',
+                                    icon: <MobileAddIcon/>,
                                     kind: 'add',
                                     onClick: () => setCreatorOpen(true),
                                 },
                                 {
                                     key: 'filter',
                                     label: '筛选与排序',
-                                    icon: '…',
+                                    icon: <MobileMoreIcon/>,
                                     kind: 'more',
                                     ariaHasPopup: 'menu',
                                     ariaExpanded: filterOpen,

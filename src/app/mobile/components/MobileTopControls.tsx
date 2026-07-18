@@ -284,3 +284,22 @@ export function MobileBackIcon() {
         </svg>
     )
 }
+
+export function MobileAddIcon() {
+    return (
+        <svg className="mobile-top-control-svg mobile-top-control-svg--add" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 4.5v15"/>
+            <path d="M4.5 12h15"/>
+        </svg>
+    )
+}
+
+export function MobileMoreIcon() {
+    return (
+        <svg className="mobile-top-control-svg mobile-top-control-svg--more" viewBox="0 0 24 24" focusable="false">
+            <circle cx="5" cy="12" r="1.65"/>
+            <circle cx="12" cy="12" r="1.65"/>
+            <circle cx="19" cy="12" r="1.65"/>
+        </svg>
+    )
+}

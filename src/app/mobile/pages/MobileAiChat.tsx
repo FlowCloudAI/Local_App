@@ -32,6 +32,8 @@ import {logger} from '../../../shared/logger'
 import {type MobileTab} from '../MobileNav'
 import {
     type MobileAnchoredMenuItem,
+    MobileAddIcon,
+    MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
     MobileTopIconButton,
@@ -708,7 +710,7 @@ export default function MobileAiChat({
                         {
                             key: 'new',
                             label: '新建对话',
-                            icon: '+',
+                            icon: <MobileAddIcon/>,
                             kind: 'add',
                             disabled: conversationCreationDisabled,
                             onClick: () => void handleNewConv(),
@@ -716,7 +718,7 @@ export default function MobileAiChat({
                         {
                             key: 'menu',
                             label: '对话操作',
-                            icon: '…',
+                            icon: <MobileMoreIcon/>,
                             kind: 'more',
                             ariaHasPopup: 'menu',
                             ariaExpanded: topMenuOpen,

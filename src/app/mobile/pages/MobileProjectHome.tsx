@@ -18,7 +18,9 @@ import {FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
 import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
+    MobileAddIcon,
     MobileBackIcon,
+    MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
@@ -376,14 +378,14 @@ export default function MobileProjectHome({
                         {
                             key: 'create',
                             label: '新建词条',
-                            icon: '+',
+                            icon: <MobileAddIcon/>,
                             kind: 'add',
                             onClick: () => void handleCreateEntry(null),
                         },
                         {
                             key: 'menu',
                             label: '项目管理',
-                            icon: '…',
+                            icon: <MobileMoreIcon/>,
                             kind: 'more',
                             ariaHasPopup: 'menu',
                             ariaExpanded: menuOpen,

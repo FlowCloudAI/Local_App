@@ -7,7 +7,7 @@ import {
     type TagSchema,
 } from '../../../api'
 import TagCreator from '../../../features/entries/components/TagCreator'
-import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileTypeTagManager.css'
 
@@ -76,7 +76,7 @@ export default function MobileTagManager({pop, params}: Props) {
                     actions={[{
                         key: 'create',
                         label: '新建标签',
-                        icon: '+',
+                        icon: <MobileAddIcon/>,
                         kind: 'add',
                         onClick: () => openCreator(null),
                     }]}

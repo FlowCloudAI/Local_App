@@ -11,6 +11,8 @@ import MobileIdeaDrawer from '../components/MobileIdeaDrawer'
 import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
+    MobileAddIcon,
+    MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
     MobileTopIconButton,
@@ -207,7 +209,7 @@ export default function MobileIdea({
                         {
                             key: 'new',
                             label: '新建灵感',
-                            icon: '+',
+                            icon: <MobileAddIcon/>,
                             kind: 'add',
                             onClick: () => {
                                 setMenuOpen(false)
@@ -218,7 +220,7 @@ export default function MobileIdea({
                         {
                             key: 'menu',
                             label: '灵感操作',
-                            icon: '…',
+                            icon: <MobileMoreIcon/>,
                             kind: 'more',
                             ariaHasPopup: 'menu',
                             ariaExpanded: menuOpen,

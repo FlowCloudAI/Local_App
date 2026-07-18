@@ -114,6 +114,19 @@
     stroke-linejoin: round;
 }
 
+.mobile-top-control-svg--more {
+    width: 1.75rem;
+    height: 1.75rem;
+    fill: currentColor;
+    stroke: none;
+}
+
+.mobile-top-control-svg--add {
+    width: 1.75rem;
+    height: 1.75rem;
+    stroke-width: 2.8;
+}
+
 .mobile-top-action-pill {
     position: relative;
     display: inline-flex;
