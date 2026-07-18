@@ -44,16 +44,6 @@
     gap: var(--fc-space-md);
 }
 
-.mobile-home__title,
-.mobile-home-worlds__title {
-    margin: 0;
-    color: var(--fc-color-text);
-    font-size: clamp(2rem, 9vw, 2.65rem);
-    font-weight: 760;
-    letter-spacing: 0;
-    line-height: 0.98;
-}
-
 .mobile-home__help {
     flex: 0 0 auto;
     display: inline-flex;

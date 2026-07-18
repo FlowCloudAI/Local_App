@@ -233,7 +233,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                     <span className="mobile-project-list__eyebrow">
                         {loading ? '正在同步' : `${filtered.length} 个世界`}
                     </span>
-                    <h2 className="mobile-project-list__title">项目</h2>
+                <h2 className="mobile-page__hero-title">项目</h2>
                 </div>
                 <button
                     type="button"

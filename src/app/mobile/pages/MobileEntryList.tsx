@@ -303,7 +303,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                             ? `${total} 个词条 · 已加载 ${entries.length}`
                             : `${total ?? entries.length} 个词条`}
                 </span>
-                <h2 className="mobile-entry-list__title">{listTitle}</h2>
+                <h2 className="mobile-page__hero-title">{listTitle}</h2>
             </div>
 
             <div className="mobile-entry-list__toolbar">

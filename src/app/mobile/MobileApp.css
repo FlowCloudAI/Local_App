@@ -235,6 +235,16 @@
     display: none;
 }
 
+.mobile-page__hero-title {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--fc-color-text);
+    font-size: clamp(2rem, 9vw, 2.65rem);
+    font-weight: 750;
+    letter-spacing: 0;
+    line-height: 0.98;
+}
+
 /*
  * 2026-07-13 暂停横滑区强制独立合成：Chromium 148 模拟器会持续触发 tile 内存超限，
  * 最终可能由 lowmemorykiller 杀死 WebView renderer；真机暂未复现原纵向压扁问题。

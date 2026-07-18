@@ -518,7 +518,7 @@ export default function MobileHome({
             <div className="mobile-home__pager">
                 <section className="mobile-home__panel mobile-home__dashboard">
                     <div className="mobile-home__hero">
-                        <h2 className="mobile-home__title">首页</h2>
+                            <h2 className="mobile-page__hero-title">首页</h2>
                         <button
                             type="button"
                             className="mobile-home__help"
@@ -588,7 +588,7 @@ export default function MobileHome({
                             <span className="mobile-home__eyebrow">
                                 {loadingWorlds ? '正在同步' : `${worldProjects.length} 个世界`}
                             </span>
-                            <h2 className="mobile-home-worlds__title">世界观</h2>
+                            <h2 className="mobile-page__hero-title">世界观</h2>
                         </div>
                         <MobileTopActionPill
                             ref={worldActionsRef}

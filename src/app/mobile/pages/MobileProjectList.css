@@ -24,15 +24,6 @@
     line-height: 1.2;
 }
 
-.mobile-project-list__title {
-    margin: 0;
-    color: var(--fc-color-text);
-    font-size: clamp(2rem, 9vw, 2.65rem);
-    font-weight: 750;
-    letter-spacing: 0;
-    line-height: 0.98;
-}
-
 .mobile-project-list__create {
     flex: 0 0 auto;
     width: 3rem;

@@ -23,16 +23,6 @@
     line-height: 1.2;
 }
 
-.mobile-entry-list__title {
-    margin: 0;
-    color: var(--fc-color-text);
-    font-size: clamp(2rem, 9vw, 2.65rem);
-    font-weight: 750;
-    letter-spacing: 0;
-    line-height: 0.98;
-    overflow-wrap: anywhere;
-}
-
 .mobile-entry-list__toolbar {
     margin-bottom: var(--fc-space-md);
 }

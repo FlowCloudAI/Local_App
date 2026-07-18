@@ -70,7 +70,7 @@ export default function MobileTagManager({pop, params}: Props) {
                 />}
                 center={<div className="mobile-type-tag__heading">
                     <span className="mobile-type-tag__eyebrow">{loading ? '正在同步' : `${tagSchemas.length} 个标签`}</span>
-                    <h2 className="mobile-type-tag__title">标签管理</h2>
+                    <h2 className="mobile-page__hero-title">标签管理</h2>
                 </div>}
                 right={<MobileTopActionPill
                     actions={[{
