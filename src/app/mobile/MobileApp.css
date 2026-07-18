@@ -45,6 +45,9 @@
     --mobile-radius-field: var(--fc-radius-xl);
     --mobile-radius-floating: calc(var(--fc-radius-xl) + var(--fc-space-sm));
     --mobile-radius-sheet: calc(var(--fc-radius-xl) + var(--fc-space-sm));
+    --mobile-top-action-size: 2.75rem;
+    --mobile-top-surface-size: 3.125rem;
+    --mobile-topbar-height: 3.5rem;
     --mobile-font-weight-label: 650;
     --mobile-font-weight-strong: 680;
     --mobile-font-weight-heading: 720;
