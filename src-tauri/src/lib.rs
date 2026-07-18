@@ -588,9 +588,6 @@ pub fn run() {
             // Plugin Management — 官方市场
             plugin_market_list,
             plugin_market_install,
-            plugin_market_upload,
-            plugin_market_update,
-            plugin_market_delete,
             map_save_scene,
             map_list_project_maps,
             map_save_map_entry,

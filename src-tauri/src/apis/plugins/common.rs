@@ -2,7 +2,6 @@ pub(super) use crate::state::PathsState;
 pub(super) use crate::{AiState, ApiError, NetworkState};
 pub(super) use flowcloudai_client::ErrorCode;
 pub(super) use flowcloudai_client::plugin::types::PluginMeta;
-pub(super) use reqwest::multipart;
 pub(super) use semver::Version;
 pub(super) use serde::{Deserialize, Serialize};
 pub(super) use std::io::Read as _;

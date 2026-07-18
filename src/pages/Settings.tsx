@@ -48,7 +48,6 @@ import {
 } from '../api'
 import {LocalPluginCard, MarketPluginCard} from '../features/plugins/PluginCard'
 import {buildTtsVoiceOptions, normalizeVoiceIdWithPlugin} from '../features/plugins/ttsVoice'
-import UploadPlugin from '../features/plugins/UploadPlugin'
 import {CONVERSATION_TEMPERATURE_MAX} from '../features/ai-chat/model/AiControllerTypes'
 import {
     deleteAppApiKey,
@@ -906,9 +905,6 @@ function TemplatesPanel({editorFontSize}: TemplatesPanelProps) {
 }
 
 interface PluginsPanelProps {
-    uploadDialogOpen: boolean
-    onCloseUploadDialog: () => void
-    onUploadComplete: () => void | Promise<void>
     localPlugins: LocalPluginInfo[]
     marketPlugins: RemotePluginInfo[]
     loadingLocal: boolean
@@ -923,7 +919,6 @@ interface PluginsPanelProps {
     onRefreshLocal: () => void | Promise<void>
     onRefreshMarket: () => void | Promise<void>
     onInstallFromFile: () => void | Promise<void>
-    onUploadLocalPlugin: () => void
     onUninstall: (pluginId: string) => void | Promise<void>
     onInstall: (pluginId: string) => void | Promise<void>
     onSearchTextChange: (value: string) => void
@@ -931,9 +926,6 @@ interface PluginsPanelProps {
 }
 
 function PluginsPanel({
-                          uploadDialogOpen,
-                          onCloseUploadDialog,
-                          onUploadComplete,
                           localPlugins,
                           marketPlugins,
                           loadingLocal,
@@ -948,7 +940,6 @@ function PluginsPanel({
                           onRefreshLocal,
                           onRefreshMarket,
                           onInstallFromFile,
-                          onUploadLocalPlugin,
                           onUninstall,
                           onInstall,
                           onSearchTextChange,
@@ -971,17 +962,9 @@ function PluginsPanel({
             <div className="settings-title fc-page-header">
                 <div className="fc-page-title-block">
                     <h1 className="fc-page-title">插件管理</h1>
-                    <p className="fc-page-subtitle">安装、更新、上传和卸载本地 AI 插件。</p>
+                    <p className="fc-page-subtitle">安装、更新和卸载本地 AI 插件。</p>
                 </div>
             </div>
-
-            <UploadPlugin
-                open={uploadDialogOpen}
-                onClose={onCloseUploadDialog}
-                onUploaded={() => {
-                    void onUploadComplete()
-                }}
-            />
 
             <section className="settings-section fc-section-card">
                 <div className="plugins-section-header">
@@ -1036,14 +1019,6 @@ function PluginsPanel({
                             onClick={onInstallFromFile}
                         >
                             {installingLocalFile ? '安装中…' : '安装本地插件'}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={onUploadLocalPlugin}
-                        >
-                            上传本地插件
                         </Button>
                         <Button
                             type="button"
@@ -1182,7 +1157,6 @@ export default function Settings({
     const loadingLocal = pluginCatalog.loadingLocal
     const loadingMarket = pluginCatalog.loadingMarket
     const installingLocalFile = pluginCatalog.installingLocalFile
-    const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
     const localError = pluginCatalog.localError
     const marketError = pluginCatalog.marketError
     const installingIds = pluginCatalog.installingIds
@@ -1742,10 +1716,6 @@ export default function Settings({
         } catch (e) {
             void showAlert('本地插件安装失败: ' + e, 'error')
         }
-    }
-
-    const handleUploadLocalPlugin = () => {
-        setUploadDialogOpen(true)
     }
 
     const handleUninstall = async (pluginId: string) => {
@@ -2564,9 +2534,6 @@ export default function Settings({
                     )}
                     {activeTab === 'plugins' && (
                         <PluginsPanel
-                            uploadDialogOpen={uploadDialogOpen}
-                            onCloseUploadDialog={() => setUploadDialogOpen(false)}
-                            onUploadComplete={loadMarket}
                             localPlugins={localPlugins}
                             marketPlugins={marketPlugins}
                             loadingLocal={loadingLocal}
@@ -2581,7 +2548,6 @@ export default function Settings({
                             onRefreshLocal={loadLocal}
                             onRefreshMarket={loadMarket}
                             onInstallFromFile={handleInstallFromFile}
-                            onUploadLocalPlugin={handleUploadLocalPlugin}
                             onUninstall={handleUninstall}
                             onInstall={handleInstall}
                             onSearchTextChange={setSearchText}
