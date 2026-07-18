@@ -478,7 +478,7 @@ export default function MobileHome({
         return (
             <Card
                 key={project.id}
-                className="mobile-project-card mobile-home-world-card"
+                className="mobile-page__card mobile-project-card mobile-home-world-card"
                 title={project.name}
                 description={project.description || '你的世界在等你回来，继续补全新的角色、地点和事件。'}
                 image={image}
@@ -533,7 +533,7 @@ export default function MobileHome({
                         placeholder="搜索世界观…"
                         value={searchText}
                         onValueChange={setSearchText}
-                        className="mobile-home__search"
+                        className="mobile-page__search mobile-home__search"
                         radius="full"
                         size="lg"
                         allowClear
@@ -585,7 +585,7 @@ export default function MobileHome({
                 >
                     <div className="mobile-home-worlds__head">
                         <div className="mobile-home-worlds__copy">
-                            <span className="mobile-home__eyebrow">
+                            <span className="mobile-page__eyebrow">
                                 {loadingWorlds ? '正在同步' : `${worldProjects.length} 个世界`}
                             </span>
                             <h2 className="mobile-page__hero-title">世界观</h2>
@@ -617,7 +617,7 @@ export default function MobileHome({
                         placeholder="搜索世界观…"
                         value={searchText}
                         onValueChange={setSearchText}
-                        className="mobile-home-worlds__search"
+                        className="mobile-page__search mobile-home-worlds__search"
                         radius="full"
                         size="lg"
                         allowClear

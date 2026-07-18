@@ -47,7 +47,7 @@ export function ProjectHomeHero({
             )}
             <div className="mobile-project-home__title-row">
                 <div className="mobile-project-home__title-copy">
-                    <span className="mobile-project-home__eyebrow">世界观</span>
+                    <span className="mobile-page__eyebrow mobile-project-home__eyebrow">世界观</span>
                     <h2 className="mobile-project-home__title">{projectName}</h2>
                 </div>
             </div>

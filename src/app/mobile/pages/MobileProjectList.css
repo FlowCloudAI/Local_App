@@ -16,12 +16,7 @@
 }
 
 .mobile-project-list__eyebrow {
-    display: block;
     margin-bottom: 0.15rem;
-    color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1.2;
 }
 
 .mobile-project-list__create {
@@ -58,18 +53,6 @@
     margin-bottom: var(--fc-space-md);
 }
 
-.mobile-project-list__search .fc-input__wrapper {
-    height: 3.25rem;
-    border: var(--mobile-border-soft);
-    background: var(--mobile-surface-muted);
-    box-shadow: var(--mobile-inset-highlight-soft);
-}
-
-.mobile-project-list__search .fc-input__field {
-    font-size: var(--fc-font-size-body);
-    font-weight: var(--fc-font-weight-medium);
-}
-
 .mobile-project-list__import.fc-btn {
     min-height: 2.9rem;
     border-radius: var(--fc-radius-full);
@@ -86,17 +69,6 @@
     border: var(--mobile-border-strong);
     border-radius: var(--mobile-radius-card);
     overflow: hidden;
-}
-
-.mobile-project-card.fc-card {
-    min-height: 0;
-    background: var(--mobile-surface-raised);
-    box-shadow: var(--mobile-shadow-card);
-}
-
-.mobile-project-card.fc-card--hoverable:hover {
-    transform: none;
-    box-shadow: var(--mobile-shadow-card-hover);
 }
 
 .mobile-project-card:active {

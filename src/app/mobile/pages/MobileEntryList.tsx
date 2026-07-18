@@ -296,7 +296,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                   * 显示后端 count 的真实总数，而不是已加载条数——分页后两者不再相等，
                   * 拿 entries.length 当总数会在大项目里直接谎报（原先固定 limit:200 时同理）。
                   */}
-                <span className="mobile-entry-list__eyebrow">
+                <span className="mobile-page__eyebrow mobile-entry-list__eyebrow">
                     {loading
                         ? '正在同步'
                         : total !== null && total > entries.length
@@ -311,7 +311,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                     placeholder="搜索词条…"
                     value={searchText}
                     onValueChange={handleSearch}
-                    className="mobile-entry-list__search"
+                    className="mobile-page__search mobile-entry-list__search"
                     radius="full"
                     size="lg"
                     allowClear
@@ -385,7 +385,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                             )
                             return (
                                 <Card
-                                    className="mobile-entry-card"
+                                    className="mobile-page__card mobile-entry-card"
                                     key={entry.id}
                                     style={{'--mobile-entry-card-color': et?.color ?? 'var(--fc-color-primary)'} as CSSProperties}
                                     imageSlot={entry.cover ? (

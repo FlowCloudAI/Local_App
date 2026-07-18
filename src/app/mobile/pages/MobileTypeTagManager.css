@@ -17,12 +17,7 @@
 }
 
 .mobile-type-tag__eyebrow {
-    display: block;
     margin-bottom: 0.15rem;
-    color: var(--fc-color-text-tertiary);
-    font-size: var(--fc-font-size-xs);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1.2;
 }
 
 .mobile-type-tag__list {

@@ -230,7 +230,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
 
             <div className="mobile-project-list__hero">
                 <div className="mobile-project-list__hero-copy">
-                    <span className="mobile-project-list__eyebrow">
+                    <span className="mobile-page__eyebrow mobile-project-list__eyebrow">
                         {loading ? '正在同步' : `${filtered.length} 个世界`}
                     </span>
                 <h2 className="mobile-page__hero-title">项目</h2>
@@ -250,7 +250,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                     placeholder="搜索项目…"
                     value={searchText}
                     onValueChange={setSearchText}
-                    className="mobile-project-list__search"
+                    className="mobile-page__search"
                     radius="full"
                     size="lg"
                     allowClear
@@ -289,7 +289,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                             return (
                                 <Card
                                     key={project.id}
-                                    className="mobile-project-card"
+                                    className="mobile-page__card mobile-project-card"
                                     title={project.name}
                                     description={project.description || '暂无描述'}
                                     image={image}
