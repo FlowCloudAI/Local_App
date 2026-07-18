@@ -1,4 +1,5 @@
 import type {HTMLAttributes, MouseEvent} from 'react'
+import {Button, Input} from 'flowcloudai-ui'
 import type {Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
 import {MobileSearchIcon} from '../components/MobileTopControls'
 import {
@@ -33,14 +34,14 @@ interface Props {
 
 export default function MobileAiConversationDrawer(props: Props) {
     return <aside className="mobile-ai-drawer" aria-label="对话列表">
-        <label className="mobile-ai-drawer__search"><MobileSearchIcon className="mobile-ai-drawer__search-icon"/><input value={props.search} onChange={event => props.onSearch(event.currentTarget.value)} placeholder="搜索对话..."/></label>
-        <div className="mobile-ai-drawer__filter-groups">
-            <div className="mobile-ai-drawer__filter-group"><span>状态</span><div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话状态">{AI_CONVERSATION_STATUS_OPTIONS.map(option => <button key={option.key} type="button" className={props.statusFilter === option.key ? 'active' : ''} aria-pressed={props.statusFilter === option.key} onClick={() => props.onStatusFilter(option.key)}>{option.label}</button>)}</div></div>
-            <div className="mobile-ai-drawer__filter-group"><span>类型</span><div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话类型">{AI_CONVERSATION_FILTER_OPTIONS.map(option => <button key={option.key} type="button" className={props.filter === option.key ? 'active' : ''} aria-pressed={props.filter === option.key} onClick={() => props.onFilter(option.key)}>{option.label}</button>)}</div></div>
-            <button type="button" className="mobile-ai-drawer__new" disabled={props.creationDisabled} onClick={props.onNew}><span aria-hidden="true">+</span><span>新对话</span></button>
+        <Input value={props.search} onValueChange={props.onSearch} placeholder="搜索对话..." aria-label="搜索对话" prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>} radius="full" size="lg" allowClear className="mobile-drawer-search"/>
+        <div className="mobile-drawer-filter-stack">
+            <div className="mobile-drawer-filter-group"><span>状态</span><div className="mobile-drawer-segmented" role="group" aria-label="AI 对话状态">{AI_CONVERSATION_STATUS_OPTIONS.map(option => <button key={option.key} type="button" className={props.statusFilter === option.key ? 'active' : ''} aria-pressed={props.statusFilter === option.key} onClick={() => props.onStatusFilter(option.key)}>{option.label}</button>)}</div></div>
+            <div className="mobile-drawer-filter-group"><span>类型</span><div className="mobile-drawer-segmented" role="group" aria-label="AI 对话类型">{AI_CONVERSATION_FILTER_OPTIONS.map(option => <button key={option.key} type="button" className={props.filter === option.key ? 'active' : ''} aria-pressed={props.filter === option.key} onClick={() => props.onFilter(option.key)}>{option.label}</button>)}</div></div>
+            <Button type="button" variant="outline" size="md" radius="full" block className="mobile-drawer-primary-action" disabled={props.creationDisabled} onClick={props.onNew}>+ 新对话</Button>
         </div>
         <div className="mobile-ai-drawer__list">
-            {props.visibleConversations.length === 0 ? <div className="mobile-ai-drawer__empty">{props.conversations.length === 0 ? '暂无历史对话' : props.hasSearch ? '没有匹配的对话' : props.statusFilter === 'archived' ? '暂无归档对话' : '当前类型下没有对话'}</div> : props.visibleConversations.map(conversation => {
+            {props.visibleConversations.length === 0 ? <div className="mobile-drawer-empty">{props.conversations.length === 0 ? '暂无历史对话' : props.hasSearch ? '没有匹配的对话' : props.statusFilter === 'archived' ? '暂无归档对话' : '当前类型下没有对话'}</div> : props.visibleConversations.map(conversation => {
                 const state = props.runtime[conversation.id]
                 const tags = [conversation.pinnedAt ? '已顶置' : null, conversation.archivedAt ? '已归档' : null, conversation.mode === 'character' ? '角色对话' : null, conversation.mode === 'report' ? '矛盾检测' : null].filter(Boolean).join(' · ')
                 return <div key={conversation.id} className={`mobile-ai-drawer__item${conversation.id === props.activeConversationId ? ' active' : ''}${conversation.mode === 'character' ? ' is-character' : ''}${conversation.mode === 'report' ? ' is-report' : ''}${conversation.pinnedAt ? ' is-pinned' : ''}${conversation.archivedAt ? ' is-archived' : ''}${state?.isStreaming ? ' is-streaming' : ''}${state?.hasUnreadReply ? ' has-unread-reply' : ''}`}>

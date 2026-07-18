@@ -1,4 +1,4 @@
-import {Select} from 'flowcloudai-ui'
+import {Button, Input, Select} from 'flowcloudai-ui'
 import {
     formatMobileIdeaDate,
     getMobileIdeaPreview,
@@ -58,25 +58,28 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
                 <small>{visibleIdeas.length}/{ideas.length} 条</small>
             </div>
 
-            <label className="mobile-idea-drawer__search">
-                <MobileSearchIcon className="mobile-idea-drawer__svg"/>
-                <input
-                    value={searchText}
-                    onChange={event => setSearchText(event.target.value)}
-                    placeholder="搜索灵感…"
-                    aria-label="搜索灵感"
-                />
-            </label>
+            <Input
+                value={searchText}
+                onValueChange={setSearchText}
+                placeholder="搜索灵感…"
+                aria-label="搜索灵感"
+                prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>}
+                radius="full"
+                size="lg"
+                allowClear
+                className="mobile-drawer-search"
+            />
 
-            <div className="mobile-idea-drawer__filters">
-                <div className="mobile-idea-drawer__filter-group">
+            <div className="mobile-drawer-filter-stack">
+                <div className="mobile-drawer-filter-group">
                     <span>状态</span>
-                    <div className="mobile-idea-drawer__segmented">
+                    <div className="mobile-drawer-segmented" role="group" aria-label="灵感状态">
                         {MOBILE_IDEA_STATUS_OPTIONS.map(option => (
                             <button
                                 key={option.key}
                                 type="button"
                                 className={statusFilter === option.key ? 'active' : ''}
+                                aria-pressed={statusFilter === option.key}
                                 onClick={() => setStatusFilter(option.key)}
                             >
                                 {option.label}
@@ -84,7 +87,7 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
                         ))}
                     </div>
                 </div>
-                <div className="mobile-idea-drawer__filter-group">
+                <div className="mobile-drawer-filter-group">
                     <span>范围</span>
                     <Select
                         value={projectFilter}
@@ -98,22 +101,26 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
                 </div>
             </div>
 
-            <button
+            <Button
                 type="button"
-                className="mobile-idea-drawer__new"
+                variant="outline"
+                size="md"
+                radius="full"
+                block
+                className="mobile-drawer-primary-action"
                 onClick={() => {
                     startNewIdea()
                     onClose?.()
                 }}
             >
                 + 新灵感
-            </button>
+            </Button>
 
             <div className="mobile-idea-drawer__list" aria-busy={loading}>
                 {loading ? (
-                    <div className="mobile-idea-drawer__empty">加载中…</div>
+                    <div className="mobile-drawer-empty">加载中…</div>
                 ) : visibleIdeas.length === 0 ? (
-                    <div className="mobile-idea-drawer__empty">没有匹配的灵感</div>
+                    <div className="mobile-drawer-empty">没有匹配的灵感</div>
                 ) : visibleIdeas.map(idea => {
                     const active = idea.id === selectedIdeaId
                     const projectName = idea.project_id ? projectNameById.get(idea.project_id) ?? '未知项目' : '全局'
