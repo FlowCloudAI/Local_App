@@ -1,7 +1,7 @@
 import type {HTMLAttributes, MouseEvent} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import type {Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
-import {MobileSearchIcon} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileSearchIcon} from '../components/MobileTopControls'
 import {
     AI_CONVERSATION_FILTER_OPTIONS,
     AI_CONVERSATION_STATUS_OPTIONS,
@@ -38,7 +38,7 @@ export default function MobileAiConversationDrawer(props: Props) {
         <div className="mobile-drawer-filter-stack">
             <div className="mobile-drawer-filter-group"><span>状态</span><div className="mobile-drawer-segmented" role="group" aria-label="AI 对话状态">{AI_CONVERSATION_STATUS_OPTIONS.map(option => <button key={option.key} type="button" className={props.statusFilter === option.key ? 'active' : ''} aria-pressed={props.statusFilter === option.key} onClick={() => props.onStatusFilter(option.key)}>{option.label}</button>)}</div></div>
             <div className="mobile-drawer-filter-group"><span>类型</span><div className="mobile-drawer-segmented" role="group" aria-label="AI 对话类型">{AI_CONVERSATION_FILTER_OPTIONS.map(option => <button key={option.key} type="button" className={props.filter === option.key ? 'active' : ''} aria-pressed={props.filter === option.key} onClick={() => props.onFilter(option.key)}>{option.label}</button>)}</div></div>
-            <Button type="button" variant="outline" size="md" radius="full" block className="mobile-drawer-primary-action" disabled={props.creationDisabled} onClick={props.onNew}>+ 新对话</Button>
+            <Button type="button" variant="outline" size="md" radius="full" block className="mobile-drawer-primary-action" disabled={props.creationDisabled} onClick={props.onNew}><MobileAddIcon className="mobile-top-control-svg--inline"/>新对话</Button>
         </div>
         <div className="mobile-ai-drawer__list">
             {props.visibleConversations.length === 0 ? <div className="mobile-drawer-empty">{props.conversations.length === 0 ? '暂无历史对话' : props.hasSearch ? '没有匹配的对话' : props.statusFilter === 'archived' ? '暂无归档对话' : '当前类型下没有对话'}</div> : props.visibleConversations.map(conversation => {

@@ -7,7 +7,7 @@ import EntryTypeCreator from '../../../features/entries/components/EntryTypeCrea
 import TagCreator from '../../../features/entries/components/TagCreator'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
-import {MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
 import {MobileEntryImagesSection} from './MobileEntryImagesSection'
@@ -58,7 +58,7 @@ export default function MobileEntryDetailEditView(p: Props) {
             <Input placeholder="词条标题" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
             <textarea placeholder="摘要（可选）" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
             <div className="mobile-entry-detail__meta-row"><label className="mobile-entry-detail__field"><span>类型</span><Select value={p.entryType ?? ''} onValueChange={value => p.onEntryType(value ? String(value) : null)} options={typeOptions} placeholder="类型" className="mobile-entry-detail__meta-select"/></label><label className="mobile-entry-detail__field"><span>分类</span><Select value={p.categoryId ?? ''} onValueChange={value => p.onCategory(value ? String(value) : null)} options={categoryOptions} placeholder="分类" className="mobile-entry-detail__meta-select"/></label></div>
-            <button type="button" className="mobile-entry-detail__add-type" onClick={p.onOpenTypeCreator}>+ 新建类型</button>
+            <button type="button" className="mobile-entry-detail__add-type" onClick={p.onOpenTypeCreator}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型</button>
         </section>
         <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
             <div className="mobile-entry-detail__section-header"><span>正文</span><button type="button" className="mobile-entry-detail__section-action" onClick={p.onOpenImmersive}>沉浸</button></div>

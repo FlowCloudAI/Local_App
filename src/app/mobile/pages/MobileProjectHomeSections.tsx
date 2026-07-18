@@ -1,5 +1,6 @@
 import {Button} from 'flowcloudai-ui'
 import {formatProjectDate} from '../../../features/projects/projectDisplay'
+import {MobileAddIcon} from '../components/MobileTopControls'
 
 export interface ProjectHomeStatItem {
     key: string
@@ -86,7 +87,7 @@ interface ProjectHomePrimaryActionsProps {
 export function ProjectHomePrimaryActions({onCreateEntry, onOpenAi}: ProjectHomePrimaryActionsProps) {
     return (
         <div className="mobile-project-home__actions">
-            <Button type="button" size="sm" className="mobile-project-home__action" onClick={onCreateEntry}>+ 新建词条</Button>
+            <Button type="button" size="sm" className="mobile-project-home__action" onClick={onCreateEntry}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建词条</Button>
             <Button type="button" size="sm" variant="outline" className="mobile-project-home__action" onClick={onOpenAi}>AI 讨论</Button>
         </div>
     )

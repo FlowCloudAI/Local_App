@@ -36,9 +36,6 @@
     color: var(--fc-color-primary);
     cursor: pointer;
     font: inherit;
-    font-size: 1.65rem;
-    font-weight: var(--fc-font-weight-semibold);
-    line-height: 1;
     place-items: center;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -159,8 +156,6 @@
     place-items: center;
     border-radius: var(--fc-radius-full);
     color: var(--fc-color-text-secondary);
-    font-size: 1.35rem;
-    line-height: 1;
 }
 
 .mobile-category-drawer__menu:active {

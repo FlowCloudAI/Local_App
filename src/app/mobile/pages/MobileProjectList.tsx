@@ -20,6 +20,7 @@ import {invalidateProjectList, useProjectListStore} from '../../../features/proj
 import {type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {formatProjectDate, toProjectImageSrc} from '../../../features/projects/projectDisplay'
+import {MobileAddIcon} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileProjectList.css'
 
@@ -241,7 +242,7 @@ export default function MobileProjectList({push, setAiFocus, pageKey}: Props) {
                     onClick={() => setCreatorOpen(true)}
                     aria-label="新建项目"
                 >
-                    +
+                    <MobileAddIcon/>
                 </button>
             </div>
 

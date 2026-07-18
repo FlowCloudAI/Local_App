@@ -127,6 +127,12 @@
     stroke-width: 2.8;
 }
 
+.mobile-top-control-svg--inline {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+}
+
 .mobile-top-action-pill {
     position: relative;
     display: inline-flex;

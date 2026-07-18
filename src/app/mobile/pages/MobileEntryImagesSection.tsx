@@ -1,5 +1,6 @@
 import {Button} from 'flowcloudai-ui'
 import {type EntryImage, toEntryImageSrc} from '../../../features/entries/lib/entryImage'
+import {MobileAddIcon} from '../components/MobileTopControls'
 import {getImageLabel} from './MobileEntryDetailUtils'
 
 interface MobileEntryImagesSectionProps {
@@ -18,7 +19,7 @@ export function MobileEntryImagesSection({
             <div className="mobile-entry-detail__images-header">
                 <div className="mobile-entry-detail__images-label">图片</div>
                 <Button type="button" size="sm" variant="outline" onClick={onAddImage}>
-                    + 添加图片
+                    <MobileAddIcon className="mobile-top-control-svg--inline"/>添加图片
                 </Button>
             </div>
             {images.length > 0 ? (

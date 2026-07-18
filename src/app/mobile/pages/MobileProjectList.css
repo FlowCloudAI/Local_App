@@ -32,9 +32,6 @@
     background: var(--fc-color-primary);
     color: var(--fc-color-text-on-primary);
     font: inherit;
-    font-size: 2rem;
-    font-weight: var(--fc-font-weight-medium);
-    line-height: 1;
     box-shadow: var(--mobile-shadow-primary-action);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;

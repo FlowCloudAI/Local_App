@@ -7,7 +7,7 @@ import {
     type MobileIdeaController,
     type MobileIdeaProjectFilter,
 } from '../hooks/useMobileIdeaController'
-import {MobileSearchIcon} from './MobileTopControls'
+import {MobileAddIcon, MobileSearchIcon} from './MobileTopControls'
 import './MobileIdeaDrawer.css'
 
 interface Props {
@@ -113,7 +113,7 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
                     onClose?.()
                 }}
             >
-                + 新灵感
+                <MobileAddIcon className="mobile-top-control-svg--inline"/>新灵感
             </Button>
 
             <div className="mobile-idea-drawer__list" aria-busy={loading}>

@@ -4,7 +4,12 @@ import type {PluginInfo} from '../../../api'
 import type {AiToolAccessMode, Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
 import {ActionMenu, RenameDialog} from '../../../shared/ui/overlay'
 import MobileBottomSheet from '../components/MobileBottomSheet'
-import {MobileAnchoredActionMenu, MobileAnchoredMenu, type MobileAnchoredMenuItem} from '../components/MobileTopControls'
+import {
+    MobileAddIcon,
+    MobileAnchoredActionMenu,
+    MobileAnchoredMenu,
+    type MobileAnchoredMenuItem,
+} from '../components/MobileTopControls'
 import {AI_TOOL_ACCESS_LABELS, MobileAiIcon} from './MobileAiChatUi'
 
 interface ModelOption { id: string; label: string; description: string }
@@ -34,7 +39,7 @@ export default function MobileAiComposer(p: Props) {
                 <button type="button" className={`mobile-ai-composer-card__chip${p.thinking ? ' active' : ''}`} disabled={p.isStreaming} onClick={p.onToggleThinking}><MobileAiIcon type="thinking"/><span>思考</span></button>
                 <button ref={p.toolModeMenuRef} type="button" className={`mobile-ai-composer-card__chip mobile-ai-composer-card__chip--mode active${p.toolAccessMode === 'reader' ? ' is-reader' : ''}${p.toolAccessMode === 'writer' ? ' is-writer' : ''}${p.toolModeMenuOpen ? ' is-menu-open' : ''}`} aria-haspopup="menu" aria-expanded={p.toolModeMenuOpen} aria-label={`切换写入模式，当前为${AI_TOOL_ACCESS_LABELS[p.toolAccessMode]}`} disabled={p.isStreaming} onClick={() => { p.onBeforeToolModeMenuOpen(); p.onToolModeMenuOpen(!p.toolModeMenuOpen) }}><MobileAiIcon type={p.toolAccessMode}/><span>{p.activeToolModeShortLabel}</span></button>
             </div><div className="mobile-ai-composer-card__actions">
-                <button type="button" className="mobile-ai-composer-card__icon-btn" aria-label="更多" aria-expanded={p.morePanelOpen} onClick={p.morePanelOpen ? p.onCloseMore : p.onOpenMore}>+</button>
+                <button type="button" className="mobile-ai-composer-card__icon-btn" aria-label="更多" aria-expanded={p.morePanelOpen} onClick={p.morePanelOpen ? p.onCloseMore : p.onOpenMore}><MobileAddIcon className="mobile-top-control-svg--inline"/></button>
                 <button type="button" className="mobile-ai-composer-card__icon-btn mobile-ai-composer-card__icon-btn--send" aria-label={p.isStreaming ? '停止生成' : '发送'} onClick={p.isStreaming ? p.onStop : p.onSend} disabled={!p.isStreaming && (!p.inputValue.trim() || p.inputDisabled)}><MobileAiIcon type={p.isStreaming ? 'stop' : 'send'}/></button>
             </div></div>
         </div></footer>

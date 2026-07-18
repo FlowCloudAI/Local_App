@@ -29,6 +29,9 @@
 }
 
 .mobile-entry-detail__add-type {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
     align-self: flex-start;
     margin-bottom: var(--fc-space-md);
     padding: 0;

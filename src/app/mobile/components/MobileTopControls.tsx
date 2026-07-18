@@ -304,9 +304,13 @@ export function MobileSearchIcon({className}: {className?: string}) {
     )
 }
 
-export function MobileAddIcon() {
+export function MobileAddIcon({className = ''}: {className?: string} = {}) {
     return (
-        <svg className="mobile-top-control-svg mobile-top-control-svg--add" viewBox="0 0 24 24" focusable="false">
+        <svg
+            className={`mobile-top-control-svg mobile-top-control-svg--add${className ? ` ${className}` : ''}`}
+            viewBox="0 0 24 24"
+            focusable="false"
+        >
             <path d="M12 4.5v15"/>
             <path d="M4.5 12h15"/>
         </svg>

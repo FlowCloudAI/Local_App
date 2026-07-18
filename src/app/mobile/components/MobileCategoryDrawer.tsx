@@ -21,7 +21,7 @@ import {
     type ProjectStats,
 } from '../../../api'
 import MobileCategoryDrawerDialogs from './MobileCategoryDrawerDialogs'
-import {MobileSearchIcon} from './MobileTopControls'
+import {MobileAddIcon, MobileMoreIcon, MobileSearchIcon} from './MobileTopControls'
 import {
     buildAllRows,
     buildChildrenMap,
@@ -645,7 +645,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                     aria-label="新建根级分类"
                     onClick={() => setRenameTarget({mode: 'create', parentId: null})}
                 >
-                    +
+                    <MobileAddIcon/>
                 </button>
             </div>
 
@@ -751,7 +751,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 aria-label={`管理分类 ${category.name}`}
                                 onClick={() => setMenuTarget(category)}
                             >
-                                ⋯
+                                <MobileMoreIcon/>
                             </button>
                         </div>
                     )

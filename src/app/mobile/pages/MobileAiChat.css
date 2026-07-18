@@ -521,8 +521,6 @@
     background: var(--mobile-surface-raised);
     color: var(--fc-color-text);
     font: inherit;
-    font-size: 1.48rem;
-    line-height: 1;
     cursor: pointer;
     box-shadow: var(--mobile-inset-highlight-soft);
     touch-action: manipulation;

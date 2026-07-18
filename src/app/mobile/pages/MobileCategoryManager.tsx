@@ -11,6 +11,7 @@ import {
 } from '../../../api'
 import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
 import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {MobileAddIcon, MobileMoreIcon} from '../components/MobileTopControls'
 import {
     buildAllRows,
     buildChildrenMap,
@@ -168,7 +169,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                     size="sm"
                     onClick={() => setRenameTarget({mode: 'create', parentId: null})}
                 >
-                    + 新建分类
+                    <MobileAddIcon className="mobile-top-control-svg--inline"/>新建分类
                 </Button>
             </div>
 
@@ -206,7 +207,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                                     aria-label={`管理分类 ${category.name}`}
                                     onClick={() => setMenuTarget(category)}
                                 >
-                                    ⋯
+                                    <MobileMoreIcon/>
                                 </button>
                             </div>
                         )

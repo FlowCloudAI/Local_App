@@ -5,6 +5,7 @@ import {
     getComparableTagValue,
     normalizeComparableTagValue,
 } from '../../../features/entries/lib/entryTag'
+import {MobileAddIcon} from '../components/MobileTopControls'
 import {type TagValueMap} from './MobileEntryDetailUtils'
 
 type SelectOptions = NonNullable<ComponentProps<typeof Select>['options']>
@@ -49,7 +50,7 @@ export function MobileEntryTagsSection({
                         />
                     )}
                     <Button type="button" variant="ghost" size="sm" onClick={onOpenTagCreator}>
-                        + 新建标签
+                        <MobileAddIcon className="mobile-top-control-svg--inline"/>新建标签
                     </Button>
                 </div>
             </div>

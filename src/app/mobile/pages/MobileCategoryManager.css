@@ -120,7 +120,6 @@
     border-left: var(--mobile-border-strong);
     background: transparent;
     color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-lg);
     cursor: pointer;
     touch-action: manipulation;
 }
