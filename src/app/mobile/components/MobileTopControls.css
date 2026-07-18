@@ -5,7 +5,7 @@
      * 2. bg-visible-*：该关键点处页面背景色的可见度，100% 为完全实色，0% 为完全透明。
      * 调整 stop 会改变渐变发生的位置；调整 visible 会改变该位置背景遮住内容的强弱。
      */
-    --mobile-page-topbar-x: clamp(1rem, 4vw, 1.35rem);
+    --mobile-page-topbar-x: var(--mobile-page-x);
     --mobile-page-topbar-body: 3rem;
     --mobile-page-topbar-bg-stop-1: 0%;
     --mobile-page-topbar-bg-visible-1: 100%;

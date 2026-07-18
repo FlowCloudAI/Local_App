@@ -1,5 +1,4 @@
 import {
-    type CSSProperties,
     useCallback,
     useEffect,
     useMemo,
@@ -38,7 +37,12 @@ import {type MobilePage} from '../usePageStack'
 import {type MobileBeforeLeave} from '../mobileBackNavigation'
 import {type MobileTab} from '../MobileNav'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
-import {MobileAddIcon, MobileMoreIcon, MobileTopActionPill} from '../components/MobileTopControls'
+import {
+    MobileAddIcon,
+    MobileAnchoredMenu,
+    MobileMoreIcon,
+    MobileTopActionPill,
+} from '../components/MobileTopControls'
 import {formatProjectDate, parseProjectDateMs, toProjectImageSrc} from '../../../features/projects/projectDisplay'
 import {
     collectDashboardTargets,
@@ -100,39 +104,7 @@ export default function MobileHome({
     const [displayMode, setDisplayMode] = useState<WorldDisplayMode>('card')
     const [sortMode, setSortMode] = useState<WorldSortMode>('updated-desc')
     const [filterOpen, setFilterOpen] = useState(false)
-    const [filterAnchor, setFilterAnchor] = useState<{top: number; right: number} | null>(null)
     const [creatorOpen, setCreatorOpen] = useState(false)
-
-    const updateFilterAnchor = useCallback(() => {
-        const homeElement = homeRef.current
-        const actionsElement = worldActionsRef.current
-        if (!homeElement || !actionsElement) return
-        const homeRect = homeElement.getBoundingClientRect()
-        const actionsRect = actionsElement.getBoundingClientRect()
-        setFilterAnchor({
-            top: Math.max(0, actionsRect.top - homeRect.top),
-            right: Math.max(0, homeRect.right - actionsRect.right),
-        })
-    }, [])
-
-    const toggleFilterMenu = useCallback(() => {
-        setFilterOpen(open => {
-            if (!open) updateFilterAnchor()
-            return !open
-        })
-    }, [updateFilterAnchor])
-
-    useEffect(() => {
-        if (!filterOpen) return undefined
-        updateFilterAnchor()
-        const viewport = window.visualViewport
-        window.addEventListener('resize', updateFilterAnchor)
-        viewport?.addEventListener('resize', updateFilterAnchor)
-        return () => {
-            window.removeEventListener('resize', updateFilterAnchor)
-            viewport?.removeEventListener('resize', updateFilterAnchor)
-        }
-    }, [filterOpen, updateFilterAnchor])
 
     useEffect(() => {
         if (!filterOpen) return undefined
@@ -635,7 +607,7 @@ export default function MobileHome({
                                     kind: 'more',
                                     ariaHasPopup: 'menu',
                                     ariaExpanded: filterOpen,
-                                    onClick: toggleFilterMenu,
+                                    onClick: () => setFilterOpen(open => !open),
                                 },
                             ]}
                         />
@@ -681,25 +653,14 @@ export default function MobileHome({
                 </section>
             </div>
 
-            {filterOpen ? (
-                <div
-                    className="mobile-home-filter-layer"
-                    role="presentation"
-                    onPointerDown={event => {
-                        if (event.target === event.currentTarget) setFilterOpen(false)
-                    }}
-                >
-                    <div
-                        className="mobile-home-filter"
-                        role="menu"
-                        aria-label="世界观筛选与排序"
-                        style={filterAnchor ? {
-                            '--mobile-home-filter-top': `${filterAnchor.top}px`,
-                            '--mobile-home-filter-right': `${filterAnchor.right}px`,
-                        } as CSSProperties : undefined}
-                        onPointerDown={event => event.stopPropagation()}
-                    >
-                        <div className="mobile-home-filter__group" aria-label="显示方式">
+            <MobileAnchoredMenu
+                open={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                anchorRef={worldActionsRef}
+                containerRef={homeRef}
+                ariaLabel="世界观筛选与排序"
+            >
+                        <div className="mobile-anchored-menu__group" aria-label="显示方式">
                             {WORLD_DISPLAY_OPTIONS.map(option => {
                                 const active = displayMode === option.key
                                 return (
@@ -708,16 +669,16 @@ export default function MobileHome({
                                         type="button"
                                         role="menuitemradio"
                                         aria-checked={active}
-                                        className={`mobile-home-filter__row${active ? ' is-active' : ''}`}
+                                        className={`mobile-anchored-menu__row${active ? ' is-active' : ''}`}
                                         onClick={() => setDisplayMode(option.key)}
                                     >
-                                        <span className="mobile-home-filter__check" aria-hidden="true">
+                                        <span className="mobile-anchored-menu__check" aria-hidden="true">
                                             {active ? <FilterCheckIcon/> : null}
                                         </span>
-                                        <span className="mobile-home-filter__icon" aria-hidden="true">
+                                        <span className="mobile-anchored-menu__icon" aria-hidden="true">
                                             {renderDisplayIcon(option.key)}
                                         </span>
-                                        <span className="mobile-home-filter__text">
+                                        <span className="mobile-anchored-menu__text">
                                             <span>{option.label}</span>
                                             <small>{option.desc}</small>
                                         </span>
@@ -726,7 +687,7 @@ export default function MobileHome({
                             })}
                         </div>
                         <div className="mobile-home-filter__divider" role="separator"/>
-                        <div className="mobile-home-filter__group" aria-label="排序方式">
+                        <div className="mobile-anchored-menu__group" aria-label="排序方式">
                             {WORLD_SORT_OPTIONS.map(option => {
                                 const active = sortMode === option.key
                                 return (
@@ -735,14 +696,14 @@ export default function MobileHome({
                                         type="button"
                                         role="menuitemradio"
                                         aria-checked={active}
-                                        className={`mobile-home-filter__row${active ? ' is-active' : ''}`}
+                                        className={`mobile-anchored-menu__row${active ? ' is-active' : ''}`}
                                         onClick={() => setSortMode(option.key)}
                                     >
-                                        <span className="mobile-home-filter__check" aria-hidden="true">
+                                        <span className="mobile-anchored-menu__check" aria-hidden="true">
                                             {active ? <FilterCheckIcon/> : null}
                                         </span>
-                                        <span className="mobile-home-filter__icon mobile-home-filter__icon--empty" aria-hidden="true"/>
-                                        <span className="mobile-home-filter__text">
+                                        <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
+                                        <span className="mobile-anchored-menu__text">
                                             <span>{option.label}</span>
                                             <small>{WORLD_SORT_DETAILS[option.key]}</small>
                                         </span>
@@ -751,22 +712,22 @@ export default function MobileHome({
                             })}
                         </div>
                         <div className="mobile-home-filter__divider" role="separator"/>
-                        <div className="mobile-home-filter__group" aria-label="列表操作">
+                        <div className="mobile-anchored-menu__group" aria-label="列表操作">
                             <button
                                 type="button"
                                 role="menuitem"
-                                className="mobile-home-filter__row"
+                                className="mobile-anchored-menu__row"
                                 disabled={importing}
                                 onClick={() => {
                                     setFilterOpen(false)
                                     void handleImportProject()
                                 }}
                             >
-                                <span className="mobile-home-filter__check" aria-hidden="true"/>
-                                <span className="mobile-home-filter__icon" aria-hidden="true">
+                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__icon" aria-hidden="true">
                                     <FilterImportIcon/>
                                 </span>
-                                <span className="mobile-home-filter__text">
+                                <span className="mobile-anchored-menu__text">
                                     <span>{importing ? '导入中…' : '导入世界'}</span>
                                     <small>从 .fcworld 文件导入</small>
                                 </span>
@@ -774,26 +735,24 @@ export default function MobileHome({
                             <button
                                 type="button"
                                 role="menuitem"
-                                className="mobile-home-filter__row"
+                                className="mobile-anchored-menu__row"
                                 disabled={loading}
                                 onClick={() => {
                                     setFilterOpen(false)
                                     void refreshProjects()
                                 }}
                             >
-                                <span className="mobile-home-filter__check" aria-hidden="true"/>
-                                <span className="mobile-home-filter__icon" aria-hidden="true">
+                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__icon" aria-hidden="true">
                                     <FilterRefreshIcon/>
                                 </span>
-                                <span className="mobile-home-filter__text">
+                                <span className="mobile-anchored-menu__text">
                                     <span>刷新列表</span>
                                     <small>重新同步世界观</small>
                                 </span>
                             </button>
                         </div>
-                    </div>
-                </div>
-            ) : null}
+            </MobileAnchoredMenu>
         </div>
     )
 }
