@@ -8,88 +8,24 @@ import {
     db_update_category,
     type Category,
     type CategoryCascadeDeleteResult,
-    type ProjectStats,
 } from '../../../api'
 import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
 import {ActionMenu, FloatingPanel, RenameDialog} from '../../../shared/ui/overlay'
+import {
+    buildAllRows,
+    buildChildrenMap,
+    collectDescendantIds,
+    type DeleteMode,
+    getEntryCountMap,
+    parentKey,
+    type RenameTarget,
+} from '../components/mobileCategoryTree'
 import {type MobilePage, type MobileProjectScopedPageParams} from '../usePageStack'
 import './MobileCategoryManager.css'
 
 interface Props {
     push: (page: MobilePage) => void
     params: MobileProjectScopedPageParams
-}
-
-interface CategoryRow {
-    category: Category
-    depth: number
-}
-
-type RenameTarget =
-    | {mode: 'create'; parentId: string | null}
-    | {mode: 'rename'; category: Category}
-
-type DeleteMode = 'empty' | 'lift' | 'cascade'
-
-const ROOT_PARENT_KEY = '__root__'
-
-function parentKey(parentId: string | null | undefined): string {
-    return parentId ?? ROOT_PARENT_KEY
-}
-
-function sortCategories(a: Category, b: Category): number {
-    return (a.sort_order - b.sort_order) || a.name.localeCompare(b.name, 'zh-Hans-CN')
-}
-
-function buildChildrenMap(categories: Category[]): Map<string, Category[]> {
-    const map = new Map<string, Category[]>()
-    for (const category of categories) {
-        const key = parentKey(category.parent_id)
-        const list = map.get(key)
-        if (list) {
-            list.push(category)
-        } else {
-            map.set(key, [category])
-        }
-    }
-    for (const list of map.values()) {
-        list.sort(sortCategories)
-    }
-    return map
-}
-
-function buildRows(childrenMap: Map<string, Category[]>): CategoryRow[] {
-    const rows: CategoryRow[] = []
-    const visit = (parentId: string | null, depth: number) => {
-        const children = childrenMap.get(parentKey(parentId)) ?? []
-        for (const category of children) {
-            rows.push({category, depth})
-            visit(category.id, depth + 1)
-        }
-    }
-    visit(null, 0)
-    return rows
-}
-
-function collectDescendantIds(categoryId: string, childrenMap: Map<string, Category[]>): string[] {
-    const result: string[] = []
-    const visit = (parentId: string) => {
-        const children = childrenMap.get(parentKey(parentId)) ?? []
-        for (const child of children) {
-            result.push(child.id)
-            visit(child.id)
-        }
-    }
-    visit(categoryId)
-    return result
-}
-
-function getEntryCountMap(stats: ProjectStats | null): Map<string, number> {
-    const map = new Map<string, number>()
-    for (const row of stats?.entriesByCategory ?? []) {
-        if (row.categoryId) map.set(row.categoryId, row.count)
-    }
-    return map
 }
 
 export default function MobileCategoryManager({push, params}: Props) {
@@ -106,7 +42,7 @@ export default function MobileCategoryManager({push, params}: Props) {
     const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
 
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
-    const rows = useMemo(() => buildRows(childrenMap), [childrenMap])
+    const rows = useMemo(() => buildAllRows(childrenMap), [childrenMap])
     const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories])
     const entryCountMap = useMemo(() => getEntryCountMap(stats), [stats])
 
