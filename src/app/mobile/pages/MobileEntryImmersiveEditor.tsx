@@ -95,7 +95,12 @@ export function MobileEntryImmersiveEditor({
                 />
                 {wikiPanel}
             </div>
-            <div className="mobile-entry-detail__markdown-toolbar" role="toolbar" aria-label="Markdown 常用工具">
+            <div
+                className="mobile-entry-detail__markdown-toolbar"
+                role="toolbar"
+                aria-label="Markdown 常用工具"
+                data-mobile-horizontal-scroll="true"
+            >
                 {MOBILE_MARKDOWN_TOOLS.map(item => (
                     <button
                         key={item.tool}

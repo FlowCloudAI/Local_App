@@ -633,7 +633,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         placeholder="搜索分类…"
                         value={searchText}
                         onValueChange={setSearchText}
-                        prefix={<MobileSearchIcon className="mobile-category-drawer__search-icon"/>}
+                        prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>}
                         radius="full"
                         size="lg"
                         allowClear

@@ -232,17 +232,6 @@
     font-weight: var(--fc-font-weight-medium);
 }
 
-.mobile-settings-plugin-search__icon {
-    display: block;
-    width: 1.18rem;
-    height: 1.18rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
 .mobile-settings-plugin-search-row .fc-btn {
     height: 3.05rem;
     border-radius: var(--mobile-radius-field);

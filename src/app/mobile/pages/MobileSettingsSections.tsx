@@ -373,7 +373,7 @@ export function MobileSettingsPluginsSection({
                     value={pluginSearch}
                     onValueChange={onPluginSearchChange}
                     placeholder="搜索插件…"
-                    prefix={<MobileSearchIcon className="mobile-settings-plugin-search__icon"/>}
+                    prefix={<MobileSearchIcon className="mobile-drawer-search-icon"/>}
                     radius="full"
                     size="lg"
                     allowClear

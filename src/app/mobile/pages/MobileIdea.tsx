@@ -255,7 +255,7 @@ export default function MobileIdea({
                             />
                         </label>
                     </div>
-                    <div className="mobile-idea__summary">
+                    <div className="mobile-idea__summary" data-mobile-horizontal-scroll="true">
                         <span>{controller.selectedProjectName}</span>
                         {controller.draftPinned ? <span>已置顶</span> : null}
                     </div>
