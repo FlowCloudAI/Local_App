@@ -20,6 +20,7 @@ import {
     type MobileAnchoredMenuItem,
     MobileAddIcon,
     MobileBackIcon,
+    MobileMenuIcon,
     MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
@@ -102,16 +103,6 @@ function ProjectMenuIcon({type}: {type: 'rename' | 'description' | 'cover' | 'ex
             <path d="M12 10v8"/>
             <path d="M16 10v8"/>
             <path d="M7 7.5 8 20h8l1-12.5"/>
-        </svg>
-    )
-}
-
-function CategoryDrawerIcon() {
-    return (
-        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
-            <path d="M5 7h14"/>
-            <path d="M5 12h14"/>
-            <path d="M5 17h14"/>
         </svg>
     )
 }
@@ -366,7 +357,7 @@ export default function MobileProjectHome({
                         {
                             key: 'categories',
                             label: '显示分类树',
-                            icon: <CategoryDrawerIcon/>,
+                            icon: <MobileMenuIcon/>,
                             ariaExpanded: categoryDrawerOpen,
                             onClick: () => onOpenCategoryDrawer?.(),
                         },

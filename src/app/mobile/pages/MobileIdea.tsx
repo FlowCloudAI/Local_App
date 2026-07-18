@@ -12,6 +12,7 @@ import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,
     MobileAddIcon,
+    MobileMenuIcon,
     MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
@@ -28,16 +29,7 @@ interface Props {
     onCloseIdeaDrawer?: () => void
 }
 
-function MobileIdeaIcon({type}: {type: 'menu' | 'pin' | 'archive' | 'delete' | 'status' | 'refresh'}) {
-    if (type === 'menu') {
-        return (
-            <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
-                <path d="M5 7h14"/>
-                <path d="M5 12h14"/>
-                <path d="M5 17h14"/>
-            </svg>
-        )
-    }
+function MobileIdeaIcon({type}: {type: 'pin' | 'archive' | 'delete' | 'status' | 'refresh'}) {
     if (type === 'pin') {
         return (
             <svg className="mobile-idea-svg" viewBox="0 0 24 24" focusable="false">
@@ -194,7 +186,7 @@ export default function MobileIdea({
                 ariaLabel="灵感操作"
                 left={<MobileTopIconButton
                     type="button"
-                    icon={<MobileIdeaIcon type="menu"/>}
+                    icon={<MobileMenuIcon className="mobile-idea-svg"/>}
                     aria-label="打开灵感列表"
                     aria-expanded={ideaDrawerOpen}
                     onClick={onOpenIdeaDrawer}

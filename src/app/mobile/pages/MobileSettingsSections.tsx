@@ -6,6 +6,7 @@ import {
     type RemotePluginInfo,
 } from '../../../api'
 import {convertFileSrc} from '../../../api/assets'
+import {MobileSearchIcon} from '../components/MobileTopControls'
 import {type MobileSettingsPageType} from '../usePageStack'
 
 type ApiKeyStatus = 'unknown' | 'checking' | 'configured' | 'missing' | 'error'
@@ -169,15 +170,6 @@ function ChevronRightIcon() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
-        </svg>
-    )
-}
-
-function SearchIcon() {
-    return (
-        <svg className="mobile-settings-plugin-search__icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="5.8"/>
-            <path d="m15 15 4.5 4.5"/>
         </svg>
     )
 }
@@ -381,7 +373,7 @@ export function MobileSettingsPluginsSection({
                     value={pluginSearch}
                     onValueChange={onPluginSearchChange}
                     placeholder="搜索插件…"
-                    prefix={<SearchIcon/>}
+                    prefix={<MobileSearchIcon className="mobile-settings-plugin-search__icon"/>}
                     radius="full"
                     size="lg"
                     allowClear

@@ -21,6 +21,7 @@ import {
     type ProjectStats,
 } from '../../../api'
 import MobileCategoryDrawerDialogs from './MobileCategoryDrawerDialogs'
+import {MobileSearchIcon} from './MobileTopControls'
 import {
     buildAllRows,
     buildChildrenMap,
@@ -36,7 +37,6 @@ import {
     parentKey,
     ROW_DRAG_START_DISTANCE,
     ROW_DRAG_VERTICAL_DOMINANCE,
-    SearchIcon,
     TreeIcon,
     type CategoryDragSource,
     type CategoryDragState,
@@ -633,7 +633,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         placeholder="搜索分类…"
                         value={searchText}
                         onValueChange={setSearchText}
-                        prefix={<SearchIcon/>}
+                        prefix={<MobileSearchIcon className="mobile-category-drawer__search-icon"/>}
                         radius="full"
                         size="lg"
                         allowClear

@@ -1,11 +1,11 @@
 import type {HTMLAttributes, MouseEvent} from 'react'
 import type {Conversation} from '../../../features/ai-chat/model/AiControllerTypes'
+import {MobileSearchIcon} from '../components/MobileTopControls'
 import {
     AI_CONVERSATION_FILTER_OPTIONS,
     AI_CONVERSATION_STATUS_OPTIONS,
     formatConversationDate,
     MoreDotsIcon,
-    SearchIcon,
     type AiConversationFilter,
     type AiConversationStatusFilter,
 } from './MobileAiChatUi'
@@ -33,7 +33,7 @@ interface Props {
 
 export default function MobileAiConversationDrawer(props: Props) {
     return <aside className="mobile-ai-drawer" aria-label="对话列表">
-        <label className="mobile-ai-drawer__search"><SearchIcon/><input value={props.search} onChange={event => props.onSearch(event.currentTarget.value)} placeholder="搜索对话..."/></label>
+        <label className="mobile-ai-drawer__search"><MobileSearchIcon className="mobile-ai-drawer__search-icon"/><input value={props.search} onChange={event => props.onSearch(event.currentTarget.value)} placeholder="搜索对话..."/></label>
         <div className="mobile-ai-drawer__filter-groups">
             <div className="mobile-ai-drawer__filter-group"><span>状态</span><div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话状态">{AI_CONVERSATION_STATUS_OPTIONS.map(option => <button key={option.key} type="button" className={props.statusFilter === option.key ? 'active' : ''} aria-pressed={props.statusFilter === option.key} onClick={() => props.onStatusFilter(option.key)}>{option.label}</button>)}</div></div>
             <div className="mobile-ai-drawer__filter-group"><span>类型</span><div className="mobile-ai-drawer__segmented" role="group" aria-label="AI 对话类型">{AI_CONVERSATION_FILTER_OPTIONS.map(option => <button key={option.key} type="button" className={props.filter === option.key ? 'active' : ''} aria-pressed={props.filter === option.key} onClick={() => props.onFilter(option.key)}>{option.label}</button>)}</div></div>

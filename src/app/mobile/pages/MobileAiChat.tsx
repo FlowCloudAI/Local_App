@@ -33,6 +33,7 @@ import {type MobileTab} from '../MobileNav'
 import {
     type MobileAnchoredMenuItem,
     MobileAddIcon,
+    MobileMenuIcon,
     MobileMoreIcon,
     MobilePageTopBar,
     MobileTopActionPill,
@@ -685,7 +686,7 @@ export default function MobileAiChat({
                 ariaLabel="AI 对话操作"
                 left={<MobileTopIconButton
                     type="button"
-                    icon={<MobileAiIcon type="menu"/>}
+                    icon={<MobileMenuIcon className="mobile-ai-svg"/>}
                     aria-label="打开对话列表"
                     aria-expanded={conversationDrawerOpen}
                     onClick={onOpenConversationDrawer}

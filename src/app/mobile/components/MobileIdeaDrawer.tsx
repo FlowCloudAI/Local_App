@@ -7,20 +7,12 @@ import {
     type MobileIdeaController,
     type MobileIdeaProjectFilter,
 } from '../hooks/useMobileIdeaController'
+import {MobileSearchIcon} from './MobileTopControls'
 import './MobileIdeaDrawer.css'
 
 interface Props {
     controller: MobileIdeaController
     onClose?: () => void
-}
-
-function SearchIcon() {
-    return (
-        <svg className="mobile-idea-drawer__svg" viewBox="0 0 24 24" focusable="false">
-            <circle cx="11" cy="11" r="6.5"/>
-            <path d="m16 16 4 4"/>
-        </svg>
-    )
 }
 
 function PinIcon() {
@@ -67,7 +59,7 @@ export default function MobileIdeaDrawer({controller, onClose}: Props) {
             </div>
 
             <label className="mobile-idea-drawer__search">
-                <SearchIcon/>
+                <MobileSearchIcon className="mobile-idea-drawer__svg"/>
                 <input
                     value={searchText}
                     onChange={event => setSearchText(event.target.value)}

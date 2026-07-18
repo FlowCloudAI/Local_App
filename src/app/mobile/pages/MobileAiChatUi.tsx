@@ -52,11 +52,10 @@ export function buildConversationExportFileName(conversation: Conversation, form
     return `${safeTitle || 'AI会话'}.${format === 'json' ? 'json' : 'md'}`
 }
 
-type IconType = 'menu' | 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking' | AiToolAccessMode
+type IconType = 'pin' | 'archive' | 'rename' | 'delete' | 'plugin' | 'image' | 'file' | 'web' | 'send' | 'stop' | 'camera' | 'thinking' | AiToolAccessMode
 export function MobileAiIcon({type}: {type: IconType}) {
     if (type === 'reader' || type === 'assistant' || type === 'writer') return <AiToolAccessIcon mode={type} className="mobile-ai-svg"/>
     const paths: Partial<Record<IconType, string[]>> = {
-        menu: ['M5 7h14', 'M5 12h14', 'M5 17h14'],
         pin: ['M12 17v5', 'M8.5 10.8 6.2 13.1A1.7 1.7 0 0 0 7.4 16h9.2a1.7 1.7 0 0 0 1.2-2.9l-2.3-2.3V6.5l1.5-1.5H7l1.5 1.5Z'],
         archive: ['M5 7.5h14', 'M7 8.5v10h10v-10', 'M9.5 12h5', 'M6.5 4.5h11l1.5 3h-13Z'],
         rename: ['M4.5 16.5 15.8 5.2a2.1 2.1 0 0 1 3 3L7.5 19.5h-3Z', 'm14 7 3 3'],
@@ -74,4 +73,3 @@ export function MobileAiIcon({type}: {type: IconType}) {
 }
 
 export function MoreDotsIcon() { return <svg className="mobile-ai-drawer__more-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18" cy="12" r="1.55"/></svg> }
-export function SearchIcon() { return <svg className="mobile-ai-drawer__search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.8"/><path d="m15 15 4.5 4.5"/></svg> }

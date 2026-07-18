@@ -110,9 +110,6 @@ export function getSortedSiblings(categories: Category[], parentId: string | nul
 export function TreeIcon({expanded}: {expanded: boolean}) {
     return <svg className="mobile-category-drawer__toggle-icon" viewBox="0 0 20 20" focusable="false"><path d={expanded ? 'M5.5 8 10 12.5 14.5 8' : 'M8 5.5 12.5 10 8 14.5'}/></svg>
 }
-export function SearchIcon() {
-    return <svg className="mobile-category-drawer__search-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.8"/><path d="m15 15 4.5 4.5"/></svg>
-}
 export function HomeIcon() {
     return <svg className="mobile-category-drawer__row-icon mobile-category-drawer__home-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4.5 11.2 12 5l7.5 6.2"/><path d="M6.5 10.5v8h11v-8"/><path d="M10 18.5v-4h4v4"/></svg>
 }

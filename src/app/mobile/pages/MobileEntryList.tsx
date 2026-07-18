@@ -17,7 +17,7 @@ import EntryTypeIcon from '../../../features/project-editor/components/EntryType
 import {type MobileEntryListPageParams, type MobilePage} from '../usePageStack'
 import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import EntryCoverImage from '../../../features/entries/components/EntryCoverImage'
-import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
+import {MobileAddIcon, MobileBackIcon, MobileMenuIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {useMobilePageScrollMemory} from '../useMobilePageScrollMemory'
 import './MobileEntryList.css'
 
@@ -68,16 +68,6 @@ const LOAD_MORE_THRESHOLD_PX = 320
  * 否则用户翻了 3 页再返回，只剩第 1 页，滚动记忆会因内容不够高而放弃恢复。
  */
 const loadedCountMemory = new Map<string, number>()
-
-function CategoryDrawerIcon() {
-    return (
-        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false">
-            <path d="M5 7h14"/>
-            <path d="M5 12h14"/>
-            <path d="M5 17h14"/>
-        </svg>
-    )
-}
 
 export default function MobileEntryList({push, pop, setAiFocus, pageKey, categoryDrawerOpen = false, onOpenCategoryDrawer, params}: Props) {
     const pageRef = useRef<HTMLDivElement>(null)
@@ -262,7 +252,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
                         {
                             key: 'categories',
                             label: '打开分类树',
-                            icon: <CategoryDrawerIcon/>,
+                            icon: <MobileMenuIcon/>,
                             ariaExpanded: categoryDrawerOpen,
                             onClick: () => onOpenCategoryDrawer?.(),
                         },

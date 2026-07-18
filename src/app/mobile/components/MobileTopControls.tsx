@@ -285,6 +285,25 @@ export function MobileBackIcon() {
     )
 }
 
+export function MobileMenuIcon({className = 'mobile-top-control-svg'}: {className?: string}) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M5 7h14"/>
+            <path d="M5 12h14"/>
+            <path d="M5 17h14"/>
+        </svg>
+    )
+}
+
+export function MobileSearchIcon({className}: {className?: string}) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="5.8"/>
+            <path d="m15 15 4.5 4.5"/>
+        </svg>
+    )
+}
+
 export function MobileAddIcon() {
     return (
         <svg className="mobile-top-control-svg mobile-top-control-svg--add" viewBox="0 0 24 24" focusable="false">
