@@ -9,7 +9,7 @@ import {
 import {useDrag} from '@use-gesture/react'
 import {createPortal} from 'react-dom'
 import {openFileDialog, saveFileDialog} from '../../../api/dialog'
-import {Button, MessageBox, useAlert} from 'flowcloudai-ui'
+import {useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
     getAppSettingsSnapshot,
@@ -42,6 +42,7 @@ import {
 import MobileAiConversationControls from './MobileAiConversationControls'
 import MobileAiConversationDrawer from './MobileAiConversationDrawer'
 import MobileAiComposer from './MobileAiComposer'
+import MobileAiMessageList from './MobileAiMessageList'
 import {
     AI_DOCUMENT_CONTEXT_EXTENSIONS,
     AI_DOCUMENT_CONTEXT_EXTENSION_SET,
@@ -734,47 +735,20 @@ export default function MobileAiChat({
                 />}
             />
 
-            <main className="mobile-ai-chat__messages">
-                {messages.length === 0 && !isStreaming && (
-                    <div className="mobile-ai-chat__empty">
-                        <p>开始 AI 对话</p>
-                        <span>{focusContext.entryId ? '围绕当前词条继续创作。' : '与 AI 讨论世界观设定、资料整理和后续创作。'}</span>
-                        {!activeConversation && (
-                            <Button type="button" onClick={() => void handleNewConv()} disabled={conversationCreationDisabled}>
-                                开始新对话
-                            </Button>
-                        )}
-                        {llmUnavailable || llmApiKeyMissing ? (
-                            <Button type="button" variant="outline" onClick={() => navigateToTab('settings')}>
-                                {llmApiKeyMissing ? '配置访问密钥' : '去设置插件'}
-                            </Button>
-                        ) : null}
-                    </div>
-                )}
-                {messages.map(message => (
-                    <MessageBox
-                        key={message.id}
-                        role={message.role}
-                        blocks={message.blocks}
-                        content={message.content}
-                        markdown={message.role === 'assistant'}
-                        contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
-                        toolCallDetail="verbose"
-                        lineHeight={1.5}
-                    />
-                ))}
-                {isStreaming && streamingBlocks.length > 0 && (
-                    <MessageBox
-                        role="assistant"
-                        blocks={streamingBlocks}
-                        streaming
-                        markdown
-                        toolCallDetail="verbose"
-                        lineHeight={1.5}
-                    />
-                )}
-                <div ref={messagesEndRef}/>
-            </main>
+            <MobileAiMessageList
+                messages={messages}
+                streamingBlocks={streamingBlocks}
+                isStreaming={isStreaming}
+                focusEntryId={focusContext.entryId}
+                hasActiveConversation={Boolean(activeConversation)}
+                conversationCreationDisabled={conversationCreationDisabled}
+                setupActionLabel={llmUnavailable || llmApiKeyMissing
+                    ? llmApiKeyMissing ? '配置访问密钥' : '去设置插件'
+                    : null}
+                messagesEndRef={messagesEndRef}
+                onNewConversation={() => void handleNewConv()}
+                onOpenSettings={() => navigateToTab('settings')}
+            />
 
             <MobileAiComposer
                 pageRef={pageRef} topActionsRef={topActionsRef} toolModeMenuRef={toolModeMenuRef} modelMenuRef={modelMenuRef}
