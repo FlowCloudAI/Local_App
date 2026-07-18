@@ -1,7 +1,5 @@
 .mobile-project-list {
-    --mobile-project-page-x: clamp(1rem, 4vw, 1.35rem);
-
-    padding: 1rem var(--mobile-project-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: 1rem var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
 }
 

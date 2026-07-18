@@ -1,5 +1,5 @@
 .mobile-category-manager {
-    padding: 1rem clamp(1rem, 4vw, 1.35rem) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: 1rem var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
 }
 

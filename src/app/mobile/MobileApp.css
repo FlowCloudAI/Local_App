@@ -1,6 +1,7 @@
 .mobile-app,
 :root {
     --mobile-border-soft: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
+    --mobile-page-x: clamp(1rem, 4vw, 1.35rem);
     --mobile-border: 1px solid color-mix(in srgb, var(--fc-color-border) 66%, transparent);
     --mobile-border-medium: 1px solid color-mix(in srgb, var(--fc-color-border) 68%, transparent);
     --mobile-border-strong: 1px solid color-mix(in srgb, var(--fc-color-border) 70%, transparent);

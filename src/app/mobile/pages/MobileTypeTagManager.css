@@ -1,10 +1,8 @@
 .mobile-type-tag {
-    --mobile-type-tag-page-x: clamp(1rem, 4vw, 1.35rem);
-
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding: 0 var(--mobile-type-tag-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: 0 var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
 }
 

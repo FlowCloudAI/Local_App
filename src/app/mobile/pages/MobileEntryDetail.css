@@ -429,13 +429,11 @@
 
 /* Native iOS direction overrides */
 .mobile-entry-detail {
-    --mobile-entry-detail-x: clamp(1rem, 4vw, 1.35rem);
-
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
-    padding: 0 var(--mobile-entry-detail-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
+    padding: 0 var(--mobile-page-x) calc(1.5rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
 }
 
@@ -790,7 +788,7 @@
     flex: 1 1 auto;
     flex-direction: column;
     gap: 0.65rem;
-    padding: 0 var(--mobile-entry-detail-x);
+    padding: 0 var(--mobile-page-x);
 }
 
 .mobile-entry-detail__immersive-editor {
@@ -860,7 +858,7 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--mobile-entry-markdown-tool-gap);
-    padding: 0.55rem var(--mobile-entry-detail-x) calc(0.55rem + env(safe-area-inset-bottom, 0));
+    padding: 0.55rem var(--mobile-page-x) calc(0.55rem + env(safe-area-inset-bottom, 0));
     overflow-x: auto;
     border-top: var(--mobile-border-soft);
     background: var(--mobile-surface-translucent-strong);

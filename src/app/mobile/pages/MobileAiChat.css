@@ -479,7 +479,7 @@
     flex-direction: column;
     gap: var(--fc-space-md);
     overflow-y: auto;
-    padding: var(--mobile-ai-topbar-space) clamp(1rem, 4vw, 1.35rem) var(--mobile-ai-composer-space);
+    padding: var(--mobile-ai-topbar-space) var(--mobile-page-x) var(--mobile-ai-composer-space);
     background: var(--fc-color-bg);
     scrollbar-width: none;
     scroll-padding-top: var(--mobile-ai-topbar-space);

@@ -1,11 +1,9 @@
 .mobile-project-home {
-    --mobile-project-home-x: clamp(1rem, 4vw, 1.35rem);
-
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 1.05rem;
-    padding: 0 var(--mobile-project-home-x) calc(1.75rem + env(safe-area-inset-bottom, 0));
+    padding: 0 var(--mobile-page-x) calc(1.75rem + env(safe-area-inset-bottom, 0));
     background: var(--fc-color-bg);
 }
 
@@ -111,8 +109,8 @@
 .mobile-project-home__stats {
     display: flex;
     gap: 0.48rem;
-    margin: 0 calc(var(--mobile-project-home-x) * -1);
-    padding: 0 var(--mobile-project-home-x);
+    margin: 0 calc(var(--mobile-page-x) * -1);
+    padding: 0 var(--mobile-page-x);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
