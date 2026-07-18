@@ -1,3 +1,4 @@
+import {getVersion} from '@tauri-apps/api/app'
 import {command} from './base'
 
 export type PlatformOs = 'windows' | 'macos' | 'linux' | 'android' | 'ios' | 'unknown'
@@ -11,3 +12,5 @@ export interface PlatformInfo {
 }
 
 export const get_platform_info = () => command<PlatformInfo>('get_platform_info')
+
+export const get_app_version = () => getVersion()

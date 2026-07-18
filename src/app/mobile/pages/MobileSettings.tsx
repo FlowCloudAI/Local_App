@@ -6,6 +6,7 @@ import {
     ai_get_usage_summary,
     exit_app,
     formatApiError,
+    get_app_version,
     read_app_log,
     type AppLogSnapshot,
     type AppSettings,
@@ -13,7 +14,6 @@ import {
     type ApiUsageSummary,
     toApiError,
 } from '../../../api'
-import {getVersion} from '@tauri-apps/api/app'
 import {openFileDialog} from '../../../api/dialog'
 import {openUrl} from '../../../api/opener'
 import {
@@ -30,7 +30,7 @@ import {
     refreshMarketPlugins,
     usePluginCatalogStore,
 } from '../../../features/settings/pluginCatalogStore'
-import {MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
+import {MobileBackIcon, MobilePageTopBar, MobileTopIconButton} from '../components/MobileTopControls'
 import {type MobilePage, type MobileSettingsPageType} from '../usePageStack'
 import MobileSettingsAboutSection from './MobileSettingsAboutSection'
 import {
@@ -99,14 +99,6 @@ function getSettingsSectionTitle(section: SettingsSection): string {
     return '设置'
 }
 
-function BackIcon() {
-    return (
-        <svg className="mobile-top-control-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <path d="M15 18 9 12l6-6"/>
-        </svg>
-    )
-}
-
 export default function MobileSettings({push, pop, page}: Props) {
     const {showAlert} = useAlert()
     const {theme, setTheme} = useTheme()
@@ -147,7 +139,7 @@ export default function MobileSettings({push, pop, page}: Props) {
     const [usageError, setUsageError] = useState('')
 
     useEffect(() => {
-        getVersion().then(setVersion).catch(() => {
+        get_app_version().then(setVersion).catch(() => {
         })
     }, [])
 
@@ -464,7 +456,7 @@ export default function MobileSettings({push, pop, page}: Props) {
             ariaLabel="设置页顶栏"
             left={section === 'menu'
                 ? <span className="mobile-settings-topbar-spacer" aria-hidden="true"/>
-                : <MobileTopIconButton aria-label="返回设置" icon={<BackIcon/>} onClick={pop}/>}
+                : <MobileTopIconButton aria-label="返回设置" icon={<MobileBackIcon/>} onClick={pop}/>}
             center={<h1 className="mobile-settings-topbar-title">{getSettingsSectionTitle(section)}</h1>}
             right={<span className="mobile-settings-topbar-spacer" aria-hidden="true"/>}
         />
