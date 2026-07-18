@@ -56,7 +56,6 @@ export default function MobileTagManager({pop, params}: Props) {
     return (
         <div className="mobile-page mobile-type-tag">
             <MobilePageTopBar
-                className="mobile-type-tag__topbar"
                 sticky
                 edgeToEdge
                 ariaLabel="标签管理操作"
@@ -68,10 +67,6 @@ export default function MobileTagManager({pop, params}: Props) {
                         onClick: pop,
                     }]}
                 />}
-                center={<div className="mobile-type-tag__heading">
-                    <span className="mobile-page__eyebrow mobile-type-tag__eyebrow">{loading ? '正在同步' : `${tagSchemas.length} 个标签`}</span>
-                    <h2 className="mobile-page__hero-title">标签管理</h2>
-                </div>}
                 right={<MobileTopActionPill
                     actions={[{
                         key: 'create',
@@ -82,6 +77,10 @@ export default function MobileTagManager({pop, params}: Props) {
                     }]}
                 />}
             />
+            <div className="mobile-type-tag__heading">
+                <span className="mobile-page__eyebrow mobile-type-tag__eyebrow">{loading ? '正在同步' : `${tagSchemas.length} 个标签`}</span>
+                <h2 className="mobile-page__hero-title">标签管理</h2>
+            </div>
 
             {loading ? (
                 <div className="mobile-page__loading">加载中…</div>

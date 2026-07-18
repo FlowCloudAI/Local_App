@@ -52,7 +52,6 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
     return (
         <div className="mobile-page mobile-type-tag">
             <MobilePageTopBar
-                className="mobile-type-tag__topbar"
                 sticky
                 edgeToEdge
                 ariaLabel="类型管理操作"
@@ -64,10 +63,6 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                         onClick: pop,
                     }]}
                 />}
-                center={<div className="mobile-type-tag__heading">
-                    <span className="mobile-page__eyebrow mobile-type-tag__eyebrow">{loading ? '正在同步' : `${allEntryTypes.length} 个类型`}</span>
-                    <h2 className="mobile-page__hero-title">类型管理</h2>
-                </div>}
                 right={<MobileTopActionPill
                     actions={[{
                         key: 'create',
@@ -78,6 +73,10 @@ export default function MobileEntryTypeManager({pop, params}: Props) {
                     }]}
                 />}
             />
+            <div className="mobile-type-tag__heading">
+                <span className="mobile-page__eyebrow mobile-type-tag__eyebrow">{loading ? '正在同步' : `${allEntryTypes.length} 个类型`}</span>
+                <h2 className="mobile-page__hero-title">类型管理</h2>
+            </div>
 
             {loading ? (
                 <div className="mobile-page__loading">加载中…</div>

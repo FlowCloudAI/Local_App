@@ -6,14 +6,9 @@
     background: var(--fc-color-bg);
 }
 
-.mobile-type-tag__topbar {
-    margin-bottom: 0.55rem;
-}
-
 .mobile-type-tag__heading {
     min-width: 0;
-    flex: 1 1 auto;
-    padding-top: 0;
+    margin-bottom: 0.95rem;
 }
 
 .mobile-type-tag__eyebrow {
