@@ -64,7 +64,7 @@
     background: var(--mobile-surface-raised);
     color: var(--fc-color-primary);
     font-size: 1.15rem;
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     box-shadow: var(--mobile-shadow-control);
 }
 
@@ -102,7 +102,7 @@
     margin: 0;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
 }
 
 .mobile-home__continue {
@@ -133,7 +133,7 @@
 .mobile-home__continue-title {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-title-sm);
-    font-weight: 740;
+    font-weight: var(--mobile-font-weight-heading);
     line-height: 1.18;
 }
 
@@ -191,7 +191,7 @@
     overflow: hidden;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 650;
+    font-weight: var(--mobile-font-weight-label);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -215,7 +215,7 @@
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--fc-font-size-sm);
-    font-weight: 680;
+    font-weight: var(--mobile-font-weight-strong);
     box-shadow: var(--mobile-shadow-control-soft);
     cursor: pointer;
     touch-action: manipulation;

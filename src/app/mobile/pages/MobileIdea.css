@@ -42,7 +42,7 @@
 .mobile-idea__title-text span {
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-sm);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     line-height: 1.1;
 }
 
@@ -80,7 +80,7 @@
     color: var(--fc-color-text);
     font: inherit;
     font-size: 1.28rem;
-    font-weight: 730;
+    font-weight: var(--mobile-font-weight-heading);
     box-shadow: var(--mobile-inset-highlight-soft);
 }
 
@@ -105,7 +105,7 @@
 .mobile-idea__select-row span {
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 650;
+    font-weight: var(--mobile-font-weight-label);
     line-height: 1.1;
 }
 
@@ -155,7 +155,7 @@
     background: color-mix(in srgb, var(--fc-color-bg-secondary) 70%, transparent);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 650;
+    font-weight: var(--mobile-font-weight-label);
     white-space: nowrap;
 }
 

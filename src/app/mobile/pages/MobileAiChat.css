@@ -152,7 +152,7 @@
     overflow: hidden;
     color: inherit;
     font-size: var(--fc-font-size-md);
-    font-weight: 680;
+    font-weight: var(--mobile-font-weight-strong);
     line-height: 1.22;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -222,7 +222,7 @@
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--fc-font-size-sm);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     cursor: pointer;
     transition: opacity 120ms ease, transform 120ms ease;
     -webkit-tap-highlight-color: transparent;
@@ -300,7 +300,7 @@
     color: currentColor;
     content: "✓";
     font-size: 1.15rem;
-    font-weight: 760;
+    font-weight: var(--mobile-font-weight-display);
     line-height: 1;
 }
 
@@ -385,7 +385,7 @@
     margin: 0;
     color: var(--fc-color-text);
     font-size: 1.35rem;
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     line-height: 1.25;
 }
 
@@ -470,7 +470,7 @@
     color: var(--fc-color-text-secondary);
     font: inherit;
     font-size: var(--fc-font-size-xs);
-    font-weight: 650;
+    font-weight: var(--mobile-font-weight-label);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -578,7 +578,7 @@
     color: var(--fc-color-text-secondary);
     font: inherit;
     font-size: var(--fc-font-size-xs);
-    font-weight: 650;
+    font-weight: var(--mobile-font-weight-label);
     cursor: pointer;
     touch-action: manipulation;
 }
@@ -606,7 +606,7 @@
 .mobile-ai-setting-prompt span {
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 650;
+    font-weight: var(--mobile-font-weight-label);
 }
 
 .mobile-ai-setting-field input,

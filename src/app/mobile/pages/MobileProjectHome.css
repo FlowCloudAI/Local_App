@@ -36,7 +36,7 @@
     justify-content: center;
     color: var(--fc-color-primary);
     font-size: 3rem;
-    font-weight: 760;
+    font-weight: var(--mobile-font-weight-display);
 }
 
 .mobile-project-home__title-row {
@@ -58,7 +58,7 @@
     margin: 0;
     color: var(--fc-color-text);
     font-size: clamp(2.15rem, 9vw, 2.85rem);
-    font-weight: 780;
+    font-weight: var(--mobile-font-weight-display);
     letter-spacing: 0;
     line-height: 0.98;
     overflow-wrap: anywhere;
@@ -125,7 +125,7 @@
 .mobile-project-home__stat strong {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
 }
 
 .mobile-project-home__actions {
@@ -156,7 +156,7 @@
     margin: 0;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 740;
+    font-weight: var(--mobile-font-weight-heading);
 }
 
 .mobile-project-home__list {
@@ -195,7 +195,7 @@
     overflow: hidden;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -244,7 +244,7 @@
 
 .mobile-project-home__tool span {
     font-size: var(--fc-font-size-sm);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
 }
 
 .mobile-project-home__tool small {

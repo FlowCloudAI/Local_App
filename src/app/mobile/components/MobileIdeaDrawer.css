@@ -29,7 +29,7 @@
 .mobile-idea-drawer__header span {
     color: var(--fc-color-text);
     font-size: 1.55rem;
-    font-weight: 760;
+    font-weight: var(--mobile-font-weight-display);
     line-height: 1.1;
 }
 
@@ -67,7 +67,7 @@
 .mobile-idea-drawer__select .fc-select__value {
     overflow: hidden;
     font-size: var(--fc-font-size-sm);
-    font-weight: 680;
+    font-weight: var(--mobile-font-weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -141,7 +141,7 @@
 .mobile-idea-drawer__item-main strong {
     color: inherit;
     font-size: var(--fc-font-size-md);
-    font-weight: 700;
+    font-weight: var(--mobile-font-weight-strong);
     line-height: 1.22;
 }
 

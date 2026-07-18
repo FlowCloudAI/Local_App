@@ -14,7 +14,7 @@
     overflow: hidden;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-md);
-    font-weight: 700;
+    font-weight: var(--mobile-font-weight-heading);
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -86,7 +86,7 @@
 
 .mobile-settings-menu-item__label {
     font-size: var(--fc-font-size-sm);
-    font-weight: 600;
+    font-weight: var(--fc-font-weight-semibold);
 }
 
 .mobile-settings-menu-item__summary {
@@ -151,7 +151,7 @@
     margin: var(--fc-space-md) 0 var(--fc-space-xs);
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 600;
+    font-weight: var(--fc-font-weight-semibold);
 }
 
 .mobile-settings-api-key {
@@ -267,7 +267,7 @@
     border-color: color-mix(in srgb, var(--fc-color-primary) 36%, transparent);
     background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     color: var(--fc-color-primary);
-    font-weight: 700;
+    font-weight: var(--mobile-font-weight-strong);
 }
 
 .mobile-settings-plugin-error,
@@ -312,7 +312,7 @@
 .mobile-settings-installed-plugin-list__title {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 700;
+    font-weight: var(--mobile-font-weight-heading);
 }
 
 .mobile-settings-installed-plugin-item {
@@ -374,7 +374,7 @@
     overflow: hidden;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 600;
+    font-weight: var(--fc-font-weight-semibold);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -433,7 +433,7 @@
     overflow: hidden;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-lg);
-    font-weight: 700;
+    font-weight: var(--mobile-font-weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -463,7 +463,7 @@
     background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-xs);
-    font-weight: 700;
+    font-weight: var(--mobile-font-weight-strong);
     white-space: nowrap;
 }
 
@@ -493,7 +493,7 @@
     margin-bottom: var(--fc-space-xs);
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 600;
+    font-weight: var(--fc-font-weight-semibold);
 }
 
 .mobile-settings-about-meta {
@@ -552,7 +552,7 @@
 .mobile-settings-about-action__title {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 600;
+    font-weight: var(--fc-font-weight-semibold);
 }
 
 .mobile-settings-about-action__desc {
@@ -585,7 +585,7 @@
 .mobile-settings-log-viewer__title {
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
-    font-weight: 600;
+    font-weight: var(--fc-font-weight-semibold);
 }
 
 .mobile-settings-log-viewer__path {

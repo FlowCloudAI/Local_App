@@ -223,7 +223,7 @@
 .mobile-category-drawer__text strong {
     color: inherit;
     font-size: var(--fc-font-size-body);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     line-height: 1.2;
 }
 

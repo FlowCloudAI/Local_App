@@ -222,7 +222,7 @@
 
 .mobile-entry-card .fc-card__title {
     font-size: var(--fc-font-size-body);
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
     line-height: 1.16;
 }
 

@@ -174,7 +174,7 @@
 
 .mobile-top-action-pill__button--more {
     font-size: 1.45rem;
-    font-weight: 720;
+    font-weight: var(--mobile-font-weight-heading);
 }
 
 .mobile-top-icon-button:active,
