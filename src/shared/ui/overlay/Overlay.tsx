@@ -14,6 +14,8 @@ interface OverlayProps {
     /** 背板点击 / Esc / 返回键是否关闭，默认 true。需强制用户做选择时传 false。 */
     dismissible?: boolean
     variant?: OverlayVariant
+    /** 浮层外壳附加类名，用于变体组件调整背板或安全区。 */
+    layerClassName?: string
     /** 浮层面板附加类名，用于承载自定义卡片样式。 */
     className?: string
     ariaLabel?: string
@@ -31,6 +33,7 @@ export default function Overlay({
     onClose,
     dismissible = true,
     variant = 'floating',
+    layerClassName,
     className,
     ariaLabel,
     labelledBy,
@@ -82,7 +85,9 @@ export default function Overlay({
     // 开启期间：注册返回栈、捕获阶段 Esc（优先于页面返回）、锁定滚动、聚焦面板。
     useEffect(() => {
         if (!open) return
-        const id = pushOverlay(() => onCloseRef.current?.())
+        const id = pushOverlay(() => {
+            if (dismissibleRef.current) onCloseRef.current?.()
+        })
 
         // 捕获阶段拦截 Esc：先于 window 冒泡监听（如移动端返回处理）执行并阻断，避免连带回退页面。
         const onKeyDownCapture = (e: KeyboardEvent) => {
@@ -116,7 +121,7 @@ export default function Overlay({
 
     return createPortal(
         <div
-            className={`fc-overlay fc-overlay--${variant}`}
+            className={`fc-overlay fc-overlay--${variant}${layerClassName ? ` ${layerClassName}` : ''}`}
             data-state={active ? 'open' : 'closed'}
             style={variant === 'floating' ? {top: overlayTop} : undefined}
             onMouseDown={(e) => {

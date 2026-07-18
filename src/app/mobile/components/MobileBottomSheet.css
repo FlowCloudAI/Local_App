@@ -1,14 +1,11 @@
 .mobile-bottom-sheet-layer {
-    position: fixed;
-    inset: 0;
     z-index: 90;
-    display: flex;
-    align-items: flex-end;
+    padding-bottom: 0;
     background: transparent;
 }
 
-.mobile-bottom-sheet-layer.is-closing {
-    pointer-events: none;
+.mobile-bottom-sheet-host {
+    overflow: visible;
 }
 
 .mobile-bottom-sheet {
@@ -27,18 +24,12 @@
     -webkit-backdrop-filter: var(--mobile-glass-filter);
     transform: translateY(var(--mobile-bottom-sheet-drag-offset));
     transition: transform 100ms ease;
-    animation: mobile-bottom-sheet-in 100ms cubic-bezier(0.22, 1, 0.36, 1) both;
     overscroll-behavior: contain;
     scrollbar-width: none;
 }
 
 .mobile-bottom-sheet.is-dragging {
     transition: none;
-    animation: none;
-}
-
-.mobile-bottom-sheet-layer.is-closing .mobile-bottom-sheet {
-    animation: mobile-bottom-sheet-out 100ms ease-in forwards;
 }
 
 .mobile-bottom-sheet::-webkit-scrollbar {
@@ -54,20 +45,8 @@
     touch-action: none;
 }
 
-@keyframes mobile-bottom-sheet-in {
-    from { transform: translateY(calc(100% + var(--mobile-bottom-sheet-drag-offset))); }
-    to { transform: translateY(var(--mobile-bottom-sheet-drag-offset)); }
-}
-
-@keyframes mobile-bottom-sheet-out {
-    from { transform: translateY(var(--mobile-bottom-sheet-drag-offset)); }
-    to { transform: translateY(calc(100% + var(--mobile-bottom-sheet-drag-offset))); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-    .mobile-bottom-sheet-layer,
     .mobile-bottom-sheet {
-        animation: none;
         transition: none;
         transform: none;
     }
