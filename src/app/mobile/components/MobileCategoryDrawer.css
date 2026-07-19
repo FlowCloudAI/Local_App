@@ -1,4 +1,6 @@
 .mobile-category-drawer {
+    --mobile-category-drawer-indent-size: 1rem;
+    --mobile-category-drawer-indent-line-color: color-mix(in srgb, var(--fc-color-border) 72%, transparent);
     display: flex;
     width: var(--mobile-entry-drawer-width, calc(100vw - 3.5rem));
     height: 100%;
@@ -75,8 +77,24 @@
 .mobile-category-drawer__node {
     display: grid;
     position: relative;
-    grid-template-columns: calc(1.45rem + var(--mobile-category-drawer-depth, 0) * 1rem) minmax(0, 1fr) 2.25rem;
+    grid-template-columns: calc(1.45rem + var(--mobile-category-drawer-depth, 0) * var(--mobile-category-drawer-indent-size)) minmax(0, 1fr) 2.25rem;
     align-items: center;
+}
+
+.mobile-category-drawer__indent-lines {
+    position: absolute;
+    top: -0.14rem;
+    bottom: -0.14rem;
+    left: 0.725rem;
+    width: calc(var(--mobile-category-drawer-depth, 0) * var(--mobile-category-drawer-indent-size));
+    background-image: repeating-linear-gradient(
+        to right,
+        var(--mobile-category-drawer-indent-line-color) 0,
+        var(--mobile-category-drawer-indent-line-color) 1px,
+        transparent 1px,
+        transparent var(--mobile-category-drawer-indent-size)
+    );
+    pointer-events: none;
 }
 
 .mobile-category-drawer__row,
@@ -123,9 +141,12 @@
 
 .mobile-category-drawer__toggle {
     display: inline-grid;
+    position: relative;
+    z-index: 1;
     width: 1.45rem;
     height: 2.6rem;
     padding: 0;
+    justify-self: end;
     place-items: center;
     color: var(--fc-color-text-tertiary);
 }
@@ -192,7 +213,7 @@
     position: absolute;
     z-index: 2;
     right: 0.4rem;
-    left: calc(1.45rem + var(--mobile-category-drawer-depth, 0) * 1rem);
+    left: calc(1.45rem + var(--mobile-category-drawer-depth, 0) * var(--mobile-category-drawer-indent-size));
     height: 0.2rem;
     border-radius: var(--fc-radius-full);
     background: var(--fc-color-primary);

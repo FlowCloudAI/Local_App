@@ -61,9 +61,19 @@ interface Props {
     selected: MobileCategoryDrawerSelection
     onSelect: (selection: MobileCategoryDrawerSelection, label: string) => void
     onChanged?: () => void | Promise<void>
+    /** 每一级分类的缩进距离，单位为像素。 */
+    indentSize?: number
 }
 
-export default function MobileCategoryDrawer({projectId, categories, stats, selected, onSelect, onChanged}: Props) {
+export default function MobileCategoryDrawer({
+    projectId,
+    categories,
+    stats,
+    selected,
+    onSelect,
+    onChanged,
+    indentSize = 16,
+}: Props) {
     const {showAlert} = useAlert()
     const [searchText, setSearchText] = useState('')
     const [busy, setBusy] = useState(false)
@@ -633,7 +643,11 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     }, [onSelect])
 
     return (
-        <aside className="mobile-category-drawer" aria-label="分类树">
+        <aside
+            className="mobile-category-drawer"
+            aria-label="分类树"
+            style={{'--mobile-category-drawer-indent-size': `${indentSize}px`} as CSSProperties}
+        >
             <div className="mobile-category-drawer__toolbar">
                 <div className="mobile-category-drawer__search">
                     <Input
@@ -707,6 +721,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                             role="none"
                             data-mobile-side-drawer-gesture-ignore="true"
                         >
+                            <span className="mobile-category-drawer__indent-lines" aria-hidden="true"/>
                             <button
                                 type="button"
                                 className="mobile-category-drawer__toggle"
