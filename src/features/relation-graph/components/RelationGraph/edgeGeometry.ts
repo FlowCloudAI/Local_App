@@ -26,6 +26,19 @@ const BIDIR_OFFSET = 8;
 /** 对端位于出射方向后方时的弯曲系数（对齐 @xyflow 默认 curvature=0.25 的 25·c·√d）。 */
 const REVERSE_CURVATURE_SCALE = 6.25;
 
+/** 标签字体，与 RelationGraph.css 的 .fc-rg-edge-label 对齐（--fc-font-size-xs, 11px）。 */
+const LABEL_FONT = '11px sans-serif';
+/** 标签水平内边距 + 边框（8×2 + 1×2）。 */
+const LABEL_H_PADDING = 18;
+/** 标签胶囊估算高度：11px × 1.5 行高 + 上下 padding 2×2 + 边框 1×2。 */
+const LABEL_HEIGHT = 23;
+/** 标签沿边的候选参数：中点优先，向两端交替展开。 */
+const LABEL_T_CANDIDATES = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82];
+/** 标签与节点的最小净距（px）。 */
+const LABEL_NODE_CLEARANCE = 4;
+/** 标签与标签的最小净距（px）。 */
+const LABEL_LABEL_CLEARANCE = 2;
+
 // ─── 类型 ─────────────────────────────────────────────────────────────
 
 export interface EdgeGeometry {
@@ -155,14 +168,12 @@ function controlPoint(side: Side, x: number, y: number, offset: number): [number
     }
 }
 
+/** 三次贝塞尔：起点、两个控制点、终点。 */
+type Cubic = [number, number, number, number, number, number, number, number];
+
 /** 三次贝塞尔在参数 t 处的取点。 */
-function cubicPointAt(
-    sx: number, sy: number,
-    c1x: number, c1y: number,
-    c2x: number, c2y: number,
-    tx: number, ty: number,
-    t: number,
-): [number, number] {
+function cubicPointAt(cubic: Cubic, t: number): [number, number] {
+    const [sx, sy, c1x, c1y, c2x, c2y, tx, ty] = cubic;
     const u = 1 - t;
     const a = u * u * u;
     const b = 3 * u * u * t;
@@ -213,6 +224,118 @@ function separatePorts(slots: PortSlot[], lo: number, hi: number): void {
         slots[slots.length - 1].geom.along = hi;
         for (let index = slots.length - 2; index >= 0; index -= 1) {
             slots[index].geom.along = Math.min(slots[index].geom.along, slots[index + 1].geom.along - gap);
+        }
+    }
+}
+
+// ─── 标签避让 ─────────────────────────────────────────────────────────
+
+interface Rect {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+const labelWidthCache = new Map<string, number>();
+
+/** canvas measureText 估算标签胶囊宽度；非 DOM 环境按字符宽粗估。 */
+function measureLabelWidth(text: string): number {
+    const cached = labelWidthCache.get(text);
+    if (cached !== undefined) return cached;
+
+    if (measureCtx === undefined) {
+        measureCtx = typeof document !== 'undefined'
+            ? document.createElement('canvas').getContext('2d')
+            : null;
+    }
+
+    let width: number;
+    if (measureCtx) {
+        measureCtx.font = LABEL_FONT;
+        width = measureCtx.measureText(text).width + LABEL_H_PADDING;
+    } else {
+        width = text.length * 11 + LABEL_H_PADDING;
+    }
+
+    if (labelWidthCache.size > 2048) labelWidthCache.clear();
+    labelWidthCache.set(text, width);
+    return width;
+}
+
+/** a 按 clearance 膨胀后与 b 的重叠面积；不相交返回 0。 */
+function inflatedOverlapArea(a: Rect, b: Rect, clearance: number): number {
+    const overlapW = Math.min(a.x + a.w + clearance, b.x + b.w) - Math.max(a.x - clearance, b.x);
+    const overlapH = Math.min(a.y + a.h + clearance, b.y + b.h) - Math.max(a.y - clearance, b.y);
+    if (overlapW <= 0 || overlapH <= 0) return 0;
+    return overlapW * overlapH;
+}
+
+interface LabeledCurve {
+    edgeId: string;
+    label: string;
+    cubic: Cubic;
+}
+
+/**
+ * 全局标签贪心避让：按边 id 稳定排序，逐个沿自己的边路径试候选 t，
+ * 取第一个既不压节点也不压已放标签的位置；全部冲突时取重叠面积最小者。
+ */
+function placeLabels(
+    labeled: LabeledCurve[],
+    rects: Map<string, NodeRect>,
+    result: Map<string, EdgeGeometry>,
+): void {
+    if (labeled.length === 0) return;
+
+    const nodeObstacles: Rect[] = [];
+    for (const rect of rects.values()) {
+        nodeObstacles.push({ x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+    }
+
+    const placed: Rect[] = [];
+    const ordered = labeled.slice().sort((left, right) => left.edgeId.localeCompare(right.edgeId));
+
+    for (const item of ordered) {
+        const width = measureLabelWidth(item.label);
+        let bestX = 0;
+        let bestY = 0;
+        let bestRect: Rect | null = null;
+        let bestScore = Infinity;
+
+        for (const t of LABEL_T_CANDIDATES) {
+            const [px, py] = cubicPointAt(item.cubic, t);
+            const rect: Rect = {
+                x: px - width / 2,
+                y: py - LABEL_HEIGHT / 2,
+                w: width,
+                h: LABEL_HEIGHT,
+            };
+
+            let score = 0;
+            for (const obstacle of nodeObstacles) {
+                score += inflatedOverlapArea(rect, obstacle, LABEL_NODE_CLEARANCE);
+            }
+            for (const obstacle of placed) {
+                score += inflatedOverlapArea(rect, obstacle, LABEL_LABEL_CLEARANCE);
+            }
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestX = px;
+                bestY = py;
+                bestRect = rect;
+            }
+            if (score <= 0) break;
+        }
+
+        if (!bestRect) continue;
+        placed.push(bestRect);
+        const entry = result.get(item.edgeId);
+        if (entry) {
+            entry.labelX = bestX;
+            entry.labelY = bestY;
         }
     }
 }
@@ -288,8 +411,9 @@ export function computeEdgeGeometries(nodes: Node[], edges: Edge[]): Map<string,
         separatePorts(slots, min + PORT_CORNER_MARGIN, max - PORT_CORNER_MARGIN);
     }
 
-    // 第三步：构建路径与标签位置
+    // 第三步：构建路径，标签先放在中点
     const result = new Map<string, EdgeGeometry>();
+    const labeledCurves: LabeledCurve[] = [];
     for (const item of working) {
         const [sx, sy] = endpointXY(item.s);
         const [tx, ty] = endpointXY(item.t);
@@ -298,10 +422,19 @@ export function computeEdgeGeometries(nodes: Node[], edges: Edge[]): Map<string,
         const [c1x, c1y] = controlPoint(item.s.side, sx, sy, sOffset);
         const [c2x, c2y] = controlPoint(item.t.side, tx, ty, tOffset);
 
+        const cubic: Cubic = [sx, sy, c1x, c1y, c2x, c2y, tx, ty];
         const path = `M ${sx},${sy} C ${c1x},${c1y} ${c2x},${c2y} ${tx},${ty}`;
-        const [labelX, labelY] = cubicPointAt(sx, sy, c1x, c1y, c2x, c2y, tx, ty, 0.5);
+        const [labelX, labelY] = cubicPointAt(cubic, 0.5);
         result.set(item.edge.id, { path, labelX, labelY });
+
+        const label = ((item.edge.data ?? {}) as { label?: unknown }).label;
+        if (typeof label === 'string' && label.length > 0) {
+            labeledCurves.push({ edgeId: item.edge.id, label, cubic });
+        }
     }
+
+    // 第四步：标签全局避让（标签×节点、标签×标签）
+    placeLabels(labeledCurves, rects, result);
 
     return result;
 }
