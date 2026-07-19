@@ -26,8 +26,9 @@ import {
     buildAllRows,
     buildChildrenMap,
     buildVisibleRows,
+    CATEGORY_REORDER_LONG_PRESS_MS,
+    CATEGORY_REORDER_MOVE_TOLERANCE,
     collectDescendantIds,
-    DragHandleIcon,
     dropTargetSignature,
     getEntryCountMap,
     getGesturePointerId,
@@ -38,7 +39,6 @@ import {
     ROW_DRAG_START_DISTANCE,
     ROW_DRAG_VERTICAL_DOMINANCE,
     TreeIcon,
-    type CategoryDragSource,
     type CategoryDragState,
     type CategoryDropTarget,
     type DeleteMode,
@@ -388,6 +388,12 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const renameTitle = renameTarget?.mode === 'rename' ? '重命名分类' : '新建分类'
 
     const getDropTarget = useCallback((pointerY: number, draggedId: string): CategoryDropTarget | null => {
+        const draggedElement = categoryNodeRefs.current.get(draggedId)
+        if (draggedElement) {
+            const draggedRect = draggedElement.getBoundingClientRect()
+            if (pointerY >= draggedRect.top && pointerY <= draggedRect.bottom) return null
+        }
+
         const blockedIds = new Set([draggedId, ...collectDescendantIds(draggedId, childrenMap)])
         const candidates = rows.filter(row => !blockedIds.has(row.category.id))
         if (candidates.length === 0) return null
@@ -467,7 +473,6 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
             logger.info('[移动端分类拖拽] 进入拖拽', {
                 pointerId: dragState.pointerId,
                 categoryId: dragState.categoryId,
-                source: dragState.source,
                 reason,
                 pointerX: Math.round(pointerX),
                 pointerY: Math.round(pointerY),
@@ -533,7 +538,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     }, [clearDragState, handleMoveByDrop, suppressNextCategoryClick])
 
     const bindCategoryDrag = useDrag(({
-        args: [category, source],
+        args: [category],
         cancel,
         event,
         first,
@@ -542,10 +547,10 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         xy: [pointerX, pointerY],
     }) => {
         const targetCategory = category as Category | undefined
-        const dragSource = source as CategoryDragSource | undefined
-        if (!targetCategory || !dragSource) return
+        if (!targetCategory) return
 
         const pointerId = getGesturePointerId(event)
+        const pointerType = getGesturePointerType(event)
         if (first) {
             if (busy || normalizedSearch) {
                 logger.info('[移动端分类拖拽] 忽略按下', {
@@ -557,27 +562,23 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                 return
             }
 
-            if (dragSource === 'handle' && event.cancelable) {
-                event.preventDefault()
-            }
             event.stopPropagation()
-            dragStateRef.current = {
+            const dragState: CategoryDragState = {
                 pointerId,
                 categoryId: targetCategory.id,
-                source: dragSource,
-                active: dragSource === 'handle',
+                active: false,
             }
-            if (dragSource === 'handle') {
-                setDraggingId(targetCategory.id)
+            dragStateRef.current = dragState
+            if (pointerType === 'touch' || pointerType === 'pen' || pointerType.startsWith('touch')) {
+                activateDrag(dragState, pointerX, pointerY, 'long-press')
             }
             setDropTarget(null)
             dropTargetRef.current = null
             logger.info('[移动端分类拖拽] 按下', {
                 pointerId,
-                pointerType: getGesturePointerType(event),
+                pointerType,
                 categoryId: targetCategory.id,
                 name: targetCategory.name,
-                source: dragSource,
                 startX: Math.round(pointerX),
                 startY: Math.round(pointerY),
             })
@@ -604,8 +605,14 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
         updateDragTarget(pointerX, pointerY, dragState.categoryId, 'use-drag')
         if (last) finishDrag(pointerId, true, 'use-drag-end')
     }, {
+        axisThreshold: {
+            pen: CATEGORY_REORDER_MOVE_TOLERANCE,
+            touch: CATEGORY_REORDER_MOVE_TOLERANCE,
+        },
         filterTaps: false,
         pointer: {capture: false, keys: false, touch: true},
+        preventScroll: CATEGORY_REORDER_LONG_PRESS_MS,
+        preventScrollAxis: 'xy',
     })
 
     const handleCategoryRowClick = useCallback((
@@ -721,7 +728,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 aria-selected={active}
                                 aria-expanded={childCount > 0 ? expanded : undefined}
                                 className={`mobile-category-drawer__row mobile-category-drawer__row--category${active ? ' is-active' : ''}`}
-                                {...bindCategoryDrag(category, 'row')}
+                                {...bindCategoryDrag(category)}
                                 onClick={(event) => handleCategoryRowClick(event, category)}
                             >
                                 <span className="mobile-category-drawer__text">
@@ -730,20 +737,6 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                         {entryCountMap.get(category.id) ?? 0} 个词条{childCount > 0 ? ` · ${childCount} 个子分类` : ''}
                                     </small>
                                 </span>
-                            </button>
-                            <button
-                                type="button"
-                                className="mobile-category-drawer__drag"
-                                aria-label={`拖拽移动分类 ${category.name}`}
-                                disabled={busy || Boolean(normalizedSearch)}
-                                data-mobile-side-drawer-gesture-ignore="true"
-                                {...bindCategoryDrag(category, 'handle')}
-                                onClick={(event) => {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                }}
-                            >
-                                <DragHandleIcon/>
                             </button>
                             <button
                                 type="button"

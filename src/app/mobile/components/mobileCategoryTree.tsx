@@ -8,10 +8,11 @@ export type RenameTarget = {mode: 'create'; parentId: string | null} | {mode: 'r
 export type DeleteMode = 'empty' | 'lift' | 'cascade'
 export type SiblingDirection = 'up' | 'down'
 export type DragDropPosition = 'before' | 'after' | 'into'
-export type CategoryDragSource = 'row' | 'handle'
+export const CATEGORY_REORDER_LONG_PRESS_MS = 430
+export const CATEGORY_REORDER_MOVE_TOLERANCE = 12
 export const ROW_DRAG_START_DISTANCE = 10
 export const ROW_DRAG_VERTICAL_DOMINANCE = 1.12
-export interface CategoryDragState { pointerId: number | string; categoryId: string; source: CategoryDragSource; active: boolean }
+export interface CategoryDragState { pointerId: number | string; categoryId: string; active: boolean }
 export interface CategoryDropTarget { targetId: string; position: DragDropPosition }
 
 export function dropTargetSignature(target: CategoryDropTarget | null) {
@@ -112,7 +113,4 @@ export function TreeIcon({expanded}: {expanded: boolean}) {
 }
 export function HomeIcon() {
     return <svg className="mobile-category-drawer__row-icon mobile-category-drawer__home-icon" viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4.5 11.2 12 5l7.5 6.2"/><path d="M6.5 10.5v8h11v-8"/><path d="M10 18.5v-4h4v4"/></svg>
-}
-export function DragHandleIcon() {
-    return <svg className="mobile-category-drawer__drag-icon" viewBox="0 0 24 24" focusable="false"><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h10"/></svg>
 }
