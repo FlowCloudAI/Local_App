@@ -40,6 +40,8 @@ pub struct LayoutParamsPayload {
     pub edge_length_max: Option<f64>,
     pub two_way_edge_length_factor: Option<f64>,
     pub two_way_attraction_weight: Option<f64>,
+    pub degree_edge_length_scale: Option<f64>,
+    pub degree_edge_length_max_factor: Option<f64>,
     pub initial_temperature_gamma: Option<f64>,
     pub min_temperature_gamma: Option<f64>,
     pub min_temperature_ratio: Option<f64>,

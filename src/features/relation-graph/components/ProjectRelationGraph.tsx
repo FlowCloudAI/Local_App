@@ -60,6 +60,8 @@ type LayoutParamKey =
     | 'edgeLengthMax'
     | 'twoWayEdgeLengthFactor'
     | 'twoWayAttractionWeight'
+    | 'degreeEdgeLengthScale'
+    | 'degreeEdgeLengthMaxFactor'
     | 'initialTemperatureGamma'
     | 'minTemperatureGamma'
     | 'minTemperatureRatio'
@@ -112,6 +114,8 @@ const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
     edgeLengthMax: 320,
     twoWayEdgeLengthFactor: 0.84,
     twoWayAttractionWeight: 1.68,
+    degreeEdgeLengthScale: 0.12,
+    degreeEdgeLengthMaxFactor: 1.7,
     initialTemperatureGamma: 0.26,
     minTemperatureGamma: 0.08,
     minTemperatureRatio: 1.5,
@@ -166,6 +170,8 @@ const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}>
             {key: 'edgeLengthAlphaCv', label: '离散放大', min: 0, step: 0.05},
             {key: 'twoWayEdgeLengthFactor', label: '双向边长度因子', min: 0.2, max: 1.5, step: 0.02},
             {key: 'twoWayAttractionWeight', label: '双向边吸引权重', min: 0.1, step: 0.05},
+            {key: 'degreeEdgeLengthScale', label: '枢纽边长放大', min: 0, max: 0.5, step: 0.02},
+            {key: 'degreeEdgeLengthMaxFactor', label: '枢纽边长上限', min: 1, max: 3, step: 0.05},
         ],
     },
     {

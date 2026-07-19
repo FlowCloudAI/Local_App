@@ -26,6 +26,8 @@ export interface LayoutParamsPayload {
     edgeLengthMax?: number
     twoWayEdgeLengthFactor?: number
     twoWayAttractionWeight?: number
+    degreeEdgeLengthScale?: number
+    degreeEdgeLengthMaxFactor?: number
     initialTemperatureGamma?: number
     minTemperatureGamma?: number
     minTemperatureRatio?: number

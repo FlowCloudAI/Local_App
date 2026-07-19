@@ -13,6 +13,8 @@ pub struct ResolvedLayoutParams {
     pub edge_length_max: f64,
     pub two_way_edge_length_factor: f64,
     pub two_way_attraction_weight: f64,
+    pub degree_edge_length_scale: f64,
+    pub degree_edge_length_max_factor: f64,
     pub initial_temperature_gamma: f64,
     pub min_temperature_gamma: f64,
     pub min_temperature_ratio: f64,
@@ -95,6 +97,14 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.two_way_attraction_weight)
                 .unwrap_or(TWO_WAY_ATTRACTION_WEIGHT),
+            degree_edge_length_scale: p
+                .as_ref()
+                .and_then(|x| x.degree_edge_length_scale)
+                .unwrap_or(DEGREE_EDGE_LENGTH_SCALE),
+            degree_edge_length_max_factor: p
+                .as_ref()
+                .and_then(|x| x.degree_edge_length_max_factor)
+                .unwrap_or(DEGREE_EDGE_LENGTH_MAX_FACTOR),
             initial_temperature_gamma: p
                 .as_ref()
                 .and_then(|x| x.initial_temperature_gamma)

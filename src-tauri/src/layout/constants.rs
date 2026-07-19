@@ -24,6 +24,15 @@ pub const EDGE_LENGTH_MIN: f64 = 100.0;
 /// 调大：超大图节点间距可进一步拉开；调小：限制最大图的舒展程度。
 pub const EDGE_LENGTH_MAX: f64 = 320.0;
 
+/// 端点度数每超出阈值 1，边理想长度增加的比例。
+/// 调大：高连接度枢纽周围的边更长，箭头与标签有更大展开空间；调小：该影响减弱。
+pub const DEGREE_EDGE_LENGTH_SCALE: f64 = 0.12;
+/// 度数加长开始生效的度数阈值（不暴露给调参面板，形状参数而非力度参数）。
+pub const DEGREE_EDGE_LENGTH_THRESHOLD: f64 = 2.0;
+/// 度数加长的乘数上限，防止超级枢纽把边拉得过长。
+/// 调大：超级枢纽的边可以更长；调小：限制枢纽边长增长。
+pub const DEGREE_EDGE_LENGTH_MAX_FACTOR: f64 = 1.7;
+
 /// 双向边相对于分量主尺度的目标长度因子，应小于 1。
 /// 调小：双向边两端节点被拉得更近；调大：双向边与单向边长度差异缩小。
 pub const TWO_WAY_EDGE_LENGTH_FACTOR: f64 = 0.84;

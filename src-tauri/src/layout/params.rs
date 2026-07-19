@@ -6,7 +6,7 @@
 //!   让统计量、参数生成、求解主循环彼此解耦。
 //! - D3 forceCollide：边长下限与碰撞半径语义保持一致，避免参数生成阶段直接要求节点重叠。
 
-use crate::layout::constants::MIN_MEAN_DEGREE;
+use crate::layout::constants::{DEGREE_EDGE_LENGTH_THRESHOLD, MIN_MEAN_DEGREE};
 use crate::layout::engine::{LayoutEdge, LayoutNode};
 use crate::layout::resolved_params::ResolvedLayoutParams;
 
@@ -237,6 +237,12 @@ pub fn derive_edge_layout_params(
     params: &ComponentLayoutParams,
     r: &ResolvedLayoutParams,
 ) -> Vec<EdgeLayoutParams> {
+    let mut degree_by_node = std::collections::HashMap::<usize, f64>::new();
+    for edge in component_edges {
+        *degree_by_node.entry(edge.source).or_insert(0.0) += 1.0;
+        *degree_by_node.entry(edge.target).or_insert(0.0) += 1.0;
+    }
+
     component_edges
         .iter()
         .map(|edge| {
@@ -248,7 +254,18 @@ pub fn derive_edge_layout_params(
             } else {
                 1.0
             };
-            let target_length = collision_floor.max(params.fr_scale * length_factor);
+            // 端点度数越高的边越长：给枢纽周围留出角度展开空间，
+            // 缓解多条边挤在同一方向导致的箭头/标签堆叠。
+            let hub_degree = degree_by_node
+                .get(&edge.source)
+                .copied()
+                .unwrap_or(0.0)
+                .max(degree_by_node.get(&edge.target).copied().unwrap_or(0.0));
+            let degree_factor = (1.0
+                + r.degree_edge_length_scale
+                    * (hub_degree - DEGREE_EDGE_LENGTH_THRESHOLD).max(0.0))
+            .min(r.degree_edge_length_max_factor);
+            let target_length = collision_floor.max(params.fr_scale * length_factor * degree_factor);
             let attraction_weight = if edge.is_two_way {
                 r.two_way_attraction_weight
             } else {
@@ -456,6 +473,66 @@ mod tests {
         assert_eq!(edge_params[1].attraction_weight, TWO_WAY_ATTRACTION_WEIGHT);
         assert!(edge_params[1].target_length <= edge_params[0].target_length);
         assert!(edge_params[1].target_length >= nodes[0].radius + nodes[1].radius);
+    }
+
+    #[test]
+    fn hub_edges_get_longer_target_length() {
+        // 小节点保证碰撞下限低于 fr_scale，让度数因子可观察
+        let nodes = vec![
+            test_node("hub", 40.0, 40.0),
+            test_node("n1", 40.0, 40.0),
+            test_node("n2", 40.0, 40.0),
+            test_node("n3", 40.0, 40.0),
+            test_node("n4", 40.0, 40.0),
+        ];
+        let params = super::ComponentLayoutParams {
+            ideal_edge_length: 160.0,
+            fr_scale: 160.0,
+            initialization_radius: 60.0,
+            initial_temperature: 24.0,
+            minimum_temperature: 4.0,
+            temperature_decay: 0.95,
+            iterations: 80,
+            estimated_area: 1000.0,
+            axis_compaction_strength: 0.1,
+            radial_pull_strength: 0.08,
+            leaf_pull_strength: 0.12,
+            branch_smoothing_strength: 0.1,
+        };
+        // 星形：hub 度数 4
+        let star_edges = (1..=4)
+            .map(|target| LayoutEdge {
+                source: 0,
+                target,
+                is_two_way: false,
+            })
+            .collect::<Vec<_>>();
+        // 对照：两节点一条边，度数 1
+        let pair_edges = vec![LayoutEdge {
+            source: 1,
+            target: 2,
+            is_two_way: false,
+        }];
+
+        let resolved = ResolvedLayoutParams::from_payload(None);
+        let star_params = derive_edge_layout_params(&star_edges, &nodes, &params, &resolved);
+        let pair_params = derive_edge_layout_params(&pair_edges, &nodes, &params, &resolved);
+
+        // 度数 4 超出阈值 2 → 因子 1 + 0.12×2 = 1.24
+        assert!(star_params[0].target_length > pair_params[0].target_length);
+        assert!((star_params[0].target_length - 160.0 * 1.24).abs() < 1e-9);
+        assert!((pair_params[0].target_length - 160.0).abs() < 1e-9);
+
+        // 超级枢纽被乘数上限约束
+        let mega_edges = (1..=20)
+            .map(|index| LayoutEdge {
+                source: 0,
+                target: 1 + (index % 4),
+                is_two_way: false,
+            })
+            .collect::<Vec<_>>();
+        let mega_params = derive_edge_layout_params(&mega_edges, &nodes, &params, &resolved);
+        assert!((mega_params[0].target_length - 160.0 * 1.7).abs() < 1e-9);
     }
 
     #[test]
