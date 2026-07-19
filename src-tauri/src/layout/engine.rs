@@ -382,7 +382,11 @@ fn assemble_cluster_component(
         for center in &mut cluster_layout.positions {
             *center += offset;
         }
+    }
 
+    apply_cluster_mirrors(component, &mut positioned_clusters, placement);
+
+    for cluster_layout in &positioned_clusters {
         for (slot, &node_index) in cluster_layout.node_indices.iter().enumerate() {
             per_node_position.insert(node_index, cluster_layout.positions[slot]);
         }
@@ -408,6 +412,88 @@ fn assemble_cluster_component(
             .map(|cluster| cluster.estimated_area)
             .sum::<f64>(),
         is_isolated: component.node_indices.len() == 1 && component.edges.is_empty(),
+    }
+}
+
+/// 簇拼装前的镜像选择：簇内布局不知道跨簇边朝向哪一侧，直接拼装可能把
+/// 连接节点甩在远离对端簇的一侧。对每个簇枚举 4 种绕自身盒中心的镜像
+/// （恒等 / 水平翻 / 垂直翻 / 双翻，镜像不改变簇的包围盒），贪心选择让
+/// 自身跨簇边总长最小的变体。按簇索引顺序单遍处理，先处理的簇以后处理
+/// 簇的未镜像位置为参照——确定性坐标下降一轮。
+fn apply_cluster_mirrors(
+    component: &ConnectedComponentSpec,
+    clusters: &mut [ComponentLayout],
+    placement: &ClusterPlacement,
+) {
+    if clusters.len() <= 1 {
+        return;
+    }
+
+    let mut locate = HashMap::<usize, (usize, usize)>::new();
+    for (cluster_index, cluster) in clusters.iter().enumerate() {
+        for (slot, &node_index) in cluster.node_indices.iter().enumerate() {
+            locate.insert(node_index, (cluster_index, slot));
+        }
+    }
+
+    // 每簇的跨簇边：（本簇槽位，对端簇，对端槽位）
+    let mut cross_edges: Vec<Vec<(usize, usize, usize)>> = vec![Vec::new(); clusters.len()];
+    for edge in &component.edges {
+        let Some(&(source_cluster, source_slot)) = locate.get(&edge.source) else {
+            continue;
+        };
+        let Some(&(target_cluster, target_slot)) = locate.get(&edge.target) else {
+            continue;
+        };
+        if source_cluster == target_cluster {
+            continue;
+        }
+        cross_edges[source_cluster].push((source_slot, target_cluster, target_slot));
+        cross_edges[target_cluster].push((target_slot, source_cluster, source_slot));
+    }
+
+    for cluster_index in 0..clusters.len() {
+        if cross_edges[cluster_index].is_empty() {
+            continue;
+        }
+        let center = Vec2::new(
+            placement.centers[cluster_index][0],
+            placement.centers[cluster_index][1],
+        );
+
+        let mut best_variant = 0usize;
+        let mut best_cost = f64::INFINITY;
+        for variant in 0..4usize {
+            let flip_x = variant & 1 == 1;
+            let flip_y = variant & 2 == 2;
+            let mut cost = 0.0;
+            for &(own_slot, other_cluster, other_slot) in &cross_edges[cluster_index] {
+                let own = clusters[cluster_index].positions[own_slot];
+                let mirrored = Vec2::new(
+                    if flip_x { 2.0 * center.x - own.x } else { own.x },
+                    if flip_y { 2.0 * center.y - own.y } else { own.y },
+                );
+                cost += (mirrored - clusters[other_cluster].positions[other_slot]).length();
+            }
+            // 严格更优才切换：并列时保留靠前变体（恒等优先），抵抗浮点噪声
+            if cost + 1e-9 < best_cost {
+                best_cost = cost;
+                best_variant = variant;
+            }
+        }
+
+        if best_variant != 0 {
+            let flip_x = best_variant & 1 == 1;
+            let flip_y = best_variant & 2 == 2;
+            for position in &mut clusters[cluster_index].positions {
+                if flip_x {
+                    position.x = 2.0 * center.x - position.x;
+                }
+                if flip_y {
+                    position.y = 2.0 * center.y - position.y;
+                }
+            }
+        }
     }
 }
 
@@ -933,6 +1019,72 @@ mod tests {
             leaf_pull_strength: 0.28,
             branch_smoothing_strength: 0.22,
         }
+    }
+
+    #[test]
+    fn mirrors_clusters_to_shorten_cross_edges() {
+        use super::{ComponentBounds, ComponentLayout, apply_cluster_mirrors};
+        use crate::layout::cluster::{ClusterEdgeRef, ClusterPlacement, ConnectedComponentSpec};
+
+        // 簇 0（中心 50,50）：节点 0 在左缘、节点 1 在右缘；
+        // 簇 1（中心 250,50）：节点 2 在左缘、节点 3 在右缘。
+        let clusters = vec![
+            ComponentLayout {
+                node_indices: vec![0, 1],
+                positions: vec![Vec2::new(10.0, 50.0), Vec2::new(90.0, 50.0)],
+                bounds: ComponentBounds {
+                    width: 100.0,
+                    height: 100.0,
+                },
+                estimated_area: 10_000.0,
+                is_isolated: false,
+            },
+            ComponentLayout {
+                node_indices: vec![2, 3],
+                positions: vec![Vec2::new(210.0, 50.0), Vec2::new(290.0, 50.0)],
+                bounds: ComponentBounds {
+                    width: 100.0,
+                    height: 100.0,
+                },
+                estimated_area: 10_000.0,
+                is_isolated: false,
+            },
+        ];
+        let component = ConnectedComponentSpec {
+            component_id: "0|1|2|3".to_string(),
+            node_indices: vec![0, 1, 2, 3],
+            edges: vec![
+                ClusterEdgeRef {
+                    source: 0,
+                    target: 1,
+                    is_two_way: false,
+                },
+                ClusterEdgeRef {
+                    source: 2,
+                    target: 3,
+                    is_two_way: false,
+                },
+                // 跨簇边连接簇 0 左缘节点与簇 1 右缘节点——不镜像时最远（280）
+                ClusterEdgeRef {
+                    source: 0,
+                    target: 3,
+                    is_two_way: false,
+                },
+            ],
+        };
+        let placement = ClusterPlacement {
+            centers: vec![[50.0, 50.0], [250.0, 50.0]],
+        };
+
+        let mut mirrored = clusters;
+        apply_cluster_mirrors(&component, &mut mirrored, &placement);
+
+        // 两簇都应水平翻转：节点 0 → x=90，节点 3 → x=210，跨簇边 280 → 120
+        let n0 = mirrored[0].positions[0];
+        let n3 = mirrored[1].positions[1];
+        assert!((n0.x - 90.0).abs() < 1e-9);
+        assert!((n3.x - 210.0).abs() < 1e-9);
+        assert!(((n3 - n0).length() - 120.0).abs() < 1e-9);
     }
 
     #[test]
