@@ -87,6 +87,7 @@ export default function MobileCategoryDrawer({
     const categoryNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
     const dragStateRef = useRef<CategoryDragState | null>(null)
     const dropTargetRef = useRef<CategoryDropTarget | null>(null)
+    const pressedCategoryIdRef = useRef<string | null>(null)
     const loggedDropTargetRef = useRef<string>('none')
     const suppressCategoryClickRef = useRef<string | null>(null)
     const suppressCategoryClickTimerRef = useRef<number | null>(null)
@@ -562,6 +563,18 @@ export default function MobileCategoryDrawer({
         const pointerId = getGesturePointerId(event)
         const pointerType = getGesturePointerType(event)
         if (first) {
+            const touchLike = pointerType === 'touch'
+                || pointerType === 'pen'
+                || pointerType.startsWith('touch')
+            if (touchLike && pressedCategoryIdRef.current !== targetCategory.id) {
+                logger.info('[移动端分类拖拽] 取消已松手的延迟拖拽', {
+                    categoryId: targetCategory.id,
+                    pointerType,
+                })
+                cancel()
+                clearDragState()
+                return
+            }
             if (busy || normalizedSearch) {
                 logger.info('[移动端分类拖拽] 忽略按下', {
                     reason: busy ? 'busy' : 'searching',
@@ -579,7 +592,7 @@ export default function MobileCategoryDrawer({
                 active: false,
             }
             dragStateRef.current = dragState
-            if (pointerType === 'touch' || pointerType === 'pen' || pointerType.startsWith('touch')) {
+            if (touchLike) {
                 activateDrag(dragState, pointerX, pointerY, 'long-press')
             }
             setDropTarget(null)
@@ -738,6 +751,9 @@ export default function MobileCategoryDrawer({
                                 aria-expanded={childCount > 0 ? expanded : undefined}
                                 className={`mobile-category-drawer__row mobile-category-drawer__row--category${active ? ' is-active' : ''}`}
                                 {...bindCategoryDrag(category)}
+                                onPointerDownCapture={() => { pressedCategoryIdRef.current = category.id }}
+                                onPointerUpCapture={() => { pressedCategoryIdRef.current = null }}
+                                onPointerCancelCapture={() => { pressedCategoryIdRef.current = null }}
                                 onClick={(event) => handleCategoryRowClick(event, category)}
                             >
                                 <span className="mobile-category-drawer__text">{category.name}</span>
