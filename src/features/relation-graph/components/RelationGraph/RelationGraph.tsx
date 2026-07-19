@@ -7,6 +7,7 @@ import {
     useContext,
     useEffect,
     useImperativeHandle,
+    useMemo,
     useRef,
     type CSSProperties,
     type MouseEvent as ReactMouseEvent,
@@ -38,6 +39,7 @@ import './RelationGraph.css';
 
 import { useRelationLayout } from './useRelationLayout';
 import { BidirectionalEdge } from './BidirectionalEdge';
+import { EdgeGeometryCtx, computeEdgeGeometries } from './edgeGeometry';
 import type {
     LayoutFunction,
     RelationEdgeInput,
@@ -373,6 +375,9 @@ function RelationGraphInner({
     const layoutState = useRelationLayout({ nodes, edges, layoutFn, nodeOrigin, fitPadding, fitDuration });
     const reactFlow = useReactFlow<Node<RGNodeData>, Edge>();
 
+    // 全图统一计算边几何（附着点分散 + 标签位置），经 context 下发给每条边
+    const edgeGeometries = useMemo(() => computeEdgeGeometries(nodes, edges), [nodes, edges]);
+
     useImperativeHandle(exportRef, () => {
         const exportImage = async (options: RelationGraphExportOptions = {}) => {
             if (layoutState.layoutLoading) {
@@ -477,36 +482,38 @@ function RelationGraphInner({
 
     return (
         <RenderNodeCtx.Provider value={renderNode}>
-            <div className="fc-rg__canvas">
-                {layoutState.layoutLoading && (
-                    <div className="fc-rg__overlay fc-rg__overlay--loading" role="status">
-                        <span className="fc-rg__spinner" aria-hidden="true" />
-                        <span>布局计算中…</span>
-                    </div>
-                )}
-                {layoutState.layoutError && !layoutState.layoutLoading && (
-                    <div className="fc-rg__overlay fc-rg__overlay--error" role="alert">
-                        <span>布局失败：{layoutState.layoutError.message}</span>
-                    </div>
-                )}
-                <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onEdgeClick={handleEdgeClick}
-                    onPaneClick={handlePaneClick}
-                    nodeTypes={NODE_TYPES}
-                    edgeTypes={EDGE_TYPES}
-                    nodeOrigin={nodeOrigin}
-                    fitView={false}
-                    minZoom={0.05}
-                    maxZoom={4}
-                    proOptions={{ hideAttribution: true }}
-                >
-                    <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-                </ReactFlow>
-            </div>
+            <EdgeGeometryCtx.Provider value={edgeGeometries}>
+                <div className="fc-rg__canvas">
+                    {layoutState.layoutLoading && (
+                        <div className="fc-rg__overlay fc-rg__overlay--loading" role="status">
+                            <span className="fc-rg__spinner" aria-hidden="true" />
+                            <span>布局计算中…</span>
+                        </div>
+                    )}
+                    {layoutState.layoutError && !layoutState.layoutLoading && (
+                        <div className="fc-rg__overlay fc-rg__overlay--error" role="alert">
+                            <span>布局失败：{layoutState.layoutError.message}</span>
+                        </div>
+                    )}
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onEdgeClick={handleEdgeClick}
+                        onPaneClick={handlePaneClick}
+                        nodeTypes={NODE_TYPES}
+                        edgeTypes={EDGE_TYPES}
+                        nodeOrigin={nodeOrigin}
+                        fitView={false}
+                        minZoom={0.05}
+                        maxZoom={4}
+                        proOptions={{ hideAttribution: true }}
+                    >
+                        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+                    </ReactFlow>
+                </div>
+            </EdgeGeometryCtx.Provider>
         </RenderNodeCtx.Provider>
     );
 }
