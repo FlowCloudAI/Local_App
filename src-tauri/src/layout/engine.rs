@@ -173,41 +173,7 @@ fn layout_connected_component(
     };
 
     apply_component_edge_clearance(prepared, component, &mut layout);
-    orient_component_landscape(prepared, &mut layout);
     layout
-}
-
-/// 关系图没有固定层级方向；最终分量明显偏竖时，以刚体旋转换成横向展布。
-fn orient_component_landscape(prepared: &PreparedLayoutRequest, layout: &mut ComponentLayout) {
-    const PORTRAIT_TRIGGER: f64 = 1.08;
-
-    if layout.positions.len() < 2 || layout.bounds.height <= layout.bounds.width * PORTRAIT_TRIGGER
-    {
-        return;
-    }
-
-    let centroid = layout
-        .positions
-        .iter()
-        .copied()
-        .fold(Vec2::default(), |acc, position| acc + position)
-        * (1.0 / layout.positions.len() as f64);
-    // ponytail: 只比较 0°/90°；需要斜向主干对齐时再扩展候选角。
-    let mut rotated = layout
-        .positions
-        .iter()
-        .map(|position| {
-            let relative = *position - centroid;
-            centroid + Vec2::new(relative.y, -relative.x)
-        })
-        .collect::<Vec<_>>();
-    let rotated_bounds = normalize_component_bounds(prepared, &layout.node_indices, &mut rotated);
-    if rotated_bounds.height + prepared.resolved_params.min_distance >= layout.bounds.height {
-        return;
-    }
-
-    layout.positions = rotated;
-    layout.bounds = rotated_bounds;
 }
 
 fn apply_component_edge_clearance(
@@ -1272,45 +1238,6 @@ mod tests {
             leaf_pull_strength: 0.28,
             branch_smoothing_strength: 0.22,
         }
-    }
-
-    #[test]
-    fn rotates_portrait_component_to_landscape_without_changing_distances() {
-        let prepared = prepare_request(LayoutRequest {
-            node_origin: None,
-            nodes: vec![
-                node("a", 180.0, 120.0),
-                node("b", 180.0, 120.0),
-                node("c", 180.0, 120.0),
-            ],
-            edges: vec![edge("a", "b"), edge("b", "c")],
-            params: None,
-        });
-        let node_indices = vec![0usize, 1, 2];
-        let mut positions = vec![
-            Vec2::new(0.0, 0.0),
-            Vec2::new(0.0, 240.0),
-            Vec2::new(0.0, 480.0),
-        ];
-        let bounds = super::normalize_component_bounds(&prepared, &node_indices, &mut positions);
-        let before_distance = (positions[2] - positions[0]).length();
-        let mut layout = super::ComponentLayout {
-            node_indices,
-            positions,
-            bounds,
-            estimated_area: 0.0,
-            is_isolated: false,
-        };
-
-        super::orient_component_landscape(&prepared, &mut layout);
-
-        assert!(layout.bounds.width > layout.bounds.height);
-        assert!(
-            ((layout.positions[2] - layout.positions[0]).length() - before_distance).abs() < 1e-9
-        );
-        let oriented = layout.positions.clone();
-        super::orient_component_landscape(&prepared, &mut layout);
-        assert_eq!(layout.positions, oriented);
     }
 
     #[test]
