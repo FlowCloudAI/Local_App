@@ -25,6 +25,10 @@ const PORT_CORNER_MARGIN = 10;
 const BIDIR_OFFSET = 8;
 /** 对端位于出射方向后方时的弯曲系数（对齐 @xyflow 默认 curvature=0.25 的 25·c·√d）。 */
 const REVERSE_CURVATURE_SCALE = 6.25;
+/** 边路径与非端点节点的最小视觉净距（px）。 */
+const EDGE_NODE_CLEARANCE = 6;
+/** 曲线折线化后的检测段数；节点尺寸远大于单段误差。 */
+const EDGE_COLLISION_SEGMENTS = 24;
 
 /** 标签字体，与 RelationGraph.css 的 .fc-rg-edge-label 对齐（--fc-font-size-xs, 11px）。 */
 const LABEL_FONT = '11px sans-serif';
@@ -183,6 +187,73 @@ function cubicPointAt(cubic: Cubic, t: number): [number, number] {
         a * sx + b * c1x + c * c2x + d * tx,
         a * sy + b * c1y + c * c2y + d * ty,
     ];
+}
+
+/** 线段是否与按 clearance 膨胀后的矩形相交。 */
+function segmentTouchesRect(
+    start: [number, number],
+    end: [number, number],
+    rect: NodeRect,
+    clearance: number,
+): boolean {
+    let entry = 0;
+    let exit = 1;
+    const axes = [
+        [start[0], end[0], rect.x - clearance, rect.x + rect.w + clearance],
+        [start[1], end[1], rect.y - clearance, rect.y + rect.h + clearance],
+    ];
+
+    for (const [from, to, min, max] of axes) {
+        const delta = to - from;
+        if (Math.abs(delta) < 0.001) {
+            if (from < min || from > max) return false;
+            continue;
+        }
+
+        const first = (min - from) / delta;
+        const second = (max - from) / delta;
+        entry = Math.max(entry, Math.min(first, second));
+        exit = Math.min(exit, Math.max(first, second));
+        if (entry > exit) return false;
+    }
+
+    return true;
+}
+
+/** 曲线是否蹭到任一非端点节点。 */
+function cubicTouchesOtherNode(
+    cubic: Cubic,
+    rects: Map<string, NodeRect>,
+    sourceId: string,
+    targetId: string,
+): boolean {
+    const xs = [cubic[0], cubic[2], cubic[4], cubic[6]];
+    const ys = [cubic[1], cubic[3], cubic[5], cubic[7]];
+    const curveMinX = Math.min(...xs);
+    const curveMaxX = Math.max(...xs);
+    const curveMinY = Math.min(...ys);
+    const curveMaxY = Math.max(...ys);
+
+    for (const [nodeId, rect] of rects) {
+        if (nodeId === sourceId || nodeId === targetId) continue;
+        if (
+            curveMaxX < rect.x - EDGE_NODE_CLEARANCE
+            || curveMinX > rect.x + rect.w + EDGE_NODE_CLEARANCE
+            || curveMaxY < rect.y - EDGE_NODE_CLEARANCE
+            || curveMinY > rect.y + rect.h + EDGE_NODE_CLEARANCE
+        ) {
+            continue;
+        }
+
+        let previous = cubicPointAt(cubic, 0);
+        for (let segment = 1; segment <= EDGE_COLLISION_SEGMENTS; segment += 1) {
+            const current = cubicPointAt(cubic, segment / EDGE_COLLISION_SEGMENTS);
+            if (segmentTouchesRect(previous, current, rect, EDGE_NODE_CLEARANCE)) return true;
+            previous = current;
+        }
+    }
+
+    return false;
 }
 
 // ─── 附着点一维分离 ────────────────────────────────────────────────────
@@ -422,8 +493,21 @@ export function computeEdgeGeometries(nodes: Node[], edges: Edge[]): Map<string,
         const [c1x, c1y] = controlPoint(item.s.side, sx, sy, sOffset);
         const [c2x, c2y] = controlPoint(item.t.side, tx, ty, tOffset);
 
-        const cubic: Cubic = [sx, sy, c1x, c1y, c2x, c2y, tx, ty];
-        const path = `M ${sx},${sy} C ${c1x},${c1y} ${c2x},${c2y} ${tx},${ty}`;
+        let cubic: Cubic = [sx, sy, c1x, c1y, c2x, c2y, tx, ty];
+        if (cubicTouchesOtherNode(cubic, rects, item.edge.source, item.edge.target)) {
+            // 后端已经为节点中心连线留出净空；仅把外鼓违规的曲线退回共线控制点。
+            cubic = [
+                sx,
+                sy,
+                sx + (tx - sx) / 3,
+                sy + (ty - sy) / 3,
+                sx + (2 * (tx - sx)) / 3,
+                sy + (2 * (ty - sy)) / 3,
+                tx,
+                ty,
+            ];
+        }
+        const path = `M ${cubic[0]},${cubic[1]} C ${cubic[2]},${cubic[3]} ${cubic[4]},${cubic[5]} ${cubic[6]},${cubic[7]}`;
         const [labelX, labelY] = cubicPointAt(cubic, 0.5);
         result.set(item.edge.id, { path, labelX, labelY });
 
