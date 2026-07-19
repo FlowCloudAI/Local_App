@@ -80,6 +80,7 @@ pub struct LayoutParamsPayload {
     pub cluster_iterations: Option<usize>,
     pub cluster_two_way_bonus: Option<f64>,
     pub cluster_horizontal_stretch: Option<f64>,
+    pub orientation_linearity_threshold: Option<f64>,
     pub fixed_random_seed: Option<u64>,
     pub min_distance: Option<f64>,
     pub attractive_direction_salt: Option<u64>,

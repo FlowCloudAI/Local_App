@@ -84,6 +84,7 @@ export interface RelationLayoutParams {
     clusterIterations?: number;
     clusterTwoWayBonus?: number;
     clusterHorizontalStretch?: number;
+    orientationLinearityThreshold?: number;
     fixedRandomSeed?: number;
     minDistance?: number;
     attractiveDirectionSalt?: number;

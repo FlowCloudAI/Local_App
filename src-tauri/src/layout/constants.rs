@@ -166,6 +166,9 @@ pub const CLUSTER_TWO_WAY_BONUS: f64 = 0.35;
 /// 让多簇分量倾向横向排布，缓解竖条式堆叠。
 /// 调大：整体更扁宽；调小（→1）：恢复各向同性。
 pub const CLUSTER_HORIZONTAL_STRETCH: f64 = 1.3;
+/// 细长簇执行水平朝向归一化所需的最小 PCA 线性度；设为大于 1 可关闭。
+/// 调大：只转更接近直线的簇；调小：更多椭圆状簇也会转为水平。
+pub const ORIENTATION_LINEARITY_THRESHOLD: f64 = 0.35;
 
 /// LRU 缓存容量。
 /// 调大：可缓存更多历史布局结果，重复请求命中率高但内存占用增加；调小：内存更省。

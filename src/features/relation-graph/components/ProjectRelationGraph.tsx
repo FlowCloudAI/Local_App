@@ -100,6 +100,7 @@ type LayoutParamKey =
     | 'clusterIterations'
     | 'clusterTwoWayBonus'
     | 'clusterHorizontalStretch'
+    | 'orientationLinearityThreshold'
 
 interface LayoutParamField {
     key: LayoutParamKey
@@ -161,6 +162,7 @@ const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
     clusterIterations: 80,
     clusterTwoWayBonus: 0.35,
     clusterHorizontalStretch: 1.3,
+    orientationLinearityThreshold: 0.35,
 }
 
 const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}> = [
@@ -236,6 +238,7 @@ const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}>
             {key: 'clusterIterations', label: '簇迭代轮数', min: 1, step: 5, integer: true},
             {key: 'clusterTwoWayBonus', label: '跨簇双向奖励', min: 0, step: 0.05},
             {key: 'clusterHorizontalStretch', label: '簇横向偏置', min: 1, max: 2.5, step: 0.05},
+            {key: 'orientationLinearityThreshold', label: '簇朝向线性阈值', min: 0, max: 1.01, step: 0.05},
         ],
     },
 ]

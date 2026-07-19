@@ -136,6 +136,10 @@ fn layout_connected_component(
         })
         .collect::<Vec<_>>();
 
+    for cluster_layout in &mut cluster_layouts {
+        normalize_cluster_orientation(prepared, cluster_layout);
+    }
+
     let mut layout = if cluster_layouts.len() == 1 {
         cluster_layouts
             .pop()
@@ -174,6 +178,47 @@ fn layout_connected_component(
 
     apply_component_edge_clearance(prepared, component, &mut layout);
     layout
+}
+
+/// 细长簇朝向归一化：linearity 达阈值的簇绕质心做刚体旋转，把 PCA 主轴
+/// 转到水平——细长形状躺平后高度最小、包围盒最小，横向空间利用最大化。
+/// 圆形碰撞模型下旋转严格保持簇内节点距离与无重叠状态；接近圆形的簇
+/// （linearity 低）主轴方向不稳定，用阈值挡掉。
+/// 阈值 >1 可整体关闭。单簇分量（簇即分量）同样适用；与已撤回的
+/// "整组件旋转"不同，这里只转单个力导向结果，不会扰动多簇组装关系。
+fn normalize_cluster_orientation(prepared: &PreparedLayoutRequest, cluster: &mut ComponentLayout) {
+    if cluster.positions.len() < 2 {
+        return;
+    }
+
+    let r = &prepared.resolved_params;
+    let Some((centroid, major_axis, linearity)) =
+        principal_axis_signature(&cluster.positions, r.min_distance)
+    else {
+        return;
+    };
+    if linearity < r.orientation_linearity_threshold {
+        return;
+    }
+
+    // principal_axis_signature 给出的主轴角在 (-90°, 90°] 内，
+    // 旋转 -angle 即最小角度转到水平；已经水平就不动。
+    let angle = major_axis.y.atan2(major_axis.x);
+    let (sin, cos) = (-angle).sin_cos();
+    if sin.abs() <= r.min_distance {
+        return;
+    }
+
+    for position in &mut cluster.positions {
+        let relative = *position - centroid;
+        *position = centroid
+            + Vec2::new(
+                relative.x * cos - relative.y * sin,
+                relative.x * sin + relative.y * cos,
+            );
+    }
+    cluster.bounds =
+        normalize_component_bounds(prepared, &cluster.node_indices, &mut cluster.positions);
 }
 
 fn apply_component_edge_clearance(
@@ -1547,6 +1592,140 @@ mod tests {
         assert!((n0.x - 90.0).abs() < 1e-9);
         assert!((n3.x - 210.0).abs() < 1e-9);
         assert!(((n3 - n0).length() - 120.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn normalizes_linear_cluster_orientation_and_respects_kill_switch() {
+        use super::{ComponentBounds, ComponentLayout, normalize_cluster_orientation};
+
+        let mut prepared = prepare_request(LayoutRequest {
+            node_origin: None,
+            nodes: vec![
+                node("a", 100.0, 50.0),
+                node("b", 100.0, 50.0),
+                node("c", 100.0, 50.0),
+                node("d", 100.0, 50.0),
+            ],
+            edges: Vec::new(),
+            params: Some(
+                serde_json::from_value(serde_json::json!({
+                    "orientationLinearityThreshold": 0.35
+                }))
+                .expect("orientation threshold payload should deserialize"),
+            ),
+        });
+        assert_eq!(
+            prepared.resolved_params.orientation_linearity_threshold,
+            0.35
+        );
+        let diagonal = ComponentLayout {
+            node_indices: vec![0, 1, 2],
+            positions: vec![
+                Vec2::new(-100.0, -100.0),
+                Vec2::new(0.0, 0.0),
+                Vec2::new(100.0, 100.0),
+            ],
+            bounds: ComponentBounds {
+                width: 300.0,
+                height: 250.0,
+            },
+            estimated_area: 75_000.0,
+            is_isolated: false,
+        };
+        let original_distance = (diagonal.positions[2] - diagonal.positions[0]).length();
+
+        let mut oriented = diagonal.clone();
+        normalize_cluster_orientation(&prepared, &mut oriented);
+        let min_y = oriented
+            .positions
+            .iter()
+            .map(|position| position.y)
+            .fold(f64::INFINITY, f64::min);
+        let max_y = oriented
+            .positions
+            .iter()
+            .map(|position| position.y)
+            .fold(f64::NEG_INFINITY, f64::max);
+        assert!(max_y - min_y < 1e-9);
+        assert!(
+            ((oriented.positions[2] - oriented.positions[0]).length() - original_distance).abs()
+                < 1e-9
+        );
+
+        prepared.resolved_params.orientation_linearity_threshold = 1.01;
+        let mut disabled = diagonal.clone();
+        normalize_cluster_orientation(&prepared, &mut disabled);
+        assert_eq!(disabled.positions, diagonal.positions);
+
+        prepared.resolved_params.orientation_linearity_threshold = 0.35;
+        let square = ComponentLayout {
+            node_indices: vec![0, 1, 2, 3],
+            positions: vec![
+                Vec2::new(-100.0, -100.0),
+                Vec2::new(100.0, -100.0),
+                Vec2::new(-100.0, 100.0),
+                Vec2::new(100.0, 100.0),
+            ],
+            bounds: ComponentBounds {
+                width: 300.0,
+                height: 250.0,
+            },
+            estimated_area: 75_000.0,
+            is_isolated: false,
+        };
+        let mut unchanged_square = square.clone();
+        normalize_cluster_orientation(&prepared, &mut unchanged_square);
+        assert_eq!(unchanged_square.positions, square.positions);
+    }
+
+    #[test]
+    fn lays_out_realistically_decomposed_three_node_chain_horizontally() {
+        let node_ids = [
+            "A", "B", "C", "d1", "d2", "d3", "p1", "p2", "s1", "s2", "s3", "s4", "s5", "s6",
+        ];
+        let request = LayoutRequest {
+            node_origin: None,
+            nodes: node_ids.iter().map(|id| node(id, 160.0, 80.0)).collect(),
+            edges: vec![
+                edge("A", "B"),
+                edge("B", "C"),
+                edge("C", "A"),
+                edge("d1", "d2"),
+                edge("d2", "d3"),
+                edge("d2", "A"),
+                edge("p1", "p2"),
+                edge("p1", "A"),
+                edge("s1", "A"),
+                edge("s2", "A"),
+                edge("s3", "B"),
+                edge("s4", "B"),
+                edge("s5", "C"),
+                edge("s6", "C"),
+            ],
+            params: None,
+        };
+        let prepared = prepare_request(request);
+        let response = compute_layout(&prepared);
+        let chain = ["d1", "d2", "d3"]
+            .map(|id| response.positions.get(id).expect("chain node should exist"));
+        let x_span = chain
+            .iter()
+            .map(|position| position.x)
+            .fold(f64::NEG_INFINITY, f64::max)
+            - chain
+                .iter()
+                .map(|position| position.x)
+                .fold(f64::INFINITY, f64::min);
+        let y_span = chain
+            .iter()
+            .map(|position| position.y)
+            .fold(f64::NEG_INFINITY, f64::max)
+            - chain
+                .iter()
+                .map(|position| position.y)
+                .fold(f64::INFINITY, f64::min);
+
+        assert!(x_span > y_span, "chain should lie horizontally");
     }
 
     #[test]
