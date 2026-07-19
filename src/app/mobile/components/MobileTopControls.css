@@ -24,10 +24,10 @@
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 0.7rem;
-    min-height: var(--mobile-topbar-height);
+    min-height: calc(var(--mobile-top-surface-size) + var(--mobile-topbar-offset));
     box-sizing: border-box;
     margin-bottom: 0.6rem;
-    padding: 0 var(--mobile-page-topbar-x);
+    padding: var(--mobile-topbar-offset) var(--mobile-page-topbar-x) 0;
     background: linear-gradient(
         180deg,
         color-mix(in srgb, var(--fc-color-bg) var(--mobile-page-topbar-bg-visible-1), transparent) var(--mobile-page-topbar-bg-stop-1),
@@ -124,7 +124,7 @@
     align-items: center;
     flex: 0 0 auto;
     gap: 0;
-    min-height: var(--mobile-top-surface-size);
+    height: var(--mobile-top-surface-size);
     box-sizing: border-box;
     padding: 0.12rem;
     border: var(--mobile-border-medium);

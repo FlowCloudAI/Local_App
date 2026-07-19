@@ -7,7 +7,7 @@ const path = require('path')
 const ADB_WAIT_TIMEOUT_MS = 180000
 const CHECK_INTERVAL_MS = 3000
 const ADB_WAIT_TIMEOUT_SECONDS = Math.round(ADB_WAIT_TIMEOUT_MS / 1000)
-const DEV_SERVER_PORTS = [5175, 1421]
+const DEV_SERVER_PORTS = [5176, 1422]
 const PORT_RELEASE_TIMEOUT_MS = 10000
 const PROJECT_ROOT = path.resolve(__dirname, '..')
 

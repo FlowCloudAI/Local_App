@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 const devHost = process.env.TAURI_DEV_HOST || process.env.HOST || '127.0.0.1'
+const isAndroid = process.env.TAURI_ENV_PLATFORM === 'android'
+const devPort = isAndroid ? 5176 : 5175
+const hmrPort = isAndroid ? 1422 : 1421
 
 function normalizeModuleId(id: string): string {
     return id.replace(/\\/g, '/')
@@ -33,7 +36,7 @@ export default defineConfig({
     // 防止 Vite 清除 Rust 显示的错误
     clearScreen: false,
     server: {
-        port: 5175,
+        port: devPort,
         // Tauri 工作于固定端口，如果端口不可用则报错
         strictPort: true,
         // Android/iOS 开发模式下，Tauri 会注入 TAURI_DEV_HOST，前端必须监听该地址。
@@ -41,7 +44,7 @@ export default defineConfig({
         hmr: {
             protocol: 'ws',
             host: devHost,
-            port: 1421,
+            port: hmrPort,
         },
         watch: {
             // 告诉 Vite 忽略监听 `src-tauri` 目录

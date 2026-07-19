@@ -630,7 +630,6 @@
     background: var(--fc-color-bg);
 }
 
-.mobile-settings-menu,
 .mobile-settings-plugin-list {
     gap: 0;
     overflow: hidden;
