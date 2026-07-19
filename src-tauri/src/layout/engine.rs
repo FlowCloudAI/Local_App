@@ -136,41 +136,89 @@ fn layout_connected_component(
         })
         .collect::<Vec<_>>();
 
-    if cluster_layouts.len() == 1 {
-        return cluster_layouts
+    let mut layout = if cluster_layouts.len() == 1 {
+        cluster_layouts
             .pop()
-            .expect("single-cluster component should yield one layout");
+            .expect("single-cluster component should yield one layout")
+    } else {
+        let external_connection_counts =
+            cluster_external_connection_counts(cluster_layouts.len(), &decomposition.links);
+        let cluster_boxes = cluster_layouts
+            .iter()
+            .enumerate()
+            .map(|(index, layout)| ClusterBox {
+                width: layout.bounds.width,
+                height: layout.bounds.height,
+                area: (layout.bounds.width * layout.bounds.height).max(layout.estimated_area),
+                center_before: [layout.bounds.width * 0.5, layout.bounds.height * 0.5],
+                external_connection_count: external_connection_counts[index],
+                node_count: layout.node_indices.len(),
+            })
+            .collect::<Vec<_>>();
+        let cluster_ids = decomposition
+            .clusters
+            .iter()
+            .map(|cluster| cluster.cluster_id.clone())
+            .collect::<Vec<_>>();
+        let placement = layout_cluster_graph(
+            &component.component_id,
+            &cluster_boxes,
+            &decomposition.links,
+            &cluster_ids,
+            &prepared.resolved_params,
+        );
+
+        log_cluster_stage(component, &decomposition, &cluster_boxes, &placement);
+        assemble_cluster_component(prepared, component, cluster_layouts, &placement)
+    };
+
+    apply_component_edge_clearance(prepared, component, &mut layout);
+    layout
+}
+
+fn apply_component_edge_clearance(
+    prepared: &PreparedLayoutRequest,
+    component: &ConnectedComponentSpec,
+    layout: &mut ComponentLayout,
+) {
+    let passes = prepared.resolved_params.edge_clearance_passes;
+    if passes == 0 || component.edges.is_empty() || layout.positions.len() < 3 {
+        return;
     }
 
-    let external_connection_counts =
-        cluster_external_connection_counts(cluster_layouts.len(), &decomposition.links);
-    let cluster_boxes = cluster_layouts
+    let node_slot = layout
+        .node_indices
         .iter()
         .enumerate()
-        .map(|(index, layout)| ClusterBox {
-            width: layout.bounds.width,
-            height: layout.bounds.height,
-            area: (layout.bounds.width * layout.bounds.height).max(layout.estimated_area),
-            center_before: [layout.bounds.width * 0.5, layout.bounds.height * 0.5],
-            external_connection_count: external_connection_counts[index],
-            node_count: layout.node_indices.len(),
+        .map(|(slot, node_index)| (*node_index, slot))
+        .collect::<HashMap<_, _>>();
+    let local_edges = component
+        .edges
+        .iter()
+        .map(|edge| {
+            (
+                *node_slot
+                    .get(&edge.source)
+                    .expect("component edge source should exist in assembled layout"),
+                *node_slot
+                    .get(&edge.target)
+                    .expect("component edge target should exist in assembled layout"),
+            )
         })
         .collect::<Vec<_>>();
-    let cluster_ids = decomposition
-        .clusters
-        .iter()
-        .map(|cluster| cluster.cluster_id.clone())
-        .collect::<Vec<_>>();
-    let placement = layout_cluster_graph(
-        &component.component_id,
-        &cluster_boxes,
-        &decomposition.links,
-        &cluster_ids,
-        &prepared.resolved_params,
-    );
+    let seed = component_seed(prepared, &layout.node_indices);
 
-    log_cluster_stage(component, &decomposition, &cluster_boxes, &placement);
-    assemble_cluster_component(prepared, component, cluster_layouts, &placement)
+    if resolve_edge_clearance(
+        prepared,
+        &layout.node_indices,
+        &local_edges,
+        &mut layout.positions,
+        seed,
+        passes,
+    ) {
+        layout.bounds =
+            normalize_component_bounds(prepared, &layout.node_indices, &mut layout.positions);
+    }
 }
 
 fn layout_component(
@@ -470,8 +518,16 @@ fn apply_cluster_mirrors(
             for &(own_slot, other_cluster, other_slot) in &cross_edges[cluster_index] {
                 let own = clusters[cluster_index].positions[own_slot];
                 let mirrored = Vec2::new(
-                    if flip_x { 2.0 * center.x - own.x } else { own.x },
-                    if flip_y { 2.0 * center.y - own.y } else { own.y },
+                    if flip_x {
+                        2.0 * center.x - own.x
+                    } else {
+                        own.x
+                    },
+                    if flip_y {
+                        2.0 * center.y - own.y
+                    } else {
+                        own.y
+                    },
                 );
                 cost += (mirrored - clusters[other_cluster].positions[other_slot]).length();
             }
@@ -611,6 +667,132 @@ fn resolve_collisions(
     any_overlap
 }
 
+fn closest_point_on_segment(point: Vec2, start: Vec2, end: Vec2, min_distance: f64) -> (Vec2, f64) {
+    let segment = end - start;
+    let length_squared = segment.dot(segment);
+    if length_squared <= min_distance * min_distance {
+        return ((start + end) * 0.5, 0.5);
+    }
+
+    let t = ((point - start).dot(segment) / length_squared).clamp(0.0, 1.0);
+    (start + segment * t, t)
+}
+
+fn resolve_edge_clearance(
+    prepared: &PreparedLayoutRequest,
+    component_nodes: &[usize],
+    local_edges: &[(usize, usize)],
+    positions: &mut [Vec2],
+    component_seed: u64,
+    passes: usize,
+) -> bool {
+    // 端点只承担部分反作用，避免修一条边时把相邻关系整体推散。
+    const REACTION_FACTOR: f64 = 0.35;
+
+    if passes == 0 || local_edges.is_empty() || positions.len() < 3 {
+        return false;
+    }
+
+    let r = &prepared.resolved_params;
+    let strength = r.edge_clearance_strength.clamp(0.0, 1.0);
+    if strength <= r.min_distance {
+        return false;
+    }
+
+    let radius_factor = r.edge_clearance_radius_factor.max(0.0);
+    let margin = r.edge_clearance_margin.max(0.0);
+    let mut any_moved = false;
+    let mut completed_passes = 0usize;
+
+    for pass in 0..passes {
+        let mut pass_moved = false;
+
+        for (edge_index, &(source_slot, target_slot)) in local_edges.iter().enumerate() {
+            for slot in 0..positions.len() {
+                if slot == source_slot || slot == target_slot {
+                    continue;
+                }
+
+                let source = positions[source_slot];
+                let target = positions[target_slot];
+                let (nearest, t) =
+                    closest_point_on_segment(positions[slot], source, target, r.min_distance);
+                let delta = positions[slot] - nearest;
+                let distance = delta.length();
+                let clearance =
+                    prepared.nodes[component_nodes[slot]].radius * radius_factor + margin;
+                if distance + r.min_distance >= clearance {
+                    continue;
+                }
+
+                let deterministic = deterministic_unit(
+                    component_seed
+                        ^ r.edge_clearance_salt
+                        ^ ((edge_index as u64) << 32)
+                        ^ slot as u64,
+                );
+                let segment = target - source;
+                let normal = safe_direction(Vec2::new(-segment.y, segment.x), deterministic);
+                let fallback = if normal.dot(deterministic) < 0.0 {
+                    normal * -1.0
+                } else {
+                    normal
+                };
+                let direction = safe_direction(delta, fallback);
+                let movement = direction * ((clearance - distance) * strength);
+
+                positions[slot] += movement;
+                positions[source_slot] -= movement * (REACTION_FACTOR * (1.0 - t));
+                positions[target_slot] -= movement * (REACTION_FACTOR * t);
+                pass_moved = true;
+                any_moved = true;
+            }
+        }
+
+        if !pass_moved {
+            break;
+        }
+        completed_passes = pass + 1;
+        let _ = resolve_collisions(
+            prepared,
+            component_nodes,
+            positions,
+            component_seed ^ r.edge_clearance_salt ^ pass as u64,
+            2,
+        );
+    }
+
+    if log::log_enabled!(log::Level::Debug) {
+        let mut residual = 0usize;
+        for &(source_slot, target_slot) in local_edges {
+            for slot in 0..positions.len() {
+                if slot == source_slot || slot == target_slot {
+                    continue;
+                }
+                let (nearest, _) = closest_point_on_segment(
+                    positions[slot],
+                    positions[source_slot],
+                    positions[target_slot],
+                    r.min_distance,
+                );
+                let clearance =
+                    prepared.nodes[component_nodes[slot]].radius * radius_factor + margin;
+                if (positions[slot] - nearest).length() + r.min_distance < clearance {
+                    residual += 1;
+                }
+            }
+        }
+        log::debug!(
+            "layout edge-clearance component={} passes={} residual={}",
+            component_key_from_node_indices(prepared, component_nodes),
+            completed_passes,
+            residual,
+        );
+    }
+
+    any_moved
+}
+
 fn build_local_topology(
     node_count: usize,
     local_edges: &[LocalEdgeLayout],
@@ -642,7 +824,8 @@ fn compact_component_shape(
             return;
         };
         // 长宽比兜底：pathish 低的混合结构跑成瘦长条时，仍按展布比触发主轴压实
-        let aspect = principal_axis_aspect(prepared, component_nodes, positions, centroid, major_axis);
+        let aspect =
+            principal_axis_aspect(prepared, component_nodes, positions, centroid, major_axis);
         let trigger = r.aspect_compaction_trigger.max(1.0);
         let aspect_boost = if aspect > trigger {
             r.aspect_compaction_max * ((aspect / trigger) - 1.0).min(1.0)
@@ -1516,5 +1699,178 @@ mod tests {
                 assert!(distance + 1e-6 >= left_radius + right_radius);
             }
         }
+    }
+
+    fn distance_to_segment(point: Vec2, start: Vec2, end: Vec2) -> f64 {
+        let edge = end - start;
+        let length_squared = edge.dot(edge);
+        if length_squared <= 1e-12 {
+            return (point - start).length();
+        }
+
+        let t = ((point - start).dot(edge) / length_squared).clamp(0.0, 1.0);
+        (point - (start + edge * t)).length()
+    }
+
+    fn edge_clearance_violation_count(
+        prepared: &super::PreparedLayoutRequest,
+        response: &crate::layout::types::LayoutResponse,
+        clearance_ratio: f64,
+    ) -> usize {
+        let centers = prepared
+            .nodes
+            .iter()
+            .map(|node| {
+                let position = response
+                    .positions
+                    .get(&node.id)
+                    .expect("position should exist");
+                Vec2::new(
+                    position.x + node.width * 0.5,
+                    position.y + node.height * 0.5,
+                )
+            })
+            .collect::<Vec<_>>();
+        let mut violations = 0usize;
+
+        for edge in &prepared.layout_edges {
+            for (slot, node) in prepared.nodes.iter().enumerate() {
+                if slot == edge.source || slot == edge.target {
+                    continue;
+                }
+                let clearance = (node.radius
+                    * prepared.resolved_params.edge_clearance_radius_factor
+                    + prepared.resolved_params.edge_clearance_margin)
+                    * clearance_ratio;
+                let distance =
+                    distance_to_segment(centers[slot], centers[edge.source], centers[edge.target]);
+                if distance < clearance {
+                    violations += 1;
+                }
+            }
+        }
+
+        violations
+    }
+
+    #[test]
+    fn pushes_node_out_of_edge_clearance() {
+        let mut prepared = prepare_request(LayoutRequest {
+            node_origin: None,
+            nodes: vec![
+                node("a", 40.0, 40.0),
+                node("b", 40.0, 40.0),
+                node("c", 40.0, 40.0),
+            ],
+            edges: vec![edge("a", "b")],
+            params: None,
+        });
+        prepared.resolved_params.edge_clearance_margin = 8.0;
+        prepared.resolved_params.edge_clearance_radius_factor = 0.7;
+        prepared.resolved_params.edge_clearance_strength = 0.5;
+        let component_nodes = vec![0usize, 1, 2];
+        let local_edges = vec![(0usize, 1usize)];
+        // c 恰在线段上，覆盖退化方向的确定性法线回退。
+        let mut positions = vec![
+            Vec2::new(-200.0, 0.0),
+            Vec2::new(200.0, 0.0),
+            Vec2::new(0.0, 0.0),
+        ];
+
+        let moved = super::resolve_edge_clearance(
+            &prepared,
+            &component_nodes,
+            &local_edges,
+            &mut positions,
+            42,
+            6,
+        );
+
+        let clearance = prepared.nodes[2].radius
+            * prepared.resolved_params.edge_clearance_radius_factor
+            + prepared.resolved_params.edge_clearance_margin;
+        let distance = distance_to_segment(positions[2], positions[0], positions[1]);
+        assert!(moved);
+        assert!(
+            positions
+                .iter()
+                .all(|position| position.x.is_finite() && position.y.is_finite())
+        );
+        assert!(
+            distance >= clearance - 0.5,
+            "distance={distance}, clearance={clearance}"
+        );
+    }
+
+    #[test]
+    fn zero_edge_clearance_passes_leave_positions_unchanged() {
+        let prepared = prepare_request(LayoutRequest {
+            node_origin: None,
+            nodes: vec![
+                node("a", 40.0, 40.0),
+                node("b", 40.0, 40.0),
+                node("c", 40.0, 40.0),
+            ],
+            edges: vec![edge("a", "b")],
+            params: None,
+        });
+        let component_nodes = vec![0usize, 1, 2];
+        let local_edges = vec![(0usize, 1usize)];
+        let original = vec![
+            Vec2::new(-200.0, 0.0),
+            Vec2::new(200.0, 0.0),
+            Vec2::new(0.0, 0.0),
+        ];
+        let mut positions = original.clone();
+
+        let moved = super::resolve_edge_clearance(
+            &prepared,
+            &component_nodes,
+            &local_edges,
+            &mut positions,
+            42,
+            0,
+        );
+
+        assert!(!moved);
+        assert_eq!(positions, original);
+    }
+
+    #[test]
+    fn final_layout_keeps_non_endpoint_nodes_clear_of_edges() {
+        let request = LayoutRequest {
+            node_origin: None,
+            nodes: vec![
+                node("hub", 48.0, 48.0),
+                node("leaf-1", 48.0, 48.0),
+                node("leaf-2", 48.0, 48.0),
+                node("leaf-3", 48.0, 48.0),
+                node("leaf-4", 48.0, 48.0),
+                node("leaf-5", 48.0, 48.0),
+                node("chain-1", 48.0, 48.0),
+                node("chain-2", 48.0, 48.0),
+                node("chain-3", 48.0, 48.0),
+            ],
+            edges: vec![
+                edge("hub", "leaf-1"),
+                edge("hub", "leaf-2"),
+                edge("hub", "leaf-3"),
+                edge("hub", "leaf-4"),
+                edge("hub", "leaf-5"),
+                edge("leaf-1", "chain-1"),
+                edge("chain-1", "chain-2"),
+                edge("chain-2", "chain-3"),
+            ],
+            params: None,
+        };
+
+        let mut disabled = prepare_request(request.clone());
+        disabled.resolved_params.edge_clearance_passes = 0;
+        let disabled_response = compute_layout(&disabled);
+        assert!(edge_clearance_violation_count(&disabled, &disabled_response, 0.9) > 0);
+
+        let prepared = prepare_request(request);
+        let response = compute_layout(&prepared);
+        assert_eq!(edge_clearance_violation_count(&prepared, &response, 0.9), 0);
     }
 }

@@ -11,6 +11,19 @@ pub const COLLISION_PASSES_PER_ITERATION: usize = 5;
 /// 调大：最终输出更确保无重叠，收敛更慢；调小：极端情况下可能残留重叠。
 pub const FINAL_COLLISION_PASSES: usize = 40;
 
+/// 非端点节点与关系边之间额外保留的净空。
+/// 调大：边更不容易贴近无关节点；调小：布局更紧凑，但边可能擦过节点。
+pub const EDGE_CLEARANCE_MARGIN: f64 = 8.0;
+/// 节点碰撞半径折算为边净空半径的比例。
+/// 调大：大节点对邻近边的排斥范围更大；调小：减弱碰撞圆高估带来的过度推移。
+pub const EDGE_CLEARANCE_RADIUS_FACTOR: f64 = 0.7;
+/// 单遍边净空违规的修正强度。
+/// 调大：更快推开违规节点，但回胀更明显；调小：修正更温和，可能需要更多遍数。
+pub const EDGE_CLEARANCE_STRENGTH: f64 = 0.5;
+/// 边净空后处理的最大遍数；设为 0 可关闭整个阶段。
+/// 调大：复杂交叉结构修正更充分但耗时增加；调小：更快结束，可能残留违规。
+pub const EDGE_CLEARANCE_PASSES: usize = 12;
+
 /// 密度对基础理想边长的放大系数。
 /// 调大：边越密集的图，节点被撑得越开；调小：密度对边长的影响减弱。
 pub const EDGE_LENGTH_ALPHA_RHO: f64 = 0.7;
@@ -190,3 +203,5 @@ pub const FINAL_COLLISION_SALT: u64 = 0xC011_1DE5;
 /// 碰撞方向退化时使用的确定性扰动盐值。
 /// 修改：会改变碰撞处理中方向退化时的回退方向，影响节点分离路径。
 pub const COLLISION_DIRECTION_SALT: u64 = 0xD15A_51DE;
+/// 边净空退化方向使用的确定性扰动盐值。
+pub const EDGE_CLEARANCE_SALT: u64 = 0xED6E_C1EA_2026_0719;

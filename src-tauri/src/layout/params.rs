@@ -265,7 +265,8 @@ pub fn derive_edge_layout_params(
                 + r.degree_edge_length_scale
                     * (hub_degree - DEGREE_EDGE_LENGTH_THRESHOLD).max(0.0))
             .min(r.degree_edge_length_max_factor);
-            let target_length = collision_floor.max(params.fr_scale * length_factor * degree_factor);
+            let target_length =
+                collision_floor.max(params.fr_scale * length_factor * degree_factor);
             let attraction_weight = if edge.is_two_way {
                 r.two_way_attraction_weight
             } else {

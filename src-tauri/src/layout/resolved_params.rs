@@ -7,6 +7,10 @@ pub struct ResolvedLayoutParams {
     pub node_gap: f64,
     pub collision_passes_per_iteration: usize,
     pub final_collision_passes: usize,
+    pub edge_clearance_margin: f64,
+    pub edge_clearance_radius_factor: f64,
+    pub edge_clearance_strength: f64,
+    pub edge_clearance_passes: usize,
     pub edge_length_alpha_rho: f64,
     pub edge_length_alpha_cv: f64,
     pub edge_length_min: f64,
@@ -54,6 +58,7 @@ pub struct ResolvedLayoutParams {
     pub attractive_direction_salt: u64,
     pub final_collision_salt: u64,
     pub collision_direction_salt: u64,
+    pub edge_clearance_salt: u64,
     pub temperature_decay_min: f64,
     pub temperature_decay_max: f64,
     pub gravity_strength: f64,
@@ -76,6 +81,22 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.final_collision_passes)
                 .unwrap_or(FINAL_COLLISION_PASSES),
+            edge_clearance_margin: p
+                .as_ref()
+                .and_then(|x| x.edge_clearance_margin)
+                .unwrap_or(EDGE_CLEARANCE_MARGIN),
+            edge_clearance_radius_factor: p
+                .as_ref()
+                .and_then(|x| x.edge_clearance_radius_factor)
+                .unwrap_or(EDGE_CLEARANCE_RADIUS_FACTOR),
+            edge_clearance_strength: p
+                .as_ref()
+                .and_then(|x| x.edge_clearance_strength)
+                .unwrap_or(EDGE_CLEARANCE_STRENGTH),
+            edge_clearance_passes: p
+                .as_ref()
+                .and_then(|x| x.edge_clearance_passes)
+                .unwrap_or(EDGE_CLEARANCE_PASSES),
             edge_length_alpha_rho: p
                 .as_ref()
                 .and_then(|x| x.edge_length_alpha_rho)
@@ -264,6 +285,7 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.collision_direction_salt)
                 .unwrap_or(COLLISION_DIRECTION_SALT),
+            edge_clearance_salt: EDGE_CLEARANCE_SALT,
             temperature_decay_min: TEMPERATURE_DECAY_MIN,
             temperature_decay_max: TEMPERATURE_DECAY_MAX,
             gravity_strength: GRAVITY_STRENGTH,

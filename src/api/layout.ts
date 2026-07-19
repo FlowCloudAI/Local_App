@@ -20,6 +20,10 @@ export interface LayoutParamsPayload {
     nodeGap?: number
     collisionPassesPerIteration?: number
     finalCollisionPasses?: number
+    edgeClearanceMargin?: number
+    edgeClearanceRadiusFactor?: number
+    edgeClearanceStrength?: number
+    edgeClearancePasses?: number
     edgeLengthAlphaRho?: number
     edgeLengthAlphaCv?: number
     edgeLengthMin?: number

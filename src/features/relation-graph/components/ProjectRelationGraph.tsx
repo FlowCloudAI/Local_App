@@ -54,6 +54,10 @@ type LayoutParamKey =
     | 'nodeGap'
     | 'collisionPassesPerIteration'
     | 'finalCollisionPasses'
+    | 'edgeClearanceMargin'
+    | 'edgeClearanceRadiusFactor'
+    | 'edgeClearanceStrength'
+    | 'edgeClearancePasses'
     | 'edgeLengthAlphaRho'
     | 'edgeLengthAlphaCv'
     | 'edgeLengthMin'
@@ -111,6 +115,10 @@ const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
     nodeGap: 28,
     collisionPassesPerIteration: 5,
     finalCollisionPasses: 40,
+    edgeClearanceMargin: 8,
+    edgeClearanceRadiusFactor: 0.7,
+    edgeClearanceStrength: 0.5,
+    edgeClearancePasses: 12,
     edgeLengthAlphaRho: 0.7,
     edgeLengthAlphaCv: 0.5,
     edgeLengthMin: 100,
@@ -165,6 +173,15 @@ const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}>
             {key: 'isolatedNodeHorizontalGap', label: '孤立节点间距', min: 0, step: 4},
             {key: 'clusterBoxGap', label: '簇盒间距', min: 0, step: 4},
             {key: 'shelfRowMaxWidth', label: '单行宽度', min: 300, step: 50},
+        ],
+    },
+    {
+        title: '边净空',
+        fields: [
+            {key: 'edgeClearanceMargin', label: '净空余量', min: 0, step: 2},
+            {key: 'edgeClearanceRadiusFactor', label: '半径折算', min: 0, max: 2, step: 0.05},
+            {key: 'edgeClearanceStrength', label: '推移强度', min: 0, max: 1, step: 0.05},
+            {key: 'edgeClearancePasses', label: '遍数', min: 0, step: 1, integer: true},
         ],
     },
     {
