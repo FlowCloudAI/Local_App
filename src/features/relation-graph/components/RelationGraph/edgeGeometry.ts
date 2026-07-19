@@ -29,6 +29,8 @@ const REVERSE_CURVATURE_SCALE = 6.25;
 const EDGE_NODE_CLEARANCE = 6;
 /** 曲线折线化后的检测段数；节点尺寸远大于单段误差。 */
 const EDGE_COLLISION_SEGMENTS = 24;
+/** 直线仍受阻时，依次尝试两侧弧线的法向偏移（px）。 */
+const EDGE_REROUTE_OFFSETS = [0, 24, -24, 48, -48, 72, -72];
 
 /** 标签字体，与 RelationGraph.css 的 .fc-rg-edge-label 对齐（--fc-font-size-xs, 11px）。 */
 const LABEL_FONT = '11px sans-serif';
@@ -495,17 +497,28 @@ export function computeEdgeGeometries(nodes: Node[], edges: Edge[]): Map<string,
 
         let cubic: Cubic = [sx, sy, c1x, c1y, c2x, c2y, tx, ty];
         if (cubicTouchesOtherNode(cubic, rects, item.edge.source, item.edge.target)) {
-            // 后端已经为节点中心连线留出净空；仅把外鼓违规的曲线退回共线控制点。
-            cubic = [
-                sx,
-                sy,
-                sx + (tx - sx) / 3,
-                sy + (ty - sy) / 3,
-                sx + (2 * (tx - sx)) / 3,
-                sy + (2 * (ty - sy)) / 3,
-                tx,
-                ty,
-            ];
+            const dx = tx - sx;
+            const dy = ty - sy;
+            const length = Math.hypot(dx, dy) || 1;
+            const normalX = -dy / length;
+            const normalY = dx / length;
+            // ponytail: 稀疏关系图只试固定双侧弧线；候选全被挡住时再升级为障碍物寻路。
+            for (const offset of EDGE_REROUTE_OFFSETS) {
+                const candidate: Cubic = [
+                    sx,
+                    sy,
+                    sx + dx / 3 + normalX * offset,
+                    sy + dy / 3 + normalY * offset,
+                    sx + (2 * dx) / 3 + normalX * offset,
+                    sy + (2 * dy) / 3 + normalY * offset,
+                    tx,
+                    ty,
+                ];
+                if (offset === 0) cubic = candidate;
+                if (cubicTouchesOtherNode(candidate, rects, item.edge.source, item.edge.target)) continue;
+                cubic = candidate;
+                break;
+            }
         }
         const path = `M ${cubic[0]},${cubic[1]} C ${cubic[2]},${cubic[3]} ${cubic[4]},${cubic[5]} ${cubic[6]},${cubic[7]}`;
         const [labelX, labelY] = cubicPointAt(cubic, 0.5);

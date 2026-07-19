@@ -57,14 +57,29 @@ const nodes = [
 const edges = [{ id: 'source-target', source: 'source', target: 'target', data: {} }];
 const geometry = computeEdgeGeometries(nodes, edges).get('source-target');
 const unobstructedGeometry = computeEdgeGeometries(nodes.slice(0, 2), edges).get('source-target');
+const blockingObstacle = { x: 395, y: 395, w: 10, h: 10 };
+const blockingNodes = nodes.map(node => node.id === 'obstacle'
+    ? {
+        ...node,
+        position: { x: blockingObstacle.x, y: blockingObstacle.y },
+        measured: { width: blockingObstacle.w, height: blockingObstacle.h },
+    }
+    : node);
+const reroutedGeometry = computeEdgeGeometries(blockingNodes, edges).get('source-target');
 
 assert.ok(geometry, '应为已测量端点生成边路径');
 assert.ok(unobstructedGeometry, '应为无障碍边生成路径');
+assert.ok(reroutedGeometry, '应为直线也受阻的边生成路径');
 assert.equal(isStraight(parseCubic(unobstructedGeometry.path)), false, '无障碍边应保留原有曲率');
 assert.equal(
     curveTouchesRect(parseCubic(geometry.path), obstacle),
     false,
     '边路径不得蹭到非端点节点',
+);
+assert.equal(
+    curveTouchesRect(parseCubic(reroutedGeometry.path), blockingObstacle),
+    false,
+    '直线受阻时应改走安全弧线',
 );
 
 console.log('边几何回归检查通过');
