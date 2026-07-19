@@ -46,6 +46,8 @@ export interface LayoutParamsPayload {
     pathishLeafPullMax?: number
     pathishBranchSmoothingMax?: number
     postLayoutCompactionPasses?: number
+    aspectCompactionTrigger?: number
+    aspectCompactionMax?: number
     earlyStopThreshold?: number
     earlyStopStreak?: number
     componentGap?: number
@@ -59,6 +61,7 @@ export interface LayoutParamsPayload {
     clusterTemperatureDecay?: number
     clusterIterations?: number
     clusterTwoWayBonus?: number
+    clusterHorizontalStretch?: number
     fixedRandomSeed?: number
     minDistance?: number
     attractiveDirectionSalt?: number

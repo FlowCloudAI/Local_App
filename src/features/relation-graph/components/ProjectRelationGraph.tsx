@@ -80,6 +80,8 @@ type LayoutParamKey =
     | 'pathishLeafPullMax'
     | 'pathishBranchSmoothingMax'
     | 'postLayoutCompactionPasses'
+    | 'aspectCompactionTrigger'
+    | 'aspectCompactionMax'
     | 'earlyStopThreshold'
     | 'earlyStopStreak'
     | 'componentGap'
@@ -93,6 +95,7 @@ type LayoutParamKey =
     | 'clusterTemperatureDecay'
     | 'clusterIterations'
     | 'clusterTwoWayBonus'
+    | 'clusterHorizontalStretch'
 
 interface LayoutParamField {
     key: LayoutParamKey
@@ -134,6 +137,8 @@ const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
     pathishLeafPullMax: 0.34,
     pathishBranchSmoothingMax: 0.28,
     postLayoutCompactionPasses: 5,
+    aspectCompactionTrigger: 1.6,
+    aspectCompactionMax: 0.22,
     earlyStopThreshold: 0.14,
     earlyStopStreak: 12,
     componentGap: 84,
@@ -147,6 +152,7 @@ const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
     clusterTemperatureDecay: 0.95,
     clusterIterations: 80,
     clusterTwoWayBonus: 0.35,
+    clusterHorizontalStretch: 1.3,
 }
 
 const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}> = [
@@ -198,6 +204,8 @@ const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}>
             {key: 'pathishLeafPullMax', label: '叶节点回拽', min: 0, max: 1, step: 0.02},
             {key: 'pathishBranchSmoothingMax', label: '枝条平滑', min: 0, max: 1, step: 0.02},
             {key: 'postLayoutCompactionPasses', label: '后处理压缩轮数', min: 0, step: 1, integer: true},
+            {key: 'aspectCompactionTrigger', label: '长宽比触发阈值', min: 1, max: 5, step: 0.1},
+            {key: 'aspectCompactionMax', label: '长宽比压实强度', min: 0, max: 0.42, step: 0.02},
         ],
     },
     {
@@ -210,6 +218,7 @@ const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}>
             {key: 'clusterTemperatureDecay', label: '簇温度衰减', min: 0.5, max: 0.999, step: 0.005},
             {key: 'clusterIterations', label: '簇迭代轮数', min: 1, step: 5, integer: true},
             {key: 'clusterTwoWayBonus', label: '跨簇双向奖励', min: 0, step: 0.05},
+            {key: 'clusterHorizontalStretch', label: '簇横向偏置', min: 1, max: 2.5, step: 0.05},
         ],
     },
 ]

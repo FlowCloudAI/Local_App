@@ -33,6 +33,8 @@ pub struct ResolvedLayoutParams {
     pub pathish_leaf_pull_max: f64,
     pub pathish_branch_smoothing_max: f64,
     pub post_layout_compaction_passes: usize,
+    pub aspect_compaction_trigger: f64,
+    pub aspect_compaction_max: f64,
     pub early_stop_threshold: f64,
     pub early_stop_streak: usize,
     pub component_gap: f64,
@@ -46,6 +48,7 @@ pub struct ResolvedLayoutParams {
     pub cluster_temperature_decay: f64,
     pub cluster_iterations: usize,
     pub cluster_two_way_bonus: f64,
+    pub cluster_horizontal_stretch: f64,
     pub fixed_random_seed: u64,
     pub min_distance: f64,
     pub attractive_direction_salt: u64,
@@ -177,6 +180,14 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.post_layout_compaction_passes)
                 .unwrap_or(POST_LAYOUT_COMPACTION_PASSES),
+            aspect_compaction_trigger: p
+                .as_ref()
+                .and_then(|x| x.aspect_compaction_trigger)
+                .unwrap_or(ASPECT_COMPACTION_TRIGGER),
+            aspect_compaction_max: p
+                .as_ref()
+                .and_then(|x| x.aspect_compaction_max)
+                .unwrap_or(ASPECT_COMPACTION_MAX),
             early_stop_threshold: p
                 .as_ref()
                 .and_then(|x| x.early_stop_threshold)
@@ -229,6 +240,10 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.cluster_two_way_bonus)
                 .unwrap_or(CLUSTER_TWO_WAY_BONUS),
+            cluster_horizontal_stretch: p
+                .as_ref()
+                .and_then(|x| x.cluster_horizontal_stretch)
+                .unwrap_or(CLUSTER_HORIZONTAL_STRETCH),
             fixed_random_seed: p
                 .as_ref()
                 .and_then(|x| x.fixed_random_seed)

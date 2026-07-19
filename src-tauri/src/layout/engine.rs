@@ -641,8 +641,17 @@ fn compact_component_shape(
         else {
             return;
         };
-        let axis_strength =
-            (params.axis_compaction_strength * (0.7 + 0.3 * linearity)).clamp(0.0, 0.42);
+        // 长宽比兜底：pathish 低的混合结构跑成瘦长条时，仍按展布比触发主轴压实
+        let aspect = principal_axis_aspect(prepared, component_nodes, positions, centroid, major_axis);
+        let trigger = r.aspect_compaction_trigger.max(1.0);
+        let aspect_boost = if aspect > trigger {
+            r.aspect_compaction_max * ((aspect / trigger) - 1.0).min(1.0)
+        } else {
+            0.0
+        };
+        let axis_strength = (params.axis_compaction_strength * (0.7 + 0.3 * linearity))
+            .max(aspect_boost)
+            .clamp(0.0, 0.42);
         let radial_strength =
             (params.radial_pull_strength * (0.65 + 0.35 * linearity)).clamp(0.0, 0.28);
         let branch_strength = params.branch_smoothing_strength.clamp(0.0, 0.32);
@@ -782,6 +791,33 @@ fn apply_branch_compaction(
             positions[slot] += shift;
         }
     }
+}
+
+/// 分量沿主轴/次轴的半展布之比（各加平均节点半径），衡量"瘦长程度"。
+/// 用主轴系而非 x/y 包围盒，斜向拉长的分量同样能被识别。
+fn principal_axis_aspect(
+    prepared: &PreparedLayoutRequest,
+    component_nodes: &[usize],
+    positions: &[Vec2],
+    centroid: Vec2,
+    major_axis: Vec2,
+) -> f64 {
+    let minor_axis = Vec2::new(-major_axis.y, major_axis.x);
+    let mut long_extent = 0.0_f64;
+    let mut short_extent = 0.0_f64;
+    for position in positions {
+        let relative = *position - centroid;
+        long_extent = long_extent.max(relative.dot(major_axis).abs());
+        short_extent = short_extent.max(relative.dot(minor_axis).abs());
+    }
+
+    let mean_radius = component_nodes
+        .iter()
+        .map(|&node_index| prepared.nodes[node_index].radius)
+        .sum::<f64>()
+        / component_nodes.len().max(1) as f64;
+    (long_extent + mean_radius)
+        / (short_extent + mean_radius).max(prepared.resolved_params.min_distance)
 }
 
 fn principal_axis_signature(positions: &[Vec2], min_distance: f64) -> Option<(Vec2, Vec2, f64)> {
@@ -1290,6 +1326,100 @@ mod tests {
 
         assert!(after_extent < before_extent);
         assert!(after_extent < 220.0);
+    }
+
+    #[test]
+    fn compacts_elongated_components_without_pathish_score() {
+        let mut prepared = prepare_request(LayoutRequest {
+            node_origin: None,
+            nodes: vec![
+                node("a", 48.0, 48.0),
+                node("b", 48.0, 48.0),
+                node("c", 48.0, 48.0),
+                node("d", 48.0, 48.0),
+            ],
+            edges: vec![edge("a", "b"), edge("b", "c"), edge("c", "d")],
+            params: None,
+        });
+        let component_nodes = vec![0usize, 1, 2, 3];
+        let local_edges = vec![
+            super::LocalEdgeLayout {
+                source: 0,
+                target: 1,
+                target_length: 120.0,
+                attraction_weight: 1.0,
+            },
+            super::LocalEdgeLayout {
+                source: 1,
+                target: 2,
+                target_length: 120.0,
+                attraction_weight: 1.0,
+            },
+            super::LocalEdgeLayout {
+                source: 2,
+                target: 3,
+                target_length: 120.0,
+                attraction_weight: 1.0,
+            },
+        ];
+        let topology = build_local_topology(component_nodes.len(), &local_edges);
+        // pathish 四项强度全零：只有长宽比兜底能驱动压实
+        let zero_pathish = ComponentLayoutParams {
+            axis_compaction_strength: 0.0,
+            radial_pull_strength: 0.0,
+            leaf_pull_strength: 0.0,
+            branch_smoothing_strength: 0.0,
+            ..compaction_params()
+        };
+        let diagonal_line = vec![
+            Vec2::new(-240.0, -240.0),
+            Vec2::new(-80.0, -80.0),
+            Vec2::new(80.0, 80.0),
+            Vec2::new(240.0, 240.0),
+        ];
+
+        // 对照：触发阈值调到不可达 → 早退，位置完全不变
+        prepared.resolved_params.aspect_compaction_trigger = 1000.0;
+        let mut untouched = diagonal_line.clone();
+        compact_component_shape(
+            &prepared,
+            &component_nodes,
+            &mut untouched,
+            42,
+            &topology,
+            &zero_pathish,
+        );
+        assert_eq!(untouched, diagonal_line);
+
+        // 默认阈值：斜向瘦长分量沿主轴收缩
+        prepared.resolved_params.aspect_compaction_trigger = 1.6;
+        let mut positions = diagonal_line.clone();
+        let (centroid, major_axis, _) =
+            principal_axis_signature(&positions, prepared.resolved_params.min_distance)
+                .expect("signature should exist");
+        let before_extent = positions
+            .iter()
+            .map(|position| (*position - centroid).dot(major_axis).abs())
+            .fold(0.0_f64, f64::max);
+
+        compact_component_shape(
+            &prepared,
+            &component_nodes,
+            &mut positions,
+            42,
+            &topology,
+            &zero_pathish,
+        );
+
+        let (centroid, major_axis, _) =
+            principal_axis_signature(&positions, prepared.resolved_params.min_distance)
+                .expect("signature should exist");
+        let after_extent = positions
+            .iter()
+            .map(|position| (*position - centroid).dot(major_axis).abs())
+            .fold(0.0_f64, f64::max);
+
+        assert!(after_extent < before_extent * 0.6);
     }
 
     #[test]

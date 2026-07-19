@@ -173,6 +173,8 @@ pub fn layout_cluster_graph(
     let mut centers =
         initial_cluster_centers(component_id, boxes, links, cluster_ids, main_cluster, r);
     let mut temperature = r.cluster_temperature_initial;
+    // 横向偏置：纵向向心力乘 stretch、横向除 stretch，让多簇分量倾向横向铺开
+    let stretch = r.cluster_horizontal_stretch.max(0.1);
 
     for _ in 0..r.cluster_iterations {
         let mut displacements = vec![Vec2::default(); boxes.len()];
@@ -222,11 +224,15 @@ pub fn layout_cluster_graph(
         }
 
         for (index, displacement) in displacements.iter_mut().enumerate() {
-            if index == main_cluster {
-                *displacement -= centers[index] * r.cluster_center_pull;
+            let pull = if index == main_cluster {
+                r.cluster_center_pull
             } else {
-                *displacement -= centers[index] * (r.cluster_center_pull * 1.15);
-            }
+                r.cluster_center_pull * 1.15
+            };
+            *displacement -= Vec2::new(
+                centers[index].x * pull / stretch,
+                centers[index].y * pull * stretch,
+            );
         }
 
         for (index, displacement) in displacements.iter().enumerate() {
@@ -410,6 +416,7 @@ fn initial_cluster_centers(
     let phase = unit_angle(fnv64(component_id.as_bytes()) ^ r.fixed_random_seed);
     let base_radius =
         boxes[main_cluster].width.max(boxes[main_cluster].height) * 0.5 + r.cluster_box_gap;
+    let stretch = r.cluster_horizontal_stretch.max(0.1);
     let mut centers = vec![Vec2::default(); boxes.len()];
 
     centers[main_cluster] = Vec2::default();
@@ -420,7 +427,11 @@ fn initial_cluster_centers(
         let ring = ((rank as f64).sqrt().floor() + 1.0).max(1.0);
         let angle = phase + TAU * (rank as f64) / (order.len().max(1) as f64);
         let radius = base_radius + ring * (r.cluster_link_distance_base * 0.7);
-        centers[cluster_index] = Vec2::new(radius * angle.cos(), radius * angle.sin());
+        // 初始同心环拉成横向椭圆，与向心力的横向偏置方向一致
+        centers[cluster_index] = Vec2::new(
+            radius * angle.cos() * stretch,
+            radius * angle.sin() / stretch,
+        );
     }
 
     centers
