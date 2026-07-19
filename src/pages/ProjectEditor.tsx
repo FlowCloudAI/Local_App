@@ -64,6 +64,7 @@ import ProjectCoverPickerModal from '../features/project-editor/components/Proje
 import type {AiMissingPluginKind} from '../shared/ui/AiPluginMissingOverlay'
 import {SidebarResizeHandle} from '../shared/ui/layout/SidebarResizeHandle'
 import {useResizableSidebar} from '../shared/ui/layout/useResizableSidebar'
+import {ProjectHomeIcon} from '../shared/ui/ProjectHomeIcon'
 import ProjectTimeline from '../features/project-editor/components/ProjectTimeline'
 import ProjectRelationGraph from '../features/relation-graph/components/ProjectRelationGraph'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
@@ -1168,9 +1169,7 @@ function ProjectEditorInner({
                                 aria-pressed={selectedKey === ROOT_ID}
                                 onClick={handleBreadcrumbProjectClick}
                             >
-                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                    <path d="M4 11.4 12 5l8 6.4v7.1a1.5 1.5 0 0 1-1.5 1.5h-4.2v-5.1H9.7V20H5.5A1.5 1.5 0 0 1 4 18.5z"/>
-                                </svg>
+                                <ProjectHomeIcon/>
                                 <span>项目主页</span>
                             </button>
                             <div className="pe-tree-panel__tree">

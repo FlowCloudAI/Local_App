@@ -10,6 +10,7 @@ import {
 import {useDrag} from '@use-gesture/react'
 import {Input, useAlert} from 'flowcloudai-ui'
 import {logger} from '../../../shared/logger'
+import {ProjectHomeIcon} from '../../../shared/ui/ProjectHomeIcon'
 import {
     db_cascade_delete_category,
     db_create_category,
@@ -34,7 +35,6 @@ import {
     getGesturePointerId,
     getGesturePointerType,
     getSortedSiblings,
-    HomeIcon,
     parentKey,
     ROW_DRAG_START_DISTANCE,
     ROW_DRAG_VERTICAL_DOMINANCE,
@@ -110,7 +110,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
     const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories])
     const entryCountMap = useMemo(() => getEntryCountMap(stats), [stats])
     const normalizedSearch = searchText.trim().toLocaleLowerCase('zh-CN')
-    const showProjectHomeRow = !normalizedSearch || '项目首页'.includes(normalizedSearch)
+    const showProjectHomeRow = !normalizedSearch || '项目主页'.includes(normalizedSearch)
     const showDefaultRow = !normalizedSearch || '默认分类'.includes(normalizedSearch)
 
     const notifyChanged = useCallback(async () => {
@@ -663,14 +663,11 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         role="treeitem"
                         aria-selected={selected.kind === 'projectHome'}
                         className={`mobile-category-drawer__row mobile-category-drawer__row--home${selected.kind === 'projectHome' ? ' is-active' : ''}`}
-                        onClick={() => onSelect({kind: 'projectHome'}, '项目首页')}
+                        onClick={() => onSelect({kind: 'projectHome'}, '项目主页')}
                     >
                         <span className="mobile-category-drawer__toggle-placeholder"/>
-                        <HomeIcon/>
-                        <span className="mobile-category-drawer__text">
-                            <strong>项目首页</strong>
-                            <small>项目概览</small>
-                        </span>
+                        <ProjectHomeIcon className="mobile-category-drawer__home-icon"/>
+                        <span className="mobile-category-drawer__text">项目主页</span>
                     </button>
                 )}
 
@@ -683,10 +680,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                         onClick={() => onSelect({kind: 'uncategorized'}, '默认分类')}
                     >
                         <span className="mobile-category-drawer__toggle-placeholder"/>
-                        <span className="mobile-category-drawer__text">
-                            <strong>默认分类</strong>
-                            <small>{stats?.uncategorizedEntryCount ?? 0} 个词条</small>
-                        </span>
+                        <span className="mobile-category-drawer__text">默认分类</span>
                     </button>
                 )}
 
@@ -731,12 +725,7 @@ export default function MobileCategoryDrawer({projectId, categories, stats, sele
                                 {...bindCategoryDrag(category)}
                                 onClick={(event) => handleCategoryRowClick(event, category)}
                             >
-                                <span className="mobile-category-drawer__text">
-                                    <strong>{category.name}</strong>
-                                    <small>
-                                        {entryCountMap.get(category.id) ?? 0} 个词条{childCount > 0 ? ` · ${childCount} 个子分类` : ''}
-                                    </small>
-                                </span>
+                                <span className="mobile-category-drawer__text">{category.name}</span>
                             </button>
                             <button
                                 type="button"
