@@ -433,7 +433,7 @@ fn assemble_cluster_component(
     }
 
     apply_cluster_mirrors(component, &mut positioned_clusters, placement);
-    orient_terminal_pairs(prepared, component, &mut positioned_clusters);
+    orient_terminal_nodes(prepared, component, &mut positioned_clusters);
 
     for cluster_layout in &positioned_clusters {
         for (slot, &node_index) in cluster_layout.node_indices.iter().enumerate() {
@@ -554,9 +554,9 @@ fn apply_cluster_mirrors(
     }
 }
 
-/// 把有唯一外联锚点的双节点末端簇转入已有水平空位。锚点和其他簇不动，
+/// 把有唯一外联锚点的末端节点转入已有水平空位。锚点和其他簇不动，
 /// 候选只有在不增加整体宽高且不制造碰撞/边净空违规时才会被接受。
-fn orient_terminal_pairs(
+fn orient_terminal_nodes(
     prepared: &PreparedLayoutRequest,
     component: &ConnectedComponentSpec,
     clusters: &mut [ComponentLayout],
@@ -573,7 +573,7 @@ fn orient_terminal_pairs(
     }
 
     let mut internal_edge_counts = vec![0usize; clusters.len()];
-    let mut cross_edges = vec![Vec::<(usize, usize)>::new(); clusters.len()];
+    let mut cross_edges = vec![Vec::<(usize, usize, usize)>::new(); clusters.len()];
     for edge in &component.edges {
         let Some(&(source_cluster, source_slot)) = locate.get(&edge.source) else {
             continue;
@@ -584,12 +584,11 @@ fn orient_terminal_pairs(
         if source_cluster == target_cluster {
             internal_edge_counts[source_cluster] += 1;
         } else {
-            cross_edges[source_cluster].push((source_slot, target_cluster));
-            cross_edges[target_cluster].push((target_slot, source_cluster));
+            cross_edges[source_cluster].push((source_slot, target_cluster, target_slot));
+            cross_edges[target_cluster].push((target_slot, source_cluster, source_slot));
         }
     }
 
-    // ponytail: 首版只处理双节点末端簇；确认三节点末端链仍竖排时再扩展到整条路径。
     for cluster_index in 0..clusters.len() {
         if clusters[cluster_index].node_indices.len() != 2
             || internal_edge_counts[cluster_index] != 1
@@ -598,120 +597,172 @@ fn orient_terminal_pairs(
             continue;
         }
 
-        let (anchor_slot, neighbor_cluster) = cross_edges[cluster_index][0];
+        let (anchor_slot, neighbor_cluster, _) = cross_edges[cluster_index][0];
         if cross_edges[cluster_index]
             .iter()
-            .any(|&(slot, other_cluster)| slot != anchor_slot || other_cluster != neighbor_cluster)
+            .any(|&(slot, other_cluster, _)| {
+                slot != anchor_slot || other_cluster != neighbor_cluster
+            })
         {
             continue;
         }
 
-        let tail_slot = 1usize.saturating_sub(anchor_slot);
-        let tail_node_index = clusters[cluster_index].node_indices[tail_slot];
-        let anchor_node_index = clusters[cluster_index].node_indices[anchor_slot];
-        let anchor = clusters[cluster_index].positions[anchor_slot];
-        let original = clusters[cluster_index].positions[tail_slot];
-        let distance = (original - anchor).length();
-        if distance <= prepared.resolved_params.min_distance {
+        let tail_slot = if anchor_slot == 0 { 1 } else { 0 };
+        if let Some((candidate, _)) = best_horizontal_terminal_candidate(
+            prepared,
+            component,
+            clusters,
+            &locate,
+            (cluster_index, tail_slot),
+            (cluster_index, anchor_slot),
+        ) {
+            clusters[cluster_index].positions[tail_slot] = candidate;
+        }
+    }
+
+    // ponytail: 单节点末端每个分量只移动收益最大的一个；需要协同换位时再扩展。
+    let mut best_singleton = None::<(f64, usize, usize, Vec2)>;
+    for cluster_index in 0..clusters.len() {
+        if clusters[cluster_index].node_indices.len() != 1 || cross_edges[cluster_index].len() != 1
+        {
             continue;
         }
+        let (tail_slot, anchor_cluster, anchor_slot) = cross_edges[cluster_index][0];
+        let Some((candidate, area_reduction)) = best_horizontal_terminal_candidate(
+            prepared,
+            component,
+            clusters,
+            &locate,
+            (cluster_index, tail_slot),
+            (anchor_cluster, anchor_slot),
+        ) else {
+            continue;
+        };
+        if best_singleton
+            .as_ref()
+            .is_none_or(|(best_reduction, _, _, _)| area_reduction > *best_reduction + 1e-9)
+        {
+            best_singleton = Some((area_reduction, cluster_index, tail_slot, candidate));
+        }
+    }
 
-        let (current_width, current_height) = assembled_dimensions(prepared, clusters, None);
-        let mut best = original;
-        let mut best_area = current_width * current_height;
-        let candidates = [
-            Vec2::new(anchor.x - distance, anchor.y),
-            Vec2::new(anchor.x + distance, anchor.y),
-        ];
+    if let Some((_, cluster_index, tail_slot, candidate)) = best_singleton {
+        clusters[cluster_index].positions[tail_slot] = candidate;
+    }
+}
 
-        'candidate: for candidate in candidates {
-            let position_of = |node_index: usize| {
-                let (other_cluster, other_slot) = locate[&node_index];
-                if other_cluster == cluster_index && other_slot == tail_slot {
-                    candidate
-                } else {
-                    clusters[other_cluster].positions[other_slot]
-                }
-            };
-            let tail_node = &prepared.nodes[tail_node_index];
+fn best_horizontal_terminal_candidate(
+    prepared: &PreparedLayoutRequest,
+    component: &ConnectedComponentSpec,
+    clusters: &[ComponentLayout],
+    locate: &HashMap<usize, (usize, usize)>,
+    tail: (usize, usize),
+    anchor: (usize, usize),
+) -> Option<(Vec2, f64)> {
+    let (tail_cluster, tail_slot) = tail;
+    let (anchor_cluster, anchor_slot) = anchor;
+    let tail_node_index = clusters[tail_cluster].node_indices[tail_slot];
+    let anchor_node_index = clusters[anchor_cluster].node_indices[anchor_slot];
+    let anchor_position = clusters[anchor_cluster].positions[anchor_slot];
+    let original = clusters[tail_cluster].positions[tail_slot];
+    let distance = (original - anchor_position).length();
+    if distance <= prepared.resolved_params.min_distance {
+        return None;
+    }
 
-            for (&node_index, &(other_cluster, other_slot)) in &locate {
-                if node_index == tail_node_index {
-                    continue;
-                }
-                let other_node = &prepared.nodes[node_index];
-                let other_position = clusters[other_cluster].positions[other_slot];
-                if (candidate - other_position).length() + prepared.resolved_params.min_distance
-                    < tail_node.radius + other_node.radius
-                {
-                    continue 'candidate;
-                }
+    let (current_width, current_height) = assembled_dimensions(prepared, clusters, None);
+    let current_area = current_width * current_height;
+    let mut best = None;
+    let mut best_area = current_area;
+    let candidates = [
+        Vec2::new(anchor_position.x - distance, anchor_position.y),
+        Vec2::new(anchor_position.x + distance, anchor_position.y),
+    ];
+
+    'candidate: for candidate in candidates {
+        let position_of = |node_index: usize| {
+            let (other_cluster, other_slot) = locate[&node_index];
+            if other_cluster == tail_cluster && other_slot == tail_slot {
+                candidate
+            } else {
+                clusters[other_cluster].positions[other_slot]
             }
+        };
+        let tail_node = &prepared.nodes[tail_node_index];
 
-            for edge in &component.edges {
-                if edge.source == tail_node_index || edge.target == tail_node_index {
-                    continue;
-                }
-                let (nearest, _) = closest_point_on_segment(
-                    candidate,
-                    position_of(edge.source),
-                    position_of(edge.target),
-                    prepared.resolved_params.min_distance,
-                );
-                let clearance = tail_node.radius
-                    * prepared
-                        .resolved_params
-                        .edge_clearance_radius_factor
-                        .max(0.0)
-                    + prepared.resolved_params.edge_clearance_margin.max(0.0);
-                if (candidate - nearest).length() + prepared.resolved_params.min_distance
-                    < clearance
-                {
-                    continue 'candidate;
-                }
-            }
-
-            for (&node_index, _) in &locate {
-                if node_index == tail_node_index || node_index == anchor_node_index {
-                    continue;
-                }
-                let (nearest, _) = closest_point_on_segment(
-                    position_of(node_index),
-                    anchor,
-                    candidate,
-                    prepared.resolved_params.min_distance,
-                );
-                let clearance = prepared.nodes[node_index].radius
-                    * prepared
-                        .resolved_params
-                        .edge_clearance_radius_factor
-                        .max(0.0)
-                    + prepared.resolved_params.edge_clearance_margin.max(0.0);
-                if (position_of(node_index) - nearest).length()
-                    + prepared.resolved_params.min_distance
-                    < clearance
-                {
-                    continue 'candidate;
-                }
-            }
-
-            let (width, height) = assembled_dimensions(
-                prepared,
-                clusters,
-                Some((cluster_index, tail_slot, candidate)),
-            );
-            if width > current_width + 1e-9 || height > current_height + 1e-9 {
+        for (&node_index, &(other_cluster, other_slot)) in locate {
+            if node_index == tail_node_index {
                 continue;
             }
-            let area = width * height;
-            if area + 1e-9 < best_area {
-                best = candidate;
-                best_area = area;
+            let other_node = &prepared.nodes[node_index];
+            let other_position = clusters[other_cluster].positions[other_slot];
+            if (candidate - other_position).length() + prepared.resolved_params.min_distance
+                < tail_node.radius + other_node.radius
+            {
+                continue 'candidate;
             }
         }
 
-        clusters[cluster_index].positions[tail_slot] = best;
+        for edge in &component.edges {
+            if edge.source == tail_node_index || edge.target == tail_node_index {
+                continue;
+            }
+            let (nearest, _) = closest_point_on_segment(
+                candidate,
+                position_of(edge.source),
+                position_of(edge.target),
+                prepared.resolved_params.min_distance,
+            );
+            let clearance = tail_node.radius
+                * prepared
+                    .resolved_params
+                    .edge_clearance_radius_factor
+                    .max(0.0)
+                + prepared.resolved_params.edge_clearance_margin.max(0.0);
+            if (candidate - nearest).length() + prepared.resolved_params.min_distance < clearance {
+                continue 'candidate;
+            }
+        }
+
+        for &node_index in locate.keys() {
+            if node_index == tail_node_index || node_index == anchor_node_index {
+                continue;
+            }
+            let (nearest, _) = closest_point_on_segment(
+                position_of(node_index),
+                anchor_position,
+                candidate,
+                prepared.resolved_params.min_distance,
+            );
+            let clearance = prepared.nodes[node_index].radius
+                * prepared
+                    .resolved_params
+                    .edge_clearance_radius_factor
+                    .max(0.0)
+                + prepared.resolved_params.edge_clearance_margin.max(0.0);
+            if (position_of(node_index) - nearest).length() + prepared.resolved_params.min_distance
+                < clearance
+            {
+                continue 'candidate;
+            }
+        }
+
+        let (width, height) = assembled_dimensions(
+            prepared,
+            clusters,
+            Some((tail_cluster, tail_slot, candidate)),
+        );
+        if width > current_width + 1e-9 || height > current_height + 1e-9 {
+            continue;
+        }
+        let area = width * height;
+        if area + 1e-9 < best_area {
+            best = Some(candidate);
+            best_area = area;
+        }
     }
+
+    best.map(|candidate| (candidate, current_area - best_area))
 }
 
 fn assembled_dimensions(
@@ -1500,7 +1551,7 @@ mod tests {
 
     #[test]
     fn orients_terminal_pair_into_free_horizontal_space_only() {
-        use super::{ComponentBounds, ComponentLayout, orient_terminal_pairs};
+        use super::{ComponentBounds, ComponentLayout, orient_terminal_nodes};
         use crate::layout::cluster::{ClusterEdgeRef, ConnectedComponentSpec};
 
         let prepared = prepare_request(LayoutRequest {
@@ -1552,16 +1603,96 @@ mod tests {
         };
 
         let mut free = vec![pair.clone(), surrounding.clone()];
-        orient_terminal_pairs(&prepared, &component, &mut free);
+        orient_terminal_nodes(&prepared, &component, &mut free);
         assert_eq!(free[0].positions[0], Vec2::new(0.0, 0.0));
         assert_eq!(free[0].positions[1], Vec2::new(-200.0, 0.0));
         assert_eq!(free[1].positions, surrounding.positions);
 
         let mut blocked = vec![pair, surrounding];
         blocked[1].positions = vec![Vec2::new(200.0, 0.0), Vec2::new(-200.0, 0.0)];
-        orient_terminal_pairs(&prepared, &component, &mut blocked);
+        orient_terminal_nodes(&prepared, &component, &mut blocked);
         assert_eq!(blocked[0].positions[0], Vec2::new(0.0, 0.0));
         assert_eq!(blocked[0].positions[1], Vec2::new(0.0, -200.0));
+    }
+
+    #[test]
+    fn orients_only_the_best_terminal_singleton() {
+        use super::{ComponentBounds, ComponentLayout, orient_terminal_nodes};
+        use crate::layout::cluster::{ClusterEdgeRef, ConnectedComponentSpec};
+
+        let prepared = prepare_request(LayoutRequest {
+            node_origin: None,
+            nodes: vec![
+                node("top-leaf", 100.0, 50.0),
+                node("top-anchor", 100.0, 50.0),
+                node("right", 100.0, 50.0),
+                node("left", 100.0, 50.0),
+                node("bottom-leaf", 100.0, 50.0),
+                node("bottom-anchor", 100.0, 50.0),
+            ],
+            edges: Vec::new(),
+            params: None,
+        });
+        let component = ConnectedComponentSpec {
+            component_id: "terminal-singletons".to_string(),
+            node_indices: vec![0, 1, 2, 3, 4, 5],
+            edges: vec![
+                ClusterEdgeRef {
+                    source: 0,
+                    target: 1,
+                    is_two_way: false,
+                },
+                ClusterEdgeRef {
+                    source: 4,
+                    target: 5,
+                    is_two_way: false,
+                },
+            ],
+        };
+        let mut clusters = vec![
+            ComponentLayout {
+                node_indices: vec![0],
+                positions: vec![Vec2::new(0.0, -240.0)],
+                bounds: ComponentBounds {
+                    width: 100.0,
+                    height: 50.0,
+                },
+                estimated_area: 5_000.0,
+                is_isolated: false,
+            },
+            ComponentLayout {
+                node_indices: vec![1, 2, 3, 5],
+                positions: vec![
+                    Vec2::new(0.0, 0.0),
+                    Vec2::new(500.0, 0.0),
+                    Vec2::new(-500.0, 0.0),
+                    Vec2::new(0.0, 200.0),
+                ],
+                bounds: ComponentBounds {
+                    width: 1_100.0,
+                    height: 250.0,
+                },
+                estimated_area: 275_000.0,
+                is_isolated: false,
+            },
+            ComponentLayout {
+                node_indices: vec![4],
+                positions: vec![Vec2::new(0.0, 400.0)],
+                bounds: ComponentBounds {
+                    width: 100.0,
+                    height: 50.0,
+                },
+                estimated_area: 5_000.0,
+                is_isolated: false,
+            },
+        ];
+        let unchanged_core = clusters[1].positions.clone();
+
+        orient_terminal_nodes(&prepared, &component, &mut clusters);
+
+        assert_eq!(clusters[0].positions[0], Vec2::new(-240.0, 0.0));
+        assert_eq!(clusters[1].positions, unchanged_core);
+        assert_eq!(clusters[2].positions[0], Vec2::new(0.0, 400.0));
     }
 
     #[test]
