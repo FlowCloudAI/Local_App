@@ -1725,7 +1725,7 @@ mod tests {
                 .map(|position| position.y)
                 .fold(f64::INFINITY, f64::min);
 
-        assert!(x_span > y_span, "chain should lie horizontally");
+        assert!(x_span > 3.0 * y_span, "chain should lie horizontally");
     }
 
     #[test]
