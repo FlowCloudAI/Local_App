@@ -5,6 +5,16 @@
     background: var(--fc-color-bg);
 }
 
+.mobile-entry-list:has(> .mobile-page__empty) {
+    display: flex;
+    flex-direction: column;
+}
+
+.mobile-entry-list > .mobile-page__empty {
+    flex: 1;
+    height: auto;
+}
+
 .mobile-entry-list__topbar {
     margin-bottom: 0.35rem;
 }

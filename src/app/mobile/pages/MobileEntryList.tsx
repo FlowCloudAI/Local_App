@@ -357,7 +357,7 @@ export default function MobileEntryList({push, pop, setAiFocus, pageKey, categor
             ) : entries.length === 0 ? (
                 <div className="mobile-page__empty">
                     <p>暂无词条</p>
-                    <Button type="button" size="sm" onClick={handleCreateEntry}>新建第一个词条</Button>
+                    <Button type="button" size="sm" radius="full" onClick={handleCreateEntry}>新建第一个词条</Button>
                 </div>
             ) : (
                 <div className="mobile-entry-list__grid">
