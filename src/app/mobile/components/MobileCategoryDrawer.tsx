@@ -732,7 +732,6 @@ export default function MobileCategoryDrawer({
                             ].filter(Boolean).join(' ')}
                             style={{'--mobile-category-drawer-depth': depth} as CSSProperties}
                             role="none"
-                            data-mobile-side-drawer-gesture-ignore="true"
                         >
                             <span className="mobile-category-drawer__indent-lines" aria-hidden="true"/>
                             <button
