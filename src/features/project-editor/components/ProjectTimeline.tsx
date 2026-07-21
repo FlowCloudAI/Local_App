@@ -403,7 +403,13 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
             )}
 
             {/* ── 主体 ── */}
-            {events.length === 0 ? (
+            {loading && !data ? (
+                <div className="fc-op-viewport-empty">
+                    <div className="fc-op-hint-block">
+                        <div className="fc-op-hint">正在加载时间线数据…</div>
+                    </div>
+                </div>
+            ) : events.length === 0 ? (
                 <div className="fc-op-viewport-empty">
                     <div className="fc-op-hint-block">
                         <div className="fc-op-hint">当前项目还没有可渲染的时间线事件。</div>
