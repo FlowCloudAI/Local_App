@@ -108,6 +108,14 @@ function normalizeError(error: unknown): Error {
     return error instanceof Error ? error : new Error(typeof error === 'string' ? error : '未知错误')
 }
 
+// 时间线用左右方向键切换事件；焦点落在可编辑元素时必须让行，否则会吞掉光标移动
+function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    if (target.isContentEditable) return true
+    const tagName = target.tagName
+    return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT'
+}
+
 function BackArrow() {
     return (
         <svg viewBox="0 0 16 16" aria-hidden="true" style={{width: 16, height: 16}}>
@@ -162,6 +170,10 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
     }, [tagSchemas])
 
     const events = useMemo(() => data?.events ?? [], [data])
+    const eventsRef = useRef(events)
+    useEffect(() => {
+        eventsRef.current = events
+    }, [events])
     const selectedEvent = useMemo(
         () => events.find((event) => event.id === selectedEventId) ?? null,
         [events, selectedEventId],
@@ -201,25 +213,29 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
             if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-            if (events.length === 0 || !selectedEventId) return
+            if (isEditableTarget(event.target)) return
 
-            const currentIndex = events.findIndex((item) => item.id === selectedEventId)
+            const currentEvents = eventsRef.current
+            const activeId = selectedEventIdRef.current
+            if (currentEvents.length === 0 || !activeId) return
+
+            const currentIndex = currentEvents.findIndex((item) => item.id === activeId)
             if (currentIndex < 0) return
 
             event.preventDefault()
             const nextIndex = event.key === 'ArrowLeft'
                 ? Math.max(0, currentIndex - 1)
-                : Math.min(events.length - 1, currentIndex + 1)
+                : Math.min(currentEvents.length - 1, currentIndex + 1)
 
             if (nextIndex !== currentIndex) {
                 shouldSyncEventStripRef.current = false
-                setSelectedEventId(events[nextIndex].id)
+                setSelectedEventId(currentEvents[nextIndex].id)
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [events, selectedEventId])
+    }, [])
 
     useEffect(() => {
         if (!selectedEventId) return
