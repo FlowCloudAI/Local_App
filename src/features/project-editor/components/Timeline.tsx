@@ -75,22 +75,28 @@ export function Timeline({
     const [zoomLevel, setZoomLevel] = useState(1)
     const [viewportWidth, setViewportWidth] = useState(0)
     const zoomAnchorRef = useRef<{ offsetX: number; contentX: number; scaleRatio: number } | null>(null)
+    const suppressAutoScrollRef = useRef(false)
 
     useEffect(() => {
         if (selectedKey === undefined) return
         setInternalSelectedId(selectedKey)
         if (!selectedKey) return
 
+        // 直接点击底部旗帜产生的选中不做自动滚动（旗帜已在光标处），避免时间线在
+        // 光标下跳动；来自事件列表/方向键的选中则滚到居中位置。
+        if (suppressAutoScrollRef.current) {
+            suppressAutoScrollRef.current = false
+            return
+        }
+
         const container = scrollRef.current
         const cardElement = document.getElementById(`event-card-${selectedKey}`)
         if (!container || !cardElement) return
 
-        // 容器 overflow-y 为 hidden：scrollIntoView({block:'center'}) 会带动外层纵向
-        // 滚动并裁掉无法滚回的内容。这里只按横轴把卡片居中，且仅在其超出可视区时滚动。
+        // 容器 overflow-y 为 hidden：不能用 scrollIntoView（会带动外层纵向滚动并裁掉
+        // 无法滚回的内容）。这里只按横轴把选中卡片滚到居中位置。
         const containerRect = container.getBoundingClientRect()
         const cardRect = cardElement.getBoundingClientRect()
-        if (cardRect.left >= containerRect.left && cardRect.right <= containerRect.right) return
-
         const cardContentLeft = cardRect.left - containerRect.left + container.scrollLeft
         const cardCenter = cardContentLeft + cardRect.width / 2
         const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth)
@@ -354,6 +360,9 @@ export function Timeline({
 
     const handleCardClick = (eventId: string, event: React.MouseEvent<HTMLDivElement>) => {
         if (onSelectedKeyChange) {
+            if (eventId !== currentSelectedId) {
+                suppressAutoScrollRef.current = true
+            }
             onSelectedKeyChange(eventId, {source: 'click', event})
         } else {
             setInternalSelectedId(eventId)
