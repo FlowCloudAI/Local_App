@@ -370,15 +370,25 @@ export function Timeline({
 
     const currentSelectedId = selectedKey !== undefined ? selectedKey : internalSelectedId
 
-    const handleCardClick = (eventId: string, event: React.MouseEvent<HTMLDivElement>) => {
+    const selectEvent = (eventId: string, meta: TimelineSelectedKeyChangeMeta) => {
         if (onSelectedKeyChange) {
             if (eventId !== currentSelectedId) {
                 suppressAutoScrollRef.current = true
             }
-            onSelectedKeyChange(eventId, {source: 'click', event})
+            onSelectedKeyChange(eventId, meta)
         } else {
             setInternalSelectedId(eventId)
         }
+    }
+
+    const handleCardClick = (eventId: string, event: React.MouseEvent<HTMLDivElement>) => {
+        selectEvent(eventId, {source: 'click', event})
+    }
+
+    const handleCardKeyDown = (eventId: string, event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return
+        event.preventDefault()
+        selectEvent(eventId, {source: 'keyboard'})
     }
 
     return (
@@ -456,12 +466,17 @@ export function Timeline({
                                 <div
                                     id={`event-card-${event.id}`}
                                     className={`flag-body ${isSelected ? 'selected' : ''}`}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-pressed={isSelected}
+                                    aria-label={event.title}
                                     style={{
                                         width: event.cardWidth,
                                         minWidth: MIN_CARD_WIDTH,
                                         maxWidth: MAX_CARD_WIDTH,
                                     }}
                                     onClick={(clickEvent) => handleCardClick(event.id, clickEvent)}
+                                    onKeyDown={(keyEvent) => handleCardKeyDown(event.id, keyEvent)}
                                 >
                                     <h3 className="flag-title">{event.title}</h3>
                                     {event.description && <p className="flag-desc">{event.description}</p>}

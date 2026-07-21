@@ -125,6 +125,11 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--fc-color-danger) 20%, transparent);
 }
 
+.flag-body:focus-visible {
+    outline: 2px solid var(--fc-color-primary);
+    outline-offset: 2px;
+}
+
 .flag-title {
     margin: 0;
     font-size: var(--fc-font-size-md);
