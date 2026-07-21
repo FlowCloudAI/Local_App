@@ -600,12 +600,24 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
         return visibleRecentItems[0] ?? null
     }, [dashboard.continueItem, isVisibleHomeTarget, visibleRecentItems])
+    const continueKey = continueItem ? getHomeActivityTargetKey(continueItem) : null
+    const continueActivity = continueKey
+        ? visibleRecentItems.find(item => getHomeActivityTargetKey(item) === continueKey)
+        : null
+    const lastSessionTarget = dashboard.lastSession?.target
+    const isLastSessionContinue = Boolean(
+        continueKey
+        && lastSessionTarget
+        && getHomeActivityTargetKey(lastSessionTarget) === continueKey,
+    )
+    const continueTimestamp = isLastSessionContinue
+        ? dashboard.lastSession?.savedAt
+        : continueActivity?.lastOpenedAt
     const recentItems = useMemo(() => {
-        const continueKey = continueItem ? getHomeActivityTargetKey(continueItem) : null
         return visibleRecentItems
             .filter(item => !continueKey || getHomeActivityTargetKey(item) !== continueKey)
-            .slice(0, 5)
-    }, [continueItem, visibleRecentItems])
+            .slice(0, continueItem ? 4 : 5)
+    }, [continueItem, continueKey, visibleRecentItems])
     const aiAssistantAction = quickActions.find(action => action.key === 'ai-chat')
     const ideaAction = quickActions.find(action => action.key === 'idea')
 
@@ -801,22 +813,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     <p>继续当前项目后，可以从词条、地图、时间线或 AI 讨论接着推进。</p>
                                 )}
                             </div>
-                            {continueItem && (
-                                <button
-                                    type="button"
-                                    className="project-home-continue-card"
-                                    onClick={() => openDashboardTarget(continueItem)}
-                                >
-                                    <span className="project-home-eyebrow">上次停在这里</span>
-                                    <div className="project-home-continue-card__topline">
-                                        <span className="project-home-continue-card__title">{continueItem.title}</span>
-                                    </div>
-                                    <p>
-                                        {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
-                                        {dashboard.lastSession?.savedAt ? ` · ${formatRelativeTime(dashboard.lastSession.savedAt)}` : ''}
-                                    </p>
-                                </button>
-                            )}
                         </div>
                     </section>
 
@@ -855,8 +851,26 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                     <div className="project-home-side">
                             <section className="project-home-panel">
                                 <h2>最近内容</h2>
-                                {recentItems.length > 0 ? (
+                                {continueItem || recentItems.length > 0 ? (
                                     <div className="project-home-recent-list">
+                                        {continueItem && (
+                                            <button
+                                                type="button"
+                                                className="project-home-recent-item project-home-recent-item--continue"
+                                                onClick={() => openDashboardTarget(continueItem)}
+                                            >
+                                                <span className="project-home-recent-item__continue-label">
+                                                    {isLastSessionContinue ? '上次停在这里' : '最近打开'}
+                                                </span>
+                                                <span className="project-home-recent-item__time">
+                                                    {formatRelativeTime(continueTimestamp)}
+                                                </span>
+                                                <span className="project-home-recent-item__type">
+                                                    {getTargetTypeLabel(continueItem.type)}
+                                                </span>
+                                                <span className="project-home-recent-item__title">{continueItem.title}</span>
+                                            </button>
+                                        )}
                                         {recentItems.map(renderRecentItem)}
                                     </div>
                                 ) : (
