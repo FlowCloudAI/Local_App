@@ -13,7 +13,7 @@
     overflow-x: auto;
     overflow-y: hidden;
     cursor: grab;
-    padding: var(--fc-space-md) 0;
+    padding: 0;
     background: var(--fc-color-bg);
     scroll-behavior: auto;
     user-select: none;

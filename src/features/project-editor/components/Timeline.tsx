@@ -74,6 +74,7 @@ export function Timeline({
     const [internalSelectedId, setInternalSelectedId] = useState<string | null>(defaultSelectedKey)
     const [zoomLevel, setZoomLevel] = useState(1)
     const [viewportWidth, setViewportWidth] = useState(0)
+    const [viewportHeight, setViewportHeight] = useState(0)
     const zoomAnchorRef = useRef<{ offsetX: number; contentX: number; scaleRatio: number } | null>(null)
     const suppressAutoScrollRef = useRef(false)
 
@@ -216,16 +217,14 @@ export function Timeline({
     }, [events, getBaseX, getX])
 
     const axisY = useMemo(() => {
-        if (!processedEvents.length) {
-            return TRACK_TOP_PADDING + FLAG_HEIGHT + AXIS_TOP_GAP
-        }
+        const contentAxisY = processedEvents.length
+            ? processedEvents.reduce((maxBottom, event) => Math.max(maxBottom, event.y + FLAG_HEIGHT), 0) + AXIS_TOP_GAP
+            : TRACK_TOP_PADDING + FLAG_HEIGHT + AXIS_TOP_GAP
 
-        const maxEventBottom = processedEvents.reduce((maxBottom, event) => {
-            return Math.max(maxBottom, event.y + FLAG_HEIGHT)
-        }, 0)
-
-        return maxEventBottom + AXIS_TOP_GAP
-    }, [processedEvents])
+        // 视口比内容高时把坐标轴下压到接近底部，让旗帜柱撑满、避免轴线下方留大片空白
+        const bottomAnchoredAxisY = viewportHeight - AXIS_LABEL_SPACE - TRACK_BOTTOM_PADDING
+        return Math.max(contentAxisY, bottomAnchoredAxisY)
+    }, [processedEvents, viewportHeight])
 
     const trackHeight = useMemo(() => {
         return axisY + AXIS_LABEL_SPACE + TRACK_BOTTOM_PADDING
@@ -292,15 +291,16 @@ export function Timeline({
     useEffect(() => {
         if (!scrollRef.current) return
 
-        const updateViewportWidth = () => {
+        const updateViewport = () => {
             if (!scrollRef.current) return
             setViewportWidth(scrollRef.current.clientWidth)
+            setViewportHeight(scrollRef.current.clientHeight)
         }
 
-        updateViewportWidth()
+        updateViewport()
 
         const resizeObserver = new ResizeObserver(() => {
-            updateViewportWidth()
+            updateViewport()
         })
 
         resizeObserver.observe(scrollRef.current)
