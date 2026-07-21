@@ -501,7 +501,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                         <div className="project-timeline__section-header project-timeline__section-header--timeline">
                             <div className="project-timeline__section-heading">
                                 <span className="project-timeline__section-title">时间线视图</span>
-                                <span className="project-timeline__section-copy">支持使用左右方向键切换当前聚焦事件。</span>
+                                <span className="project-timeline__section-copy">滚轮左右平移，Ctrl+滚轮或右上角按钮缩放，左右方向键切换聚焦事件。</span>
                             </div>
                             {selectedEvent && (
                                 <span className="project-timeline__selected-meta">

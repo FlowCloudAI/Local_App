@@ -261,22 +261,20 @@ export function Timeline({
     }, [minZoomLevel, zoomLevel])
 
     const interceptWheel = useCallback((event: WheelEvent, container: HTMLDivElement) => {
-        const rect = container.getBoundingClientRect()
-        const offsetY = event.clientY - rect.top
-        const offsetX = event.clientX - rect.left
-
-        // 仅在坐标轴一带用滚轮缩放；卡片区域的滚轮交给 RollingBox 做横向滚动
-        if (offsetY < axisY) {
+        // 普通滚轮交给 RollingBox 做横向平移；Ctrl/⌘ + 滚轮以光标为锚点缩放
+        if (!event.ctrlKey && !event.metaKey) {
             return false
         }
 
         event.preventDefault()
         event.stopPropagation()
 
+        const rect = container.getBoundingClientRect()
+        const offsetX = event.clientX - rect.left
         const direction = event.deltaY > 0 ? -1 : 1
         zoomTo(zoomLevel + direction * ZOOM_STEP, offsetX)
         return true
-    }, [axisY, zoomLevel, zoomTo])
+    }, [zoomLevel, zoomTo])
 
     // 按钮缩放以视口中心为锚点，保持中间内容稳定
     const handleZoomButton = useCallback((direction: 1 | -1) => {
