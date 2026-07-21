@@ -126,7 +126,7 @@ export default function MobileSettingsAboutSection({
                         <span className="mobile-settings-about-action__title">官网</span>
                         <span className="mobile-settings-about-action__desc">{officialSiteUrl}</span>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => onOpenOfficialUrl(officialSiteUrl)}>
+                    <Button type="button" variant="outline" size="sm" radius="full" onClick={() => onOpenOfficialUrl(officialSiteUrl)}>
                         打开
                     </Button>
                 </div>
@@ -135,7 +135,7 @@ export default function MobileSettingsAboutSection({
                         <span className="mobile-settings-about-action__title">官方 GitHub</span>
                         <span className="mobile-settings-about-action__desc">{officialGithubUrl}</span>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => onOpenOfficialUrl(officialGithubUrl)}>
+                    <Button type="button" variant="outline" size="sm" radius="full" onClick={() => onOpenOfficialUrl(officialGithubUrl)}>
                         打开
                     </Button>
                 </div>
@@ -144,7 +144,7 @@ export default function MobileSettingsAboutSection({
                         <span className="mobile-settings-about-action__title">官方邮箱</span>
                         <span className="mobile-settings-about-action__desc">{officialEmail}</span>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => void onCopyOfficialEmail()}>
+                    <Button type="button" variant="outline" size="sm" radius="full" onClick={() => void onCopyOfficialEmail()}>
                         复制
                     </Button>
                 </div>
@@ -159,6 +159,7 @@ export default function MobileSettingsAboutSection({
                         type="button"
                         variant="outline"
                         size="sm"
+                        radius="full"
                         onClick={onOpenLogViewer}
                     >
                         <span className="mobile-settings-button-content">
@@ -182,6 +183,7 @@ export default function MobileSettingsAboutSection({
                                 type="button"
                                 variant="outline"
                                 size="sm"
+                                radius="full"
                                 onClick={() => void onLoadAppLog()}
                                 disabled={logLoading}
                             >
@@ -194,6 +196,7 @@ export default function MobileSettingsAboutSection({
                                 type="button"
                                 variant="outline"
                                 size="sm"
+                                radius="full"
                                 onClick={() => void onCopyLog()}
                                 disabled={!logSnapshot?.content}
                             >
@@ -223,6 +226,7 @@ export default function MobileSettingsAboutSection({
             <Button
                 type="button"
                 variant="ghost"
+                radius="full"
                 onClick={onExit}
                 className="mobile-settings-exit-button"
             >

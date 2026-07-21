@@ -143,6 +143,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<Error | null>(null)
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+    const [timelineControlsContainer, setTimelineControlsContainer] = useState<HTMLDivElement | null>(null)
     const selectedEventIdRef = useRef<string | null>(null)
     const eventStripRef = useRef<HTMLDivElement | null>(null)
     const eventItemRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -278,30 +279,13 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
         setSelectedEventId(eventId)
     }, [])
 
-    const handleEventStripWheelIntercept = useCallback((event: WheelEvent, container: HTMLDivElement) => {
-        const rawDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
-        event.stopPropagation()
-
-        if (rawDelta === 0) return true
-
-        event.preventDefault()
-        const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-            ? rawDelta * 16
-            : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-                ? rawDelta * container.clientWidth
-                : rawDelta
-
-        container.scrollLeft += delta
-        return true
-    }, [])
-
     const timelineEvents = useMemo<TimelineEvent[]>(
         () => events.map((event) => ({
             id: event.id,
             title: event.title,
             startTime: event.startTime,
             endTime: event.endTime ?? undefined,
-            description: event.description ?? undefined,
+            description: formatRange(event),
             parentId: event.parentId ?? undefined,
         })),
         [events],
@@ -334,8 +318,11 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                 <span className="project-timeline__stats-value">{buildRangeText(data)}</span>
             </div>
             {matchedTagCount > 0 && (
-                <div className="project-timeline__stats-block">
-                    <span className="project-timeline__stats-label">识别标签</span>
+                <details className="project-timeline__stats-block project-timeline__stats-details">
+                    <summary className="project-timeline__stats-label">
+                        识别规则
+                        <span>{matchedTagCount}</span>
+                    </summary>
                     <span className="project-timeline__stats-value">
                         {[
                             matchedSchemaNames.start.length > 0 ? `开始 ${matchedSchemaNames.start.join('、')}` : '',
@@ -344,7 +331,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                             matchedSchemaNames.show.length > 0 ? `显示 ${matchedSchemaNames.show.join('、')}` : '',
                         ].filter(Boolean).join('；')}
                     </span>
-                </div>
+                </details>
             )}
         </div>
     ) : (
@@ -377,13 +364,13 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                     {selectedEvent && onOpenEntry && (
                         <Button type="button"
                             size="sm"
-                            variant="outline"
+                            variant="primary"
                             onClick={() => onOpenEntry({id: selectedEvent.id, title: selectedEvent.title})}
                         >
                             打开当前词条
                         </Button>
                     )}
-                    <Button type="button" size="sm" variant="outline" onClick={() => void loadTimeline()} disabled={loading}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => void loadTimeline()} disabled={loading}>
                         {loading ? '刷新中' : '刷新'}
                     </Button>
                 </div>
@@ -456,8 +443,8 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                             className="project-timeline__event-strip"
                             axis="x"
                             thumbSize="thin"
-                            showThumb="auto"
-                            interceptWheel={handleEventStripWheelIntercept}
+                            showThumb="show"
+                            showTrack
                             role="list"
                             aria-label="时间线事件列表"
                         >
@@ -501,13 +488,29 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                         <div className="project-timeline__section-header project-timeline__section-header--timeline">
                             <div className="project-timeline__section-heading">
                                 <span className="project-timeline__section-title">时间线视图</span>
-                                <span className="project-timeline__section-copy">上方滚轮左右平移，底部色带内滚轮缩放（也支持 Ctrl+滚轮与右上角按钮），左右方向键切换聚焦事件。</span>
+                                <span className="project-timeline__section-copy">滚轮平移 · Ctrl/⌘ + 滚轮缩放 · ←/→ 切换事件</span>
                             </div>
-                            {selectedEvent && (
-                                <span className="project-timeline__selected-meta">
-                                    当前：{selectedEvent.title} · {formatRange(selectedEvent)}
-                                </span>
-                            )}
+                            <div className="project-timeline__timeline-header-actions">
+                                {selectedEvent && (
+                                    <div
+                                        className="project-timeline__selected-meta"
+                                        title={`${selectedEvent.title} · ${formatRange(selectedEvent)}${selectedEvent.description?.trim() ? ` · ${selectedEvent.description.trim()}` : ''}`}
+                                    >
+                                        <span className="project-timeline__selected-title">
+                                            {selectedEvent.title} · {formatRange(selectedEvent)}
+                                        </span>
+                                        {selectedEvent.description?.trim() && (
+                                            <span className="project-timeline__selected-summary">
+                                                {selectedEvent.description.trim()}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                                <div
+                                    ref={setTimelineControlsContainer}
+                                    className="project-timeline__zoom-host"
+                                />
+                            </div>
                         </div>
                         <div className="project-timeline__timeline-shell">
                             <Timeline
@@ -516,6 +519,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                                 yearEnd={data?.yearEnd ?? Math.max(...timelineEvents.map((event) => event.endTime ?? event.startTime))}
                                 selectedKey={selectedEventId}
                                 onSelectedKeyChange={handleTimelineSelect}
+                                controlsContainer={timelineControlsContainer}
                             />
                         </div>
                     </section>

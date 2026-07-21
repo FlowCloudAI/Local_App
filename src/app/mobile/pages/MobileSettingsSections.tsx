@@ -280,6 +280,7 @@ export function MobileSettingsAiSection({
                         onValueChange={v => onSelectedPluginChange(String(v ?? ''))}
                         options={pluginOptions}
                         placeholder="选择插件"
+                        radius="full"
                     />
                 </div>
                 <div>
@@ -289,6 +290,7 @@ export function MobileSettingsAiSection({
                         onValueChange={v => onSelectedModelChange(String(v ?? ''))}
                         options={modelOptions}
                         placeholder="选择模型"
+                        radius="full"
                     />
                 </div>
                 <div className="mobile-settings-api-key">
@@ -309,6 +311,7 @@ export function MobileSettingsAiSection({
                         onValueChange={v => onSelectedApiKeyPluginChange(String(v ?? ''))}
                         options={apiKeyPluginOptions}
                         placeholder="选择需要配置密钥的插件"
+                        radius="full"
                     />
                     <Input
                         type="password"
@@ -383,6 +386,7 @@ export function MobileSettingsPluginsSection({
                     type="button"
                     size="md"
                     variant="outline"
+                    radius="full"
                     onClick={() => void onRefreshPluginSources()}
                     disabled={pluginSourcesRefreshing}
                 >
@@ -424,6 +428,7 @@ export function MobileSettingsPluginsSection({
                         type="button"
                         size="sm"
                         variant="outline"
+                        radius="full"
                         onClick={() => void onInstallFromFile()}
                         disabled={installingLocalFile}
                     >
@@ -488,6 +493,7 @@ export function MobileSettingsPluginsSection({
                                 <Button
                                     type="button"
                                     size="sm"
+                                    radius="full"
                                     variant={installed && !hasUpdate ? 'outline' : 'primary'}
                                     disabled={actionDisabled}
                                     onClick={() => void onInstallMarketPlugin(plugin.id)}
@@ -526,6 +532,7 @@ export function MobileSettingsAppearanceSection({
                         onValueChange={v => onThemeChange(String(v ?? 'system') as 'system' | 'light' | 'dark')}
                         options={themeOptions}
                         placeholder="选择主题"
+                        radius="full"
                     />
                 </div>
                 <div>
@@ -535,6 +542,7 @@ export function MobileSettingsAppearanceSection({
                         onValueChange={v => onLanguageChange(String(v ?? 'zh-CN'))}
                         options={languageOptions}
                         placeholder="选择语言"
+                        radius="full"
                     />
                 </div>
                 <div>
@@ -592,7 +600,7 @@ export function MobileSettingsUsageSection({
         return (
             <div className="mobile-settings-section">
                 <div className="mobile-settings-plugin-error">加载失败：{error}</div>
-                <Button type="button" size="sm" variant="outline" onClick={() => void onRefresh()}>
+                <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void onRefresh()}>
                     重试
                 </Button>
             </div>
@@ -603,7 +611,7 @@ export function MobileSettingsUsageSection({
         <div className="mobile-settings-section">
             <div className="mobile-settings-section__header">
                 <div className="mobile-settings-plugin-count">查看 AI 使用次数与消耗统计</div>
-                <Button type="button" size="sm" variant="outline" onClick={() => void onRefresh()} disabled={loading}>
+                <Button type="button" size="sm" variant="outline" radius="full" onClick={() => void onRefresh()} disabled={loading}>
                     {loading ? '刷新中…' : '刷新'}
                 </Button>
             </div>

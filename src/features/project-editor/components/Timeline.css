@@ -10,7 +10,7 @@
 }
 
 .timeline-scroll-area {
-    overflow-x: auto;
+    overflow-x: scroll;
     overflow-y: hidden;
     cursor: grab;
     padding: 0;
@@ -108,16 +108,21 @@
     z-index: 10;
 }
 
+.flag-event:hover,
+.flag-event:focus-within {
+    z-index: 1000 !important;
+}
+
 .flag-body {
     background: var(--fc-color-bg-elevated);
     border: 1px solid var(--fc-color-border);
     border-left: 3px solid var(--fc-color-primary);
     border-radius: var(--fc-radius-md);
     padding: var(--fc-space-sm) var(--fc-space-md);
-    box-shadow: var(--fc-shadow-xs);
+    box-shadow: var(--fc-shadow-sm);
     transition: all var(--fc-transition);
     cursor: pointer;
-    height: 70px;
+    height: 60px;
     box-sizing: border-box;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -201,7 +206,7 @@
     z-index: 5;
 }
 
-/* 浮层缩放控件：固定在时间线右上角，不随内容横向滚动 */
+/* 缩放控件默认悬浮；页面可将它挂载到标题栏 */
 .timeline-zoom {
     position: absolute;
     top: var(--fc-space-md);
@@ -216,6 +221,13 @@
     border: 1px solid var(--fc-color-border);
     box-shadow: var(--fc-shadow-sm);
     backdrop-filter: blur(4px);
+}
+
+.timeline-zoom--inline {
+    position: static;
+    z-index: auto;
+    flex-shrink: 0;
+    backdrop-filter: none;
 }
 
 .timeline-zoom__btn,
@@ -273,7 +285,7 @@
     }
 
     .flag-body {
-        height: 65px;
+        height: 60px;
     }
 
     .flag-title {

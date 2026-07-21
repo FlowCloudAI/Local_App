@@ -63,6 +63,44 @@
     padding: 9px 10px;
 }
 
+.project-timeline__stats-details {
+    display: block;
+}
+
+.project-timeline__stats-details > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-sm);
+    cursor: pointer;
+    list-style: none;
+}
+
+.project-timeline__stats-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.project-timeline__stats-details > summary::after {
+    content: '›';
+    font-size: var(--fc-font-size-md);
+    line-height: 1;
+    transition: transform var(--fc-transition);
+}
+
+.project-timeline__stats-details[open] > summary::after {
+    transform: rotate(90deg);
+}
+
+.project-timeline__stats-details > summary > span {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.project-timeline__stats-details .project-timeline__stats-value {
+    display: block;
+    margin-top: var(--fc-space-sm);
+}
+
 .project-timeline__stats-value {
     font-size: var(--fc-font-size-xs);
     line-height: 1.55;
@@ -97,8 +135,8 @@
 }
 
 .project-timeline__event-panel {
-    flex: 0 0 14rem;
-    min-height: 14rem;
+    flex: 0 0 11.25rem;
+    min-height: 11.25rem;
 }
 
 .project-timeline__timeline-panel {
@@ -118,6 +156,7 @@
 
 .project-timeline__section-header--timeline {
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .project-timeline__section-heading {
@@ -142,19 +181,53 @@
 }
 
 .project-timeline__selected-meta {
-    flex-shrink: 0;
+    display: flex;
+    min-width: 0;
+    max-width: clamp(16rem, 34vw, 34rem);
+    flex-direction: column;
+    gap: 0.1rem;
     text-align: right;
+}
+
+.project-timeline__selected-title,
+.project-timeline__selected-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.project-timeline__selected-title {
+    color: var(--fc-color-text);
+    font-weight: var(--fc-font-weight-medium);
+}
+
+.project-timeline__selected-summary {
+    color: var(--fc-color-text-tertiary);
+}
+
+.project-timeline__timeline-header-actions {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--fc-space-md);
+}
+
+.project-timeline__zoom-host {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
 }
 
 .project-timeline__event-strip {
     --roll-thumb-hover: var(--fc-color-scrollbar-thumb-hover);
     --roll-thumb-active: var(--fc-color-scrollbar-thumb-active);
-    --roll-track: transparent;
     --roll-size: 0.5rem;
     width: 100%;
     height: auto;
     max-width: 100%;
-    padding: var(--fc-space-md);
+    padding: var(--fc-space-sm) var(--fc-space-md);
     box-sizing: border-box;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
@@ -174,7 +247,7 @@
 .project-timeline__event-item {
     width: clamp(15rem, 22vw, 18.5rem);
     flex: 0 0 clamp(15rem, 22vw, 18.5rem);
-    min-height: 7.25rem;
+    min-height: 5rem;
     align-items: flex-start;
     gap: var(--fc-space-sm);
     padding: var(--fc-space-sm) var(--fc-space-md);
@@ -227,7 +300,7 @@
 }
 
 .project-timeline__event-item .fc-op-item__excerpt {
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 1;
 }
 
 .project-timeline__timeline-shell {
@@ -261,8 +334,8 @@
     }
 
     .project-timeline__event-panel {
-        flex-basis: 13rem;
-        min-height: 13rem;
+        flex-basis: 10.75rem;
+        min-height: 10.75rem;
     }
 
     .project-timeline__event-strip {
@@ -275,6 +348,11 @@
 
     .project-timeline__selected-meta {
         text-align: left;
+    }
+
+    .project-timeline__timeline-header-actions {
+        width: 100%;
+        flex-basis: 100%;
     }
 
     .project-timeline__event-strip.fc-roll .fc-roll__content {
@@ -297,8 +375,8 @@
     }
 
     .project-timeline__event-panel {
-        flex-basis: 12rem;
-        min-height: 12rem;
+        flex-basis: 11.5rem;
+        min-height: 11.5rem;
     }
 
     .project-timeline__event-strip.fc-roll .fc-roll__content {
@@ -308,8 +386,16 @@
     .project-timeline__event-item {
         width: clamp(12.5rem, 72vw, 14.5rem);
         flex-basis: clamp(12.5rem, 72vw, 14.5rem);
-        min-height: 6.75rem;
+        min-height: 4.75rem;
         padding: var(--fc-space-sm);
+    }
+
+    .project-timeline__timeline-header-actions {
+        align-items: flex-start;
+    }
+
+    .project-timeline__zoom-host {
+        align-self: flex-end;
     }
 
     .project-timeline__timeline-shell {

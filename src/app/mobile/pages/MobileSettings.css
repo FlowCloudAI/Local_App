@@ -228,7 +228,6 @@
 
 .mobile-settings-plugin-search-row .fc-btn {
     height: 3.05rem;
-    border-radius: var(--mobile-radius-field);
 }
 
 .mobile-settings-plugin-filter {

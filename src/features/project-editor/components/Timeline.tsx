@@ -1,5 +1,14 @@
 import React, {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {createPortal} from 'react-dom'
 import {RollingBox} from 'flowcloudai-ui'
+import {
+    calculateTimelineFitZoom,
+    calculateTimelineRowCapacity,
+    LEFT_OFFSET,
+    MAX_CARD_WIDTH,
+    MIN_CARD_WIDTH,
+    placeTimelineRows,
+} from './timelineGeometry'
 import './Timeline.css'
 
 export interface TimelineEvent {
@@ -29,23 +38,22 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLDivElement> {
     selectedKey?: string | null
     defaultSelectedKey?: string | null
     onSelectedKeyChange?: TimelineSelectedKeyChangeHandler
+    controlsContainer?: HTMLElement | null
 }
 
-const LEFT_OFFSET = 50
-const FLAG_HEIGHT = 70
+const FLAG_HEIGHT = 60
 const PX_PER_YEAR = 12
 const MIN_TRACK_WIDTH = 800
-const MIN_CARD_WIDTH = 160
-const MAX_CARD_WIDTH = 360
-const MIN_ZOOM = 0.05
 const MAX_ZOOM = 6
 const ZOOM_STEP = 0.15
 const TRACK_TOP_PADDING = 20
-const EVENT_ROW_GAP = 90
+const EVENT_ROW_GAP = 76
 const AXIS_TOP_GAP = 28
 const AXIS_LABEL_SPACE = 28
 const TRACK_BOTTOM_PADDING = 16
-const AXIS_WHEEL_ZONE = 44
+const AXIS_WHEEL_ZONE = 8
+const SINGLE_ROW_TRACK_HEIGHT = TRACK_TOP_PADDING + FLAG_HEIGHT + AXIS_TOP_GAP
+    + AXIS_LABEL_SPACE + TRACK_BOTTOM_PADDING + AXIS_WHEEL_ZONE
 
 const syncGroups = new Map<string, Set<React.RefObject<HTMLDivElement | null>>>()
 const syncLocks = new WeakMap<React.RefObject<HTMLDivElement | null>, boolean>()
@@ -64,6 +72,7 @@ export function Timeline({
                              selectedKey,
                              defaultSelectedKey = null,
                              onSelectedKeyChange,
+                             controlsContainer,
                              className,
                              style,
                              ...props
@@ -115,17 +124,13 @@ export function Timeline({
 
     const baseTrackWidth = useMemo(() => {
         const range = Math.max(currentEnd - currentStart, 1)
-        return Math.max(range * PX_PER_YEAR, MIN_TRACK_WIDTH)
-    }, [currentStart, currentEnd])
+        return Math.max(range * PX_PER_YEAR, MIN_TRACK_WIDTH, viewportWidth - LEFT_OFFSET * 2)
+    }, [currentStart, currentEnd, viewportWidth])
 
-    const minZoomLevel = useMemo(() => {
-        if (viewportWidth <= 0) {
-            return MIN_ZOOM
-        }
-
-        const fitZoom = (viewportWidth - LEFT_OFFSET * 2) / baseTrackWidth
-        return Math.max(MIN_ZOOM, Math.min(1, fitZoom))
-    }, [baseTrackWidth, viewportWidth])
+    const minZoomLevel = useMemo(
+        () => calculateTimelineFitZoom(events, currentStart, currentEnd, viewportWidth, baseTrackWidth),
+        [baseTrackWidth, currentEnd, currentStart, events, viewportWidth],
+    )
 
     const trackWidth = useMemo(() => {
         return baseTrackWidth * zoomLevel
@@ -171,6 +176,11 @@ export function Timeline({
         return ticksArr
     }, [currentStart, currentEnd])
 
+    const maxRows = useMemo(
+        () => calculateTimelineRowCapacity(viewportHeight, SINGLE_ROW_TRACK_HEIGHT, EVENT_ROW_GAP),
+        [viewportHeight],
+    )
+
     const processedEvents = useMemo(() => {
         if (!events.length) return []
 
@@ -196,26 +206,15 @@ export function Timeline({
         })
 
         const sorted = [...eventsWithCoords].sort((a, b) => a.startTime - b.startTime)
-        const rows: { rightX: number; y: number }[] = []
-        return sorted.map(event => {
-            const layoutCardRightX = event.layoutStartX + event.layoutCardWidth
-            let y = TRACK_TOP_PADDING
-            let found = false
-            for (let i = 0; i < rows.length; i += 1) {
-                if (rows[i].rightX + 30 <= event.layoutStartX) {
-                    rows[i].rightX = layoutCardRightX
-                    y = rows[i].y
-                    found = true
-                    break
-                }
+        const placements = placeTimelineRows(sorted, maxRows)
+        return sorted.map((event, index) => {
+            const placement = placements[index]
+            return {
+                ...event,
+                y: TRACK_TOP_PADDING + placement.rowIndex * EVENT_ROW_GAP,
             }
-            if (!found) {
-                y = TRACK_TOP_PADDING + rows.length * EVENT_ROW_GAP
-                rows.push({rightX: layoutCardRightX, y})
-            }
-            return {...event, y}
         })
-    }, [events, getBaseX, getX])
+    }, [events, getBaseX, getX, maxRows])
 
     const axisY = useMemo(() => {
         const contentAxisY = processedEvents.length
@@ -292,7 +291,7 @@ export function Timeline({
         zoomTo(minZoomLevel, offsetX)
     }, [minZoomLevel, zoomTo])
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!scrollRef.current) return
 
         const updateViewport = () => {
@@ -393,6 +392,44 @@ export function Timeline({
         selectEvent(eventId, {source: 'keyboard'})
     }
 
+    const zoomControls = (
+        <div
+            className={`timeline-zoom${controlsContainer !== undefined ? ' timeline-zoom--inline' : ''}`}
+            role="group"
+            aria-label="时间线缩放控制"
+        >
+            <button
+                type="button"
+                className="timeline-zoom__btn"
+                onClick={() => handleZoomButton(-1)}
+                disabled={zoomLevel <= minZoomLevel}
+                aria-label="缩小时间线"
+                title="缩小"
+            >
+                <span aria-hidden="true">−</span>
+            </button>
+            <button
+                type="button"
+                className="timeline-zoom__level"
+                onClick={handleZoomFit}
+                aria-label={`当前缩放 ${Math.round(zoomLevel * 100)}%，点击适应视图`}
+                title="适应视图"
+            >
+                {Math.round(zoomLevel * 100)}%
+            </button>
+            <button
+                type="button"
+                className="timeline-zoom__btn"
+                onClick={() => handleZoomButton(1)}
+                disabled={zoomLevel >= MAX_ZOOM}
+                aria-label="放大时间线"
+                title="放大"
+            >
+                <span aria-hidden="true">+</span>
+            </button>
+        </div>
+    )
+
     return (
         <div
             {...props}
@@ -467,7 +504,7 @@ export function Timeline({
                                     position: 'absolute',
                                     left: LEFT_OFFSET + event.startX,
                                     top: event.y,
-                                    zIndex: processedEvents.length - index + 10,
+                                    zIndex: isSelected ? processedEvents.length + 20 : index + 10,
                                 }}
                             >
                                 <div
@@ -498,37 +535,11 @@ export function Timeline({
                     })}
                 </div>
             </RollingBox>
-            <div className="timeline-zoom" role="group" aria-label="时间线缩放控制">
-                <button
-                    type="button"
-                    className="timeline-zoom__btn"
-                    onClick={() => handleZoomButton(-1)}
-                    disabled={zoomLevel <= minZoomLevel}
-                    aria-label="缩小时间线"
-                    title="缩小"
-                >
-                    <span aria-hidden="true">−</span>
-                </button>
-                <button
-                    type="button"
-                    className="timeline-zoom__level"
-                    onClick={handleZoomFit}
-                    aria-label={`当前缩放 ${Math.round(zoomLevel * 100)}%，点击适应视图`}
-                    title="适应视图"
-                >
-                    {Math.round(zoomLevel * 100)}%
-                </button>
-                <button
-                    type="button"
-                    className="timeline-zoom__btn"
-                    onClick={() => handleZoomButton(1)}
-                    disabled={zoomLevel >= MAX_ZOOM}
-                    aria-label="放大时间线"
-                    title="放大"
-                >
-                    <span aria-hidden="true">+</span>
-                </button>
-            </div>
+            {controlsContainer === undefined
+                ? zoomControls
+                : controlsContainer
+                    ? createPortal(zoomControls, controlsContainer)
+                    : null}
         </div>
     )
 }
