@@ -45,6 +45,7 @@ const EVENT_ROW_GAP = 90
 const AXIS_TOP_GAP = 28
 const AXIS_LABEL_SPACE = 28
 const TRACK_BOTTOM_PADDING = 16
+const AXIS_WHEEL_ZONE = 44
 
 const syncGroups = new Map<string, Set<React.RefObject<HTMLDivElement | null>>>()
 const syncLocks = new WeakMap<React.RefObject<HTMLDivElement | null>, boolean>()
@@ -221,13 +222,13 @@ export function Timeline({
             ? processedEvents.reduce((maxBottom, event) => Math.max(maxBottom, event.y + FLAG_HEIGHT), 0) + AXIS_TOP_GAP
             : TRACK_TOP_PADDING + FLAG_HEIGHT + AXIS_TOP_GAP
 
-        // 视口比内容高时把坐标轴下压到接近底部，让旗帜柱撑满、避免轴线下方留大片空白
-        const bottomAnchoredAxisY = viewportHeight - AXIS_LABEL_SPACE - TRACK_BOTTOM_PADDING
+        // 视口比内容高时把坐标轴下压到接近底部：旗帜柱撑满上方，轴线下方留出固定高度的缩放色带
+        const bottomAnchoredAxisY = viewportHeight - AXIS_LABEL_SPACE - TRACK_BOTTOM_PADDING - AXIS_WHEEL_ZONE
         return Math.max(contentAxisY, bottomAnchoredAxisY)
     }, [processedEvents, viewportHeight])
 
     const trackHeight = useMemo(() => {
-        return axisY + AXIS_LABEL_SPACE + TRACK_BOTTOM_PADDING
+        return axisY + AXIS_LABEL_SPACE + TRACK_BOTTOM_PADDING + AXIS_WHEEL_ZONE
     }, [axisY])
 
     const handleMouseDown = (event: React.MouseEvent) => {
@@ -417,6 +418,11 @@ export function Timeline({
                         position: 'relative',
                     }}
                 >
+                    <div
+                        className="flag-wheel-zone"
+                        aria-hidden="true"
+                        style={{top: axisY, height: trackHeight - axisY}}
+                    />
                     <div className="flag-axis" style={{left: LEFT_OFFSET, right: LEFT_OFFSET, top: axisY}}>
                         <div className="flag-axis-line"/>
                         <div className="flag-ticks">

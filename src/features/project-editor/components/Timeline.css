@@ -43,6 +43,16 @@
     box-sizing: border-box;
 }
 
+/* 坐标轴下方的滚轮缩放区，用底色标出以便发现 */
+.flag-wheel-zone {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: color-mix(in srgb, var(--fc-color-primary) 10%, transparent);
+}
+
 .flag-axis {
     position: absolute;
     height: 30px;
