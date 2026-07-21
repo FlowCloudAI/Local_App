@@ -471,6 +471,7 @@ export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEn
                                             eventItemRefs.current[event.id] = node
                                         }}
                                         className={`project-timeline__event-item fc-op-item${isSelected ? ' is-active' : ''}`}
+                                        aria-pressed={isSelected}
                                         onClick={() => {
                                             shouldSyncEventStripRef.current = false
                                             setSelectedEventId(event.id)
