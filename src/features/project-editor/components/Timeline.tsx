@@ -79,10 +79,25 @@ export function Timeline({
     useEffect(() => {
         if (selectedKey === undefined) return
         setInternalSelectedId(selectedKey)
-        if (!selectedKey || !scrollRef.current) return
+        if (!selectedKey) return
 
+        const container = scrollRef.current
         const cardElement = document.getElementById(`event-card-${selectedKey}`)
-        cardElement?.scrollIntoView({behavior: 'smooth', block: 'center'})
+        if (!container || !cardElement) return
+
+        // 容器 overflow-y 为 hidden：scrollIntoView({block:'center'}) 会带动外层纵向
+        // 滚动并裁掉无法滚回的内容。这里只按横轴把卡片居中，且仅在其超出可视区时滚动。
+        const containerRect = container.getBoundingClientRect()
+        const cardRect = cardElement.getBoundingClientRect()
+        if (cardRect.left >= containerRect.left && cardRect.right <= containerRect.right) return
+
+        const cardContentLeft = cardRect.left - containerRect.left + container.scrollLeft
+        const cardCenter = cardContentLeft + cardRect.width / 2
+        const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth)
+        const nextScrollLeft = Math.min(maxScrollLeft, Math.max(0, cardCenter - container.clientWidth / 2))
+        if (Math.abs(container.scrollLeft - nextScrollLeft) < 1) return
+
+        container.scrollTo({left: nextScrollLeft, behavior: 'smooth'})
     }, [selectedKey])
 
     const [currentStart, currentEnd] = useMemo(
