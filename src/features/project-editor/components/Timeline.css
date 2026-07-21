@@ -1,5 +1,6 @@
 /* 时间线旗帜视图 */
 .timeline-flag {
+    position: relative;
     font-family: var(--fc-font-family), serif;
     background: var(--fc-color-bg);
     border-radius: var(--fc-radius-lg);
@@ -183,6 +184,72 @@
     background: var(--fc-color-primary);
     border: 2px solid var(--fc-color-bg-elevated);
     z-index: 5;
+}
+
+/* 浮层缩放控件：固定在时间线右上角，不随内容横向滚动 */
+.timeline-zoom {
+    position: absolute;
+    top: var(--fc-space-md);
+    right: var(--fc-space-md);
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+    border: 1px solid var(--fc-color-border);
+    box-shadow: var(--fc-shadow-sm);
+    backdrop-filter: blur(4px);
+}
+
+.timeline-zoom__btn,
+.timeline-zoom__level {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--fc-color-text-secondary);
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: var(--fc-radius-full);
+    transition: background var(--fc-transition), color var(--fc-transition);
+}
+
+.timeline-zoom__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    font-size: var(--fc-font-size-md);
+    line-height: 1;
+}
+
+.timeline-zoom__level {
+    min-width: 46px;
+    height: 26px;
+    padding: 0 var(--fc-space-xs);
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-medium);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.timeline-zoom__btn:hover:not(:disabled),
+.timeline-zoom__level:hover {
+    background: var(--fc-color-bg-secondary);
+    color: var(--fc-color-text);
+}
+
+.timeline-zoom__btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.timeline-zoom__btn:focus-visible,
+.timeline-zoom__level:focus-visible {
+    outline: 2px solid var(--fc-color-primary);
+    outline-offset: 1px;
 }
 
 @media (max-width: 768px) {

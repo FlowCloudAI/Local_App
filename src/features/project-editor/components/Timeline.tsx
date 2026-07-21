@@ -247,13 +247,26 @@ export function Timeline({
         scrollRef.current.scrollLeft = dragScrollLeft - (x - dragStartX) * 1.5
     }, [isDragging, dragScrollLeft, dragStartX])
 
+    const zoomTo = useCallback((nextZoomLevelRaw: number, offsetX: number) => {
+        const container = scrollRef.current
+        if (!container) return
+        const nextZoomLevel = Math.min(MAX_ZOOM, Math.max(minZoomLevel, nextZoomLevelRaw))
+        if (nextZoomLevel === zoomLevel) return
+        zoomAnchorRef.current = {
+            offsetX,
+            contentX: container.scrollLeft + offsetX - LEFT_OFFSET,
+            scaleRatio: nextZoomLevel / zoomLevel,
+        }
+        setZoomLevel(nextZoomLevel)
+    }, [minZoomLevel, zoomLevel])
+
     const interceptWheel = useCallback((event: WheelEvent, container: HTMLDivElement) => {
         const rect = container.getBoundingClientRect()
         const offsetY = event.clientY - rect.top
         const offsetX = event.clientX - rect.left
-        const isAxisWheelZone = offsetY >= axisY
 
-        if (!isAxisWheelZone) {
+        // 仅在坐标轴一带用滚轮缩放；卡片区域的滚轮交给 RollingBox 做横向滚动
+        if (offsetY < axisY) {
             return false
         }
 
@@ -261,23 +274,22 @@ export function Timeline({
         event.stopPropagation()
 
         const direction = event.deltaY > 0 ? -1 : 1
-        const nextZoomLevel = Math.min(
-            MAX_ZOOM,
-            Math.max(minZoomLevel, zoomLevel + direction * ZOOM_STEP),
-        )
-
-        if (nextZoomLevel === zoomLevel) {
-            return true
-        }
-
-        zoomAnchorRef.current = {
-            offsetX,
-            contentX: container.scrollLeft + offsetX - LEFT_OFFSET,
-            scaleRatio: nextZoomLevel / zoomLevel,
-        }
-        setZoomLevel(nextZoomLevel)
+        zoomTo(zoomLevel + direction * ZOOM_STEP, offsetX)
         return true
-    }, [axisY, minZoomLevel, zoomLevel])
+    }, [axisY, zoomLevel, zoomTo])
+
+    // 按钮缩放以视口中心为锚点，保持中间内容稳定
+    const handleZoomButton = useCallback((direction: 1 | -1) => {
+        const container = scrollRef.current
+        const offsetX = container ? container.clientWidth / 2 : 0
+        zoomTo(zoomLevel + direction * ZOOM_STEP, offsetX)
+    }, [zoomLevel, zoomTo])
+
+    const handleZoomFit = useCallback(() => {
+        const container = scrollRef.current
+        const offsetX = container ? container.clientWidth / 2 : 0
+        zoomTo(minZoomLevel, offsetX)
+    }, [minZoomLevel, zoomTo])
 
     useEffect(() => {
         if (!scrollRef.current) return
@@ -464,6 +476,37 @@ export function Timeline({
                     })}
                 </div>
             </RollingBox>
+            <div className="timeline-zoom" role="group" aria-label="时间线缩放控制">
+                <button
+                    type="button"
+                    className="timeline-zoom__btn"
+                    onClick={() => handleZoomButton(-1)}
+                    disabled={zoomLevel <= minZoomLevel}
+                    aria-label="缩小时间线"
+                    title="缩小"
+                >
+                    <span aria-hidden="true">−</span>
+                </button>
+                <button
+                    type="button"
+                    className="timeline-zoom__level"
+                    onClick={handleZoomFit}
+                    aria-label={`当前缩放 ${Math.round(zoomLevel * 100)}%，点击适应视图`}
+                    title="适应视图"
+                >
+                    {Math.round(zoomLevel * 100)}%
+                </button>
+                <button
+                    type="button"
+                    className="timeline-zoom__btn"
+                    onClick={() => handleZoomButton(1)}
+                    disabled={zoomLevel >= MAX_ZOOM}
+                    aria-label="放大时间线"
+                    title="放大"
+                >
+                    <span aria-hidden="true">+</span>
+                </button>
+            </div>
         </div>
     )
 }
