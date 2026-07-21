@@ -140,7 +140,7 @@ function BackArrow() {
 
 export default function ProjectTimeline({projectId, tagSchemas, onBack, onOpenEntry, sidebarContainer}: ProjectTimelineProps) {
     const [data, setData] = useState<ProjectTimelineData | null>(null)
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [error, setError] = useState<Error | null>(null)
     const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
     const selectedEventIdRef = useRef<string | null>(null)
