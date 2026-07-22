@@ -12,7 +12,7 @@ import {
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {getComparableTagValue} from '../../../features/entries/lib/entryTag'
 import {type EntryImage, toEntryImageSrc} from '../../../features/entries/lib/entryImage'
-import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
+import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelations/EntryRelationCreator'
 import {
     MobileAnchoredActionMenu,
     type MobileAnchoredMenuItem,

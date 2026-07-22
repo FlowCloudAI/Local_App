@@ -1,4 +1,4 @@
-import {openFileDialog} from '../../../api/dialog'
+import {openFileDialog} from '../../../../api/dialog'
 import {type ChangeEvent, type KeyboardEvent, useEffect, useMemo, useState} from 'react'
 import {Button, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -15,12 +15,12 @@ import {
     type PluginInfo,
     setting_has_api_key,
     toApiError,
-} from '../../../api'
-import type {EntryImage} from '../../entries/lib/entryImage'
-import {toEntryImageSrc} from '../../entries/lib/entryImage'
-import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
-import FloatingPanel from '../../../shared/ui/overlay/FloatingPanel'
-import '../../../shared/ui/layout/WorkspaceScaffold.css'
+} from '../../../../api'
+import type {EntryImage} from '../../../entries/lib/entryImage'
+import {toEntryImageSrc} from '../../../entries/lib/entryImage'
+import AiPluginMissingOverlay, {type AiMissingPluginKind} from '../../../../shared/ui/AiPluginMissingOverlay'
+import FloatingPanel from '../../../../shared/ui/overlay/FloatingPanel'
+import '../../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectCoverPickerModal.css'
 
 type Tab = 'existing' | 'local' | 'ai'

@@ -1,4 +1,4 @@
-import {logger} from '../../../shared/logger'
+import {logger} from '../../../../shared/logger'
 
 const PROJECT_HOME_PERF_LOG_KEY = 'flowcloudai.projectHomePerfLog'
 

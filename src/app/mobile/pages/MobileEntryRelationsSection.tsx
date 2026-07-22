@@ -1,5 +1,5 @@
 import {type Category, type EntryBrief} from '../../../api'
-import EntryRelationCreator, {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
+import EntryRelationCreator, {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelations/EntryRelationCreator'
 
 interface MobileEntryRelationsSectionProps {
     relationDrafts: EntryRelationDraft[]

@@ -71,7 +71,7 @@ import {
     parseDateValue,
 } from '../lib/entryCommon'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
-import type {EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator.tsx'
+import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
 type TtsVoiceState = {

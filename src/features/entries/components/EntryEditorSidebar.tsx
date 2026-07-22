@@ -6,8 +6,8 @@ import {buildExcerpt, formatDate, getCategoryName} from '../lib/entryCommon'
 import {
     EntryRelationDraftForm,
     type EntryRelationDraft,
-} from '../../project-editor/components/EntryRelationCreator'
-import EntryRelationViewer from '../../project-editor/components/EntryRelationViewer'
+} from '../../project-editor/components/EntryRelations/EntryRelationCreator'
+import EntryRelationViewer from '../../project-editor/components/EntryRelations/EntryRelationViewer'
 
 interface EntryEditorSidebarProps {
     entryId: string

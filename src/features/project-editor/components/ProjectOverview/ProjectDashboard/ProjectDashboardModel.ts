@@ -4,7 +4,7 @@ import {
     type EntryTypeView,
     type ProjectStats,
     type TagSchema,
-} from '../../../api'
+} from '../../../../../api'
 import {formatDashboardNumber} from './ProjectDashboardFormat'
 import type {
     DashboardActionItem,
@@ -12,7 +12,7 @@ import type {
     DashboardKpiItem,
     DashboardSignalItem,
 } from './ProjectDashboardParts'
-import type {ProjectRiskSummary} from './ProjectOverview.types'
+import type {ProjectRiskSummary} from '../ProjectOverview.types'
 
 export interface ProjectDashboardModelInput {
     categories: Category[]

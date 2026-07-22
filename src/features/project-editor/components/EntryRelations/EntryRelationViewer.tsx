@@ -1,4 +1,4 @@
-import type {Category, EntryBrief} from '../../../api'
+import type {Category, EntryBrief} from '../../../../api'
 import type {EntryRelationDraft} from './EntryRelationCreator'
 import './EntryRelationEditor.css'
 

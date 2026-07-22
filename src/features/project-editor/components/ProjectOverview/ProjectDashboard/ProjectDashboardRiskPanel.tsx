@@ -1,8 +1,8 @@
 import {useState} from 'react'
 import {Button, RollingBox} from 'flowcloudai-ui'
-import type {ProjectStats} from '../../../api'
-import {FloatingPanel} from '../../../shared/ui/overlay'
-import type {ProjectRiskSummary} from './ProjectOverview.types'
+import type {ProjectStats} from '../../../../../api'
+import {FloatingPanel} from '../../../../../shared/ui/overlay'
+import type {ProjectRiskSummary} from '../ProjectOverview.types'
 import {DashboardIssueList, type DashboardIssueItem} from './ProjectDashboardParts'
 
 interface ProjectDashboardRiskPanelProps {

@@ -6,7 +6,7 @@ import type {
     Project,
     ProjectStats,
     TagSchema,
-} from '../../../api'
+} from '../../../../api'
 
 export interface ProjectOverviewProps {
     project: Project

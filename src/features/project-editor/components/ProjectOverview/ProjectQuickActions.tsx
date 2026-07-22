@@ -1,8 +1,8 @@
 import {memo, type ReactNode} from 'react'
-import {DashboardActionList} from './ProjectDashboardParts'
-import {buildProjectQuickActionItems, type ProjectQuickActionInput} from './ProjectDashboardModel'
-import './ProjectDashboard.css'
-import './ProjectDashboardControls.css'
+import {DashboardActionList} from './ProjectDashboard/ProjectDashboardParts'
+import {buildProjectQuickActionItems, type ProjectQuickActionInput} from './ProjectDashboard/ProjectDashboardModel'
+import './ProjectDashboard/ProjectDashboard.css'
+import './ProjectDashboard/ProjectDashboardControls.css'
 import './ProjectQuickActions.css'
 
 function RelationGraphIcon() {

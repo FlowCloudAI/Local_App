@@ -1,5 +1,5 @@
 import type {EntryRelation, RelationDirection} from '../../../api'
-import type {EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator'
+import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator'
 
 export function buildRelationDraft(entryId: string, relation: EntryRelation): EntryRelationDraft {
     if (relation.relation === 'two_way') {

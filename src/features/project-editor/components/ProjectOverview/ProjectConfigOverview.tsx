@@ -4,8 +4,8 @@ import {
     entryTypeKey,
     type EntryTypeView,
     type TagSchema,
-} from '../../../api'
-import EntryTypeIcon from './EntryTypeIcon'
+} from '../../../../api'
+import EntryTypeIcon from '../EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo} from './projectHomePerfDebug'
 
 function getTagTypeLabel(type: string): string {

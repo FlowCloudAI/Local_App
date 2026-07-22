@@ -1,4 +1,4 @@
-import {logger} from '../../../shared/logger'
+import {logger} from '../../../../shared/logger'
 import {
     type CSSProperties,
     memo,
@@ -22,12 +22,12 @@ import {
     entryTypeKey,
     type EntryTypeView,
     setting_get_settings,
-} from '../../../api'
-import {saveAppSettings} from '../../settings/appSettingsStore'
-import EntryCoverImage from '../../entries/components/EntryCoverImage'
-import {buildInternalEntryMarkdown} from '../../entries/lib/entryMarkdown'
-import {RenameDialog} from '../../../shared/ui/overlay'
-import EntryTypeIcon from './EntryTypeIcon'
+} from '../../../../api'
+import {saveAppSettings} from '../../../settings/appSettingsStore'
+import EntryCoverImage from '../../../entries/components/EntryCoverImage'
+import {buildInternalEntryMarkdown} from '../../../entries/lib/entryMarkdown'
+import {RenameDialog} from '../../../../shared/ui/overlay'
+import EntryTypeIcon from '../EntryTypeIcon'
 import {PROJECT_HOME_PERF_LOG_ENABLED, projectHomePerfInfo, projectHomePerfWarn} from './projectHomePerfDebug'
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'

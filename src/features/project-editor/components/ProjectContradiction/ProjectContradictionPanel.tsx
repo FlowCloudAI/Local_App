@@ -1,4 +1,4 @@
-import {logger} from '../../../shared/logger'
+import {logger} from '../../../../shared/logger'
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, Input, RollingBox, Select, useAlert} from 'flowcloudai-ui'
@@ -17,12 +17,12 @@ import {
     type WorldCheckKind,
     type WorldCheckReport,
     type WorldCheckReportHistoryItem,
-} from '../../../api'
-import {listen} from '../../../api/events'
-import type {ReportConversationContext} from '../../ai-chat/model/AiControllerTypes'
-import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
-import {FloatingPanel} from '../../../shared/ui/overlay'
-import '../../../shared/ui/layout/WorkspaceScaffold.css'
+} from '../../../../api'
+import {listen} from '../../../../api/events'
+import type {ReportConversationContext} from '../../../ai-chat/model/AiControllerTypes'
+import {normalizeEntryLookupTitle} from '../../../entries/lib/entryCommon'
+import {FloatingPanel} from '../../../../shared/ui/overlay'
+import '../../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectContradictionPanel.css'
 
 interface ProjectContradictionPanelProps {

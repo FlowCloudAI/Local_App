@@ -64,7 +64,7 @@ import {
 } from '../../../features/entries/lib/entryRelation'
 import useEntryTags from '../../../features/entries/hooks/useEntryTags'
 import {buildEntryTagsPayload} from '../../../features/entries/components/entryTagUtils'
-import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelationCreator'
+import {type EntryRelationDraft} from '../../../features/project-editor/components/EntryRelations/EntryRelationCreator'
 import {
     appendImages,
     areImagesEqual,

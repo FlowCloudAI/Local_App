@@ -1,5 +1,5 @@
 import {Button, Select, useAlert} from 'flowcloudai-ui'
-import type {Category, EntryBrief} from '../../../api'
+import type {Category, EntryBrief} from '../../../../api'
 import './EntryRelationEditor.css'
 
 export type EntryRelationDraftDirection = 'outgoing' | 'incoming' | 'two_way'

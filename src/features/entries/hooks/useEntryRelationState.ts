@@ -1,6 +1,6 @@
 import {useCallback, useMemo, useState} from 'react'
 import type {EntryRelation} from '../../../api'
-import type {EntryRelationDraft} from '../../project-editor/components/EntryRelationCreator'
+import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator'
 import {areRelationDraftsEqual, buildRelationDraft, hasInvalidRelationDraft} from '../lib/entryRelation'
 
 export default function useEntryRelationState(entryId: string) {

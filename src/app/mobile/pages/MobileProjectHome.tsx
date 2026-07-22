@@ -25,7 +25,7 @@ import {
     MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
-import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPickerModal'
+import ProjectCoverPickerModal from '../../../features/project-editor/components/ProjectCoverPicker/ProjectCoverPickerModal'
 import {invalidateProjectContext, useProjectContextStore} from '../../../features/projects/projectContextStore'
 import {patchProjectDetail, useProjectDetailStore} from '../../../features/projects/projectDetailStore'
 import {invalidateProjectList} from '../../../features/projects/projectListStore'

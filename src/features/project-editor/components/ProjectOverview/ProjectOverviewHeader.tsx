@@ -1,10 +1,10 @@
 import {useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
-import type {Project} from '../../../api'
-import FloatingPanel from '../../../shared/ui/overlay/FloatingPanel'
-import RenameDialog from '../../../shared/ui/overlay/RenameDialog'
-import {formatProjectDate, toProjectImageSrc} from '../../projects/projectDisplay'
-import '../../../shared/ui/overlay/FloatingPanelMenu.css'
+import type {Project} from '../../../../api'
+import FloatingPanel from '../../../../shared/ui/overlay/FloatingPanel'
+import RenameDialog from '../../../../shared/ui/overlay/RenameDialog'
+import {formatProjectDate, toProjectImageSrc} from '../../../projects/projectDisplay'
+import '../../../../shared/ui/overlay/FloatingPanelMenu.css'
 
 function formatDate(s?: string | null): string {
     return formatProjectDate(s, {fallback: '未知', includeTime: true})
