@@ -233,6 +233,7 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     backdrop-filter: blur(2px);
+    view-transition-name: mobile-ai-model-menu;
 }
 
 .mobile-ai-model-pill span {
@@ -269,6 +270,7 @@
 .mobile-ai-model-pill--expanded {
     opacity: 0;
     pointer-events: none;
+    view-transition-name: none;
 }
 
 .mobile-ai-model-menu {
@@ -277,6 +279,50 @@
 
     width: calc(var(--mobile-anchored-menu-right-boundary) - var(--mobile-anchored-menu-left));
     max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
+    view-transition-name: mobile-ai-model-menu;
+}
+
+.mobile-ai-chat__top-actions {
+    view-transition-name: mobile-ai-more-menu;
+}
+
+.mobile-ai-chat__top-actions.mobile-top-action-pill--expanded {
+    view-transition-name: none;
+}
+
+.mobile-ai-conversation-menu {
+    view-transition-name: mobile-ai-more-menu;
+}
+
+@supports (view-transition-name: none) {
+    .mobile-anchored-menu.mobile-ai-model-menu,
+    .mobile-anchored-menu.mobile-ai-conversation-menu {
+        animation: none;
+    }
+
+    .mobile-ai-model-menu[data-open="false"],
+    .mobile-ai-conversation-menu[data-open="false"] {
+        visibility: hidden;
+        view-transition-name: none;
+    }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+        animation: none;
+    }
+
+    ::view-transition-group(mobile-ai-model-menu),
+    ::view-transition-group(mobile-ai-more-menu) {
+        animation-duration: 220ms;
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    ::view-transition-old(mobile-ai-model-menu),
+    ::view-transition-new(mobile-ai-model-menu),
+    ::view-transition-old(mobile-ai-more-menu),
+    ::view-transition-new(mobile-ai-more-menu) {
+        mix-blend-mode: normal;
+    }
 }
 
 .mobile-ai-model-menu__row {

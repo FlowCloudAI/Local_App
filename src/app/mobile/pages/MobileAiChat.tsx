@@ -7,7 +7,7 @@ import {
     useState,
 } from 'react'
 import {useDrag} from '@use-gesture/react'
-import {createPortal} from 'react-dom'
+import {createPortal, flushSync} from 'react-dom'
 import {openFileDialog, saveFileDialog} from '../../../api/dialog'
 import {useAlert} from 'flowcloudai-ui'
 import {useAiController, type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
@@ -68,6 +68,19 @@ interface Props {
     conversationDrawerOpen?: boolean
     onOpenConversationDrawer?: () => void
     onCloseConversationDrawer?: () => void
+}
+
+function runAiMenuTransition(update: () => void) {
+    if (
+        typeof document.startViewTransition !== 'function'
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+        update()
+        return
+    }
+
+    const transition = document.startViewTransition(() => flushSync(update))
+    void transition.finished.catch(() => undefined)
 }
 
 export default function MobileAiChat({
@@ -287,15 +300,39 @@ export default function MobileAiChat({
     }, [])
 
     const closeModelMenu = useCallback(() => {
-        setModelMenuOpen(false)
-        setModelMenuMode('models')
-    }, [])
+        if (!modelMenuOpen) return
+        runAiMenuTransition(() => {
+            setModelMenuOpen(false)
+            setModelMenuMode('models')
+        })
+    }, [modelMenuOpen])
+
+    const changeModelMenuMode = useCallback((mode: 'models' | 'plugins') => {
+        if (mode === modelMenuMode) return
+        runAiMenuTransition(() => setModelMenuMode(mode))
+    }, [modelMenuMode])
+
+    const closeTopMenu = useCallback(() => {
+        if (!topMenuOpen) return
+        runAiMenuTransition(() => setTopMenuOpen(false))
+    }, [topMenuOpen])
 
     const handleToggleModelMenu = useCallback(() => {
-        setTopMenuOpen(false)
-        setToolModeMenuOpen(false)
-        setModelMenuOpen(open => !open)
-        setModelMenuMode('models')
+        runAiMenuTransition(() => {
+            setTopMenuOpen(false)
+            setToolModeMenuOpen(false)
+            setModelMenuOpen(open => !open)
+            setModelMenuMode('models')
+        })
+    }, [])
+
+    const handleToggleTopMenu = useCallback(() => {
+        runAiMenuTransition(() => {
+            setModelMenuOpen(false)
+            setModelMenuMode('models')
+            setToolModeMenuOpen(false)
+            setTopMenuOpen(open => !open)
+        })
     }, [])
 
     const handleSelectModel = useCallback(async (modelId: string) => {
@@ -315,8 +352,8 @@ export default function MobileAiChat({
             return
         }
         await switchActiveConversationModel(plugin.id, nextModel)
-        setModelMenuMode('models')
-    }, [plugins, showAlert, switchActiveConversationModel])
+        changeModelMenuMode('models')
+    }, [changeModelMenuMode, plugins, showAlert, switchActiveConversationModel])
 
     const updateConversationSetting = useCallback(<K extends keyof ConversationSettings>(
         key: K,
@@ -707,6 +744,7 @@ export default function MobileAiChat({
                 </button>}
                 right={<MobileTopActionPill
                     ref={topActionsRef}
+                    className="mobile-ai-chat__top-actions"
                     actions={[
                         {
                             key: 'new',
@@ -724,11 +762,7 @@ export default function MobileAiChat({
                             ariaHasPopup: 'menu',
                             ariaExpanded: topMenuOpen,
                             disabled: !activeConversation,
-                            onClick: () => {
-                                closeModelMenu()
-                                setToolModeMenuOpen(false)
-                                setTopMenuOpen(open => !open)
-                            },
+                            onClick: handleToggleTopMenu,
                         },
                     ]}
                 />}
@@ -759,11 +793,11 @@ export default function MobileAiChat({
                 onBeforeToolModeMenuOpen={() => { closeModelMenu(); setTopMenuOpen(false) }}
                 toolModeOptions={toolModeOptions} onToolModeChange={mode => void handleToolModeChange(mode)}
                 morePanelOpen={morePanelOpen} onOpenMore={openMorePanel} onCloseMore={closeMorePanel}
-                modelMenuOpen={modelMenuOpen} onCloseModelMenu={closeModelMenu} modelMenuMode={modelMenuMode} onModelMenuMode={setModelMenuMode}
+                modelMenuOpen={modelMenuOpen} onCloseModelMenu={closeModelMenu} modelMenuMode={modelMenuMode} onModelMenuMode={changeModelMenuMode}
                 plugins={plugins} activeLlmPluginName={activeLlmPluginName} activeLlmPluginId={activeLlmPluginId}
                 activeModelOptions={activeModelOptions} activeModelId={activeModelId}
                 onSelectModel={modelId => void handleSelectModel(modelId)} onSelectPlugin={pluginId => void handleSelectPlugin(pluginId)}
-                topMenuOpen={topMenuOpen} onCloseTopMenu={() => setTopMenuOpen(false)} activeConversationMenuItems={activeConversationMenuItems}
+                topMenuOpen={topMenuOpen} onCloseTopMenu={closeTopMenu} activeConversationMenuItems={activeConversationMenuItems}
                 onUnavailable={handleUnavailableMobileAiTool}
                 onGallery={() => void showAlert('当前 AI 对话还不支持图片作为模型输入。', 'info', 'nonInvasive', 1800)}
                 onAttachDocuments={() => void handleAttachDocuments()} webSearchEnabled={webSearchEnabled} onToggleWebSearch={() => void toggleWebSearch()}

@@ -58,7 +58,7 @@ export default function MobileAiComposer(p: Props) {
             </div>}
         </MobileAnchoredMenu>
 
-        <MobileAnchoredActionMenu open={p.topMenuOpen} onClose={p.onCloseTopMenu} anchorRef={p.topActionsRef} containerRef={p.pageRef} ariaLabel="对话操作" items={p.activeConversationMenuItems}/>
+        <MobileAnchoredActionMenu open={p.topMenuOpen} onClose={p.onCloseTopMenu} anchorRef={p.topActionsRef} containerRef={p.pageRef} ariaLabel="对话操作" className="mobile-ai-conversation-menu" items={p.activeConversationMenuItems}/>
         <MobileBottomSheet open={p.morePanelOpen} onClose={p.onCloseMore} ariaLabel="更多对话设置" className="mobile-ai-more-sheet"><div className="mobile-ai-more-sheet__quick" aria-label="添加内容">
             <button type="button" onClick={() => p.onUnavailable('相机')}><MobileAiIcon type="camera"/><span>相机</span></button><button type="button" onClick={p.onGallery}><MobileAiIcon type="image"/><span>图库</span></button><button type="button" onClick={p.onAttachDocuments}><MobileAiIcon type="file"/><span>文件</span></button><button type="button" className={p.webSearchEnabled ? 'active' : ''} aria-pressed={p.webSearchEnabled} onClick={p.onToggleWebSearch}><MobileAiIcon type="web"/><span>联网搜索</span></button>
         </div>{p.conversationControls}</MobileBottomSheet>

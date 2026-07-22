@@ -165,11 +165,11 @@ export function MobileAnchoredMenu({
     }, [open, rendered])
 
     useLayoutEffect(() => {
-        if (open && rendered) updateAnchor()
-    }, [open, rendered, updateAnchor])
+        if (open) updateAnchor()
+    }, [open, updateAnchor])
 
     useEffect(() => {
-        if (!open || !rendered) return undefined
+        if (!open) return undefined
         updateAnchor()
         const viewport = window.visualViewport
         window.addEventListener('resize', updateAnchor)
@@ -178,9 +178,9 @@ export function MobileAnchoredMenu({
             window.removeEventListener('resize', updateAnchor)
             viewport?.removeEventListener('resize', updateAnchor)
         }
-    }, [open, rendered, updateAnchor])
+    }, [open, updateAnchor])
 
-    if (!rendered) return null
+    if (!open && !rendered) return null
 
     return (
         <div
@@ -194,6 +194,7 @@ export function MobileAnchoredMenu({
                 className={`mobile-anchored-menu mobile-anchored-menu--${align} mobile-anchored-menu--placement-${placement}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
                 role="menu"
                 aria-label={ariaLabel}
+                data-open={open}
                 style={anchor ? {
                     '--mobile-anchored-menu-top': `${anchor.top}px`,
                     '--mobile-anchored-menu-bottom': `${anchor.bottom}px`,
