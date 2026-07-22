@@ -208,7 +208,7 @@
     box-sizing: border-box;
     padding: var(--fc-space-md) 0;
     overflow: hidden;
-    border-radius: var(--mobile-radius-floating);
+    border-radius: calc(var(--mobile-radius-floating) + var(--fc-space-xs));
     background: transparent;
     isolation: isolate;
     contain: paint;
