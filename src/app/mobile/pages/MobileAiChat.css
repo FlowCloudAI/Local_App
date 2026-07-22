@@ -18,6 +18,11 @@
     right: 0;
     left: 0;
     z-index: 20;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.mobile-ai-chat__topbar .mobile-page-topbar__center {
+    justify-content: flex-start;
 }
 
 .mobile-ai-svg {
@@ -221,7 +226,7 @@
     background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     color: var(--fc-color-primary);
     font: inherit;
-    font-size: var(--fc-font-size-sm);
+    font-size: var(--fc-font-size-caption);
     font-weight: var(--mobile-font-weight-heading);
     cursor: pointer;
     transition: opacity 120ms ease, transform 120ms ease;
@@ -286,6 +291,14 @@
 .mobile-ai-model-menu__row .mobile-anchored-menu__text {
     grid-column: 2;
     grid-row: 1;
+}
+
+.mobile-ai-model-menu__row .mobile-anchored-menu__text > span {
+    font-size: var(--fc-font-size-sm);
+}
+
+.mobile-ai-model-menu__row .mobile-anchored-menu__text small {
+    font-size: var(--fc-font-size-2xs);
 }
 
 .mobile-ai-model-menu__row.active {
