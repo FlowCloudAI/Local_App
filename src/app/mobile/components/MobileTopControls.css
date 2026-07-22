@@ -196,6 +196,7 @@
     --mobile-anchored-menu-left: 1rem;
     --mobile-anchored-menu-anchor-width: var(--mobile-top-surface-size);
     --mobile-anchored-menu-anchor-height: var(--mobile-top-surface-size);
+    --mobile-anchored-menu-anchor-border-color: color-mix(in srgb, var(--fc-color-border) 68%, transparent);
     --mobile-anchored-menu-content-offset: -0.18rem;
 
     position: absolute;
@@ -231,13 +232,15 @@
     transition:
         width 220ms cubic-bezier(0.22, 1, 0.36, 1),
         height 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1);
+        border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color 180ms ease;
     will-change: width, height, border-radius;
 }
 
 .mobile-anchored-menu[data-open="false"]::before {
     width: var(--mobile-anchored-menu-anchor-width);
     height: var(--mobile-anchored-menu-anchor-height);
+    border-color: var(--mobile-anchored-menu-anchor-border-color);
     border-radius: var(--fc-radius-full);
 }
 
@@ -364,6 +367,7 @@
     .mobile-anchored-menu[data-open="true"]::before {
         width: var(--mobile-anchored-menu-anchor-width);
         height: var(--mobile-anchored-menu-anchor-height);
+        border-color: var(--mobile-anchored-menu-anchor-border-color);
         border-radius: var(--fc-radius-full);
     }
 

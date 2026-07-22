@@ -126,7 +126,7 @@ export function MobileAnchoredMenu({
     rightBoundaryRef,
     rightBoundaryGap = 0,
 }: MobileAnchoredMenuProps) {
-    const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; rightBoundary: number | null} | null>(null)
+    const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; borderColor: string; rightBoundary: number | null} | null>(null)
     const [rendered, setRendered] = useState(open)
     const [closing, setClosing] = useState(false)
 
@@ -137,6 +137,7 @@ export function MobileAnchoredMenu({
         const viewportWidth = window.innerWidth || containerElement?.clientWidth || 0
         const viewportHeight = window.innerHeight || containerElement?.clientHeight || 0
         const anchorRect = anchorElement.getBoundingClientRect()
+        const anchorStyle = window.getComputedStyle(anchorElement)
         const boundaryRect = rightBoundaryRef?.current?.getBoundingClientRect()
         setAnchor({
             top: Math.max(0, anchorRect.top),
@@ -145,6 +146,7 @@ export function MobileAnchoredMenu({
             right: Math.max(0, viewportWidth - anchorRect.right),
             width: anchorRect.width,
             height: anchorRect.height,
+            borderColor: anchorStyle.borderTopColor,
             rightBoundary: boundaryRect
                 ? Math.max(0, boundaryRect.left - rightBoundaryGap)
                 : null,
@@ -204,6 +206,7 @@ export function MobileAnchoredMenu({
                     '--mobile-anchored-menu-right': `${anchor.right}px`,
                     '--mobile-anchored-menu-anchor-width': `${anchor.width}px`,
                     '--mobile-anchored-menu-anchor-height': `${anchor.height}px`,
+                    '--mobile-anchored-menu-anchor-border-color': anchor.borderColor,
                     ...(anchor.rightBoundary != null
                         ? {'--mobile-anchored-menu-right-boundary': `${anchor.rightBoundary}px`}
                         : {}),
