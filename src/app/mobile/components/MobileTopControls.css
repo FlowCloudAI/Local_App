@@ -233,7 +233,7 @@
         width 220ms cubic-bezier(0.22, 1, 0.36, 1),
         height 220ms cubic-bezier(0.22, 1, 0.36, 1),
         border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-color 180ms ease;
+        border-color 110ms ease 110ms;
     will-change: width, height, border-radius;
 }
 
