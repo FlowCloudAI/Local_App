@@ -126,7 +126,7 @@
     gap: 0;
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
-    padding: 0 0.12rem;
+    padding: 0;
     border: var(--mobile-border-medium);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);

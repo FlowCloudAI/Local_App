@@ -220,7 +220,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    padding: 0 0.9rem 0 1rem;
+    padding: 0 0.7rem;
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
