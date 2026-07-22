@@ -226,7 +226,7 @@
     background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     color: var(--fc-color-primary);
     font: inherit;
-    font-size: var(--fc-font-size-caption);
+    font-size: var(--fc-font-size-xs);
     font-weight: var(--mobile-font-weight-heading);
     cursor: pointer;
     transition: opacity 120ms ease, transform 120ms ease;
