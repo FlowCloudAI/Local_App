@@ -11,7 +11,7 @@ import {
 } from 'react'
 import './MobileTopControls.css'
 
-const MOBILE_ANCHORED_MENU_CLOSE_MS = 130
+const MOBILE_ANCHORED_MENU_CLOSE_MS = 220
 
 export interface MobilePageTopBarProps {
     left?: ReactNode
@@ -126,7 +126,7 @@ export function MobileAnchoredMenu({
     rightBoundaryRef,
     rightBoundaryGap = 0,
 }: MobileAnchoredMenuProps) {
-    const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; rightBoundary: number | null} | null>(null)
+    const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; rightBoundary: number | null} | null>(null)
     const [rendered, setRendered] = useState(open)
     const [closing, setClosing] = useState(false)
 
@@ -143,6 +143,8 @@ export function MobileAnchoredMenu({
             bottom: Math.max(0, viewportHeight - anchorRect.bottom),
             left: Math.max(0, anchorRect.left),
             right: Math.max(0, viewportWidth - anchorRect.right),
+            width: anchorRect.width,
+            height: anchorRect.height,
             rightBoundary: boundaryRect
                 ? Math.max(0, boundaryRect.left - rightBoundaryGap)
                 : null,
@@ -200,13 +202,17 @@ export function MobileAnchoredMenu({
                     '--mobile-anchored-menu-bottom': `${anchor.bottom}px`,
                     '--mobile-anchored-menu-left': `${anchor.left}px`,
                     '--mobile-anchored-menu-right': `${anchor.right}px`,
+                    '--mobile-anchored-menu-anchor-width': `${anchor.width}px`,
+                    '--mobile-anchored-menu-anchor-height': `${anchor.height}px`,
                     ...(anchor.rightBoundary != null
                         ? {'--mobile-anchored-menu-right-boundary': `${anchor.rightBoundary}px`}
                         : {}),
                 } as CSSProperties : undefined}
                 onPointerDown={event => event.stopPropagation()}
             >
-                {children}
+                <div className="mobile-anchored-menu__content">
+                    {children}
+                </div>
             </div>
         </div>
     )
