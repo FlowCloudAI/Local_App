@@ -293,12 +293,9 @@
     grid-row: 1;
 }
 
-.mobile-ai-model-menu__row .mobile-anchored-menu__text > span {
-    font-size: var(--fc-font-size-sm);
-}
-
+.mobile-ai-model-menu__row .mobile-anchored-menu__text > span,
 .mobile-ai-model-menu__row .mobile-anchored-menu__text small {
-    font-size: var(--fc-font-size-2xs);
+    font-size: var(--fc-font-size-xs);
 }
 
 .mobile-ai-model-menu__row.active {
