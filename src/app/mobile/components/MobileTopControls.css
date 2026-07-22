@@ -222,7 +222,7 @@
     height: 100%;
     box-sizing: border-box;
     border: var(--mobile-glass-border);
-    border-radius: var(--mobile-radius-floating);
+    border-radius: inherit;
     background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: var(--mobile-glass-filter);

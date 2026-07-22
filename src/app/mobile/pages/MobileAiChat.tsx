@@ -70,7 +70,7 @@ interface Props {
     onCloseConversationDrawer?: () => void
 }
 
-function runAiMenuTransition(update: () => void) {
+function runAiMenuContentTransition(update: () => void) {
     if (
         typeof document.startViewTransition !== 'function'
         || window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -300,39 +300,31 @@ export default function MobileAiChat({
     }, [])
 
     const closeModelMenu = useCallback(() => {
-        if (!modelMenuOpen) return
-        runAiMenuTransition(() => {
-            setModelMenuOpen(false)
-            setModelMenuMode('models')
-        })
-    }, [modelMenuOpen])
+        setModelMenuOpen(false)
+        setModelMenuMode('models')
+    }, [])
 
     const changeModelMenuMode = useCallback((mode: 'models' | 'plugins') => {
         if (mode === modelMenuMode) return
-        runAiMenuTransition(() => setModelMenuMode(mode))
+        runAiMenuContentTransition(() => setModelMenuMode(mode))
     }, [modelMenuMode])
 
     const closeTopMenu = useCallback(() => {
-        if (!topMenuOpen) return
-        runAiMenuTransition(() => setTopMenuOpen(false))
-    }, [topMenuOpen])
+        setTopMenuOpen(false)
+    }, [])
 
     const handleToggleModelMenu = useCallback(() => {
-        runAiMenuTransition(() => {
-            setTopMenuOpen(false)
-            setToolModeMenuOpen(false)
-            setModelMenuOpen(open => !open)
-            setModelMenuMode('models')
-        })
+        setTopMenuOpen(false)
+        setToolModeMenuOpen(false)
+        setModelMenuOpen(open => !open)
+        setModelMenuMode('models')
     }, [])
 
     const handleToggleTopMenu = useCallback(() => {
-        runAiMenuTransition(() => {
-            setModelMenuOpen(false)
-            setModelMenuMode('models')
-            setToolModeMenuOpen(false)
-            setTopMenuOpen(open => !open)
-        })
+        setModelMenuOpen(false)
+        setModelMenuMode('models')
+        setToolModeMenuOpen(false)
+        setTopMenuOpen(open => !open)
     }, [])
 
     const handleSelectModel = useCallback(async (modelId: string) => {
@@ -744,7 +736,6 @@ export default function MobileAiChat({
                 </button>}
                 right={<MobileTopActionPill
                     ref={topActionsRef}
-                    className="mobile-ai-chat__top-actions"
                     actions={[
                         {
                             key: 'new',
