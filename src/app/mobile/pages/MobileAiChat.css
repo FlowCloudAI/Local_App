@@ -343,7 +343,9 @@
 }
 
 .mobile-ai-model-menu__row .mobile-anchored-menu__text > span,
-.mobile-ai-model-menu__row .mobile-anchored-menu__text small {
+.mobile-ai-model-menu__row .mobile-anchored-menu__text small,
+.mobile-ai-conversation-menu .mobile-anchored-menu__text > span,
+.mobile-ai-conversation-menu .mobile-anchored-menu__text small {
     font-size: var(--fc-font-size-xs);
 }
 
