@@ -1,4 +1,6 @@
 /* 时间线旗帜视图 */
+
+/* ─── 容器与滚动区 ────────────────────────────────────────── */
 .timeline-flag {
     position: relative;
     font-family: var(--fc-font-family), serif;
@@ -43,6 +45,7 @@
     box-sizing: border-box;
 }
 
+/* ─── 坐标轴与滚轮缩放区 ──────────────────────────────────── */
 /* 坐标轴下方的滚轮缩放区，用底色标出以便发现 */
 .flag-wheel-zone {
     position: absolute;
@@ -100,6 +103,7 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ─── 事件卡片与旗杆 ──────────────────────────────────────── */
 .flag-event {
     position: absolute;
     display: flex;
@@ -206,6 +210,7 @@
     z-index: 5;
 }
 
+/* ─── 缩放控件 ────────────────────────────────────────────── */
 /* 缩放控件默认悬浮；页面可将它挂载到标题栏 */
 .timeline-zoom {
     position: absolute;
@@ -279,6 +284,7 @@
     outline-offset: 1px;
 }
 
+/* ─── 响应式 ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
     .timeline-flag {
         padding: var(--fc-space-md);

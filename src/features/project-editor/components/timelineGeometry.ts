@@ -25,6 +25,10 @@ function getCardWidth(event: TimelineGeometryEvent, range: number, trackWidth: n
     return Math.min(Math.max(durationWidth, MIN_CARD_WIDTH), MAX_CARD_WIDTH)
 }
 
+/**
+ * 计算让所有事件恰好适配视口的最小缩放倍率。
+ * 使用二分查找在 [MIN_ZOOM, 1] 区间内搜索，确保每张卡片右边界不超出可用宽度。
+ */
 export function calculateTimelineFitZoom(
     events: TimelineGeometryEvent[],
     yearStart: number,
@@ -54,11 +58,19 @@ export function calculateTimelineFitZoom(
     return lower
 }
 
+/**
+ * 根据视口高度计算时间线轨道可容纳的最大事件行数。
+ * 第一行占 singleRowHeight，后续每行占 rowGap。
+ */
 export function calculateTimelineRowCapacity(viewportHeight: number, singleRowHeight: number, rowGap: number) {
     if (viewportHeight <= singleRowHeight || rowGap <= 0) return 1
     return 1 + Math.floor((viewportHeight - singleRowHeight) / rowGap)
 }
 
+/**
+ * 贪心行分配算法：将事件按时间顺序放置到行中，避免水平重叠。
+ * 优先放入有空隙的行，无空隙时新增行；超过 maxRows 时强制放入重叠最少的行。
+ */
 export function placeTimelineRows(events: TimelineRowEvent[], maxRows: number, cardGap = 30) {
     const rowCapacity = Number.isFinite(maxRows) ? Math.max(1, Math.floor(maxRows)) : 1
     const rows: number[] = []
