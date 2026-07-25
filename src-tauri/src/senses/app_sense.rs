@@ -1,13 +1,22 @@
+//! 通用创作对话的默认 Sense 与工具能力分级。
+//!
+//! 默认会话只开放项目资料读取工具；带写入权限的助手必须由调用方显式选择
+//! `assistant_tool_whitelist`，网页工具也只能按需附加。
+
 use crate::template::render_global_template;
 use flowcloudai_client::llm::types::ChatRequest;
 use flowcloudai_client::{ToolRegistry, sense::Sense};
 use serde::Serialize;
 
+/// 通用对话的系统提示词和最小只读工具集。
+///
+/// 自定义提示词只能追加到内置规则之后，不能替换安全边界或默认身份说明。
 pub struct AppSense {
     custom_prompt: Option<String>,
 }
 
 impl AppSense {
+    /// 接受非空自定义提示词；空白输入按未配置处理。
     pub fn new(custom_prompt: Option<String>) -> Self {
         Self {
             custom_prompt: custom_prompt
@@ -25,10 +34,12 @@ impl AppSense {
         }
     }
 
+    /// 返回通用对话的默认只读白名单，不包含网页或写入工具。
     pub fn default_tool_whitelist() -> Vec<String> {
         Self::reader_tool_whitelist(false)
     }
 
+    /// 返回资料读取工具；仅在调用方授权时附加外部网页能力。
     pub fn reader_tool_whitelist(allow_web_tools: bool) -> Vec<String> {
         let mut tools = [
             "list_projects",
@@ -56,6 +67,9 @@ impl AppSense {
         tools
     }
 
+    /// 返回编辑助手白名单，包含会修改项目数据的工具。
+    ///
+    /// 使用该方法即表示调用方已经为本次会话授予写入权限，不能作为普通对话的默认配置。
     pub fn assistant_tool_whitelist(allow_web_tools: bool) -> Vec<String> {
         let mut tools = Self::reader_tool_whitelist(false);
         extend_tool_whitelist(

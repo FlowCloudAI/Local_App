@@ -1,14 +1,21 @@
+//! 基于项目快照的角色扮演 Sense。
+//!
+//! 调用方在创建时提供目标角色及世界观快照；本模块只将其裁剪为系统提示词，不在对话期间
+//! 查询或修改项目数据，以维持角色的知识边界。
+
 use crate::template::render_global_template;
 use flowcloudai_client::llm::types::ChatRequest;
 use flowcloudai_client::{ToolRegistry, sense::Sense};
 use serde::{Deserialize, Serialize};
 
+// 防止单个词条的标签或全量世界观摘录挤占角色设定本身的提示词预算。
 const MAX_TAG_LINES: usize = 16;
 const MAX_WORLD_ENTRIES: usize = 120;
 const MAX_RELATIONS: usize = 160;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 角色扮演所需项目元数据的稳定快照。
 pub struct CharacterProjectMeta {
     pub id: String,
     pub name: String,
@@ -44,6 +51,7 @@ pub struct CharacterTagSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 可嵌入角色提示词的词条信息；字段缺失以 `None` 保留，避免伪造设定。
 pub struct CharacterEntrySnapshot {
     pub id: String,
     pub title: String,
@@ -67,6 +75,9 @@ pub struct CharacterRelationSnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 创建角色扮演会话时冻结的项目资料。
+///
+/// `target_character` 优先于其他世界观摘录；两者矛盾时角色设定决定回答边界。
 pub struct CharacterProjectSnapshot {
     pub project: CharacterProjectMeta,
     pub target_character: CharacterEntrySnapshot,
@@ -76,6 +87,9 @@ pub struct CharacterProjectSnapshot {
     pub relations: Vec<CharacterRelationSnapshot>,
 }
 
+/// 只使用快照生成角色口吻回复的 Sense。
+///
+/// 默认请求禁用工具调用，避免模型越过创建会话时确定的角色知识范围。
 pub struct CharacterSense {
     character_name: String,
     project_snapshot: CharacterProjectSnapshot,
@@ -99,6 +113,7 @@ struct CharacterSenseTemplateContext {
 }
 
 impl CharacterSense {
+    /// 将角色名与同一时刻获取的项目快照绑定为会话规则。
     pub fn new(
         character_name: impl Into<String>,
         project_snapshot: CharacterProjectSnapshot,

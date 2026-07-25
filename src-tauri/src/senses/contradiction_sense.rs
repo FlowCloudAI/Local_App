@@ -1,16 +1,24 @@
+//! 旧版设定矛盾检测的专用 Sense。
+//!
+//! 它保留历史提示词模板名与 API 入口，但工具权限与通用世界观检测共用同一白名单，防止两套
+//! 检测会话的能力范围逐渐分叉。
+
 use crate::ai_services::world_check::world_check_tool_whitelist;
 use crate::template::render_global_template;
 use flowcloudai_client::llm::types::ChatRequest;
 use flowcloudai_client::{ToolRegistry, sense::Sense};
 use serde::Serialize;
 
+/// 强制结构化矛盾报告输出的检测 Sense。
 pub struct ContradictionSense;
 
 impl ContradictionSense {
+    /// 创建无状态的矛盾检测规则。
     pub fn new() -> Self {
         Self
     }
 
+    /// 返回与通用世界观检测一致的最小工具集。
     pub fn tool_whitelist() -> Vec<String> {
         world_check_tool_whitelist()
     }
