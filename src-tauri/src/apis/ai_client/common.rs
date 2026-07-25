@@ -950,6 +950,8 @@ pub(crate) fn spawn_session_event_loop<S>(
                             delay_secs,
                         );
                     }
+                    // 用户节点已经进入消息树；此时先落盘，避免回复失败或应用退出时丢失首条消息。
+                    save_session_snapshot(&app_clone, &sid).await;
                     app_clone
                         .emit(
                             "ai:turn_begin",
@@ -1106,6 +1108,8 @@ pub(crate) fn spawn_session_event_loop<S>(
                 }
                 SessionEvent::Error(e) => {
                     log::error!("[ai:error] session_id={} run_id={} error={}", sid, rid, e);
+                    // 部分供应商会在 TurnBegin 后直接报错，保留已进入消息树的用户内容。
+                    save_session_snapshot(&app_clone, &sid).await;
                     app_clone
                         .emit(
                             "ai:error",
@@ -1142,4 +1146,48 @@ pub(crate) fn spawn_session_event_loop<S>(
         );
         cleanup_session_state(&app_clone, &sid, &rid).await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_only_snapshot_is_persisted() {
+        let root =
+            std::env::temp_dir().join(format!("flowcloudai-user-snapshot-test-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let paths = PathsState {
+            db_path: root.join("flowcloudai.db"),
+            plugins_path: root.join("plugins"),
+        };
+        let timestamp = chrono::Utc::now().to_rfc3339();
+
+        chat_store_save_snapshot(
+            &paths,
+            "session_test",
+            "test-plugin",
+            "test-model",
+            None,
+            vec![ConversationNode {
+                id: 1,
+                message: Message::user("首条消息"),
+                parent: None,
+                turn_id: 1,
+                timestamp,
+            }],
+            Some(1),
+        )
+        .unwrap();
+
+        let saved = chat_store_get_conversation(&paths, "session_test")
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.meta.title, "首条消息");
+        assert_eq!(saved.messages.len(), 1);
+        assert_eq!(saved.messages[0].role, "user");
+        assert_eq!(saved.messages[0].content.as_deref(), Some("首条消息"));
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
