@@ -101,6 +101,8 @@ type LayoutParamKey =
     | 'clusterTwoWayBonus'
     | 'clusterHorizontalStretch'
     | 'orientationLinearityThreshold'
+    | 'viewportAspect'
+    | 'shapeSlackWeight'
 
 interface LayoutParamField {
     key: LayoutParamKey
@@ -163,6 +165,8 @@ const LAYOUT_PARAM_DEFAULTS: Record<LayoutParamKey, number> = {
     clusterTwoWayBonus: 0.35,
     clusterHorizontalStretch: 1.3,
     orientationLinearityThreshold: 0.35,
+    viewportAspect: 1.7,
+    shapeSlackWeight: 0.125,
 }
 
 const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}> = [
@@ -239,6 +243,9 @@ const ADVANCED_LAYOUT_GROUPS: Array<{title: string; fields: LayoutParamField[]}>
             {key: 'clusterTwoWayBonus', label: '跨簇双向奖励', min: 0, step: 0.05},
             {key: 'clusterHorizontalStretch', label: '簇横向偏置', min: 1, max: 2.5, step: 0.05},
             {key: 'orientationLinearityThreshold', label: '簇朝向线性阈值', min: 0, max: 1.01, step: 0.05},
+            // 0 = 退回按包围盒面积评分（旧行为）。取值应接近关系图面板的实际宽高比。
+            {key: 'viewportAspect', label: '目标视口宽高比', min: 0, max: 3, step: 0.05},
+            {key: 'shapeSlackWeight', label: '非约束方向收缩权重', min: 0, max: 1, step: 0.025},
         ],
     },
 ]
