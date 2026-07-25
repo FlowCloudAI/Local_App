@@ -1,9 +1,14 @@
+//! 基于 `office_oxide` 的 Office 文档解析适配器。
+//!
+//! 该实现只在启用对应特性时注册，负责转换格式；通用分块仍由 `document_context` 完成。
+
 use anyhow::Result;
 
 use crate::document_context::{
     DocumentParser, ParseInput, ParsedDocument, split_markdown_into_chunks,
 };
 
+/// 解析 Word、Excel 和 PowerPoint 的统一适配器。
 pub struct OfficeOxideParser;
 
 impl DocumentParser for OfficeOxideParser {

@@ -1,3 +1,8 @@
+//! 纯文本及源码文件的解析与编码归一化。
+//!
+//! 该适配器在不引入格式专用依赖的前提下识别常见 Unicode 与 GB18030 编码，并把非 Markdown
+//! 文本包进代码围栏，交由通用分块器处理。
+
 use anyhow::{Context, Result, anyhow, bail};
 use encoding_rs::{GB18030, UTF_16BE, UTF_16LE};
 
@@ -13,6 +18,7 @@ const PLAIN_TEXT_EXTENSIONS: &[&str] = &[
     "rb", "swift", "kt", "sql", "html", "htm", "css", "scss", "less", "sh", "bat", "ps1", "env",
 ];
 
+/// 始终可用的纯文本解析器，拒绝明显的二进制内容和超大文件。
 pub struct PlainTextParser;
 
 impl DocumentParser for PlainTextParser {

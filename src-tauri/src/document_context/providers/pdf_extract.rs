@@ -1,3 +1,7 @@
+//! 基于 `pdf_extract` 的 PDF 文本提取适配器。
+//!
+//! 该实现只提取可获得的文本层，不负责 OCR；扫描件能否产生内容取决于源 PDF 本身。
+
 use anyhow::{Context, Result};
 
 use crate::document_context::chunking::split_markdown_into_chunks;
@@ -5,6 +9,7 @@ use crate::document_context::chunking::split_markdown_into_chunks;
 use super::super::model::ParsedDocument;
 use super::super::parser::{DocumentParser, ParseInput};
 
+/// 将 PDF 文本层转换为标准文档上下文。
 pub struct PdfExtractParser;
 
 impl DocumentParser for PdfExtractParser {

@@ -1,8 +1,16 @@
+//! 将解析后的 Markdown 切分为可放入模型上下文的连续片段。
+//!
+//! 切分优先保持标题边界；超出单片预算时保留尾部重叠，以减少跨片段信息丢失。片段的
+//! 持久化和检索排序由 `storage` 模块负责。
+
 use super::model::DocumentChunk;
 
 const DEFAULT_CHUNK_CHARS: usize = 3_000;
 const DEFAULT_CHUNK_OVERLAP_CHARS: usize = 300;
 
+/// 按默认字符预算切分 Markdown。
+///
+/// 长度按 Unicode 字符计算，避免中文或 emoji 在切分时破坏 UTF-8 边界。
 pub fn split_markdown_into_chunks(markdown: &str) -> Vec<DocumentChunk> {
     split_markdown_with_limit(markdown, DEFAULT_CHUNK_CHARS)
 }

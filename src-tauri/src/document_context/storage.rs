@@ -1,3 +1,8 @@
+//! 文档上下文的本地归档、解析缓存与上下文组装。
+//!
+//! 缓存按源文件 SHA-256 复用并由 JSON 索引引用；附件删除后仅清理由索引和聊天消息都未引用的
+//! 缓存目录，解析器实现与分块策略分别位于 `parser` 和 `chunking`。
+
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -70,6 +75,7 @@ struct ChunkCandidate {
     score: f64,
 }
 
+/// 返回随应用数据库存放的文档上下文根目录，避免依赖原始附件的可变路径。
 pub fn context_root_dir(paths: &PathsState) -> Result<PathBuf> {
     let db_dir = paths
         .db_path
@@ -78,6 +84,10 @@ pub fn context_root_dir(paths: &PathsState) -> Result<PathBuf> {
     Ok(db_dir.join("document_context"))
 }
 
+/// 归档源文件并创建待解析索引项。
+///
+/// 相同内容复用同一 SHA-256 缓存目录；索引项仍各自绑定会话，且只有支持格式与 50 MB 以内的
+/// 文件能进入解析队列。
 pub fn create_pending_items(
     paths: &PathsState,
     conversation_id: Option<String>,
@@ -243,6 +253,7 @@ fn read_cached_parse_output(root: &Path, sha256: &str) -> Result<CachedParseOutp
     })
 }
 
+/// 列出全部或指定会话的附件，按最近更新时间倒序返回。
 pub fn list_items(
     paths: &PathsState,
     conversation_id: Option<&str>,
@@ -257,6 +268,7 @@ pub fn list_items(
     Ok(items)
 }
 
+/// 读取单个索引项；不存在时返回错误，不检查其解析状态。
 pub fn get_item(paths: &PathsState, item_id: &str) -> Result<DocumentContextItem> {
     let root = context_root_dir(paths)?;
     let _guard = lock_index()?;
@@ -267,6 +279,7 @@ pub fn get_item(paths: &PathsState, item_id: &str) -> Result<DocumentContextItem
         .ok_or_else(|| anyhow!("未找到文档上下文：{}", item_id))
 }
 
+/// 标记重新或首次解析开始，并清除上一次失败信息。
 pub fn mark_item_parsing(paths: &PathsState, item_id: &str) -> Result<DocumentContextItem> {
     update_item(paths, item_id, |item| {
         item.status = DocumentContextStatus::Parsing;
@@ -275,6 +288,9 @@ pub fn mark_item_parsing(paths: &PathsState, item_id: &str) -> Result<DocumentCo
     })
 }
 
+/// 持久化完整解析结果后才将索引项切换为 `Ready`。
+///
+/// 缓存文件全部写入成功前，调用方不会看到可参与提示词构建的半成品附件。
 pub fn save_parse_success(
     paths: &PathsState,
     item_id: &str,
@@ -316,6 +332,7 @@ pub fn save_parse_success(
     })
 }
 
+/// 记录解析失败，不删除已归档源文件，以便用户重试或定位格式问题。
 pub fn save_parse_failure(
     paths: &PathsState,
     item_id: &str,
@@ -328,6 +345,7 @@ pub fn save_parse_failure(
     })
 }
 
+/// 删除一个索引项，并清理不再被其他附件或聊天消息引用的缓存。
 pub fn remove_item(paths: &PathsState, item_id: &str) -> Result<()> {
     let root = context_root_dir(paths)?;
     {
@@ -344,6 +362,7 @@ pub fn remove_item(paths: &PathsState, item_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// 删除会话的全部附件索引项；共享缓存仍会保留到所有引用都消失为止。
 pub fn remove_items_for_conversation(
     paths: &PathsState,
     conversation_id: &str,
@@ -371,6 +390,7 @@ pub fn remove_items_for_conversation(
     Ok(removed)
 }
 
+/// 将附件索引项转移到另一会话，不复制或重新解析其按哈希共享的缓存。
 pub fn reassign_conversation(
     paths: &PathsState,
     from_conversation_id: &str,
@@ -399,6 +419,10 @@ pub fn reassign_conversation(
     Ok(updated)
 }
 
+/// 构建指定会话的已就绪附件上下文。
+///
+/// 未指定条目时纳入该会话的全部就绪附件；指定查询时先按词项相关度排序。无论何种模式，
+/// 最终输出都按 Unicode 字符预算截断，并通过 `truncated` 告知调用方资料不完整。
 pub fn build_context_markdown(
     paths: &PathsState,
     conversation_id: &str,
