@@ -716,9 +716,9 @@ fn best_horizontal_terminal_candidate(
     }
 
     let (current_width, current_height) = assembled_dimensions(prepared, clusters, None);
-    let current_area = current_width * current_height;
+    let current_cost = shape_cost(prepared, current_width, current_height);
     let mut best = None;
-    let mut best_area = current_area;
+    let mut best_cost = current_cost;
     let candidates = [
         Vec2::new(anchor_position.x - distance, anchor_position.y),
         Vec2::new(anchor_position.x + distance, anchor_position.y),
@@ -797,17 +797,33 @@ fn best_horizontal_terminal_candidate(
             clusters,
             Some((tail_cluster, tail_slot, candidate)),
         );
-        if width > current_width + 1e-9 || height > current_height + 1e-9 {
-            continue;
-        }
-        let area = width * height;
-        if area + 1e-9 < best_area {
+        // 只看形状代价，不再要求两个维度都不增长：把叶子摊到横向常常需要多花几十像素宽度
+        // 换回几百像素高度，而旧的"任一维度变大即否决"会把这类净收益的候选全部判死。
+        let cost = shape_cost(prepared, width, height);
+        if cost + 1e-9 < best_cost {
             best = Some(candidate);
-            best_area = area;
+            best_cost = cost;
         }
     }
 
-    best.map(|candidate| (candidate, current_area - best_area))
+    best.map(|candidate| (candidate, current_cost - best_cost))
+}
+
+/// 组装尺寸的形状代价，越小越好。
+///
+/// 主项按目标视口拟合：`max(w/aspect, h)` 与 fitView 的缩放比成反比，所以最小化它等价于
+/// 最大化卡片在屏幕上的实际大小。副项是两个归一化边长之和，只为在非约束方向上提供梯度
+/// （见 `SHAPE_SLACK_WEIGHT`），否则某一维吃满时另一维的收缩会被判为零收益。
+/// `viewport_aspect <= 0` 时退回包围盒面积（旧行为）。
+/// 注意两种模式量纲不同（长度 vs 面积），只能同口径比较，不要跨模式做差。
+fn shape_cost(prepared: &PreparedLayoutRequest, width: f64, height: f64) -> f64 {
+    let aspect = prepared.resolved_params.viewport_aspect;
+    if aspect <= 0.0 {
+        return width * height;
+    }
+    let normalized_width = width / aspect;
+    normalized_width.max(height)
+        + prepared.resolved_params.shape_slack_weight.max(0.0) * (normalized_width + height)
 }
 
 fn assembled_dimensions(

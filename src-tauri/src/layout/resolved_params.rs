@@ -54,6 +54,8 @@ pub struct ResolvedLayoutParams {
     pub cluster_two_way_bonus: f64,
     pub cluster_horizontal_stretch: f64,
     pub orientation_linearity_threshold: f64,
+    pub viewport_aspect: f64,
+    pub shape_slack_weight: f64,
     pub fixed_random_seed: u64,
     pub min_distance: f64,
     pub attractive_direction_salt: u64,
@@ -270,6 +272,14 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.orientation_linearity_threshold)
                 .unwrap_or(ORIENTATION_LINEARITY_THRESHOLD),
+            viewport_aspect: p
+                .as_ref()
+                .and_then(|x| x.viewport_aspect)
+                .unwrap_or(VIEWPORT_ASPECT),
+            shape_slack_weight: p
+                .as_ref()
+                .and_then(|x| x.shape_slack_weight)
+                .unwrap_or(SHAPE_SLACK_WEIGHT),
             fixed_random_seed: p
                 .as_ref()
                 .and_then(|x| x.fixed_random_seed)
