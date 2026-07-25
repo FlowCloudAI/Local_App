@@ -1,3 +1,7 @@
+//! 旧版矛盾检测的语料加载兼容层。
+//!
+//! 矛盾检测已复用通用世界观检测的请求、语料和加载规则，本文件仅保留旧 API 名称。
+
 use crate::AppState;
 use crate::ai_services::world_check::{
     WorldCheckCorpus, WorldCheckLoadRequest, load_world_check_corpus,

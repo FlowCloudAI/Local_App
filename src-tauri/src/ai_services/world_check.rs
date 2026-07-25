@@ -1,3 +1,8 @@
+//! 通用世界观检测的定义与语料加载。
+//!
+//! 本文件统一检测种类的固定配置、工具能力边界和提示词语料预算；具体提示词文本由
+//! `context_builders` 构造，旧矛盾检测入口通过 `contradiction_loader` 复用这里的规则。
+
 use crate::AppState;
 use crate::ai_services::context_builders::build_entry_markdown;
 use crate::reports::world_check_report::WorldCheckKind;

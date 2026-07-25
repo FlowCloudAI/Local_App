@@ -1,3 +1,7 @@
+//! 模型结构化输出的轻量解析入口。
+//!
+//! 本文件只剥离已知的回复包装并交给 `serde_json` 校验；具体工件的业务语义由调用方定义。
+
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 

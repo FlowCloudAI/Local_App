@@ -1,3 +1,8 @@
+//! AI 任务的上下文和提示词构造。
+//!
+//! 本文件将项目词条转换为受限、可安全嵌入提示词的文本；语料选择和长度预算由
+//! `world_check` 负责，模板的实际渲染由 `template` 模块负责。
+
 use crate::ai_services::contradiction_loader::ContradictionCorpus;
 use crate::ai_services::world_check::{WorldCheckCorpus, WorldCheckDefinition};
 use crate::template::render_global_template;
