@@ -21,6 +21,7 @@ import {
     type Conversation,
     type ConversationSettings,
 } from '../../../features/ai-chat/model/AiControllerTypes'
+import {isPendingConversationId} from '../../../features/ai-chat/model/conversationState'
 import {
     ai_export_conversation,
     type ConversationExportFormat,
@@ -97,7 +98,8 @@ export default function MobileAiChat({
 
     const controller = useAiController(aiFocus)
     const {
-        conversations, activeConversationId, setActiveConversationId,
+        conversations, activeConversationId, activeConversation: controllerActiveConversation,
+        isComposingNewConversation, setActiveConversationId,
         messages, sendMessage, stopStreaming,
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
@@ -128,10 +130,7 @@ export default function MobileAiChat({
     const modelMenuRef = useRef<HTMLButtonElement>(null)
     const toolModeMenuRef = useRef<HTMLButtonElement>(null)
 
-    const activeConversation = useMemo(
-        () => conversations.find(conversation => conversation.id === activeConversationId) ?? null,
-        [activeConversationId, conversations],
-    )
+    const activeConversation = controllerActiveConversation ?? null
     const activeLlmPluginId = activeConversation?.pluginId || selectedPlugin
     const activeLlmPluginInfo = useMemo(
         () => plugins.find(plugin => plugin.id === activeLlmPluginId) ?? null,
@@ -193,6 +192,7 @@ export default function MobileAiChat({
         || pluginSelectionIncomplete
         || llmApiKeyChecking
         || llmApiKeyMissing
+        || isComposingNewConversation
     const inputDisabled = !activeConversation
         || isArchivedConversation
         || pluginsLoading
@@ -531,7 +531,7 @@ export default function MobileAiChat({
     ) => {
         setConversationActionTarget(null)
 
-        if (conversation.id.startsWith('conv_')) {
+        if (isPendingConversationId(conversation.id)) {
             await showAlert('这条会话尚未写入历史，发送消息后再导出。', 'warning', 'nonInvasive', 2200)
             return
         }
@@ -601,7 +601,7 @@ export default function MobileAiChat({
         }
     }, [activeConversation, addDocumentContextFiles, closeMorePanel, isArchivedConversation, showAlert])
 
-    const activeConversationMenuItems: MobileAnchoredMenuItem[] = activeConversation ? [
+    const activeConversationMenuItems: MobileAnchoredMenuItem[] = activeConversation && !isComposingNewConversation ? [
         {
             key: 'pin',
             label: activeConversation.pinnedAt ? '取消顶置' : '顶置对话',
@@ -626,17 +626,17 @@ export default function MobileAiChat({
         {
             key: 'export-markdown',
             label: '导出 Markdown',
-            description: activeConversation.id.startsWith('conv_') ? '发送消息后可导出' : '保存为 .md 文件',
+            description: isPendingConversationId(activeConversation.id) ? '发送消息后可导出' : '保存为 .md 文件',
             icon: <MobileAiIcon type="file"/>,
-            disabled: activeConversation.id.startsWith('conv_'),
+            disabled: isPendingConversationId(activeConversation.id),
             onSelect: () => void handleExportConversation(activeConversation, 'markdown'),
         },
         {
             key: 'export-json',
             label: '导出 JSON',
-            description: activeConversation.id.startsWith('conv_') ? '发送消息后可导出' : '保存为 .json 文件',
+            description: isPendingConversationId(activeConversation.id) ? '发送消息后可导出' : '保存为 .json 文件',
             icon: <MobileAiIcon type="file"/>,
-            disabled: activeConversation.id.startsWith('conv_'),
+            disabled: isPendingConversationId(activeConversation.id),
             onSelect: () => void handleExportConversation(activeConversation, 'json'),
         },
         {
@@ -668,13 +668,13 @@ export default function MobileAiChat({
         {
             key: 'export-markdown',
             label: '导出 Markdown',
-            disabled: conversationActionTarget.id.startsWith('conv_'),
+            disabled: isPendingConversationId(conversationActionTarget.id),
             onSelect: () => void handleExportConversation(conversationActionTarget, 'markdown'),
         },
         {
             key: 'export-json',
             label: '导出 JSON',
-            disabled: conversationActionTarget.id.startsWith('conv_'),
+            disabled: isPendingConversationId(conversationActionTarget.id),
             onSelect: () => void handleExportConversation(conversationActionTarget, 'json'),
         },
         {
@@ -752,7 +752,7 @@ export default function MobileAiChat({
                             kind: 'more',
                             ariaHasPopup: 'menu',
                             ariaExpanded: topMenuOpen,
-                            disabled: !activeConversation,
+                            disabled: !activeConversation || isComposingNewConversation,
                             onClick: handleToggleTopMenu,
                         },
                     ]}

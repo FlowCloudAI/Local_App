@@ -99,6 +99,11 @@ import type {
     AiToolAccessMode,
 } from '../model/AiControllerTypes'
 import {DEFAULT_CONVERSATION_SETTINGS, normalizeConversationSettings} from '../model/AiControllerTypes'
+import {
+    isEmptyDraftConversation,
+    isPendingConversationId,
+    toConversationHistory,
+} from '../model/conversationState'
 import {toEntryImageSrc} from '../../entries/lib/entryImage'
 
 const generateTitleFromMessage = (content: string): string => {
@@ -265,11 +270,6 @@ const createDraftConversation = (
     reportSeeded: false,
     settings: normalizeConversationSettings(settings),
 })
-
-const isEmptyDraftConversation = (conversation: Conversation) =>
-    conversation.id.startsWith('conv_')
-    && conversation.messages.length === 0
-    && (!conversation.mode || conversation.mode === 'default')
 
 interface StoredCharacterConversationMeta {
     mode?: 'character' | 'report' | null
@@ -727,6 +727,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
         () => conversations.find((conversation) => conversation.id === activeConversationId),
         [conversations, activeConversationId],
     )
+    const historyConversations = useMemo(
+        () => toConversationHistory(conversations),
+        [conversations],
+    )
+    const isComposingNewConversation = Boolean(
+        activeConversation && isEmptyDraftConversation(activeConversation),
+    )
 
     const messages = useMemo(() => activeConversation?.messages ?? [], [activeConversation])
     const documentContextItemsByConversationRef = useRef(documentContextItemsByConversation)
@@ -1070,7 +1077,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     useEffect(() => {
         if (session.branchSwitchVersion === 0) return
         const convId = activeConversationIdRef.current
-        if (!convId || convId.startsWith('conv_')) return
+        if (!convId || isPendingConversationId(convId)) return
         ai_get_conversation(convId).then(stored => {
             if (!stored) return
             setAiConversations(prev => prev.map(c =>
@@ -1432,7 +1439,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [conversationMetaLoaded, pluginsReady, selectedModel, selectedPlugin, session])
 
     useEffect(() => {
-        if (!activeConversationId?.startsWith('conv_') || !selectedPlugin || !selectedModel) return
+        if (!activeConversationId || !isPendingConversationId(activeConversationId) || !selectedPlugin || !selectedModel) return
         setAiConversations((prev) => prev.map((conversation) => {
             if (conversation.id !== activeConversationId || !isEmptyDraftConversation(conversation)) {
                 return conversation
@@ -1453,7 +1460,39 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ).catch(logger.error)
     }, [activeConversation?.settings, sessionParams, session.sessionId])
 
+    const discardDraftDocumentContext = useCallback(async (conversationId: string) => {
+        const items = documentContextItemsByConversationRef.current[conversationId]
+            ?? await docctx_list_items(conversationId).catch((error) => {
+                logger.warn('读取待丢弃草稿的文档上下文失败', {conversationId, error})
+                return []
+            })
+        await Promise.all(items.map((item) =>
+            docctx_remove_item(item.id).catch((error) => {
+                logger.warn('清理待丢弃草稿的文档上下文失败', {
+                    conversationId,
+                    itemId: item.id,
+                    error,
+                })
+            }),
+        ))
+        setAiDocumentContextItemsByConversation((current) => {
+            if (!current[conversationId]) return current
+            const next = {...current}
+            delete next[conversationId]
+            return next
+        })
+        setAiPendingDocumentAttachmentIdsByConversation((current) => {
+            if (!current[conversationId]) return current
+            const next = {...current}
+            delete next[conversationId]
+            return next
+        })
+    }, [])
+
     const createNewConversation = useCallback(async () => {
+        if (activeConversationRef.current && isEmptyDraftConversation(activeConversationRef.current)) {
+            return
+        }
         if (!selectedPlugin || !selectedModel) {
             session.activateSession(null, null)
             setAiActiveConversationId(null)
@@ -1464,6 +1503,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
             return
         }
 
+        const staleDrafts = conversationsRef.current.filter(isEmptyDraftConversation)
+        await Promise.all(staleDrafts.map((conversation) =>
+            discardDraftDocumentContext(conversation.id),
+        ))
         const draft = createDraftConversation(
             selectedPlugin,
             selectedModel,
@@ -1479,7 +1522,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setInputValue('')
         setEditingMessageId(null)
         setAutoScroll(true)
-    }, [selectedModel, selectedPlugin, session])
+    }, [discardDraftDocumentContext, selectedModel, selectedPlugin, session])
 
     const startReportDiscussion = useCallback(async ({
                                                          title,
@@ -1592,7 +1635,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         settings: ConversationSettings,
         immediate = false,
     ) => {
-        if (convId.startsWith('conv_')) return
+        if (isPendingConversationId(convId)) return
         const timers = conversationSettingsSaveTimersRef.current
         if (timers[convId]) {
             window.clearTimeout(timers[convId])
@@ -1719,7 +1762,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             session.activateSession(targetConv.sessionId, targetConv.runId)
             setAiSelectedPluginModel(targetConv.pluginId, targetConv.model)
 
-            if (targetConv.messages.length === 0 && !targetConv.id.startsWith('conv_')) {
+            if (targetConv.messages.length === 0 && !isPendingConversationId(targetConv.id)) {
                 const stored = await ai_get_conversation(targetConv.id).catch(() => null)
                 if (stored) {
                     setAiConversations((prev) => prev.map((conversation) =>
@@ -1747,7 +1790,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         if (conv?.sessionId) {
             await session.closeSession(conv.sessionId)
         }
-        if (conv && !conv.id.startsWith('conv_')) {
+        if (conv && !isPendingConversationId(conv.id)) {
             await ai_delete_conversation(conv.id).catch(logger.error)
         }
 
@@ -1937,7 +1980,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     : conversation,
             ))
 
-            const isPending = failedSession.conversationId.startsWith('conv_')
+            const isPending = isPendingConversationId(failedSession.conversationId)
             const created = await session.createSession(
                 currentConv.pluginId || selectedPlugin,
                 currentConv.model || selectedModel,
@@ -2084,7 +2127,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 conversationId: currentConvId,
             })
 
-            const isPending = currentConvId.startsWith('conv_')
+            const isPending = isPendingConversationId(currentConvId)
             const desiredSessionId = isPending ? undefined : currentConvId
             const created = await session.createSession(
                 selectedPlugin,
@@ -2508,7 +2551,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         selectedModel,
         setSelectedPlugin: setAiSelectedPlugin,
         setSelectedModel: setAiSelectedModel,
-        conversations,
+        conversations: historyConversations,
         activeConversationId,
         setActiveConversationId: selectConversation,
         messages,
@@ -2543,6 +2586,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setSidebarCollapsed,
         autoScroll,
         setAutoScroll,
+        isComposingNewConversation,
         createNewConversation,
         startReportDiscussion,
         startCharacterConversation,
@@ -2558,11 +2602,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
         getBranchInfo: session.getBranchInfo,
         switchBranch: session.switchBranch,
     }), [
-        plugins, pluginsReady, selectedPlugin, selectedModel, conversations, activeConversationId,
+        plugins, pluginsReady, selectedPlugin, selectedModel, historyConversations, activeConversationId,
         documentContextItems, pendingDocumentAttachmentItems,
         messages, inputValue, editingMessageId, tools, webSearchEnabled, toolAccessMode,
         writerModeAvailable, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
+        isComposingNewConversation,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
         addDocumentContextFiles, removeDocumentContextItem, retryDocumentContextItem,
         toggleWebSearch, setToolAccessMode, toggleEditMode, createNewConversation, switchConversation, deleteConversation,

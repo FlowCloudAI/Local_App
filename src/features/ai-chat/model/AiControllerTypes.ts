@@ -185,6 +185,7 @@ export interface AiContextValue {
     autoScroll: boolean
     setAutoScroll: (v: boolean) => void
 
+    isComposingNewConversation: boolean
     createNewConversation: () => Promise<void>
     startReportDiscussion: (params: {
         title: string

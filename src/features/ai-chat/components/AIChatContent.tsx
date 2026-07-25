@@ -1526,6 +1526,7 @@ export default function AIChatContent({
                             variant="primary"
                             size="sm"
                             onClick={() => void ctx.createNewConversation()}
+                            disabled={ctx.isComposingNewConversation}
                             title="新对话"
                         >
                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
@@ -1812,6 +1813,7 @@ export default function AIChatContent({
                         <DockPanelIconButton
                             className="ai-topbar-new-chat"
                             onClick={() => void ctx.createNewConversation()}
+                            disabled={ctx.isComposingNewConversation}
                             title="新对话"
                         >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"

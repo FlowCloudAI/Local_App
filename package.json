@@ -9,6 +9,7 @@
     "tauri": "tauri",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:ai-conversation-draft": "node --test --experimental-test-isolation=none ./scripts/ai-conversation-state.test.ts",
     "test:edge-geometry": "node ./scripts/check-edge-geometry.ts",
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
     "tauri:build:windows:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-windows-signed.ps1",
