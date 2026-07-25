@@ -1,7 +1,15 @@
+//! 矛盾检测报告的 JSON 模型与可信度校验。
+//!
+//! 本文件是模型输出进入持久化和 UI 前的边界：字段必须符合固定契约，且每条证据引用都必须
+//! 能在本轮资料或工具返回中回查。
+
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 
+/// 兼容早期模型把概览输出为非字符串 JSON 值的情况。
+///
+/// 仅 `overview` 保留此兼容入口；其余结构仍由严格形状校验约束。
 fn deserialize_overview_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -15,6 +23,7 @@ where
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 一段可定位到原始词条的矛盾证据。
 pub struct ContradictionEvidence {
     pub entry_id: String,
     pub entry_title: String,
@@ -24,6 +33,7 @@ pub struct ContradictionEvidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 单个已确认的世界观矛盾及其支撑证据。
 pub struct ContradictionIssue {
     pub issue_id: String,
     pub severity: String,
@@ -37,6 +47,9 @@ pub struct ContradictionIssue {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 矛盾检测的固定输出契约。
+///
+/// `issues` 只收录证据充分的问题；信息不足的情况应保留在 `unresolved_questions`，而非伪造结论。
 pub struct ContradictionReport {
     #[serde(deserialize_with = "deserialize_overview_string")]
     pub overview: String,
@@ -46,6 +59,9 @@ pub struct ContradictionReport {
 }
 
 impl ContradictionReport {
+    /// 先拒绝未知字段，再反序列化并验证所有证据引用。
+    ///
+    /// 严格字段校验避免模型的额外 JSON 被静默丢弃，导致调用方误以为报告完整。
     pub fn from_value_and_validate(value: Value, quote_sources: &[String]) -> Result<Self, String> {
         validate_report_value_shape(&value)?;
         let report: Self = serde_json::from_value(value)
@@ -54,6 +70,7 @@ impl ContradictionReport {
         Ok(report)
     }
 
+    /// 验证业务字段、枚举值和证据是否可在本轮输入中回查。
     pub fn validate(&self, quote_sources: &[String]) -> Result<(), String> {
         if self.overview.trim().is_empty() {
             return Err("矛盾检测报告 overview 不能为空".to_string());

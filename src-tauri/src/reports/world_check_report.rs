@@ -1,3 +1,8 @@
+//! 通用世界观检测报告的模型、兼容转换与证据校验。
+//!
+//! 该模型统一矛盾、单词条契合度和出版风险检测；检测种类决定可用分类，所有发现仍须引用
+//! 可回查的原始资料。
+
 use crate::reports::contradiction_report::{
     ContradictionEvidence, ContradictionIssue, ContradictionReport,
 };
@@ -7,6 +12,7 @@ use std::collections::HashSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+/// 决定报告提示词、允许分类和展示语义的检测种类。
 pub enum WorldCheckKind {
     Contradiction,
     EntryAlignment,
@@ -14,6 +20,7 @@ pub enum WorldCheckKind {
 }
 
 impl WorldCheckKind {
+    /// 返回与 JSON、模板和会话配置一致的稳定标识。
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Contradiction => "contradiction",
@@ -59,6 +66,7 @@ impl WorldCheckKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 通用检测报告中的可回查证据。
 pub struct WorldCheckEvidence {
     pub entry_id: String,
     pub entry_title: String,
@@ -68,6 +76,7 @@ pub struct WorldCheckEvidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 单条检测发现；分类是否合法取决于所属报告的 `check_kind`。
 pub struct WorldCheckFinding {
     pub finding_id: String,
     pub severity: String,
@@ -83,6 +92,9 @@ pub struct WorldCheckFinding {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 所有世界观检测共用的严格 JSON 输出契约。
+///
+/// 可选字段上的 `default` 仅兼容缺省值，不能绕过 `from_value_and_validate` 的未知字段检查。
 pub struct WorldCheckReport {
     pub check_kind: WorldCheckKind,
     pub overview: String,
@@ -99,6 +111,7 @@ pub struct WorldCheckReport {
 }
 
 impl WorldCheckReport {
+    /// 验证模型 JSON 的完整形状、预期检测种类及引用来源后再返回报告。
     pub fn from_value_and_validate(
         value: Value,
         expected_kind: WorldCheckKind,
@@ -111,6 +124,9 @@ impl WorldCheckReport {
         Ok(report)
     }
 
+    /// 验证已反序列化报告的业务约束。
+    ///
+    /// 分数必须位于 0 到 100；每个发现需包含至少一条能从输入资料中回查的证据。
     pub fn validate(
         &self,
         expected_kind: WorldCheckKind,
@@ -190,6 +206,7 @@ impl From<ContradictionIssue> for WorldCheckFinding {
     }
 }
 
+/// 将旧矛盾报告无损映射到通用报告，保持历史报告可在统一界面中展示。
 impl From<ContradictionReport> for WorldCheckReport {
     fn from(value: ContradictionReport) -> Self {
         Self {
