@@ -1,3 +1,8 @@
+//! 内置提示词模板、用户覆盖文件与 Tera 渲染运行时。
+//!
+//! 内置模板编译进程序，用户只能以同名覆盖文件替换；覆盖内容保存前必须通过独立运行时验证，
+//! 以免无效模板破坏所有依赖它的 AI 会话。
+
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,12 +14,16 @@ use tera::{Context as TeraContext, Tera};
 static TEMPLATE_RUNTIME: OnceLock<Arc<RwLock<TemplateRuntime>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Copy, Serialize)]
+/// 模板可用参数的展示元数据；字段名同时是模板上下文契约。
 pub struct TemplateParamMeta {
     pub name: &'static str,
     pub description: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
+/// 可编辑模板的稳定标识与定位信息。
+///
+/// `id` 和 `relative_path` 被前端及覆盖目录使用，重命名需保留兼容迁移。
 pub struct TemplateMeta {
     pub id: &'static str,
     pub group: &'static str,
@@ -26,6 +35,7 @@ pub struct TemplateMeta {
 }
 
 #[derive(Debug, Clone, Serialize)]
+/// 模板读取结果，标明当前内容是否来自用户覆盖文件。
 pub struct TemplateDocument {
     pub meta: TemplateMeta,
     pub content: String,
@@ -614,6 +624,7 @@ impl TemplateRuntime {
     }
 }
 
+/// 安装全局模板运行时；启动阶段只能调用一次。
 pub fn install_global_template_runtime(builtin_dir: PathBuf, override_dir: PathBuf) -> Result<()> {
     let runtime = TemplateRuntime::new(builtin_dir, override_dir)?;
     TEMPLATE_RUNTIME
@@ -687,6 +698,7 @@ pub fn get_template_effective_path(id: &str) -> Result<String> {
     Err(anyhow::anyhow!("模板文件不存在：{}", meta.id))
 }
 
+/// 校验并保存用户模板覆盖；校验失败时不改动当前生效模板。
 pub fn save_template_content(id: &str, content: String) -> TemplateSaveResult {
     match save_template_content_impl(id, content) {
         Ok(document) => TemplateSaveResult::Success { document },
@@ -699,6 +711,7 @@ pub fn save_template_content(id: &str, content: String) -> TemplateSaveResult {
     }
 }
 
+/// 渲染当前生效模板；调用方可在 `None` 时使用内置文本回退。
 pub fn render_global_template(name: &str, ctx: &impl Serialize) -> Option<String> {
     let runtime = global_template_runtime().ok()?;
     let runtime = runtime.read().ok()?;

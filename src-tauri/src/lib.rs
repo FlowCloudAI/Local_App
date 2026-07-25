@@ -1,3 +1,8 @@
+//! FlowCloudAI Tauri 后端的装配与启动入口。
+//!
+//! 此处集中声明功能模块、初始化全局状态和注册前端命令；领域逻辑应保留在各自模块，避免把
+//! 运行时装配层变成新的业务实现入口。
+
 mod ai_services;
 #[cfg(target_os = "android")]
 mod android_file_import;

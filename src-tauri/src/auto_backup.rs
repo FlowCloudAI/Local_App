@@ -1,3 +1,8 @@
+//! SQLite 用户表的定时 CSV 备份。
+//!
+//! 备份任务从应用状态读取配置，按表导出到同一时间戳集合并按集合数量清理旧文件；它是恢复用的
+//! 数据导出，而非 SQLite 事务级快照。
+
 use crate::{AppState, PathsState, SettingsState};
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -13,6 +18,7 @@ use tokio::io::AsyncWriteExt;
 const BACKUP_POLL_INTERVAL: Duration = Duration::from_secs(5);
 const TIMESTAMP_LEN: usize = 19;
 
+/// 启动常驻轮询任务；设置为 `0` 时不执行备份并重置计时。
 pub fn start_auto_backup_worker(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_attempt = Instant::now();

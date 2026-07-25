@@ -1,3 +1,8 @@
+//! Android `content://` 文件导入的 JNI 桥接。
+//!
+//! Android 文件选择器返回的 URI 不一定对应应用可直接读取的路径；本模块在 Java 层复制内容到
+//! 应用管理的目录，并缓存 Activity/JavaVM 以支持后续异步线程调用。
+
 use std::path::{Path, PathBuf};
 
 struct AndroidFileImportRuntime {
@@ -8,6 +13,7 @@ struct AndroidFileImportRuntime {
 static ANDROID_FILE_IMPORT_RUNTIME: std::sync::OnceLock<AndroidFileImportRuntime> =
     std::sync::OnceLock::new();
 
+/// 在 Activity 创建时初始化运行时引用；后续导入必须在此成功后进行。
 pub(crate) fn init_android_file_import(
     env: &mut jni::Env,
     activity: &jni::objects::JObject<'_>,
@@ -26,6 +32,7 @@ pub(crate) fn is_android_file_uri(path: &str) -> bool {
     path.starts_with("content://") || path.starts_with("file://")
 }
 
+/// 通过 Android ContentResolver 复制 URI 指向的文件，并返回应用可访问的本地路径。
 pub(crate) fn copy_android_file_uri_to_dir(
     uri: &str,
     target_dir: &Path,

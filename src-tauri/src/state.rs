@@ -1,3 +1,8 @@
+//! Tauri 管理状态与跨请求共享资源。
+//!
+//! 本文件只定义启动时注入的状态容器；API 和工具从中取得数据库、客户端、路径和确认通道，
+//! 因此各状态的初始化顺序由 `lib` 中的启动流程保证。
+
 use crate::apis::ai_client::StoredConversationSettings;
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::WorldCheckReport;
@@ -14,7 +19,7 @@ use worldflow_core::{SqliteDb, WorldStore};
 
 // ── 搜索引擎状态 ─────────────────────────────────────────────────────────────
 
-/// 当前搜索引擎选择（与设置同步，供 AI 工具使用）
+/// 当前搜索引擎选择（与设置同步，供 AI 工具使用）。
 pub struct SearchEngineState {
     pub engine: Arc<Mutex<String>>,
 }
@@ -26,7 +31,9 @@ pub struct SearchSourcesState {
 
 // ── 网络状态 ──────────────────────────────────────────────────────────────────
 
-/// 全局共享 HTTP 客户端（连接池复用）
+/// 全局共享 HTTP 客户端（连接池复用）。
+///
+/// Android 使用显式根证书配置，避免依赖桌面平台的默认 TLS 根证书来源。
 pub struct NetworkState {
     pub client: reqwest::Client,
 }

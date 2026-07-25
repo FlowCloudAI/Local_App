@@ -1,10 +1,17 @@
+//! 非敏感应用设置与 API 密钥存储适配。
+//!
+//! `settings.json` 只保存可公开的运行配置；密钥由 `ApiKeyStore` 交给平台安全存储。配置写入
+//! 使用同目录临时文件，避免中断时破坏整份设置。
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 // ── 应用设置 ───────────────────────────────────────────────────────────────
 
-/// 存储在 app_config_dir/settings.json，不含任何密钥
+/// 存储在 app_config_dir/settings.json，不含任何密钥。
+///
+/// 新字段必须提供默认值，以便旧版配置能够无损加载。
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct AppSettings {
