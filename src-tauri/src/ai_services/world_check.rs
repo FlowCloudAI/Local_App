@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
+/// 单种世界观检测的稳定运行配置。
+///
+/// 模板名、任务类型和工具白名单必须随检测种类一起定义，避免调用方拼装出权限与提示词
+/// 不匹配的会话。
 pub struct WorldCheckDefinition {
     pub kind: WorldCheckKind,
     pub task_type: &'static str,
@@ -20,6 +24,9 @@ pub struct WorldCheckDefinition {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+/// 选择检测语料的请求。
+///
+/// 词条 ID 优先于搜索条件；所有可选限额都会在加载时收紧到服务允许的范围。
 pub struct WorldCheckLoadRequest {
     pub project_id: String,
     pub entry_ids: Option<Vec<String>>,
@@ -33,6 +40,9 @@ pub struct WorldCheckLoadRequest {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+/// 实际交给模型的检测语料，以及范围是否因字符预算而被裁剪的事实。
+///
+/// 目标词条单独保存，不与参考资料混排，供需要单词条判断的检测复用。
 pub struct WorldCheckCorpus {
     pub project_id: String,
     pub project_name: String,
@@ -45,6 +55,9 @@ pub struct WorldCheckCorpus {
     pub truncated: bool,
 }
 
+/// 返回世界观检测会话所需的最小工具集。
+///
+/// 新增工具前应确认检测提示词确实需要它；该列表同时是会话能力边界。
 pub fn world_check_tool_whitelist() -> Vec<String> {
     [
         "search_entries",
@@ -67,6 +80,7 @@ pub fn world_check_tool_whitelist() -> Vec<String> {
     .collect()
 }
 
+/// 将公开检测种类映射到不可由请求方覆盖的运行配置。
 pub fn world_check_definition(kind: WorldCheckKind) -> WorldCheckDefinition {
     match kind {
         WorldCheckKind::Contradiction => WorldCheckDefinition {
@@ -105,6 +119,10 @@ pub fn world_check_definition(kind: WorldCheckKind) -> WorldCheckDefinition {
     }
 }
 
+/// 加载并限额世界观检测语料。
+///
+/// 显式词条集合优先；否则依次使用搜索结果和分类下的词条。目标词条即使不在候选集中也
+/// 会优先纳入，随后去重并按字符预算停止加载，避免提示词超过可控范围。
 pub async fn load_world_check_corpus(
     app_state: &AppState,
     request: &WorldCheckLoadRequest,

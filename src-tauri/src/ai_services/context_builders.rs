@@ -46,6 +46,10 @@ struct WorldCheckPromptTemplateContext<'a> {
     entry_blocks: &'a [String],
 }
 
+/// 构造提交给 AI 客户端的最小任务上下文。
+///
+/// `attributes` 与 `flags` 由具体任务定义；这里不填充可推导字段，避免不同检测任务带入
+/// 不属于自身的上下文。
 pub fn build_task_context(
     project_id: Option<String>,
     task_type: &str,
@@ -61,6 +65,9 @@ pub fn build_task_context(
     }
 }
 
+/// 将持久化词条转换为可安全嵌入提示词的快照。
+///
+/// 正文上限按 Unicode 字符而非字节截断，保证中文和 emoji 不会被截成非法 UTF-8。
 pub fn build_entry_markdown(entry: &Entry, max_content_chars: usize) -> String {
     let tags = entry
         .tags
@@ -79,6 +86,9 @@ pub fn build_entry_markdown(entry: &Entry, max_content_chars: usize) -> String {
     )
 }
 
+/// 构造词条快照，并隔离用户可编辑字段中的 XML-like 标记。
+///
+/// 模板与回退格式都依赖相同的转义结果，防止用户内容闭合提示词中的资料边界。
 pub fn build_entry_snapshot_markdown(
     entry_id: &str,
     title: &str,
@@ -154,6 +164,7 @@ fn escape_xml_like_text(input: &str) -> String {
     output
 }
 
+/// 生成摘要任务的提示词；`entry_field` 模式的输出可直接写回词条摘要字段。
 pub fn build_summary_prompt(
     project_name: &str,
     focus: Option<&str>,
@@ -204,6 +215,9 @@ pub fn build_summary_prompt(
     prompt
 }
 
+/// 生成旧版矛盾检测提示词。
+///
+/// 语料被裁剪时必须要求模型保留不确定性，不能把缺失资料当作冲突证据。
 pub fn build_contradiction_prompt(corpus: &ContradictionCorpus) -> String {
     if let Some(rendered) = render_global_template(
         "contradiction/detection_prompt",
@@ -289,6 +303,9 @@ pub fn build_contradiction_prompt(corpus: &ContradictionCorpus) -> String {
     prompt
 }
 
+/// 根据检测定义和已限额的语料生成世界观检测提示词。
+///
+/// 有对应全局模板时优先使用模板；内置文本只是模板缺失时的可用回退。
 pub fn build_world_check_prompt(
     definition: &WorldCheckDefinition,
     corpus: &WorldCheckCorpus,
