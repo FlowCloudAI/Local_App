@@ -1,3 +1,8 @@
+//! 分类创建与删除工具的注册。
+//!
+//! 所有写入操作都通过确认层；联级删除比内容上移更具破坏性，注册参数与确认文案必须保持
+//! 对应，不能将其降级为普通删除。
+
 use crate::tools;
 use crate::tools::confirm::{request_confirmation, request_write_confirmation};
 use crate::tools::format;

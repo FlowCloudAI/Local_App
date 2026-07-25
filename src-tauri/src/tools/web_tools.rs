@@ -1,3 +1,8 @@
+//! 联网搜索与 URL 文本提取工具。
+//!
+//! 搜索只返回候选链接，正文需再经 `open_url` 获取；URL 内容会短期缓存，调用方不能将缓存结果
+//! 视为实时来源，也不能把服务不可用误解为资料不存在。
+
 use crate::settings::SearchSourceSettings;
 use anyhow::Result;
 use ego_tree::NodeRef;
@@ -28,7 +33,7 @@ fn is_text_content_type(ct: &str) -> bool {
     )
 }
 
-// ── URL 内容缓存：15 分钟 TTL，最多 100 条 ───────────────────────────────────
+// URL 内容缓存仅用于降低重复抓取；不保证实时性或跨进程共享。
 static URL_CACHE: OnceLock<Cache<String, (u16, String)>> = OnceLock::new();
 
 fn url_cache() -> &'static Cache<String, (u16, String)> {

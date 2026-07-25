@@ -1,3 +1,8 @@
+//! 工具注册表与共享运行时状态的装配入口。
+//!
+//! 这里集中注册所有工具并标记读写属性；白名单只声明某个 Sense 可见的工具，`mark_read` 则是
+//! read-only 会话实际放行的下限，两者必须同步维护。
+
 use crate::AppState;
 use crate::settings::SearchSourceSettings;
 use anyhow::Result;
@@ -15,7 +20,9 @@ use super::project_tools;
 use super::state::WorldflowToolState;
 use super::web_tools;
 
-/// 注册所有 Worldflow 工具到 ToolRegistry
+/// 注册所有 Worldflow 工具并注入每个调用共享的状态。
+///
+/// 新增工具时必须同时判断其读写属性；未标记为读取的工具会在 read-only 会话中被拒绝。
 pub fn register_worldflow_tools(
     registry: &mut flowcloudai_client::tool::ToolRegistry,
     app_state: std::sync::Arc<AppState>,

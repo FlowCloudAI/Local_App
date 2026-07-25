@@ -1,9 +1,15 @@
+//! AI 写入操作的前端确认协议。
+//!
+//! 本模块用一次性通道关联确认请求与用户响应；超时、缺少窗口句柄或通道异常均按取消处理，
+//! 以避免模型在无人确认时继续修改数据。
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{Mutex, oneshot};
 
 #[derive(serde::Serialize, Clone)]
+/// 发往前端确认弹窗的操作摘要。
 pub struct AiWriteRequestPayload {
     pub request_id: String,
     pub operation: String,
@@ -13,6 +19,9 @@ pub struct AiWriteRequestPayload {
     pub warning: Option<String>,
 }
 
+/// 查询当前运行环境是否允许自动确认普通写入。
+///
+/// 删除和移除操作仍须人工确认，不能因该开关失去恢复前的最后一道保护。
 pub fn should_auto_confirm_writes() -> bool {
     flowcloudai_client::tool::auto_confirm_writes_enabled()
 }
@@ -46,6 +55,7 @@ pub async fn request_confirmation<P: serde::Serialize + Clone>(
     }
 }
 
+/// 请求写入确认；在允许自动确认时只放行非删除、非移除操作。
 pub async fn request_write_confirmation(
     app_handle: Option<&AppHandle>,
     pending_edits: &Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,

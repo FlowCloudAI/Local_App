@@ -1,3 +1,8 @@
+//! Worldflow 数据访问工具的领域服务与输出格式化。
+//!
+//! 子模块负责把模型工具调用注册到客户端；本文件提供与数据库的异步操作和 Markdown 回退格式，
+//! 不负责会话权限判定，读写能力由 `registry` 的标注与 Sense 白名单共同约束。
+
 use crate::AppState;
 use crate::apis::worldflow::common::{
     open_category_db, open_entry_db, open_project_db, open_relation_db,
@@ -17,7 +22,9 @@ pub mod state;
 pub mod web_tools;
 pub use registry::register_worldflow_tools;
 
-/// 工具返回结果格式化辅助
+/// 工具返回结果格式化辅助。
+///
+/// 全局模板可覆盖回退格式；两者都面向模型消费，修改字段或标题会影响提示词与工具链兼容性。
 pub mod format {
     use super::*;
     use crate::template::render_global_template;

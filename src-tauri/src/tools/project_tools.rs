@@ -1,3 +1,8 @@
+//! 项目创建工具的注册。
+//!
+//! 通过工具创建的项目不会补齐界面创建流程中的默认标签定义，因此调用方必须明确该差异，
+//! 且创建前仍需用户确认。
+
 use crate::tools;
 use crate::tools::confirm::request_write_confirmation;
 use anyhow::Result;

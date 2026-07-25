@@ -1,9 +1,16 @@
+//! 工具执行所需的应用状态与确认通道。
+//!
+//! 该状态由注册表创建后放入客户端 SenseState；默认值只供测试或未装配环境使用，真实工具调用
+//! 需要完整的应用状态和窗口句柄才能执行数据访问或人工确认。
+
 use crate::AppState;
 use crate::settings::SearchSourceSettings;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 
-/// Worldflow 工具的状态结构
+/// Worldflow 工具共享的依赖容器。
+///
+/// `pending_edits` 将一次性确认请求与前端响应关联，不能在操作完成前替换为独立映射。
 #[derive(Clone)]
 pub struct WorldflowToolState {
     pub app_state: Option<std::sync::Arc<AppState>>,

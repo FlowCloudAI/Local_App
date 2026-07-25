@@ -1,3 +1,8 @@
+//! 词条正文的行级编辑、整体替换与删除工具。
+//!
+//! 编辑前会读取当前内容并把前后版本交给确认层；行号使用从 1 开始的用户语义，支持在
+//! `start_line - 1` 处纯插入。
+
 use crate::tools;
 use crate::tools::confirm::{request_confirmation, should_auto_confirm_writes};
 use anyhow::Result;

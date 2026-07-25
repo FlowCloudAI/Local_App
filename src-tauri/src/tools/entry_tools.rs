@@ -1,3 +1,8 @@
+//! 词条、标签与关系工具的注册及操作分派。
+//!
+//! 本文件将模型参数解析为受限操作，再统一执行数据访问、确认与界面更新事件；写入路径不能
+//! 绕过确认分派，否则模型工具调用会脱离用户审核。
+
 use crate::tools;
 use crate::tools::confirm::request_write_confirmation;
 use crate::tools::format;
