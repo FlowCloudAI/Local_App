@@ -56,6 +56,9 @@ pub struct ResolvedLayoutParams {
     pub orientation_linearity_threshold: f64,
     pub viewport_aspect: f64,
     pub shape_slack_weight: f64,
+    pub terminal_tuck_angles: usize,
+    pub terminal_tuck_radius_steps: usize,
+    pub terminal_tuck_min_radius_factor: f64,
     pub fixed_random_seed: u64,
     pub min_distance: f64,
     pub attractive_direction_salt: u64,
@@ -280,6 +283,18 @@ impl ResolvedLayoutParams {
                 .as_ref()
                 .and_then(|x| x.shape_slack_weight)
                 .unwrap_or(SHAPE_SLACK_WEIGHT),
+            terminal_tuck_angles: p
+                .as_ref()
+                .and_then(|x| x.terminal_tuck_angles)
+                .unwrap_or(TERMINAL_TUCK_ANGLES),
+            terminal_tuck_radius_steps: p
+                .as_ref()
+                .and_then(|x| x.terminal_tuck_radius_steps)
+                .unwrap_or(TERMINAL_TUCK_RADIUS_STEPS),
+            terminal_tuck_min_radius_factor: p
+                .as_ref()
+                .and_then(|x| x.terminal_tuck_min_radius_factor)
+                .unwrap_or(TERMINAL_TUCK_MIN_RADIUS_FACTOR),
             fixed_random_seed: p
                 .as_ref()
                 .and_then(|x| x.fixed_random_seed)

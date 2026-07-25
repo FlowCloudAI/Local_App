@@ -717,12 +717,10 @@ fn best_horizontal_terminal_candidate(
 
     let (current_width, current_height) = assembled_dimensions(prepared, clusters, None);
     let current_cost = shape_cost(prepared, current_width, current_height);
+    let current_fit = shape_fit(prepared, current_width, current_height);
     let mut best = None;
     let mut best_cost = current_cost;
-    let candidates = [
-        Vec2::new(anchor_position.x - distance, anchor_position.y),
-        Vec2::new(anchor_position.x + distance, anchor_position.y),
-    ];
+    let candidates = terminal_tuck_candidates(prepared, anchor_position, distance);
 
     'candidate: for candidate in candidates {
         let position_of = |node_index: usize| {
@@ -797,6 +795,15 @@ fn best_horizontal_terminal_candidate(
             clusters,
             Some((tail_cluster, tail_slot, candidate)),
         );
+        // 离轴重排必须换到主项（屏幕可见尺寸）的实打实改善；只靠副项紧凑度的微调不算，
+        // 否则会把干净的竖直末端拧成 60° 斜角去换几十像素高度——在宽度受限的布局里
+        // 那点高度对 fitView 后的卡片大小毫无影响。与锚点持平的候选保留原有语义，
+        // 允许仅凭副项收益成立（这才是"把竖挂的末端摊平"依赖的路径）。
+        let level_with_anchor = (candidate.y - anchor_position.y).abs() <= 1e-6;
+        if !level_with_anchor && shape_fit(prepared, width, height) + 1e-9 >= current_fit {
+            continue;
+        }
+
         // 只看形状代价，不再要求两个维度都不增长：把叶子摊到横向常常需要多花几十像素宽度
         // 换回几百像素高度，而旧的"任一维度变大即否决"会把这类净收益的候选全部判死。
         let cost = shape_cost(prepared, width, height);
@@ -809,20 +816,70 @@ fn best_horizontal_terminal_candidate(
     best.map(|candidate| (candidate, current_cost - best_cost))
 }
 
-/// 组装尺寸的形状代价，越小越好。
+/// 枚举末端节点绕锚点的候选落点：若干均匀方向 × 若干半径档，半径上限是原本到锚点
+/// 的距离（不把叶子推得更远），下限由 `terminal_tuck_min_radius_factor` 给出，
+/// 且不小于最小间距以免一开始就自撞。
 ///
-/// 主项按目标视口拟合：`max(w/aspect, h)` 与 fitView 的缩放比成反比，所以最小化它等价于
-/// 最大化卡片在屏幕上的实际大小。副项是两个归一化边长之和，只为在非约束方向上提供梯度
-/// （见 `SHAPE_SLACK_WEIGHT`），否则某一维吃满时另一维的收缩会被判为零收益。
+/// 生成顺序固定（角度外层、半径内层），配合调用方"严格改善才接受"的比较，
+/// 保证同一输入的收拢结果可复现——布局缓存依赖这个确定性。
+/// 正左/正右两个原候选位仍包含在内（角度 0 与 π、系数 1.0）。
+fn terminal_tuck_candidates(
+    prepared: &PreparedLayoutRequest,
+    anchor_position: Vec2,
+    distance: f64,
+) -> Vec<Vec2> {
+    let r = &prepared.resolved_params;
+    let angles = r.terminal_tuck_angles.max(1);
+    let steps = r.terminal_tuck_radius_steps.max(1);
+    let min_factor = r.terminal_tuck_min_radius_factor.clamp(0.0, 1.0);
+
+    let mut candidates = Vec::with_capacity(angles * steps);
+    for angle_step in 0..angles {
+        let theta = TAU * angle_step as f64 / angles as f64;
+        let (sin, cos) = theta.sin_cos();
+        for radius_step in 0..steps {
+            // steps == 1 时只取系数 1.0，避免除零。
+            let factor = if steps == 1 {
+                1.0
+            } else {
+                min_factor + (1.0 - min_factor) * radius_step as f64 / (steps - 1) as f64
+            };
+            let radius = (distance * factor).max(r.min_distance);
+            candidates.push(Vec2::new(
+                anchor_position.x + radius * cos,
+                anchor_position.y + radius * sin,
+            ));
+        }
+    }
+    candidates
+}
+
+/// 形状代价的主项：按目标视口拟合。
+///
+/// `max(w/aspect, h)` 与 fitView 的缩放比成反比，所以它就是"卡片在屏幕上有多大"的
+/// 倒数代理——只有这一项的改善才是用户真能看见的收益。
 /// `viewport_aspect <= 0` 时退回包围盒面积（旧行为）。
-/// 注意两种模式量纲不同（长度 vs 面积），只能同口径比较，不要跨模式做差。
+fn shape_fit(prepared: &PreparedLayoutRequest, width: f64, height: f64) -> f64 {
+    let aspect = prepared.resolved_params.viewport_aspect;
+    if aspect <= 0.0 {
+        return width * height;
+    }
+    (width / aspect).max(height)
+}
+
+/// 组装尺寸的形状代价，越小越好：主项拟合 + 副项紧凑度。
+///
+/// 副项是两个归一化边长之和，只为在非约束方向上提供梯度（见 `SHAPE_SLACK_WEIGHT`），
+/// 否则某一维吃满时另一维的收缩会被判为零收益。副项本身不产生屏幕收益，所以调用方
+/// 对离轴重排会额外要求主项改善。
+/// 注意面积退化模式与拟合模式量纲不同（长度 vs 面积），只能同口径比较，不要跨模式做差。
 fn shape_cost(prepared: &PreparedLayoutRequest, width: f64, height: f64) -> f64 {
     let aspect = prepared.resolved_params.viewport_aspect;
     if aspect <= 0.0 {
         return width * height;
     }
     let normalized_width = width / aspect;
-    normalized_width.max(height)
+    shape_fit(prepared, width, height)
         + prepared.resolved_params.shape_slack_weight.max(0.0) * (normalized_width + height)
 }
 
@@ -1800,7 +1857,18 @@ mod tests {
         let mut free = vec![pair.clone(), surrounding.clone()];
         orient_terminal_nodes(&prepared, &component, &mut free);
         assert_eq!(free[0].positions[0], Vec2::new(0.0, 0.0));
-        assert_eq!(free[0].positions[1], Vec2::new(-200.0, 0.0));
+        // 右侧被 right 占住，只有左侧是空的，所以尾节点必须落到锚点左边并与之持平。
+        // 具体收到多近由候选环的枚举顺序决定，不锁死坐标：候选位由三角函数生成，
+        // 正负 x 轴方向会带 1e-14 级的 sin 噪声。
+        let tucked = free[0].positions[1];
+        assert!(
+            tucked.y.abs() < 1e-6,
+            "tail should end up level with the anchor: {tucked:?}"
+        );
+        assert!(
+            tucked.x < 0.0 && tucked.x >= -200.0 - 1e-6,
+            "tail should take the free left side without moving farther out: {tucked:?}"
+        );
         assert_eq!(free[1].positions, surrounding.positions);
 
         let mut blocked = vec![pair, surrounding];
@@ -1885,7 +1953,19 @@ mod tests {
 
         orient_terminal_nodes(&prepared, &component, &mut clusters);
 
-        assert_eq!(clusters[0].positions[0], Vec2::new(-240.0, 0.0));
+        // 只断言"上叶子被摊平到锚点两侧、且没被推得更远"。左右两侧在这个布局里包围盒
+        // 完全等价，谁胜出取决于候选环的枚举顺序，锁死坐标等于把任意的平局结果当契约。
+        let tucked = clusters[0].positions[0];
+        assert_ne!(tucked, Vec2::new(0.0, -240.0), "top leaf should have moved");
+        assert!(
+            tucked.y.abs() < 1e-6,
+            "top leaf should end up level with its anchor: {tucked:?}"
+        );
+        assert!(
+            tucked.x.abs() <= 240.0 + 1e-6,
+            "top leaf should not be pushed farther than it started: {tucked:?}"
+        );
+        // 本测试的真正契约：每个分量只收拢收益最大的那一个单节点末端。
         assert_eq!(clusters[1].positions, unchanged_core);
         assert_eq!(clusters[2].positions[0], Vec2::new(0.0, 400.0));
     }
