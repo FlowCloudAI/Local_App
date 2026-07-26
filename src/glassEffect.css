@@ -94,8 +94,12 @@
     backdrop-filter: var(--app-glass-filter-soft) !important;
 }
 
+/*
+ * 注意 .mobile-anchored-menu 要落到 ::before：菜单容器本身是 background: transparent，
+ * 玻璃面在伪元素上。打在容器上会让它变成满尺寸不透明，把展开动画整个盖掉。
+ */
 :root:not([data-glass-effect="enabled"]) .mobile-top-action-pill,
-:root:not([data-glass-effect="enabled"]) .mobile-anchored-menu,
+:root:not([data-glass-effect="enabled"]) .mobile-anchored-menu::before,
 :root:not([data-glass-effect="enabled"]) .mobile-ai-model-pill,
 :root:not([data-glass-effect="enabled"]) .mobile-ai-composer-card,
 :root:not([data-glass-effect="enabled"]) .mobile-entry-card__tag {
