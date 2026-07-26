@@ -10,6 +10,7 @@ import {
     useRef,
     useState,
 } from 'react'
+import {pushOverlay, removeOverlay} from '../../../shared/ui/overlay/overlayStack'
 import './MobileTopControls.css'
 
 /** 读不到 CSS 变量时的兜底，正常路径下不应命中。 */
@@ -191,6 +192,22 @@ export function MobileAnchoredMenu({
     useLayoutEffect(() => {
         if (open) updateAnchor()
     }, [open, updateAnchor])
+
+    const onCloseRef = useRef(onClose)
+    useEffect(() => {
+        onCloseRef.current = onClose
+    }, [onClose])
+
+    /*
+     * 打开期间注册到浮层返回栈：安卓物理返回键（以及外接键盘 Esc）走 MobileApp.handleBack，
+     * 它会先 closeTopOverlay()。不注册的话返回键会越过菜单直接退页面——
+     * 「按钮 + 返回键都能退出当前层」是移动端的基线预期。
+     */
+    useEffect(() => {
+        if (!open) return undefined
+        const id = pushOverlay(() => onCloseRef.current())
+        return () => removeOverlay(id)
+    }, [open])
 
     useEffect(() => {
         if (!open) return undefined
