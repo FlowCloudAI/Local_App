@@ -220,10 +220,16 @@
      * 收起时长同时决定 CSS 过渡和 JS 何时卸载浮层，所以只在这里写一次，
      * 由 MobileAnchoredMenu 读取（含 reduced-motion 降级值）。改这里两边一起动。
      */
+    /*
+     * 开关不对称。展开用减速曲线、慢一点，让人看清它从哪长出来；
+     * 收起用加速曲线、快一点——收起时用户已经做完决定，减速曲线的长尾
+     * 会把最后那点位移拖成「卡了一下」的观感。
+     */
     --mobile-anchored-menu-duration: 220ms;
-    --mobile-anchored-menu-duration-close: 220ms;
-    --mobile-anchored-menu-exit-fade: 90ms;
+    --mobile-anchored-menu-duration-close: 170ms;
+    --mobile-anchored-menu-exit-fade: 70ms;
     --mobile-anchored-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --mobile-anchored-menu-ease-close: cubic-bezier(0.4, 0, 1, 1);
     /*
      * 收起态的裁剪边距，默认贴锚点右上角；align / placement 变体只改对应的两条边。
      * 展开由容器的 clip-path 驱动：玻璃层和内容被裁到同一个正在生长的形状，
@@ -260,6 +266,7 @@
         round var(--mobile-anchored-menu-anchor-radius)
     );
     transition-duration: var(--mobile-anchored-menu-duration-close);
+    transition-timing-function: var(--mobile-anchored-menu-ease-close);
 }
 
 /*
@@ -307,6 +314,7 @@
     border-color: var(--mobile-anchored-menu-anchor-border-color);
     border-radius: var(--mobile-anchored-menu-anchor-radius);
     transition-duration: var(--mobile-anchored-menu-duration-close);
+    transition-timing-function: var(--mobile-anchored-menu-ease-close);
     transition-delay: 0ms;
 }
 
@@ -344,9 +352,11 @@
         transform 170ms cubic-bezier(0.22, 1, 0.36, 1) 35ms;
 }
 
+/* 收起时内容先走：比外框更短，等外框缩到一半时里面已经空了。 */
 .mobile-anchored-menu[data-open="false"] .mobile-anchored-menu__content {
     opacity: 0;
     transform: translateY(var(--mobile-anchored-menu-content-offset));
+    transition-duration: 110ms;
     transition-delay: 0ms;
 }
 
