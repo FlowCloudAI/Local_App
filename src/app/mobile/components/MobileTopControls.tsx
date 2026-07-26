@@ -149,6 +149,7 @@ export function MobileAnchoredMenu({
     const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; borderColor: string; rightBoundary: number | null} | null>(null)
     const [rendered, setRendered] = useState(open)
     const [closing, setClosing] = useState(false)
+    const [anchorReady, setAnchorReady] = useState(false)
     const menuRef = useRef<HTMLDivElement | null>(null)
 
     const updateAnchor = useCallback(() => {
@@ -189,8 +190,20 @@ export function MobileAnchoredMenu({
         return () => window.clearTimeout(timer)
     }, [open, rendered])
 
+    /*
+     * 必须在菜单进 DOM 之前把锚点量好（见下方的 anchorReady 闸门）。
+     * @starting-style 取的是元素第一次样式解析时的值，那时候要是
+     * --mobile-anchored-menu-anchor-* 还没写进 style，latch 到的就是 CSS 里的默认值
+     * （--mobile-top-surface-size，等于单按钮胶囊的尺寸）——双按钮胶囊首次展开
+     * 就会从一个偏窄的起始形状长出来，正好毁掉「从这颗按钮长出来」这件事本身。
+     */
     useLayoutEffect(() => {
-        if (open) updateAnchor()
+        if (!open) {
+            setAnchorReady(false)
+            return
+        }
+        updateAnchor()
+        setAnchorReady(true)
     }, [open, updateAnchor])
 
     const onCloseRef = useRef(onClose)
@@ -222,6 +235,12 @@ export function MobileAnchoredMenu({
     }, [open, updateAnchor])
 
     if (!open && !rendered) return null
+    /*
+     * 打开时先跳过一次渲染，等上面那个 layout effect 量完锚点再挂载。
+     * setAnchorReady 发生在 layout effect 里，重渲染在同一帧的绘制前就冲掉了，所以不会慢一帧。
+     * 收起中（open=false、rendered=true）不受这道闸门影响，退场动画照常播。
+     */
+    if (open && !anchorReady) return null
 
     return (
         <div
