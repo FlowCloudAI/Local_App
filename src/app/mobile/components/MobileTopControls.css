@@ -127,10 +127,12 @@
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
     /*
-     * 只在「菜单收起、胶囊回来」这一个方向上淡入，并且要等菜单的收尾淡出开始之后。
-     * 展开方向见 --expanded：那边必须瞬间消失。
+     * 开关都走淡入淡出，不要做成「展开瞬间隐藏」。
+     * 菜单的玻璃盒是从这颗胶囊的矩形上原地长出来的，两者在起手那一帧几乎完全重合；
+     * 胶囊突然消失会在形态连续的动画里插进一个断点——旧元素没了、新元素还没长开，
+     * 观感上就是断一下。叠加期那点密度差远比断点轻。
      */
-    transition: opacity 120ms ease 90ms;
+    transition: opacity 120ms ease;
     backdrop-filter: blur(2px);
 }
 
@@ -140,15 +142,8 @@
     padding: 0;
 }
 
-/*
- * 展开时瞬间隐藏，不要淡出：菜单的玻璃盒从第 0 帧起就盖在同一个矩形上，
- * 胶囊再慢慢淡出就是两层半透明背景加两条边框叠着，起手那一下按钮会明显变深、边框变粗。
- * 而展开动画的起点恰恰是视线焦点。
- */
 .mobile-top-action-pill--expanded {
     opacity: 0;
-    transition-duration: 0ms;
-    transition-delay: 0ms;
     pointer-events: none;
 }
 
@@ -227,18 +222,18 @@
      */
     --mobile-anchored-menu-duration: 220ms;
     --mobile-anchored-menu-duration-close: 170ms;
-    --mobile-anchored-menu-exit-fade: 70ms;
+    --mobile-anchored-menu-exit-fade: 50ms;
     --mobile-anchored-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
     --mobile-anchored-menu-ease-close: cubic-bezier(0.4, 0, 1, 1);
     /*
-     * 收起态的裁剪边距，默认贴锚点右上角；align / placement 变体只改对应的两条边。
-     * 展开由容器的 clip-path 驱动：玻璃层和内容被裁到同一个正在生长的形状，
-     * 内容不会在生长期间露到玻璃盒外面。
+     * 内容的收起态裁剪框，跟着玻璃盒的锚点矩形走，默认贴右上角。
+     * 注意坐标系差一个纵向 padding：内容盒是容器的内容盒，比容器border盒矮 2 * --fc-space-md、
+     * 顶边低 --fc-space-md，所以纵向那两条要把 padding 加回来。横向 padding 为 0，不用管。
      */
-    --mobile-anchored-menu-clip-top: 0px;
-    --mobile-anchored-menu-clip-right: 0px;
-    --mobile-anchored-menu-clip-bottom: calc(100% - var(--mobile-anchored-menu-anchor-height));
-    --mobile-anchored-menu-clip-left: calc(100% - var(--mobile-anchored-menu-anchor-width));
+    --mobile-anchored-menu-content-clip-top: 0px;
+    --mobile-anchored-menu-content-clip-right: 0px;
+    --mobile-anchored-menu-content-clip-bottom: calc(100% - var(--mobile-anchored-menu-anchor-height) + var(--fc-space-md));
+    --mobile-anchored-menu-content-clip-left: calc(100% - var(--mobile-anchored-menu-anchor-width));
 
     position: absolute;
     display: grid;
@@ -253,45 +248,19 @@
     background: transparent;
     isolation: isolate;
     contain: paint;
-    clip-path: inset(0 0 0 0 round var(--mobile-anchored-menu-radius));
-    transition: clip-path var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease);
-}
-
-.mobile-anchored-menu[data-open="false"] {
-    clip-path: inset(
-        var(--mobile-anchored-menu-clip-top)
-        var(--mobile-anchored-menu-clip-right)
-        var(--mobile-anchored-menu-clip-bottom)
-        var(--mobile-anchored-menu-clip-left)
-        round var(--mobile-anchored-menu-anchor-radius)
-    );
-    transition-duration: var(--mobile-anchored-menu-duration-close);
-    transition-timing-function: var(--mobile-anchored-menu-ease-close);
 }
 
 /*
- * 玻璃层：尺寸固定，只被容器的 clip-path 裁剪。
- * 之所以不让它跟着形状改尺寸——backdrop-filter 每帧都要在自己的区域上重算模糊，
- * 区域一直在变就等于每帧重新模糊一次；固定尺寸后模糊区域是稳定的。
+ * 玻璃盒：直接改自己的宽高从锚点矩形长到菜单矩形，形态是连续的。
+ *
+ * 不要改用容器 clip-path 来裁形状——实测（Redmi 24129RT7CC / Android WebView）
+ * clip-path 会让容器成为 backdrop root，子元素的 backdrop-filter 就只能采样到
+ * 容器内部（空的），毛玻璃直接消失。filter / opacity / mask / mix-blend-mode
+ * 加在祖先上是同一类陷阱。
  */
 .mobile-anchored-menu::before {
     position: absolute;
     z-index: 0;
-    inset: 0;
-    background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
-    backdrop-filter: var(--mobile-glass-filter);
-    -webkit-backdrop-filter: var(--mobile-glass-filter);
-    content: "";
-    pointer-events: none;
-}
-
-/*
- * 描边层：clip-path 裁得出形状、裁不出描边，所以边框单独用这一层跟着形状长大。
- * 它没有背景和滤镜，逐帧成本只有一个绝对定位盒的布局加 1px 描边重绘。
- */
-.mobile-anchored-menu::after {
-    position: absolute;
-    z-index: 2;
     top: 0;
     right: 0;
     width: 100%;
@@ -299,6 +268,9 @@
     box-sizing: border-box;
     border: var(--mobile-glass-border);
     border-radius: inherit;
+    background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
+    backdrop-filter: var(--mobile-glass-filter);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
     content: "";
     pointer-events: none;
     transition:
@@ -306,9 +278,10 @@
         height var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
         border-radius var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
         border-color 110ms ease 110ms;
+    will-change: width, height, border-radius;
 }
 
-.mobile-anchored-menu[data-open="false"]::after {
+.mobile-anchored-menu[data-open="false"]::before {
     width: var(--mobile-anchored-menu-anchor-width);
     height: var(--mobile-anchored-menu-anchor-height);
     border-color: var(--mobile-anchored-menu-anchor-border-color);
@@ -319,16 +292,18 @@
 }
 
 /*
- * 收尾淡出：形状缩回锚点矩形的同时把玻璃和描边淡掉。
+ * 收尾淡出：形状缩回锚点矩形之后再把玻璃淡掉。
  * 不淡的话，卸载那一帧是「玻璃盒」硬切成「胶囊」——两者刚好重合在同一个矩形上，
  * 底色和模糊却不同，看起来就是闪一下。
  *
+ * 时序上必须排在胶囊淡回来（120ms）之后，否则中间会出现两边都半透明、
+ * 直接看穿到页面的一帧。--exit-fade 的值就是按这个约束定的，改之前先看这里。
+ *
  * 用 animation 而不是 transition：延迟只该作用在 opacity 上，
- * 而 transition-delay 会套用到 ::after 整条 transition-property 列表，把形状收缩也一起推迟。
+ * 而 transition-delay 会套用到 ::before 整条 transition-property 列表，把形状收缩一起推迟。
  * 另外 --closing 撤销时动画随之消失、opacity 立刻回到 1，中途反悔重开不会残留半透明。
  */
-.mobile-anchored-menu--closing::before,
-.mobile-anchored-menu--closing::after {
+.mobile-anchored-menu--closing::before {
     animation: mobile-anchored-menu-exit-fade var(--mobile-anchored-menu-exit-fade) ease
         calc(var(--mobile-anchored-menu-duration-close) - var(--mobile-anchored-menu-exit-fade)) forwards;
 }
@@ -339,6 +314,15 @@
     }
 }
 
+/*
+ * 内容从第一帧起就按最终尺寸布局（不能让它跟着外框逐帧重排），所以必须自己裁到
+ * 玻璃盒的形状上，否则外框还只有胶囊那么大时，整屏菜单文字已经浮在页面上了——
+ * 这是「展开不连贯」最大的来源。
+ *
+ * clip-path 只能加在内容自己身上，不能加到容器：容器是玻璃层的祖先，
+ * 而 clip-path 会让祖先成为 backdrop root，直接把 backdrop-filter 废掉（已实测）。
+ * 内容层没有 backdrop-filter 后代，所以裁它是安全的。
+ */
 .mobile-anchored-menu__content {
     position: relative;
     z-index: 1;
@@ -347,44 +331,53 @@
     opacity: 1;
     scrollbar-width: none;
     transform: translateY(0);
+    clip-path: inset(0 0 0 0);
     transition:
         opacity 130ms ease 55ms,
-        transform 170ms cubic-bezier(0.22, 1, 0.36, 1) 35ms;
+        transform 170ms cubic-bezier(0.22, 1, 0.36, 1) 35ms,
+        clip-path var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease);
 }
 
-/* 收起时内容先走：比外框更短，等外框缩到一半时里面已经空了。 */
+/* 收起时内容先走：透明度/位移比外框更短，但裁剪框要和外框同步收，才不会脱开。 */
 .mobile-anchored-menu[data-open="false"] .mobile-anchored-menu__content {
     opacity: 0;
     transform: translateY(var(--mobile-anchored-menu-content-offset));
-    transition-duration: 110ms;
+    clip-path: inset(
+        var(--mobile-anchored-menu-content-clip-top)
+        var(--mobile-anchored-menu-content-clip-right)
+        var(--mobile-anchored-menu-content-clip-bottom)
+        var(--mobile-anchored-menu-content-clip-left)
+    );
+    transition-duration: 110ms, 110ms, var(--mobile-anchored-menu-duration-close);
+    transition-timing-function: ease, cubic-bezier(0.22, 1, 0.36, 1), var(--mobile-anchored-menu-ease-close);
     transition-delay: 0ms;
 }
 
 .mobile-anchored-menu--left {
-    --mobile-anchored-menu-clip-right: calc(100% - var(--mobile-anchored-menu-anchor-width));
-    --mobile-anchored-menu-clip-left: 0px;
+    --mobile-anchored-menu-content-clip-right: calc(100% - var(--mobile-anchored-menu-anchor-width));
+    --mobile-anchored-menu-content-clip-left: 0px;
 
     right: auto;
     left: var(--mobile-anchored-menu-left);
     max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
 }
 
-.mobile-anchored-menu--left::after {
+.mobile-anchored-menu--left::before {
     right: auto;
     left: 0;
 }
 
 .mobile-anchored-menu--placement-top {
     --mobile-anchored-menu-content-offset: 0.18rem;
-    --mobile-anchored-menu-clip-top: calc(100% - var(--mobile-anchored-menu-anchor-height));
-    --mobile-anchored-menu-clip-bottom: 0px;
+    --mobile-anchored-menu-content-clip-top: calc(100% - var(--mobile-anchored-menu-anchor-height) + var(--fc-space-md));
+    --mobile-anchored-menu-content-clip-bottom: 0px;
 
     top: auto;
     bottom: var(--mobile-anchored-menu-bottom);
     max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-bottom) - 1rem));
 }
 
-.mobile-anchored-menu--placement-top::after {
+.mobile-anchored-menu--placement-top::before {
     top: auto;
     bottom: 0;
 }
@@ -467,17 +460,7 @@
 }
 
 @starting-style {
-    .mobile-anchored-menu[data-open="true"] {
-        clip-path: inset(
-            var(--mobile-anchored-menu-clip-top)
-            var(--mobile-anchored-menu-clip-right)
-            var(--mobile-anchored-menu-clip-bottom)
-            var(--mobile-anchored-menu-clip-left)
-            round var(--mobile-anchored-menu-anchor-radius)
-        );
-    }
-
-    .mobile-anchored-menu[data-open="true"]::after {
+    .mobile-anchored-menu[data-open="true"]::before {
         width: var(--mobile-anchored-menu-anchor-width);
         height: var(--mobile-anchored-menu-anchor-height);
         border-color: var(--mobile-anchored-menu-anchor-border-color);
@@ -487,6 +470,12 @@
     .mobile-anchored-menu[data-open="true"] .mobile-anchored-menu__content {
         opacity: 0;
         transform: translateY(var(--mobile-anchored-menu-content-offset));
+        clip-path: inset(
+            var(--mobile-anchored-menu-content-clip-top)
+            var(--mobile-anchored-menu-content-clip-right)
+            var(--mobile-anchored-menu-content-clip-bottom)
+            var(--mobile-anchored-menu-content-clip-left)
+        );
     }
 }
 
@@ -498,8 +487,7 @@
         --mobile-anchored-menu-exit-fade: 1ms;
     }
 
-    .mobile-anchored-menu,
-    .mobile-anchored-menu::after,
+    .mobile-anchored-menu::before,
     .mobile-anchored-menu__content {
         transition-delay: 0ms;
         transition-duration: 1ms;
