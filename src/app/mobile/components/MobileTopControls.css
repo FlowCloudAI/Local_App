@@ -216,7 +216,12 @@
      * 表现为收尾时圆角突然收紧。用真实半径插值才是连续的。
      */
     --mobile-anchored-menu-anchor-radius: calc(var(--mobile-anchored-menu-anchor-height) / 2);
+    /*
+     * 收起时长同时决定 CSS 过渡和 JS 何时卸载浮层，所以只在这里写一次，
+     * 由 MobileAnchoredMenu 读取（含 reduced-motion 降级值）。改这里两边一起动。
+     */
     --mobile-anchored-menu-duration: 220ms;
+    --mobile-anchored-menu-duration-close: 220ms;
     --mobile-anchored-menu-exit-fade: 90ms;
     --mobile-anchored-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
     /*
@@ -254,6 +259,7 @@
         var(--mobile-anchored-menu-clip-left)
         round var(--mobile-anchored-menu-anchor-radius)
     );
+    transition-duration: var(--mobile-anchored-menu-duration-close);
 }
 
 /*
@@ -300,6 +306,8 @@
     height: var(--mobile-anchored-menu-anchor-height);
     border-color: var(--mobile-anchored-menu-anchor-border-color);
     border-radius: var(--mobile-anchored-menu-anchor-radius);
+    transition-duration: var(--mobile-anchored-menu-duration-close);
+    transition-delay: 0ms;
 }
 
 /*
@@ -314,7 +322,7 @@
 .mobile-anchored-menu--closing::before,
 .mobile-anchored-menu--closing::after {
     animation: mobile-anchored-menu-exit-fade var(--mobile-anchored-menu-exit-fade) ease
-        calc(var(--mobile-anchored-menu-duration) - var(--mobile-anchored-menu-exit-fade)) forwards;
+        calc(var(--mobile-anchored-menu-duration-close) - var(--mobile-anchored-menu-exit-fade)) forwards;
 }
 
 @keyframes mobile-anchored-menu-exit-fade {
@@ -473,16 +481,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+    /* 降级同样要走变量，JS 的卸载时机才会跟着一起缩短。 */
+    .mobile-anchored-menu {
+        --mobile-anchored-menu-duration: 1ms;
+        --mobile-anchored-menu-duration-close: 1ms;
+        --mobile-anchored-menu-exit-fade: 1ms;
+    }
+
     .mobile-anchored-menu,
     .mobile-anchored-menu::after,
     .mobile-anchored-menu__content {
         transition-delay: 0ms;
         transition-duration: 1ms;
-    }
-
-    .mobile-anchored-menu--closing::before,
-    .mobile-anchored-menu--closing::after {
-        animation-delay: 0ms;
-        animation-duration: 1ms;
     }
 }

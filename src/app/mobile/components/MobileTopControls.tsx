@@ -7,11 +7,30 @@ import {
     useCallback,
     useEffect,
     useLayoutEffect,
+    useRef,
     useState,
 } from 'react'
 import './MobileTopControls.css'
 
-const MOBILE_ANCHORED_MENU_CLOSE_MS = 220
+/** 读不到 CSS 变量时的兜底，正常路径下不应命中。 */
+const MOBILE_ANCHORED_MENU_CLOSE_FALLBACK_MS = 220
+
+/**
+ * 收起时长以 CSS 的 --mobile-anchored-menu-duration-close 为准。
+ * 卸载时机必须等于收尾动画时长，早了会截断、晚了会留着不可见的 DOM；
+ * 两边各写一个数字迟早失步，所以这里去读 CSS 声明的那一份
+ * （reduced-motion 降级也是改这个变量，因此会一起跟上）。
+ */
+function readAnchoredMenuCloseMs(element: HTMLElement | null): number {
+    if (!element) return MOBILE_ANCHORED_MENU_CLOSE_FALLBACK_MS
+    const raw = window.getComputedStyle(element)
+        .getPropertyValue('--mobile-anchored-menu-duration-close')
+        .trim()
+    if (!raw) return MOBILE_ANCHORED_MENU_CLOSE_FALLBACK_MS
+    const value = Number.parseFloat(raw)
+    if (!Number.isFinite(value) || value < 0) return MOBILE_ANCHORED_MENU_CLOSE_FALLBACK_MS
+    return raw.endsWith('ms') ? value : value * 1000
+}
 
 export interface MobilePageTopBarProps {
     left?: ReactNode
@@ -129,6 +148,7 @@ export function MobileAnchoredMenu({
     const [anchor, setAnchor] = useState<{top: number; bottom: number; left: number; right: number; width: number; height: number; borderColor: string; rightBoundary: number | null} | null>(null)
     const [rendered, setRendered] = useState(open)
     const [closing, setClosing] = useState(false)
+    const menuRef = useRef<HTMLDivElement | null>(null)
 
     const updateAnchor = useCallback(() => {
         const containerElement = containerRef.current
@@ -164,7 +184,7 @@ export function MobileAnchoredMenu({
         const timer = window.setTimeout(() => {
             setRendered(false)
             setClosing(false)
-        }, MOBILE_ANCHORED_MENU_CLOSE_MS)
+        }, readAnchoredMenuCloseMs(menuRef.current))
         return () => window.clearTimeout(timer)
     }, [open, rendered])
 
@@ -195,6 +215,7 @@ export function MobileAnchoredMenu({
             }}
         >
             <div
+                ref={menuRef}
                 className={`mobile-anchored-menu mobile-anchored-menu--${align} mobile-anchored-menu--placement-${placement}${closing ? ' mobile-anchored-menu--closing' : ''}${className ? ` ${className}` : ''}`}
                 role="menu"
                 aria-label={ariaLabel}
