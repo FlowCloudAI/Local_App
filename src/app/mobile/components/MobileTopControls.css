@@ -126,7 +126,11 @@
     border: var(--mobile-border-medium);
     border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
-    transition: opacity 120ms ease, transform 120ms ease;
+    /*
+     * 只在「菜单收起、胶囊回来」这一个方向上淡入，并且要等菜单的收尾淡出开始之后。
+     * 展开方向见 --expanded：那边必须瞬间消失。
+     */
+    transition: opacity 120ms ease 90ms;
     backdrop-filter: blur(2px);
 }
 
@@ -136,8 +140,15 @@
     padding: 0;
 }
 
+/*
+ * 展开时瞬间隐藏，不要淡出：菜单的玻璃盒从第 0 帧起就盖在同一个矩形上，
+ * 胶囊再慢慢淡出就是两层半透明背景加两条边框叠着，起手那一下按钮会明显变深、边框变粗。
+ * 而展开动画的起点恰恰是视线焦点。
+ */
 .mobile-top-action-pill--expanded {
     opacity: 0;
+    transition-duration: 0ms;
+    transition-delay: 0ms;
     pointer-events: none;
 }
 
