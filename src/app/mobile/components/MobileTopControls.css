@@ -198,6 +198,24 @@
     --mobile-anchored-menu-anchor-height: var(--mobile-top-surface-size);
     --mobile-anchored-menu-anchor-border-color: color-mix(in srgb, var(--fc-color-border) 68%, transparent);
     --mobile-anchored-menu-content-offset: -0.18rem;
+    --mobile-anchored-menu-radius: calc(var(--mobile-radius-floating) + var(--fc-space-xs));
+    /*
+     * 锚点的实际胶囊圆角。不能用 --fc-radius-full：9999px 在插值到最终圆角的路上，
+     * 绝大部分时间都仍然大于"盒高一半"而被钳制成胶囊，直到最后几帧才掉下来，
+     * 表现为收尾时圆角突然收紧。用真实半径插值才是连续的。
+     */
+    --mobile-anchored-menu-anchor-radius: calc(var(--mobile-anchored-menu-anchor-height) / 2);
+    --mobile-anchored-menu-duration: 220ms;
+    --mobile-anchored-menu-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    /*
+     * 收起态的裁剪边距，默认贴锚点右上角；align / placement 变体只改对应的两条边。
+     * 展开由容器的 clip-path 驱动：玻璃层和内容被裁到同一个正在生长的形状，
+     * 内容不会在生长期间露到玻璃盒外面。
+     */
+    --mobile-anchored-menu-clip-top: 0px;
+    --mobile-anchored-menu-clip-right: 0px;
+    --mobile-anchored-menu-clip-bottom: calc(100% - var(--mobile-anchored-menu-anchor-height));
+    --mobile-anchored-menu-clip-left: calc(100% - var(--mobile-anchored-menu-anchor-width));
 
     position: absolute;
     display: grid;
@@ -208,15 +226,47 @@
     box-sizing: border-box;
     padding: var(--fc-space-md) 0;
     overflow: hidden;
-    border-radius: calc(var(--mobile-radius-floating) + var(--fc-space-xs));
+    border-radius: var(--mobile-anchored-menu-radius);
     background: transparent;
     isolation: isolate;
     contain: paint;
+    clip-path: inset(0 0 0 0 round var(--mobile-anchored-menu-radius));
+    transition: clip-path var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease);
 }
 
+.mobile-anchored-menu[data-open="false"] {
+    clip-path: inset(
+        var(--mobile-anchored-menu-clip-top)
+        var(--mobile-anchored-menu-clip-right)
+        var(--mobile-anchored-menu-clip-bottom)
+        var(--mobile-anchored-menu-clip-left)
+        round var(--mobile-anchored-menu-anchor-radius)
+    );
+}
+
+/*
+ * 玻璃层：尺寸固定，只被容器的 clip-path 裁剪。
+ * 之所以不让它跟着形状改尺寸——backdrop-filter 每帧都要在自己的区域上重算模糊，
+ * 区域一直在变就等于每帧重新模糊一次；固定尺寸后模糊区域是稳定的。
+ */
 .mobile-anchored-menu::before {
     position: absolute;
     z-index: 0;
+    inset: 0;
+    background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
+    backdrop-filter: var(--mobile-glass-filter);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
+    content: "";
+    pointer-events: none;
+}
+
+/*
+ * 描边层：clip-path 裁得出形状、裁不出描边，所以边框单独用这一层跟着形状长大。
+ * 它没有背景和滤镜，逐帧成本只有一个绝对定位盒的布局加 1px 描边重绘。
+ */
+.mobile-anchored-menu::after {
+    position: absolute;
+    z-index: 2;
     top: 0;
     right: 0;
     width: 100%;
@@ -224,24 +274,20 @@
     box-sizing: border-box;
     border: var(--mobile-glass-border);
     border-radius: inherit;
-    background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: var(--mobile-glass-filter);
     content: "";
     pointer-events: none;
     transition:
-        width 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        height 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-radius 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        width var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
+        height var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
+        border-radius var(--mobile-anchored-menu-duration) var(--mobile-anchored-menu-ease),
         border-color 110ms ease 110ms;
-    will-change: width, height, border-radius;
 }
 
-.mobile-anchored-menu[data-open="false"]::before {
+.mobile-anchored-menu[data-open="false"]::after {
     width: var(--mobile-anchored-menu-anchor-width);
     height: var(--mobile-anchored-menu-anchor-height);
     border-color: var(--mobile-anchored-menu-anchor-border-color);
-    border-radius: var(--fc-radius-full);
+    border-radius: var(--mobile-anchored-menu-anchor-radius);
 }
 
 .mobile-anchored-menu__content {
@@ -264,24 +310,30 @@
 }
 
 .mobile-anchored-menu--left {
+    --mobile-anchored-menu-clip-right: calc(100% - var(--mobile-anchored-menu-anchor-width));
+    --mobile-anchored-menu-clip-left: 0px;
+
     right: auto;
     left: var(--mobile-anchored-menu-left);
     max-width: calc(100% - var(--mobile-anchored-menu-left) - 1rem);
 }
 
-.mobile-anchored-menu--left::before {
+.mobile-anchored-menu--left::after {
     right: auto;
     left: 0;
 }
 
 .mobile-anchored-menu--placement-top {
+    --mobile-anchored-menu-content-offset: 0.18rem;
+    --mobile-anchored-menu-clip-top: calc(100% - var(--mobile-anchored-menu-anchor-height));
+    --mobile-anchored-menu-clip-bottom: 0px;
+
     top: auto;
     bottom: var(--mobile-anchored-menu-bottom);
     max-height: min(31rem, calc(100% - var(--mobile-anchored-menu-bottom) - 1rem));
-    --mobile-anchored-menu-content-offset: 0.18rem;
 }
 
-.mobile-anchored-menu--placement-top::before {
+.mobile-anchored-menu--placement-top::after {
     top: auto;
     bottom: 0;
 }
@@ -364,11 +416,21 @@
 }
 
 @starting-style {
-    .mobile-anchored-menu[data-open="true"]::before {
+    .mobile-anchored-menu[data-open="true"] {
+        clip-path: inset(
+            var(--mobile-anchored-menu-clip-top)
+            var(--mobile-anchored-menu-clip-right)
+            var(--mobile-anchored-menu-clip-bottom)
+            var(--mobile-anchored-menu-clip-left)
+            round var(--mobile-anchored-menu-anchor-radius)
+        );
+    }
+
+    .mobile-anchored-menu[data-open="true"]::after {
         width: var(--mobile-anchored-menu-anchor-width);
         height: var(--mobile-anchored-menu-anchor-height);
         border-color: var(--mobile-anchored-menu-anchor-border-color);
-        border-radius: var(--fc-radius-full);
+        border-radius: var(--mobile-anchored-menu-anchor-radius);
     }
 
     .mobile-anchored-menu[data-open="true"] .mobile-anchored-menu__content {
@@ -378,7 +440,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .mobile-anchored-menu::before,
+    .mobile-anchored-menu,
+    .mobile-anchored-menu::after,
     .mobile-anchored-menu__content {
         transition-delay: 0ms;
         transition-duration: 1ms;
