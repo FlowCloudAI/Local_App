@@ -30,8 +30,6 @@
 :root:not([data-glass-effect="enabled"]) .mobile-app {
     --mobile-glass-filter: none;
     --mobile-glass-filter-soft: none;
-    --mobile-chrome-filter: none;
-    --mobile-chip-filter: none;
     --mobile-surface-translucent: var(--fc-color-bg-elevated);
     --mobile-surface-translucent-strong: var(--fc-color-bg-elevated);
     --mobile-surface-glass: var(--fc-color-bg-elevated);
@@ -116,7 +114,8 @@
 }
 
 :root .mobile-idea-drawer__select .fc-select__dropdown,
-:root .mobile-idea__select .fc-select__dropdown {
+:root .mobile-idea__select .fc-select__dropdown,
+:root .mobile-category-dialog {
     background: var(--mobile-surface-dialog);
     -webkit-backdrop-filter: var(--mobile-glass-filter);
     backdrop-filter: var(--mobile-glass-filter);
@@ -129,16 +128,10 @@
     backdrop-filter: var(--mobile-glass-filter);
 }
 
-:root .mobile-category-dialog {
-    background: var(--mobile-surface-dialog);
-    -webkit-backdrop-filter: var(--mobile-chrome-filter);
-    backdrop-filter: var(--mobile-chrome-filter);
-}
-
 :root .mobile-entry-card__tag {
     background: var(--mobile-surface-panel);
-    -webkit-backdrop-filter: var(--mobile-chip-filter);
-    backdrop-filter: var(--mobile-chip-filter);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
+    backdrop-filter: var(--mobile-glass-filter);
 }
 
 :root .mobile-top-action-pill,
