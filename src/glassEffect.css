@@ -29,6 +29,7 @@
 :root:not([data-glass-effect="enabled"]),
 :root:not([data-glass-effect="enabled"]) .mobile-app {
     --mobile-glass-filter: none;
+    --mobile-glass-filter-soft: none;
     --mobile-chrome-filter: none;
     --mobile-chip-filter: none;
     --mobile-surface-translucent: var(--fc-color-bg-elevated);
@@ -36,6 +37,8 @@
     --mobile-surface-glass: var(--fc-color-bg-elevated);
     --mobile-surface-panel: var(--fc-color-bg-elevated);
     --mobile-surface-dialog: var(--fc-color-bg-elevated);
+    --mobile-surface-control: var(--fc-color-bg-elevated);
+    --mobile-surface-menu: var(--fc-color-bg-elevated);
 }
 
 :root .fc-overlay__panel--floating,
@@ -95,15 +98,58 @@
 }
 
 /*
- * 注意 .mobile-anchored-menu 要落到 ::before：菜单容器本身是 background: transparent，
- * 玻璃面在伪元素上。打在容器上会让它变成满尺寸不透明，把展开动画整个盖掉。
+ * 移动端玻璃面：和上面桌面端同构，统一在这里声明底色与滤镜，组件 CSS 不再自己写。
+ *
+ * 为什么集中：开关只是把上面那组变量换掉，所以只要一处漏了 token（组件里硬编码
+ * color-mix / blur），关闭态就得再补一条 !important 兜底——两套机制并存，
+ * 而兜底那条还可能指错元素（.mobile-anchored-menu 的玻璃在 ::before 上，
+ * 曾经打在容器上导致关掉毛玻璃后整块面板盖住屏幕）。收口到这里后关闭态是纯变量替换，
+ * 不需要任何兜底名单。
+ *
+ * 新增浮层时在下面按「底色档 + 模糊档」归组登记，不要在组件里写 backdrop-filter。
+ * 用 :root 前缀提高优先级，避免受组件样式表加载顺序影响。
  */
-:root:not([data-glass-effect="enabled"]) .mobile-top-action-pill,
-:root:not([data-glass-effect="enabled"]) .mobile-anchored-menu::before,
-:root:not([data-glass-effect="enabled"]) .mobile-ai-model-pill,
-:root:not([data-glass-effect="enabled"]) .mobile-ai-composer-card,
-:root:not([data-glass-effect="enabled"]) .mobile-entry-card__tag {
-    background: var(--fc-color-bg-elevated) !important;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
+:root .mobile-bottom-sheet {
+    background: var(--mobile-surface-glass);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
+    backdrop-filter: var(--mobile-glass-filter);
+}
+
+:root .mobile-idea-drawer__select .fc-select__dropdown,
+:root .mobile-idea__select .fc-select__dropdown {
+    background: var(--mobile-surface-dialog);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
+    backdrop-filter: var(--mobile-glass-filter);
+}
+
+/* 玻璃面在伪元素上：容器本身必须保持 transparent，否则会盖掉展开动画。 */
+:root .mobile-anchored-menu::before {
+    background: var(--mobile-surface-menu);
+    -webkit-backdrop-filter: var(--mobile-glass-filter);
+    backdrop-filter: var(--mobile-glass-filter);
+}
+
+:root .mobile-category-dialog {
+    background: var(--mobile-surface-dialog);
+    -webkit-backdrop-filter: var(--mobile-chrome-filter);
+    backdrop-filter: var(--mobile-chrome-filter);
+}
+
+:root .mobile-entry-card__tag {
+    background: var(--mobile-surface-panel);
+    -webkit-backdrop-filter: var(--mobile-chip-filter);
+    backdrop-filter: var(--mobile-chip-filter);
+}
+
+:root .mobile-top-action-pill,
+:root .mobile-ai-model-pill {
+    background: var(--mobile-surface-control);
+    -webkit-backdrop-filter: var(--mobile-glass-filter-soft);
+    backdrop-filter: var(--mobile-glass-filter-soft);
+}
+
+:root .mobile-ai-composer-card {
+    background: var(--mobile-surface-panel);
+    -webkit-backdrop-filter: var(--mobile-glass-filter-soft);
+    backdrop-filter: var(--mobile-glass-filter-soft);
 }

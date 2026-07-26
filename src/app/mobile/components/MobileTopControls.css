@@ -125,7 +125,7 @@
     padding: 0;
     border: var(--mobile-border-medium);
     border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     /*
      * 开关都走淡入淡出，不要做成「展开瞬间隐藏」。
      * 菜单的玻璃盒是从这颗胶囊的矩形上原地长出来的，两者在起手那一帧几乎完全重合；
@@ -133,7 +133,6 @@
      * 观感上就是断一下。叠加期那点密度差远比断点轻。
      */
     transition: opacity 120ms ease;
-    backdrop-filter: blur(2px);
 }
 
 .mobile-top-action-pill:has(.mobile-top-action-pill__button:only-child) {
@@ -268,9 +267,7 @@
     box-sizing: border-box;
     border: var(--mobile-glass-border);
     border-radius: inherit;
-    background: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
-    backdrop-filter: var(--mobile-glass-filter);
-    -webkit-backdrop-filter: var(--mobile-glass-filter);
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     content: "";
     pointer-events: none;
     transition:

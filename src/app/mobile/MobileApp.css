@@ -9,6 +9,12 @@
     --mobile-border-bold: 1px solid color-mix(in srgb, var(--fc-color-border) 78%, transparent);
     --mobile-glass-border: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
     --mobile-surface-raised: var(--fc-color-bg-elevated);
+    /*
+     * 玻璃面的底色分档。这几个都只在 glassEffect.css 里被引用——移动端的毛玻璃
+     * 统一在那儿声明，组件不要自己写 background/backdrop-filter，否则关闭开关时会漏。
+     */
+    --mobile-surface-control: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
+    --mobile-surface-menu: color-mix(in srgb, var(--mobile-surface-raised) 80%, transparent);
     --mobile-surface-muted: color-mix(in srgb, var(--fc-color-bg-secondary) 76%, var(--fc-color-bg-elevated));
     --mobile-surface-muted-soft: color-mix(in srgb, var(--fc-color-bg-secondary) 58%, var(--fc-color-bg-elevated));
     --mobile-surface-translucent: color-mix(in srgb, var(--fc-color-bg-elevated) 82%, transparent);
@@ -39,6 +45,7 @@
     --mobile-shadow-primary-soft: 0 0.35rem 0.95rem color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
     --mobile-shadow-chip: 0 0.25rem 0.75rem color-mix(in srgb, var(--fc-color-text) 14%, transparent);
     --mobile-glass-filter: blur(8px) saturate(1.3);
+    --mobile-glass-filter-soft: blur(2px);
     --mobile-chrome-filter: blur(18px);
     --mobile-chip-filter: blur(10px);
     --mobile-radius-card: var(--fc-radius-xl);

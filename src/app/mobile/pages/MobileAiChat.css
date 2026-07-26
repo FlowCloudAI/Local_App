@@ -223,7 +223,7 @@
     padding: 0 0.7rem;
     border: var(--mobile-border);
     border-radius: var(--fc-radius-full);
-    background: color-mix(in srgb, var(--mobile-surface-raised) 60%, transparent);
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     color: var(--fc-color-primary);
     font: inherit;
     font-size: var(--fc-font-size-xs);
@@ -232,7 +232,6 @@
     transition: opacity 120ms ease, transform 120ms ease;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-    backdrop-filter: blur(2px);
 }
 
 .mobile-ai-model-pill span {
@@ -451,8 +450,7 @@
     padding: 0.72rem;
     border: var(--mobile-border-medium);
     border-radius: var(--mobile-radius-sheet);
-    background: var(--mobile-surface-panel);
-    backdrop-filter: blur(2px);
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
 }
 
 .mobile-ai-composer-card textarea {

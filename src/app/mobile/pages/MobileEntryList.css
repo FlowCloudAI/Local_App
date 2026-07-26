@@ -188,13 +188,12 @@
     padding: 0.28rem 0.55rem;
     border: 1px solid color-mix(in srgb, var(--mobile-entry-card-color) 18%, var(--fc-color-border));
     border-radius: var(--fc-radius-full);
-    background: var(--mobile-surface-panel);
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     color: var(--fc-color-primary);
     font-size: var(--fc-font-size-xs);
     font-weight: var(--fc-font-weight-semibold);
     line-height: 1.1;
     box-shadow: var(--mobile-shadow-chip);
-    backdrop-filter: var(--mobile-chip-filter);
 }
 
 .mobile-entry-card__tag-icon {

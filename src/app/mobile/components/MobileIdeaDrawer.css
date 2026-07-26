@@ -73,11 +73,9 @@
 }
 
 .mobile-idea-drawer__select .fc-select__dropdown {
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     border: var(--mobile-border-strong);
-    background: var(--mobile-surface-dialog);
     box-shadow: var(--mobile-shadow-anchored-menu);
-    backdrop-filter: var(--mobile-glass-filter);
-    -webkit-backdrop-filter: var(--mobile-glass-filter);
 }
 
 .mobile-idea-drawer__list {

@@ -130,9 +130,8 @@
     padding: var(--fc-space-lg);
     border: var(--mobile-border-emphasis);
     border-radius: var(--mobile-radius-floating);
-    background: var(--mobile-surface-dialog);
+    /* 底色与毛玻璃见 src/glassEffect.css，勿在此重复声明。 */
     box-shadow: var(--mobile-shadow-floating-soft);
-    backdrop-filter: var(--mobile-chrome-filter);
 }
 
 .mobile-category-dialog__summary,
