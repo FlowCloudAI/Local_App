@@ -1,0 +1,195 @@
+/* ========================================
+   MarkdownEditor.css - 基于 FC Design System
+   覆盖 @uiw/react-md-editor 默认样式
+   ======================================== */
+
+.fc-md-wrap {
+    /* 组件局部变量 */
+    --md-bg:                  var(--fc-color-bg-elevated);
+    --md-toolbar-bg:          var(--fc-color-bg-secondary);
+    --md-border:              var(--fc-color-border);
+    --md-text:                var(--fc-color-text);
+    --md-text-muted:          var(--fc-color-text-secondary);
+    --md-toolbar-hover-bg:    var(--fc-color-bg-tertiary, rgba(255,255,255,0.06));
+    --md-toolbar-hover-color: var(--fc-color-text);
+    --md-primary:             var(--fc-color-primary, #6366f1);
+    --md-primary-bg:          var(--fc-color-primary-bg, rgba(99,102,241,0.15));
+    --md-editor-text-bg:      transparent;
+    --md-preview-bg:          transparent;
+    --md-font-size-scale:     1;
+    --md-code-inline-bg:      var(--fc-color-bg-tertiary, rgba(255,255,255,0.06));
+    --md-code-block-bg:       var(--fc-color-bg-secondary);
+    --md-blockquote-border:   var(--fc-color-primary, #6366f1);
+    --md-selection-bg:        rgba(55, 138, 221, 0.25);
+
+    border-radius: var(--fc-radius-md);
+    border:        1px solid var(--md-border);
+    overflow:      hidden;
+    font-family:   var(--fc-font-family), serif;
+}
+
+/* ---------- 覆盖 w-md-editor 壳 ---------- */
+.fc-md-wrap .w-md-editor {
+    background:    var(--md-bg) !important;
+    border:        none !important;
+    box-shadow:    none !important;
+    border-radius: 0 !important;
+    font-family:   var(--fc-font-family), serif;
+    /* GitHub Primer 变量映射 */
+    --color-canvas-default:  var(--md-bg);
+    --color-canvas-subtle:   var(--md-toolbar-bg);
+    --color-border-default:  var(--md-border);
+    --color-fg-default:      var(--md-text);
+    --color-fg-muted:        var(--md-text-muted);
+}
+
+.fc-md-wrap[data-auto-height="true"] .w-md-editor {
+    height:         auto !important;
+    padding-bottom: 0 !important;
+}
+
+.fc-md-wrap[data-auto-height="true"] .w-md-editor-content {
+    height: auto !important;
+}
+
+.fc-md-wrap[data-auto-height="true"][data-mode="preview"] .w-md-editor-content {
+    overflow: visible !important;
+}
+
+.fc-md-wrap[data-auto-height="true"][data-mode="preview"] .w-md-editor-preview {
+    position:  relative !important;
+    inset:     auto !important;
+    width:     100% !important;
+    overflow:  visible !important;
+    box-shadow: none !important;
+}
+
+/* ---------- 工具栏 ---------- */
+.fc-md-wrap .w-md-editor-toolbar {
+    background:    var(--md-toolbar-bg) !important;
+    border-bottom: 1px solid var(--md-border) !important;
+    padding:       var(--fc-space-xs) var(--fc-space-sm) !important;
+}
+
+.fc-md-wrap .w-md-editor-toolbar ul > li > button {
+    color:         var(--md-text-muted) !important;
+    border-radius: var(--fc-radius-sm) !important;
+    transition:    background 0.12s, color 0.12s;
+}
+
+.fc-md-wrap[data-color-mode="light"] .w-md-editor-toolbar ul > li > button {
+    color: var(--md-text-muted) !important;
+}
+
+.fc-md-wrap .w-md-editor-toolbar ul > li > button:hover {
+    background: var(--md-toolbar-hover-bg) !important;
+    color:      var(--md-toolbar-hover-color) !important;
+}
+
+.fc-md-wrap .w-md-editor-toolbar ul > li > button svg {
+    fill:   currentColor;
+    stroke: currentColor;
+}
+
+/* ---------- 选中文本样式修复 ---------- */
+.fc-md-wrap ::selection {
+    background-color: var(--md-selection-bg) !important;
+    color: inherit !important;
+}
+
+/* ---------- FlowCloudAI 双链 ---------- */
+.fc-md-wrap .w-md-editor-text-pre .token.wiki-link {
+    color: var(--md-primary) !important;
+}
+
+.fc-md-wrap .w-md-editor-text-pre .token.wiki-link > .token.punctuation {
+    color: var(--md-text-muted) !important;
+}
+
+/* ---------- 双栏切换按钮 ---------- */
+.fc-md-split-btn {
+    border-radius: var(--fc-radius-md, 8px) !important;
+}
+
+.fc-md-split-btn--active {
+    background: var(--md-primary-bg) !important;
+    color:      var(--md-primary) !important;
+}
+
+.fc-md-split-btn--active:hover {
+    background: var(--md-primary-bg) !important;
+}
+
+.fc-md-split-icon {
+    font-size: var(--fc-font-size-md);
+    line-height: 1;
+}
+
+/* ---------- 编辑区 ---------- */
+.fc-md-wrap .w-md-editor-text {
+    background:  var(--md-editor-text-bg) !important;
+    font-size:   calc(var(--fc-font-size-sm) * var(--md-font-size-scale)) !important;
+    line-height: var(--fc-line-height-relaxed, 1.75) !important;
+    color:       var(--md-text) !important;
+    padding:     12px 14px !important;
+}
+
+.fc-md-wrap .w-md-editor-text-pre > code,
+.fc-md-wrap .w-md-editor-text-input {
+    font-family: var(--fc-font-family-mono, ui-monospace, monospace) !important;
+    font-size:   calc(var(--fc-font-size-sm) * var(--md-font-size-scale)) !important;
+}
+
+/* ---------- 隐藏拖拽分隔线 ---------- */
+.fc-md-wrap .w-md-editor-bar {
+    display: none !important;
+}
+
+/* ---------- 预览区 markdown 样式 ---------- */
+.fc-md-wrap .wmde-markdown {
+    background:  var(--md-preview-bg) !important;
+    font-family: var(--fc-font-family), serif;
+    font-size:   calc(var(--fc-font-size-sm) * var(--md-font-size-scale));
+    color:       var(--md-text);
+    padding:     12px 14px;
+}
+
+.fc-md-wrap .wmde-markdown h1,
+.fc-md-wrap .wmde-markdown h2,
+.fc-md-wrap .wmde-markdown h3 {
+    color:        var(--md-text);
+    border-color: var(--md-border);
+}
+
+.fc-md-wrap .wmde-markdown code {
+    background:    var(--md-code-inline-bg);
+    border-radius: 3px;
+    font-family:   var(--fc-font-family-mono, ui-monospace, monospace);
+}
+
+.fc-md-wrap .wmde-markdown pre {
+    background: var(--md-code-block-bg);
+    border:     1px solid var(--md-border);
+}
+
+.fc-md-wrap .wmde-markdown blockquote {
+    border-left-color: var(--md-blockquote-border);
+    color:             var(--md-text-muted);
+}
+
+.fc-md-wrap .w-md-editor-text-input::placeholder {
+    color: var(--md-text-muted) !important;
+}
+
+.fc-md-wrap .w-md-editor-text-input,
+.fc-md-wrap .w-md-editor-text-pre > code {
+    color: var(--md-text) !important;
+}
+
+.fc-md-wrap .wmde-markdown pre code {
+    background: transparent;
+}
+
+.fc-md-wrap .w-md-editor.fc-md-editor--disabled .w-md-editor-text-input {
+    cursor: not-allowed;
+}

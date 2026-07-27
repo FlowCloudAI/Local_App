@@ -13,7 +13,8 @@ import {
     useRef,
     useState,
 } from 'react'
-import {Button, type MarkdownEditorRef, useAlert, useTheme} from 'flowcloudai-ui'
+import {Button, useAlert, useTheme} from 'flowcloudai-ui'
+import type {MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import {
     type Category,
     type CustomEntryType,

@@ -9,7 +9,8 @@ import {
     useRef,
     useState,
 } from 'react'
-import {type MarkdownEditorRef, useAlert} from 'flowcloudai-ui'
+import {useAlert} from 'flowcloudai-ui'
+import type {MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import {
     db_create_entry,
     type EntryBrief,

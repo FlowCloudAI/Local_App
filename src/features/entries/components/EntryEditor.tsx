@@ -4,7 +4,7 @@ import {openFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {commands, type ICommand} from '@uiw/react-md-editor'
-import {Button, MarkdownEditor, type MarkdownEditorRef, RollingBox, useAlert} from 'flowcloudai-ui'
+import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_generate_entry_summary,
     ai_list_plugins,
@@ -34,6 +34,7 @@ import {
 } from '../../../api'
 import {openUrl} from '../../../api/opener'
 import EntryEditorSidebar from './EntryEditorSidebar'
+import {MarkdownEditor, type MarkdownEditorRef} from './MarkdownEditor/MarkdownEditor'
 import EntryImageLightbox from './EntryImageLightbox'
 import TagCreator from './TagCreator'
 import EntryEditorMetaPanel from './EntryEditorMetaPanel'

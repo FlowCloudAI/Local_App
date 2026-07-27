@@ -1,7 +1,4 @@
-import {
-    MarkdownEditor,
-    type MarkdownEditorRef,
-} from 'flowcloudai-ui'
+import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import {type ComponentProps, type ReactNode, type RefObject} from 'react'
 import {
     MobileBackIcon,
@@ -77,7 +74,6 @@ export function MobileEntryImmersiveEditor({
                     height="100%"
                     minHeight={420}
                     showSplitToggle={false}
-                    showAiButton={false}
                     hideFullscreen
                     toolbarCommands={[]}
                     extraCommands={[]}
