@@ -1,4 +1,12 @@
-import {type CSSProperties, useEffect, useMemo} from 'react'
+import {
+    type CSSProperties,
+    type ReactNode,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+} from 'react'
 import {Button, RollingBox} from 'flowcloudai-ui'
 import {
     entryTypeKey,
@@ -101,6 +109,59 @@ interface ProjectConfigOverviewProps {
     onEditEntryType?: (entryType: Extract<EntryTypeView, { kind: 'custom' }>) => void
 }
 
+function ProjectConfigList({children}: { children: ReactNode }) {
+    const frameRef = useRef<HTMLDivElement>(null)
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const contentRef = useRef<HTMLDivElement>(null)
+    const updateOverflow = useCallback(() => {
+        const frame = frameRef.current
+        const scroll = scrollRef.current
+        if (!frame || !scroll) return
+
+        frame.toggleAttribute('data-overflow-top', scroll.scrollTop > 1)
+        frame.toggleAttribute(
+            'data-overflow-bottom',
+            scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 1,
+        )
+    }, [])
+
+    useLayoutEffect(() => {
+        const frame = frameRef.current
+        const scroll = scrollRef.current
+        const content = contentRef.current
+        if (!frame || !scroll || !content) return
+
+        updateOverflow()
+        const animationFrame = requestAnimationFrame(updateOverflow)
+        const observer = new ResizeObserver(updateOverflow)
+        observer.observe(frame)
+        observer.observe(scroll)
+        observer.observe(content)
+        window.addEventListener('resize', updateOverflow)
+        return () => {
+            cancelAnimationFrame(animationFrame)
+            observer.disconnect()
+            window.removeEventListener('resize', updateOverflow)
+        }
+    }, [children, updateOverflow])
+
+    return (
+        <div ref={frameRef} className="pe-config-list-frame">
+            <RollingBox
+                ref={scrollRef}
+                axis="y"
+                className="pe-config-list"
+                thumbSize="thin"
+                onScroll={updateOverflow}
+            >
+                <div ref={contentRef} className="pe-config-list__inner pe-entry-type-grid">
+                    {children}
+                </div>
+            </RollingBox>
+        </div>
+    )
+}
+
 function ProjectConfigOverview({
                                    entryTypes,
                                    tagSchemas,
@@ -138,49 +199,47 @@ function ProjectConfigOverview({
                     <Button type="button" variant="outline" size="sm" onClick={onCreateEntryType}>+ 添加词条类型</Button>
                 </div>
 
-                <RollingBox axis="y" className="pe-config-list pe-config-list--entry-types" thumbSize="thin">
-                    <div className="pe-config-list__inner pe-entry-type-grid">
-                        {entryTypes.map(entryType => {
-                            const isBuiltin = entryType.kind === 'builtin'
-                            return (
-                                <article
-                                    key={entryTypeKey(entryType)}
-                                    className="pe-entry-type-item"
-                                    style={{'--pe-config-color': entryType.color} as CSSProperties}
-                                >
-                                    <div className="pe-entry-type-item__main">
-                                        <div className="pe-entry-type-item__header">
-                                            <div className="pe-entry-type-item__title-row">
-                                                <span className="pe-entry-type-item__icon">
-                                                    <EntryTypeIcon entryType={entryType}
-                                                                   className="pe-config-item__entry-icon"/>
-                                                </span>
-                                                <span className="pe-config-item__title">{entryType.name}</span>
-                                                <span className="pe-config-item__badge">
-                                                    {isBuiltin ? '内置' : '自定义'}
-                                                </span>
-                                            </div>
-                                            {!isBuiltin && onEditEntryType && (
-                                                <Button type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => onEditEntryType(entryType)}
-                                                >
-                                                    编辑
-                                                </Button>
-                                            )}
+                <ProjectConfigList>
+                    {entryTypes.map(entryType => {
+                        const isBuiltin = entryType.kind === 'builtin'
+                        return (
+                            <article
+                                key={entryTypeKey(entryType)}
+                                className="pe-entry-type-item"
+                                style={{'--pe-config-color': entryType.color} as CSSProperties}
+                            >
+                                <div className="pe-entry-type-item__main">
+                                    <div className="pe-entry-type-item__header">
+                                        <div className="pe-entry-type-item__title-row">
+                                            <span className="pe-entry-type-item__icon">
+                                                <EntryTypeIcon entryType={entryType}
+                                                               className="pe-config-item__entry-icon"/>
+                                            </span>
+                                            <span className="pe-config-item__title">{entryType.name}</span>
+                                            <span className="pe-config-item__badge">
+                                                {isBuiltin ? '内置' : '自定义'}
+                                            </span>
                                         </div>
+                                        {!isBuiltin && onEditEntryType && (
+                                            <Button type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => onEditEntryType(entryType)}
+                                            >
+                                                编辑
+                                            </Button>
+                                        )}
                                     </div>
-                                    {entryType.description && (
-                                        <p className="pe-entry-type-item__desc">
-                                            {entryType.description}
-                                        </p>
-                                    )}
-                                </article>
-                            )
-                        })}
-                    </div>
-                </RollingBox>
+                                </div>
+                                {entryType.description && (
+                                    <p className="pe-entry-type-item__desc">
+                                        {entryType.description}
+                                    </p>
+                                )}
+                            </article>
+                        )
+                    })}
+                </ProjectConfigList>
             </section>
 
             <section className="pe-config-section">
@@ -194,61 +253,59 @@ function ProjectConfigOverview({
                     <Button type="button" variant="outline" size="sm" onClick={onCreateTag}>+ 添加标签</Button>
                 </div>
 
-                <RollingBox axis="y" className="pe-config-list pe-config-list--tags" thumbSize="thin">
-                    <div className="pe-config-list__inner pe-entry-type-grid">
-                        {tagSchemas.map(tag => {
-                            const compactTargets = getCompactTagTargetLabels(tag, entryTypeNameMap)
-                            const defaultValue = getTagDefaultValue(tag)
-                            const hasDescription = Boolean(tag.description?.trim())
-                            return (
-                                <article key={tag.id} className="pe-entry-type-item pe-entry-type-item--tag">
-                                    <div className="pe-entry-type-item__main">
-                                        <div className="pe-entry-type-item__header">
-                                            <div className="pe-entry-type-item__title-row">
-                                                <span
-                                                    className={`pe-entry-type-item__icon pe-entry-type-item__icon--tag ${getTagTypeIconClass(tag.type)}`}
-                                                >
-                                                    <TagTypeIcon type={tag.type}/>
-                                                </span>
-                                                <span className="pe-config-item__title">{tag.name}</span>
-                                                <span className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
-                                            </div>
-                                            {onEditTag && (
-                                                <Button type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => onEditTag(tag)}
-                                                >
-                                                    编辑
-                                                </Button>
-                                            )}
+                <ProjectConfigList>
+                    {tagSchemas.map(tag => {
+                        const compactTargets = getCompactTagTargetLabels(tag, entryTypeNameMap)
+                        const defaultValue = getTagDefaultValue(tag)
+                        const hasDescription = Boolean(tag.description?.trim())
+                        return (
+                            <article key={tag.id} className="pe-entry-type-item pe-entry-type-item--tag">
+                                <div className="pe-entry-type-item__main">
+                                    <div className="pe-entry-type-item__header">
+                                        <div className="pe-entry-type-item__title-row">
+                                            <span
+                                                className={`pe-entry-type-item__icon pe-entry-type-item__icon--tag ${getTagTypeIconClass(tag.type)}`}
+                                            >
+                                                <TagTypeIcon type={tag.type}/>
+                                            </span>
+                                            <span className="pe-config-item__title">{tag.name}</span>
+                                            <span className="pe-config-item__badge">{getTagTypeLabel(tag.type)}</span>
                                         </div>
-                                        <div className="pe-tag-config-item__meta-row">
-                                            {defaultValue && (
-                                                <span className="pe-config-item__badge is-muted">默认值：{defaultValue}</span>
-                                            )}
-                                            {compactTargets.length > 0 ? (
-                                                compactTargets.map(target => (
-                                                    <span key={`${tag.id}-${target}`}
-                                                          className="pe-tag-target-chip">
-                                                        {target}
-                                                    </span>
-                                                ))
-                                            ) : (
-                                                <span className="pe-tag-target-chip is-free">自由标签</span>
-                                            )}
-                                        </div>
+                                        {onEditTag && (
+                                            <Button type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => onEditTag(tag)}
+                                            >
+                                                编辑
+                                            </Button>
+                                        )}
                                     </div>
-                                    {hasDescription && (
-                                        <p className="pe-entry-type-item__desc">
-                                            {tag.description}
-                                        </p>
-                                    )}
-                                </article>
-                            )
-                        })}
-                    </div>
-                </RollingBox>
+                                    <div className="pe-tag-config-item__meta-row">
+                                        {defaultValue && (
+                                            <span className="pe-config-item__badge is-muted">默认值：{defaultValue}</span>
+                                        )}
+                                        {compactTargets.length > 0 ? (
+                                            compactTargets.map(target => (
+                                                <span key={`${tag.id}-${target}`}
+                                                      className="pe-tag-target-chip">
+                                                    {target}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="pe-tag-target-chip is-free">自由标签</span>
+                                        )}
+                                    </div>
+                                </div>
+                                {hasDescription && (
+                                    <p className="pe-entry-type-item__desc">
+                                        {tag.description}
+                                    </p>
+                                )}
+                            </article>
+                        )
+                    })}
+                </ProjectConfigList>
             </section>
         </div>
     )

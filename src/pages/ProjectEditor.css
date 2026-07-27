@@ -737,11 +737,42 @@
     border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 58%, transparent);
 }
 
+.pe-config-list-frame {
+    position: relative;
+    height: clamp(20rem, 48vh, 26rem);
+    padding: 0.1rem;
+}
+
 .pe-config-list {
-    flex: 1;
-    min-height: 14rem;
-    max-height: 19rem;
+    height: 100%;
     padding-right: 0.2rem;
+}
+
+.pe-config-list-frame::before,
+.pe-config-list-frame::after {
+    content: "";
+    position: absolute;
+    z-index: 2;
+    right: 0.2rem;
+    left: 0;
+    height: var(--fc-space-xl);
+    pointer-events: none;
+    opacity: 0;
+}
+
+.pe-config-list-frame::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--fc-color-bg), transparent);
+}
+
+.pe-config-list-frame::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--fc-color-bg), transparent);
+}
+
+.pe-config-list-frame[data-overflow-top]::before,
+.pe-config-list-frame[data-overflow-bottom]::after {
+    opacity: 1;
 }
 
 .pe-config-list__inner {
@@ -749,16 +780,6 @@
     flex-direction: column;
     gap: 0.55rem;
     min-height: 100%;
-}
-
-.pe-config-list--entry-types {
-    min-height: 13.5rem;
-    max-height: 18rem;
-}
-
-.pe-config-list--tags {
-    min-height: 13.5rem;
-    max-height: 18rem;
 }
 
 .pe-entry-type-grid {

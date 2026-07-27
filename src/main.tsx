@@ -6,6 +6,7 @@ import AppShell from './app/index/AppShell'
 import {get_platform_info, type PlatformInfo, setting_get_settings} from './api'
 import {getAppSettingsSnapshot, subscribeAppSettings} from './features/settings/appSettingsStore'
 import {getFormFactorOverride, isDevPreviewBackendEnabled, isTauriRuntime} from './shared/devPreview'
+import {resolveDensity} from './shared/formFactor'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
 import './glassEffect.css'
@@ -114,6 +115,12 @@ const initApp = async () => {
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : initialTheme
     document.documentElement.setAttribute('data-theme', resolvedTheme)
+
+    // 同理预写控件密度：ThemeProvider 的同步发生在 useEffect（首帧绘制之后），
+    // 只靠它会让移动端首帧按桌面高度排版再跳一次——闪白是颜色问题，这个是布局抖动，更显眼。
+    if (resolveDensity(platformInfo) === 'touch') {
+        document.documentElement.setAttribute('data-fc-density', 'touch')
+    }
 
     createRoot(document.getElementById('root')!).render(
         <StrictMode>

@@ -1941,16 +1941,17 @@ export default function Settings({
                                 <div className="settings-row settings-row--compact">
                                     <div className="settings-field">
                                         <label className="settings-label-wide">自动备份</label>
-                                        <input
+                                        <Input
                                             className="settings-number-input"
                                             type="number"
+                                            size="sm"
                                             min={0}
                                             max={86400}
                                             step={30}
                                             value={settings.auto_backup_secs}
-                                            onChange={(event) => handleNumberSettingChange(
+                                            onValueChange={(value) => handleNumberSettingChange(
                                                 'auto_backup_secs',
-                                                event.target.value,
+                                                value,
                                                 300,
                                                 0,
                                                 86400,
@@ -1961,16 +1962,17 @@ export default function Settings({
                                     </div>
                                     <div className="settings-field">
                                         <label className="settings-label-wide">最大备份数量</label>
-                                        <input
+                                        <Input
                                             className="settings-number-input"
                                             type="number"
+                                            size="sm"
                                             min={1}
                                             max={999}
                                             step={1}
                                             value={settings.max_backup_count}
-                                            onChange={(event) => handleNumberSettingChange(
+                                            onValueChange={(value) => handleNumberSettingChange(
                                                 'max_backup_count',
-                                                event.target.value,
+                                                value,
                                                 20,
                                                 1,
                                                 999,
@@ -2198,15 +2200,16 @@ export default function Settings({
                                 <div className="settings-text-model-grid">
                                     <label className="settings-text-model-field">
                                         <span>温度</span>
-                                        <input
+                                        <Input
                                             type="number"
+                                            size="sm"
                                             min={0}
                                             max={CONVERSATION_TEMPERATURE_MAX}
                                             step={0.1}
                                             value={settings.llm.temperature}
-                                            onChange={(event) => updateLlmDefaults({
+                                            onValueChange={(value) => updateLlmDefaults({
                                                 temperature: clampNumberValue(
-                                                    event.currentTarget.value,
+                                                    value,
                                                     settings.llm.temperature,
                                                     0,
                                                     CONVERSATION_TEMPERATURE_MAX,
@@ -2216,14 +2219,15 @@ export default function Settings({
                                     </label>
                                     <label className="settings-text-model-field" title="回答开放度：越低越稳定严谨，越高越自由发散。">
                                         <span>回答开放度</span>
-                                        <input
+                                        <Input
                                             type="number"
+                                            size="sm"
                                             min={0}
                                             max={1}
                                             step={0.05}
                                             value={settings.llm.top_p}
-                                            onChange={(event) => updateLlmDefaults({
-                                                top_p: clampNumberValue(event.currentTarget.value, settings.llm.top_p, 0, 1),
+                                            onValueChange={(value) => updateLlmDefaults({
+                                                top_p: clampNumberValue(value, settings.llm.top_p, 0, 1),
                                             })}
                                         />
                                     </label>
@@ -2240,15 +2244,16 @@ export default function Settings({
                                                 })}
                                             />
                                         </label>
-                                        <input
+                                        <Input
                                             type="number"
+                                            size="sm"
                                             min={-2}
                                             max={2}
                                             step={0.1}
                                             disabled={settings.llm.frequency_penalty === 0}
                                             value={settings.llm.frequency_penalty}
-                                            onChange={(event) => updateLlmDefaults({
-                                                frequency_penalty: clampNumberValue(event.currentTarget.value, settings.llm.frequency_penalty, -2, 2),
+                                            onValueChange={(value) => updateLlmDefaults({
+                                                frequency_penalty: clampNumberValue(value, settings.llm.frequency_penalty, -2, 2),
                                             })}
                                         />
                                     </div>
@@ -2265,15 +2270,16 @@ export default function Settings({
                                                 })}
                                             />
                                         </label>
-                                        <input
+                                        <Input
                                             type="number"
+                                            size="sm"
                                             min={-2}
                                             max={2}
                                             step={0.1}
                                             disabled={settings.llm.presence_penalty === 0}
                                             value={settings.llm.presence_penalty}
-                                            onChange={(event) => updateLlmDefaults({
-                                                presence_penalty: clampNumberValue(event.currentTarget.value, settings.llm.presence_penalty, -2, 2),
+                                            onValueChange={(value) => updateLlmDefaults({
+                                                presence_penalty: clampNumberValue(value, settings.llm.presence_penalty, -2, 2),
                                             })}
                                         />
                                     </div>
@@ -2459,14 +2465,15 @@ export default function Settings({
                                         </div>
                                         <div className="settings-field">
                                             <label className="settings-label-wide">保留近期消息</label>
-                                            <input
+                                            <Input
                                                 className="settings-number-input"
                                                 type="number"
+                                                size="sm"
                                                 min={2}
                                                 max={30}
                                                 step={1}
                                                 value={settings.llm.auto_compact_recent_messages}
-                                                onChange={(event) => handleLlmCompactRecentMessagesChange(event.target.value)}
+                                                onValueChange={handleLlmCompactRecentMessagesChange}
                                             />
                                             <span className="settings-span">条</span>
                                         </div>

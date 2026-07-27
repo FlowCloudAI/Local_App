@@ -109,8 +109,9 @@
     line-height: 1.1;
 }
 
+/* 高度交给 flowcloudai-ui 的 --fc-control-tap-min（触控密度 = 44 像素），
+   这里只管横向内边距与移动端质感；原先写死的 2.55rem 低于触控下限。 */
 .mobile-idea__select .fc-select__trigger {
-    min-height: 2.55rem;
     padding: 0 0.78rem;
     border: var(--mobile-border);
     background: var(--mobile-surface-translucent);

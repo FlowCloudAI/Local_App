@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import type {Category, ProjectStats} from '../../../api'
 
 const ROOT_PARENT_KEY = '__root__'
@@ -8,24 +7,7 @@ export type RenameTarget = {mode: 'create'; parentId: string | null} | {mode: 'r
 export type DeleteMode = 'empty' | 'lift' | 'cascade'
 export type SiblingDirection = 'up' | 'down'
 export type DragDropPosition = 'before' | 'after' | 'into'
-export const CATEGORY_REORDER_LONG_PRESS_MS = 430
-export const CATEGORY_REORDER_MOVE_TOLERANCE = 12
-export const ROW_DRAG_START_DISTANCE = 10
-export const ROW_DRAG_VERTICAL_DOMINANCE = 1.12
-export interface CategoryDragState { pointerId: number | string; categoryId: string; active: boolean }
 export interface CategoryDropTarget { targetId: string; position: DragDropPosition }
-
-export function dropTargetSignature(target: CategoryDropTarget | null) {
-    return target ? `${target.targetId}:${target.position}` : 'none'
-}
-
-export function getGesturePointerId(event: Event): number | string {
-    return 'pointerId' in event && typeof event.pointerId === 'number' ? event.pointerId : 'gesture'
-}
-
-export function getGesturePointerType(event: Event): string {
-    return 'pointerType' in event && typeof event.pointerType === 'string' ? event.pointerType : event.type
-}
 
 export function parentKey(parentId: string | null | undefined) { return parentId ?? ROOT_PARENT_KEY }
 function sortCategories(a: Category, b: Category) { return (a.sort_order - b.sort_order) || a.name.localeCompare(b.name, 'zh-Hans-CN') }
@@ -40,42 +22,6 @@ export function buildChildrenMap(categories: Category[]) {
     }
     for (const siblings of map.values()) siblings.sort(sortCategories)
     return map
-}
-
-export function buildVisibleRows(childrenMap: Map<string, Category[]>, expandedIds: Set<string>, query: string) {
-    const rows: CategoryRow[] = []
-    const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN')
-    if (normalizedQuery) {
-        const categoryById = new Map<string, Category>()
-        for (const siblings of childrenMap.values()) for (const category of siblings) categoryById.set(category.id, category)
-        const visibleIds = new Set<string>()
-        for (const category of categoryById.values()) {
-            if (!category.name.toLocaleLowerCase('zh-CN').includes(normalizedQuery)) continue
-            visibleIds.add(category.id)
-            let parentId = category.parent_id ?? null
-            while (parentId) {
-                visibleIds.add(parentId)
-                parentId = categoryById.get(parentId)?.parent_id ?? null
-            }
-        }
-        const visit = (parentId: string | null, depth: number) => {
-            for (const category of childrenMap.get(parentKey(parentId)) ?? []) {
-                if (!visibleIds.has(category.id)) continue
-                rows.push({category, depth})
-                visit(category.id, depth + 1)
-            }
-        }
-        visit(null, 0)
-        return rows
-    }
-    const visit = (parentId: string | null, depth: number) => {
-        for (const category of childrenMap.get(parentKey(parentId)) ?? []) {
-            rows.push({category, depth})
-            if (expandedIds.has(category.id)) visit(category.id, depth + 1)
-        }
-    }
-    visit(null, 0)
-    return rows
 }
 
 export function buildAllRows(childrenMap: Map<string, Category[]>) {
@@ -106,8 +52,4 @@ export function getEntryCountMap(stats: ProjectStats | null) {
 
 export function getSortedSiblings(categories: Category[], parentId: string | null) {
     return categories.filter(category => (category.parent_id ?? null) === parentId).sort(sortCategories)
-}
-
-export function TreeIcon({expanded}: {expanded: boolean}) {
-    return <svg className="mobile-category-drawer__toggle-icon" viewBox="0 0 20 20" focusable="false"><path d={expanded ? 'M5.5 8 10 12.5 14.5 8' : 'M8 5.5 12.5 10 8 14.5'}/></svg>
 }

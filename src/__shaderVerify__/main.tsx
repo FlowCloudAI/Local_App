@@ -8,8 +8,8 @@
  */
 import {StrictMode, useEffect, useMemo, useState} from 'react'
 import {createRoot} from 'react-dom/client'
-import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles/pixi'
-import type {PixiMapStyle} from '../features/maps/styles/pixi'
+import {compilePixiMapStyle, getPixiMapStyle} from '../features/maps/styles'
+import type {PixiMapStyle} from '../features/maps/styles'
 import {retainShapesWhenPolygonsMatch} from '../features/maps/styles/pixi/overlays'
 import {buildTerrainSymbolPlacements} from '../features/maps/styles/pixi/terrainSymbols'
 import {
@@ -29,7 +29,7 @@ import {
     compactTerrainStrokes,
     resolveTerrainStrokesForViewport,
     TERRAIN_FIELD_EMPTY_INDEX,
-} from '../features/maps/styles/common'
+} from '../features/maps/styles'
 
 function makeIsland(
     cx: number,

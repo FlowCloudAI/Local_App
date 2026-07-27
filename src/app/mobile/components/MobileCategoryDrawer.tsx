@@ -1,14 +1,13 @@
+import {useCallback, useEffect, useMemo, useState} from 'react'
 import {
-    type CSSProperties,
-    type MouseEvent as ReactMouseEvent,
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react'
-import {useDrag} from '@use-gesture/react'
-import {Input, useAlert} from 'flowcloudai-ui'
+    type CategoryTreeNode,
+    type DropPosition,
+    flatToTree,
+    Input,
+    Tree,
+    type TreeActionItem,
+    useAlert,
+} from 'flowcloudai-ui'
 import {logger} from '../../../shared/logger'
 import {ProjectHomeIcon} from '../../../shared/ui/ProjectHomeIcon'
 import {
@@ -26,23 +25,12 @@ import {MobileAddIcon, MobileMoreIcon, MobileSearchIcon} from './MobileTopContro
 import {
     buildAllRows,
     buildChildrenMap,
-    buildVisibleRows,
-    CATEGORY_REORDER_LONG_PRESS_MS,
-    CATEGORY_REORDER_MOVE_TOLERANCE,
     collectDescendantIds,
-    dropTargetSignature,
     getEntryCountMap,
-    getGesturePointerId,
-    getGesturePointerType,
     getSortedSiblings,
     parentKey,
-    ROW_DRAG_START_DISTANCE,
-    ROW_DRAG_VERTICAL_DOMINANCE,
-    TreeIcon,
-    type CategoryDragState,
     type CategoryDropTarget,
     type DeleteMode,
-    type DragDropPosition,
     type RenameTarget,
     type SiblingDirection,
 } from './mobileCategoryTree'
@@ -81,16 +69,6 @@ export default function MobileCategoryDrawer({
     const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
     const [moveTarget, setMoveTarget] = useState<Category | null>(null)
     const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
-    const [draggingId, setDraggingId] = useState<string | null>(null)
-    const [dropTarget, setDropTarget] = useState<CategoryDropTarget | null>(null)
-    const listRef = useRef<HTMLDivElement | null>(null)
-    const categoryNodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-    const dragStateRef = useRef<CategoryDragState | null>(null)
-    const dropTargetRef = useRef<CategoryDropTarget | null>(null)
-    const pressedCategoryIdRef = useRef<string | null>(null)
-    const loggedDropTargetRef = useRef<string>('none')
-    const suppressCategoryClickRef = useRef<string | null>(null)
-    const suppressCategoryClickTimerRef = useRef<number | null>(null)
     const childrenMap = useMemo(() => buildChildrenMap(categories), [categories])
     const initialExpanded = useMemo(() => {
         const ids = new Set<string>()
@@ -113,10 +91,19 @@ export default function MobileCategoryDrawer({
         })
     }, [initialExpanded])
 
-    const rows = useMemo(
-        () => buildVisibleRows(childrenMap, expandedIds, searchText),
-        [childrenMap, expandedIds, searchText],
+    /*
+     * Tree 负责按 searchValue 过滤与按 expandedKeys 展开，这里只把扁平分类转成它要的嵌套结构。
+     * parent_id 要显式归一到 null：API 里它是可选字段（undefined 表示顶层），
+     * 而 flatToTree 用 `=== null` 判定根节点，undefined 会被当成「父节点缺失」丢进 orphans。
+     */
+    const treeData = useMemo(
+        () => flatToTree(categories.map(category => ({
+            ...category,
+            parent_id: category.parent_id ?? null,
+        }))).roots,
+        [categories],
     )
+    const expandedKeys = useMemo(() => Array.from(expandedIds), [expandedIds])
     const allRows = useMemo(() => buildAllRows(childrenMap), [childrenMap])
     const categoryById = useMemo(() => new Map(categories.map(category => [category.id, category])), [categories])
     const entryCountMap = useMemo(() => getEntryCountMap(stats), [stats])
@@ -132,18 +119,6 @@ export default function MobileCategoryDrawer({
         const ids = [categoryId, ...collectDescendantIds(categoryId, childrenMap)]
         return ids.reduce((sum, id) => sum + (entryCountMap.get(id) ?? 0), 0)
     }, [childrenMap, entryCountMap])
-
-    const toggleExpanded = (categoryId: string) => {
-        setExpandedIds(current => {
-            const next = new Set(current)
-            if (next.has(categoryId)) {
-                next.delete(categoryId)
-            } else {
-                next.add(categoryId)
-            }
-            return next
-        })
-    }
 
     const handleConfirmName = useCallback(async (name: string) => {
         if (!renameTarget) return
@@ -398,269 +373,44 @@ export default function MobileCategoryDrawer({
     const renameInitialValue = renameTarget?.mode === 'rename' ? renameTarget.category.name : ''
     const renameTitle = renameTarget?.mode === 'rename' ? '重命名分类' : '新建分类'
 
-    const getDropTarget = useCallback((pointerY: number, draggedId: string): CategoryDropTarget | null => {
-        const draggedElement = categoryNodeRefs.current.get(draggedId)
-        if (draggedElement) {
-            const draggedRect = draggedElement.getBoundingClientRect()
-            if (pointerY >= draggedRect.top && pointerY <= draggedRect.bottom) return null
-        }
-
-        const blockedIds = new Set([draggedId, ...collectDescendantIds(draggedId, childrenMap)])
-        const candidates = rows.filter(row => !blockedIds.has(row.category.id))
-        if (candidates.length === 0) return null
-
-        for (const row of candidates) {
-            const element = categoryNodeRefs.current.get(row.category.id)
-            if (!element) continue
-            const rect = element.getBoundingClientRect()
-            if (pointerY < rect.top || pointerY > rect.bottom) continue
-
-            const ratio = (pointerY - rect.top) / rect.height
-            const position: DragDropPosition = ratio < 0.25 ? 'before' : ratio > 0.75 ? 'after' : 'into'
-            return {targetId: row.category.id, position}
-        }
-
-        const firstElement = categoryNodeRefs.current.get(candidates[0].category.id)
-        const lastElement = categoryNodeRefs.current.get(candidates[candidates.length - 1].category.id)
-        if (firstElement && pointerY < firstElement.getBoundingClientRect().top) {
-            return {targetId: candidates[0].category.id, position: 'before'}
-        }
-        if (lastElement && pointerY > lastElement.getBoundingClientRect().bottom) {
-            return {targetId: candidates[candidates.length - 1].category.id, position: 'after'}
-        }
-
-        return null
-    }, [childrenMap, rows])
-
-    const scrollListDuringDrag = useCallback((pointerY: number) => {
-        const list = listRef.current
-        if (!list) return
-
-        const rect = list.getBoundingClientRect()
-        const edgeSize = 58
-        const maxStep = 18
-        if (pointerY < rect.top + edgeSize) {
-            const strength = (rect.top + edgeSize - pointerY) / edgeSize
-            list.scrollTop -= Math.ceil(maxStep * strength)
-        } else if (pointerY > rect.bottom - edgeSize) {
-            const strength = (pointerY - (rect.bottom - edgeSize)) / edgeSize
-            list.scrollTop += Math.ceil(maxStep * strength)
-        }
-    }, [])
-
-    const clearDragState = useCallback(() => {
-        dragStateRef.current = null
-        dropTargetRef.current = null
-        loggedDropTargetRef.current = 'none'
-        setDraggingId(null)
-        setDropTarget(null)
-    }, [])
-
-    const suppressNextCategoryClick = useCallback((categoryId: string) => {
-        suppressCategoryClickRef.current = categoryId
-        if (suppressCategoryClickTimerRef.current !== null) {
-            window.clearTimeout(suppressCategoryClickTimerRef.current)
-        }
-        suppressCategoryClickTimerRef.current = window.setTimeout(() => {
-            if (suppressCategoryClickRef.current === categoryId) {
-                suppressCategoryClickRef.current = null
-            }
-            suppressCategoryClickTimerRef.current = null
-        }, 350)
-    }, [])
-
-    useEffect(() => {
-        return () => {
-            if (suppressCategoryClickTimerRef.current !== null) {
-                window.clearTimeout(suppressCategoryClickTimerRef.current)
-            }
-        }
-    }, [])
-
-    const activateDrag = useCallback((dragState: CategoryDragState, pointerX: number, pointerY: number, reason: string) => {
-        if (!dragState.active) {
-            dragState.active = true
-            setDraggingId(dragState.categoryId)
-            logger.info('[移动端分类拖拽] 进入拖拽', {
-                pointerId: dragState.pointerId,
-                categoryId: dragState.categoryId,
-                reason,
-                pointerX: Math.round(pointerX),
-                pointerY: Math.round(pointerY),
-            })
-        }
-    }, [])
-
-    const updateDragTarget = useCallback((pointerX: number, pointerY: number, draggedId: string, source: string) => {
-        scrollListDuringDrag(pointerY)
-        const nextTarget = getDropTarget(pointerY, draggedId)
-        dropTargetRef.current = nextTarget
-        setDropTarget(nextTarget)
-        const signature = dropTargetSignature(nextTarget)
-        if (loggedDropTargetRef.current !== signature) {
-            loggedDropTargetRef.current = signature
-            logger.info('[移动端分类拖拽] 目标变化', {
-                source,
-                draggedId,
-                pointerX: Math.round(pointerX),
-                pointerY: Math.round(pointerY),
-                target: nextTarget,
-                targetName: nextTarget ? categoryById.get(nextTarget.targetId)?.name ?? null : null,
-            })
-        }
-    }, [categoryById, getDropTarget, scrollListDuringDrag])
-
-    const finishDrag = useCallback((pointerId: number | string, commit: boolean, reason: string) => {
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== pointerId) return
-
-        const wasActive = dragState.active
-        const nextTarget = dropTargetRef.current
-        const draggedId = dragState.categoryId
-        clearDragState()
-
-        logger.info('[移动端分类拖拽] 结算', {
-            pointerId,
-            draggedId,
-            commit,
-            reason,
-            active: wasActive,
-            target: nextTarget,
-        })
-        if (!wasActive) {
-            logger.info('[移动端分类拖拽] 结束但未进入拖拽', {
-                pointerId,
-                draggedId,
-                reason,
-            })
-            return
-        }
-        suppressNextCategoryClick(draggedId)
-        if (commit && !nextTarget) {
-            logger.info('[移动端分类拖拽] 结算但没有有效目标', {
-                pointerId,
-                draggedId,
-                reason,
-            })
-        }
-        if (commit && nextTarget) {
-            void handleMoveByDrop(draggedId, nextTarget)
-        }
-    }, [clearDragState, handleMoveByDrop, suppressNextCategoryClick])
-
-    const bindCategoryDrag = useDrag(({
-        args: [category],
-        cancel,
-        event,
-        first,
-        last,
-        movement: [moveX, moveY],
-        xy: [pointerX, pointerY],
-    }) => {
-        const targetCategory = category as Category | undefined
-        if (!targetCategory) return
-
-        const pointerId = getGesturePointerId(event)
-        const pointerType = getGesturePointerType(event)
-        if (first) {
-            const touchLike = pointerType === 'touch'
-                || pointerType === 'pen'
-                || pointerType.startsWith('touch')
-            if (touchLike && pressedCategoryIdRef.current !== targetCategory.id) {
-                logger.info('[移动端分类拖拽] 取消已松手的延迟拖拽', {
-                    categoryId: targetCategory.id,
-                    pointerType,
-                })
-                cancel()
-                clearDragState()
-                return
-            }
-            if (busy || normalizedSearch) {
-                logger.info('[移动端分类拖拽] 忽略按下', {
-                    reason: busy ? 'busy' : 'searching',
-                    categoryId: targetCategory.id,
-                    normalizedSearch,
-                })
-                cancel()
-                return
-            }
-
-            event.stopPropagation()
-            const dragState: CategoryDragState = {
-                pointerId,
-                categoryId: targetCategory.id,
-                active: false,
-            }
-            dragStateRef.current = dragState
-            if (touchLike) {
-                activateDrag(dragState, pointerX, pointerY, 'long-press')
-            }
-            setDropTarget(null)
-            dropTargetRef.current = null
-            logger.info('[移动端分类拖拽] 按下', {
-                pointerId,
-                pointerType,
-                categoryId: targetCategory.id,
-                name: targetCategory.name,
-                startX: Math.round(pointerX),
-                startY: Math.round(pointerY),
-            })
-        }
-
-        const dragState = dragStateRef.current
-        if (!dragState || dragState.pointerId !== pointerId) return
-
-        event.stopPropagation()
-        if (!dragState.active) {
-            const horizontal = Math.abs(moveX)
-            const vertical = Math.abs(moveY)
-            if (
-                vertical < ROW_DRAG_START_DISTANCE
-                || vertical < horizontal * ROW_DRAG_VERTICAL_DOMINANCE
-            ) {
-                if (last) finishDrag(pointerId, true, 'use-drag-tap')
-                return
-            }
-            activateDrag(dragState, pointerX, pointerY, 'row-vertical-drag')
-        }
-
-        if (event.cancelable) event.preventDefault()
-        updateDragTarget(pointerX, pointerY, dragState.categoryId, 'use-drag')
-        if (last) finishDrag(pointerId, true, 'use-drag-end')
-    }, {
-        axisThreshold: {
-            pen: CATEGORY_REORDER_MOVE_TOLERANCE,
-            touch: CATEGORY_REORDER_MOVE_TOLERANCE,
-        },
-        filterTaps: false,
-        pointer: {capture: false, keys: false, touch: true},
-        preventScroll: CATEGORY_REORDER_LONG_PRESS_MS,
-        preventScrollAxis: 'xy',
-    })
-
-    const handleCategoryRowClick = useCallback((
-        event: ReactMouseEvent<HTMLButtonElement>,
-        category: Category,
+    /*
+     * 拖拽移动交给 Tree（dragActivation='long-press'，长按 430ms 激活）。
+     * 原先这里有约 230 行手写手势：drop 命中判定、拖到边缘自动滚动、方向锁、
+     * 拖拽后的点击抑制、pointerId 追踪——现在全部由 dnd-kit 承担，
+     * 只留下「拖到哪里 → 怎么改 parent_id 与 sort_order」这段业务。
+     * Tree 自己会拒绝把节点拖进自己的子孙（沿 parentMap 上溯），不必再挡一次。
+     */
+    const handleTreeMove = useCallback(async (
+        key: string,
+        targetKey: string,
+        position: DropPosition,
     ) => {
-        if (suppressCategoryClickRef.current === category.id) {
-            suppressCategoryClickRef.current = null
-            event.preventDefault()
-            event.stopPropagation()
-            logger.info('[移动端分类拖拽] 抑制拖拽后的点击', {
-                categoryId: category.id,
-                name: category.name,
-            })
-            return
-        }
+        await handleMoveByDrop(key, {targetId: targetKey, position})
+    }, [handleMoveByDrop])
+
+    /* 搜索态下看到的是过滤后的局部顺序，此时排序结果没有意义；写库期间同样不接受新拖拽。 */
+    const canDragCategory = useCallback(() => !busy && !normalizedSearch, [busy, normalizedSearch])
+
+    const getCategoryActions = useCallback((node: CategoryTreeNode): TreeActionItem[] => [{
+        key: 'manage',
+        label: '管理',
+        title: `管理分类 ${node.title}`,
+        icon: <MobileMoreIcon/>,
+        onClick: () => setMenuTarget(categoryById.get(node.key) ?? null),
+    }], [categoryById])
+
+    const handleTreeSelect = useCallback((key: string) => {
+        const category = categoryById.get(key)
+        if (!category) return
         onSelect({kind: 'category', categoryId: category.id}, category.name)
-    }, [onSelect])
+    }, [categoryById, onSelect])
+
+    const handleExpandedKeysChange = useCallback((keys: string[]) => {
+        setExpandedIds(new Set(keys))
+    }, [])
 
     return (
-        <aside
-            className="mobile-category-drawer"
-            aria-label="分类树"
-            style={{'--mobile-category-drawer-indent-size': `${indentSize}px`} as CSSProperties}
-        >
+        <aside className="mobile-category-drawer" aria-label="分类树">
             <div className="mobile-category-drawer__toolbar">
                 <div className="mobile-category-drawer__search">
                     <Input
@@ -683,7 +433,8 @@ export default function MobileCategoryDrawer({
                 </button>
             </div>
 
-            <div className="mobile-category-drawer__list" role="tree" aria-label="词条分类" ref={listRef}>
+            {/* 「项目主页 / 默认分类」不是分类，不参与拖拽排序，固定在树上方不跟着滚。 */}
+            <div className="mobile-category-drawer__fixed-rows">
                 {showProjectHomeRow && (
                     <button
                         type="button"
@@ -711,67 +462,27 @@ export default function MobileCategoryDrawer({
                     </button>
                 )}
 
-                {rows.map(({category, depth}) => {
-                    const childCount = (childrenMap.get(parentKey(category.id)) ?? []).length
-                    const expanded = expandedIds.has(category.id) || Boolean(normalizedSearch)
-                    const active = selected.kind === 'category' && selected.categoryId === category.id
-                    return (
-                        <div
-                            key={category.id}
-                            ref={(element) => {
-                                if (element) {
-                                    categoryNodeRefs.current.set(category.id, element)
-                                } else {
-                                    categoryNodeRefs.current.delete(category.id)
-                                }
-                            }}
-                            className={[
-                                'mobile-category-drawer__node',
-                                draggingId === category.id ? 'is-dragging-source' : '',
-                                dropTarget?.targetId === category.id ? `is-drop-${dropTarget.position}` : '',
-                            ].filter(Boolean).join(' ')}
-                            style={{'--mobile-category-drawer-depth': depth} as CSSProperties}
-                            role="none"
-                        >
-                            <span className="mobile-category-drawer__indent-lines" aria-hidden="true"/>
-                            <button
-                                type="button"
-                                className="mobile-category-drawer__toggle"
-                                aria-label={expanded ? `收起 ${category.name}` : `展开 ${category.name}`}
-                                disabled={childCount === 0 || Boolean(normalizedSearch)}
-                                onClick={() => toggleExpanded(category.id)}
-                            >
-                                {childCount > 0 ? <TreeIcon expanded={expanded}/> : null}
-                            </button>
-                            <button
-                                type="button"
-                                role="treeitem"
-                                aria-selected={active}
-                                aria-expanded={childCount > 0 ? expanded : undefined}
-                                className={`mobile-category-drawer__row mobile-category-drawer__row--category${active ? ' is-active' : ''}`}
-                                {...bindCategoryDrag(category)}
-                                onPointerDownCapture={() => { pressedCategoryIdRef.current = category.id }}
-                                onPointerUpCapture={() => { pressedCategoryIdRef.current = null }}
-                                onPointerCancelCapture={() => { pressedCategoryIdRef.current = null }}
-                                onClick={(event) => handleCategoryRowClick(event, category)}
-                            >
-                                <span className="mobile-category-drawer__text">{category.name}</span>
-                            </button>
-                            <button
-                                type="button"
-                                className="mobile-category-drawer__menu"
-                                aria-label={`管理分类 ${category.name}`}
-                                onClick={() => setMenuTarget(category)}
-                            >
-                                <MobileMoreIcon/>
-                            </button>
-                        </div>
-                    )
-                })}
+            </div>
 
-                {normalizedSearch && rows.length === 0 && !showProjectHomeRow && !showDefaultRow ? (
-                    <div className="mobile-category-drawer__empty">没有匹配的分类</div>
-                ) : null}
+            <div className="mobile-category-drawer__tree">
+                <Tree
+                    treeData={treeData}
+                    selectedKey={selected.kind === 'category' ? selected.categoryId : ''}
+                    onSelectedKeyChange={handleTreeSelect}
+                    expandedKeys={expandedKeys}
+                    onExpandedKeysChange={handleExpandedKeysChange}
+                    onMove={handleTreeMove}
+                    canDrag={canDragCategory}
+                    getNodeActions={getCategoryActions}
+                    actionDisplayMode="inline"
+                    dragActivation="long-press"
+                    indentSize={indentSize}
+                    indentationLine
+                    /* 搜索框是抽屉工具栏里那个定制样式的 Input，这里只把值喂给 Tree 做过滤，
+                       不让它渲染自带的搜索框。 */
+                    searchable={false}
+                    searchValue={searchText}
+                />
             </div>
 
             <MobileCategoryDrawerDialogs

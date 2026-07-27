@@ -20,9 +20,9 @@
     line-height: 1.05;
 }
 
+/* 高度由 --fc-control-tap-min 统一；原先的 2.45rem 低于触控下限。 */
 .mobile-category-manager__head .fc-btn {
     flex: 0 0 auto;
-    min-height: 2.45rem;
     border-radius: var(--fc-radius-full);
     padding-inline: 0.95rem;
 }

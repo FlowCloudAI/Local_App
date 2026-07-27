@@ -1,25 +1,16 @@
 import {lazy, Suspense} from 'react'
 import type {PlatformInfo} from '../../api'
+import {isDesktopBuild, isMobileBuild, resolveFormFactor} from '../../shared/formFactor'
 
 interface AppRootProps {
     platformInfo: PlatformInfo
 }
 
-const buildPlatform = import.meta.env.TAURI_ENV_PLATFORM
-const isMobileBuild = buildPlatform === 'android' || buildPlatform === 'ios'
-const isDesktopBuild = buildPlatform === 'windows' || buildPlatform === 'macos' || buildPlatform === 'linux'
-
 const DesktopApp = isMobileBuild ? null : lazy(() => import('../desktop/DesktopApp'))
 const MobileApp = isDesktopBuild ? null : lazy(() => import('../mobile/MobileApp'))
 
-function getFormFactor(platformInfo: PlatformInfo) {
-    if (isMobileBuild) return 'mobile'
-    if (isDesktopBuild) return 'desktop'
-    return platformInfo.formFactor
-}
-
 export default function AppRoot({platformInfo}: AppRootProps) {
-    const formFactor = getFormFactor(platformInfo)
+    const formFactor = resolveFormFactor(platformInfo)
     const AppComponent = formFactor === 'mobile' ? MobileApp : DesktopApp
 
     return (

@@ -3,6 +3,7 @@ import {AlertProvider, ContextMenuProvider, ThemeProvider} from 'flowcloudai-ui'
 import 'flowcloudai-ui/style'
 import type {PlatformInfo} from '../../api'
 import {TourProvider} from '../../features/onboarding'
+import {resolveDensity} from '../../shared/formFactor'
 import AppRoot from './AppRoot'
 
 interface AppShellProps {
@@ -12,7 +13,7 @@ interface AppShellProps {
 
 export default function AppShell({initialTheme, platformInfo}: AppShellProps) {
     return (
-        <ThemeProvider defaultTheme={initialTheme}>
+        <ThemeProvider defaultTheme={initialTheme} density={resolveDensity(platformInfo)}>
             <ContextMenuProvider>
                 <AlertProvider>
                     <TourProvider>

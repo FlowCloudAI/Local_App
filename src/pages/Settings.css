@@ -270,18 +270,12 @@
 .settings-number-input {
   width: 6rem;
   min-width: 0;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid var(--fc-color-border);
-  border-radius: var(--fc-radius-md);
-  background: var(--fc-color-bg);
-  color: var(--fc-color-text);
-  font: inherit;
-  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
-.settings-number-input:focus {
-  outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
-  outline-offset: 1px;
+.settings-number-input .fc-input__field {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .settings-textarea {
@@ -330,27 +324,15 @@
   color: var(--fc-color-text);
 }
 
-.settings-text-model-field input[type='number'] {
+.settings-text-model-field > .fc-input {
   width: 5.5rem;
   min-width: 0;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid color-mix(in srgb, var(--fc-color-border) 84%, transparent);
-  border-radius: var(--fc-radius-sm);
-  background: color-mix(in srgb, var(--fc-color-bg) 84%, transparent);
-  color: var(--fc-color-text);
-  font: inherit;
+  flex: none;
+}
+
+.settings-text-model-field > .fc-input .fc-input__field {
   font-variant-numeric: tabular-nums;
   text-align: right;
-}
-
-.settings-text-model-field input[type='number']:disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-}
-
-.settings-text-model-field input[type='number']:focus {
-  outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 42%, transparent);
-  outline-offset: 1px;
 }
 
 .settings-text-model-field--penalty {
