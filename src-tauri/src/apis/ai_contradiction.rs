@@ -7,7 +7,8 @@ use crate::ai_services::contradiction_loader::{
 use crate::ai_services::world_check::world_check_definition;
 use crate::apis::ai_client::{
     CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
-    EventTurnBegin, EventTurnEnd, cleanup_session_state, save_api_usage, turn_status_str,
+    EventTurnBegin, EventTurnEnd, cleanup_session_state, save_api_usage, turn_status_error,
+    turn_status_str,
 };
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
@@ -570,6 +571,7 @@ fn spawn_contradiction_event_loop<S>(
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
                                 status: turn_status_str(&status),
+                                error: turn_status_error(&status),
                                 node_id,
                                 usage,
                             },

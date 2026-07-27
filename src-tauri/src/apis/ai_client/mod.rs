@@ -11,5 +11,5 @@ pub(crate) mod usage;
 pub(crate) use common::{
     CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
     EventTurnBegin, EventTurnEnd, StoredConversationSettings, cleanup_session_state,
-    save_api_usage, spawn_session_event_loop, turn_status_str,
+    save_api_usage, spawn_session_event_loop, turn_status_error, turn_status_str,
 };

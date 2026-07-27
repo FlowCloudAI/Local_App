@@ -1,6 +1,7 @@
 import {type RefObject} from 'react'
 import {Button, MessageBox} from 'flowcloudai-ui'
 import {type AiContextValue} from '../../../features/ai-chat/model/AiControllerTypes'
+import AiChatErrorNotice from '../../../features/ai-chat/components/AiChatErrorNotice'
 
 interface MobileAiMessageListProps {
     messages: AiContextValue['messages']
@@ -13,6 +14,7 @@ interface MobileAiMessageListProps {
     messagesEndRef: RefObject<HTMLDivElement | null>
     onNewConversation: () => void
     onOpenSettings: () => void
+    onRetryMessage: (messageId: string) => void
 }
 
 export default function MobileAiMessageList({
@@ -26,6 +28,7 @@ export default function MobileAiMessageList({
     messagesEndRef,
     onNewConversation,
     onOpenSettings,
+    onRetryMessage,
 }: MobileAiMessageListProps) {
     return (
         <main className="mobile-ai-chat__messages">
@@ -45,18 +48,49 @@ export default function MobileAiMessageList({
                     ) : null}
                 </div>
             )}
-            {messages.map(message => (
-                <MessageBox
-                    key={message.id}
-                    role={message.role}
-                    blocks={message.blocks}
-                    content={message.content}
-                    markdown={message.role === 'assistant'}
-                    contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
-                    toolCallDetail="verbose"
-                    lineHeight={1.5}
-                />
-            ))}
+            {messages.map((message, messageIndex) => {
+                if (!message.error) {
+                    return (
+                        <MessageBox
+                            key={message.id}
+                            role={message.role}
+                            blocks={message.blocks}
+                            content={message.content}
+                            markdown={message.role === 'assistant'}
+                            contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
+                            toolCallDetail="verbose"
+                            lineHeight={1.5}
+                        />
+                    )
+                }
+                const canRetry = messages
+                    .slice(0, messageIndex)
+                    .some(item => item.role === 'user' && item.nodeId != null)
+                const hasRenderableMessage = Boolean(
+                    message.content || message.reasoning || message.blocks?.length,
+                )
+                return (
+                    <div key={message.id} className="mobile-ai-chat__message">
+                        {hasRenderableMessage ? (
+                            <MessageBox
+                                role={message.role}
+                                blocks={message.blocks}
+                                content={message.content}
+                                markdown={message.role === 'assistant'}
+                                contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
+                                toolCallDetail="verbose"
+                                lineHeight={1.5}
+                            />
+                        ) : null}
+                        <AiChatErrorNotice
+                            compact
+                            error={message.error}
+                            onRetry={canRetry ? () => onRetryMessage(message.id) : undefined}
+                            onOpenSettings={onOpenSettings}
+                        />
+                    </div>
+                )
+            })}
             {isStreaming && streamingBlocks.length > 0 && (
                 <MessageBox
                     role="assistant"

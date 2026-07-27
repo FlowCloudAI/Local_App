@@ -401,6 +401,12 @@
     display: none;
 }
 
+.mobile-ai-chat__message {
+    display: grid;
+    width: 100%;
+    gap: var(--fc-space-sm);
+}
+
 .mobile-ai-chat__empty {
     display: flex;
     min-height: 100%;

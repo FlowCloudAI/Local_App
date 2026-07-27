@@ -48,6 +48,7 @@ import {
 } from '../../entries/lib/entryMarkdown'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import {subscribeAppSettings} from '../../settings/appSettingsStore'
+import AiChatErrorNotice from './AiChatErrorNotice'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../../shared/ui/layout/DockPanelScaffold.css'
 import './AIChatContent.css'
@@ -1888,47 +1889,71 @@ export default function AIChatContent({
                             onMouseOver={handleEntryLinkMouseOver}
                             onMouseOut={handleEntryLinkMouseOut}
                         >
-                            {ctx.messages.map((message) => (
-                                <div
-                                    key={message.id}
-                                    className={`ai-message-frame ai-message-frame--${message.role}`}
-                                >
-                                    {message.role === 'user' && (
-                                        <AiMessageAttachments attachments={message.attachments}/>
-                                    )}
-                                    <MessageBox
-                                        role={message.role}
-                                        blocks={message.role === 'assistant'
-                                            ? buildRenderableAiChatBlocks(message.blocks, true)
-                                            : message.blocks}
-                                        contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
-                                        content={message.role === 'assistant'
-                                            ? buildRenderableAiChatMarkdown(message.content)
-                                            : message.content}
-                                        toolCallDetail={'verbose'}
-                                        markdown={message.role === 'assistant'}
-                                        lineHeight={1.5}
-                                        reasoning={message.reasoning || undefined}
-                                        rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
-                                        onCopy={() => navigator.clipboard.writeText(message.content)}
-                                        onPlay={roleplayTtsEnabled && message.role === 'assistant'
-                                            ? () => void handlePlayRoleMessage(message.content, activeConversation?.characterVoiceId)
-                                            : undefined}
-                                        onEdit={message.role === 'user'
-                                            ? () => ctx.editMessage(message.id)
-                                            : undefined}
-                                        onRegenerate={message.role === 'assistant'
-                                            ? () => {
-                                                logger.log('[AIChatContent] 点击重说', {
-                                                    messageId: message.id,
-                                                    conversationId: ctx.activeConversationId,
-                                                })
-                                                void ctx.regenerateMessage(message.id)
-                                            }
-                                            : undefined}
-                                    />
-                                </div>
-                            ))}
+                            {ctx.messages.map((message, messageIndex) => {
+                                const canRetry = ctx.messages
+                                    .slice(0, messageIndex)
+                                    .some(item => item.role === 'user' && item.nodeId != null)
+                                const hasRenderableMessage = Boolean(
+                                    message.content || message.reasoning || message.blocks?.length,
+                                )
+                                return (
+                                    <div
+                                        key={message.id}
+                                        className={`ai-message-frame ai-message-frame--${message.role}`}
+                                    >
+                                        {message.role === 'user' && (
+                                            <AiMessageAttachments attachments={message.attachments}/>
+                                        )}
+                                        {hasRenderableMessage || !message.error ? (
+                                            <MessageBox
+                                                role={message.role}
+                                                blocks={message.role === 'assistant'
+                                                    ? buildRenderableAiChatBlocks(message.blocks, true)
+                                                    : message.blocks}
+                                                contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
+                                                content={message.role === 'assistant'
+                                                    ? buildRenderableAiChatMarkdown(message.content)
+                                                    : message.content}
+                                                toolCallDetail={'verbose'}
+                                                markdown={message.role === 'assistant'}
+                                                lineHeight={1.5}
+                                                reasoning={message.reasoning || undefined}
+                                                rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
+                                                onCopy={() => navigator.clipboard.writeText(message.content)}
+                                                onPlay={roleplayTtsEnabled && message.role === 'assistant'
+                                                    ? () => void handlePlayRoleMessage(
+                                                        message.content,
+                                                        activeConversation?.characterVoiceId,
+                                                    )
+                                                    : undefined}
+                                                onEdit={message.role === 'user'
+                                                    ? () => ctx.editMessage(message.id)
+                                                    : undefined}
+                                                onRegenerate={message.role === 'assistant' && !message.error
+                                                    ? () => {
+                                                        logger.log('[AIChatContent] 点击重说', {
+                                                            messageId: message.id,
+                                                            conversationId: ctx.activeConversationId,
+                                                        })
+                                                        void ctx.regenerateMessage(message.id)
+                                                    }
+                                                    : undefined}
+                                            />
+                                        ) : null}
+                                        {message.error ? (
+                                            <AiChatErrorNotice
+                                                error={message.error}
+                                                onRetry={canRetry
+                                                    ? () => void ctx.regenerateMessage(message.id)
+                                                    : undefined}
+                                                onOpenSettings={onOpenPluginManagement
+                                                    ? () => onOpenPluginManagement('llm')
+                                                    : undefined}
+                                            />
+                                        ) : null}
+                                    </div>
+                                )
+                            })}
                             {ctx.streamingBlocks.length > 0 && ctx.isStreaming && (
                                 <MessageBox
                                     role="assistant"

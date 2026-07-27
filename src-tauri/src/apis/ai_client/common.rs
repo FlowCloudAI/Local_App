@@ -56,7 +56,9 @@ pub(crate) struct EventToolCall {
 pub(crate) struct EventTurnEnd {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
-    pub(crate) status: String, // "ok" | "cancelled" | "interrupted" | "error:<msg>"
+    pub(crate) status: String, // "ok" | "cancelled" | "interrupted" | "error"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) error: Option<ApiError>,
     pub(crate) node_id: u64,
     pub(crate) usage: Option<Usage>,
 }
@@ -735,7 +737,14 @@ pub(crate) fn turn_status_str(s: &TurnStatus) -> String {
         TurnStatus::Ok => "ok".to_string(),
         TurnStatus::Cancelled => "cancelled".to_string(),
         TurnStatus::Interrupted => "interrupted".to_string(),
-        TurnStatus::Error(e) => format!("error:{}", e),
+        TurnStatus::Error(_) => "error".to_string(),
+    }
+}
+
+pub(crate) fn turn_status_error(s: &TurnStatus) -> Option<ApiError> {
+    match s {
+        TurnStatus::Error(error) => Some(error.into()),
+        _ => None,
     }
 }
 
@@ -1100,6 +1109,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
                                 status: turn_status_str(&status),
+                                error: turn_status_error(&status),
                                 node_id,
                                 usage,
                             },

@@ -1,0 +1,52 @@
+/* AI 对话失败提示：只使用 fc 语义令牌，供桌面端与移动端共同渲染。 */
+.ai-chat-error-notice {
+    display: grid;
+    gap: var(--fc-space-xs);
+    padding: var(--fc-space-md);
+    border: 1px solid var(--fc-color-danger-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-danger-bg);
+    color: var(--fc-color-text);
+}
+
+.ai-chat-error-notice--compact {
+    padding: var(--fc-space-sm);
+}
+
+.ai-chat-error-notice__title {
+    color: var(--fc-color-danger);
+    font-size: var(--fc-font-size-sm);
+    font-weight: 600;
+}
+
+.ai-chat-error-notice__message,
+.ai-chat-error-notice__provider {
+    overflow-wrap: anywhere;
+    font-size: var(--fc-font-size-sm);
+    line-height: 1.45;
+}
+
+.ai-chat-error-notice__provider,
+.ai-chat-error-notice__meta {
+    color: var(--fc-color-text-secondary);
+}
+
+.ai-chat-error-notice__meta,
+.ai-chat-error-notice__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fc-space-sm);
+}
+
+.ai-chat-error-notice__meta {
+    font-size: var(--fc-font-size-xs);
+}
+
+.ai-chat-error-notice__meta code {
+    color: inherit;
+}
+
+.ai-chat-error-notice__actions {
+    margin-top: var(--fc-space-xs);
+}

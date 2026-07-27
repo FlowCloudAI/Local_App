@@ -101,6 +101,7 @@ export default function MobileAiChat({
         conversations, activeConversationId, activeConversation: controllerActiveConversation,
         isComposingNewConversation, setActiveConversationId,
         messages, sendMessage, stopStreaming,
+        regenerateMessage,
         inputValue, setInputValue, isStreaming, streamingBlocks,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
@@ -772,6 +773,7 @@ export default function MobileAiChat({
                 messagesEndRef={messagesEndRef}
                 onNewConversation={() => void handleNewConv()}
                 onOpenSettings={() => navigateToTab('settings')}
+                onRetryMessage={messageId => void regenerateMessage(messageId)}
             />
 
             <MobileAiComposer

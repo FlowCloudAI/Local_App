@@ -1,5 +1,12 @@
 import {type MessageBoxBlock} from 'flowcloudai-ui'
-import {type AiUsage, type DocumentContextItem, type DocumentContextStatus, type PluginInfo, type ToolStatus} from '../../../api'
+import {
+    type AiUsage,
+    type ApiError,
+    type DocumentContextItem,
+    type DocumentContextStatus,
+    type PluginInfo,
+    type ToolStatus,
+} from '../../../api'
 
 export interface Attachment {
     id: string
@@ -33,6 +40,7 @@ export interface Message {
     attachments?: Attachment[]
     nodeId?: number
     usage?: AiUsage | null
+    error?: ApiError
 }
 
 export interface ConversationSettings {

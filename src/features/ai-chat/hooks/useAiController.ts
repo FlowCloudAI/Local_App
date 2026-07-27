@@ -43,10 +43,9 @@ import {
     type TaskContextPayload,
     type ToolStatus,
     type UpdateSessionParams,
-    formatApiError,
     toApiError,
 } from '../../../api'
-import {type SessionMessage, useAiSession} from './useAiSession'
+import {type SessionFailure, type SessionMessage, useAiSession} from './useAiSession'
 import {estimateMessagesTokens, estimateTextTokens} from '../lib/contextUsage'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import {
@@ -995,8 +994,57 @@ export function useAiController(focus: AiFocus): AiContextValue {
         }))
     }, [])
 
-    const onError = useCallback((message: string) => {
-        logger.error('[useAiController]', message)
+    const onError = useCallback((failure: SessionFailure) => {
+        logger.error('[useAiController] AI 对话失败', {
+            code: failure.error.code,
+            message: failure.error.message,
+            detail: failure.error.detail,
+            sessionId: failure.sessionId,
+            runId: failure.runId,
+            fatal: failure.fatal,
+        })
+        const mappedConversationId = failure.sessionId && failure.runId
+            ? findRuntimeConversation(failure.sessionId, failure.runId)
+            : null
+        const targetConversationId = mappedConversationId
+            ?? conversationsRef.current.find((conversation) => (
+                conversation.sessionId === failure.sessionId
+                && (!failure.runId || conversation.runId === failure.runId)
+            ))?.id
+            ?? activeConversationIdRef.current
+        if (!targetConversationId) return
+
+        if (failure.fatal && failure.sessionId && failure.runId) {
+            deleteRuntimeConversation(failure.sessionId, failure.runId)
+        }
+        setAiConversations((prev) => prev.map((conversation) => {
+            if (conversation.id !== targetConversationId) return conversation
+            const ownsFailedSession = Boolean(
+                failure.fatal
+                && failure.sessionId
+                && conversation.sessionId === failure.sessionId
+                && (!failure.runId || conversation.runId === failure.runId),
+            )
+            return {
+                ...conversation,
+                sessionId: ownsFailedSession ? null : conversation.sessionId,
+                runId: ownsFailedSession ? null : conversation.runId,
+                messages: [...conversation.messages, {
+                    id: `error_${Date.now()}_${failure.runId ?? 'session'}`,
+                    role: 'assistant',
+                    content: failure.content,
+                    timestamp: Date.now(),
+                    reasoning: failure.reasoning,
+                    blocks: failure.blocks,
+                    nodeId: failure.nodeId,
+                    error: failure.error,
+                }],
+            }
+        }))
+        setAiUnreadConversationIds((prev) => {
+            if (targetConversationId === activeConversationIdRef.current) return prev
+            return {...prev, [targetConversationId]: true}
+        })
     }, [])
 
     const session = useAiSession({onMessage, onUserTurnBegin, onError})
@@ -2293,7 +2341,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     runId: preparedSession.runId,
                     error,
                 })
-                onError(`发送失败: ${formatApiError(toApiError(error))}`)
+                onError({
+                    sessionId: preparedSession.sid,
+                    runId: preparedSession.runId,
+                    error: toApiError(error),
+                    content: '',
+                    fatal: false,
+                })
                 return
             }
 
@@ -2315,7 +2369,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     runId: recoveredSession.runId,
                     error: retryError,
                 })
-                onError(`发送失败: ${formatApiError(toApiError(retryError))}`)
+                onError({
+                    sessionId: recoveredSession.sid,
+                    runId: recoveredSession.runId,
+                    error: toApiError(retryError),
+                    content: '',
+                    fatal: true,
+                })
             }
         }
     }, [

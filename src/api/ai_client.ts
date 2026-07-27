@@ -187,6 +187,7 @@ export interface AiEventTurnEnd {
   session_id: string
   run_id: string
   status: string
+  error?: ApiError | null
   node_id: number
   usage?: AiUsage | null
 }

@@ -24,7 +24,7 @@ import {
     type AiUsage,
     type CharacterChatProjectSnapshot,
     type ConversationNode,
-    formatApiError,
+    type ApiError,
     type StoredConversationSettings,
     toApiError,
 } from '../../../api'
@@ -56,6 +56,17 @@ export interface SessionIdentity {
     runId: string
 }
 
+export interface SessionFailure {
+    sessionId: string | null
+    runId: string | null
+    error: ApiError
+    content: string
+    reasoning?: string
+    blocks?: MessageBoxBlock[]
+    nodeId?: number
+    fatal: boolean
+}
+
 export interface CreateSessionToolAccess {
     toolAccess: AiToolAccessMode
     webSearchEnabled: boolean
@@ -68,8 +79,8 @@ interface UseAiSessionOptions {
     onMessage: (msg: SessionMessage) => void
     /** 用户轮次开始时调用，用于给对应会话回填节点 ID */
     onUserTurnBegin?: (payload: { sessionId: string; runId: string; nodeId: number }) => void
-    /** 会话级错误时调用 */
-    onError: (msg: string) => void
+    /** 对话失败时调用，携带可展示、可分支处理的结构化错误。 */
+    onError: (failure: SessionFailure) => void
 }
 
 const attachWorkSecondsToFirstBlock = (
@@ -250,6 +261,51 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         if (startedAt === undefined) return undefined
         return Math.max(0, Math.round((Date.now() - startedAt) / 1000))
     }, [])
+
+    const reportRunFailure = useCallback((
+        sid: string,
+        rid: string,
+        error: ApiError,
+        nodeId: number | undefined,
+        fatal: boolean,
+    ) => {
+        processingNodeIdByRunRef.current[rid] = null
+        const finalBlocks = finalizePendingTools(
+            blocksByRunRef.current[rid] ?? [],
+            '对话失败，工具调用未完成。',
+            true,
+            getRunWorkSeconds(rid),
+        )
+        const content = finalBlocks
+            .filter(block => block.type === 'content')
+            .map(block => block.content)
+            .join('')
+        const reasoning = finalBlocks
+            .filter(block => block.type === 'reasoning')
+            .map(block => block.content)
+            .join('')
+        onErrorRef.current({
+            sessionId: sid,
+            runId: rid,
+            error,
+            content,
+            reasoning: reasoning || undefined,
+            blocks: finalBlocks.length > 0 ? finalBlocks : undefined,
+            nodeId,
+            fatal,
+        })
+
+        if (fatal) {
+            clearRunState(rid)
+            return
+        }
+        delete blocksByRunRef.current[rid]
+        delete turnStartedAtByRunRef.current[rid]
+        setRunStreaming(rid, false)
+        if (runIdRef.current === rid) {
+            setBlocks([])
+        }
+    }, [clearRunState, getRunWorkSeconds, setRunStreaming])
 
     useEffect(() => {
         queueMicrotask(() => {
@@ -541,7 +597,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         })
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
-            const {session_id: sid, run_id: rid, status, node_id, usage} = event.payload
+            const {session_id: sid, run_id: rid, status, error, node_id, usage} = event.payload
             markRunEvent('ai:turn_end', rid)
             logger.log('[useAiSession][turn_end]', {
                 sessionId: sid,
@@ -611,17 +667,16 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         setTreeRefreshCounter(c => c + 1)
                     }
                 })
-            } else if (status.startsWith('error:')) {
-                processingNodeIdByRunRef.current[rid] = null
-                onErrorRef.current(`对话失败: ${status.slice(6)}`)
-                queueMicrotask(() => {
-                    delete blocksByRunRef.current[rid]
-                    delete turnStartedAtByRunRef.current[rid]
-                    setRunStreaming(rid, false)
-                    if (runIdRef.current === rid) {
-                        setBlocks([])
-                    }
-                })
+            } else if (status === 'error' || status.startsWith('error:')) {
+                reportRunFailure(
+                    sid,
+                    rid,
+                    error
+                        ? toApiError(error)
+                        : toApiError(status.startsWith('error:') ? status.slice(6) : 'AI 对话失败'),
+                    node_id,
+                    false,
+                )
             } else if (status === 'cancelled' || status === 'interrupted') {
                 processingNodeIdByRunRef.current[rid] = null
                 const prev = blocksByRunRef.current[rid] ?? []
@@ -674,15 +729,13 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
             })
-            onErrorRef.current(`AI 错误: ${formatApiError(err)}`)
-            queueMicrotask(() => {
-                delete blocksByRunRef.current[event.payload.run_id]
-                delete turnStartedAtByRunRef.current[event.payload.run_id]
-                setRunStreaming(event.payload.run_id, false)
-                if (runIdRef.current === event.payload.run_id) {
-                    setBlocks([])
-                }
-            })
+            reportRunFailure(
+                event.payload.session_id,
+                event.payload.run_id,
+                err,
+                undefined,
+                true,
+            )
         })
 
         const unlistenBranchChanged = listen<AiEventBranchChanged>('ai:branch_changed', event => {
@@ -702,7 +755,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             unlistenError.then(fn => fn())
             unlistenBranchChanged.then(fn => fn())
         }
-    }, [getRunWorkSeconds, markRunEvent, scheduleTurnBeginWatchdog, setRunStreaming]) // 回调通过 ref 访问
+    }, [getRunWorkSeconds, markRunEvent, reportRunFailure, scheduleTurnBeginWatchdog, setRunStreaming]) // 回调通过 ref 访问
 
     // 分支树刷新
     const refreshTree = useCallback(async () => {
@@ -760,7 +813,13 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 runId: created.run_id,
             }
         } catch (e) {
-            onErrorRef.current(`创建会话失败: ${e}`)
+            onErrorRef.current({
+                sessionId: newId,
+                runId: null,
+                error: toApiError(e),
+                content: '',
+                fatal: true,
+            })
             return null
         }
     }, [activateSession])
@@ -792,7 +851,13 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 runId: created.run_id,
             }
         } catch (e) {
-            onErrorRef.current(`创建角色会话失败: ${e}`)
+            onErrorRef.current({
+                sessionId: newId,
+                runId: null,
+                error: toApiError(e),
+                content: '',
+                fatal: true,
+            })
             return null
         }
     }, [activateSession])
@@ -877,7 +942,13 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             if (missingBackendSession) {
                 throw e
             }
-            onErrorRef.current(`发送失败: ${formatApiError(toApiError(e))}`)
+            onErrorRef.current({
+                sessionId: sid,
+                runId: rid,
+                error: toApiError(e),
+                content: '',
+                fatal: false,
+            })
         }
     }, [setRunStreaming])
 

@@ -44,6 +44,8 @@ export const ErrorCode = {
     LlmToolCallInvalid: 'LLM_TOOL_CALL_INVALID',
     HttpBadRequest: 'HTTP_BAD_REQUEST',
     HttpUnauthorized: 'HTTP_UNAUTHORIZED',
+    HttpPaymentRequired: 'HTTP_PAYMENT_REQUIRED',
+    HttpForbidden: 'HTTP_FORBIDDEN',
     HttpNotFound: 'HTTP_NOT_FOUND',
     HttpTooManyRequests: 'HTTP_TOO_MANY_REQUESTS',
     HttpServerError: 'HTTP_SERVER_ERROR',
