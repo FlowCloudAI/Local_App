@@ -177,6 +177,18 @@
     color:             var(--md-text-muted);
 }
 
+/* 正文图片保留原始比例；小图不放大，长图同时受视口高度约束。 */
+.fc-md-wrap .wmde-markdown img:not(.emoji) {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: min(100%, 48rem);
+    max-height: min(65vh, 42rem);
+    object-fit: contain;
+    margin: var(--fc-space-lg) auto;
+    border-radius: var(--fc-radius-md);
+}
+
 .fc-md-wrap .w-md-editor-text-input::placeholder {
     color: var(--md-text-muted) !important;
 }
