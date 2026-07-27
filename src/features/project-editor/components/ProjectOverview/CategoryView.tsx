@@ -229,10 +229,12 @@ function EntryCardItem({projectId, entry, entryTypes, isStarred, onContextMenu, 
 }
 
 function CreateEntryCard({
-                             categoryId,
-                             onRequestCreateEntry,
-                         }: {
+                              categoryId,
+                              creating,
+                              onRequestCreateEntry,
+                          }: {
     categoryId: string | null
+    creating: boolean
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
 }) {
     return (
@@ -240,9 +242,10 @@ function CreateEntryCard({
             type="button"
             className="pe-entry-create-card"
             onClick={() => void onRequestCreateEntry?.(categoryId)}
+            disabled={creating}
         >
             <span className="pe-entry-create-card__plus">+</span>
-            <span className="pe-entry-create-card__label">新建词条</span>
+            <span className="pe-entry-create-card__label">{creating ? '创建中…' : '新建词条'}</span>
         </button>
     )
 }
@@ -252,6 +255,7 @@ interface VirtualEntryGridProps {
     entries: EntryBrief[]
     entryTypes: EntryTypeView[]
     categoryId: string | null
+    creatingEntry: boolean
     starredEntryIdSet: Set<string>
     scrollElement?: HTMLElement | null
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
@@ -270,6 +274,7 @@ function VirtualEntryGrid({
                                entries,
                                entryTypes,
                                categoryId,
+                               creatingEntry,
                                starredEntryIdSet,
                                scrollElement,
                                onRequestCreateEntry,
@@ -419,6 +424,7 @@ function VirtualEntryGrid({
                     {isCreateCard ? (
                         <CreateEntryCard
                             categoryId={categoryId}
+                            creating={creatingEntry}
                             onRequestCreateEntry={onRequestCreateEntry}
                         />
                     ) : (
@@ -456,6 +462,7 @@ interface CategoryViewProps {
     childCategories?: Category[]
     refreshToken?: number
     noScroll?: boolean
+    creatingEntry?: boolean
     virtualScrollElement?: HTMLElement | null
     onDefaultEntriesLoaded?: (categoryId: string | null, entries: EntryBrief[]) => void
     onRequestCreateEntry?: (categoryId: string | null) => void | Promise<void>
@@ -474,6 +481,7 @@ function CategoryView({
                           childCategories = [],
                           refreshToken = 0,
                           noScroll = false,
+                          creatingEntry = false,
                           virtualScrollElement,
                            onDefaultEntriesLoaded,
                            onRequestCreateEntry,
@@ -712,9 +720,9 @@ function CategoryView({
 
         showContextMenu(event, [
             {label: '刷新', disabled: loading, onClick: () => void loadEntries(searchText, typeFilter)},
-            {label: '新建词条', onClick: () => void onRequestCreateEntry?.(categoryId)},
+            {label: '新建词条', disabled: creatingEntry, onClick: () => void onRequestCreateEntry?.(categoryId)},
         ])
-    }, [categoryId, loadEntries, loading, onRequestCreateEntry, searchText, showContextMenu, typeFilter])
+    }, [categoryId, creatingEntry, loadEntries, loading, onRequestCreateEntry, searchText, showContextMenu, typeFilter])
 
     const displayed = useMemo(() => sortEntries(entries, sortMode, starredEntryIdSet), [entries, sortMode, starredEntryIdSet])
     const coverStats = useMemo(
@@ -771,6 +779,7 @@ function CategoryView({
             ))}
             <CreateEntryCard
                 categoryId={categoryId}
+                creating={creatingEntry}
                 onRequestCreateEntry={onRequestCreateEntry}
             />
         </div>
@@ -782,6 +791,7 @@ function CategoryView({
             entries={displayed}
             entryTypes={entryTypes}
             categoryId={categoryId}
+            creatingEntry={creatingEntry}
             starredEntryIdSet={starredEntryIdSet}
             scrollElement={virtualScrollElement}
             onRequestCreateEntry={onRequestCreateEntry}
@@ -820,8 +830,13 @@ function CategoryView({
                             onValueChange={handleSearchChange}
                         />
                         <div className="pe-category-toolbar-actions">
-                            <Button type="button" size="sm" onClick={() => void onRequestCreateEntry?.(categoryId)}>
-                                + 新建词条
+                            <Button
+                                type="button"
+                                size="sm"
+                                disabled={creatingEntry}
+                                onClick={() => void onRequestCreateEntry?.(categoryId)}
+                            >
+                                {creatingEntry ? '创建中…' : '+ 新建词条'}
                             </Button>
                         </div>
                         <div className="pe-sort-tabs">

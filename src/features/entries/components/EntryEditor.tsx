@@ -107,6 +107,7 @@ interface EntryEditorProps {
     onBack?: () => void | Promise<void>
     onDelete?: () => void | Promise<void>
     onDirtyChange?: (dirty: boolean) => void
+    onSavingChange?: (saving: boolean) => void
     onStartCharacterChat?: (entry: Entry) => void | Promise<void>
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
 }
@@ -188,6 +189,7 @@ export default function EntryEditor({
                                         onBack,
                                         onDelete,
                                         onDirtyChange,
+                                        onSavingChange,
                                         onStartCharacterChat,
                                         onOpenPluginManagement,
                                     }: EntryEditorProps) {
@@ -873,6 +875,7 @@ export default function EntryEditor({
         if (!entry || !canSave) return
 
         setSaving(true)
+        onSavingChange?.(true)
         setError(null)
 
         try {
@@ -913,8 +916,9 @@ export default function EntryEditor({
             }
         } finally {
             setSaving(false)
+            onSavingChange?.(false)
         }
-    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, relationDrafts, onTitleChange, onSaved, showAlert, reloadEntryFromDatabase, setEntryRelations])
+    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations])
 
     useEffect(() => {
         canSaveRef.current = canSave

@@ -98,11 +98,13 @@ interface Props {
     activeEntryId?: string | null
     activeEntryTitle?: string | null
     openEntryIds?: string[]
+    mountedEntryIds?: string[]
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onEntryTitleChange?: (projectId: string, entry: { id: string; title: string }) => void
     onBackHome?: () => void
     onBackToProject?: (projectId: string) => void
     onEntryDirtyChange?: (projectId: string, entryId: string, dirty: boolean) => void
+    onEntrySavingChange?: (projectId: string, entryId: string, saving: boolean) => void
     onStartCharacterChat?: (projectId: string, entry: { id: string; title: string }) => void
     onStartReportDiscussion?: (params: {
         title: string
@@ -203,11 +205,13 @@ function ProjectEditorInner({
                                 activeEntryId = null,
                                 activeEntryTitle = null,
                                 openEntryIds = [],
+                                mountedEntryIds = [],
                                 onOpenEntry,
                                 onEntryTitleChange,
                                 onBackHome,
                                 onBackToProject,
                                 onEntryDirtyChange,
+                                onEntrySavingChange,
                                  onStartCharacterChat,
                                  onStartReportDiscussion,
                                  onOpenPluginManagement,
@@ -261,9 +265,12 @@ function ProjectEditorInner({
     const selectedKey = selection.kind === 'project' ? ROOT_ID : selection.id
     const [expandedKeys, setExpandedKeys] = useState<string[]>([ROOT_ID])
     const [deleteTarget, setDeleteTarget] = useState<CategoryTreeNode | null>(null)
+    // ponytail: 占位状态仅服务当前会话；需要崩溃恢复时再持久化草稿，而不是继续扩大内存状态。
     const [placeholderEntryIds, setPlaceholderEntryIds] = useState<Set<string>>(() => new Set())
+    const [creatingEntryCategoryKeys, setCreatingEntryCategoryKeys] = useState<Set<string>>(() => new Set())
     const [prefetchedCategoryEntries, setPrefetchedCategoryEntries] = useState<Record<string, EntryBrief[]>>({})
     const placeholderSeenInOpenRef = useRef<Set<string>>(new Set())
+    const creatingEntryCategoryKeysRef = useRef<Set<string>>(new Set())
     const prefetchingCategoryKeysRef = useRef<Set<string>>(new Set())
     const categoriesRef = useRef<Category[]>([])
     const pendingCategoryNameKeysRef = useRef<Set<string>>(new Set())
@@ -282,6 +289,16 @@ function ProjectEditorInner({
             ? {...current, entryCount: Math.max(0, current.entryCount + delta)}
             : current
         )
+    }, [])
+
+    const forgetPlaceholderEntry = useCallback((entryId: string) => {
+        setPlaceholderEntryIds(current => {
+            if (!current.has(entryId)) return current
+            const next = new Set(current)
+            next.delete(entryId)
+            return next
+        })
+        placeholderSeenInOpenRef.current.delete(entryId)
     }, [])
 
     const refreshProject = useCallback(async () => {
@@ -697,6 +714,11 @@ function ProjectEditorInner({
     }
 
     const handleRequestCreateEntry = useCallback(async (categoryId: string | null) => {
+        const categoryKey = getCategoryCacheKey(categoryId)
+        if (creatingEntryCategoryKeysRef.current.has(categoryKey)) return
+
+        creatingEntryCategoryKeysRef.current.add(categoryKey)
+        setCreatingEntryCategoryKeys(current => new Set(current).add(categoryKey))
         try {
             const created = await db_create_entry({
                 projectId,
@@ -718,21 +740,31 @@ function ProjectEditorInner({
             onOpenEntry?.(projectId, {id: created.id, title: created.title})
         } catch (e) {
             await showAlert(`新建词条失败：${String(e)}`, 'error', 'nonInvasive', 2200)
+        } finally {
+            creatingEntryCategoryKeysRef.current.delete(categoryKey)
+            setCreatingEntryCategoryKeys(current => {
+                if (!current.has(categoryKey)) return current
+                const next = new Set(current)
+                next.delete(categoryKey)
+                return next
+            })
         }
     }, [projectId, onOpenEntry, showAlert, touchProjectUpdatedAt, adjustEntryCount])
 
     const handleCategoryEntryRenamed = useCallback((entry: { id: string; title: string }) => {
+        forgetPlaceholderEntry(entry.id)
         onEntryTitleChange?.(projectId, entry)
         setCategoryEntryRefreshToken(current => current + 1)
         touchProjectUpdatedAt()
-    }, [onEntryTitleChange, projectId, touchProjectUpdatedAt])
+    }, [forgetPlaceholderEntry, onEntryTitleChange, projectId, touchProjectUpdatedAt])
 
     const handleCategoryEntryDeleted = useCallback((entryId: string) => {
+        forgetPlaceholderEntry(entryId)
         adjustEntryCount(-1)
         setCategoryEntryRefreshToken(current => current + 1)
         touchProjectUpdatedAt()
         onDeleteEntry?.(projectId, entryId)
-    }, [adjustEntryCount, onDeleteEntry, projectId, touchProjectUpdatedAt])
+    }, [adjustEntryCount, forgetPlaceholderEntry, onDeleteEntry, projectId, touchProjectUpdatedAt])
 
     useEffect(() => {
         if (placeholderEntryIds.size === 0) return
@@ -757,27 +789,20 @@ function ProjectEditorInner({
             return next
         })
 
-        // 未修改的占位符 → 从数据库中静默删除。
-        // "未修改"指：标题仍为默认值且无内容/摘要/图片。
+        // 只有从未成功保存、且用户明确关闭了标签页的新词条才会进入这里。
+        // 不再根据字段内容猜测，避免仅保存类型、标签或关系时误删有效词条。
         for (const id of removed) {
             void (async () => {
                 try {
-                    const entry = await db_get_entry(id, projectId)
-                    const titleUntouched = (entry.title ?? '').trim() === '未命名词条'
-                    const contentEmpty = !(entry.content ?? '').trim()
-                    const summaryEmpty = !(entry.summary ?? '').trim()
-                    const imagesEmpty = !entry.images || (Array.isArray(entry.images) && entry.images.length === 0)
-                    if (titleUntouched && contentEmpty && summaryEmpty && imagesEmpty) {
-                        await db_delete_entry(id, projectId)
-                        adjustEntryCount(-1)
-                        setCategoryEntryRefreshToken(current => current + 1)
-                    }
-                } catch {
-                    // 词条可能已被删除 — 忽略。
+                    await db_delete_entry(id, projectId)
+                    adjustEntryCount(-1)
+                    setCategoryEntryRefreshToken(current => current + 1)
+                } catch (error) {
+                    await showAlert(`清理未保存的新词条失败：${String(error)}`, 'error', 'nonInvasive', 3000)
                 }
             })()
         }
-    }, [openEntryIds, placeholderEntryIds, adjustEntryCount, projectId])
+    }, [openEntryIds, placeholderEntryIds, adjustEntryCount, projectId, showAlert])
 
     const handleMove = async (key: string, targetKey: string, position: DropPosition) => {
         if (key === ROOT_ID) return
@@ -916,7 +941,6 @@ function ProjectEditorInner({
         })
     }, [prefetchCategoryEntries])
 
-    const visibleEntryIds = useMemo(() => openEntryIds.slice(-10), [openEntryIds])
     const hasActiveEntry = Boolean(activeEntryId)
     const hasActiveTool = Boolean(activeToolPanel)
     const isWorldMapPanelActive = activeToolPanel === 'world-map'
@@ -1290,6 +1314,7 @@ function ProjectEditorInner({
                                     childCategories={rootChildCategories}
                                     refreshToken={categoryEntryRefreshToken}
                                     noScroll
+                                    creatingEntry={creatingEntryCategoryKeys.has(getCategoryCacheKey(null))}
                                     onDefaultEntriesLoaded={storePrefetchedEntries}
                                     onRequestCreateEntry={handleRequestCreateEntry}
                                     onSelectCategory={handleSelect}
@@ -1308,6 +1333,7 @@ function ProjectEditorInner({
                                 prefetchedEntries={prefetchedCategoryEntries[getCategoryCacheKey(selection.id)]}
                                 childCategories={selectedChildCategories}
                                 refreshToken={categoryEntryRefreshToken}
+                                creatingEntry={creatingEntryCategoryKeys.has(getCategoryCacheKey(selection.id))}
                                 onDefaultEntriesLoaded={storePrefetchedEntries}
                                 onRequestCreateEntry={handleRequestCreateEntry}
                                 onSelectCategory={handleSelect}
@@ -1357,7 +1383,7 @@ function ProjectEditorInner({
                     </div>
 
                     <div className={`pe-entry-stack${hasActiveEntry ? ' active' : ''}`}>
-                        {visibleEntryIds.map((entryId) => (
+                        {mountedEntryIds.map((entryId) => (
                             <div
                                 key={entryId}
                                 className={`pe-entry-layer${entryId === activeEntryId ? ' active' : ''}`}
@@ -1371,7 +1397,7 @@ function ProjectEditorInner({
                                     categories={categories}
                                     entryTypes={entryTypes}
                                     tagSchemas={tagSchemas}
-                                    openEntryIds={visibleEntryIds}
+                                    openEntryIds={openEntryIds}
                                     initialEditorMode={placeholderEntryIds.has(entryId) ? 'edit' : 'browse'}
                                     onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                     onTitleChange={async (updatedEntry) => {
@@ -1381,6 +1407,7 @@ function ProjectEditorInner({
                                         })
                                     }}
                                     onSaved={async () => {
+                                        forgetPlaceholderEntry(entryId)
                                         setCategoryEntryRefreshToken(current => current + 1)
                                         touchProjectUpdatedAt()
                                     }}
@@ -1391,12 +1418,16 @@ function ProjectEditorInner({
                                     }}
                                     onBack={() => onBackToProject?.(projectId)}
                                     onDelete={() => {
+                                        forgetPlaceholderEntry(entryId)
                                         adjustEntryCount(-1)
                                         setCategoryEntryRefreshToken((t) => t + 1)
                                         onDeleteEntry?.(projectId, entryId)
                                     }}
                                     onDirtyChange={(dirty) => {
                                         onEntryDirtyChange?.(projectId, entryId, dirty)
+                                    }}
+                                    onSavingChange={(saving) => {
+                                        onEntrySavingChange?.(projectId, entryId, saving)
                                     }}
                                     onStartCharacterChat={(entry) => onStartCharacterChat?.(projectId, {
                                         id: entry.id,

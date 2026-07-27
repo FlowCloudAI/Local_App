@@ -28,14 +28,10 @@ import {
 } from '../../features/home/homeActivity'
 import {invalidateProjectList} from '../../features/projects/projectListStore'
 import {parseHelpTarget} from '../../shared/help/helpCatalog'
+import {groupEntryIdsByProject, type EntryTabMeta} from './entryTabMounting'
 
 interface DesktopAppProps {
     platformInfo: PlatformInfo
-}
-
-type EntryTabMeta = {
-    projectId: string
-    entryId: string
 }
 
 type ProjectToolPanel = 'relation-graph' | 'timeline' | 'contradiction' | 'world-map'
@@ -62,6 +58,7 @@ type DesktopTabState = {
     entryTabMap: Record<string, EntryTabMeta>
     toolTabMap: Record<string, ProjectToolTabMeta>
     entryDirtyMap: Record<string, boolean>
+    entrySavingMap: Record<string, boolean>
     recentPageKeys: string[]
 }
 
@@ -76,6 +73,7 @@ type DesktopTabAction =
     | { type: 'upsert-tool-tab'; tabKey: string; projectId: string; panel: ProjectToolPanel; label: string; activate?: boolean; touchRecent?: boolean }
     | { type: 'rename-tab'; tabKey: string; label: string }
     | { type: 'set-entry-dirty'; tabKey: string; dirty: boolean }
+    | { type: 'set-entry-saving'; tabKey: string; saving: boolean }
     | { type: 'close-tabs'; keys: string[]; primaryKey?: string }
 
 const initialDesktopTabState: DesktopTabState = {
@@ -85,6 +83,7 @@ const initialDesktopTabState: DesktopTabState = {
     entryTabMap: {},
     toolTabMap: {},
     entryDirtyMap: {},
+    entrySavingMap: {},
     recentPageKeys: [],
 }
 
@@ -226,6 +225,19 @@ function desktopTabReducer(state: DesktopTabState, action: DesktopTabAction): De
                 entryDirtyMap: {...state.entryDirtyMap, [action.tabKey]: true},
             }
         }
+        case 'set-entry-saving': {
+            if (!action.saving) {
+                if (!state.entrySavingMap[action.tabKey]) return state
+                const next = {...state.entrySavingMap}
+                delete next[action.tabKey]
+                return {...state, entrySavingMap: next}
+            }
+            if (state.entrySavingMap[action.tabKey]) return state
+            return {
+                ...state,
+                entrySavingMap: {...state.entrySavingMap, [action.tabKey]: true},
+            }
+        }
         case 'close-tabs': {
             const keysToRemove = new Set(action.keys)
             if (keysToRemove.size === 0) return state
@@ -250,6 +262,7 @@ function desktopTabReducer(state: DesktopTabState, action: DesktopTabAction): De
                 entryTabMap: omitRecordKeys(state.entryTabMap, keysToRemove),
                 toolTabMap: omitRecordKeys(state.toolTabMap, keysToRemove),
                 entryDirtyMap: omitRecordKeys(state.entryDirtyMap, keysToRemove),
+                entrySavingMap: omitRecordKeys(state.entrySavingMap, keysToRemove),
                 recentPageKeys: nextRecentPageKeys,
             }
         }
@@ -371,6 +384,7 @@ function DesktopAppContent() {
         entryTabMap,
         toolTabMap,
         entryDirtyMap,
+        entrySavingMap,
         recentPageKeys,
     } = tabState
 
@@ -639,6 +653,11 @@ function DesktopAppContent() {
         dispatchTabState({type: 'set-entry-dirty', tabKey, dirty})
     }, [])
 
+    const handleEntrySavingChange = useCallback((projectId: string, entryId: string, saving: boolean) => {
+        const tabKey = `entry-${projectId}-${entryId}`
+        dispatchTabState({type: 'set-entry-saving', tabKey, saving})
+    }, [])
+
     const handleProjectVersionApplied = useCallback((projectId: string) => {
         setProjectReloadTokens(current => ({
             ...current,
@@ -744,6 +763,11 @@ function DesktopAppContent() {
                 .map(([entryKey]) => entryKey)
             : []
         const keysToRemove = new Set([key, ...relatedToolKeys, ...relatedEntryKeys])
+        const savingEntryKeys = [...keysToRemove].filter(tabKey => entrySavingMap[tabKey])
+        if (savingEntryKeys.length > 0) {
+            await showAlert('词条正在保存，请稍候再关闭标签页。', 'warning', 'nonInvasive', 1800)
+            return
+        }
         const dirtyEntryKeys = [...keysToRemove].filter(tabKey => entryDirtyMap[tabKey])
         if (dirtyEntryKeys.length > 0) {
             const message = dirtyEntryKeys.length === 1
@@ -766,12 +790,17 @@ function DesktopAppContent() {
                 setSelectedKey('')
             }
         }
-    }, [activeKey, entryDirtyMap, entryTabMap, projectTabMap, showAlert, showHomeWorkspace, tabState, toolTabMap])
+    }, [activeKey, entryDirtyMap, entrySavingMap, entryTabMap, projectTabMap, showAlert, showHomeWorkspace, tabState, toolTabMap])
 
     // 窗口关闭（右上角 X / Alt+F4 / 任务栏关闭均会触发 close-requested）
     const handleWindowClose = useCallback(async () => {
         if (windowClosingRef.current) return
 
+        const savingEntryKeys = Object.keys(entrySavingMap).filter(key => entrySavingMap[key])
+        if (savingEntryKeys.length > 0) {
+            await showAlert('词条正在保存，请稍候再关闭窗口。', 'warning', 'nonInvasive', 1800)
+            return
+        }
         const dirtyEntryKeys = Object.keys(entryDirtyMap).filter(key => entryDirtyMap[key])
         if (dirtyEntryKeys.length > 0) {
             const message = dirtyEntryKeys.length === 1
@@ -788,7 +817,7 @@ function DesktopAppContent() {
             windowClosingRef.current = false
             throw error
         }
-    }, [entryDirtyMap, showAlert, win])
+    }, [entryDirtyMap, entrySavingMap, showAlert, win])
 
     const openSettings = useCallback((options: OpenSettingsOptions = {}) => {
         setSettingsOpenIntent(current => ({
@@ -1073,24 +1102,26 @@ function DesktopAppContent() {
         if (mountedSidePanelKeys.includes('help')) out.help = helpSlots.main
         return out
     }, [mountedSidePanelKeys, ideaSlots.main, snapshotSlots.main, aiChatSlots.main, helpSlots.main])
-    const recentPageKeySet = useMemo(() => new Set(recentPageKeys), [recentPageKeys])
+    const mountedPageKeys = useMemo(() => [...new Set([
+        ...recentPageKeys,
+        ...Object.keys(entryDirtyMap).filter(key => entryDirtyMap[key]),
+        ...Object.keys(entrySavingMap).filter(key => entrySavingMap[key]),
+        activeKey,
+    ].filter(Boolean))], [activeKey, entryDirtyMap, entrySavingMap, recentPageKeys])
+    const mountedPageKeySet = useMemo(() => new Set(mountedPageKeys), [mountedPageKeys])
     const homeProjectIds = useMemo(() => [...new Set(
-        recentPageKeys
+        mountedPageKeys
             .map((key) => projectTabMap[key] ?? toolTabMap[key]?.projectId ?? entryTabMap[key]?.projectId ?? null)
             .filter((projectId): projectId is string => Boolean(projectId)),
-    )], [entryTabMap, projectTabMap, recentPageKeys, toolTabMap])
-    const openEntryIdsByProject = useMemo(() => {
-        const next: Record<string, string[]> = {}
-        for (const item of tabs) {
-            const entryMeta = entryTabMap[item.key]
-            if (!entryMeta || !recentPageKeySet.has(item.key)) continue
-            if (!next[entryMeta.projectId]) {
-                next[entryMeta.projectId] = []
-            }
-            next[entryMeta.projectId].push(entryMeta.entryId)
-        }
-        return next
-    }, [entryTabMap, recentPageKeySet, tabs])
+    )], [entryTabMap, mountedPageKeys, projectTabMap, toolTabMap])
+    const openEntryIdsByProject = useMemo(
+        () => groupEntryIdsByProject(tabs, entryTabMap),
+        [entryTabMap, tabs],
+    )
+    const mountedEntryIdsByProject = useMemo(
+        () => groupEntryIdsByProject(tabs, entryTabMap, mountedPageKeySet),
+        [entryTabMap, mountedPageKeySet, tabs],
+    )
 
     // 侧边栏相关状态
     const IdeaIcon = (
@@ -1357,11 +1388,13 @@ function DesktopAppContent() {
                                             activeEntryId={activeEntryMeta?.projectId === projectId ? activeEntryMeta.entryId : null}
                                             activeEntryTitle={activeEntryMeta?.projectId === projectId ? activeEntryTitle : null}
                                             openEntryIds={openEntryIdsByProject[projectId] ?? []}
+                                            mountedEntryIds={mountedEntryIdsByProject[projectId] ?? []}
                                             onOpenEntry={handleOpenEntry}
                                             onEntryTitleChange={handleEntryTitleChange}
                                             onBackHome={handleBackHome}
                                             onBackToProject={handleBackToProject}
                                             onEntryDirtyChange={handleEntryDirtyChange}
+                                            onEntrySavingChange={handleEntrySavingChange}
                                             onStartCharacterChat={handleStartCharacterChat}
                                             onStartReportDiscussion={handleStartReportDiscussion}
                                             onOpenPluginManagement={handleOpenPluginManagement}
