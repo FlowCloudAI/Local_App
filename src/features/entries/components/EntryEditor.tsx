@@ -1458,10 +1458,10 @@ export default function EntryEditor({
                 onSetCover={editorMode === 'edit' ? handleSetCover : undefined}
                 onRemove={editorMode === 'edit' ? handleRemoveImage : undefined}
                 onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
-                onAddImage={editorMode === 'edit' ? () => {
+                onAddImage={() => {
                     setLightboxOpen(false)
                     openImageAddModal('add')
-                } : undefined}
+                }}
             />
 
             <TagCreator
