@@ -63,7 +63,6 @@ export function useHelpPanel({
     const [activeTopicKey, setActiveTopicKey] = useState<HelpTopicKey | null>(null)
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
     const [searchText, setSearchText] = useState('')
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
     const articleBodyRef = useRef<HTMLDivElement | null>(null)
     const requestId = request?.requestId
     const requestTopicKey = request?.topicKey
@@ -77,16 +76,6 @@ export function useHelpPanel({
         setActiveTopicKey(nextTopic.key)
         setActiveSectionId(requestSectionId ?? null)
     }, [requestId, requestSectionId, requestTopicKey])
-
-    useEffect(() => {
-        if (panelMode === 'fullscreen') {
-            setSidebarCollapsed(false)
-            return
-        }
-        if (panelMode === 'floating') {
-            setSidebarCollapsed(true)
-        }
-    }, [panelMode])
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
@@ -114,11 +103,6 @@ export function useHelpPanel({
         [activeModuleKey],
     )
 
-    const allTopicGroups = useMemo(
-        () => groupHelpTopicsByModule(HELP_TOPICS),
-        [],
-    )
-
     const topicGroups = useMemo(
         () => groupHelpTopicsByModule(filterHelpTopics(HELP_TOPICS, searchText)),
         [searchText],
@@ -129,9 +113,6 @@ export function useHelpPanel({
         setActiveModuleKey(nextTopic.moduleKey)
         setActiveTopicKey(nextTopic.key)
         setActiveSectionId(sectionId)
-        if (panelMode !== 'fullscreen') {
-            setSidebarCollapsed(true)
-        }
     }
 
     const handleSelectHome = () => {
@@ -161,12 +142,10 @@ export function useHelpPanel({
             activeModuleKey={activeModuleKey}
             activeTopicKey={activeTopic?.key ?? null}
             searchText={searchText}
-            showCollapseButton={panelMode !== 'fullscreen'}
             onSearchTextChange={setSearchText}
             onSelectHome={handleSelectHome}
             onSelectModule={handleSelectModule}
             onSelectTopic={handleSelectTopic}
-            onCollapse={() => setSidebarCollapsed(true)}
         />
     )
 
@@ -174,20 +153,6 @@ export function useHelpPanel({
         <DockPanelMain className={`help-main help-main--${resolvedPanelMode}`}>
             <DockPanelTopbar className="help-main__topbar">
                 <div className="help-main__topbar-left">
-                    {panelMode !== 'fullscreen' && sidebarCollapsed ? (
-                        <DockPanelIconButton
-                            type="button"
-                            className="help-main__sidebar-toggle"
-                            onClick={() => setSidebarCollapsed(false)}
-                            title="展开目录"
-                            aria-label="展开帮助目录"
-                            aria-expanded={!sidebarCollapsed}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                                <path d="M6 3 11 8l-5 5"/>
-                            </svg>
-                        </DockPanelIconButton>
-                    ) : null}
                     <DockPanelTitle>帮助中心</DockPanelTitle>
                 </div>
                 <div className="help-main__topbar-actions">
@@ -234,8 +199,10 @@ export function useHelpPanel({
                 />
             ) : (
                 <HelpHome
-                    groups={allTopicGroups}
+                    groups={topicGroups}
                     bodyRef={articleBodyRef}
+                    searchText={searchText}
+                    onSearchTextChange={setSearchText}
                     onSelectModule={handleSelectModule}
                     onSelectTopic={handleSelectTopic}
                 />
@@ -247,21 +214,5 @@ export function useHelpPanel({
         return {side: sideContent, main: mainContent}
     }
 
-    return {
-        side: null,
-        main: (
-            <div className={`help-panel${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-                {!sidebarCollapsed ? (
-                    <button
-                        type="button"
-                        className="help-panel__sidebar-backdrop"
-                        aria-label="关闭帮助目录"
-                        onClick={() => setSidebarCollapsed(true)}
-                    />
-                ) : null}
-                {sideContent}
-                {mainContent}
-            </div>
-        ),
-    }
+    return {side: null, main: mainContent}
 }

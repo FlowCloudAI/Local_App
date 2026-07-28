@@ -1,7 +1,6 @@
 import type {HelpModuleKey, HelpTopicGroup, HelpTopicKey} from '../../../shared/help/helpCatalog'
 import {DockPanelSearchInput} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {
-    DockPanelIconButton,
     DockPanelSide,
     DockPanelTitle,
     DockPanelTopbar,
@@ -14,12 +13,10 @@ interface HelpSidebarProps {
     activeModuleKey: HelpModuleKey | null
     activeTopicKey: HelpTopicKey | null
     searchText: string
-    showCollapseButton: boolean
     onSearchTextChange: (value: string) => void
     onSelectHome: () => void
     onSelectModule: (moduleKey: HelpModuleKey) => void
     onSelectTopic: (topicKey: HelpTopicKey) => void
-    onCollapse: () => void
 }
 
 function HelpHomeIcon() {
@@ -79,30 +76,15 @@ export default function HelpSidebar({
     activeModuleKey,
     activeTopicKey,
     searchText,
-    showCollapseButton,
     onSearchTextChange,
     onSelectHome,
     onSelectModule,
     onSelectTopic,
-    onCollapse,
 }: HelpSidebarProps) {
     return (
         <DockPanelSide className="help-side">
             <DockPanelTopbar className="help-side__topbar" variant="side">
-                <DockPanelTitle>帮助分类</DockPanelTitle>
-                {showCollapseButton ? (
-                    <DockPanelIconButton
-                        type="button"
-                        className="help-side__toggle"
-                        onClick={onCollapse}
-                        title="收起目录"
-                        aria-label="收起帮助目录"
-                    >
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                            <path d="M10 3 5 8l5 5"/>
-                        </svg>
-                    </DockPanelIconButton>
-                ) : null}
+                <DockPanelTitle>帮助中心</DockPanelTitle>
             </DockPanelTopbar>
             <div className="help-side__controls">
                 <DockPanelSearchInput
