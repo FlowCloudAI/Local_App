@@ -1,3 +1,4 @@
+import {Input} from 'flowcloudai-ui'
 import './HighLightTagItem.css'
 
 type HighLightTagType = 'number' | 'string' | 'boolean'
@@ -63,8 +64,10 @@ export default function HighLightTagItem({
                     )}
                 </div>
             </div>
-            {isEditMode && rangeText && (
-                <div className="highlight-tag-item__hint">{rangeText}</div>
+            {isEditMode && (
+                <div className="highlight-tag-item__hint" aria-hidden={!rangeText}>
+                    {rangeText ?? '\u00a0'}
+                </div>
             )}
 
             {isEditMode ? (
@@ -94,13 +97,14 @@ export default function HighLightTagItem({
                     </div>
                 ) : (
                     <div className="highlight-tag-item__editor highlight-tag-item__editor--edit">
-                        <input
+                        <Input
                             className="highlight-tag-item__input"
                             type={schema.type === 'number' ? 'number' : 'text'}
                             inputMode={schema.type === 'number' ? 'decimal' : 'text'}
+                            size="lg"
+                            radius="lg"
                             value={value == null ? '' : String(value)}
-                            onChange={(event) => {
-                                const raw = event.target.value
+                            onValueChange={(raw) => {
                                 if (!raw.trim()) {
                                     onChange?.(null)
                                     return

@@ -99,17 +99,6 @@
 .highlight-tag-item__input {
     flex: 1;
     min-width: 0;
-    padding: 0.68rem 0.8rem;
-    border-radius: 0.78rem;
-    border: 1px solid color-mix(in srgb, var(--fc-color-primary) 12%, var(--fc-color-border));
-    background: color-mix(in srgb, var(--fc-color-bg) 94%, white 2%);
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-control, 0.875rem);
-}
-
-.highlight-tag-item__input:focus {
-    outline: none;
-    border-color: var(--fc-color-primary);
 }
 
 .highlight-tag-item__clear,
@@ -140,7 +129,7 @@
 }
 
 .highlight-tag-item__bool-chip {
-    min-height: 2.5rem;
+    min-height: var(--fc-control-height-lg, 3rem);
     padding: 0.56rem 0.68rem;
     border-radius: 0.78rem;
     font-size: var(--fc-font-size-sm);

@@ -48,6 +48,7 @@ import useEntryImageState from '../hooks/useEntryImageState'
 import useEntryRelationState from '../hooks/useEntryRelationState'
 import useEntrySaveStatus from '../hooks/useEntrySaveStatus'
 import {buildEntryTagsPayload,} from './entryTagUtils'
+import ActionMenu from '../../../shared/ui/overlay/ActionMenu'
 
 import './EntryEditor.css'
 import {
@@ -218,6 +219,7 @@ export default function EntryEditor({
     const [outgoingLinks, setOutgoingLinks] = useState<EntryLink[]>([])
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
+    const [actionMenuOpen, setActionMenuOpen] = useState(false)
     const {
         entryRelations,
         setEntryRelations,
@@ -1170,64 +1172,73 @@ export default function EntryEditor({
                     <section className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}>
                         <div className="entry-editor-workspace__header">
                             <div className="entry-editor-workspace__toolbar">
-                                <button
-                                    type="button"
-                                    className="entry-editor-back-button"
-                                    onClick={onBack}
-                                    disabled={!onBack}
-                                >
-                                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                                        <path
-                                            d="M14.5 6.5L9 12l5.5 5.5"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                    </svg>
-                                    <span>返回</span>
-                                </button>
-                                <div className="entry-editor-mode-switch">
+                                <div className="entry-editor-workspace__toolbar-main">
                                     <button
                                         type="button"
-                                        className={`entry-editor-mode-chip${editorMode === 'browse' ? ' active' : ''}`}
-                                        onClick={() => setEditorMode('browse')}
+                                        className="entry-editor-back-button"
+                                        onClick={onBack}
+                                        disabled={!onBack}
                                     >
-                                        浏览
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path
+                                                d="M14.5 6.5L9 12l5.5 5.5"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="1.8"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            />
+                                        </svg>
+                                        <span>返回</span>
                                     </button>
-                                    <button
-                                        type="button"
-                                        className={`entry-editor-mode-chip${editorMode === 'edit' ? ' active' : ''}`}
-                                        onClick={() => setEditorMode('edit')}
-                                    >
-                                        编辑
-                                    </button>
+                                    <div className="entry-editor-mode-switch" role="group" aria-label="词条查看模式">
+                                        <button
+                                            type="button"
+                                            className={`entry-editor-mode-chip${editorMode === 'browse' ? ' active' : ''}`}
+                                            aria-pressed={editorMode === 'browse'}
+                                            onClick={() => setEditorMode('browse')}
+                                        >
+                                            浏览
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`entry-editor-mode-chip${editorMode === 'edit' ? ' active' : ''}`}
+                                            aria-pressed={editorMode === 'edit'}
+                                            onClick={() => setEditorMode('edit')}
+                                        >
+                                            编辑
+                                        </button>
+                                    </div>
                                 </div>
-                                <Button type="button" size="sm" disabled={!canSave} onClick={() => void handleSave()}>
-                                    {saving ? '保存中…' : '保存修改'}
-                                </Button>
-                                {onDelete && (
-                                    <Button type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="entry-editor-delete-button"
-                                        disabled={loading || saving}
-                                        onClick={() => void handleDelete()}
-                                    >
-                                        删除词条
+                                <div className="entry-editor-workspace__toolbar-actions">
+                                    {editorMode === 'edit' && (
+                                        <span className={`entry-editor-save-state${saveStatusText ? ' is-dirty' : ''}`}>
+                                            {saving ? '正在保存…' : (saveStatusText || '已保存')}
+                                        </span>
+                                    )}
+                                    <Button type="button" size="sm" disabled={!canSave} onClick={() => void handleSave()}>
+                                        {saving ? '保存中…' : '保存修改'}
                                     </Button>
-                                )}
+                                    {onDelete && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="entry-editor-more-button"
+                                            aria-label="更多词条操作"
+                                            disabled={loading || saving}
+                                            onClick={() => setActionMenuOpen(true)}
+                                        >
+                                            更多
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
-                            <span className="entry-editor-workspace__meta">
-                            {editorMode === 'edit'
-                                ? (
-                                    saveStatusText
-                                        ? `${projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`} · ${saveStatusText}`
-                                        : (projectDataLoading ? '正在索引项目词条…' : `${projectEntries.length} 个词条可用于双链联想`)
-                                )
-                                : '单击双链查看预览，双击或按钮可在新页签打开。'}
-                        </span>
+                            {editorMode === 'browse' && (
+                                <span className="entry-editor-workspace__meta">
+                                    单击双链查看预览，双击或按钮可在新页签打开。
+                                </span>
+                            )}
                         </div>
 
                         <div className="entry-editor-workspace__body">
@@ -1236,7 +1247,13 @@ export default function EntryEditor({
                                 entry={entry}
                                 draft={draft}
                                 status={{editorMode, loading, saving, generatingSummary}}
-                                projectContext={{projectName, categories, entryTypes}}
+                                projectContext={{
+                                    projectName,
+                                    categories,
+                                    entryTypes,
+                                    entryCount: projectEntries.length,
+                                    entryCountLoading: projectDataLoading,
+                                }}
                                 tagUi={{
                                     localTagSchemas: entryTags.localTagSchemas,
                                     visibleTagSchemas: entryTags.visibleTagSchemas,
@@ -1415,6 +1432,20 @@ export default function EntryEditor({
                     )}
                 </div>
             </RollingBox>
+
+            <ActionMenu
+                open={actionMenuOpen}
+                onClose={() => setActionMenuOpen(false)}
+                title={draft.title || entry?.title || '词条操作'}
+                ariaLabel="更多词条操作"
+                items={[{
+                    key: 'delete-entry',
+                    label: '删除词条',
+                    danger: true,
+                    disabled: loading || saving,
+                    onSelect: () => void handleDelete(),
+                }]}
+            />
 
             <EntryImageLightbox
                 open={lightboxOpen}

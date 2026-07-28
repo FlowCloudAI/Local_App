@@ -41,6 +41,8 @@ interface EntryEditorMetaPanelProps {
         projectName: string
         categories: Category[]
         entryTypes: EntryTypeView[]
+        entryCount: number
+        entryCountLoading: boolean
     }
     tagUi: {
         localTagSchemas: TagSchema[]
@@ -78,7 +80,7 @@ export default function EntryEditorMetaPanel({
                                                  actions,
                                              }: EntryEditorMetaPanelProps) {
     const {editorMode, loading, saving, generatingSummary} = status
-    const {projectName, categories, entryTypes} = projectContext
+    const {projectName, categories, entryTypes, entryCount, entryCountLoading} = projectContext
     const {
         localTagSchemas,
         visibleTagSchemas,
@@ -109,7 +111,7 @@ export default function EntryEditorMetaPanel({
     const coverImage = getCoverImage(draft.images)
     const coverSrc = toEntryImageSrc(coverImage)
     const coverHintText = isBrowseMode ? '暂无主图' : '点击添加图片'
-    const entryPathLabel = buildEntryPath(projectName, categories, entry?.category_id ?? null, infoTitle)
+    const entryPathLabel = buildEntryPath(projectName, categories, draft.categoryId, infoTitle)
     const entryCreatedAtText = formatDate(entry?.['created_at'] as string | null | undefined)
     const entryUpdatedAtText = formatDate(entry?.updated_at as string | null | undefined)
     const isCharacterEntry = normalizeComparableType(draft.type) === 'character'
@@ -126,6 +128,9 @@ export default function EntryEditorMetaPanel({
     const customTypeOptions = typeOptions
         .filter(({entryType}) => entryType.kind === 'custom')
         .map(({key, entryType}) => ({value: key, label: entryType.name}))
+    const selectedCustomType = customTypeOptions.some((option) => option.value === draft.type)
+    const titleInputId = `entry-editor-title-${entryId}`
+    const summaryInputId = `entry-editor-summary-${entryId}`
 
     return (
         <div className="entry-editor-meta-layout">
@@ -133,6 +138,9 @@ export default function EntryEditorMetaPanel({
                 <button
                     type="button"
                     className={`entry-editor-cover ${coverSrc ? 'has-image' : ''}`}
+                    aria-label={draft.images.length
+                        ? `查看${infoTitle}的图片设定集`
+                        : (isBrowseMode ? `${infoTitle}暂无主图` : `为${infoTitle}添加图片`)}
                     onClick={() => {
                         if (draft.images.length) {
                             onViewImageSet()
@@ -167,7 +175,7 @@ export default function EntryEditorMetaPanel({
 
             <div className="entry-editor-meta-panel entry-editor-meta-panel--primary">
                 <div className="entry-editor-meta-panel__section">
-                    <label className="entry-editor-field-label">
+                    <label className="entry-editor-field-label" htmlFor={titleInputId}>
                         标题
                         {!isBrowseMode && (
                             <span className="entry-editor-required" aria-hidden="true"> *</span>
@@ -178,6 +186,7 @@ export default function EntryEditorMetaPanel({
                     ) : (
                         <>
                             <input
+                                id={titleInputId}
                                 className={`entry-editor-title-input${trimmedTitle ? '' : ' is-missing'}`}
                                 value={draft.title}
                                 onChange={(event) => onDraftChange((current) => (
@@ -200,7 +209,7 @@ export default function EntryEditorMetaPanel({
 
                 <div className="entry-editor-meta-panel__section">
                     <div className="entry-editor-field-label-row">
-                        <label className="entry-editor-field-label">摘要</label>
+                        <label className="entry-editor-field-label" htmlFor={summaryInputId}>摘要</label>
                         {!isBrowseMode && (
                             <Button
                                 variant="outline"
@@ -219,6 +228,7 @@ export default function EntryEditorMetaPanel({
                         </div>
                     ) : (
                         <textarea
+                            id={summaryInputId}
                             className="entry-editor-summary-input"
                             value={draft.summary}
                             onChange={(event) => onDraftChange((current) => (
@@ -233,7 +243,147 @@ export default function EntryEditorMetaPanel({
                     )}
                 </div>
 
+                <div className="entry-editor-meta-panel__section entry-editor-type-section">
+                    <div className="entry-editor-field-label-row">
+                        <span className="entry-editor-field-label">词条类型</span>
+                        {!isBrowseMode && (
+                            <span className="entry-editor-field-note">类型会影响植入标签的重点显示</span>
+                        )}
+                    </div>
+                    {isBrowseMode ? (
+                        <div className="entry-editor-type-grid">
+                            {draft.type ? (
+                                (() => {
+                                    const selectedType = typeOptions.find(({key}) => key === draft.type)
+                                    return selectedType ? (
+                                        <span
+                                            className="entry-editor-type-chip active is-readonly"
+                                            style={{'--entry-editor-chip-color': selectedType.entryType.color} as CSSProperties}
+                                        >
+                                            <EntryTypeIcon
+                                                entryType={selectedType.entryType}
+                                                className="entry-editor-type-chip__icon"
+                                            />
+                                            <span>{selectedType.entryType.name}</span>
+                                        </span>
+                                    ) : (
+                                        <span className="entry-editor-type-chip is-readonly">未设置</span>
+                                    )
+                                })()
+                            ) : (
+                                <span className="entry-editor-type-chip is-readonly">未设置</span>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="entry-editor-type-grid">
+                            <button
+                                type="button"
+                                className={`entry-editor-type-chip${draft.type === null ? ' active' : ''}`}
+                                aria-pressed={draft.type === null}
+                                onClick={() => onDraftChange((current) => (
+                                    normalizeComparableType(current.type) === null
+                                        ? current
+                                        : {...current, type: null}
+                                ))}
+                            >
+                                不设置
+                            </button>
+                            {builtinTypeOptions.map(({key, entryType}) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    className={`entry-editor-type-chip${draft.type === key ? ' active' : ''}`}
+                                    style={{'--entry-editor-chip-color': entryType.color} as CSSProperties}
+                                    aria-pressed={draft.type === key}
+                                    onClick={() => onDraftChange((current) => ({
+                                        ...current,
+                                        type: normalizeComparableType(current.type) === key ? null : key,
+                                    }))}
+                                >
+                                    <EntryTypeIcon entryType={entryType} className="entry-editor-type-chip__icon"/>
+                                    <span>{entryType.name}</span>
+                                </button>
+                            ))}
+                            {customTypeOptions.length > 0 && (
+                                <Select
+                                    className={`entry-editor-select entry-editor-more-type${selectedCustomType ? ' is-active' : ''}`}
+                                    options={customTypeOptions}
+                                    value={selectedCustomType ? draft.type ?? undefined : undefined}
+                                    onValueChange={(value) => onDraftChange((current) => {
+                                        const nextType = normalizeComparableType(typeof value === 'string' ? value : null)
+                                        return normalizeComparableType(current.type) === nextType
+                                            ? current
+                                            : {...current, type: nextType}
+                                    })}
+                                    placeholder="更多类型"
+                                    aria-label="选择自定义词条类型"
+                                    searchable
+                                />
+                            )}
+                        </div>
+                    )}
+                </div>
+
             </div>
+
+            <aside className="entry-editor-auxiliary-panel" aria-labelledby={`entry-editor-auxiliary-${entryId}`}>
+                <h2 id={`entry-editor-auxiliary-${entryId}`} className="entry-editor-auxiliary-title">
+                    辅助信息
+                </h2>
+                <div className="entry-editor-auxiliary-section">
+                    <span className="entry-editor-field-label">所属分类</span>
+                    {isBrowseMode ? (
+                        <div className="entry-editor-auxiliary-value">
+                            {getCategoryName(categories, draft.categoryId)}
+                        </div>
+                    ) : (
+                        <Select
+                            className="entry-editor-select entry-editor-category-select"
+                            options={[
+                                {value: '', label: '无分类'},
+                                ...categories.map((category) => ({value: category.id, label: category.name})),
+                            ]}
+                            value={draft.categoryId ?? ''}
+                            onValueChange={(value) => onDraftChange((current) => {
+                                const nextCategoryId = typeof value === 'string' && value ? value : null
+                                return current.categoryId === nextCategoryId
+                                    ? current
+                                    : {...current, categoryId: nextCategoryId}
+                            })}
+                            placeholder="选择分类"
+                            aria-label="所属分类"
+                            searchable
+                        />
+                    )}
+                </div>
+                <div className="entry-editor-auxiliary-section">
+                    <span className="entry-editor-field-label">系统信息</span>
+                    <dl className="entry-editor-system-meta">
+                        <div>
+                            <dt>路径</dt>
+                            <dd title={entryPathLabel}>{entryPathLabel}</dd>
+                        </div>
+                        <div>
+                            <dt>创建</dt>
+                            <dd>{entryCreatedAtText}</dd>
+                        </div>
+                        <div>
+                            <dt>更新</dt>
+                            <dd>{entryUpdatedAtText}</dd>
+                        </div>
+                    </dl>
+                </div>
+                <div className="entry-editor-auxiliary-count" aria-live="polite">
+                    {entryCountLoading ? (
+                        <span>正在索引项目词条…</span>
+                    ) : (
+                        <>
+                            <strong>{entryCount}</strong>
+                            <span>个词条可用于正文双链联想</span>
+                        </>
+                    )}
+                </div>
+            </aside>
 
             <div className="entry-editor-meta-panel entry-editor-meta-panel--secondary">
                 {isBrowseMode && isCharacterEntry && onStartCharacterChat && (
@@ -337,91 +487,14 @@ export default function EntryEditorMetaPanel({
                     </div>
                 )}
 
-                <div className="entry-editor-meta-panel__section">
+                <div className="entry-editor-meta-panel__section entry-editor-tags-section">
                     <div className="entry-editor-field-label-row">
-                        <label className="entry-editor-field-label">词条类型</label>
-                        {!isBrowseMode &&
-                            <span className="entry-editor-field-note">切换后会同步影响植入标签的重点显示</span>}
-                    </div>
-                    {isBrowseMode ? (
-                        <div className="entry-editor-type-grid">
-                            {draft.type ? (
-                                (() => {
-                                    const selectedType = typeOptions.find(({key}) => key === draft.type)
-                                    return selectedType ? (
-                                        <span
-                                            className="entry-editor-type-chip active is-readonly"
-                                            style={{'--entry-editor-chip-color': selectedType.entryType.color} as CSSProperties}
-                                        >
-                                            <EntryTypeIcon entryType={selectedType.entryType}
-                                                           className="entry-editor-type-chip__icon"/>
-                                            <span>{selectedType.entryType.name}</span>
-                                        </span>
-                                    ) : (
-                                        <span className="entry-editor-type-chip is-readonly">未设置</span>
-                                    )
-                                })()
-                            ) : (
-                                <span className="entry-editor-type-chip is-readonly">未设置</span>
+                        <div className="entry-editor-tags-heading">
+                            <span className="entry-editor-field-label">标签</span>
+                            {!isBrowseMode && (
+                                <span className="entry-editor-field-note">切换类型不会删除已有值</span>
                             )}
                         </div>
-                    ) : (
-                        <>
-                            <div className="entry-editor-type-grid">
-                                <button
-                                    type="button"
-                                    className={`entry-editor-type-chip${draft.type === null ? ' active' : ''}`}
-                                    onClick={() => onDraftChange((current) => (
-                                        normalizeComparableType(current.type) === null
-                                            ? current
-                                            : {...current, type: null}
-                                    ))}
-                                >
-                                    不设置
-                                </button>
-                                {builtinTypeOptions.map(({key, entryType}) => (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        className={`entry-editor-type-chip${draft.type === key ? ' active' : ''}`}
-                                        style={{'--entry-editor-chip-color': entryType.color} as CSSProperties}
-                                        onClick={() => onDraftChange((current) => ({
-                                            ...current,
-                                            type: normalizeComparableType(current.type) === key ? null : key,
-                                        }))}
-                                    >
-                                        <EntryTypeIcon entryType={entryType} className="entry-editor-type-chip__icon"/>
-                                        <span>{entryType.name}</span>
-                                    </button>
-                                ))}
-                            </div>
-                            {customTypeOptions.length > 0 && (
-                                <div className="entry-editor-custom-type">
-                                    <label className="entry-editor-field-label">自定义类型</label>
-                                    <Select
-                                        className="entry-editor-select"
-                                        options={customTypeOptions}
-                                        value={draft.type && customTypeOptions.some(option => option.value === draft.type) ? draft.type : undefined}
-                                        onValueChange={(value) => onDraftChange((current) => {
-                                            const nextType = normalizeComparableType(typeof value === 'string' ? value : null)
-                                            return normalizeComparableType(current.type) === nextType
-                                                ? current
-                                                : {
-                                                    ...current,
-                                                    type: nextType,
-                                                }
-                                        })}
-                                        placeholder="搜索并选择自定义词条类型"
-                                        searchable
-                                    />
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-                <div className="entry-editor-meta-panel__section">
-                    <div className="entry-editor-field-label-row">
-                        <label className="entry-editor-field-label">标签</label>
                         {!isBrowseMode && (
                             <div className="entry-editor-tag-actions">
                                 {availableTagSchemaOptions.length > 0 && (
@@ -445,13 +518,6 @@ export default function EntryEditorMetaPanel({
                             </div>
                         )}
                     </div>
-                    {!isBrowseMode && (
-                        <div className="entry-editor-field-note">
-                            {draft.type
-                                ? '当前词条类型的植入标签会重点显示；切换类型后，原有标签只会取消强调，不会被删除。'
-                                : '未设置词条类型时，仅显示已添加的标签。'}
-                        </div>
-                    )}
                     {localTagSchemas.length === 0 ? (
                         <div className="entry-editor-empty-tip">当前项目还没有标签定义，先创建一个再给词条填写。</div>
                     ) : isBrowseMode ? (
@@ -564,33 +630,6 @@ export default function EntryEditorMetaPanel({
                                 className="entry-editor-empty-tip">当前词条还没有已添加标签，可从已有标签中选择，或新建一个标签。</div>
                         )
                     )}
-                    <div className="entry-editor-entry-meta">
-                        <span>路径：{entryPathLabel}</span>
-                        {isBrowseMode ? (
-                            <span>分类：{getCategoryName(categories, draft.categoryId)}</span>
-                        ) : (
-                            <div className="entry-editor-category-select">
-                                <Select
-                                    className="entry-editor-select"
-                                    options={[
-                                        {value: '', label: '无分类'},
-                                        ...categories.map((c) => ({value: c.id, label: c.name})),
-                                    ]}
-                                    value={draft.categoryId ?? ''}
-                                    onValueChange={(value) => onDraftChange((current) => {
-                                        const nextCategoryId = typeof value === 'string' && value ? value : null
-                                        return current.categoryId === nextCategoryId
-                                            ? current
-                                            : {...current, categoryId: nextCategoryId}
-                                    })}
-                                    placeholder="选择分类"
-                                    searchable
-                                />
-                            </div>
-                        )}
-                        <span>创建于 {entryCreatedAtText}</span>
-                        <span>更新于 {entryUpdatedAtText}</span>
-                    </div>
                 </div>
             </div>
         </div>
