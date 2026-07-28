@@ -1,7 +1,6 @@
 import MarkdownPreview from '@uiw/react-markdown-preview'
 import {type CSSProperties, type Dispatch, type MouseEvent as ReactMouseEvent, type RefObject, type SetStateAction} from 'react'
 import {rehypeSanitizeRawHtml} from '../../../shared/markdown/rehypeSanitizeRawHtml'
-import {TagItem} from 'flowcloudai-ui'
 import {
     type Entry,
     type EntryBrief,
@@ -9,6 +8,7 @@ import {
     type EntryTypeView,
     type TagSchema,
 } from '../../../api'
+import HighLightTagItem from '../../../features/entries/components/HighLightTagItem'
 import EntryTypeIcon from '../../../features/project-editor/components/EntryTypeIcon'
 import {getComparableTagValue} from '../../../features/entries/lib/entryTag'
 import {type EntryImage, toEntryImageSrc} from '../../../features/entries/lib/entryImage'
@@ -31,6 +31,7 @@ interface MobileEntryDetailViewProps {
     entryType: EntryTypeView | null
     typeBadgeStyle?: CSSProperties
     viewTagSchemas: TagSchema[]
+    implantedTagSchemaIdSet: Set<string>
     viewTagMap: TagValueMap
     viewImages: EntryImage[]
     viewMarkdownSource: string
@@ -63,6 +64,7 @@ export function MobileEntryDetailView({
     entryType,
     typeBadgeStyle,
     viewTagSchemas,
+    implantedTagSchemaIdSet,
     viewTagMap,
     viewImages,
     viewMarkdownSource,
@@ -157,10 +159,11 @@ export function MobileEntryDetailView({
                         </span>
                     )}
                     {viewTagSchemas.map(s => (
-                        <TagItem
+                        <HighLightTagItem
                             key={s.id}
                             schema={{id: s.id, name: s.name, type: s.type as 'number' | 'string' | 'boolean', range_min: s.range_min ?? null, range_max: s.range_max ?? null}}
-                            value={getComparableTagValue(viewTagMap, s) ?? undefined}
+                            value={getComparableTagValue(viewTagMap, s)}
+                            implanted={implantedTagSchemaIdSet.has(s.id)}
                             mode="show"
                         />
                     ))}

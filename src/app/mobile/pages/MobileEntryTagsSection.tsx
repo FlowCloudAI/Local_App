@@ -1,6 +1,7 @@
 import {type ComponentProps, type Dispatch, type SetStateAction} from 'react'
-import {Button, Select, TagItem} from 'flowcloudai-ui'
+import {Button, Select} from 'flowcloudai-ui'
 import {type TagSchema} from '../../../api'
+import HighLightTagItem from '../../../features/entries/components/HighLightTagItem'
 import {
     getComparableTagValue,
     normalizeComparableTagValue,
@@ -15,6 +16,7 @@ interface MobileEntryTagsSectionProps {
     availableTagSchemaOptions: SelectOptions
     tagSchemaPickerValue?: string
     editTagSchemas: TagSchema[]
+    implantedTagSchemaIdSet: Set<string>
     tagDraft: TagValueMap
     onAddVisibleTagSchema: (schemaId: string) => void
     onTagDraftChange: Dispatch<SetStateAction<TagValueMap>>
@@ -26,6 +28,7 @@ export function MobileEntryTagsSection({
     availableTagSchemaOptions,
     tagSchemaPickerValue,
     editTagSchemas,
+    implantedTagSchemaIdSet,
     tagDraft,
     onAddVisibleTagSchema,
     onTagDraftChange,
@@ -59,7 +62,7 @@ export function MobileEntryTagsSection({
             ) : editTagSchemas.length > 0 ? (
                 <div className="mobile-entry-detail__tags-list">
                     {editTagSchemas.map(schema => (
-                        <TagItem
+                        <HighLightTagItem
                             key={schema.id}
                             schema={{
                                 id: schema.id,
@@ -68,7 +71,8 @@ export function MobileEntryTagsSection({
                                 range_min: schema.range_min ?? null,
                                 range_max: schema.range_max ?? null,
                             }}
-                            value={tagDraft[schema.id] ?? tagDraft[schema.name] ?? undefined}
+                            value={tagDraft[schema.id] ?? tagDraft[schema.name] ?? null}
+                            implanted={implantedTagSchemaIdSet.has(schema.id)}
                             mode="edit"
                             onChange={(value) => onTagDraftChange(prev => {
                                 const nextValue = normalizeComparableTagValue(value)

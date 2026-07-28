@@ -577,7 +577,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             categoryNameById={categoryNameById} creatingLinkedEntry={creatingLinkedEntry}
             onWikiIndex={setActiveWikiOptionIndex} onWikiCommit={handleWikiOptionCommit}
             imagesProps={{images, onAddImage: () => setImageAddModalOpen(true), onOpenImage: index => { setLightboxIndex(index); setLightboxOpen(true) }}}
-            tagsProps={{hasTagDefinitions: entryTags.localTagSchemas.length > 0, availableTagSchemaOptions: entryTags.availableTagSchemaOptions, tagSchemaPickerValue: entryTags.tagSchemaPickerValue, editTagSchemas: entryTags.visibleTagSchemas, tagDraft, onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema, onTagDraftChange: setTagDraft, onOpenTagCreator: () => setTagCreatorOpen(true)}}
+            tagsProps={{hasTagDefinitions: entryTags.localTagSchemas.length > 0, availableTagSchemaOptions: entryTags.availableTagSchemaOptions, tagSchemaPickerValue: entryTags.tagSchemaPickerValue, editTagSchemas: entryTags.visibleTagSchemas, implantedTagSchemaIdSet: entryTags.implantedTagSchemaIdSet, tagDraft, onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema, onTagDraftChange: setTagDraft, onOpenTagCreator: () => setTagCreatorOpen(true)}}
             relationsProps={{relationDrafts, entries: projectEntries, categories, currentEntryId: entryId, disabled: saving, onChange: setRelationDrafts, onOpenEntry: target => void (async () => { if (await confirmDiscard()) handleOpenLinkedEntry(target.id) })()}}
             immersiveProps={{editorRef: immersiveContentEditorRef, content, textareaProps, isDirty, saving, onContentChange: handleContentChange, onClose: () => setImmersiveEditorOpen(false), onSave: () => void handleSave(), onMarkdownTool: handleMarkdownTool}}
             typeCreatorProps={{open: typeCreatorOpen, projectId, existingNames: entryTypes.map(type => type.name), onClose: () => setTypeCreatorOpen(false), onSaved: created => void handleTypeCreated(created)}}
@@ -613,6 +613,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             entryType={et}
             typeBadgeStyle={typeBadgeStyle}
             viewTagSchemas={viewTagSchemas}
+            implantedTagSchemaIdSet={entryTags.implantedTagSchemaIdSet}
             viewTagMap={viewTagMap}
             viewImages={viewImages}
             viewMarkdownSource={viewMarkdownSource}

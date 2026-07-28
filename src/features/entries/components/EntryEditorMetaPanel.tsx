@@ -1,5 +1,5 @@
 import type {CSSProperties} from 'react'
-import {Button, Select, TagItem} from 'flowcloudai-ui'
+import {Button, Select} from 'flowcloudai-ui'
 import type {Category, Entry, EntryTypeView, TagSchema} from '../../../api'
 import HighLightTagItem from './HighLightTagItem'
 import EntryTypeIcon from '../../project-editor/components/EntryTypeIcon'
@@ -531,32 +531,18 @@ export default function EntryEditorMetaPanel({
                                             key={`${entryId}-${schema.id}`}
                                             className="entry-editor-tag-card"
                                         >
-                                            {isImplanted ? (
-                                                <HighLightTagItem
-                                                    schema={{
-                                                        id: schema.id,
-                                                        name: schema.name,
-                                                        type: schema.type as 'number' | 'string' | 'boolean',
-                                                        range_min: schema.range_min ?? null,
-                                                        range_max: schema.range_max ?? null,
-                                                    }}
-                                                    value={value}
-                                                    implanted
-                                                    mode="show"
-                                                />
-                                            ) : (
-                                                <TagItem
-                                                    schema={{
-                                                        id: schema.id,
-                                                        name: schema.name,
-                                                        type: schema.type as 'number' | 'string' | 'boolean',
-                                                        range_min: schema.range_min ?? null,
-                                                        range_max: schema.range_max ?? null,
-                                                    }}
-                                                    value={value ?? undefined}
-                                                    mode="show"
-                                                />
-                                            )}
+                                            <HighLightTagItem
+                                                schema={{
+                                                    id: schema.id,
+                                                    name: schema.name,
+                                                    type: schema.type as 'number' | 'string' | 'boolean',
+                                                    range_min: schema.range_min ?? null,
+                                                    range_max: schema.range_max ?? null,
+                                                }}
+                                                value={value}
+                                                implanted={isImplanted}
+                                                mode="show"
+                                            />
                                         </div>
                                     )
                                 })}
@@ -572,56 +558,30 @@ export default function EntryEditorMetaPanel({
                                         key={`${entryId}-${schema.id}`}
                                         className="entry-editor-tag-card"
                                     >
-                                        {implantedTagSchemaIdSet.has(schema.id) ? (
-                                            <HighLightTagItem
-                                                schema={{
-                                                    id: schema.id,
-                                                    name: schema.name,
-                                                    type: schema.type as 'number' | 'string' | 'boolean',
-                                                    range_min: schema.range_min ?? null,
-                                                    range_max: schema.range_max ?? null,
-                                                }}
-                                                value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? null}
-                                                implanted
-                                                mode="edit"
-                                                onChange={(value) => onDraftChange((current) => {
-                                                    const nextValue = normalizeComparableTagValue(value)
-                                                    const currentValue = getComparableTagValue(current.tags, schema)
-                                                    if (currentValue === nextValue) return current
-                                                    return {
-                                                        ...current,
-                                                        tags: {
-                                                            ...current.tags,
-                                                            [schema.id]: nextValue,
-                                                        },
-                                                    }
-                                                })}
-                                            />
-                                        ) : (
-                                            <TagItem
-                                                schema={{
-                                                    id: schema.id,
-                                                    name: schema.name,
-                                                    type: schema.type as 'number' | 'string' | 'boolean',
-                                                    range_min: schema.range_min ?? null,
-                                                    range_max: schema.range_max ?? null,
-                                                }}
-                                                value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? undefined}
-                                                mode="edit"
-                                                onChange={(value) => onDraftChange((current) => {
-                                                    const nextValue = normalizeComparableTagValue(value)
-                                                    const currentValue = getComparableTagValue(current.tags, schema)
-                                                    if (currentValue === nextValue) return current
-                                                    return {
-                                                        ...current,
-                                                        tags: {
-                                                            ...current.tags,
-                                                            [schema.id]: nextValue,
-                                                        },
-                                                    }
-                                                })}
-                                            />
-                                        )}
+                                        <HighLightTagItem
+                                            schema={{
+                                                id: schema.id,
+                                                name: schema.name,
+                                                type: schema.type as 'number' | 'string' | 'boolean',
+                                                range_min: schema.range_min ?? null,
+                                                range_max: schema.range_max ?? null,
+                                            }}
+                                            value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? null}
+                                            implanted={implantedTagSchemaIdSet.has(schema.id)}
+                                            mode="edit"
+                                            onChange={(value) => onDraftChange((current) => {
+                                                const nextValue = normalizeComparableTagValue(value)
+                                                const currentValue = getComparableTagValue(current.tags, schema)
+                                                if (currentValue === nextValue) return current
+                                                return {
+                                                    ...current,
+                                                    tags: {
+                                                        ...current.tags,
+                                                        [schema.id]: nextValue,
+                                                    },
+                                                }
+                                            })}
+                                        />
                                     </div>
                                 ))}
                             </div>

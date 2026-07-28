@@ -52,8 +52,13 @@ export default function useEntryTags({
         [visibleTagSchemaIds],
     )
     const visibleTagSchemas = useMemo(
-        () => localTagSchemas.filter((schema) => visibleTagSchemaIdSet.has(schema.id)),
-        [localTagSchemas, visibleTagSchemaIdSet],
+        () => localTagSchemas
+            .filter((schema) => visibleTagSchemaIdSet.has(schema.id))
+            .sort((left, right) => (
+                Number(isSchemaImplantedForType(right, draftType))
+                - Number(isSchemaImplantedForType(left, draftType))
+            )),
+        [draftType, localTagSchemas, visibleTagSchemaIdSet],
     )
     const implantedTagSchemaIdSet = useMemo(
         () => new Set(
