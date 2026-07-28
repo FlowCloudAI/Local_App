@@ -3,7 +3,7 @@
  * 图片数据仍由词条编辑器持有，本组件只负责当前选择与交互呈现。
  */
 import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'react'
-import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
+import {Button, RollingBox, Slider, useAlert} from 'flowcloudai-ui'
 import {open_entry_image_path} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryImageLightbox.css'
@@ -396,6 +396,50 @@ export default function EntryImageLightbox({
                         </Button>
                     </div>
 
+                    {viewMode === 'preview' && currentImage?.src && (
+                        <div className="entry-editor-lightbox__zoom-controls" role="group" aria-label="缩放控制">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="entry-editor-lightbox__zoom-value"
+                                title="恢复适应窗口"
+                                onClick={() => updateScale(FIT_SCALE)}
+                            >
+                                {Math.round(scale * 100)}%
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label="缩小图片"
+                                onClick={() => updateScale(scale - ZOOM_STEP)}
+                                disabled={scale <= MIN_SCALE}
+                            >
+                                −
+                            </Button>
+                            <Slider
+                                className="entry-editor-lightbox__zoom-slider"
+                                value={scale}
+                                min={MIN_SCALE}
+                                max={MAX_SCALE}
+                                step={ZOOM_STEP}
+                                aria-label="图片缩放比例"
+                                onValueChange={(value) => updateScale(Array.isArray(value) ? value[1] : value)}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label="放大图片"
+                                onClick={() => updateScale(scale + ZOOM_STEP)}
+                                disabled={scale >= MAX_SCALE}
+                            >
+                                ＋
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="entry-editor-lightbox__header-actions">
                         {onInsertMarkdown && (
                             <Button
@@ -483,9 +527,11 @@ export default function EntryImageLightbox({
                                     variant="secondary"
                                     size="sm"
                                     className="entry-editor-lightbox__previous"
+                                    aria-label="上一张"
+                                    title="上一张"
                                     onClick={() => selectImage(safeIndex - 1)}
                                 >
-                                    上一张
+                                    <span aria-hidden="true">‹</span>
                                 </Button>
                             )}
 
@@ -522,48 +568,18 @@ export default function EntryImageLightbox({
                                     variant="secondary"
                                     size="sm"
                                     className="entry-editor-lightbox__next"
+                                    aria-label="下一张"
+                                    title="下一张"
                                     onClick={() => selectImage(safeIndex + 1)}
                                 >
-                                    下一张
+                                    <span aria-hidden="true">›</span>
                                 </Button>
-                            )}
-
-                            {currentImage?.src && (
-                                <div className="entry-editor-lightbox__zoom-controls" role="group" aria-label="缩放控制">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => updateScale(scale - ZOOM_STEP)}
-                                        disabled={scale <= MIN_SCALE}
-                                    >
-                                        缩小
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => updateScale(FIT_SCALE)}
-                                        aria-label={scale === FIT_SCALE ? '图片已适应窗口' : '恢复适应窗口'}
-                                    >
-                                        {scale === FIT_SCALE ? '适应' : `${Math.round(scale * 100)}%`}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => updateScale(scale + ZOOM_STEP)}
-                                        disabled={scale >= MAX_SCALE}
-                                    >
-                                        放大
-                                    </Button>
-                                </div>
                             )}
                         </>
                     ) : renderGalleryGrid()}
                 </main>
 
-                {renderImageRail()}
+                {viewMode === 'preview' && renderImageRail()}
 
                 <span className="entry-editor-lightbox__live" aria-live="polite">
                     第 {safeIndex + 1} 张，共 {images.length} 张；缩放 {Math.round(scale * 100)}%
