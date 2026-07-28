@@ -132,6 +132,10 @@
     overflow: hidden;
 }
 
+.dockable-side-panel--floating .dockable-side-panel__main-stack {
+    min-width: var(--dockable-side-panel-content-min-width);
+}
+
 .dockable-side-panel__side-layer,
 .dockable-side-panel__main-layer {
     grid-area: layer;

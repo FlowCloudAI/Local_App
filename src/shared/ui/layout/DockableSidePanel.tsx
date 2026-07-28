@@ -587,7 +587,10 @@ export default function DockableSidePanel({
         <section
             ref={rootRef}
             className={rootClassName}
-            style={rootStyle}
+            style={{
+                ...rootStyle,
+                '--dockable-side-panel-content-min-width': `${minWidth}px`,
+            } as CSSProperties}
         >
             {mode === 'floating' && (
                 <div
