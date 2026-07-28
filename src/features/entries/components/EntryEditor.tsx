@@ -240,6 +240,7 @@ export default function EntryEditor({
         openImageAddModal,
         closeImageAddModal,
     } = useEntryImageState(draft.images)
+    const reopenLightboxAfterImageAddRef = useRef(false)
     const openEntryStateCacheRef = useRef<Record<string, OpenEntryEditorState>>({})
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
@@ -1459,6 +1460,7 @@ export default function EntryEditor({
                 onRemove={editorMode === 'edit' ? handleRemoveImage : undefined}
                 onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
                 onAddImage={() => {
+                    reopenLightboxAfterImageAddRef.current = true
                     setLightboxOpen(false)
                     openImageAddModal('add')
                 }}
@@ -1485,9 +1487,18 @@ export default function EntryEditor({
                 aiModel={aiModel}
                 mode={imageAddModalMode ?? 'add'}
                 existingImages={draft.images}
-                onClose={closeImageAddModal}
+                onClose={() => {
+                    closeImageAddModal()
+                    if (!reopenLightboxAfterImageAddRef.current) return
+                    reopenLightboxAfterImageAddRef.current = false
+                    setLightboxOpen(true)
+                }}
                 onUploadLocal={handleUploadImages}
-                onOpenPluginManagement={onOpenPluginManagement}
+                onOpenPluginManagement={onOpenPluginManagement ? (kind) => {
+                    reopenLightboxAfterImageAddRef.current = false
+                    setLightboxOpen(false)
+                    onOpenPluginManagement(kind)
+                } : undefined}
                 onAddAiImages={handleAddAiImages}
                 onInsertImage={(image) => insertImageMarkdown(image)}
             />
