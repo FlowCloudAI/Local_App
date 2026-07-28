@@ -1267,7 +1267,8 @@ export default function EntryEditor({
                                     onDraftChange: setDraft,
                                     onOpenImageAddModal: () => openImageAddModal('add'),
                                     onViewImageSet: () => {
-                                        setLightboxIndex(0)
+                                        const coverIndex = draft.images.findIndex((image) => image.is_cover)
+                                        setLightboxIndex(Math.max(0, coverIndex))
                                         setLightboxOpen(true)
                                     },
                                     onGenerateSummary: handleGenerateSummary,
@@ -1454,13 +1455,13 @@ export default function EntryEditor({
                 infoTitle={infoTitle}
                 onClose={() => setLightboxOpen(false)}
                 onIndexChange={setLightboxIndex}
-                onSetCover={handleSetCover}
-                onRemove={handleRemoveImage}
+                onSetCover={editorMode === 'edit' ? handleSetCover : undefined}
+                onRemove={editorMode === 'edit' ? handleRemoveImage : undefined}
                 onInsertMarkdown={editorMode === 'edit' ? handleInsertImageMarkdown : undefined}
-                onAddImage={() => {
+                onAddImage={editorMode === 'edit' ? () => {
                     setLightboxOpen(false)
                     openImageAddModal('add')
-                }}
+                } : undefined}
             />
 
             <TagCreator

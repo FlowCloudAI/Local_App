@@ -1,7 +1,11 @@
-import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'react'
+/**
+ * 词条图片浏览器：统一桌面端与移动端的预览、画廊、缩放和图片管理入口。
+ * 图片数据仍由词条编辑器持有，本组件只负责当前选择与交互呈现。
+ */
+import {type PointerEvent, useEffect, useId, useRef, useState, type WheelEvent} from 'react'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {open_entry_image_path} from '../../../api'
-import {FloatingPanel} from '../../../shared/ui/overlay'
+import {Overlay} from '../../../shared/ui/overlay'
 import './EntryImageLightbox.css'
 
 const MIN_SCALE = 1
@@ -23,8 +27,8 @@ interface EntryImageLightboxProps {
     infoTitle: string
     onClose: () => void
     onIndexChange: (index: number) => void
-    onSetCover: (index: number) => void
-    onRemove: (index: number) => void
+    onSetCover?: (index: number) => void
+    onRemove?: (index: number) => void
     onAddImage?: () => void
     onInsertMarkdown?: (index: number) => void
 }
@@ -51,11 +55,13 @@ export default function EntryImageLightbox({
                                                onInsertMarkdown,
                                            }: EntryImageLightboxProps) {
     const {showAlert} = useAlert()
+    const titleId = useId()
     const [viewMode, setViewMode] = useState<'preview' | 'gallery'>('preview')
-    const [scale, setScale] = useState(1)
+    const [scale, setScale] = useState(MIN_SCALE)
     const [offset, setOffset] = useState({x: 0, y: 0})
     const [isDragging, setIsDragging] = useState(false)
     const previewThumbRefs = useRef<Record<number, HTMLButtonElement | null>>({})
+    const moreDetailsRef = useRef<HTMLDetailsElement>(null)
     const dragStateRef = useRef({
         pointerId: -1,
         startX: 0,
@@ -63,6 +69,9 @@ export default function EntryImageLightbox({
         startOffsetX: 0,
         startOffsetY: 0,
     })
+
+    const safeIndex = Math.min(Math.max(currentIndex, 0), Math.max(0, images.length - 1))
+    const currentImage = images[safeIndex]
 
     function resetPreviewTransform() {
         setScale(MIN_SCALE)
@@ -81,13 +90,35 @@ export default function EntryImageLightbox({
         }
     }
 
+    function selectImage(index: number) {
+        onIndexChange((index + images.length) % images.length)
+    }
+
+    function closeMoreMenu() {
+        moreDetailsRef.current?.removeAttribute('open')
+    }
+
+    useEffect(() => {
+        if (!open) return
+        if (images.length === 0) {
+            queueMicrotask(onClose)
+            return
+        }
+        if (safeIndex !== currentIndex) {
+            queueMicrotask(() => onIndexChange(safeIndex))
+        }
+    }, [currentIndex, images.length, onClose, onIndexChange, open, safeIndex])
+
     useEffect(() => {
         if (open) queueMicrotask(() => setViewMode('preview'))
     }, [open])
 
     useEffect(() => {
         if (!open) return
-        queueMicrotask(() => resetPreviewTransform())
+        queueMicrotask(() => {
+            resetPreviewTransform()
+            closeMoreMenu()
+        })
     }, [open, currentIndex])
 
     useEffect(() => {
@@ -98,7 +129,7 @@ export default function EntryImageLightbox({
 
     useEffect(() => {
         if (!open || viewMode !== 'preview') return
-        const currentThumb = previewThumbRefs.current[currentIndex]
+        const currentThumb = previewThumbRefs.current[safeIndex]
         if (!currentThumb) return
         const rafId = window.requestAnimationFrame(() => {
             currentThumb.scrollIntoView({
@@ -108,29 +139,10 @@ export default function EntryImageLightbox({
             })
         })
         return () => window.cancelAnimationFrame(rafId)
-    }, [open, viewMode, currentIndex])
+    }, [open, safeIndex, viewMode])
 
     useEffect(() => {
         if (!open || viewMode !== 'preview') return
-
-        function resetByKeyboard() {
-            setScale(MIN_SCALE)
-            setOffset({x: 0, y: 0})
-            setIsDragging(false)
-            dragStateRef.current.pointerId = -1
-        }
-
-        function zoomByKeyboard(delta: number) {
-            setScale((current) => {
-                const safeScale = clampScale(current + delta)
-                if (safeScale === MIN_SCALE) {
-                    setOffset({x: 0, y: 0})
-                    setIsDragging(false)
-                    dragStateRef.current.pointerId = -1
-                }
-                return safeScale
-            })
-        }
 
         function handleKeyDown(event: KeyboardEvent) {
             if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
@@ -139,48 +151,65 @@ export default function EntryImageLightbox({
             if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && images.length > 1) {
                 event.preventDefault()
                 const direction = event.key === 'ArrowLeft' ? -1 : 1
-                onIndexChange((currentIndex + images.length + direction) % images.length)
+                onIndexChange((safeIndex + images.length + direction) % images.length)
                 return
             }
 
             if (event.key === '0' || event.code === 'Numpad0') {
                 event.preventDefault()
-                resetByKeyboard()
+                setScale(MIN_SCALE)
+                setOffset({x: 0, y: 0})
+                setIsDragging(false)
+                dragStateRef.current.pointerId = -1
                 return
             }
 
             if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') {
                 event.preventDefault()
-                zoomByKeyboard(ZOOM_STEP)
+                setScale((current) => clampScale(current + ZOOM_STEP))
                 return
             }
 
             if (event.key === '-' || event.code === 'NumpadSubtract') {
                 event.preventDefault()
-                zoomByKeyboard(-ZOOM_STEP)
+                setScale((current) => {
+                    const nextScale = clampScale(current - ZOOM_STEP)
+                    if (nextScale === MIN_SCALE) {
+                        setOffset({x: 0, y: 0})
+                        setIsDragging(false)
+                        dragStateRef.current.pointerId = -1
+                    }
+                    return nextScale
+                })
             }
         }
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [currentIndex, images.length, onIndexChange, open, viewMode])
+    }, [images.length, onIndexChange, open, safeIndex, viewMode])
 
     if (!open || images.length === 0) return null
 
-    const currentImage = images[currentIndex]
+    const canSetCover = Boolean(onSetCover && !currentImage?.is_cover)
+    const showSetCoverAsPrimary = canSetCover && !onInsertMarkdown
+    const hasMoreActions = Boolean(
+        (canSetCover && onInsertMarkdown)
+        || currentImage?.path
+        || onRemove,
+    )
 
     async function handleRemoveClick() {
+        if (!onRemove) return
         const result = await showAlert('确认移除这张图片？', 'warning', 'confirm')
         if (result !== 'yes') return
-        onRemove(currentIndex)
+        closeMoreMenu()
+        onRemove(safeIndex)
     }
 
     async function handleOpenLocalPath() {
         const rawPath = currentImage?.path
-        if (!rawPath) {
-            void showAlert('当前图片没有可打开的本地路径', 'warning')
-            return
-        }
+        if (!rawPath) return
+        closeMoreMenu()
         try {
             await open_entry_image_path(String(rawPath))
         } catch (error) {
@@ -188,19 +217,10 @@ export default function EntryImageLightbox({
         }
     }
 
-    function handleZoomIn() {
-        updateScale(scale + ZOOM_STEP)
-    }
-
-    function handleZoomOut() {
-        updateScale(scale - ZOOM_STEP)
-    }
-
     function handleWheelZoom(event: WheelEvent<HTMLDivElement>) {
         if (!currentImage?.src) return
         event.preventDefault()
-        const delta = event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP
-        updateScale(scale + delta)
+        updateScale(scale + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))
     }
 
     function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -215,11 +235,11 @@ export default function EntryImageLightbox({
     }
 
     function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-        if (!isDragging) return
-        if (dragStateRef.current.pointerId !== event.pointerId) return
-        const nextX = dragStateRef.current.startOffsetX + (event.clientX - dragStateRef.current.startX)
-        const nextY = dragStateRef.current.startOffsetY + (event.clientY - dragStateRef.current.startY)
-        setOffset({x: nextX, y: nextY})
+        if (!isDragging || dragStateRef.current.pointerId !== event.pointerId) return
+        setOffset({
+            x: dragStateRef.current.startOffsetX + (event.clientX - dragStateRef.current.startX),
+            y: dragStateRef.current.startOffsetY + (event.clientY - dragStateRef.current.startY),
+        })
     }
 
     function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
@@ -231,59 +251,59 @@ export default function EntryImageLightbox({
         }
     }
 
-    function renderThumbItems(isWrapMode = false) {
+    function renderImageThumb(image: LightboxImage, index: number) {
+        const active = index === safeIndex
+        const label = `${image.alt || infoTitle}，第 ${index + 1} 张${image.is_cover ? '，主图' : ''}`
         return (
-            <div className={`entry-editor-lightbox__thumbs${isWrapMode ? ' entry-editor-lightbox__thumbs--wrap' : ''}`}>
-                {images.map((image, index) => (
-                    <button
-                        key={`${image.path ?? image.url ?? index}-${index}`}
-                        type="button"
-                        className={`entry-editor-lightbox__thumb${index === currentIndex ? ' active' : ''}`}
-                        ref={isWrapMode ? undefined : (element) => {
-                            previewThumbRefs.current[index] = element
-                        }}
-                        onClick={() => {
-                            onIndexChange(index)
-                            if (viewMode === 'gallery') setViewMode('preview')
-                        }}
-                    >
-                        <div className="entry-editor-lightbox__thumb-media">
-                            {image.src ? (
-                                <img
-                                    src={image.src}
-                                    alt={image.alt || `${infoTitle} ${index + 1}`}
-                                    loading="lazy"
-                                    decoding="async"
-                                />
-                            ) : (
-                                <span className="entry-editor-lightbox__thumb-empty">{index + 1}</span>
-                            )}
-                        </div>
-                    </button>
-                ))}
-                <button
-                    type="button"
-                    className="entry-editor-lightbox__thumb entry-editor-lightbox__thumb--add"
-                    onClick={() => onAddImage?.()}
-                    disabled={!onAddImage}
-                >
-                    <div className="entry-editor-lightbox__thumb-media entry-editor-lightbox__thumb-media--add">
-                        <span className="entry-editor-lightbox__thumb-plus">+</span>
-                        <span className="entry-editor-lightbox__thumb-add-label">添加图片</span>
-                    </div>
-                </button>
-            </div>
+            <button
+                key={`${image.path ?? image.url ?? index}-${index}`}
+                type="button"
+                className={`entry-editor-lightbox__thumb${active ? ' is-active' : ''}`}
+                ref={(element) => {
+                    previewThumbRefs.current[index] = element
+                }}
+                aria-current={active ? 'true' : undefined}
+                aria-label={label}
+                onClick={() => {
+                    selectImage(index)
+                    if (viewMode === 'gallery') setViewMode('preview')
+                }}
+            >
+                <span className="entry-editor-lightbox__thumb-media">
+                    {image.src ? (
+                        <img
+                            src={image.src}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    ) : (
+                        <span className="entry-editor-lightbox__thumb-empty">{index + 1}</span>
+                    )}
+                </span>
+            </button>
         )
     }
 
     function renderImageRail() {
         return (
             <RollingBox
-                className="entry-editor-lightbox__gallery"
+                className="entry-editor-lightbox__rail"
                 axis="x"
                 thumbSize="thin"
             >
-                {renderThumbItems()}
+                <div className="entry-editor-lightbox__thumbs">
+                    {images.map(renderImageThumb)}
+                    {onAddImage && (
+                        <button
+                            type="button"
+                            className="entry-editor-lightbox__thumb entry-editor-lightbox__thumb--add"
+                            onClick={onAddImage}
+                        >
+                            添加图片
+                        </button>
+                    )}
+                </div>
             </RollingBox>
         )
     }
@@ -291,116 +311,202 @@ export default function EntryImageLightbox({
     function renderGalleryGrid() {
         return (
             <div className="entry-editor-lightbox__gallery-grid">
-                {renderThumbItems(true)}
+                {images.map((image, index) => {
+                    const active = index === safeIndex
+                    return (
+                        <button
+                            key={`${image.path ?? image.url ?? index}-${index}`}
+                            type="button"
+                            className={`entry-editor-lightbox__gallery-card${active ? ' is-active' : ''}`}
+                            aria-current={active ? 'true' : undefined}
+                            onClick={() => {
+                                selectImage(index)
+                                setViewMode('preview')
+                            }}
+                        >
+                            <span className="entry-editor-lightbox__gallery-media">
+                                {image.src ? (
+                                    <img
+                                        src={image.src}
+                                        alt={image.alt || `${infoTitle} ${index + 1}`}
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
+                                ) : (
+                                    <span>图片路径不可预览</span>
+                                )}
+                            </span>
+                            <span className="entry-editor-lightbox__gallery-caption">
+                                <span>{index + 1} / {images.length}</span>
+                                {image.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
+                            </span>
+                        </button>
+                    )
+                })}
+                {onAddImage && (
+                    <button
+                        type="button"
+                        className="entry-editor-lightbox__gallery-card entry-editor-lightbox__gallery-card--add"
+                        onClick={onAddImage}
+                    >
+                        添加图片
+                    </button>
+                )}
             </div>
         )
     }
 
     return (
-        <FloatingPanel
+        <Overlay
             open={open}
             onClose={onClose}
-            title={`${infoTitle} 图片浏览`}
+            layerClassName="entry-editor-lightbox-layer"
             className="entry-editor-lightbox"
-            ariaLabel={`${infoTitle} 图片浏览`}
+            labelledBy={titleId}
         >
-            <div className="entry-editor-lightbox__dialog">
-                <div className="entry-editor-lightbox__toolbar">
-                    <div className="entry-editor-lightbox__meta">
-                        <span>{currentIndex + 1} / {images.length}</span>
+            <section className="entry-editor-lightbox__dialog">
+                <header className="entry-editor-lightbox__header">
+                    <div className="entry-editor-lightbox__identity">
+                        <h2 id={titleId}>{infoTitle} · 图片</h2>
+                        <span className="entry-editor-lightbox__count">
+                            {safeIndex + 1} / {images.length}
+                        </span>
                         {currentImage?.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
                     </div>
-                    <div className="entry-editor-lightbox__actions">
-                        <Button type="button"
-                            variant="outline"
+
+                    <div className="entry-editor-lightbox__view-switch" role="group" aria-label="浏览模式">
+                        <Button
+                            type="button"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => setViewMode((current) => current === 'preview' ? 'gallery' : 'preview')}
+                            aria-pressed={viewMode === 'preview'}
+                            onClick={() => setViewMode('preview')}
                         >
-                            {viewMode === 'preview' ? '缩略图' : '大图预览'}
+                            预览
                         </Button>
-                        <Button type="button"
-                            variant="outline"
+                        <Button
+                            type="button"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => onSetCover(currentIndex)}
+                            aria-pressed={viewMode === 'gallery'}
+                            onClick={() => setViewMode('gallery')}
                         >
-                            设为主图
+                            画廊
                         </Button>
+                    </div>
+
+                    <div className="entry-editor-lightbox__header-actions">
                         {onInsertMarkdown && (
-                            <Button type="button"
-                                variant="outline"
+                            <Button
+                                type="button"
                                 size="sm"
-                                onClick={() => onInsertMarkdown(currentIndex)}
+                                onClick={() => onInsertMarkdown(safeIndex)}
                             >
                                 插入正文
                             </Button>
                         )}
-                        <Button type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleZoomOut()}
-                            disabled={!currentImage?.src || scale <= MIN_SCALE}
-                        >
-                            缩小
-                        </Button>
-                        <Button type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateScale(MIN_SCALE)}
-                            disabled={!currentImage?.src || scale === MIN_SCALE}
-                        >
-                            100%
-                        </Button>
-                        <Button type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleZoomIn()}
-                            disabled={!currentImage?.src || scale >= MAX_SCALE}
-                        >
-                            放大
-                        </Button>
-                        <span>{Math.round(scale * 100)}%</span>
-                        <Button type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void handleOpenLocalPath()}
-                        >
-                            打开所在文件夹
-                        </Button>
-                        <Button type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void handleRemoveClick()}
-                        >
-                            移除
-                        </Button>
-                        <Button type="button"
-                            variant="outline"
+                        {showSetCoverAsPrimary && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => onSetCover?.(safeIndex)}
+                            >
+                                设为主图
+                            </Button>
+                        )}
+                        {hasMoreActions && (
+                            <details
+                                ref={moreDetailsRef}
+                                className="entry-editor-lightbox__more"
+                                onBlur={(event) => {
+                                    const nextTarget = event.relatedTarget
+                                    if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+                                        event.currentTarget.open = false
+                                    }
+                                }}
+                            >
+                                <summary>更多</summary>
+                                <div className="entry-editor-lightbox__more-menu" role="menu">
+                                    {canSetCover && onInsertMarkdown && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            block
+                                            role="menuitem"
+                                            onClick={() => {
+                                                closeMoreMenu()
+                                                onSetCover?.(safeIndex)
+                                            }}
+                                        >
+                                            设为主图
+                                        </Button>
+                                    )}
+                                    {currentImage?.path && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            block
+                                            role="menuitem"
+                                            onClick={() => void handleOpenLocalPath()}
+                                        >
+                                            打开所在文件夹
+                                        </Button>
+                                    )}
+                                    {onRemove && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            block
+                                            role="menuitem"
+                                            className="entry-editor-lightbox__danger-action"
+                                            onClick={() => void handleRemoveClick()}
+                                        >
+                                            移除图片
+                                        </Button>
+                                    )}
+                                </div>
+                            </details>
+                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
                             size="sm"
                             onClick={onClose}
                         >
                             关闭
                         </Button>
                     </div>
-                </div>
+                </header>
 
-                {viewMode === 'preview' ? (
-                    <>
-                        <div className="entry-editor-lightbox__main">
+                <main className="entry-editor-lightbox__stage">
+                    {viewMode === 'preview' ? (
+                        <>
+                            {images.length > 1 && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="entry-editor-lightbox__previous"
+                                    onClick={() => selectImage(safeIndex - 1)}
+                                >
+                                    上一张
+                                </Button>
+                            )}
+
                             {currentImage?.src ? (
                                 <div
-                                    className={`entry-editor-lightbox__zoom-surface${scale > MIN_SCALE ? ' entry-editor-lightbox__zoom-surface--zoomable' : ''}${isDragging ? ' entry-editor-lightbox__zoom-surface--dragging' : ''}`}
+                                    className={`entry-editor-lightbox__zoom-surface${scale > MIN_SCALE ? ' is-zoomable' : ''}${isDragging ? ' is-dragging' : ''}`}
+                                    tabIndex={0}
+                                    aria-label={`图片预览，第 ${safeIndex + 1} 张。方向键切换图片，加减号缩放，数字 0 恢复适应。`}
                                     onWheel={handleWheelZoom}
                                     onPointerDown={handlePointerDown}
                                     onPointerMove={handlePointerMove}
                                     onPointerUp={handlePointerUp}
                                     onPointerCancel={handlePointerUp}
-                                    onDoubleClick={() => {
-                                        if (scale > MIN_SCALE) {
-                                            updateScale(MIN_SCALE)
-                                        } else {
-                                            updateScale(2)
-                                        }
-                                    }}
+                                    onDoubleClick={() => updateScale(scale > MIN_SCALE ? MIN_SCALE : 2)}
                                 >
                                     <img
                                         src={currentImage.src}
@@ -416,15 +522,60 @@ export default function EntryImageLightbox({
                             ) : (
                                 <div className="entry-editor-lightbox__empty">图片路径不可预览</div>
                             )}
-                        </div>
-                        {renderImageRail()}
-                    </>
-                ) : (
-                    <div className="entry-editor-lightbox__gallery-view">
-                        {renderGalleryGrid()}
-                    </div>
-                )}
-            </div>
-        </FloatingPanel>
+
+                            {images.length > 1 && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="entry-editor-lightbox__next"
+                                    onClick={() => selectImage(safeIndex + 1)}
+                                >
+                                    下一张
+                                </Button>
+                            )}
+
+                            {currentImage?.src && (
+                                <div className="entry-editor-lightbox__zoom-controls" role="group" aria-label="缩放控制">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => updateScale(scale - ZOOM_STEP)}
+                                        disabled={scale <= MIN_SCALE}
+                                    >
+                                        缩小
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => updateScale(MIN_SCALE)}
+                                        aria-label={scale === MIN_SCALE ? '图片已适应窗口' : '恢复适应窗口'}
+                                    >
+                                        {scale === MIN_SCALE ? '适应' : `${Math.round(scale * 100)}%`}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => updateScale(scale + ZOOM_STEP)}
+                                        disabled={scale >= MAX_SCALE}
+                                    >
+                                        放大
+                                    </Button>
+                                </div>
+                            )}
+                        </>
+                    ) : renderGalleryGrid()}
+                </main>
+
+                {renderImageRail()}
+
+                <span className="entry-editor-lightbox__live" aria-live="polite">
+                    第 {safeIndex + 1} 张，共 {images.length} 张；缩放 {Math.round(scale * 100)}%
+                </span>
+            </section>
+        </Overlay>
     )
 }
