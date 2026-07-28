@@ -8,7 +8,8 @@ import {open_entry_image_path} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryImageLightbox.css'
 
-const MIN_SCALE = 1
+const MIN_SCALE = 0.8
+const FIT_SCALE = 1
 const MAX_SCALE = 5
 const ZOOM_STEP = 0.2
 
@@ -56,7 +57,7 @@ export default function EntryImageLightbox({
                                            }: EntryImageLightboxProps) {
     const {showAlert} = useAlert()
     const [viewMode, setViewMode] = useState<'preview' | 'gallery'>('preview')
-    const [scale, setScale] = useState(MIN_SCALE)
+    const [scale, setScale] = useState(FIT_SCALE)
     const [offset, setOffset] = useState({x: 0, y: 0})
     const [isDragging, setIsDragging] = useState(false)
     const previewThumbRefs = useRef<Record<number, HTMLButtonElement | null>>({})
@@ -73,7 +74,7 @@ export default function EntryImageLightbox({
     const currentImage = images[safeIndex]
 
     function resetPreviewTransform() {
-        setScale(MIN_SCALE)
+        setScale(FIT_SCALE)
         setOffset({x: 0, y: 0})
         setIsDragging(false)
         dragStateRef.current.pointerId = -1
@@ -82,7 +83,7 @@ export default function EntryImageLightbox({
     function updateScale(nextScale: number) {
         const safeScale = clampScale(nextScale)
         setScale(safeScale)
-        if (safeScale === MIN_SCALE) {
+        if (safeScale <= FIT_SCALE) {
             setOffset({x: 0, y: 0})
             setIsDragging(false)
             dragStateRef.current.pointerId = -1
@@ -156,7 +157,7 @@ export default function EntryImageLightbox({
 
             if (event.key === '0' || event.code === 'Numpad0') {
                 event.preventDefault()
-                setScale(MIN_SCALE)
+                setScale(FIT_SCALE)
                 setOffset({x: 0, y: 0})
                 setIsDragging(false)
                 dragStateRef.current.pointerId = -1
@@ -173,7 +174,7 @@ export default function EntryImageLightbox({
                 event.preventDefault()
                 setScale((current) => {
                     const nextScale = clampScale(current - ZOOM_STEP)
-                    if (nextScale === MIN_SCALE) {
+                    if (nextScale <= FIT_SCALE) {
                         setOffset({x: 0, y: 0})
                         setIsDragging(false)
                         dragStateRef.current.pointerId = -1
@@ -223,7 +224,7 @@ export default function EntryImageLightbox({
     }
 
     function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-        if (scale <= MIN_SCALE) return
+        if (scale <= FIT_SCALE) return
         dragStateRef.current.pointerId = event.pointerId
         dragStateRef.current.startX = event.clientX
         dragStateRef.current.startY = event.clientY
@@ -490,7 +491,7 @@ export default function EntryImageLightbox({
 
                             {currentImage?.src ? (
                                 <div
-                                    className={`entry-editor-lightbox__zoom-surface${scale > MIN_SCALE ? ' is-zoomable' : ''}${isDragging ? ' is-dragging' : ''}`}
+                                    className={`entry-editor-lightbox__zoom-surface${scale > FIT_SCALE ? ' is-zoomable' : ''}${isDragging ? ' is-dragging' : ''}`}
                                     tabIndex={0}
                                     aria-label={`图片预览，第 ${safeIndex + 1} 张。方向键切换图片，加减号缩放，数字 0 恢复适应。`}
                                     onWheel={handleWheelZoom}
@@ -498,7 +499,7 @@ export default function EntryImageLightbox({
                                     onPointerMove={handlePointerMove}
                                     onPointerUp={handlePointerUp}
                                     onPointerCancel={handlePointerUp}
-                                    onDoubleClick={() => updateScale(scale > MIN_SCALE ? MIN_SCALE : 2)}
+                                    onDoubleClick={() => updateScale(scale > FIT_SCALE ? FIT_SCALE : 2)}
                                 >
                                     <img
                                         src={currentImage.src}
@@ -542,10 +543,10 @@ export default function EntryImageLightbox({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => updateScale(MIN_SCALE)}
-                                        aria-label={scale === MIN_SCALE ? '图片已适应窗口' : '恢复适应窗口'}
+                                        onClick={() => updateScale(FIT_SCALE)}
+                                        aria-label={scale === FIT_SCALE ? '图片已适应窗口' : '恢复适应窗口'}
                                     >
-                                        {scale === MIN_SCALE ? '适应' : `${Math.round(scale * 100)}%`}
+                                        {scale === FIT_SCALE ? '适应' : `${Math.round(scale * 100)}%`}
                                     </Button>
                                     <Button
                                         type="button"
