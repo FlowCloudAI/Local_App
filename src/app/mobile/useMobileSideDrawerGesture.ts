@@ -29,6 +29,15 @@ interface UseMobileSideDrawerGestureOptions {
      * 适合没有页面返回语义的嵌入场景。
      */
     onEdgeBackGesture?: () => void
+    /**
+     * 每帧求值的让路谓词：返回 true 时本手势立即放弃当前这一划。
+     *
+     * 与 `data-mobile-side-drawer-gesture-ignore` 的区别是**时机**：那个标记只在 touchstart
+     * 时看一眼，而抽屉里的分类树是「长按 430ms 才进入拖拽」的，按下那一刻还看不出来。
+     * 实测（2026-07-27 真机）不逐帧检查的话，节点拖拽中手指往左飘就会把抽屉一起关掉，
+     * 树跟着卸载、拖拽中断。
+     */
+    shouldSuppress?: () => boolean
 }
 
 interface MobileSideDrawerDragRuntime {
@@ -167,6 +176,7 @@ export function useMobileSideDrawerGesture({
     logLabel = '[移动端侧边抽屉手势]',
     allowTextEditingTargetGestures = false,
     onEdgeBackGesture,
+    shouldSuppress,
 }: UseMobileSideDrawerGestureOptions): MobileSideDrawerGesture {
     // 抽屉不在的页面（词条详情、世界观列表、各管理页、设置…）仍然要能边缘右划返回，
     // 所以整个手势的开关是「有抽屉」或「有返回」，不能只看 enabled。
@@ -177,6 +187,13 @@ export function useMobileSideDrawerGesture({
     const [offset, setOffset] = useState<number | null>(null)
     const [dragging, setDragging] = useState(false)
     const dragRuntimeRef = useRef<MobileSideDrawerDragRuntime | null>(null)
+    // ref 包一层，避免调用方为谓词套 useCallback，也让它在手势回调里始终读到最新实现。
+    // 同步放在 effect 里而不是渲染期：渲染期写 ref 会被 react-hooks 规则拦下，
+    // 而这个谓词只在手势回调（渲染之后）里读，晚一拍赋值没有影响。
+    const shouldSuppressRef = useRef(shouldSuppress)
+    useEffect(() => {
+        shouldSuppressRef.current = shouldSuppress
+    }, [shouldSuppress])
     const suppressClickRef = useRef(false)
     const suppressClickTimerRef = useRef<number | null>(null)
 
@@ -237,6 +254,18 @@ export function useMobileSideDrawerGesture({
         if (!gestureEnabled) return
 
         const pointerId = getPointerId(event)
+
+        // 逐帧让路：分类树的长按拖拽在按下 430ms 后才成立，光靠 first 阶段的判定拦不住。
+        if (shouldSuppressRef.current?.()) {
+            if (dragRuntimeRef.current) {
+                logger.info(`${logLabel} 让路`, {pointerId, reason: '上层手势已接管（如分类树拖拽）'})
+                resetDrag()
+            }
+            dragRuntimeRef.current = null
+            cancel()
+            return
+        }
+
         if (first) {
             const edgeBackCandidate = Boolean(
                 !open

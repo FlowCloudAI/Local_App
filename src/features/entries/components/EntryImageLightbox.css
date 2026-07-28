@@ -180,7 +180,6 @@
     display: grid;
     place-items: center;
     overflow: hidden;
-    background: var(--fc-color-bg);
 }
 
 .entry-editor-lightbox__zoom-surface {

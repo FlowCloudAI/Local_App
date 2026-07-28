@@ -51,6 +51,11 @@ interface Props {
     onChanged?: () => void | Promise<void>
     /** 每一级分类的缩进距离，单位为像素。 */
     indentSize?: number
+    /**
+     * 分类拖拽开始/结束。宿主据此让抽屉的横滑手势在拖拽期间让路——
+     * 否则拖节点时手指往左飘会把抽屉一起关掉，树跟着卸载、拖拽中断。
+     */
+    onDragStateChange?: (dragging: boolean) => void
 }
 
 export default function MobileCategoryDrawer({
@@ -61,6 +66,7 @@ export default function MobileCategoryDrawer({
     onSelect,
     onChanged,
     indentSize = 16,
+    onDragStateChange,
 }: Props) {
     const {showAlert} = useAlert()
     const [searchText, setSearchText] = useState('')
@@ -472,6 +478,7 @@ export default function MobileCategoryDrawer({
                     expandedKeys={expandedKeys}
                     onExpandedKeysChange={handleExpandedKeysChange}
                     onMove={handleTreeMove}
+                    onDragStateChange={onDragStateChange}
                     canDrag={canDragCategory}
                     getNodeActions={getCategoryActions}
                     actionDisplayMode="inline"

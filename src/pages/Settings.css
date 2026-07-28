@@ -117,7 +117,6 @@
   border-radius: var(--fc-radius-xl);
   background: var(--fc-color-bg);
   box-sizing: border-box;
-  margin-right: var(--fc-space-lg);
 }
 
 .settings-scroll-area > .fc-roll__content {

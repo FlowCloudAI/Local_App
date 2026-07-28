@@ -133,6 +133,11 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             }
         })()
     }, [activeStack, activeTab, runLeaveGuard, showAlert])
+    /*
+     * 分类树是否正在拖拽。用 ref 不用 state：它只在手势回调里被读，
+     * 走 state 会在每次拖拽起止时重渲染整个移动端外壳，白白掉帧。
+     */
+    const categoryDragActiveRef = useRef(false)
     const {
         open: sideDrawerOpen,
         dragging: sideDrawerDragging,
@@ -145,6 +150,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         width: categoryDrawerWidth,
         allowTextEditingTargetGestures: ideaDrawerEnabled,
         onEdgeBackGesture: runBackNavigation,
+        // 分类树长按拖拽进行中：抽屉横滑必须整划让路，否则拖节点时往左飘会把抽屉关掉。
+        shouldSuppress: () => categoryDragActiveRef.current,
     })
     const sideDrawerProgress = categoryDrawerWidth > 0
         ? Math.min(1, Math.max(0, sideDrawerSurfaceOffset / categoryDrawerWidth))
@@ -374,6 +381,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 selected={categoryDrawerSelection}
                                 onSelect={handleSelectDrawerCategory}
                                 onChanged={refreshCategoryDrawer}
+                                onDragStateChange={(dragging) => { categoryDragActiveRef.current = dragging }}
                             />
                         ) : aiConversationDrawerEnabled ? (
                             <div id="mobile-ai-conversation-drawer-root" className="mobile-app-ai-drawer-root"/>
