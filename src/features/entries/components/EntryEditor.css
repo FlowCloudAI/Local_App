@@ -518,6 +518,16 @@
     scrollbar-gutter: stable;
 }
 
+.entry-editor-tags-grid.entry-editor-tags-grid--browse {
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 18rem));
+    justify-content: start;
+    gap: var(--fc-space-sm);
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+    scrollbar-gutter: auto;
+}
+
 .entry-editor-tag-card {
     display: flex;
     flex-direction: column;

@@ -52,7 +52,9 @@ export default function HighLightTagItem({
     const rangeText = getRangeText(schema)
 
     return (
-        <div className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}`}>
+        <div
+            className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}${implanted ? ' is-implanted' : ''}`}
+        >
             <div className="highlight-tag-item__header">
                 <div className="highlight-tag-item__title-group">
                     <span className="highlight-tag-item__title">{schema.name}</span>

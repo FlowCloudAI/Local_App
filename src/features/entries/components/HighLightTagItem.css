@@ -12,6 +12,35 @@
     border: 1px solid color-mix(in srgb, var(--fc-color-primary) 18%, var(--fc-color-border));
 }
 
+.highlight-tag-item.is-show {
+    gap: var(--fc-space-xs);
+    min-width: 0;
+    padding: var(--fc-space-md);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
+    background: transparent;
+}
+
+.highlight-tag-item.is-show.is-implanted {
+    border-inline-start: var(--fc-space-xs) solid var(--fc-color-primary);
+}
+
+.highlight-tag-item.is-show .highlight-tag-item__title {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    font-weight: var(--fc-font-weight-normal);
+}
+
+.highlight-tag-item.is-show .highlight-tag-item__value {
+    min-height: 0;
+    display: block;
+    padding: 0;
+    border-radius: 0;
+    font-size: var(--fc-font-size-md);
+    line-height: var(--fc-line-height-normal);
+    overflow-wrap: anywhere;
+}
+
 .highlight-tag-item__header {
     display: flex;
     justify-content: space-between;
