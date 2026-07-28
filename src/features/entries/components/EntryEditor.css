@@ -308,22 +308,6 @@
     white-space: nowrap;
 }
 
-.entry-editor-auxiliary-count {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fc-space-xs);
-    padding-top: var(--fc-space-lg);
-    border-top: 1px solid var(--fc-color-border);
-    color: var(--fc-color-text-secondary);
-    font-size: var(--fc-font-size-caption, 0.75rem);
-}
-
-.entry-editor-auxiliary-count strong {
-    color: var(--fc-color-text);
-    font-size: var(--fc-font-size-lg);
-    line-height: 1;
-}
-
 .entry-editor-meta-panel__section {
     display: flex;
     flex-direction: column;
@@ -484,6 +468,16 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.7rem;
+}
+
+.entry-editor-type-section.is-browse {
+    flex-flow: row wrap;
+    align-items: center;
+    gap: var(--fc-space-md);
+}
+
+.entry-editor-type-section.is-browse > .entry-editor-field-label-row {
+    flex: 0 0 auto;
 }
 
 .entry-editor-more-type {
@@ -659,14 +653,6 @@
     min-width: auto;
 }
 
-.entry-editor-workspace__desc,
-.entry-editor-workspace__meta {
-    align-self: flex-end;
-    margin: 0;
-    font-size: var(--fc-font-size-caption, 0.75rem);
-    color: var(--fc-color-text-secondary);
-}
-
 .entry-editor-workspace__body {
     position: relative;
     flex: 1;
@@ -705,7 +691,7 @@
 
     .entry-editor-auxiliary-panel {
         display: grid;
-        grid-template-columns: minmax(13rem, 1.15fr) minmax(17rem, 1.3fr) minmax(10rem, 0.65fr);
+        grid-template-columns: minmax(13rem, 1fr) minmax(17rem, 1fr);
         gap: 1.1rem 1.75rem;
         align-items: start;
         padding-top: var(--fc-space-lg);
@@ -716,14 +702,6 @@
 
     .entry-editor-auxiliary-title {
         grid-column: 1 / -1;
-    }
-
-    .entry-editor-auxiliary-count {
-        min-height: 100%;
-        padding-top: 0;
-        padding-left: var(--fc-space-lg);
-        border-top: 0;
-        border-left: 1px solid var(--fc-color-border);
     }
 
     .entry-editor-title-input {
@@ -779,14 +757,6 @@
 
     .entry-editor-auxiliary-title {
         grid-column: auto;
-    }
-
-    .entry-editor-auxiliary-count {
-        min-height: 0;
-        padding-top: var(--fc-space-lg);
-        padding-left: 0;
-        border-top: 1px solid var(--fc-color-border);
-        border-left: 0;
     }
 
     .entry-editor-field-label-row {

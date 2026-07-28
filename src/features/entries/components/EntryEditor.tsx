@@ -1235,11 +1235,6 @@ export default function EntryEditor({
                                     )}
                                 </div>
                             </div>
-                            {editorMode === 'browse' && (
-                                <span className="entry-editor-workspace__meta">
-                                    单击双链查看预览，双击或按钮可在新页签打开。
-                                </span>
-                            )}
                         </div>
 
                         <div className="entry-editor-workspace__body">
@@ -1252,8 +1247,6 @@ export default function EntryEditor({
                                     projectName,
                                     categories,
                                     entryTypes,
-                                    entryCount: projectEntries.length,
-                                    entryCountLoading: projectDataLoading,
                                 }}
                                 tagUi={{
                                     localTagSchemas: entryTags.localTagSchemas,

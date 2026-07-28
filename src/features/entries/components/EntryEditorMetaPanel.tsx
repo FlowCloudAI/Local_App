@@ -41,8 +41,6 @@ interface EntryEditorMetaPanelProps {
         projectName: string
         categories: Category[]
         entryTypes: EntryTypeView[]
-        entryCount: number
-        entryCountLoading: boolean
     }
     tagUi: {
         localTagSchemas: TagSchema[]
@@ -80,7 +78,7 @@ export default function EntryEditorMetaPanel({
                                                  actions,
                                              }: EntryEditorMetaPanelProps) {
     const {editorMode, loading, saving, generatingSummary} = status
-    const {projectName, categories, entryTypes, entryCount, entryCountLoading} = projectContext
+    const {projectName, categories, entryTypes} = projectContext
     const {
         localTagSchemas,
         visibleTagSchemas,
@@ -243,7 +241,9 @@ export default function EntryEditorMetaPanel({
                     )}
                 </div>
 
-                <div className="entry-editor-meta-panel__section entry-editor-type-section">
+                <div
+                    className={`entry-editor-meta-panel__section entry-editor-type-section${isBrowseMode ? ' is-browse' : ''}`}
+                >
                     <div className="entry-editor-field-label-row">
                         <span className="entry-editor-field-label">词条类型</span>
                         {!isBrowseMode && (
@@ -372,16 +372,6 @@ export default function EntryEditorMetaPanel({
                             <dd>{entryUpdatedAtText}</dd>
                         </div>
                     </dl>
-                </div>
-                <div className="entry-editor-auxiliary-count" aria-live="polite">
-                    {entryCountLoading ? (
-                        <span>正在索引项目词条…</span>
-                    ) : (
-                        <>
-                            <strong>{entryCount}</strong>
-                            <span>个词条可用于正文双链联想</span>
-                        </>
-                    )}
                 </div>
             </aside>
 
