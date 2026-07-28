@@ -186,6 +186,7 @@ export function useHelpPanel({
                 <HelpArticle
                     topic={activeTopic}
                     bodyRef={articleBodyRef}
+                    panelMode={resolvedPanelMode}
                     onSelectHome={handleSelectHome}
                     onSelectSection={handleSelectSection}
                 />

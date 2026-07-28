@@ -1,6 +1,6 @@
 import type {RefObject} from 'react'
 import {Button} from 'flowcloudai-ui'
-import type {HelpFigure, HelpModule, HelpTopic, HelpTopicKey} from '../../../shared/help/helpCatalog'
+import type {HelpModule, HelpTopic, HelpTopicKey} from '../../../shared/help/helpCatalog'
 import './HelpModuleHome.css'
 
 interface HelpModuleHomeProps {
@@ -11,14 +11,6 @@ interface HelpModuleHomeProps {
     onSelectTopic: (topicKey: HelpTopicKey, sectionId?: string) => void
 }
 
-function findLeadFigure(topics: HelpTopic[]): HelpFigure | null {
-    for (const topic of topics) {
-        const section = topic.sections.find(item => item.figure)
-        if (section?.figure) return section.figure
-    }
-    return null
-}
-
 export default function HelpModuleHome({
     module,
     topics,
@@ -26,7 +18,6 @@ export default function HelpModuleHome({
     onSelectHome,
     onSelectTopic,
 }: HelpModuleHomeProps) {
-    const leadFigure = findLeadFigure(topics)
     const sectionCount = topics.reduce((total, topic) => total + topic.sections.length, 0)
 
     return (
@@ -42,9 +33,9 @@ export default function HelpModuleHome({
                     <svg viewBox="0 0 16 16" aria-hidden="true">
                         <path d="M9.5 3.5 5 8l4.5 4.5"/>
                     </svg>
-                    返回首页
+                    返回帮助首页
                 </Button>
-                <header className={`help-home__header${leadFigure ? ' has-figure' : ''}`}>
+                <header className="help-home__header">
                     <div className="help-home__intro">
                         <div className="help-home__crumb">帮助中心 / {module.label}</div>
                         <h2>{module.label}</h2>
@@ -54,34 +45,10 @@ export default function HelpModuleHome({
                             <span>{sectionCount} 个小节</span>
                         </div>
                     </div>
-                    {leadFigure ? (
-                        <figure className="help-home__figure">
-                            <img src={leadFigure.src} alt={leadFigure.alt} loading="lazy"/>
-                            <figcaption>{leadFigure.caption}</figcaption>
-                        </figure>
-                    ) : null}
                 </header>
 
                 <section className="help-home__section" aria-labelledby="help-home-recommended">
-                    <h3 id="help-home-recommended">推荐阅读</h3>
-                    <div className="help-home__featured-list">
-                        {topics.map(topic => (
-                            <button
-                                key={topic.key}
-                                type="button"
-                                className="help-home__featured-item"
-                                onClick={() => onSelectTopic(topic.key)}
-                            >
-                                <span>{topic.category} / {topic.readingTime}</span>
-                                <strong>{topic.label}</strong>
-                                <em>{topic.summary}</em>
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="help-home__section" aria-labelledby="help-home-topics">
-                    <h3 id="help-home-topics">本模块内容</h3>
+                    <h3 id="help-home-recommended">本分类文档</h3>
                     <div className="help-home__topic-list">
                         {topics.map(topic => (
                             <section className="help-home__topic-row" key={topic.key}>

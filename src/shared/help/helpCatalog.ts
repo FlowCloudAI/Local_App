@@ -66,18 +66,18 @@ export interface HelpTopicGroup {
 }
 
 export const HELP_MODULES: HelpModule[] = [
-    {key: 'basics', label: '基础操作', description: '从界面结构到日常工作流。'},
-    {key: 'knowledge', label: '资料管理', description: '词条、分类、关系和时间线。'},
-    {key: 'ai', label: 'AI 与插件', description: '对话辅助、模型插件和密钥配置。'},
+    {key: 'basics', label: '开始创作', description: '创建世界并熟悉日常工作区。'},
+    {key: 'knowledge', label: '管理资料', description: '组织词条、分类、关系和时间。'},
+    {key: 'ai', label: '使用 AI 与插件', description: '使用创作辅助并完成插件配置。'},
     {key: 'visualization', label: '地图与可视化', description: '地图、形状和地理复核。'},
-    {key: 'safety', label: '版本与排查', description: '历史版本、分支路线和常见问题。'},
+    {key: 'safety', label: '恢复与排查', description: '找回历史版本并处理常见问题。'},
 ]
 
 export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'getting-started',
         moduleKey: 'basics',
-        label: '新手指南',
+        label: '创建第一个世界',
         summary: '从创建世界观到写下第一批词条，建立一个可持续扩展的创作起点。',
         category: '入门',
         readingTime: '约 3 分钟',
@@ -111,7 +111,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'workspace',
         moduleKey: 'basics',
-        label: '工作区结构',
+        label: '熟悉工作区',
         summary: '理解主工作区、右侧 Dock 工具和底部设置入口之间的关系。',
         category: '界面',
         readingTime: '约 2 分钟',
@@ -140,7 +140,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'entries',
         moduleKey: 'knowledge',
-        label: '词条与分类',
+        label: '创建并整理词条',
         summary: '用分类、标签、正文和链接管理角色、地点、组织与事件。',
         category: '资料',
         readingTime: '约 4 分钟',
@@ -174,7 +174,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'relations-timeline',
         moduleKey: 'knowledge',
-        label: '关系图与时间线',
+        label: '检查关系与时间顺序',
         summary: '通过关系图检查连接，通过时间线整理事件顺序。',
         category: '分析',
         readingTime: '约 3 分钟',
@@ -203,7 +203,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'maps',
         moduleKey: 'visualization',
-        label: '地图与形状编辑',
+        label: '编辑地图与形状',
         summary: '维护世界地图、区域边界和地点语义，服务地理叙事。',
         category: '可视化',
         readingTime: '约 3 分钟',
@@ -237,7 +237,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'ai-guide',
         moduleKey: 'ai',
-        label: 'AI 功能',
+        label: '使用 AI 辅助创作',
         summary: '使用对话、角色聊天、总结和矛盾检测来辅助创作。',
         category: 'AI',
         readingTime: '约 4 分钟',
@@ -271,7 +271,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'plugins',
         moduleKey: 'ai',
-        label: '插件与密钥',
+        label: '配置插件与密钥',
                 summary: '管理模型插件、访问密钥和本地能力扩展。',
         category: '设置',
         readingTime: '约 3 分钟',
@@ -305,7 +305,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'snapshots',
         moduleKey: 'safety',
-        label: '历史版本',
+        label: '恢复历史版本',
         summary: '用保存版本和分支路线保护世界观数据。',
         category: '安全',
         readingTime: '约 3 分钟',
@@ -334,7 +334,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     {
         key: 'troubleshooting',
         moduleKey: 'safety',
-        label: '常见问题',
+        label: '排查常见问题',
         summary: '遇到插件、数据、界面和 AI 调用问题时的排查顺序。',
         category: '排查',
         readingTime: '约 3 分钟',

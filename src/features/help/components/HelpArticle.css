@@ -6,13 +6,13 @@
 }
 
 .help-doc {
-    width: min(100%, 58rem);
+    width: min(100%, 48rem);
     margin: 0 auto;
     color: var(--fc-color-text);
 }
 
 .help-doc__header {
-    padding: var(--fc-space-xl) 0 var(--fc-space-lg);
+    padding: var(--fc-space-sm) 0 var(--fc-space-lg);
     border-bottom: 1px solid var(--fc-color-border);
 }
 
@@ -32,7 +32,7 @@
 
 .help-doc__header p {
     max-width: 44rem;
-    margin: var(--fc-space-md) 0 0;
+    margin: var(--fc-space-sm) 0 0;
     color: var(--fc-color-text-secondary);
     font-size: var(--fc-font-size-md);
     line-height: var(--fc-line-height-normal);
@@ -42,7 +42,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--fc-space-sm);
-    margin-top: var(--fc-space-md);
+    margin-top: var(--fc-space-sm);
 }
 
 .help-doc__meta span {
@@ -137,6 +137,10 @@
     line-height: var(--fc-line-height-tight);
 }
 
+.help-doc__toc summary {
+    cursor: pointer;
+}
+
 .help-doc__markdown.wmde-markdown {
     margin-top: var(--fc-space-sm);
     background: transparent;
@@ -164,15 +168,13 @@
 
 .help-doc__markdown.wmde-markdown img {
     display: block;
-    width: 100%;
+    width: min(100%, 36rem);
     height: auto;
-    max-height: 14rem;
-    object-fit: cover;
     margin: var(--fc-space-md) 0 0;
     overflow: hidden;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
-    background: var(--fc-color-bg);
+    background: var(--fc-color-bg-secondary);
 }
 
 .help-doc__markdown.wmde-markdown p:has(> img) {
@@ -234,10 +236,14 @@
 }
 
 .help-main--floating .help-doc__toc-title {
-    margin-bottom: var(--fc-space-sm);
+    margin-bottom: 0;
     color: var(--fc-color-text);
     font-size: var(--fc-font-size-sm);
     font-weight: var(--fc-font-weight-normal, 400);
+}
+
+.help-main--floating .help-doc__toc[open] .help-doc__toc-title {
+    margin-bottom: var(--fc-space-sm);
 }
 
 .help-main--floating .help-doc__toc-list {
@@ -267,8 +273,8 @@
 
 .help-main--fullscreen .help-doc {
     display: grid;
-    width: min(100%, 76rem);
-    grid-template-columns: minmax(0, 58rem) minmax(12rem, 15rem);
+    width: min(100%, 66rem);
+    grid-template-columns: minmax(0, 48rem) minmax(12rem, 14rem);
     column-gap: var(--fc-space-2xl);
     align-items: start;
 }
@@ -278,6 +284,10 @@
 .help-main--fullscreen .help-doc__sections,
 .help-main--fullscreen .help-doc__tips {
     grid-column: 1;
+}
+
+.help-main--fullscreen .help-content-home-button {
+    justify-self: start;
 }
 
 .help-main--fullscreen .help-doc__toc {
@@ -346,7 +356,7 @@
 @media (max-width: 960px) {
     .help-main--fullscreen .help-doc {
         display: block;
-        width: min(100%, 58rem);
+        width: min(100%, 48rem);
     }
 
     .help-main--fullscreen .help-doc__toc {
