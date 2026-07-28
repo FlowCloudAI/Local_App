@@ -574,7 +574,7 @@ export default function DockableSidePanel({
                 left: fullscreenRect.left,
                 width: fullscreenRect.width,
                 height: fullscreenRect.height,
-                zIndex: 1000,
+                zIndex: 'var(--fc-z-sticky)',
                 transform: fullscreenTransform,
                 transformOrigin: 'top left',
             }
