@@ -85,7 +85,6 @@
     box-sizing: border-box;
     border: var(--dock-panel-owned-border);
     border-radius: var(--dock-panel-owned-radius);
-    transition: opacity 0.15s ease, padding-left 0.15s ease;
 }
 
 .dockable-side-panel--fullscreen .dockable-side-panel__body {
@@ -102,7 +101,7 @@
     flex-shrink: 0;
     min-height: 0;
     overflow: hidden;
-    transition: width 0.18s ease, opacity 0.15s ease;
+    transition: width 0.18s ease;
 }
 
 .dockable-side-panel--fullscreen.is-dragging .dockable-side-panel__side-stack {
@@ -111,14 +110,12 @@
 
 .dockable-side-panel--fullscreen.is-dragging.is-fullscreen-side-collapse-preview .dockable-side-panel__side-stack,
 .dockable-side-panel--fullscreen.is-dragging.is-fullscreen-side-collapse-restoring .dockable-side-panel__side-stack {
-    transition: width 0.14s ease, opacity 0.15s ease;
+    transition: width 0.14s ease;
 }
 
 .dockable-side-panel--fullscreen.is-fullscreen-side-collapsed .dockable-side-panel__side-stack,
 .dockable-side-panel--fullscreen.is-fullscreen-side-collapse-preview .dockable-side-panel__side-stack {
     width: 0;
-    opacity: 0;
-    pointer-events: none;
 }
 
 .dockable-side-panel--fullscreen .dock-panel-side,
@@ -156,21 +153,6 @@
 
 .dockable-side-panel--floating .dockable-side-panel__body {
     padding-left: 0;
-}
-
-.dockable-side-panel--floating.is-collapsed .dockable-side-panel__body,
-.dockable-side-panel--floating.is-collapse-preview .dockable-side-panel__body {
-    padding-left: 0;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.dockable-side-panel--floating.is-dragging .dockable-side-panel__body {
-    transition: none;
-}
-
-.dockable-side-panel--floating.is-dragging.is-collapse-restoring .dockable-side-panel__body {
-    transition: opacity 0.15s ease, padding-left 0.15s ease;
 }
 
 .dockable-side-panel__resize-handle {
