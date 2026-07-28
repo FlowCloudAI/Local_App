@@ -2,10 +2,10 @@
  * 词条图片浏览器：统一桌面端与移动端的预览、画廊、缩放和图片管理入口。
  * 图片数据仍由词条编辑器持有，本组件只负责当前选择与交互呈现。
  */
-import {type PointerEvent, useEffect, useId, useRef, useState, type WheelEvent} from 'react'
+import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'react'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {open_entry_image_path} from '../../../api'
-import {Overlay} from '../../../shared/ui/overlay'
+import {FloatingPanel} from '../../../shared/ui/overlay'
 import './EntryImageLightbox.css'
 
 const MIN_SCALE = 1
@@ -55,7 +55,6 @@ export default function EntryImageLightbox({
                                                onInsertMarkdown,
                                            }: EntryImageLightboxProps) {
     const {showAlert} = useAlert()
-    const titleId = useId()
     const [viewMode, setViewMode] = useState<'preview' | 'gallery'>('preview')
     const [scale, setScale] = useState(MIN_SCALE)
     const [offset, setOffset] = useState({x: 0, y: 0})
@@ -357,23 +356,24 @@ export default function EntryImageLightbox({
     }
 
     return (
-        <Overlay
+        <FloatingPanel
             open={open}
             onClose={onClose}
             layerClassName="entry-editor-lightbox-layer"
             className="entry-editor-lightbox"
-            labelledBy={titleId}
+            closeLabel="关闭图片浏览"
+            title={(
+                <div className="entry-editor-lightbox__identity">
+                    <span className="entry-editor-lightbox__identity-title">{infoTitle} · 图片</span>
+                    <span className="entry-editor-lightbox__count">
+                        {safeIndex + 1} / {images.length}
+                    </span>
+                    {currentImage?.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
+                </div>
+            )}
         >
             <section className="entry-editor-lightbox__dialog">
-                <header className="entry-editor-lightbox__header">
-                    <div className="entry-editor-lightbox__identity">
-                        <h2 id={titleId}>{infoTitle} · 图片</h2>
-                        <span className="entry-editor-lightbox__count">
-                            {safeIndex + 1} / {images.length}
-                        </span>
-                        {currentImage?.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
-                    </div>
-
+                <div className="entry-editor-lightbox__toolbar">
                     <div className="entry-editor-lightbox__view-switch" role="group" aria-label="浏览模式">
                         <Button
                             type="button"
@@ -470,16 +470,8 @@ export default function EntryImageLightbox({
                                 </div>
                             </details>
                         )}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={onClose}
-                        >
-                            关闭
-                        </Button>
                     </div>
-                </header>
+                </div>
 
                 <main className="entry-editor-lightbox__stage">
                     {viewMode === 'preview' ? (
@@ -576,6 +568,6 @@ export default function EntryImageLightbox({
                     第 {safeIndex + 1} 张，共 {images.length} 张；缩放 {Math.round(scale * 100)}%
                 </span>
             </section>
-        </Overlay>
+        </FloatingPanel>
     )
 }

@@ -6,6 +6,8 @@ export interface FloatingPanelProps {
     open: boolean
     onClose?: () => void
     dismissible?: boolean
+    /** 浮层背板附加类名，用于全屏等页面级布局。 */
+    layerClassName?: string
     className?: string
     title?: ReactNode
     ariaLabel?: string
