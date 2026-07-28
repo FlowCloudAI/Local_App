@@ -16,10 +16,7 @@
     overflow: hidden;
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-xl);
-    background: var(--fc-color-bg-elevated);
     box-shadow: var(--fc-shadow-lg);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
 }
 
 .entry-editor-lightbox > .fc-floating-panel__header {
@@ -39,7 +36,6 @@
     min-height: 0;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
-    background: var(--fc-color-bg-elevated);
 }
 
 .entry-editor-lightbox__toolbar {
@@ -339,7 +335,6 @@
     min-height: 0;
     padding: var(--fc-space-sm) var(--fc-space-lg);
     border-top: 1px solid var(--fc-color-border);
-    background: var(--fc-color-bg-elevated);
     box-sizing: border-box;
 }
 
