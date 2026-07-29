@@ -532,7 +532,7 @@
   min-width: 10rem;
 }
 
-.settings-llm-compact-options {
+.settings-section > .settings-field + .settings-row {
   margin-top: var(--fc-space-md);
 }
 
