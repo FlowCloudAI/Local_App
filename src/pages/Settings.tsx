@@ -1944,7 +1944,7 @@ export default function Settings({
                                         )}
                                     </div>
                                 </div>
-                                <div className="settings-row settings-row--compact">
+                                <div className="settings-row">
                                     <div className="settings-field">
                                         <label className="settings-label-wide">自动备份</label>
                                         <Input
@@ -2453,7 +2453,7 @@ export default function Settings({
                                     </span>
                                 </div>
                                 {settings.llm.auto_compact_enabled && (
-                                    <div className="settings-row settings-row--compact settings-llm-compact-options">
+                                    <div className="settings-row settings-llm-compact-options">
                                         <div className="settings-field">
                                             <label className="settings-label-wide">压缩阈值</label>
                                             <div className="settings-range-control">
@@ -2499,7 +2499,7 @@ export default function Settings({
                                 )}
                                 <div className="settings-row">
                                     <div className="settings-field">
-                                        <label className="settings-label">搜索引擎</label>
+                                        <label className="settings-label-wide">搜索引擎</label>
                                         <Select
                                             options={[
                                                 {value: 'bing', label: '必应 (Bing)'},

@@ -175,10 +175,6 @@
   align-items: start;
 }
 
-.settings-row--compact {
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-}
-
 .settings-field {
   display: flex;
   align-items: center;
@@ -187,7 +183,7 @@
   min-width: 0;
 }
 
-.settings-section .settings-field + .settings-field {
+.settings-section > .settings-field + .settings-field {
   margin-top: 0.85rem;
 }
 
@@ -538,6 +534,10 @@
 
 .settings-llm-compact-options {
   margin-top: var(--fc-space-md);
+}
+
+.settings-llm-compact-options > .settings-field {
+  align-items: flex-start;
 }
 
 .settings-llm-prompt-field {
