@@ -6,6 +6,7 @@ import {Button} from 'flowcloudai-ui'
 import {
     buildBlockStyleEdit,
     buildWikiLinkEdit,
+    type MarkdownBlockStyle,
 } from './entryMarkdownToolbarCommands'
 
 function createBlockStyleCommand(name: string, prefix: string): ICommand {
@@ -22,11 +23,11 @@ function createBlockStyleCommand(name: string, prefix: string): ICommand {
 }
 
 const BLOCK_STYLE_COMMANDS = [
-    {label: '正文', command: createBlockStyleCommand('paragraph', '')},
-    {label: 'H1', command: createBlockStyleCommand('heading1', '# ')},
-    {label: 'H2', command: createBlockStyleCommand('heading2', '## ')},
-    {label: 'H3', command: createBlockStyleCommand('heading3', '### ')},
-]
+    {style: 'paragraph', label: '正文', command: createBlockStyleCommand('paragraph', '')},
+    {style: 'heading1', label: 'H1', command: createBlockStyleCommand('heading1', '# ')},
+    {style: 'heading2', label: 'H2', command: createBlockStyleCommand('heading2', '## ')},
+    {style: 'heading3', label: 'H3', command: createBlockStyleCommand('heading3', '### ')},
+] as const
 
 const WIKI_LINK_COMMAND: ICommand = {
     name: 'wiki-link',
@@ -41,6 +42,7 @@ const WIKI_LINK_COMMAND: ICommand = {
 interface EntryMarkdownToolbarProps {
     canUndo: boolean
     canRedo: boolean
+    activeBlockStyle: MarkdownBlockStyle
     splitView: boolean
     onUndo: () => void
     onRedo: () => void
@@ -52,19 +54,22 @@ interface EntryMarkdownToolbarProps {
 interface CommandButtonProps {
     command: ICommand
     label: string
+    title?: string
+    active?: boolean
     onCommand: (command: ICommand) => void
 }
 
-function CommandButton({command, label, onCommand}: CommandButtonProps) {
+function CommandButton({command, label, title = label, active, onCommand}: CommandButtonProps) {
     return (
         <Button
             type="button"
             variant="ghost"
             size="sm"
             iconOnly
-            className="entry-editor-format-toolbar__command"
+            className={`entry-editor-format-toolbar__command${active ? ' is-active' : ''}`}
             aria-label={label}
-            title={label}
+            aria-pressed={active}
+            title={title}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onCommand(command)}
         >
@@ -76,6 +81,7 @@ function CommandButton({command, label, onCommand}: CommandButtonProps) {
 export default function EntryMarkdownToolbar({
     canUndo,
     canRedo,
+    activeBlockStyle,
     splitView,
     onUndo,
     onRedo,
@@ -87,8 +93,14 @@ export default function EntryMarkdownToolbar({
         <div className="entry-editor-format-toolbar" aria-label="正文格式工具栏">
             <div className="entry-editor-format-toolbar__viewport">
                 <div className="entry-editor-format-toolbar__commands">
-                    {BLOCK_STYLE_COMMANDS.map(({label, command}) => (
-                        <CommandButton key={command.name} command={command} label={label} onCommand={onCommand}/>
+                    {BLOCK_STYLE_COMMANDS.map(({style, label, command}) => (
+                        <CommandButton
+                            key={command.name}
+                            command={command}
+                            label={label}
+                            active={activeBlockStyle === style}
+                            onCommand={onCommand}
+                        />
                     ))}
                     <span className="entry-editor-format-toolbar__divider" aria-hidden="true"/>
                     <Button
@@ -96,6 +108,7 @@ export default function EntryMarkdownToolbar({
                         variant="ghost"
                         size="sm"
                         disabled={!canUndo}
+                        title="撤销（Ctrl+Z）"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={onUndo}
                     >
@@ -106,14 +119,15 @@ export default function EntryMarkdownToolbar({
                         variant="ghost"
                         size="sm"
                         disabled={!canRedo}
+                        title="重做（Ctrl+Shift+Z 或 Ctrl+Y）"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={onRedo}
                     >
                         重做
                     </Button>
                     <span className="entry-editor-format-toolbar__divider" aria-hidden="true"/>
-                    <CommandButton command={commands.bold} label="加粗" onCommand={onCommand}/>
-                    <CommandButton command={commands.italic} label="斜体" onCommand={onCommand}/>
+                    <CommandButton command={commands.bold} label="加粗" title="加粗（Ctrl+B）" onCommand={onCommand}/>
+                    <CommandButton command={commands.italic} label="斜体" title="斜体（Ctrl+I）" onCommand={onCommand}/>
                     <CommandButton command={commands.strikethrough} label="删除线" onCommand={onCommand}/>
                     <span className="entry-editor-format-toolbar__divider" aria-hidden="true"/>
                     <CommandButton command={commands.quote} label="引用" onCommand={onCommand}/>
@@ -123,7 +137,7 @@ export default function EntryMarkdownToolbar({
                     <CommandButton command={commands.unorderedListCommand} label="无序列表" onCommand={onCommand}/>
                     <CommandButton command={commands.orderedListCommand} label="有序列表" onCommand={onCommand}/>
                     <span className="entry-editor-format-toolbar__divider" aria-hidden="true"/>
-                    <CommandButton command={commands.link} label="链接" onCommand={onCommand}/>
+                    <CommandButton command={commands.link} label="链接" title="链接（Ctrl+L）" onCommand={onCommand}/>
                     <CommandButton command={WIKI_LINK_COMMAND} label="双链" onCommand={onCommand}/>
                     <Button
                         type="button"

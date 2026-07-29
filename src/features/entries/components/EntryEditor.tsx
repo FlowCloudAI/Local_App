@@ -46,6 +46,8 @@ import EntryMarkdownToolbar, {
 } from './EntryMarkdownToolbar'
 import {
     buildListEnterEdit,
+    resolveMarkdownBlockStyle,
+    type MarkdownBlockStyle,
 } from './entryMarkdownToolbarCommands'
 import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
@@ -218,6 +220,7 @@ export default function EntryEditor({
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
     const [editorSplitView, setEditorSplitView] = useState(false)
+    const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
     const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
         left: number
         top: number
@@ -285,6 +288,7 @@ export default function EntryEditor({
 
     useEffect(() => {
         setSelectionToolbarPosition(null)
+        setActiveBlockStyle('paragraph')
     }, [entryId, editorMode])
 
     useEffect(() => {
@@ -1149,16 +1153,24 @@ export default function EntryEditor({
         setTagCreatorOpen(false)
     }
 
+    const syncActiveBlockStyle = useCallback((textarea?: HTMLTextAreaElement | null) => {
+        const input = textarea ?? editorRef.current?.getTextareaElement()
+        if (!input) return
+        setActiveBlockStyle(resolveMarkdownBlockStyle(input.value, input.selectionStart))
+    }, [])
+
     const executeMarkdownCommand = useCallback((command: ICommand) => {
         editorRef.current?.executeCommand(command)
         setSelectionToolbarPosition(null)
-    }, [])
+        window.requestAnimationFrame(() => syncActiveBlockStyle())
+    }, [syncActiveBlockStyle])
 
     const updateSelectionToolbar = useCallback((
         textarea: HTMLTextAreaElement,
         clientX?: number,
         clientY?: number,
     ) => {
+        syncActiveBlockStyle(textarea)
         if (textarea.selectionStart === textarea.selectionEnd) {
             setSelectionToolbarPosition(null)
             return
@@ -1180,7 +1192,7 @@ export default function EntryEditor({
             left: Math.min(Math.max(anchorX - bounds.left, edge), bounds.width - edge),
             top: Math.max(anchorY - bounds.top, formatToolbarHeight + 48),
         })
-    }, [])
+    }, [syncActiveBlockStyle])
 
     return (
         <div className="entry-editor-page">
@@ -1301,6 +1313,7 @@ export default function EntryEditor({
                                     <EntryMarkdownToolbar
                                         canUndo={undoRedo.canUndo}
                                         canRedo={undoRedo.canRedo}
+                                        activeBlockStyle={activeBlockStyle}
                                         splitView={editorSplitView}
                                         onUndo={handleUndo}
                                         onRedo={handleRedo}
@@ -1320,11 +1333,14 @@ export default function EntryEditor({
                                             ref={editorRef}
                                             key={entryId}
                                             value={draft.content}
-                                            onValueChange={(value) => setDraft((current) => (
-                                                current.content === value
-                                                    ? current
-                                                    : {...current, content: value}
-                                            ))}
+                                            onValueChange={(value) => {
+                                                setDraft((current) => (
+                                                    current.content === value
+                                                        ? current
+                                                        : {...current, content: value}
+                                                ))
+                                                window.requestAnimationFrame(() => syncActiveBlockStyle())
+                                            }}
                                             tokens={{fontSizeScale: editorFontSize / 14}}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
@@ -1382,6 +1398,7 @@ export default function EntryEditor({
                                                             edit.selection.end,
                                                         )
                                                         wikiLink.handleMarkdownCursorSync(textarea)
+                                                        syncActiveBlockStyle(textarea)
                                                     })
                                                 },
                                                 onKeyUp: (event) => {
@@ -1401,7 +1418,11 @@ export default function EntryEditor({
                                                         updateSelectionToolbar(textarea, clientX, clientY)
                                                     })
                                                 },
-                                                onSelect: (event) => wikiLink.handleMarkdownCursorSync(event.currentTarget),
+                                                onSelect: (event) => {
+                                                    wikiLink.handleMarkdownCursorSync(event.currentTarget)
+                                                    syncActiveBlockStyle(event.currentTarget)
+                                                },
+                                                onFocus: (event) => syncActiveBlockStyle(event.currentTarget),
                                                 onScroll: (event) => {
                                                     wikiLink.updateWikiPopoverPosition(event.currentTarget as unknown as HTMLTextAreaElement)
                                                     setSelectionToolbarPosition(null)

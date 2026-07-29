@@ -13,6 +13,22 @@ export interface MarkdownTextEdit {
     selection: TextRange
 }
 
+export type MarkdownBlockStyle = 'paragraph' | 'heading1' | 'heading2' | 'heading3' | null
+
+export function resolveMarkdownBlockStyle(text: string, cursor: number): MarkdownBlockStyle {
+    const safeCursor = Math.max(0, Math.min(cursor, text.length))
+    const lineStart = text.lastIndexOf('\n', safeCursor - 1) + 1
+    const lineEnd = text.indexOf('\n', safeCursor)
+    const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd)
+    const heading = line.match(/^\s{0,3}(#{1,6})\s+/)
+
+    if (!heading) return 'paragraph'
+    if (heading[1].length === 1) return 'heading1'
+    if (heading[1].length === 2) return 'heading2'
+    if (heading[1].length === 3) return 'heading3'
+    return null
+}
+
 export function buildBlockStyleEdit(
     text: string,
     selection: TextRange,

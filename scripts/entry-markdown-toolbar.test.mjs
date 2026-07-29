@@ -6,6 +6,7 @@ import {
     buildBlockStyleEdit,
     buildListEnterEdit,
     buildWikiLinkEdit,
+    resolveMarkdownBlockStyle,
 } from '../src/features/entries/components/entryMarkdownToolbarCommands.ts'
 
 assert.deepEqual(
@@ -62,3 +63,7 @@ assert.equal(
     buildListEnterEdit('- [x] 已完成', {start: 9, end: 9})?.replacement,
     '\n- [ ] ',
 )
+
+assert.equal(resolveMarkdownBlockStyle('正文\n## 二级标题', 6), 'heading2')
+assert.equal(resolveMarkdownBlockStyle('正文', 2), 'paragraph')
+assert.equal(resolveMarkdownBlockStyle('#### 四级标题', 5), null)

@@ -733,6 +733,11 @@
     height: 0.95rem;
 }
 
+.entry-editor-format-toolbar__command.is-active {
+    background: var(--fc-color-primary-subtle);
+    color: var(--fc-color-primary);
+}
+
 .entry-editor-format-toolbar__divider {
     width: 1px;
     height: 1.35rem;
