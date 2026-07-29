@@ -608,7 +608,6 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    min-height: var(--entry-editor-page-toolbar-height);
     background: color-mix(in srgb, var(--fc-color-bg) 90%, transparent);
     border-bottom: 1px solid var(--fc-color-border);
     box-shadow: var(--fc-shadow-sm);
@@ -621,7 +620,6 @@
     justify-content: space-between;
     gap: var(--fc-space-lg);
     min-width: 0;
-    min-height: var(--entry-editor-page-toolbar-height);
     padding: 1rem 1.5rem 0.85rem;
 }
 
@@ -682,21 +680,6 @@
     background: var(--fc-color-bg-secondary);
     box-shadow: var(--fc-shadow-sm);
     backdrop-filter: blur(1.25rem) saturate(125%);
-}
-
-.entry-editor-format-toolbar__style {
-    width: 6.5rem;
-    flex: 0 0 6.5rem;
-}
-
-.entry-editor-format-toolbar__style .fc-select__trigger {
-    min-height: 2rem;
-    padding: 0 var(--fc-space-sm);
-    background: color-mix(in srgb, var(--fc-color-bg) 86%, var(--fc-color-bg-secondary));
-}
-
-.entry-editor-format-toolbar__style .fc-select__value {
-    font-size: var(--fc-font-size-sm);
 }
 
 .entry-editor-format-toolbar__viewport {
@@ -762,8 +745,22 @@
     color: var(--fc-color-primary);
 }
 
-.entry-editor-format-toolbar__more {
-    min-width: auto;
+.entry-editor-selection-toolbar {
+    position: absolute;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: var(--fc-space-xs);
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: color-mix(in srgb, var(--fc-color-bg-secondary) 92%, transparent);
+    box-shadow: var(--fc-shadow-lg);
+    backdrop-filter: blur(1rem) saturate(125%);
+    transform: translate(-50%, calc(-100% - var(--fc-space-sm)));
+}
+
+.entry-editor-selection-toolbar .entry-editor-format-toolbar__command {
     flex: none;
 }
 
@@ -1376,11 +1373,6 @@
 
     .entry-editor-format-toolbar {
         padding-inline: var(--fc-space-lg);
-    }
-
-    .entry-editor-format-toolbar__style {
-        width: 5.5rem;
-        flex-basis: 5.5rem;
     }
 
     .entry-editor-format-toolbar__view .fc-btn {

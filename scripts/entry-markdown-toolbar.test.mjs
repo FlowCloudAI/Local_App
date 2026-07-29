@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict'
 import {
     buildBlockStyleEdit,
+    buildListEnterEdit,
     buildWikiLinkEdit,
 } from '../src/features/entries/components/entryMarkdownToolbarCommands.ts'
 
@@ -30,4 +31,34 @@ assert.deepEqual(
         replacement: '[[纪远舟]]',
         selection: {start: 8, end: 11},
     },
+)
+
+assert.deepEqual(
+    buildListEnterEdit('- 第一项', {start: 5, end: 5}),
+    {
+        start: 5,
+        end: 5,
+        replacement: '\n- ',
+        selection: {start: 8, end: 8},
+    },
+)
+
+assert.deepEqual(
+    buildListEnterEdit('- ', {start: 2, end: 2}),
+    {
+        start: 0,
+        end: 2,
+        replacement: '',
+        selection: {start: 0, end: 0},
+    },
+)
+
+assert.equal(
+    buildListEnterEdit('3. 第三项', {start: 6, end: 6})?.replacement,
+    '\n4. ',
+)
+
+assert.equal(
+    buildListEnterEdit('- [x] 已完成', {start: 9, end: 9})?.replacement,
+    '\n- [ ] ',
 )

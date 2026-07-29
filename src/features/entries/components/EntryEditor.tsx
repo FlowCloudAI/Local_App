@@ -2,8 +2,8 @@ import {logger} from '../../../shared/logger'
 import {rehypeSanitizeRawHtml} from '../../../shared/markdown/rehypeSanitizeRawHtml'
 import {openFileDialog} from '../../../api/dialog'
 import {listen} from '../../../api/events'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {commands, type ICommand} from '@uiw/react-md-editor'
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import type {ICommand} from '@uiw/react-md-editor'
 import {Button, RollingBox, useAlert} from 'flowcloudai-ui'
 import {
     ai_generate_entry_summary,
@@ -41,7 +41,12 @@ import EntryEditorMetaPanel from './EntryEditorMetaPanel'
 import EntryImageAddModal from './EntryImageAddModal'
 import EntryEditorWikiLink from './EntryEditorWikiLink'
 import EntryEditorLinkPreview from './EntryEditorLinkPreview'
-import EntryMarkdownToolbar from './EntryMarkdownToolbar'
+import EntryMarkdownToolbar, {
+    EntryMarkdownSelectionToolbar,
+} from './EntryMarkdownToolbar'
+import {
+    buildListEnterEdit,
+} from './entryMarkdownToolbarCommands'
 import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
@@ -211,8 +216,11 @@ export default function EntryEditor({
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
-    const [editorActionMenuOpen, setEditorActionMenuOpen] = useState(false)
     const [editorSplitView, setEditorSplitView] = useState(false)
+    const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
+        left: number
+        top: number
+    } | null>(null)
     const {
         entryRelations,
         setEntryRelations,
@@ -235,6 +243,8 @@ export default function EntryEditor({
     } = useEntryImageState(draft.images)
     const reopenLightboxAfterImageAddRef = useRef(false)
     const openEntryStateCacheRef = useRef<Record<string, OpenEntryEditorState>>({})
+    const workspaceRef = useRef<HTMLElement | null>(null)
+    const workspaceHeaderRef = useRef<HTMLDivElement | null>(null)
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
     const previewContainerRef = useRef<HTMLDivElement | null>(null)
@@ -257,6 +267,24 @@ export default function EntryEditor({
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
+
+    useLayoutEffect(() => {
+        const workspace = workspaceRef.current
+        const header = workspaceHeaderRef.current
+        if (!workspace || !header) return
+
+        const syncHeaderHeight = () => {
+            workspace.style.setProperty('--entry-editor-page-toolbar-height', `${header.offsetHeight}px`)
+        }
+        syncHeaderHeight()
+        const observer = new ResizeObserver(syncHeaderHeight)
+        observer.observe(header)
+        return () => observer.disconnect()
+    }, [])
+
+    useEffect(() => {
+        setSelectionToolbarPosition(null)
+    }, [entryId, editorMode])
 
     useEffect(() => {
         lastSuccessfulSaveAtRef.current = Date.now()
@@ -1117,14 +1145,46 @@ export default function EntryEditor({
 
     const executeMarkdownCommand = useCallback((command: ICommand) => {
         editorRef.current?.executeCommand(command)
+        setSelectionToolbarPosition(null)
+    }, [])
+
+    const updateSelectionToolbar = useCallback((
+        textarea: HTMLTextAreaElement,
+        clientX?: number,
+        clientY?: number,
+    ) => {
+        if (textarea.selectionStart === textarea.selectionEnd) {
+            setSelectionToolbarPosition(null)
+            return
+        }
+
+        const markdown = markdownContainerRef.current?.parentElement
+        if (!markdown) return
+        const bounds = markdown.getBoundingClientRect()
+        const textareaBounds = textarea.getBoundingClientRect()
+        const formatToolbar = markdown.querySelector<HTMLElement>('.entry-editor-format-toolbar')
+        const formatToolbarHeight = formatToolbar?.offsetHeight ?? 0
+        const edge = Math.min(96, bounds.width / 2)
+        const anchorX = clientX ?? (textareaBounds.left + textareaBounds.width / 2)
+        const anchorY = clientY ?? (
+            Math.max(textareaBounds.top, formatToolbar?.getBoundingClientRect().bottom ?? bounds.top) + 56
+        )
+
+        setSelectionToolbarPosition({
+            left: Math.min(Math.max(anchorX - bounds.left, edge), bounds.width - edge),
+            top: Math.max(anchorY - bounds.top, formatToolbarHeight + 48),
+        })
     }, [])
 
     return (
         <div className="entry-editor-page">
             <RollingBox axis="y" className="entry-editor-page__scroll" thumbSize="thin">
                 <div className="entry-editor-shell">
-                    <section className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}>
-                        <div className="entry-editor-workspace__header">
+                    <section
+                        ref={workspaceRef}
+                        className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}
+                    >
+                        <div ref={workspaceHeaderRef} className="entry-editor-workspace__header">
                             <div className="entry-editor-workspace__toolbar" data-mobile-horizontal-scroll>
                                 <div className="entry-editor-workspace__toolbar-main">
                                     <button
@@ -1237,8 +1297,14 @@ export default function EntryEditor({
                                         onCommand={executeMarkdownCommand}
                                         onInsertImage={() => openImageAddModal('insert')}
                                         onSplitViewChange={setEditorSplitView}
-                                        onMore={() => setEditorActionMenuOpen(true)}
                                     />
+                                    {selectionToolbarPosition && (
+                                        <EntryMarkdownSelectionToolbar
+                                            left={selectionToolbarPosition.left}
+                                            top={selectionToolbarPosition.top}
+                                            onCommand={executeMarkdownCommand}
+                                        />
+                                    )}
                                     <div ref={markdownContainerRef} className="entry-editor-markdown-anchor">
                                         <MarkdownEditor
                                             ref={editorRef}
@@ -1270,12 +1336,70 @@ export default function EntryEditor({
                                                 }
                                             }}
                                             textareaProps={{
-                                                onKeyDown: (event) => wikiLink.handleWikiKeyDown(event),
-                                                onKeyUp: (event) => wikiLink.handleMarkdownCursorSync(event.currentTarget),
-                                                onClick: (event) => wikiLink.handleMarkdownCursorSync(event.currentTarget),
+                                                onKeyDownCapture: (event) => {
+                                                    wikiLink.handleWikiKeyDown(event)
+                                                    if (event.key !== 'Enter') return
+                                                    const textarea = event.currentTarget
+                                                    if (
+                                                        event.defaultPrevented
+                                                        || event.shiftKey
+                                                        || event.ctrlKey
+                                                        || event.altKey
+                                                        || event.metaKey
+                                                        || event.nativeEvent.isComposing
+                                                    ) {
+                                                        return
+                                                    }
+                                                    const edit = buildListEnterEdit(textarea.value, {
+                                                        start: textarea.selectionStart,
+                                                        end: textarea.selectionEnd,
+                                                    })
+                                                    if (!edit) return
+                                                    event.preventDefault()
+                                                    event.stopPropagation()
+                                                    const nextContent = textarea.value.slice(0, edit.start)
+                                                        + edit.replacement
+                                                        + textarea.value.slice(edit.end)
+                                                    setDraft((current) => (
+                                                        current.content === nextContent
+                                                            ? current
+                                                            : {...current, content: nextContent}
+                                                    ))
+                                                    setSelectionToolbarPosition(null)
+                                                    window.requestAnimationFrame(() => {
+                                                        textarea.setSelectionRange(
+                                                            edit.selection.start,
+                                                            edit.selection.end,
+                                                        )
+                                                        wikiLink.handleMarkdownCursorSync(textarea)
+                                                    })
+                                                },
+                                                onKeyUp: (event) => {
+                                                    wikiLink.handleMarkdownCursorSync(event.currentTarget)
+                                                    updateSelectionToolbar(event.currentTarget)
+                                                },
+                                                onMouseUp: (event) => updateSelectionToolbar(
+                                                    event.currentTarget,
+                                                    event.clientX,
+                                                    event.clientY,
+                                                ),
+                                                onClick: (event) => {
+                                                    const textarea = event.currentTarget
+                                                    const {clientX, clientY} = event
+                                                    wikiLink.handleMarkdownCursorSync(textarea)
+                                                    window.requestAnimationFrame(() => {
+                                                        updateSelectionToolbar(textarea, clientX, clientY)
+                                                    })
+                                                },
                                                 onSelect: (event) => wikiLink.handleMarkdownCursorSync(event.currentTarget),
-                                                onScroll: (event) => wikiLink.updateWikiPopoverPosition(event.currentTarget as unknown as HTMLTextAreaElement),
-                                                onBlur: () => wikiLink.handleTextareaBlur(),
+                                                onScroll: (event) => {
+                                                    wikiLink.updateWikiPopoverPosition(event.currentTarget as unknown as HTMLTextAreaElement)
+                                                    setSelectionToolbarPosition(null)
+                                                },
+                                                onBlur: () => {
+                                                    wikiLink.handleTextareaBlur()
+                                                    setSelectionToolbarPosition(null)
+                                                },
                                             }}
                                         />
 
@@ -1408,30 +1532,6 @@ export default function EntryEditor({
                     disabled: loading || saving,
                     onSelect: () => void handleDelete(),
                 }]}
-            />
-
-            <ActionMenu
-                open={editorActionMenuOpen}
-                onClose={() => setEditorActionMenuOpen(false)}
-                title="正文操作"
-                ariaLabel="更多正文操作"
-                items={[
-                    {
-                        key: 'insert-task-list',
-                        label: '插入任务列表',
-                        onSelect: () => executeMarkdownCommand(commands.checkedListCommand),
-                    },
-                    {
-                        key: 'insert-table',
-                        label: '插入表格',
-                        onSelect: () => executeMarkdownCommand(commands.table),
-                    },
-                    {
-                        key: 'insert-divider',
-                        label: '插入分割线',
-                        onSelect: () => executeMarkdownCommand(commands.hr),
-                    },
-                ]}
             />
 
             <EntryImageLightbox

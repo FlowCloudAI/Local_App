@@ -2,15 +2,11 @@
  * 桌面端词条正文工具栏；只负责命令编排，文本修改仍交给 MarkdownEditor。
  */
 import {commands, type ICommand} from '@uiw/react-md-editor'
-import {Button, Select} from 'flowcloudai-ui'
-import {buildBlockStyleEdit, buildWikiLinkEdit} from './entryMarkdownToolbarCommands'
-
-const STYLE_OPTIONS = [
-    {value: 'paragraph', label: '正文'},
-    {value: 'heading1', label: '标题 1'},
-    {value: 'heading2', label: '标题 2'},
-    {value: 'heading3', label: '标题 3'},
-]
+import {Button} from 'flowcloudai-ui'
+import {
+    buildBlockStyleEdit,
+    buildWikiLinkEdit,
+} from './entryMarkdownToolbarCommands'
 
 function createBlockStyleCommand(name: string, prefix: string): ICommand {
     return {
@@ -25,12 +21,12 @@ function createBlockStyleCommand(name: string, prefix: string): ICommand {
     }
 }
 
-const STYLE_COMMANDS: Record<string, ICommand> = {
-    paragraph: createBlockStyleCommand('paragraph', ''),
-    heading1: createBlockStyleCommand('heading1', '# '),
-    heading2: createBlockStyleCommand('heading2', '## '),
-    heading3: createBlockStyleCommand('heading3', '### '),
-}
+const BLOCK_STYLE_COMMANDS = [
+    {label: '正文', command: createBlockStyleCommand('paragraph', '')},
+    {label: 'H1', command: createBlockStyleCommand('heading1', '# ')},
+    {label: 'H2', command: createBlockStyleCommand('heading2', '## ')},
+    {label: 'H3', command: createBlockStyleCommand('heading3', '### ')},
+]
 
 const WIKI_LINK_COMMAND: ICommand = {
     name: 'wiki-link',
@@ -51,7 +47,6 @@ interface EntryMarkdownToolbarProps {
     onCommand: (command: ICommand) => void
     onInsertImage: () => void
     onSplitViewChange: (split: boolean) => void
-    onMore: () => void
 }
 
 interface CommandButtonProps {
@@ -87,29 +82,15 @@ export default function EntryMarkdownToolbar({
     onCommand,
     onInsertImage,
     onSplitViewChange,
-    onMore,
 }: EntryMarkdownToolbarProps) {
-    const handleStyleChange = (value: string | number | (string | number)[]) => {
-        const styleCommand = STYLE_COMMANDS[String(value)]
-        if (styleCommand) onCommand(styleCommand)
-    }
-
     return (
         <div className="entry-editor-format-toolbar" aria-label="正文格式工具栏">
-            <Select
-                className="entry-editor-format-toolbar__style"
-                aria-label="段落样式"
-                value="paragraph"
-                options={STYLE_OPTIONS}
-                onValueChange={handleStyleChange}
-                radius="md"
-            />
-
-            <div
-                className="entry-editor-format-toolbar__viewport"
-                data-mobile-horizontal-scroll
-            >
+            <div className="entry-editor-format-toolbar__viewport">
                 <div className="entry-editor-format-toolbar__commands">
+                    {BLOCK_STYLE_COMMANDS.map(({label, command}) => (
+                        <CommandButton key={command.name} command={command} label={label} onCommand={onCommand}/>
+                    ))}
+                    <span className="entry-editor-format-toolbar__divider" aria-hidden="true"/>
                     <Button
                         type="button"
                         variant="ghost"
@@ -157,6 +138,14 @@ export default function EntryMarkdownToolbar({
                     >
                         {commands.image.icon}
                     </Button>
+                    <span className="entry-editor-format-toolbar__divider" aria-hidden="true"/>
+                    <CommandButton
+                        command={commands.checkedListCommand}
+                        label="任务列表"
+                        onCommand={onCommand}
+                    />
+                    <CommandButton command={commands.table} label="表格" onCommand={onCommand}/>
+                    <CommandButton command={commands.hr} label="分割线" onCommand={onCommand}/>
                 </div>
             </div>
 
@@ -182,16 +171,33 @@ export default function EntryMarkdownToolbar({
                     双栏
                 </Button>
             </div>
+        </div>
+    )
+}
 
-            <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="entry-editor-format-toolbar__more"
-                onClick={onMore}
-            >
-                更多
-            </Button>
+interface EntryMarkdownSelectionToolbarProps {
+    left: number
+    top: number
+    onCommand: (command: ICommand) => void
+}
+
+export function EntryMarkdownSelectionToolbar({
+    left,
+    top,
+    onCommand,
+}: EntryMarkdownSelectionToolbarProps) {
+    return (
+        <div
+            className="entry-editor-selection-toolbar"
+            role="toolbar"
+            aria-label="选中文本格式"
+            style={{left, top}}
+        >
+            <CommandButton command={commands.bold} label="加粗" onCommand={onCommand}/>
+            <CommandButton command={commands.italic} label="斜体" onCommand={onCommand}/>
+            <CommandButton command={commands.strikethrough} label="删除线" onCommand={onCommand}/>
+            <CommandButton command={commands.code} label="行内代码" onCommand={onCommand}/>
+            <CommandButton command={commands.link} label="链接" onCommand={onCommand}/>
         </div>
     )
 }
