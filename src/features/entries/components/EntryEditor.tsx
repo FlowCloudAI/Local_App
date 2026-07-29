@@ -41,6 +41,7 @@ import EntryEditorMetaPanel from './EntryEditorMetaPanel'
 import EntryImageAddModal from './EntryImageAddModal'
 import EntryEditorWikiLink from './EntryEditorWikiLink'
 import EntryEditorLinkPreview from './EntryEditorLinkPreview'
+import EntryMarkdownToolbar from './EntryMarkdownToolbar'
 import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
@@ -163,16 +164,6 @@ function escapeMarkdownImageAlt(value: string): string {
     return value.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-function withToolbarTitle(command: ICommand, title: string): ICommand {
-    return {
-        ...command,
-        buttonProps: {
-            ...(command.buttonProps ?? {}),
-            title,
-        },
-    }
-}
-
 export default function EntryEditor({
                                         entryId,
                                         projectId,
@@ -220,6 +211,8 @@ export default function EntryEditor({
     const [incomingLinks, setIncomingLinks] = useState<EntryLink[]>([])
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
+    const [editorActionMenuOpen, setEditorActionMenuOpen] = useState(false)
+    const [editorSplitView, setEditorSplitView] = useState(false)
     const {
         entryRelations,
         setEntryRelations,
@@ -1122,49 +1115,9 @@ export default function EntryEditor({
         setTagCreatorOpen(false)
     }
 
-    const imageInsertCommand = useMemo<ICommand>(() => ({
-        name: 'entry-image-insert',
-        keyCommand: 'entry-image-insert',
-        buttonProps: {
-            'aria-label': '插入图片',
-            title: '插入图片',
-        },
-        icon: (
-            <svg
-                className="entry-editor-md-image-command"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                focusable="false"
-            >
-                <rect x="3.5" y="5" width="17" height="14" rx="2"/>
-                <circle cx="8.5" cy="9.5" r="1.5"/>
-                <path d="M5.5 17l4.5-4.5 3 3 2-2 3.5 3.5"/>
-            </svg>
-        ),
-        execute: () => {
-            openImageAddModal('insert')
-        },
-    }), [openImageAddModal])
-
-    const markdownToolbarCommands = useMemo<ICommand[]>(() => [
-        withToolbarTitle(commands.bold, '加粗'),
-        withToolbarTitle(commands.italic, '斜体'),
-        withToolbarTitle(commands.strikethrough, '删除线'),
-        commands.divider,
-        withToolbarTitle(commands.heading1, '一级标题'),
-        withToolbarTitle(commands.heading2, '二级标题'),
-        withToolbarTitle(commands.heading3, '三级标题'),
-        commands.divider,
-        withToolbarTitle(commands.quote, '引用'),
-        withToolbarTitle(commands.code, '行内代码'),
-        withToolbarTitle(commands.codeBlock, '代码块'),
-        commands.divider,
-        withToolbarTitle(commands.link, '链接'),
-        imageInsertCommand,
-        withToolbarTitle(commands.unorderedListCommand, '无序列表'),
-        withToolbarTitle(commands.orderedListCommand, '有序列表'),
-        withToolbarTitle(commands.hr, '分割线'),
-    ], [imageInsertCommand])
+    const executeMarkdownCommand = useCallback((command: ICommand) => {
+        editorRef.current?.executeCommand(command)
+    }, [])
 
     return (
         <div className="entry-editor-page">
@@ -1172,7 +1125,7 @@ export default function EntryEditor({
                 <div className="entry-editor-shell">
                     <section className={`entry-editor-workspace${editorMode === 'edit' ? ' is-editing' : ''}`}>
                         <div className="entry-editor-workspace__header">
-                            <div className="entry-editor-workspace__toolbar">
+                            <div className="entry-editor-workspace__toolbar" data-mobile-horizontal-scroll>
                                 <div className="entry-editor-workspace__toolbar-main">
                                     <button
                                         type="button"
@@ -1275,6 +1228,17 @@ export default function EntryEditor({
                             />
                             {editorMode === 'edit' ? (
                                 <div className="entry-editor-markdown">
+                                    <EntryMarkdownToolbar
+                                        canUndo={undoRedo.canUndo}
+                                        canRedo={undoRedo.canRedo}
+                                        splitView={editorSplitView}
+                                        onUndo={handleUndo}
+                                        onRedo={handleRedo}
+                                        onCommand={executeMarkdownCommand}
+                                        onInsertImage={() => openImageAddModal('insert')}
+                                        onSplitViewChange={setEditorSplitView}
+                                        onMore={() => setEditorActionMenuOpen(true)}
+                                    />
                                     <div ref={markdownContainerRef} className="entry-editor-markdown-anchor">
                                         <MarkdownEditor
                                             ref={editorRef}
@@ -1289,7 +1253,11 @@ export default function EntryEditor({
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
                                             previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
-                                            toolbarCommands={markdownToolbarCommands}
+                                            hideToolbar
+                                            hideFullscreen
+                                            showSplitToggle={false}
+                                            splitView={editorSplitView}
+                                            onSplitChange={setEditorSplitView}
                                             onKeyDown={(event) => {
                                                 if (!(event.ctrlKey || event.metaKey) || event.repeat) return
                                                 const key = event.key.toLowerCase()
@@ -1440,6 +1408,30 @@ export default function EntryEditor({
                     disabled: loading || saving,
                     onSelect: () => void handleDelete(),
                 }]}
+            />
+
+            <ActionMenu
+                open={editorActionMenuOpen}
+                onClose={() => setEditorActionMenuOpen(false)}
+                title="正文操作"
+                ariaLabel="更多正文操作"
+                items={[
+                    {
+                        key: 'insert-task-list',
+                        label: '插入任务列表',
+                        onSelect: () => executeMarkdownCommand(commands.checkedListCommand),
+                    },
+                    {
+                        key: 'insert-table',
+                        label: '插入表格',
+                        onSelect: () => executeMarkdownCommand(commands.table),
+                    },
+                    {
+                        key: 'insert-divider',
+                        label: '插入分割线',
+                        onSelect: () => executeMarkdownCommand(commands.hr),
+                    },
+                ]}
             />
 
             <EntryImageLightbox

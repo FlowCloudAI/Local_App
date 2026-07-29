@@ -47,6 +47,8 @@ export interface MarkdownEditorRef {
     getEditorInstance: () => RefMDEditor | null;
     /** 获取内部 textarea DOM 节点 */
     getTextareaElement: () => HTMLTextAreaElement | null;
+    /** 由外部工具栏复用底层 Markdown 命令。 */
+    executeCommand: (command: ICommand) => void;
 }
 
 export interface MarkdownEditorProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onChange" | "onFocus" | "onBlur" | "onKeyDown"> {
@@ -85,6 +87,7 @@ export interface MarkdownEditorProps extends Omit<React.HTMLAttributes<HTMLDivEl
     onSplitChange?: (split: boolean) => void;
     toolbarCommands?: ICommand[];
     extraCommands?: ICommand[];
+    hideToolbar?: boolean;
     hideFullscreen?: boolean;
     previewOptions?: MarkdownPreviewOptions;
     previewRender?: MarkdownPreviewRenderer;
@@ -138,6 +141,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         onSplitChange,
         toolbarCommands,
         extraCommands,
+        hideToolbar = false,
         hideFullscreen = false,
         previewOptions,
         previewRender,
@@ -151,6 +155,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         getEditorInstance: () => editorRef.current,
         getTextareaElement: () =>
             wrapRef.current?.querySelector<HTMLTextAreaElement>('.w-md-editor-text-input') ?? null,
+        executeCommand: (command) => {
+            editorRef.current?.commandOrchestrator?.executeCommand(command);
+            editorRef.current?.textarea?.focus();
+        },
     }), []);
 
     // 稳定的 change 包装 — MDEditor 每次渲染不会看到新的函数引用
@@ -167,6 +175,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     const isSplitControlled = splitView !== undefined;
     const showSplit = isSplitControlled ? splitView : uncontrolledSplit;
     const isPreviewMode = mode === "preview";
+    const hideInternalToolbar = isPreviewMode || hideToolbar;
 
     const setShowSplit = (next: boolean | ((prev: boolean) => boolean)) => {
         const nextValue = typeof next === "function" ? next(showSplit) : next;
@@ -257,7 +266,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
         const measure = () => {
             const toolbarHeight =
-                isPreviewMode
+                hideInternalToolbar
                     ? 0
                     : root.querySelector<HTMLElement>('.w-md-editor-toolbar')?.getBoundingClientRect().height ?? 0;
             const editorText = root.querySelector<HTMLElement>('.w-md-editor-text');
@@ -320,7 +329,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             resizeObserver?.disconnect();
             window.removeEventListener('resize', measure);
         };
-    }, [autoHeight, value, isPreviewMode, showSplit, minHeight, maxHeight, height]);
+    }, [autoHeight, value, hideInternalToolbar, isPreviewMode, showSplit, minHeight, maxHeight, height]);
 
     const editorHeightValue = autoHeight ? editorHeight : (height ?? minHeight);
     const editorCommands = toolbarCommands ?? TOOLBAR_COMMANDS;
@@ -344,7 +353,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 extraCommands={mergedExtraCommands}
                 height={editorHeightValue}
                 preview={editorPreview}
-                hideToolbar={mode === 'preview'}
+                hideToolbar={hideInternalToolbar}
                 visibleDragbar={false}
                 textareaProps={mergedTextareaProps}
                 previewOptions={previewOptions}

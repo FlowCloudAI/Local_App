@@ -587,6 +587,8 @@
 }
 
 .entry-editor-workspace {
+    --entry-editor-page-toolbar-height: 3.85rem;
+
     position: relative;
     display: flex;
     flex-direction: column;
@@ -605,12 +607,12 @@
     z-index: 10;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    gap: var(--fc-space-lg);
     align-items: stretch;
-    padding: 1rem 1.5rem 0.85rem;
-    background: var(--fc-color-bg);
+    min-height: var(--entry-editor-page-toolbar-height);
+    background: color-mix(in srgb, var(--fc-color-bg) 90%, transparent);
     border-bottom: 1px solid var(--fc-color-border);
+    box-shadow: var(--fc-shadow-sm);
+    backdrop-filter: blur(1.25rem) saturate(125%);
 }
 
 .entry-editor-workspace__toolbar {
@@ -618,6 +620,9 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fc-space-lg);
+    min-width: 0;
+    min-height: var(--entry-editor-page-toolbar-height);
+    padding: 1rem 1.5rem 0.85rem;
 }
 
 .entry-editor-workspace__toolbar-main,
@@ -661,6 +666,105 @@
 
 .entry-editor-more-button {
     min-width: auto;
+}
+
+.entry-editor-format-toolbar {
+    position: sticky;
+    top: var(--entry-editor-page-toolbar-height);
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    gap: var(--fc-space-sm);
+    min-width: 0;
+    padding: 0.55rem 1.5rem;
+    border-bottom: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg) var(--fc-radius-lg) 0 0;
+    background: var(--fc-color-bg-secondary);
+    box-shadow: var(--fc-shadow-sm);
+    backdrop-filter: blur(1.25rem) saturate(125%);
+}
+
+.entry-editor-format-toolbar__style {
+    width: 6.5rem;
+    flex: 0 0 6.5rem;
+}
+
+.entry-editor-format-toolbar__style .fc-select__trigger {
+    min-height: 2rem;
+    padding: 0 var(--fc-space-sm);
+    background: color-mix(in srgb, var(--fc-color-bg) 86%, var(--fc-color-bg-secondary));
+}
+
+.entry-editor-format-toolbar__style .fc-select__value {
+    font-size: var(--fc-font-size-sm);
+}
+
+.entry-editor-format-toolbar__viewport {
+    min-width: 0;
+    flex: 1;
+}
+
+.entry-editor-workspace__toolbar::-webkit-scrollbar {
+    display: none;
+}
+
+.entry-editor-format-toolbar__commands {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.15rem;
+    width: 100%;
+    padding-inline: 0.6rem;
+}
+
+.entry-editor-format-toolbar__commands > .fc-btn {
+    min-height: 2rem;
+    flex: none;
+}
+
+.entry-editor-format-toolbar__command {
+    width: 2rem;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0;
+}
+
+.entry-editor-format-toolbar__command svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+
+.entry-editor-format-toolbar__divider {
+    width: 1px;
+    height: 1.35rem;
+    margin-inline: 0.25rem;
+    flex: none;
+    background: var(--fc-color-border);
+}
+
+.entry-editor-format-toolbar__view {
+    display: inline-flex;
+    flex: none;
+    gap: 0.1rem;
+    padding: 0.15rem;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: color-mix(in srgb, var(--fc-color-bg) 88%, var(--fc-color-bg-secondary));
+}
+
+.entry-editor-format-toolbar__view .fc-btn {
+    min-height: 1.7rem;
+    padding-inline: var(--fc-space-sm);
+}
+
+.entry-editor-format-toolbar__view .fc-btn.is-active {
+    background: var(--fc-color-primary-subtle);
+    color: var(--fc-color-primary);
+}
+
+.entry-editor-format-toolbar__more {
+    min-width: auto;
+    flex: none;
 }
 
 .entry-editor-workspace__body {
@@ -782,6 +886,10 @@
     position: relative;
     min-height: 0;
     flex: 1;
+    width: min(100%, 64rem);
+    margin-inline: auto;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-lg);
     user-select: text;
 }
 
@@ -804,40 +912,15 @@
     height: 100%;
 }
 
-.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar {
-    min-height: 2.75rem;
-    padding: var(--fc-space-sm) var(--fc-space-md) !important;
-    align-items: center;
+.entry-editor-markdown .fc-md-wrap {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
 }
 
-.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar ul {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.1rem;
-    min-height: 1.75rem;
-}
-
-.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar ul > li > button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 1.75rem;
-    min-width: 1.75rem;
-}
-
-.entry-editor-markdown .fc-md-wrap .w-md-editor-toolbar-divider {
-    height: 1.1rem;
-    margin-top: 0 !important;
-}
-
-.entry-editor-md-image-command {
-    width: 1rem;
-    height: 1rem;
-    fill: none !important;
-    stroke: currentColor !important;
-    stroke-width: 1.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.entry-editor-markdown .fc-md-wrap .w-md-editor {
+    background: transparent !important;
 }
 
 .entry-editor-workspace.is-editing .entry-editor-markdown-anchor {
@@ -1270,27 +1353,38 @@
         padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-lg);
     }
 
-    .entry-editor-workspace__header {
-        padding: var(--fc-space-md) var(--fc-space-lg) 0;
-    }
-
     .entry-editor-workspace__body {
         padding: var(--fc-space-md) var(--fc-space-lg) var(--fc-space-lg);
     }
 
-    .entry-editor-workspace__header {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     .entry-editor-workspace__toolbar {
-        align-items: stretch;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
+        padding: var(--fc-space-md) var(--fc-space-lg);
+        overflow-x: auto;
+        scrollbar-width: none;
     }
 
     .entry-editor-workspace__toolbar-main,
     .entry-editor-workspace__toolbar-actions {
-        justify-content: space-between;
+        flex: none;
+    }
+
+    .entry-editor-save-state {
+        display: none;
+    }
+
+    .entry-editor-format-toolbar {
+        padding-inline: var(--fc-space-lg);
+    }
+
+    .entry-editor-format-toolbar__style {
+        width: 5.5rem;
+        flex-basis: 5.5rem;
+    }
+
+    .entry-editor-format-toolbar__view .fc-btn {
+        padding-inline: 0.45rem;
     }
 
     .entry-editor-wikilink-popover,
