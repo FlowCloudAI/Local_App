@@ -687,6 +687,7 @@
     top: var(--entry-editor-page-toolbar-height);
     z-index: 11;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--fc-space-sm);
     min-width: 0;
@@ -754,6 +755,44 @@
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-md);
     background: color-mix(in srgb, var(--fc-color-bg) 88%, var(--fc-color-bg-secondary));
+}
+
+.entry-editor-format-toolbar__find {
+    flex: none;
+}
+
+.entry-editor-format-toolbar__find-slot {
+    flex: 1 0 100%;
+    min-width: 0;
+    padding-top: var(--fc-space-sm);
+    border-top: 1px solid var(--fc-color-border);
+}
+
+.entry-editor-find-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--fc-space-sm);
+    min-width: 0;
+}
+
+.entry-editor-find-bar__input {
+    flex: 1 1 14rem;
+    min-width: 10rem;
+}
+
+.entry-editor-find-bar__count {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    white-space: nowrap;
+}
+
+.entry-editor-find-bar__navigation,
+.entry-editor-find-bar__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fc-space-xs);
+    flex: none;
 }
 
 .entry-editor-format-toolbar__view .fc-btn {

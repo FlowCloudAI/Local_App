@@ -44,11 +44,19 @@ import EntryEditorLinkPreview from './EntryEditorLinkPreview'
 import EntryMarkdownToolbar, {
     EntryMarkdownSelectionToolbar,
 } from './EntryMarkdownToolbar'
+import EntryMarkdownFindBar, {
+    type EntryMarkdownFindBarRef,
+} from './EntryMarkdownFindBar'
 import {
     buildListEnterEdit,
     resolveMarkdownBlockStyle,
     type MarkdownBlockStyle,
 } from './entryMarkdownToolbarCommands'
+import {
+    type MarkdownTextMatch,
+    replaceMarkdownTextMatch,
+    replaceMarkdownTextMatches,
+} from './entryMarkdownSearch'
 import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
@@ -74,6 +82,7 @@ import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverla
 import {
     buildTagValueMap,
     findCategoryDuplicatedEntry,
+    getTextareaCaretOffset,
     normalizeComparableContent,
     normalizeComparableText,
     normalizeComparableType,
@@ -220,6 +229,7 @@ export default function EntryEditor({
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
     const [editorSplitView, setEditorSplitView] = useState(false)
+    const [findBarOpen, setFindBarOpen] = useState(false)
     const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
     const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
         left: number
@@ -247,9 +257,11 @@ export default function EntryEditor({
     } = useEntryImageState(draft.images)
     const reopenLightboxAfterImageAddRef = useRef(false)
     const openEntryStateCacheRef = useRef<Record<string, OpenEntryEditorState>>({})
+    const pageScrollRef = useRef<HTMLDivElement | null>(null)
     const workspaceRef = useRef<HTMLElement | null>(null)
     const workspaceHeaderRef = useRef<HTMLDivElement | null>(null)
     const markdownContainerRef = useRef<HTMLDivElement | null>(null)
+    const findBarRef = useRef<EntryMarkdownFindBarRef>(null)
     const wikiPopoverRef = useRef<HTMLDivElement | null>(null)
     const previewContainerRef = useRef<HTMLDivElement | null>(null)
     const linkPreviewPanelRef = useRef<HTMLDivElement | null>(null)
@@ -288,6 +300,7 @@ export default function EntryEditor({
 
     useEffect(() => {
         setSelectionToolbarPosition(null)
+        setFindBarOpen(false)
         setActiveBlockStyle('paragraph')
     }, [entryId, editorMode])
 
@@ -1153,6 +1166,64 @@ export default function EntryEditor({
         setTagCreatorOpen(false)
     }
 
+    const selectMarkdownMatch = useCallback((match: MarkdownTextMatch) => {
+        const textarea = editorRef.current?.getTextareaElement()
+        if (!textarea) return
+        textarea.setSelectionRange(match.start, match.end)
+        setSelectionToolbarPosition(null)
+        setActiveBlockStyle(resolveMarkdownBlockStyle(textarea.value, match.start))
+
+        window.requestAnimationFrame(() => {
+            const scroll = pageScrollRef.current
+            if (!scroll) return
+            const {top} = getTextareaCaretOffset(textarea, match.start)
+            const scrollBounds = scroll.getBoundingClientRect()
+            const textareaBounds = textarea.getBoundingClientRect()
+            const formatToolbar = markdownContainerRef.current
+                ?.parentElement
+                ?.querySelector<HTMLElement>('.entry-editor-format-toolbar')
+            const visibleTop = Math.max(scrollBounds.top, formatToolbar?.getBoundingClientRect().bottom ?? 0)
+            const targetTop = visibleTop + Math.min(96, scrollBounds.height * 0.2)
+            const caretTop = textareaBounds.top + top
+            scroll.scrollTo({
+                top: scroll.scrollTop + caretTop - targetTop,
+                behavior: 'auto',
+            })
+        })
+    }, [])
+
+    const openFindBar = useCallback(() => {
+        setFindBarOpen(true)
+        window.requestAnimationFrame(() => findBarRef.current?.focusSearch())
+    }, [])
+
+    const closeFindBar = useCallback(() => {
+        setFindBarOpen(false)
+        window.requestAnimationFrame(() => editorRef.current?.getTextareaElement()?.focus())
+    }, [])
+
+    const replaceMarkdownMatch = useCallback((match: MarkdownTextMatch, replacement: string) => {
+        setDraft((current) => ({
+            ...current,
+            content: replaceMarkdownTextMatch(current.content, match, replacement),
+        }))
+        window.requestAnimationFrame(() => selectMarkdownMatch({
+            start: match.start,
+            end: match.start + replacement.length,
+        }))
+    }, [selectMarkdownMatch])
+
+    const replaceAllMarkdownMatches = useCallback((
+        matches: MarkdownTextMatch[],
+        replacement: string,
+    ) => {
+        setDraft((current) => ({
+            ...current,
+            content: replaceMarkdownTextMatches(current.content, matches, replacement),
+        }))
+        window.requestAnimationFrame(() => findBarRef.current?.focusSearch())
+    }, [])
+
     const syncActiveBlockStyle = useCallback((textarea?: HTMLTextAreaElement | null) => {
         const input = textarea ?? editorRef.current?.getTextareaElement()
         if (!input) return
@@ -1196,7 +1267,7 @@ export default function EntryEditor({
 
     return (
         <div className="entry-editor-page">
-            <RollingBox axis="y" className="entry-editor-page__scroll" thumbSize="thin">
+            <RollingBox ref={pageScrollRef} axis="y" className="entry-editor-page__scroll" thumbSize="thin">
                 <div className="entry-editor-shell">
                     <section
                         ref={workspaceRef}
@@ -1315,8 +1386,19 @@ export default function EntryEditor({
                                         canRedo={undoRedo.canRedo}
                                         activeBlockStyle={activeBlockStyle}
                                         splitView={editorSplitView}
+                                        findBar={findBarOpen ? (
+                                            <EntryMarkdownFindBar
+                                                ref={findBarRef}
+                                                value={draft.content}
+                                                onSelect={selectMarkdownMatch}
+                                                onReplace={replaceMarkdownMatch}
+                                                onReplaceAll={replaceAllMarkdownMatches}
+                                                onClose={closeFindBar}
+                                            />
+                                        ) : undefined}
                                         onUndo={handleUndo}
                                         onRedo={handleRedo}
+                                        onFind={openFindBar}
                                         onCommand={executeMarkdownCommand}
                                         onInsertImage={() => openImageAddModal('insert')}
                                         onSplitViewChange={setEditorSplitView}
@@ -1353,7 +1435,10 @@ export default function EntryEditor({
                                             onKeyDown={(event) => {
                                                 if (!(event.ctrlKey || event.metaKey) || event.repeat) return
                                                 const key = event.key.toLowerCase()
-                                                if (key === 'z' && !event.shiftKey) {
+                                                if (key === 'f') {
+                                                    event.preventDefault()
+                                                    openFindBar()
+                                                } else if (key === 'z' && !event.shiftKey) {
                                                     event.preventDefault()
                                                     handleUndo()
                                                 } else if ((key === 'z' && event.shiftKey) || key === 'y') {

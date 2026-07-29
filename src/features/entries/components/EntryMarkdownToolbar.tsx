@@ -3,6 +3,7 @@
  */
 import {commands, type ICommand} from '@uiw/react-md-editor'
 import {Button} from 'flowcloudai-ui'
+import type {ReactNode} from 'react'
 import {
     buildBlockStyleEdit,
     buildWikiLinkEdit,
@@ -44,8 +45,10 @@ interface EntryMarkdownToolbarProps {
     canRedo: boolean
     activeBlockStyle: MarkdownBlockStyle
     splitView: boolean
+    findBar?: ReactNode
     onUndo: () => void
     onRedo: () => void
+    onFind: () => void
     onCommand: (command: ICommand) => void
     onInsertImage: () => void
     onSplitViewChange: (split: boolean) => void
@@ -83,8 +86,10 @@ export default function EntryMarkdownToolbar({
     canRedo,
     activeBlockStyle,
     splitView,
+    findBar,
     onUndo,
     onRedo,
+    onFind,
     onCommand,
     onInsertImage,
     onSplitViewChange,
@@ -163,6 +168,17 @@ export default function EntryMarkdownToolbar({
                 </div>
             </div>
 
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="entry-editor-format-toolbar__find"
+                title="查找替换（Ctrl+F）"
+                onClick={onFind}
+            >
+                查找
+            </Button>
+
             <div className="entry-editor-format-toolbar__view" role="group" aria-label="编辑器视图">
                 <Button
                     type="button"
@@ -185,6 +201,12 @@ export default function EntryMarkdownToolbar({
                     双栏
                 </Button>
             </div>
+
+            {findBar && (
+                <div className="entry-editor-format-toolbar__find-slot">
+                    {findBar}
+                </div>
+            )}
         </div>
     )
 }
