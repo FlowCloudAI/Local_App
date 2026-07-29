@@ -1,4 +1,4 @@
-import {Input} from 'flowcloudai-ui'
+import {Button, Input} from 'flowcloudai-ui'
 import './HighLightTagItem.css'
 
 type HighLightTagType = 'number' | 'string' | 'boolean'
@@ -19,6 +19,7 @@ interface HighLightTagItemProps {
     implanted?: boolean
     mode?: 'show' | 'edit'
     onChange?: (value: HighLightTagValue) => void
+    onRemove?: () => void
 }
 
 function formatValue(value?: HighLightTagValue): string {
@@ -47,6 +48,7 @@ export default function HighLightTagItem({
                                               implanted = false,
                                               mode = 'show',
                                               onChange,
+                                              onRemove,
                                           }: HighLightTagItemProps) {
     const isEditMode = mode === 'edit'
     const rangeText = getRangeText(schema)
@@ -65,6 +67,18 @@ export default function HighLightTagItem({
                         <span className={`highlight-tag-item__type is-${schema.type}`}>{getTypeLabel(schema.type)}</span>
                     )}
                 </div>
+                {isEditMode && !implanted && onRemove && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="highlight-tag-item__remove"
+                        title="从当前词条移除标签"
+                        onClick={onRemove}
+                    >
+                        删除
+                    </Button>
+                )}
             </div>
             {isEditMode && (
                 <div className="highlight-tag-item__hint" aria-hidden={!rangeText}>

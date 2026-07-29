@@ -140,6 +140,14 @@ export default function useEntryTags({
         setTagSchemaPickerValue(undefined)
     }
 
+    function handleRemoveVisibleTagSchema(schema: TagSchema) {
+        setPinnedTagSchemaIds((current) => current.filter((id) => id !== schema.id))
+        const nextTags = {...draftTags}
+        delete nextTags[schema.id]
+        delete nextTags[schema.name]
+        onTagsChangeRef.current(nextTags)
+    }
+
     function handleTagSchemaSaved(schema: TagSchema) {
         const nextSchemas = [...localTagSchemas, schema]
         setLocalTagSchemas(nextSchemas)
@@ -167,6 +175,7 @@ export default function useEntryTags({
         setPinnedTagSchemaIds,
         setTagSchemaPickerValue,
         handleAddVisibleTagSchema,
+        handleRemoveVisibleTagSchema,
         handleTagSchemaSaved,
     }
 }

@@ -65,6 +65,16 @@
     user-select: text;
 }
 
+.highlight-tag-item__remove {
+    flex: none;
+    color: var(--fc-color-danger);
+}
+
+.highlight-tag-item__remove:hover {
+    background: color-mix(in srgb, var(--fc-color-danger) 10%, transparent);
+    color: var(--fc-color-danger);
+}
+
 .highlight-tag-item__badge,
 .highlight-tag-item__type {
     padding: 0.18rem 0.48rem;

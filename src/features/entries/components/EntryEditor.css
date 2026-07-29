@@ -885,6 +885,10 @@
     transform: translate(-50%, calc(-100% - var(--fc-space-sm)));
 }
 
+.entry-editor-selection-toolbar.is-below {
+    transform: translate(-50%, var(--fc-space-sm));
+}
+
 .entry-editor-selection-toolbar .entry-editor-format-toolbar__command {
     flex: none;
 }

@@ -60,6 +60,10 @@ import {
     replaceMarkdownTextMatches,
 } from './entryMarkdownSearch'
 import {
+    resolveSelectionToolbarPlacement,
+    type SelectionToolbarPlacement,
+} from './entrySelectionToolbar'
+import {
     buildMarkdownOutline,
     type MarkdownOutlineItem,
 } from './entryMarkdownOutlineUtils'
@@ -257,6 +261,7 @@ export default function EntryEditor({
     const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
         left: number
         top: number
+        placement: SelectionToolbarPlacement
     } | null>(null)
     const {
         entryRelations,
@@ -1423,16 +1428,34 @@ export default function EntryEditor({
         const bounds = markdown.getBoundingClientRect()
         const textareaBounds = textarea.getBoundingClientRect()
         const formatToolbar = markdown.querySelector<HTMLElement>('.entry-editor-format-toolbar')
-        const formatToolbarHeight = formatToolbar?.offsetHeight ?? 0
+        const scrollBounds = pageScrollRef.current?.getBoundingClientRect() ?? bounds
+        const start = getTextareaCaretOffset(textarea, textarea.selectionStart)
+        const end = getTextareaCaretOffset(textarea, textarea.selectionEnd)
+        const selectionTop = textareaBounds.top + Math.min(start.top, end.top)
+        const selectionBottom = textareaBounds.top + Math.max(
+            start.top + start.lineHeight,
+            end.top + end.lineHeight,
+        )
+        const visibleTop = Math.max(scrollBounds.top, formatToolbar?.getBoundingClientRect().bottom ?? bounds.top)
+        const visibleBottom = Math.min(scrollBounds.bottom, window.innerHeight)
+        const placement = resolveSelectionToolbarPlacement({
+            selectionTop,
+            selectionBottom,
+            visibleTop,
+            visibleBottom,
+            pointerY: clientY,
+        })
+        if (!placement) {
+            setSelectionToolbarPosition(null)
+            return
+        }
         const edge = Math.min(96, bounds.width / 2)
         const anchorX = clientX ?? (textareaBounds.left + textareaBounds.width / 2)
-        const anchorY = clientY ?? (
-            Math.max(textareaBounds.top, formatToolbar?.getBoundingClientRect().bottom ?? bounds.top) + 56
-        )
 
         setSelectionToolbarPosition({
             left: Math.min(Math.max(anchorX - bounds.left, edge), bounds.width - edge),
-            top: Math.max(anchorY - bounds.top, formatToolbarHeight + 48),
+            top: (placement === 'above' ? selectionTop : selectionBottom) - bounds.top,
+            placement,
         })
     }, [syncActiveBlockStyle])
 
@@ -1544,6 +1567,7 @@ export default function EntryEditor({
                                     },
                                     onGenerateSummary: handleGenerateSummary,
                                     onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema,
+                                    onRemoveVisibleTagSchema: entryTags.handleRemoveVisibleTagSchema,
                                     onOpenTagCreator: () => setTagCreatorOpen(true),
                                     onStartCharacterChat: entry ? () => {
                                         void onStartCharacterChat?.(entry)
@@ -1597,6 +1621,7 @@ export default function EntryEditor({
                                         <EntryMarkdownSelectionToolbar
                                             left={selectionToolbarPosition.left}
                                             top={selectionToolbarPosition.top}
+                                            placement={selectionToolbarPosition.placement}
                                             onCommand={executeMarkdownCommand}
                                         />
                                     )}

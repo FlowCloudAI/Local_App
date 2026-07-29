@@ -62,6 +62,7 @@ interface EntryEditorMetaPanelProps {
         onViewImageSet: () => void
         onGenerateSummary: () => void
         onAddVisibleTagSchema: (schemaId: string) => void
+        onRemoveVisibleTagSchema: (schema: TagSchema) => void
         onOpenTagCreator: () => void
         onStartCharacterChat?: () => void
     }
@@ -99,6 +100,7 @@ export default function EntryEditorMetaPanel({
         onViewImageSet,
         onGenerateSummary,
         onAddVisibleTagSchema,
+        onRemoveVisibleTagSchema,
         onOpenTagCreator,
         onStartCharacterChat,
     } = actions
@@ -543,37 +545,41 @@ export default function EntryEditorMetaPanel({
                     ) : (
                         visibleTagSchemas.length > 0 ? (
                             <div className="entry-editor-tags-grid entry-editor-tags-grid--edit">
-                                {visibleTagSchemas.map((schema) => (
-                                    <div
-                                        key={`${entryId}-${schema.id}`}
-                                        className="entry-editor-tag-card"
-                                    >
-                                        <HighLightTagItem
-                                            schema={{
-                                                id: schema.id,
-                                                name: schema.name,
-                                                type: schema.type as 'number' | 'string' | 'boolean',
-                                                range_min: schema.range_min ?? null,
-                                                range_max: schema.range_max ?? null,
-                                            }}
-                                            value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? null}
-                                            implanted={implantedTagSchemaIdSet.has(schema.id)}
-                                            mode="edit"
-                                            onChange={(value) => onDraftChange((current) => {
-                                                const nextValue = normalizeComparableTagValue(value)
-                                                const currentValue = getComparableTagValue(current.tags, schema)
-                                                if (currentValue === nextValue) return current
-                                                return {
-                                                    ...current,
-                                                    tags: {
-                                                        ...current.tags,
-                                                        [schema.id]: nextValue,
-                                                    },
-                                                }
-                                            })}
-                                        />
-                                    </div>
-                                ))}
+                                {visibleTagSchemas.map((schema) => {
+                                    const isImplanted = implantedTagSchemaIdSet.has(schema.id)
+                                    return (
+                                        <div
+                                            key={`${entryId}-${schema.id}`}
+                                            className="entry-editor-tag-card"
+                                        >
+                                            <HighLightTagItem
+                                                schema={{
+                                                    id: schema.id,
+                                                    name: schema.name,
+                                                    type: schema.type as 'number' | 'string' | 'boolean',
+                                                    range_min: schema.range_min ?? null,
+                                                    range_max: schema.range_max ?? null,
+                                                }}
+                                                value={draft.tags[schema.id] ?? draft.tags[schema.name] ?? null}
+                                                implanted={isImplanted}
+                                                mode="edit"
+                                                onRemove={isImplanted ? undefined : () => onRemoveVisibleTagSchema(schema)}
+                                                onChange={(value) => onDraftChange((current) => {
+                                                    const nextValue = normalizeComparableTagValue(value)
+                                                    const currentValue = getComparableTagValue(current.tags, schema)
+                                                    if (currentValue === nextValue) return current
+                                                    return {
+                                                        ...current,
+                                                        tags: {
+                                                            ...current.tags,
+                                                            [schema.id]: nextValue,
+                                                        },
+                                                    }
+                                                })}
+                                            />
+                                        </div>
+                                    )
+                                })}
                             </div>
                         ) : (
                             <div

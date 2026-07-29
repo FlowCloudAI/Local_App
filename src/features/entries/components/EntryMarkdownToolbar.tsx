@@ -231,17 +231,19 @@ export default function EntryMarkdownToolbar({
 interface EntryMarkdownSelectionToolbarProps {
     left: number
     top: number
+    placement: 'above' | 'below'
     onCommand: (command: ICommand) => void
 }
 
 export function EntryMarkdownSelectionToolbar({
     left,
     top,
+    placement,
     onCommand,
 }: EntryMarkdownSelectionToolbarProps) {
     return (
         <div
-            className="entry-editor-selection-toolbar"
+            className={`entry-editor-selection-toolbar is-${placement}`}
             role="toolbar"
             aria-label="选中文本格式"
             style={{left, top}}

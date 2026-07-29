@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict'
 import {UndoRedoHistory} from '../src/shared/hooks/useUndoRedo.ts'
 import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySaveStatus.ts'
+import {resolveSelectionToolbarPlacement} from '../src/features/entries/components/entrySelectionToolbar.ts'
 
 const history = new UndoRedoHistory('初始内容')
 history.setPending('刚输入的内容')
@@ -46,3 +47,24 @@ assert.equal(
     }).kind,
     'dirty',
 )
+
+assert.equal(resolveSelectionToolbarPlacement({
+    selectionTop: 120,
+    selectionBottom: 180,
+    visibleTop: 0,
+    visibleBottom: 400,
+    pointerY: 170,
+}), 'below')
+assert.equal(resolveSelectionToolbarPlacement({
+    selectionTop: 120,
+    selectionBottom: 380,
+    visibleTop: 0,
+    visibleBottom: 400,
+    pointerY: 370,
+}), 'above')
+assert.equal(resolveSelectionToolbarPlacement({
+    selectionTop: 30,
+    selectionBottom: 380,
+    visibleTop: 0,
+    visibleBottom: 400,
+}), null)
