@@ -1155,7 +1155,10 @@ function ProjectEditorInner({
         <div
             className={`pe-layout ${treeCollapsed ? 'is-tree-collapsed' : ''} ${dividerDragging ? 'is-divider-dragging' : ''}`}
             ref={layoutRef}
-            style={{'--pe-tree-width': `${treeCollapsed ? 0 : treeWidth}px`} as React.CSSProperties}
+            style={{
+                '--pe-tree-width': `${treeCollapsed ? 0 : treeWidth}px`,
+                '--pe-tree-content-min-width': TREE_MIN_WIDTH,
+            } as React.CSSProperties}
         >
             <FcworldProgressDialog progress={fcworldProgress} />
             <div className="pe-tree-panel" data-tour-id="project-editor-tree">

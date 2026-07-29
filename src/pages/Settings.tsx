@@ -1755,7 +1755,10 @@ export default function Settings({
                 <div
                     ref={settingsLayoutRef}
                     className={`settings-page-layout ${settingsSidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${settingsSidebarDragging ? 'is-sidebar-dragging' : ''}`}
-                    style={{'--settings-sidebar-width': `${settingsSidebarCollapsed ? 0 : settingsSidebarWidth}px`} as CSSProperties}
+                    style={{
+                        '--settings-sidebar-width': `${settingsSidebarCollapsed ? 0 : settingsSidebarWidth}px`,
+                        '--settings-sidebar-content-min-width': SETTINGS_SIDEBAR_MIN_WIDTH,
+                    } as CSSProperties}
                 >
                     <SettingsSidebar
                         activeTab={activeTab}
@@ -1818,7 +1821,10 @@ export default function Settings({
             <div
                 ref={settingsLayoutRef}
                 className={`settings-page-layout ${settingsSidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${settingsSidebarDragging ? 'is-sidebar-dragging' : ''}`}
-                style={{'--settings-sidebar-width': `${settingsSidebarCollapsed ? 0 : settingsSidebarWidth}px`} as CSSProperties}
+                style={{
+                    '--settings-sidebar-width': `${settingsSidebarCollapsed ? 0 : settingsSidebarWidth}px`,
+                    '--settings-sidebar-content-min-width': SETTINGS_SIDEBAR_MIN_WIDTH,
+                } as CSSProperties}
             >
                 <SettingsSidebar
                     activeTab={activeTab}
