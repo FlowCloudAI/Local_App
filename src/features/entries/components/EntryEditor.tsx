@@ -47,6 +47,7 @@ import EntryMarkdownToolbar, {
 import EntryMarkdownFindBar, {
     type EntryMarkdownFindBarRef,
 } from './EntryMarkdownFindBar'
+import EntryMarkdownOutline from './EntryMarkdownOutline'
 import {
     buildListEnterEdit,
     resolveMarkdownBlockStyle,
@@ -57,6 +58,10 @@ import {
     replaceMarkdownTextMatch,
     replaceMarkdownTextMatches,
 } from './entryMarkdownSearch'
+import {
+    buildMarkdownOutline,
+    type MarkdownOutlineItem,
+} from './entryMarkdownOutlineUtils'
 import useWikiLink from '../hooks/useWikiLink'
 import useLinkPreview from '../hooks/useLinkPreview'
 import useEntryTags from '../hooks/useEntryTags'
@@ -230,6 +235,7 @@ export default function EntryEditor({
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
     const [editorSplitView, setEditorSplitView] = useState(false)
     const [findBarOpen, setFindBarOpen] = useState(false)
+    const [outlineOpen, setOutlineOpen] = useState(false)
     const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
     const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
         left: number
@@ -301,6 +307,7 @@ export default function EntryEditor({
     useEffect(() => {
         setSelectionToolbarPosition(null)
         setFindBarOpen(false)
+        setOutlineOpen(false)
         setActiveBlockStyle('paragraph')
     }, [entryId, editorMode])
 
@@ -800,6 +807,10 @@ export default function EntryEditor({
         () => buildMarkdownPreviewSource(draft.content, draft.images),
         [draft.content, draft.images],
     )
+    const outlineItems = useMemo(
+        () => buildMarkdownOutline(draft.content),
+        [draft.content],
+    )
 
     const backlinks = useMemo(() => {
         const linkedEntryIds = new Set(incomingLinks.map((link) => link.a_id))
@@ -1193,6 +1204,7 @@ export default function EntryEditor({
     }, [])
 
     const openFindBar = useCallback(() => {
+        setOutlineOpen(false)
         setFindBarOpen(true)
         window.requestAnimationFrame(() => findBarRef.current?.focusSearch())
     }, [])
@@ -1201,6 +1213,17 @@ export default function EntryEditor({
         setFindBarOpen(false)
         window.requestAnimationFrame(() => editorRef.current?.getTextareaElement()?.focus())
     }, [])
+
+    const toggleOutline = useCallback(() => {
+        setFindBarOpen(false)
+        setOutlineOpen((current) => !current)
+    }, [])
+
+    const selectMarkdownOutlineItem = useCallback((item: MarkdownOutlineItem) => {
+        selectMarkdownMatch(item)
+        setOutlineOpen(false)
+        window.requestAnimationFrame(() => editorRef.current?.getTextareaElement()?.focus())
+    }, [selectMarkdownMatch])
 
     const replaceMarkdownMatch = useCallback((match: MarkdownTextMatch, replacement: string) => {
         setDraft((current) => ({
@@ -1396,9 +1419,18 @@ export default function EntryEditor({
                                                 onClose={closeFindBar}
                                             />
                                         ) : undefined}
+                                        outlineOpen={outlineOpen}
+                                        outlinePanel={outlineOpen ? (
+                                            <EntryMarkdownOutline
+                                                items={outlineItems}
+                                                onSelect={selectMarkdownOutlineItem}
+                                                onClose={() => setOutlineOpen(false)}
+                                            />
+                                        ) : undefined}
                                         onUndo={handleUndo}
                                         onRedo={handleRedo}
                                         onFind={openFindBar}
+                                        onOutline={toggleOutline}
                                         onCommand={executeMarkdownCommand}
                                         onInsertImage={() => openImageAddModal('insert')}
                                         onSplitViewChange={setEditorSplitView}

@@ -46,9 +46,12 @@ interface EntryMarkdownToolbarProps {
     activeBlockStyle: MarkdownBlockStyle
     splitView: boolean
     findBar?: ReactNode
+    outlinePanel?: ReactNode
+    outlineOpen: boolean
     onUndo: () => void
     onRedo: () => void
     onFind: () => void
+    onOutline: () => void
     onCommand: (command: ICommand) => void
     onInsertImage: () => void
     onSplitViewChange: (split: boolean) => void
@@ -87,9 +90,12 @@ export default function EntryMarkdownToolbar({
     activeBlockStyle,
     splitView,
     findBar,
+    outlinePanel,
+    outlineOpen,
     onUndo,
     onRedo,
     onFind,
+    onOutline,
     onCommand,
     onInsertImage,
     onSplitViewChange,
@@ -178,6 +184,16 @@ export default function EntryMarkdownToolbar({
             >
                 查找
             </Button>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={`entry-editor-format-toolbar__outline${outlineOpen ? ' is-active' : ''}`}
+                aria-pressed={outlineOpen}
+                onClick={onOutline}
+            >
+                大纲
+            </Button>
 
             <div className="entry-editor-format-toolbar__view" role="group" aria-label="编辑器视图">
                 <Button
@@ -207,6 +223,7 @@ export default function EntryMarkdownToolbar({
                     {findBar}
                 </div>
             )}
+            {outlinePanel}
         </div>
     )
 }

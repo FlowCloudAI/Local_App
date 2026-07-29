@@ -16,6 +16,7 @@
     "test:entry-markdown-toolbar": "node --experimental-strip-types ./scripts/entry-markdown-toolbar.test.mjs",
     "test:entry-editor-reliability": "node --experimental-strip-types ./scripts/entry-editor-reliability.test.mjs",
     "test:entry-markdown-search": "node --experimental-strip-types ./scripts/entry-markdown-search.test.mjs",
+    "test:entry-markdown-outline": "node --experimental-strip-types ./scripts/entry-markdown-outline.test.mjs",
     "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
     "tauri:build:windows:signed": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-windows-signed.ps1",
     "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu",
