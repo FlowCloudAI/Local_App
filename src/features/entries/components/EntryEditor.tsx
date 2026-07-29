@@ -48,6 +48,7 @@ import EntryMarkdownFindBar, {
     type EntryMarkdownFindBarRef,
 } from './EntryMarkdownFindBar'
 import EntryMarkdownOutline from './EntryMarkdownOutline'
+import EntryDraftRecoveryBanner from './EntryDraftRecoveryBanner'
 import {
     buildListEnterEdit,
     resolveMarkdownBlockStyle,
@@ -80,6 +81,13 @@ import {
     resolveMarkdownAnchor,
 } from '../lib/entryMarkdown'
 import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
+import {
+    deleteEntryDraftRecovery,
+    type EntryDraftRecoveryRecord,
+    getEntryDraftRecovery,
+    resolveEntryDraftRecoveryKind,
+    saveEntryDraftRecovery,
+} from '../lib/entryDraftRecovery'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {buildRelationDraft,} from '../lib/entryRelation'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
@@ -237,6 +245,11 @@ export default function EntryEditor({
     const [findBarOpen, setFindBarOpen] = useState(false)
     const [outlineOpen, setOutlineOpen] = useState(false)
     const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
+    const [recoveryReady, setRecoveryReady] = useState(false)
+    const [recoveryNotice, setRecoveryNotice] = useState<{
+        record: EntryDraftRecoveryRecord
+        mode: 'restored' | 'stale'
+    } | null>(null)
     const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
         left: number
         top: number
@@ -279,6 +292,8 @@ export default function EntryEditor({
     const canSaveRef = useRef(false)
     const saveActionRef = useRef<(() => void) | null>(null)
     const editorRef = useRef<MarkdownEditorRef>(null)
+    const recoveryLoadKeyRef = useRef<string | null>(null)
+    const recoveryWriteTimerRef = useRef<number | null>(null)
     const isApplyingHistoryRef = useRef(false)
     const historyInitializedRef = useRef<string | null>(null)
     const entryRef = useRef<Entry | null>(null)
@@ -491,6 +506,13 @@ export default function EntryEditor({
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
         lastSuccessfulSaveAtRef.current = Date.now()
+        recoveryLoadKeyRef.current = null
+        setRecoveryReady(false)
+        setRecoveryNotice(null)
+        if (recoveryWriteTimerRef.current !== null) {
+            window.clearTimeout(recoveryWriteTimerRef.current)
+            recoveryWriteTimerRef.current = null
+        }
         // 切换词条时重置历史追踪
         historyInitializedRef.current = null
         undoRedo.reset({
@@ -693,11 +715,14 @@ export default function EntryEditor({
             images: initialDraft.images,
         }
     }, [initialDraft])
+    const hasBodyChanges = Boolean(
+        comparableInitial && normalizedContent !== comparableInitial.content,
+    )
     const hasChanges = Boolean(
         comparableInitial && (
             trimmedTitle !== comparableInitial.title
             || trimmedSummary !== comparableInitial.summary
-            || normalizedContent !== comparableInitial.content
+            || hasBodyChanges
             || normalizeComparableType(draft.type) !== comparableInitial.type
             || !areTagMapsEqual(draft.tags, comparableInitial.tags, entryTags.localTagSchemas)
             || (draft.categoryId ?? null) !== comparableInitial.categoryId
@@ -706,6 +731,110 @@ export default function EntryEditor({
         ),
     )
     const canSave = Boolean(entry && trimmedTitle && hasChanges && !hasInvalidRelationDrafts && !loading && !saving)
+
+    useEffect(() => {
+        if (!entry || entry.id !== entryId || !comparableInitial) return
+        const currentUpdatedAt = String(entry.updated_at ?? '')
+        const loadKey = JSON.stringify([projectId, entryId, currentUpdatedAt])
+        if (recoveryLoadKeyRef.current === loadKey) return
+        recoveryLoadKeyRef.current = loadKey
+        setRecoveryReady(false)
+        setRecoveryNotice(null)
+
+        // 当前进程内已有更新时，内存草稿比崩溃恢复快照更新，直接进入后续写入。
+        if (hasBodyChanges) {
+            setRecoveryReady(true)
+            return
+        }
+
+        let cancelled = false
+        void getEntryDraftRecovery(projectId, entryId)
+            .then((record) => {
+                if (cancelled || !record) return
+                if (normalizeComparableContent(record.content) === comparableInitial.content) {
+                    void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
+                        logger.error('delete redundant entry recovery failed', recoveryError)
+                    })
+                    return
+                }
+
+                if (resolveEntryDraftRecoveryKind(record, currentUpdatedAt) === 'current') {
+                    setDraft((current) => ({...current, content: record.content}))
+                    setEditorMode('edit')
+                    setRecoveryNotice({record, mode: 'restored'})
+                    return
+                }
+                setRecoveryNotice({record, mode: 'stale'})
+            })
+            .catch((recoveryError) => {
+                logger.error('load entry recovery failed', recoveryError)
+            })
+            .finally(() => {
+                if (!cancelled) setRecoveryReady(true)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [comparableInitial, entry, entryId, hasBodyChanges, projectId])
+
+    useEffect(() => {
+        if (recoveryWriteTimerRef.current !== null) {
+            window.clearTimeout(recoveryWriteTimerRef.current)
+            recoveryWriteTimerRef.current = null
+        }
+        if (!entry || !comparableInitial || !recoveryReady || recoveryNotice?.mode === 'stale') return
+
+        if (!hasBodyChanges) {
+            void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
+                logger.error('delete entry recovery failed', recoveryError)
+            })
+            return
+        }
+
+        recoveryWriteTimerRef.current = window.setTimeout(() => {
+            recoveryWriteTimerRef.current = null
+            void saveEntryDraftRecovery({
+                projectId,
+                entryId,
+                baseUpdatedAt: String(entry.updated_at ?? ''),
+                savedAt: Date.now(),
+                content: draft.content,
+            }).catch((recoveryError) => {
+                logger.error('save entry recovery failed', recoveryError)
+            })
+        }, 1000)
+
+        return () => {
+            if (recoveryWriteTimerRef.current !== null) {
+                window.clearTimeout(recoveryWriteTimerRef.current)
+                recoveryWriteTimerRef.current = null
+            }
+        }
+    }, [
+        comparableInitial,
+        draft.content,
+        entry,
+        entryId,
+        hasBodyChanges,
+        projectId,
+        recoveryNotice?.mode,
+        recoveryReady,
+    ])
+
+    const handleRestoreRecovery = useCallback(() => {
+        if (!recoveryNotice) return
+        setDraft((current) => ({...current, content: recoveryNotice.record.content}))
+        setEditorMode('edit')
+        setRecoveryNotice({...recoveryNotice, mode: 'restored'})
+    }, [recoveryNotice])
+
+    const handleDiscardRecovery = useCallback(() => {
+        setRecoveryNotice(null)
+        void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
+            logger.error('discard entry recovery failed', recoveryError)
+        })
+    }, [entryId, projectId])
 
     const handleGenerateSummary = useCallback(async () => {
         if (generatingSummary || loading || saving) return
@@ -958,6 +1087,14 @@ export default function EntryEditor({
             setOutgoingLinks(savedBundle.outgoingLinks)
             setIncomingLinks(savedBundle.incomingLinks)
             setEntryRelations(savedBundle.relations)
+            if (recoveryWriteTimerRef.current !== null) {
+                window.clearTimeout(recoveryWriteTimerRef.current)
+                recoveryWriteTimerRef.current = null
+            }
+            await deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
+                logger.error('delete saved entry recovery failed', recoveryError)
+            })
+            setRecoveryNotice(null)
 
             const refreshed = await reloadEntryFromDatabase('save')
             if (refreshed.title !== entry.title) {
@@ -977,7 +1114,7 @@ export default function EntryEditor({
             setSaving(false)
             onSavingChange?.(false)
         }
-    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations])
+    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations])
 
     useEffect(() => {
         canSaveRef.current = canSave
@@ -1435,6 +1572,15 @@ export default function EntryEditor({
                                         onInsertImage={() => openImageAddModal('insert')}
                                         onSplitViewChange={setEditorSplitView}
                                     />
+                                    {recoveryNotice && (
+                                        <EntryDraftRecoveryBanner
+                                            record={recoveryNotice.record}
+                                            mode={recoveryNotice.mode}
+                                            onRestore={handleRestoreRecovery}
+                                            onDiscard={handleDiscardRecovery}
+                                            onDismiss={() => setRecoveryNotice(null)}
+                                        />
+                                    )}
                                     {selectionToolbarPosition && (
                                         <EntryMarkdownSelectionToolbar
                                             left={selectionToolbarPosition.left}
