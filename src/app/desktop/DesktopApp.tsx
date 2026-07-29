@@ -1272,7 +1272,7 @@ function DesktopAppContent() {
                         draggable
                         addable
                         tabSizing="adaptive"
-                        dragGutter="96px"
+                        dragGutter="min(96px, 12%)"
                         tauriDragRegion
                         minTabWidth="10rem"
                         items={tabs}
