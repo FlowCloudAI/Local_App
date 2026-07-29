@@ -1,6 +1,77 @@
-import {useCallback, useRef, useState} from 'react'
+/**
+ * 为受控编辑状态提供有限历史记录；防抖期间的最新快照也必须参与撤销，避免快速操作失效。
+ */
+import {useCallback, useEffect, useRef, useState} from 'react'
 
 const MAX_HISTORY = 100
+
+export class UndoRedoHistory<T> {
+    private history: T[]
+    private cursor = 0
+    private pendingState: T | undefined
+    private hasPendingState = false
+
+    constructor(initialState: T) {
+        this.history = [initialState]
+    }
+
+    get canUndo(): boolean {
+        return this.hasPendingState || this.cursor > 0
+    }
+
+    get canRedo(): boolean {
+        return !this.hasPendingState && this.cursor < this.history.length - 1
+    }
+
+    setPending(state: T): void {
+        this.pendingState = state
+        this.hasPendingState = true
+    }
+
+    commitPending(): void {
+        if (!this.hasPendingState) return
+        const state = this.pendingState as T
+        this.pendingState = undefined
+        this.hasPendingState = false
+        this.push(state)
+    }
+
+    push(state: T): void {
+        this.pendingState = undefined
+        this.hasPendingState = false
+        this.history = this.history.slice(0, this.cursor + 1)
+        this.history.push(state)
+        if (this.history.length > MAX_HISTORY) {
+            this.history.shift()
+        } else {
+            this.cursor++
+        }
+    }
+
+    undo(): T | null {
+        this.commitPending()
+        if (this.cursor <= 0) return null
+        this.cursor--
+        return this.history[this.cursor]
+    }
+
+    redo(): T | null {
+        if (this.hasPendingState) {
+            this.commitPending()
+            return null
+        }
+        if (this.cursor >= this.history.length - 1) return null
+        this.cursor++
+        return this.history[this.cursor]
+    }
+
+    reset(state: T): void {
+        this.history = [state]
+        this.cursor = 0
+        this.pendingState = undefined
+        this.hasPendingState = false
+    }
+}
 
 export interface UndoRedoHandle<T> {
     push: (state: T) => void
@@ -14,74 +85,69 @@ export interface UndoRedoHandle<T> {
 }
 
 export function useUndoRedo<T>(initialState: T): UndoRedoHandle<T> {
-    const historyRef = useRef<T[]>([initialState])
-    const cursorRef = useRef(0)
+    const historyRef = useRef<UndoRedoHistory<T> | null>(null)
+    historyRef.current ??= new UndoRedoHistory(initialState)
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [canUndo, setCanUndo] = useState(false)
     const [canRedo, setCanRedo] = useState(false)
 
     const updateFlags = useCallback(() => {
-        setCanUndo(cursorRef.current > 0)
-        setCanRedo(cursorRef.current < historyRef.current.length - 1)
+        const history = historyRef.current!
+        setCanUndo(history.canUndo)
+        setCanRedo(history.canRedo)
     }, [])
+
+    const clearDebounceTimer = useCallback(() => {
+        if (debounceTimerRef.current !== null) {
+            clearTimeout(debounceTimerRef.current)
+            debounceTimerRef.current = null
+        }
+    }, [])
+
+    useEffect(() => clearDebounceTimer, [clearDebounceTimer])
 
     const push = useCallback((state: T) => {
-        // 截断所有前进历史
-        historyRef.current = historyRef.current.slice(0, cursorRef.current + 1)
-        historyRef.current.push(state)
-        if (historyRef.current.length > MAX_HISTORY) {
-            historyRef.current.shift()
-        } else {
-            cursorRef.current++
-        }
+        clearDebounceTimer()
+        historyRef.current!.push(state)
         updateFlags()
-    }, [updateFlags])
+    }, [clearDebounceTimer, updateFlags])
 
     const pushDebounced = useCallback((state: T, delayMs = 600) => {
-        if (debounceTimerRef.current !== null) {
-            clearTimeout(debounceTimerRef.current)
-        }
+        clearDebounceTimer()
+        historyRef.current!.setPending(state)
+        updateFlags()
         debounceTimerRef.current = setTimeout(() => {
             debounceTimerRef.current = null
-            push(state)
+            historyRef.current!.commitPending()
+            updateFlags()
         }, delayMs)
-    }, [push])
+    }, [clearDebounceTimer, updateFlags])
 
     const flushDebounced = useCallback(() => {
-        // 无待处理防抖时不做任何操作 — 调用方无需额外检查
-        if (debounceTimerRef.current === null) return
-        clearTimeout(debounceTimerRef.current)
-        debounceTimerRef.current = null
-        // 这里不知道要提交什么状态；调用方必须在 flush 后显式 push
-    }, [])
+        clearDebounceTimer()
+        historyRef.current!.commitPending()
+        updateFlags()
+    }, [clearDebounceTimer, updateFlags])
 
     const undo = useCallback((): T | null => {
-        if (debounceTimerRef.current !== null) {
-            clearTimeout(debounceTimerRef.current)
-            debounceTimerRef.current = null
-        }
-        if (cursorRef.current <= 0) return null
-        cursorRef.current--
+        clearDebounceTimer()
+        const state = historyRef.current!.undo()
         updateFlags()
-        return historyRef.current[cursorRef.current]
-    }, [updateFlags])
+        return state
+    }, [clearDebounceTimer, updateFlags])
 
     const redo = useCallback((): T | null => {
-        if (cursorRef.current >= historyRef.current.length - 1) return null
-        cursorRef.current++
+        clearDebounceTimer()
+        const state = historyRef.current!.redo()
         updateFlags()
-        return historyRef.current[cursorRef.current]
-    }, [updateFlags])
+        return state
+    }, [clearDebounceTimer, updateFlags])
 
     const reset = useCallback((state: T) => {
-        if (debounceTimerRef.current !== null) {
-            clearTimeout(debounceTimerRef.current)
-            debounceTimerRef.current = null
-        }
-        historyRef.current = [state]
-        cursorRef.current = 0
+        clearDebounceTimer()
+        historyRef.current!.reset(state)
         updateFlags()
-    }, [updateFlags])
+    }, [clearDebounceTimer, updateFlags])
 
     return {push, pushDebounced, flushDebounced, undo, redo, reset, canUndo, canRedo}
 }

@@ -1,0 +1,48 @@
+/**
+ * 验证正文编辑器在防抖窗口内仍可撤销，并保持明确的保存状态。
+ */
+import assert from 'node:assert/strict'
+import {UndoRedoHistory} from '../src/shared/hooks/useUndoRedo.ts'
+import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySaveStatus.ts'
+
+const history = new UndoRedoHistory('初始内容')
+history.setPending('刚输入的内容')
+
+assert.equal(history.canUndo, true)
+assert.equal(history.undo(), '初始内容')
+assert.equal(history.canRedo, true)
+assert.equal(history.redo(), '刚输入的内容')
+
+history.undo()
+history.setPending('新的分支')
+assert.equal(history.canRedo, false)
+history.commitPending()
+assert.equal(history.redo(), null)
+
+assert.deepEqual(
+    resolveEntrySaveStatus({
+        entryLoaded: true,
+        hasChanges: true,
+        trimmedTitle: '词条',
+        hasInvalidRelationDrafts: false,
+        saving: false,
+        saveError: '磁盘写入失败',
+    }),
+    {
+        kind: 'error',
+        text: '保存失败',
+        detail: '磁盘写入失败',
+    },
+)
+
+assert.equal(
+    resolveEntrySaveStatus({
+        entryLoaded: true,
+        hasChanges: true,
+        trimmedTitle: '词条',
+        hasInvalidRelationDrafts: false,
+        saving: false,
+        saveError: null,
+    }).kind,
+    'dirty',
+)

@@ -662,6 +662,22 @@
     background: var(--fc-color-warning, var(--fc-color-primary));
 }
 
+.entry-editor-save-state.is-saving::before {
+    background: var(--fc-color-primary);
+}
+
+.entry-editor-save-state.is-blocked::before {
+    background: var(--fc-color-warning, var(--fc-color-primary));
+}
+
+.entry-editor-save-state.is-error {
+    color: var(--fc-color-danger);
+}
+
+.entry-editor-save-state.is-error::before {
+    background: var(--fc-color-danger);
+}
+
 .entry-editor-more-button {
     min-width: auto;
 }
@@ -776,6 +792,7 @@
 
 .entry-editor-workspace.is-editing .entry-editor-workspace__body {
     flex: 0 0 auto;
+    padding-bottom: max(var(--fc-space-xl, 1.2rem), 38vh);
 }
 
 .entry-editor-meta-layout {

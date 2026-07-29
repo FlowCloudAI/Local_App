@@ -204,6 +204,7 @@ export default function EntryEditor({
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [saveError, setSaveError] = useState<string | null>(null)
     const [editorFontSize, setEditorFontSize] = useState(14)
     const [generatingSummary, setGeneratingSummary] = useState(false)
     const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode)
@@ -487,6 +488,7 @@ export default function EntryEditor({
         setLoading(true)
         setSaving(false)
         setError(null)
+        setSaveError(null)
         linkPreview.closeLinkPreview()
         wikiLink.setWikiDraft?.(null)
         setOutgoingLinks([])
@@ -751,12 +753,13 @@ export default function EntryEditor({
         onDirtyChangeRef.current?.(hasChanges)
     }, [hasChanges])
 
-    const saveStatusText = useEntrySaveStatus({
+    const saveStatus = useEntrySaveStatus({
         entryLoaded: Boolean(entry),
         hasChanges,
         trimmedTitle,
         hasInvalidRelationDrafts,
         saving,
+        saveError,
     })
 
     useEffect(() => {
@@ -813,6 +816,7 @@ export default function EntryEditor({
 
         setEntry(refreshed)
         setDraft(buildDraft(refreshed))
+        setSaveError(null)
         setOutgoingLinks(refreshedOutgoing)
         setIncomingLinks(refreshedIncoming)
         applySavedRelations(refreshedRelations, refreshed.id)
@@ -902,6 +906,7 @@ export default function EntryEditor({
         setSaving(true)
         onSavingChange?.(true)
         setError(null)
+        setSaveError(null)
 
         try {
             if (hasInvalidRelationDrafts) {
@@ -936,6 +941,7 @@ export default function EntryEditor({
         } catch (e) {
             const message = String(e)
             setError(message)
+            setSaveError(message)
             if (message.includes('同名词条')) {
                 void showAlert(message, 'warning', 'nonInvasive', 1800)
             }
@@ -1226,8 +1232,12 @@ export default function EntryEditor({
                                 </div>
                                 <div className="entry-editor-workspace__toolbar-actions">
                                     {editorMode === 'edit' && (
-                                        <span className={`entry-editor-save-state${saveStatusText ? ' is-dirty' : ''}`}>
-                                            {saving ? '正在保存…' : (saveStatusText || '已保存')}
+                                        <span
+                                            className={`entry-editor-save-state is-${saveStatus.kind}`}
+                                            title={saveStatus.detail}
+                                            role={saveStatus.kind === 'error' ? 'alert' : 'status'}
+                                        >
+                                            {saveStatus.text}
                                         </span>
                                     )}
                                     <Button type="button" size="sm" disabled={!canSave} onClick={() => void handleSave()}>
