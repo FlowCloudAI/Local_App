@@ -18,6 +18,10 @@ export interface MarkdownEditorValueChangeMeta {
     source: "input";
     event: MarkdownEditorChangeEvent;
 }
+export interface MarkdownEditorSearchHighlights {
+    matches: ReadonlyArray<{start: number; end: number}>;
+    activeIndex: number;
+}
 export type MarkdownEditorValueChangeHandler = (
     nextValue: string,
     meta?: MarkdownEditorValueChangeMeta,
@@ -92,6 +96,8 @@ export interface MarkdownEditorProps extends Omit<React.HTMLAttributes<HTMLDivEl
     previewOptions?: MarkdownPreviewOptions;
     previewRender?: MarkdownPreviewRenderer;
     tokens?: Partial<MarkdownEditorTokens>;
+    /** 在编辑层高亮正文查找结果。 */
+    searchHighlights?: MarkdownEditorSearchHighlights;
 }
 
 function withTitle(cmd: ICommand, title: string): ICommand {
@@ -146,6 +152,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         previewOptions,
         previewRender,
         tokens,
+        searchHighlights,
         ...props
     } = _ref;
     const resolvedTheme = useOptionalTheme()?.resolvedTheme ?? "light";
@@ -330,6 +337,46 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             window.removeEventListener('resize', measure);
         };
     }, [autoHeight, value, hideInternalToolbar, isPreviewMode, showSplit, minHeight, maxHeight, height]);
+
+    useLayoutEffect(() => {
+        if (!searchHighlights?.matches.length || typeof Highlight === "undefined") return;
+        const registry = CSS.highlights;
+        const matchName = "fc-markdown-search-match";
+        const activeName = "fc-markdown-search-active";
+        const code = wrapRef.current?.querySelector<HTMLElement>(".w-md-editor-text-pre > code");
+        if (!code) return;
+        const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+        const nodes: Array<{node: Text; start: number; end: number}> = [];
+        let offset = 0;
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const text = node as Text;
+            nodes.push({node: text, start: offset, end: offset + text.data.length});
+            offset += text.data.length;
+        }
+
+        const ranges = searchHighlights.matches.map((match) => {
+            const start = nodes.find((item) => match.start >= item.start && match.start < item.end);
+            const end = nodes.find((item) => match.end > item.start && match.end <= item.end);
+            if (!start || !end) return null;
+            const range = new Range();
+            range.setStart(start.node, match.start - start.start);
+            range.setEnd(end.node, match.end - end.start);
+            return range;
+        });
+        const regular = ranges.filter((range, index): range is Range => (
+            range !== null && index !== searchHighlights.activeIndex
+        ));
+        const active = ranges[searchHighlights.activeIndex];
+        const regularHighlight = new Highlight(...regular);
+        const activeHighlight = active ? new Highlight(active) : null;
+        registry.set(matchName, regularHighlight);
+        if (activeHighlight) registry.set(activeName, activeHighlight);
+
+        return () => {
+            if (registry.get(matchName) === regularHighlight) registry.delete(matchName);
+            if (activeHighlight && registry.get(activeName) === activeHighlight) registry.delete(activeName);
+        };
+    }, [searchHighlights, value]);
 
     const editorHeightValue = autoHeight ? editorHeight : (height ?? minHeight);
     const editorCommands = toolbarCommands ?? TOOLBAR_COMMANDS;

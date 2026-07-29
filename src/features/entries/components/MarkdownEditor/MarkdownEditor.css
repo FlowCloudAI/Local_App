@@ -97,6 +97,16 @@
     color: inherit !important;
 }
 
+::highlight(fc-markdown-search-match) {
+    background-color: color-mix(in srgb, var(--fc-color-warning, var(--md-primary)) 32%, transparent);
+    color: inherit;
+}
+
+::highlight(fc-markdown-search-active) {
+    background-color: color-mix(in srgb, var(--fc-color-warning, var(--md-primary)) 68%, transparent);
+    color: inherit;
+}
+
 /* ---------- FlowCloudAI 双链 ---------- */
 .fc-md-wrap .w-md-editor-text-pre .token.wiki-link {
     color: var(--md-primary) !important;

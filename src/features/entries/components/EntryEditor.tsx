@@ -243,6 +243,10 @@ export default function EntryEditor({
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
     const [editorSplitView, setEditorSplitView] = useState(false)
     const [findBarOpen, setFindBarOpen] = useState(false)
+    const [markdownSearchHighlights, setMarkdownSearchHighlights] = useState<{
+        matches: MarkdownTextMatch[]
+        activeIndex: number
+    } | null>(null)
     const [outlineOpen, setOutlineOpen] = useState(false)
     const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
     const [recoveryReady, setRecoveryReady] = useState(false)
@@ -1351,6 +1355,13 @@ export default function EntryEditor({
         window.requestAnimationFrame(() => editorRef.current?.getTextareaElement()?.focus())
     }, [])
 
+    const handleMarkdownSearchHighlights = useCallback((
+        matches: MarkdownTextMatch[],
+        activeIndex: number,
+    ) => {
+        setMarkdownSearchHighlights(matches.length ? {matches, activeIndex} : null)
+    }, [])
+
     const toggleOutline = useCallback(() => {
         setFindBarOpen(false)
         setOutlineOpen((current) => !current)
@@ -1553,6 +1564,7 @@ export default function EntryEditor({
                                                 onSelect={selectMarkdownMatch}
                                                 onReplace={replaceMarkdownMatch}
                                                 onReplaceAll={replaceAllMarkdownMatches}
+                                                onHighlightChange={handleMarkdownSearchHighlights}
                                                 onClose={closeFindBar}
                                             />
                                         ) : undefined}
@@ -1605,6 +1617,7 @@ export default function EntryEditor({
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
                                             previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
+                                            searchHighlights={markdownSearchHighlights ?? undefined}
                                             hideToolbar
                                             hideFullscreen
                                             showSplitToggle={false}

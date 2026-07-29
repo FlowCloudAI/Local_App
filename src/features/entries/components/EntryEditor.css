@@ -901,7 +901,6 @@
 
 .entry-editor-workspace.is-editing .entry-editor-workspace__body {
     flex: 0 0 auto;
-    padding-bottom: max(var(--fc-space-xl, 1.2rem), 38vh);
 }
 
 .entry-editor-meta-layout {
@@ -1087,6 +1086,7 @@
 
 .entry-editor-workspace.is-editing .entry-editor-markdown-anchor {
     height: auto;
+    padding-bottom: 38vh;
 }
 
 .entry-editor-readonly-title {

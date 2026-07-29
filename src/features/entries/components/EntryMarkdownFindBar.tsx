@@ -1,7 +1,7 @@
 /**
- * 正文查找替换栏；匹配计算保持纯文本语义，选区与滚动由 EntryEditor 接管。
+ * 正文查找替换栏；匹配计算保持纯文本语义，选区、滚动与高亮渲染由外层编辑器接管。
  */
-import {forwardRef, useImperativeHandle, useMemo, useRef, useState} from 'react'
+import {forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import {
     findMarkdownTextMatches,
@@ -17,11 +17,19 @@ interface EntryMarkdownFindBarProps {
     onSelect: (match: MarkdownTextMatch) => void
     onReplace: (match: MarkdownTextMatch, replacement: string) => void
     onReplaceAll: (matches: MarkdownTextMatch[], replacement: string) => void
+    onHighlightChange: (matches: MarkdownTextMatch[], activeIndex: number) => void
     onClose: () => void
 }
 
 const EntryMarkdownFindBar = forwardRef<EntryMarkdownFindBarRef, EntryMarkdownFindBarProps>(
-    function EntryMarkdownFindBar({value, onSelect, onReplace, onReplaceAll, onClose}, ref) {
+    function EntryMarkdownFindBar({
+        value,
+        onSelect,
+        onReplace,
+        onReplaceAll,
+        onHighlightChange,
+        onClose,
+    }, ref) {
         const searchInputRef = useRef<HTMLInputElement>(null)
         const [query, setQuery] = useState('')
         const [replacement, setReplacement] = useState('')
@@ -35,6 +43,11 @@ const EntryMarkdownFindBar = forwardRef<EntryMarkdownFindBarRef, EntryMarkdownFi
                 searchInputRef.current?.select()
             },
         }), [])
+
+        useEffect(() => {
+            onHighlightChange(matches, currentIndex)
+            return () => onHighlightChange([], -1)
+        }, [currentIndex, matches, onHighlightChange])
 
         function handleQueryChange(nextQuery: string) {
             setQuery(nextQuery)
