@@ -684,7 +684,7 @@
         "cover primary auxiliary"
         "cover secondary secondary";
     align-items: start;
-    gap: 1.6rem 1.75rem;
+    gap: 0.5rem 1.6rem;
     width: min(100%, 110rem);
     margin-inline: auto;
 }
