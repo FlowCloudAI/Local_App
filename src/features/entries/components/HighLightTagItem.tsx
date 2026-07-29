@@ -51,11 +51,12 @@ export default function HighLightTagItem({
                                               onRemove,
                                           }: HighLightTagItemProps) {
     const isEditMode = mode === 'edit'
+    const canRemove = isEditMode && !implanted && Boolean(onRemove)
     const rangeText = getRangeText(schema)
 
     return (
         <div
-            className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}${implanted ? ' is-implanted' : ''}`}
+            className={`highlight-tag-item${isEditMode ? ' is-edit' : ' is-show'}${implanted ? ' is-implanted' : ''}${canRemove ? ' has-remove' : ''}`}
         >
             <div className="highlight-tag-item__header">
                 <div className="highlight-tag-item__title-group">
@@ -67,7 +68,7 @@ export default function HighLightTagItem({
                         <span className={`highlight-tag-item__type is-${schema.type}`}>{getTypeLabel(schema.type)}</span>
                     )}
                 </div>
-                {isEditMode && !implanted && onRemove && (
+                {canRemove && (
                     <Button
                         type="button"
                         variant="ghost"
