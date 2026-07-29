@@ -1271,7 +1271,8 @@ function DesktopAppContent() {
                         closable
                         draggable
                         addable
-                        fillWidth={false}
+                        tabSizing="adaptive"
+                        dragGutter="96px"
                         tauriDragRegion
                         minTabWidth="10rem"
                         items={tabs}
