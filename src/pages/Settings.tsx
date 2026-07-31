@@ -1505,8 +1505,8 @@ export default function Settings({
                 show_reasoning: false,
                 app_sense_custom_prompt: '',
                 writer_mode_enabled: false,
-                auto_compact_enabled: false,
-                auto_compact_threshold_ratio: 0.75,
+                auto_compact_enabled: true,
+                auto_compact_threshold_ratio: 0.65,
                 auto_compact_recent_messages: 8,
                 auto_compact_detail: 'balanced',
                 token_calibration_factors: {},
@@ -2476,7 +2476,7 @@ export default function Settings({
                                         <span>自动精简对话记忆</span>
                                     </label>
                                     <span className="settings-field-hint">
-                                        回复后若对话记忆较满，自动整理摘要，节省对话空间。
+                                        发送前若预计达到阈值，会先把较早对话整理成摘要并保留近期原文；可关闭此功能。
                                     </span>
                                 </div>
                                 {settings.llm.auto_compact_enabled && (

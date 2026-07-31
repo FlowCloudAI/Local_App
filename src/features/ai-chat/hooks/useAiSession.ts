@@ -53,6 +53,8 @@ export interface SessionMessage {
     /** 本轮 API 用量。供应商未返回 usage 时为空。 */
     usage?: AiUsage | null
     calibrationFactor?: number
+    /** 本轮机械裁剪后，是否建议在下次发送前执行语义压缩。 */
+    suggestCompaction?: boolean
     turnStatus?: string
     finishReason?: string
     continuationOfNodeId?: number
@@ -174,6 +176,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
     const traceIdByRunRef = useRef<Record<string, string>>({})
     const turnStartedAtByRunRef = useRef<Record<string, number>>({})
     const continuationNodeIdByRunRef = useRef<Record<string, number | null>>({})
+    const suggestCompactionByRunRef = useRef<Record<string, boolean>>({})
     const sessionIdRef = useRef<string | null>(null)
     const runIdRef = useRef<string | null>(null)
     // 标记每个 run 的下一个 TurnBegin 是用户发起的（非工具续轮）
@@ -235,6 +238,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         delete traceIdByRunRef.current[targetRunId]
         delete turnStartedAtByRunRef.current[targetRunId]
         delete continuationNodeIdByRunRef.current[targetRunId]
+        delete suggestCompactionByRunRef.current[targetRunId]
         setRunStreaming(targetRunId, false)
         if (runIdRef.current === targetRunId) {
             sessionIdRef.current = null
@@ -652,6 +656,9 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         const unlistenContextTrimmed = listen<AiEventContextTrimmed>('ai:context_trimmed', event => {
             markRunEvent('ai:context_trimmed', event.payload.run_id)
             const payload = event.payload
+            if (payload.suggest_compaction) {
+                suggestCompactionByRunRef.current[payload.run_id] = true
+            }
             const notice = [
                 '> **系统提示**：上下文已自动裁剪',
                 `（截断 ${payload.truncated_messages} 条消息，省略 ${payload.dropped_rounds} 轮，`,
@@ -733,6 +740,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         nodeId: node_id ?? undefined,
                         usage,
                         calibrationFactor: calibration_factor ?? undefined,
+                        suggestCompaction: suggestCompactionByRunRef.current[rid] || undefined,
                         turnStatus: status,
                         finishReason: finish_reason ?? undefined,
                         continuationOfNodeId: continuation_of ?? undefined,
@@ -755,6 +763,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     delete blocksByRunRef.current[rid]
                     delete turnStartedAtByRunRef.current[rid]
                     delete continuationNodeIdByRunRef.current[rid]
+                    delete suggestCompactionByRunRef.current[rid]
                     setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])

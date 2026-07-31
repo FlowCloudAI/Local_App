@@ -754,6 +754,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const entrySnippetCacheRef = useRef<Map<string, string>>(new Map())
     const entryTitleCacheRef = useRef<Map<string, string>>(new Map())
     const conversationSettingsSaveTimersRef = useRef<Record<string, ReturnType<typeof window.setTimeout>>>({})
+    const autoCompactSuggestedConversationIdsRef = useRef(new Set<string>())
     const {
         focusContext,
         documentContextItemsByConversation,
@@ -867,72 +868,80 @@ export function useAiController(focus: AiFocus): AiContextValue {
         return migrated
     }, [])
 
-    const maybeAutoCompactAfterMessage = useCallback(async (
-        conversationId: string,
-        message: SessionMessage,
-    ) => {
-        if (!message.nodeId) return
-
+    const maybeAutoCompactBeforeSend = useCallback(async (
+        conversation: Conversation,
+        messages: Message[],
+        pendingContent: string,
+    ): Promise<boolean> => {
         const settings = await setting_get_settings().catch(() => appSettingsRef.current)
         if (settings) appSettingsRef.current = settings
         const compactSettings = settings?.llm
-        if (!compactSettings?.auto_compact_enabled) return
+        if (!compactSettings?.auto_compact_enabled || conversation.mode !== 'default') return false
 
-        const conversation = conversationsRef.current.find((item) => item.id === conversationId)
-        if (!conversation || conversation.mode !== 'default') return
+        const headMessage = [...messages]
+            .reverse()
+            .find((item) => item.role === 'assistant' && item.nodeId != null)
+        if (!headMessage?.nodeId) return false
 
         const plugin = getAiPluginSnapshot().plugins.find((item) => item.id === conversation.pluginId)
         const modelInfo = plugin?.model_infos.find((item) => item.id === conversation.model)
         const contextWindowTokens = modelInfo?.context_window_tokens ?? null
-        if (!contextWindowTokens || contextWindowTokens <= 0) return
+        if (!contextWindowTokens || contextWindowTokens <= 0) return false
 
-        const messagesForEstimate = conversation.messages.some((item) => item.id === message.id)
-            ? conversation.messages
-            : [...conversation.messages, {content: message.content}]
-        const calibrationFactor = message.calibrationFactor ?? resolveTokenCalibrationFactor(
+        const calibrationFactor = headMessage.calibrationFactor ?? resolveTokenCalibrationFactor(
             compactSettings.token_calibration_factors,
             conversation.pluginId,
             conversation.model,
         )
-        const estimatedTokens = estimateMessagesTokens(messagesForEstimate, calibrationFactor)
-        const usageTokens = message.usage?.total_tokens ?? 0
+        const estimatedTokens = estimateMessagesTokens([...messages, {content: pendingContent}], calibrationFactor)
+        const usageTokens = headMessage.usage?.total_tokens ?? 0
         const usedTokens = Math.max(usageTokens, estimatedTokens)
         const usageRatio = usedTokens / contextWindowTokens
-        if (usageRatio < compactSettings.auto_compact_threshold_ratio) return
+        const suggested = autoCompactSuggestedConversationIdsRef.current.has(conversation.id)
+        if (!suggested && usageRatio < compactSettings.auto_compact_threshold_ratio) return false
 
-        const inFlightKey = `${conversationId}:${message.nodeId}`
-        if (!markAutoCompactInFlight(inFlightKey)) return
+        const inFlightKey = `${conversation.id}:${headMessage.nodeId}:pre-send`
+        if (!markAutoCompactInFlight(inFlightKey)) return false
 
         try {
             const result = await ai_compact_conversation({
-                conversationId,
+                conversationId: conversation.id,
                 pluginId: conversation.pluginId,
                 model: conversation.model,
-                headNodeId: message.nodeId,
+                headNodeId: headMessage.nodeId,
                 recentMessages: compactSettings.auto_compact_recent_messages,
                 detail: compactSettings.auto_compact_detail,
             })
-            logger.log('[useAiController][自动压缩] 压缩检查完成', {
-                conversationId,
+            autoCompactSuggestedConversationIdsRef.current.delete(conversation.id)
+            logger.log('[useAiController][自动压缩] 发送前压缩检查完成', {
+                conversationId: conversation.id,
                 applied: result.applied,
                 positionNodeId: result.positionNodeId ?? null,
                 summaryChars: result.summaryChars,
+                suggested,
                 usageRatio,
-                usageTokens: message.usage?.total_tokens ?? null,
+                usageTokens: headMessage.usage?.total_tokens ?? null,
                 estimatedTokens,
             })
-            if (!result.applied) return
+            if (!result.applied) return false
 
-            await getAiSessionApi()?.closeSession(message.sessionId)
-            deleteRuntimeConversation(message.sessionId, message.runId)
+            if (conversation.sessionId) {
+                await getAiSessionApi()?.closeSession(conversation.sessionId)
+            }
+            if (conversation.sessionId && conversation.runId) {
+                deleteRuntimeConversation(conversation.sessionId, conversation.runId)
+            }
+            getAiSessionApi()?.activateSession(null, null)
             setAiConversations((prev) => prev.map((item) =>
-                item.id === conversationId ? {...item, sessionId: null, runId: null} : item,
+                item.id === conversation.id ? {...item, sessionId: null, runId: null} : item,
             ))
+            return true
         } catch (error) {
-            logger.warn('[useAiController][自动压缩] 压缩失败', {
-                conversationId,
+            logger.warn('[useAiController][自动压缩] 发送前压缩失败，继续发送', {
+                conversationId: conversation.id,
                 error,
             })
+            return false
         } finally {
             clearAutoCompactInFlight(inFlightKey)
         }
@@ -1013,10 +1022,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
             })
         }
         if (resolvedConversationId) {
-            void maybeAutoCompactAfterMessage(resolvedConversationId, message)
+            if (message.suggestCompaction) {
+                autoCompactSuggestedConversationIdsRef.current.add(resolvedConversationId)
+            }
             persistUserMessageAttachments(resolvedConversationId, latestUserMessageWithAttachments)
         }
-    }, [maybeAutoCompactAfterMessage, persistUserMessageAttachments])
+    }, [persistUserMessageAttachments])
 
     const onUserTurnBegin = useCallback((payload: { sessionId: string; runId: string; nodeId: number }) => {
         const targetConversationId = findRuntimeConversation(payload.sessionId, payload.runId)
@@ -2187,8 +2198,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
         && currentConv.reportContext
             ? buildReportBootstrapPrompt(currentConv.reportContext, trimmed)
             : trimmed
-        const existingSid = sessionClosedForEdit ? null : currentConv.sessionId
-        const existingRunId = sessionClosedForEdit ? null : currentConv.runId
+        const compactApplied = await maybeAutoCompactBeforeSend(currentConv, messagesBeforeNewUser, actualPrompt)
+        const existingSid = sessionClosedForEdit || compactApplied ? null : currentConv.sessionId
+        const existingRunId = sessionClosedForEdit || compactApplied ? null : currentConv.runId
         const preparedSession = await (async (): Promise<PreparedAiSession | null> => {
             if (existingSid && existingRunId) {
                 logger.log('[useAiController][发送链路] 复用当前对话已有后端会话', {
@@ -2451,6 +2463,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         toolAccessMode,
         webSearchEnabled,
         onError,
+        maybeAutoCompactBeforeSend,
     ])
 
     const stopStreaming = useCallback(() => {
