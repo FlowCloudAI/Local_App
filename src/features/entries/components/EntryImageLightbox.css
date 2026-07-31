@@ -115,68 +115,6 @@
     gap: var(--fc-space-sm);
 }
 
-.entry-editor-lightbox__more {
-    position: relative;
-}
-
-.entry-editor-lightbox__more summary {
-    min-height: var(--fc-control-tap-min, 2.5rem);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--fc-space-sm) var(--fc-space-md);
-    border-radius: var(--fc-radius-sm);
-    color: var(--fc-color-text);
-    font-family: var(--fc-font-family);
-    font-size: var(--fc-font-size-sm);
-    font-weight: var(--fc-font-weight-medium);
-    line-height: var(--fc-line-height-tight);
-    list-style: none;
-    cursor: pointer;
-    user-select: none;
-}
-
-.entry-editor-lightbox__more summary::-webkit-details-marker {
-    display: none;
-}
-
-.entry-editor-lightbox__more summary:hover,
-.entry-editor-lightbox__more summary:focus-visible,
-.entry-editor-lightbox__more[open] summary {
-    background: var(--fc-color-bg-secondary);
-    outline: none;
-}
-
-.entry-editor-lightbox__more summary:focus-visible {
-    box-shadow: 0 0 0 2px var(--fc-color-primary);
-}
-
-.entry-editor-lightbox__more-menu {
-    position: absolute;
-    top: calc(100% + var(--fc-space-xs));
-    right: 0;
-    z-index: var(--fc-z-dropdown);
-    width: max-content;
-    min-width: 12rem;
-    display: grid;
-    gap: var(--fc-space-xs);
-    padding: var(--fc-space-xs);
-    border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
-    background: var(--fc-color-bg-elevated);
-    box-shadow: var(--fc-shadow-md);
-}
-
-.entry-editor-lightbox__more-menu .fc-btn {
-    justify-content: flex-start;
-}
-
-.entry-editor-lightbox__danger-action.fc-btn {
-    --btn-color: var(--fc-color-danger);
-    --btn-color-hover: var(--fc-color-danger);
-    --btn-bg-hover: var(--fc-color-danger-bg);
-}
-
 .entry-editor-lightbox__stage {
     position: relative;
     min-height: 0;
@@ -490,13 +428,8 @@
         gap: var(--fc-space-xs);
     }
 
-    .entry-editor-lightbox__header-actions .fc-btn,
-    .entry-editor-lightbox__more summary {
+    .entry-editor-lightbox__header-actions .fc-btn {
         padding-inline: var(--fc-space-sm);
-    }
-
-    .entry-editor-lightbox__more-menu {
-        right: 0;
     }
 
     .entry-editor-lightbox__previous {

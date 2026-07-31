@@ -6,6 +6,7 @@ import {type PointerEvent, useEffect, useRef, useState, type WheelEvent} from 'r
 import {Button, RollingBox, Slider, useAlert} from 'flowcloudai-ui'
 import {open_entry_image_path} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
+import ActionMenu from '../../../shared/ui/overlay/ActionMenu'
 import './EntryImageLightbox.css'
 
 const MIN_SCALE = 0.8
@@ -60,8 +61,8 @@ export default function EntryImageLightbox({
     const [scale, setScale] = useState(FIT_SCALE)
     const [offset, setOffset] = useState({x: 0, y: 0})
     const [isDragging, setIsDragging] = useState(false)
+    const [moreMenuOpen, setMoreMenuOpen] = useState(false)
     const previewThumbRefs = useRef<Record<number, HTMLButtonElement | null>>({})
-    const moreDetailsRef = useRef<HTMLDetailsElement>(null)
     const dragStateRef = useRef({
         pointerId: -1,
         startX: 0,
@@ -94,10 +95,6 @@ export default function EntryImageLightbox({
         onIndexChange((index + images.length) % images.length)
     }
 
-    function closeMoreMenu() {
-        moreDetailsRef.current?.removeAttribute('open')
-    }
-
     useEffect(() => {
         if (!open) return
         if (images.length === 0) {
@@ -117,7 +114,7 @@ export default function EntryImageLightbox({
         if (!open) return
         queueMicrotask(() => {
             resetPreviewTransform()
-            closeMoreMenu()
+            setMoreMenuOpen(false)
         })
     }, [open, currentIndex])
 
@@ -202,14 +199,12 @@ export default function EntryImageLightbox({
         if (!onRemove) return
         const result = await showAlert('确认移除这张图片？', 'warning', 'confirm')
         if (result !== 'yes') return
-        closeMoreMenu()
         onRemove(safeIndex)
     }
 
     async function handleOpenLocalPath() {
         const rawPath = currentImage?.path
         if (!rawPath) return
-        closeMoreMenu()
         try {
             await open_entry_image_path(String(rawPath))
         } catch (error) {
@@ -356,23 +351,43 @@ export default function EntryImageLightbox({
         )
     }
 
+    const moreMenuItems = [
+        ...(canSetCover && onInsertMarkdown ? [{
+            key: 'set-cover',
+            label: '设为主图',
+            onSelect: () => onSetCover?.(safeIndex),
+        }] : []),
+        ...(currentImage?.path ? [{
+            key: 'open-folder',
+            label: '打开所在文件夹',
+            onSelect: () => void handleOpenLocalPath(),
+        }] : []),
+        ...(onRemove ? [{
+            key: 'remove-image',
+            label: '移除图片',
+            danger: true,
+            onSelect: () => void handleRemoveClick(),
+        }] : []),
+    ]
+
     return (
-        <FloatingPanel
-            open={open}
-            onClose={onClose}
-            layerClassName="entry-editor-lightbox-layer"
-            className="entry-editor-lightbox"
-            closeLabel="关闭图片浏览"
-            title={(
-                <div className="entry-editor-lightbox__identity">
-                    <span className="entry-editor-lightbox__identity-title">{infoTitle} · 图片</span>
-                    <span className="entry-editor-lightbox__count">
-                        {safeIndex + 1} / {images.length}
-                    </span>
-                    {currentImage?.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
-                </div>
-            )}
-        >
+        <>
+            <FloatingPanel
+                open={open}
+                onClose={onClose}
+                layerClassName="entry-editor-lightbox-layer"
+                className="entry-editor-lightbox"
+                closeLabel="关闭图片浏览"
+                title={(
+                    <div className="entry-editor-lightbox__identity">
+                        <span className="entry-editor-lightbox__identity-title">{infoTitle} · 图片</span>
+                        <span className="entry-editor-lightbox__count">
+                            {safeIndex + 1} / {images.length}
+                        </span>
+                        {currentImage?.is_cover && <span className="entry-editor-lightbox__badge">主图</span>}
+                    </div>
+                )}
+            >
             <section className="entry-editor-lightbox__dialog">
                 <div className="entry-editor-lightbox__toolbar">
                     <div className="entry-editor-lightbox__view-switch" role="group" aria-label="浏览模式">
@@ -460,60 +475,14 @@ export default function EntryImageLightbox({
                             </Button>
                         )}
                         {hasMoreActions && (
-                            <details
-                                ref={moreDetailsRef}
-                                className="entry-editor-lightbox__more"
-                                onBlur={(event) => {
-                                    const nextTarget = event.relatedTarget
-                                    if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
-                                        event.currentTarget.open = false
-                                    }
-                                }}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setMoreMenuOpen(true)}
                             >
-                                <summary>更多</summary>
-                                <div className="entry-editor-lightbox__more-menu" role="menu">
-                                    {canSetCover && onInsertMarkdown && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            block
-                                            role="menuitem"
-                                            onClick={() => {
-                                                closeMoreMenu()
-                                                onSetCover?.(safeIndex)
-                                            }}
-                                        >
-                                            设为主图
-                                        </Button>
-                                    )}
-                                    {currentImage?.path && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            block
-                                            role="menuitem"
-                                            onClick={() => void handleOpenLocalPath()}
-                                        >
-                                            打开所在文件夹
-                                        </Button>
-                                    )}
-                                    {onRemove && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            block
-                                            role="menuitem"
-                                            className="entry-editor-lightbox__danger-action"
-                                            onClick={() => void handleRemoveClick()}
-                                        >
-                                            移除图片
-                                        </Button>
-                                    )}
-                                </div>
-                            </details>
+                                更多
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -585,6 +554,14 @@ export default function EntryImageLightbox({
                     第 {safeIndex + 1} 张，共 {images.length} 张；缩放 {Math.round(scale * 100)}%
                 </span>
             </section>
-        </FloatingPanel>
+            </FloatingPanel>
+            <ActionMenu
+                open={moreMenuOpen}
+                onClose={() => setMoreMenuOpen(false)}
+                title={`${infoTitle} · 图片操作`}
+                ariaLabel="图片操作"
+                items={moreMenuItems}
+            />
+        </>
     )
 }
