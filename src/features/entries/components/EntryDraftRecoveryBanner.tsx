@@ -1,49 +1,89 @@
 /**
- * 正文恢复提示；当前版本自动恢复，旧版本草稿必须由用户明确选择。
+ * 词条草稿恢复提示；集中列出可恢复字段，由用户一次性选择。
  */
 import {Button} from 'flowcloudai-ui'
-import type {EntryDraftRecoveryRecord} from '../lib/entryDraftRecovery'
+import {useEffect, useState} from 'react'
+import type {
+    EntryDraftRecoveryField,
+    EntryDraftRecoveryKind,
+    EntryDraftRecoveryRecord,
+} from '../lib/entryDraftRecovery'
 
 interface EntryDraftRecoveryBannerProps {
     record: EntryDraftRecoveryRecord
-    mode: 'restored' | 'stale'
-    onRestore: () => void
+    kind: EntryDraftRecoveryKind
+    fields: EntryDraftRecoveryField[]
+    onRestore: (fields: EntryDraftRecoveryField[]) => void
     onDiscard: () => void
-    onDismiss: () => void
+}
+
+const FIELD_LABELS: Record<EntryDraftRecoveryField, string> = {
+    title: '标题',
+    summary: '摘要',
+    content: '正文',
+    type: '词条类型',
+    categoryId: '所属分类',
+    tags: '标签',
+    images: '图片',
+    relationDrafts: '词条关系',
 }
 
 export default function EntryDraftRecoveryBanner({
     record,
-    mode,
+    kind,
+    fields,
     onRestore,
     onDiscard,
-    onDismiss,
 }: EntryDraftRecoveryBannerProps) {
     const savedAt = new Date(record.savedAt).toLocaleString()
+    const [selectedFields, setSelectedFields] = useState<EntryDraftRecoveryField[]>(fields)
+
+    useEffect(() => {
+        setSelectedFields(fields)
+    }, [fields])
 
     return (
         <div
-            className={`entry-editor-recovery-banner is-${mode}`}
-            role={mode === 'stale' ? 'alert' : 'status'}
+            className={`entry-editor-recovery-banner is-${kind}`}
+            role={kind === 'stale' ? 'alert' : 'status'}
         >
             <div className="entry-editor-recovery-banner__copy">
-                <strong>{mode === 'restored' ? '已恢复未保存的正文草稿' : '发现基于旧版本的正文草稿'}</strong>
+                <strong>{kind === 'current' ? '发现未保存的词条草稿' : '发现基于旧版本的词条草稿'}</strong>
                 <span>
-                    {mode === 'restored'
+                    {kind === 'current'
                         ? `恢复点：${savedAt}`
                         : `草稿保存于 ${savedAt}；正式词条此后已更新，不会自动覆盖。`}
                 </span>
+                <fieldset className="entry-editor-recovery-banner__fields">
+                    <legend>选择要恢复的内容</legend>
+                    {fields.map((field) => (
+                        <label key={field}>
+                            <input
+                                type="checkbox"
+                                checked={selectedFields.includes(field)}
+                                onChange={(event) => {
+                                    setSelectedFields((current) => (
+                                        event.target.checked
+                                            ? [...current, field]
+                                            : current.filter((item) => item !== field)
+                                    ))
+                                }}
+                            />
+                            <span>{FIELD_LABELS[field]}</span>
+                        </label>
+                    ))}
+                </fieldset>
             </div>
             <div className="entry-editor-recovery-banner__actions">
-                {mode === 'stale' && (
-                    <>
-                        <Button type="button" size="sm" onClick={onRestore}>恢复旧草稿</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={onDiscard}>放弃草稿</Button>
-                    </>
-                )}
-                {mode === 'restored' && (
-                    <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>知道了</Button>
-                )}
+                <Button
+                    type="button"
+                    size="sm"
+                    disabled={selectedFields.length === 0}
+                    onClick={() => onRestore(selectedFields)}
+                >
+                    恢复所选
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={onDiscard}>放弃草稿</Button>
             </div>
         </div>
     )

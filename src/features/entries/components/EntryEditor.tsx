@@ -87,7 +87,9 @@ import {resolveMarkdownPreviewSourceContent} from '../lib/entryMarkdownPreviewSt
 import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
 import {
     deleteEntryDraftRecovery,
+    type EntryDraftRecoveryField,
     type EntryDraftRecoveryRecord,
+    getEntryDraftRecoveryFields,
     getEntryDraftRecovery,
     resolveEntryDraftRecoveryKind,
     saveEntryDraftRecovery,
@@ -261,9 +263,11 @@ export default function EntryEditor({
     const [outlineOpen, setOutlineOpen] = useState(false)
     const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
     const [recoveryReady, setRecoveryReady] = useState(false)
+    const [relationsReady, setRelationsReady] = useState(false)
     const [recoveryNotice, setRecoveryNotice] = useState<{
         record: EntryDraftRecoveryRecord
-        mode: 'restored' | 'stale'
+        kind: ReturnType<typeof resolveEntryDraftRecoveryKind>
+        fields: EntryDraftRecoveryField[]
     } | null>(null)
     const [selectionToolbarPosition, setSelectionToolbarPosition] = useState<{
         left: number
@@ -274,6 +278,7 @@ export default function EntryEditor({
         setEntryRelations,
         relationDrafts,
         setRelationDrafts,
+        initialRelationDrafts,
         hasRelationChanges,
         hasInvalidRelationDrafts,
         clearRelations,
@@ -580,6 +585,7 @@ export default function EntryEditor({
         setOutgoingLinks([])
         setIncomingLinks([])
         clearRelations()
+        setRelationsReady(false)
 
         void db_get_entry(entryId, projectId)
             .then((result) => {
@@ -610,6 +616,7 @@ export default function EntryEditor({
                 setIncomingLinks(incoming)
                 void ensureEntryDetails(incoming.map((link) => link.a_id))
                 applySavedRelations(relations)
+                setRelationsReady(true)
             })
 
         return () => {
@@ -638,11 +645,11 @@ export default function EntryEditor({
 
     // 每次加载词条时初始化历史记录（词条和关联都就绪后触发）
     useEffect(() => {
-        if (!entry || entry.id !== entryId) return
+        if (!entry || entry.id !== entryId || !relationsReady) return
         if (historyInitializedRef.current === entryId) return
         historyInitializedRef.current = entryId
         undoRedo.reset(buildEditorHistory(draft, relationDrafts))
-    }, [entry, entryId, draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [entry, entryId, draft, relationDrafts, relationsReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // 草稿/关联变更时自动推送历史快照（防抖以避免每次按键都记录）
     useEffect(() => {
@@ -717,7 +724,7 @@ export default function EntryEditor({
     const canSave = Boolean(entry && trimmedTitle && hasChanges && !hasInvalidRelationDrafts && !loading && !saving)
 
     useEffect(() => {
-        if (!entry || entry.id !== entryId || !comparableInitial) return
+        if (!entry || entry.id !== entryId || !initialDraft || !relationsReady) return
         const currentUpdatedAt = String(entry.updated_at ?? '')
         const loadKey = JSON.stringify([projectId, entryId, currentUpdatedAt])
         if (recoveryLoadKeyRef.current === loadKey) return
@@ -726,7 +733,7 @@ export default function EntryEditor({
         setRecoveryNotice(null)
 
         // 当前进程内已有更新时，内存草稿比崩溃恢复快照更新，直接进入后续写入。
-        if (hasBodyChanges) {
+        if (hasChanges) {
             setRecoveryReady(true)
             return
         }
@@ -735,20 +742,21 @@ export default function EntryEditor({
         void getEntryDraftRecovery(projectId, entryId)
             .then((record) => {
                 if (cancelled || !record) return
-                if (normalizeComparableContent(record.content) === comparableInitial.content) {
+                const fields = getEntryDraftRecoveryFields(record, {
+                    ...initialDraft,
+                    relationDrafts: initialRelationDrafts,
+                })
+                if (fields.length === 0) {
                     void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
                         logger.error('delete redundant entry recovery failed', recoveryError)
                     })
                     return
                 }
-
-                if (resolveEntryDraftRecoveryKind(record, currentUpdatedAt) === 'current') {
-                    setDraft((current) => ({...current, content: record.content}))
-                    setEditorMode('edit')
-                    setRecoveryNotice({record, mode: 'restored'})
-                    return
-                }
-                setRecoveryNotice({record, mode: 'stale'})
+                setRecoveryNotice({
+                    record,
+                    kind: resolveEntryDraftRecoveryKind(record, currentUpdatedAt),
+                    fields,
+                })
             })
             .catch((recoveryError) => {
                 logger.error('load entry recovery failed', recoveryError)
@@ -760,16 +768,24 @@ export default function EntryEditor({
         return () => {
             cancelled = true
         }
-    }, [comparableInitial, entry, entryId, hasBodyChanges, projectId])
+    }, [
+        entry,
+        entryId,
+        hasChanges,
+        initialDraft,
+        initialRelationDrafts,
+        projectId,
+        relationsReady,
+    ])
 
     useEffect(() => {
         if (recoveryWriteTimerRef.current !== null) {
             window.clearTimeout(recoveryWriteTimerRef.current)
             recoveryWriteTimerRef.current = null
         }
-        if (!entry || !comparableInitial || !recoveryReady || recoveryNotice?.mode === 'stale') return
+        if (!entry || !comparableInitial || !recoveryReady || recoveryNotice) return
 
-        if (!hasBodyChanges) {
+        if (!hasChanges) {
             void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
                 logger.error('delete entry recovery failed', recoveryError)
             })
@@ -783,7 +799,12 @@ export default function EntryEditor({
                 entryId,
                 baseUpdatedAt: String(entry.updated_at ?? ''),
                 savedAt: Date.now(),
-                content: draft.content,
+                draft: {
+                    ...draft,
+                    tags: {...draft.tags},
+                    images: draft.images.map((image) => ({...image})),
+                    relationDrafts: relationDrafts.map((relation) => ({...relation})),
+                },
             }).catch((recoveryError) => {
                 logger.error('save entry recovery failed', recoveryError)
             })
@@ -797,21 +818,41 @@ export default function EntryEditor({
         }
     }, [
         comparableInitial,
-        draft.content,
+        draft,
         entry,
         entryId,
-        hasBodyChanges,
+        hasChanges,
         projectId,
-        recoveryNotice?.mode,
+        recoveryNotice,
         recoveryReady,
+        relationDrafts,
     ])
 
-    const handleRestoreRecovery = useCallback(() => {
+    const handleRestoreRecovery = useCallback((fields: EntryDraftRecoveryField[]) => {
         if (!recoveryNotice) return
-        setDraft((current) => ({...current, content: recoveryNotice.record.content}))
+        const snapshot = recoveryNotice.record.draft
+        setDraft((current) => ({
+            title: fields.includes('title') && snapshot.title !== undefined ? snapshot.title : current.title,
+            summary: fields.includes('summary') && snapshot.summary !== undefined ? snapshot.summary : current.summary,
+            content: fields.includes('content') && snapshot.content !== undefined ? snapshot.content : current.content,
+            type: fields.includes('type') && snapshot.type !== undefined ? snapshot.type : current.type,
+            categoryId: fields.includes('categoryId') && snapshot.categoryId !== undefined
+                ? snapshot.categoryId
+                : current.categoryId,
+            tags: fields.includes('tags') && snapshot.tags ? {...snapshot.tags} : current.tags,
+            images: fields.includes('images') && snapshot.images
+                ? snapshot.images.map((image) => ({...image}))
+                : current.images,
+        }))
+        if (fields.includes('relationDrafts') && snapshot.relationDrafts) {
+            setRelationDrafts(snapshot.relationDrafts.map((relation) => ({...relation})))
+        }
         setEditorMode('edit')
-        setRecoveryNotice({...recoveryNotice, mode: 'restored'})
-    }, [recoveryNotice])
+        setRecoveryNotice(null)
+        void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
+            logger.error('delete restored entry recovery failed', recoveryError)
+        })
+    }, [entryId, projectId, recoveryNotice, setRelationDrafts])
 
     const handleDiscardRecovery = useCallback(() => {
         setRecoveryNotice(null)
@@ -1615,10 +1656,10 @@ export default function EntryEditor({
                                     {recoveryNotice && (
                                         <EntryDraftRecoveryBanner
                                             record={recoveryNotice.record}
-                                            mode={recoveryNotice.mode}
+                                            kind={recoveryNotice.kind}
+                                            fields={recoveryNotice.fields}
                                             onRestore={handleRestoreRecovery}
                                             onDiscard={handleDiscardRecovery}
-                                            onDismiss={() => setRecoveryNotice(null)}
                                         />
                                     )}
                                     {selectionToolbarPosition && (

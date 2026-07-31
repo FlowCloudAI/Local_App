@@ -975,6 +975,29 @@
     font-size: var(--fc-font-size-sm);
 }
 
+.entry-editor-recovery-banner__fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fc-space-2) var(--fc-space-3);
+    padding: 0;
+    border: 0;
+}
+
+.entry-editor-recovery-banner__fields legend {
+    width: 100%;
+    padding: 0;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+.entry-editor-recovery-banner__fields label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fc-space-1);
+    cursor: pointer;
+    font-size: var(--fc-font-size-sm);
+}
+
 .entry-editor-recovery-banner__actions {
     display: flex;
     flex: 0 0 auto;
