@@ -13,6 +13,15 @@ registerWikiLinkSyntax(refractor);
 
 export type MarkdownPreviewOptions = MDEditorProps["previewOptions"];
 export type MarkdownPreviewRenderer = NonNullable<MDEditorProps["components"]>["preview"];
+const StableMarkdownPreview = React.memo(function StableMarkdownPreview({
+    source,
+    options,
+}: {
+    source: string;
+    options?: MarkdownPreviewOptions;
+}) {
+    return <MDEditor.Markdown {...options} source={source}/>;
+});
 type MarkdownEditorChangeEvent = Parameters<NonNullable<MDEditorProps["onChange"]>>[1];
 export interface MarkdownEditorValueChangeMeta {
     source: "input";
@@ -95,6 +104,8 @@ export interface MarkdownEditorProps extends Omit<React.HTMLAttributes<HTMLDivEl
     hideFullscreen?: boolean;
     previewOptions?: MarkdownPreviewOptions;
     previewRender?: MarkdownPreviewRenderer;
+    /** 双栏预览使用的独立 Markdown 源码；省略时与编辑值保持一致。 */
+    previewValue?: string;
     tokens?: Partial<MarkdownEditorTokens>;
     /** 在编辑层高亮正文查找结果。 */
     searchHighlights?: MarkdownEditorSearchHighlights;
@@ -151,6 +162,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         hideFullscreen = false,
         previewOptions,
         previewRender,
+        previewValue,
         tokens,
         searchHighlights,
         ...props
@@ -380,7 +392,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
     const editorHeightValue = autoHeight ? editorHeight : (height ?? minHeight);
     const editorCommands = toolbarCommands ?? TOOLBAR_COMMANDS;
-    const editorComponents = previewRender ? { preview: previewRender } : undefined;
+    const editorComponents = useMemo(() => {
+        if (previewRender) return {preview: previewRender};
+        if (previewValue === undefined) return undefined;
+        return {
+            preview: () => (
+                <StableMarkdownPreview source={previewValue} options={previewOptions}/>
+            ),
+        };
+    }, [previewOptions, previewRender, previewValue]);
 
     return (
         <div

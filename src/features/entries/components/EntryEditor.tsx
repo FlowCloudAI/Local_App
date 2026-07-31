@@ -84,6 +84,7 @@ import {
     parseInternalEntryHref,
     resolveMarkdownAnchor,
 } from '../lib/entryMarkdown'
+import {resolveMarkdownPreviewSourceContent} from '../lib/entryMarkdownPreviewState'
 import {buildEntryImageMarkdownRef, type EntryImage, normalizeEntryImages,} from '../lib/entryImage'
 import {
     deleteEntryDraftRecovery,
@@ -177,6 +178,10 @@ const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
     hint: '请先在设置中选择默认 AI 语音插件',
 }
 
+const ENTRY_MARKDOWN_PREVIEW_OPTIONS = {
+    rehypePlugins: [rehypeSanitizeRawHtml],
+}
+
 function buildDraft(entry: Entry): EntryDraft {
     return {
         title: entry.title ?? '',
@@ -255,6 +260,7 @@ export default function EntryEditor({
     const [tagCreatorOpen, setTagCreatorOpen] = useState(false)
     const [actionMenuOpen, setActionMenuOpen] = useState(false)
     const [editorSplitView, setEditorSplitView] = useState(false)
+    const [debouncedContent, setDebouncedContent] = useState('')
     const [findBarOpen, setFindBarOpen] = useState(false)
     const [markdownSearchHighlights, setMarkdownSearchHighlights] = useState<{
         matches: MarkdownTextMatch[]
@@ -959,10 +965,23 @@ export default function EntryEditor({
         delete openEntryStateCacheRef.current[entryId]
     }, [draft, editorMode, entry, entryId, entryRelations, hasChanges, relationDrafts])
 
-    // 预览源码缓存：draft.content 不变时不重算
+    useEffect(() => {
+        if (editorMode !== 'edit') return
+        const timer = window.setTimeout(() => setDebouncedContent(draft.content), 150)
+        return () => window.clearTimeout(timer)
+    }, [draft.content, editorMode])
+
+    const previewSourceContent = resolveMarkdownPreviewSourceContent(
+        editorMode,
+        editorSplitView,
+        draft.content,
+        debouncedContent,
+    )
     const previewContent = useMemo(
-        () => buildMarkdownPreviewSource(draft.content, draft.images),
-        [draft.content, draft.images],
+        () => previewSourceContent === null
+            ? ''
+            : buildMarkdownPreviewSource(previewSourceContent, draft.images),
+        [previewSourceContent, draft.images],
     )
     const outlineItems = useMemo(
         () => buildMarkdownOutline(draft.content),
@@ -1674,7 +1693,8 @@ export default function EntryEditor({
                                             tokens={{fontSizeScale: editorFontSize / 14}}
                                             minHeight={720}
                                             placeholder="在这里写正文。输入 [[ 可以快速插入双链。"
-                                            previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
+                                            previewOptions={ENTRY_MARKDOWN_PREVIEW_OPTIONS}
+                                            previewValue={previewContent}
                                             searchHighlights={markdownSearchHighlights ?? undefined}
                                             hideToolbar
                                             hideFullscreen
@@ -1844,7 +1864,7 @@ export default function EntryEditor({
                                             fontSizeScale: editorFontSize / 14,
                                         }}
                                         autoHeight
-                                        previewOptions={{rehypePlugins: [rehypeSanitizeRawHtml]}}
+                                        previewOptions={ENTRY_MARKDOWN_PREVIEW_OPTIONS}
                                     />
 
                                     <EntryEditorLinkPreview

@@ -6,6 +6,7 @@ import {UndoRedoHistory} from '../src/shared/hooks/useUndoRedo.ts'
 import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySaveStatus.ts'
 import {resolveSelectionToolbarPlacement} from '../src/features/entries/components/entrySelectionToolbar.ts'
 import {reserveMissingEntryDetailIds} from '../src/features/entries/lib/entryDetailLoading.ts'
+import {resolveMarkdownPreviewSourceContent} from '../src/features/entries/lib/entryMarkdownPreviewState.ts'
 
 const history = new UndoRedoHistory('初始内容')
 history.setPending('刚输入的内容')
@@ -87,3 +88,7 @@ assert.deepEqual(
     ['new'],
 )
 assert.deepEqual(reserveMissingEntryDetailIds(['new'], loadedEntryDetailIds, 'current'), [])
+
+assert.equal(resolveMarkdownPreviewSourceContent('edit', false, '新内容', '旧内容'), null)
+assert.equal(resolveMarkdownPreviewSourceContent('edit', true, '新内容', '旧内容'), '旧内容')
+assert.equal(resolveMarkdownPreviewSourceContent('browse', false, '新内容', '旧内容'), '新内容')
