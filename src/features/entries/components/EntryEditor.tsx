@@ -94,6 +94,7 @@ import {
 } from '../lib/entryDraftRecovery'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {buildRelationDraft,} from '../lib/entryRelation'
+import {reserveMissingEntryDetailIds} from '../lib/entryDetailLoading'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
 import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import {
@@ -298,7 +299,7 @@ export default function EntryEditor({
     const onDirtyChangeRef = useRef(onDirtyChange)
     const projectEntriesRef = useRef(projectEntries)
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
-    const projectEntryDetailsStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
+    const loadedDetailIdsRef = useRef(new Set<string>())
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     const canSaveRef = useRef(false)
     const saveActionRef = useRef<(() => void) | null>(null)
@@ -484,6 +485,7 @@ export default function EntryEditor({
                 projectEntriesRef.current = next
                 return next
             })
+            loadedDetailIdsRef.current.add(created.id)
             setProjectEntryDetailsById((current) => ({...current, [created.id]: created}))
             return {id: created.id, title: created.title}
         },
@@ -496,11 +498,31 @@ export default function EntryEditor({
         },
     })
 
+    const ensureEntryDetails = useCallback(async (ids: string[]) => {
+        const missingIds = reserveMissingEntryDetailIds(ids, loadedDetailIdsRef.current, entryId)
+        if (!missingIds.length) return
+
+        const results = await Promise.all(missingIds.map(async (targetEntryId) => {
+            try {
+                const detail = await db_get_entry(targetEntryId, projectId)
+                return [targetEntryId, detail] as const
+            } catch {
+                loadedDetailIdsRef.current.delete(targetEntryId)
+                return null
+            }
+        }))
+        setProjectEntryDetailsById((current) => ({
+            ...current,
+            ...Object.fromEntries(results.filter(Boolean) as Array<readonly [string, Entry]>),
+        }))
+    }, [entryId, projectId])
+
     const linkPreview = useLinkPreview({
         currentProjectId: projectId,
         entryCache: projectEntryDetailsById,
         projectEntries,
         ensureProjectEntriesLoaded: () => ensureProjectEntriesLoaded(),
+        ensureEntryDetail: (targetEntryId) => ensureEntryDetails([targetEntryId]),
         onOpenEntry: (targetProjectId, targetEntry) => {
             if (targetProjectId !== projectId) {
                 void showAlert('该词条链接指向其他项目，当前编辑器无法直接打开。', 'warning', 'nonInvasive', 1800)
@@ -592,6 +614,7 @@ export default function EntryEditor({
                 if (cancelled) return
                 setOutgoingLinks(outgoing)
                 setIncomingLinks(incoming)
+                void ensureEntryDetails(incoming.map((link) => link.a_id))
                 applySavedRelations(relations)
             })
 
@@ -604,10 +627,11 @@ export default function EntryEditor({
     // projectId 变化时重置词条列表状态
     useEffect(() => {
         projectEntriesStatusRef.current = 'idle'
-        projectEntryDetailsStatusRef.current = 'idle'
+        loadedDetailIdsRef.current.clear()
         projectEntriesLoadPromiseRef.current = null
         projectEntriesRef.current = []
         setProjectEntries([])
+        setProjectEntryDetailsById({})
     }, [projectId])
 
     useEffect(() => {
@@ -637,32 +661,6 @@ export default function EntryEditor({
         undoRedo.pushDebounced({draft, relationDrafts})
     }, [draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const ensureProjectEntryDetailsLoaded = useCallback(async (briefs: EntryBrief[]) => {
-        if (!briefs.length || projectEntryDetailsStatusRef.current !== 'idle') return
-        projectEntryDetailsStatusRef.current = 'loading'
-        try {
-            const results = await Promise.all(
-                briefs
-                    .filter((brief) => brief.id !== entryId)
-                    .map(async (brief) => {
-                        try {
-                            const detail = await db_get_entry(brief.id, projectId)
-                            return [brief.id, detail] as const
-                        } catch {
-                            return null
-                        }
-                    }),
-            )
-            setProjectEntryDetailsById((current) => ({
-                ...current,
-                ...Object.fromEntries(results.filter(Boolean) as Array<readonly [string, Entry]>),
-            }))
-            projectEntryDetailsStatusRef.current = 'loaded'
-        } catch {
-            projectEntryDetailsStatusRef.current = 'idle'
-        }
-    }, [entryId, projectId])
-
     // 按需加载：进入编辑模式或需要双链时调用
     const ensureProjectEntriesLoaded = useCallback(async () => {
         if (projectEntriesStatusRef.current === 'loaded') return
@@ -676,7 +674,6 @@ export default function EntryEditor({
                 projectEntriesRef.current = briefs
                 setProjectEntries(briefs)
                 projectEntriesStatusRef.current = 'loaded'
-                void ensureProjectEntryDetailsLoaded(briefs)
             } catch {
                 projectEntriesStatusRef.current = 'idle'
             } finally {
@@ -686,11 +683,12 @@ export default function EntryEditor({
         })()
 
         return projectEntriesLoadPromiseRef.current
-    }, [ensureProjectEntryDetailsLoaded, projectId])
+    }, [projectId])
 
     useEffect(() => {
+        if (!active) return
         void ensureProjectEntriesLoaded()
-    }, [ensureProjectEntriesLoaded])
+    }, [active, ensureProjectEntriesLoaded])
 
 
     const typeOptions = useMemo(
@@ -987,6 +985,7 @@ export default function EntryEditor({
         setSaveError(null)
         setOutgoingLinks(refreshedOutgoing)
         setIncomingLinks(refreshedIncoming)
+        void ensureEntryDetails(refreshedIncoming.map((link) => link.a_id))
         applySavedRelations(refreshedRelations, refreshed.id)
         setProjectEntryDetailsById((current) => ({...current, [refreshed.id]: refreshed}))
         setProjectEntries((current) => {
@@ -1019,7 +1018,7 @@ export default function EntryEditor({
         }
 
         return refreshed
-    }, [applySavedRelations, entryId, projectId, undoRedo])
+    }, [applySavedRelations, ensureEntryDetails, entryId, projectId, undoRedo])
 
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {

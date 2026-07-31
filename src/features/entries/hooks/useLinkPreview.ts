@@ -8,6 +8,7 @@ interface UseLinkPreviewOptions {
     entryCache: Record<string, Entry>
     projectEntries: EntryBrief[]
     ensureProjectEntriesLoaded: () => Promise<void>
+    ensureEntryDetail?: (entryId: string) => Promise<void>
     onOpenEntry?: (projectId: string, entry: { id: string; title: string }) => void
     onMissingLink?: (message: string) => void
 }
@@ -31,6 +32,7 @@ export default function useLinkPreview({
                                            entryCache,
                                            projectEntries,
                                            ensureProjectEntriesLoaded,
+                                           ensureEntryDetail,
                                            onOpenEntry,
                                            onMissingLink,
                                        }: UseLinkPreviewOptions) {
@@ -169,9 +171,11 @@ export default function useLinkPreview({
             })
             return
         }
-        void ensureProjectEntriesLoaded().then(() => {
+        void ensureProjectEntriesLoaded().then(async () => {
             if (linkPreviewAnchorRef.current !== anchor) return
             const target = findProjectEntry(link)
+            if (target) await ensureEntryDetail?.(target.id)
+            if (linkPreviewAnchorRef.current !== anchor) return
             setLinkPreview({
                 title: target?.title ?? link.title,
                 projectId: currentProjectId ?? null,

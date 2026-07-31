@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import {UndoRedoHistory} from '../src/shared/hooks/useUndoRedo.ts'
 import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySaveStatus.ts'
 import {resolveSelectionToolbarPlacement} from '../src/features/entries/components/entrySelectionToolbar.ts'
+import {reserveMissingEntryDetailIds} from '../src/features/entries/lib/entryDetailLoading.ts'
 
 const history = new UndoRedoHistory('初始内容')
 history.setPending('刚输入的内容')
@@ -68,3 +69,10 @@ assert.equal(resolveSelectionToolbarPlacement({
     visibleTop: 0,
     visibleBottom: 400,
 }), null)
+
+const loadedEntryDetailIds = new Set(['loaded'])
+assert.deepEqual(
+    reserveMissingEntryDetailIds(['current', 'new', 'new', 'loaded'], loadedEntryDetailIds, 'current'),
+    ['new'],
+)
+assert.deepEqual(reserveMissingEntryDetailIds(['new'], loadedEntryDetailIds, 'current'), [])
