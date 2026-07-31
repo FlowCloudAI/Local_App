@@ -110,6 +110,7 @@ import {
     parseDateValue,
     stripMarkdown,
 } from '../lib/entryCommon'
+import {resolveSavedState} from '../lib/entrySaveState'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 
@@ -238,7 +239,8 @@ export default function EntryEditor({
         images: [],
     })
     const [loading, setLoading] = useState(false)
-    const [saving, setSaving] = useState(false)
+    const [savingSource, setSavingSource] = useState<EntrySaveSource | null>(null)
+    const saving = savingSource !== null
     const [error, setError] = useState<string | null>(null)
     const [saveError, setSaveError] = useState<string | null>(null)
     const [editorFontSize, setEditorFontSize] = useState(14)
@@ -578,7 +580,7 @@ export default function EntryEditor({
     useEffect(() => {
         let cancelled = false
         setLoading(true)
-        setSaving(false)
+        setSavingSource(null)
         setError(null)
         setSaveError(null)
         linkPreview.closeLinkPreview()
@@ -988,7 +990,10 @@ export default function EntryEditor({
 
     const infoTitle = trimmedTitle || entry?.title || '未命名词条'
 
-    const reloadEntryFromDatabase = useCallback(async (reason: 'external' | 'save' = 'external') => {
+    const reloadEntryFromDatabase = useCallback(async (
+        reason: 'external' | 'save' = 'external',
+        submitted?: {draft: EntryDraft; relationDrafts: EntryRelationDraft[]},
+    ) => {
         const [refreshed, refreshedOutgoing, refreshedIncoming, refreshedRelations] = await Promise.all([
             db_get_entry(entryId, projectId),
             db_list_outgoing_links(entryId, projectId).catch(() => [] as EntryLink[]),
@@ -998,13 +1003,26 @@ export default function EntryEditor({
 
         const previousEntry = entryRef.current
 
+        const savedDraft = buildDraft(refreshed)
+        const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation))
+
         setEntry(refreshed)
-        setDraft(buildDraft(refreshed))
+        if (reason === 'save' && submitted) {
+            setDraft((current) => resolveSavedState(current, submitted.draft, savedDraft))
+            setEntryRelations(refreshedRelations)
+            setRelationDrafts((current) => resolveSavedState(
+                current,
+                submitted.relationDrafts,
+                savedRelationDrafts,
+            ))
+        } else {
+            setDraft(savedDraft)
+            applySavedRelations(refreshedRelations, refreshed.id)
+        }
         setSaveError(null)
         setOutgoingLinks(refreshedOutgoing)
         setIncomingLinks(refreshedIncoming)
         void ensureEntryDetails(refreshedIncoming.map((link) => link.a_id))
-        applySavedRelations(refreshedRelations, refreshed.id)
         setProjectEntryDetailsById((current) => ({...current, [refreshed.id]: refreshed}))
         setProjectEntries((current) => {
             const next = current.map((item) => (
@@ -1022,8 +1040,6 @@ export default function EntryEditor({
             return next
         })
 
-        const savedDraft = buildDraft(refreshed)
-        const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation))
         if (reason === 'external') {
             historyInitializedRef.current = null
             undoRedo.reset(buildEditorHistory(savedDraft, savedRelationDrafts))
@@ -1038,7 +1054,16 @@ export default function EntryEditor({
         }
 
         return refreshed
-    }, [applySavedRelations, buildEditorHistory, ensureEntryDetails, entryId, projectId, undoRedo])
+    }, [
+        applySavedRelations,
+        buildEditorHistory,
+        ensureEntryDetails,
+        entryId,
+        projectId,
+        setEntryRelations,
+        setRelationDrafts,
+        undoRedo,
+    ])
 
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
@@ -1091,7 +1116,7 @@ export default function EntryEditor({
     const handleSave = useCallback(async (source: EntrySaveSource = 'manual') => {
         if (!entry || !canSave) return
 
-        setSaving(true)
+        setSavingSource(source)
         onSavingChange?.(true)
         setError(null)
         setSaveError(null)
@@ -1099,11 +1124,12 @@ export default function EntryEditor({
         try {
             if (hasInvalidRelationDrafts) {
                 setError('存在未完成的词条关系，请先选择目标词条。')
-                setSaving(false)
+                setSavingSource(null)
                 return
             }
 
             undoRedo.flushDebounced()
+            const submitted = {draft, relationDrafts}
             const savedBundle = await db_save_entry_bundle({
                 id: entry.id,
                 projectId,
@@ -1129,7 +1155,7 @@ export default function EntryEditor({
             })
             setRecoveryNotice(null)
 
-            const refreshed = await reloadEntryFromDatabase('save')
+            const refreshed = await reloadEntryFromDatabase('save', submitted)
             if (refreshed.title !== entry.title) {
                 await onTitleChange?.(refreshed)
             }
@@ -1146,10 +1172,10 @@ export default function EntryEditor({
                 void showAlert(message, 'warning', 'nonInvasive', 1800)
             }
         } finally {
-            setSaving(false)
+            setSavingSource(null)
             onSavingChange?.(false)
         }
-    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations, undoRedo])
+    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations, undoRedo])
 
     useEffect(() => {
         canSaveRef.current = canSave
@@ -1589,7 +1615,12 @@ export default function EntryEditor({
                                 entryId={entryId}
                                 entry={entry}
                                 draft={draft}
-                                status={{editorMode, loading, saving, generatingSummary}}
+                                status={{
+                                    editorMode,
+                                    loading,
+                                    saving: savingSource === 'manual',
+                                    generatingSummary,
+                                }}
                                 projectContext={{
                                     projectName,
                                     categories,
@@ -1881,7 +1912,7 @@ export default function EntryEditor({
                         entryId={entryId}
                         entry={entry}
                         editorMode={editorMode}
-                        saving={saving}
+                        saving={savingSource === 'manual'}
                         projectDataLoading={projectDataLoading}
                         relationDrafts={relationDrafts}
                         outgoingLinks={outgoingLinks}
