@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test:ai-conversation-draft": "node --test --experimental-test-isolation=none ./scripts/ai-conversation-state.test.ts",
+    "test:ai-continuation": "node --test --experimental-test-isolation=none ./scripts/ai-continuation.test.ts",
     "test:entry-tab-mounting": "node --test --experimental-test-isolation=none ./scripts/entry-tab-mounting.test.ts",
     "test:edge-geometry": "node ./scripts/check-edge-geometry.ts",
     "test:markdown-wiki-link-highlight": "node --experimental-strip-types ./scripts/markdown-wiki-link-highlight.test.mjs",

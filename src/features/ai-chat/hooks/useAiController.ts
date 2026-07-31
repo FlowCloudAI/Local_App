@@ -35,6 +35,7 @@ import {
     type DocumentContextItem,
     type DocumentContextUpdatedEvent,
     ENTRY_UPDATED,
+    ErrorCode,
     type EntryUpdatedEvent,
     setting_get_settings,
     type StoredConversationSettings,
@@ -99,7 +100,9 @@ import type {
 } from '../model/AiControllerTypes'
 import {DEFAULT_CONVERSATION_SETTINGS, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {
+    appendOrMergeContinuation,
     isEmptyDraftConversation,
+    isIncompleteMessage,
     isPendingConversationId,
     toConversationHistory,
 } from '../model/conversationState'
@@ -553,6 +556,9 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
                 timestamp: new Date(message.timestamp).getTime(),
                 nodeId: message.node_id ?? undefined,
                 blocks: [],
+                turnStatus: message.turn_status ?? undefined,
+                finishReason: message.finish_reason ?? undefined,
+                continuationOfNodeId: message.continuation_of ?? undefined,
             }
         }
         return pendingAssistant
@@ -642,6 +648,20 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
                 timestamp: new Date(message.timestamp).getTime(),
                 nodeId: message.node_id ?? assistant.nodeId,
                 blocks: nextBlocks,
+                turnStatus: message.turn_status ?? assistant.turnStatus,
+                finishReason: message.finish_reason ?? assistant.finishReason,
+                continuationOfNodeId: message.continuation_of ?? assistant.continuationOfNodeId,
+                error: message.turn_status === 'cancelled'
+                    || message.turn_status === 'interrupted'
+                    || message.turn_status === 'error'
+                    ? {
+                        code: message.turn_status === 'cancelled'
+                            ? ErrorCode.CoreClientCancelled
+                            : ErrorCode.LlmStreamProtocolError,
+                        message: '上次生成未正常完成，可从保留内容继续。',
+                        detail: {retryable: true},
+                    }
+                    : undefined,
             }
             return
         }
@@ -932,7 +952,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 ?? null
             return {
                 ...conversation,
-                messages: [...conversation.messages, {
+                messages: appendOrMergeContinuation(conversation.messages, {
                     id: message.id,
                     role: message.role,
                     content: message.content,
@@ -941,7 +961,20 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     blocks: message.blocks,
                     nodeId: message.nodeId,
                     usage: message.usage,
-                }],
+                    turnStatus: message.turnStatus,
+                    finishReason: message.finishReason,
+                    continuationOfNodeId: message.continuationOfNodeId,
+                    error: message.turnStatus === 'cancelled'
+                        || message.turnStatus === 'interrupted'
+                        ? {
+                            code: message.turnStatus === 'cancelled'
+                                ? ErrorCode.CoreClientCancelled
+                                : ErrorCode.LlmStreamProtocolError,
+                            message: '本轮生成未完成，可从保留内容继续。',
+                            detail: {retryable: true},
+                        }
+                        : undefined,
+                }),
             }
         }))
         if (resolvedConversationId) {
@@ -1029,7 +1062,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 ...conversation,
                 sessionId: ownsFailedSession ? null : conversation.sessionId,
                 runId: ownsFailedSession ? null : conversation.runId,
-                messages: [...conversation.messages, {
+                messages: appendOrMergeContinuation(conversation.messages, {
                     id: `error_${Date.now()}_${failure.runId ?? 'session'}`,
                     role: 'assistant',
                     content: failure.content,
@@ -1038,7 +1071,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     blocks: failure.blocks,
                     nodeId: failure.nodeId,
                     error: failure.error,
-                }],
+                    turnStatus: failure.turnStatus ?? 'error',
+                    finishReason: failure.finishReason,
+                    continuationOfNodeId: failure.continuationOfNodeId,
+                }),
             }
         }))
         setAiUnreadConversationIds((prev) => {
@@ -2399,6 +2435,123 @@ export function useAiController(focus: AiFocus): AiContextValue {
         void session.cancelSession(conv?.sessionId)
     }, [session])
 
+    const continueMessage = useCallback(async (messageId: string) => {
+        const conversation = conversationsRef.current.find(
+            item => item.id === activeConversationIdRef.current,
+        )
+        const message = conversation?.messages.find(item => item.id === messageId)
+        if (
+            !conversation
+            || message?.role !== 'assistant'
+            || message.nodeId == null
+            || !isIncompleteMessage(message)
+        ) return
+        const nodeId = message.nodeId
+        if (conversation.runId && session.isRunStreaming(conversation.runId)) return
+
+        const traceId = createAiTraceId()
+        const settings = normalizeConversationSettings(conversation.settings)
+        const documentAttachmentItemIds = collectDocumentAttachmentItemIdsUntilMessage(
+            conversation.messages,
+            message.id,
+        )
+        const createBackendSession = async (): Promise<PreparedAiSession | null> => {
+            const created = await session.createSession(
+                conversation.pluginId,
+                conversation.model,
+                conversation.id,
+                sessionParams.maxToolRounds,
+                traceId,
+                toStoredConversationSettings(settings, appSettingsRef.current),
+                {toolAccess: toolAccessMode, webSearchEnabled},
+            )
+            if (!created) return null
+            setRuntimeConversation(created.sessionId, created.runId, conversation.id)
+            setAiConversations(prev => prev.map(item => item.id === conversation.id
+                ? {...item, sessionId: created.sessionId, runId: created.runId}
+                : item,
+            ))
+            return {sid: created.sessionId, runId: created.runId, conversationId: conversation.id}
+        }
+        const syncContext = async (target: PreparedAiSession) => {
+            try {
+                await ai_update_session(
+                    target.sid,
+                    buildSessionUpdateParams(settings, sessionParamsRef.current.thinking),
+                )
+                const context = await resolveContextPayload(
+                    focusRef.current.projectId,
+                    focusRef.current.entryId,
+                    settings,
+                )
+                await ai_set_task_context(
+                    target.sid,
+                    await appendDocumentContext(
+                        context,
+                        conversation.id,
+                        documentAttachmentItemIds,
+                    ),
+                )
+            } catch (error) {
+                logger.warn('[useAiController][继续生成] 同步上下文失败，继续使用已恢复的历史', {
+                    traceId,
+                    sessionId: target.sid,
+                    error,
+                })
+            }
+        }
+        const reportFailure = (error: unknown, target: PreparedAiSession) => onError({
+            sessionId: target.sid,
+            runId: target.runId,
+            error: toApiError(error),
+            content: '',
+            turnStatus: 'error',
+            continuationOfNodeId: nodeId,
+            fatal: false,
+        })
+
+        let target = conversation.sessionId && conversation.runId
+            ? {sid: conversation.sessionId, runId: conversation.runId, conversationId: conversation.id}
+            : await createBackendSession()
+        if (!target) return
+        session.activateSession(target.sid, target.runId)
+        setRuntimeConversation(target.sid, target.runId, conversation.id)
+        await syncContext(target)
+        setAutoScroll(true)
+
+        try {
+            await session.continueGeneration(nodeId, target.sid, target.runId, traceId)
+        } catch (error) {
+            if (!isMissingBackendSessionError(error)) {
+                reportFailure(error, target)
+                return
+            }
+
+            deleteRuntimeConversation(target.sid, target.runId)
+            session.activateSession(null, null)
+            setAiConversations(prev => prev.map(item => item.id === conversation.id
+                ? {...item, sessionId: null, runId: null}
+                : item,
+            ))
+            target = await createBackendSession()
+            if (!target) return
+            await syncContext(target)
+            try {
+                await session.continueGeneration(nodeId, target.sid, target.runId, traceId)
+            } catch (retryError) {
+                reportFailure(retryError, target)
+            }
+        }
+    }, [
+        appendDocumentContext,
+        onError,
+        resolveContextPayload,
+        session,
+        sessionParams.maxToolRounds,
+        toolAccessMode,
+        webSearchEnabled,
+    ])
+
     const regenerateMessage = useCallback(async (messageId: string) => {
         logger.log('[useAiController] 进入重说', {
             messageId,
@@ -2623,6 +2776,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         sendMessage,
         stopStreaming,
         regenerateMessage,
+        continueMessage,
         editMessage,
         inputValue,
         setInputValue,
@@ -2641,6 +2795,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         setSessionParams,
         isStreaming: session.isStreaming,
         streamingBlocks: session.blocks,
+        continuationNodeId: session.continuationNodeId,
         conversationRuntime,
         sidebarCollapsed,
         setSidebarCollapsed,
@@ -2668,13 +2823,13 @@ export function useAiController(focus: AiFocus): AiContextValue {
         writerModeAvailable, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         isComposingNewConversation,
-        activeConversation, sendMessage, stopStreaming, regenerateMessage, editMessage,
+        activeConversation, sendMessage, stopStreaming, regenerateMessage, continueMessage, editMessage,
         addDocumentContextFiles, removeDocumentContextItem, retryDocumentContextItem,
         toggleWebSearch, setToolAccessMode, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
         updateConversationSettings, switchActiveConversationModel,
-        selectConversation, session.getBranchInfo, session.switchBranch,
+        selectConversation, session.getBranchInfo, session.switchBranch, session.continuationNodeId,
     ])
 }
 

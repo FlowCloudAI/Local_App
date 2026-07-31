@@ -6,6 +6,7 @@ import {
     ai_cancel_session,
     ai_checkout,
     ai_close_session,
+    ai_continue_generation,
     ai_create_character_session,
     ai_create_llm_session,
     ai_get_conversation_tree,
@@ -48,6 +49,9 @@ export interface SessionMessage {
     nodeId?: number
     /** 本轮 API 用量。供应商未返回 usage 时为空。 */
     usage?: AiUsage | null
+    turnStatus?: string
+    finishReason?: string
+    continuationOfNodeId?: number
 }
 
 export interface SessionIdentity {
@@ -64,6 +68,9 @@ export interface SessionFailure {
     reasoning?: string
     blocks?: MessageBoxBlock[]
     nodeId?: number
+    turnStatus?: string
+    finishReason?: string
+    continuationOfNodeId?: number
     fatal: boolean
 }
 
@@ -128,6 +135,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
     const [runId, setRunId] = useState<string | null>(null)
     const [streamingByRun, setStreamingByRun] = useState<Record<string, boolean>>({})
     const [blocks, setBlocks] = useState<MessageBoxBlock[]>([])
+    const [continuationNodeId, setContinuationNodeId] = useState<number | null>(null)
     const [lastUserNodeId, setLastUserNodeId] = useState<number | null>(null)
 
     // 内部缓冲
@@ -145,6 +153,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
     const lastEventNameByRunRef = useRef<Record<string, string>>({})
     const traceIdByRunRef = useRef<Record<string, string>>({})
     const turnStartedAtByRunRef = useRef<Record<string, number>>({})
+    const continuationNodeIdByRunRef = useRef<Record<string, number | null>>({})
     const sessionIdRef = useRef<string | null>(null)
     const runIdRef = useRef<string | null>(null)
     // 标记每个 run 的下一个 TurnBegin 是用户发起的（非工具续轮）
@@ -178,6 +187,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
 
     const syncActiveRunView = useCallback((nextRunId: string | null) => {
         setBlocks(nextRunId ? (blocksByRunRef.current[nextRunId] ?? []) : [])
+        setContinuationNodeId(nextRunId ? (continuationNodeIdByRunRef.current[nextRunId] ?? null) : null)
         const nextLastUserNodeId = nextRunId ? (lastUserNodeIdByRunRef.current[nextRunId] ?? null) : null
         lastUserNodeIdRef.current = nextLastUserNodeId
         setLastUserNodeId(nextLastUserNodeId)
@@ -204,6 +214,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         delete lastEventNameByRunRef.current[targetRunId]
         delete traceIdByRunRef.current[targetRunId]
         delete turnStartedAtByRunRef.current[targetRunId]
+        delete continuationNodeIdByRunRef.current[targetRunId]
         setRunStreaming(targetRunId, false)
         if (runIdRef.current === targetRunId) {
             sessionIdRef.current = null
@@ -268,6 +279,9 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         error: ApiError,
         nodeId: number | undefined,
         fatal: boolean,
+        turnStatus = 'error',
+        finishReason?: string,
+        continuationOfNodeId?: number,
     ) => {
         processingNodeIdByRunRef.current[rid] = null
         const finalBlocks = finalizePendingTools(
@@ -292,6 +306,9 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             reasoning: reasoning || undefined,
             blocks: finalBlocks.length > 0 ? finalBlocks : undefined,
             nodeId,
+            turnStatus,
+            finishReason,
+            continuationOfNodeId,
             fatal,
         })
 
@@ -301,9 +318,11 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         }
         delete blocksByRunRef.current[rid]
         delete turnStartedAtByRunRef.current[rid]
+        delete continuationNodeIdByRunRef.current[rid]
         setRunStreaming(rid, false)
         if (runIdRef.current === rid) {
             setBlocks([])
+            setContinuationNodeId(null)
         }
     }, [clearRunState, getRunWorkSeconds, setRunStreaming])
 
@@ -597,13 +616,24 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         })
 
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
-            const {session_id: sid, run_id: rid, status, error, node_id, usage} = event.payload
+            const {
+                session_id: sid,
+                run_id: rid,
+                status,
+                error,
+                node_id,
+                finish_reason,
+                continuation_of,
+                usage,
+            } = event.payload
             markRunEvent('ai:turn_end', rid)
             logger.log('[useAiSession][turn_end]', {
                 sessionId: sid,
                 runId: rid,
                 status,
                 nodeId: node_id,
+                finishReason: finish_reason,
+                continuationOf: continuation_of,
                 usage,
                 currentSessionId: sessionIdRef.current,
                 currentRunId: runIdRef.current,
@@ -641,8 +671,11 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         blocks: finalBlocks,
                         sessionId: sid,
                         runId: rid,
-                        nodeId: node_id,
+                        nodeId: node_id ?? undefined,
                         usage,
+                        turnStatus: status,
+                        finishReason: finish_reason ?? undefined,
+                        continuationOfNodeId: continuation_of ?? undefined,
                     })
                 }
 
@@ -661,9 +694,11 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
                     delete turnStartedAtByRunRef.current[rid]
+                    delete continuationNodeIdByRunRef.current[rid]
                     setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
+                        setContinuationNodeId(null)
                         setTreeRefreshCounter(c => c + 1)
                     }
                 })
@@ -674,8 +709,11 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     error
                         ? toApiError(error)
                         : toApiError(status.startsWith('error:') ? status.slice(6) : 'AI 对话失败'),
-                    node_id,
+                    node_id ?? undefined,
                     false,
+                    'error',
+                    finish_reason ?? undefined,
+                    continuation_of ?? undefined,
                 )
             } else if (status === 'cancelled' || status === 'interrupted') {
                 processingNodeIdByRunRef.current[rid] = null
@@ -702,7 +740,10 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         blocks: finalBlocks,
                         sessionId: sid,
                         runId: rid,
-                        // 取消的轮次没有有效的 checkpoint 节点，不设 nodeId
+                        nodeId: node_id ?? undefined,
+                        turnStatus: status,
+                        finishReason: finish_reason ?? undefined,
+                        continuationOfNodeId: continuation_of ?? undefined,
                     })
                 }
                 queueMicrotask(() => {
@@ -711,9 +752,11 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     queued.forEach(m => onMessageRef.current(m))
                     delete blocksByRunRef.current[rid]
                     delete turnStartedAtByRunRef.current[rid]
+                    delete continuationNodeIdByRunRef.current[rid]
                     setRunStreaming(rid, false)
                     if (runIdRef.current === rid) {
                         setBlocks([])
+                        setContinuationNodeId(null)
                     }
                 })
             }
@@ -735,6 +778,9 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 err,
                 undefined,
                 true,
+                'error',
+                undefined,
+                continuationNodeIdByRunRef.current[event.payload.run_id] ?? undefined,
             )
         })
 
@@ -885,12 +931,14 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
 
     const sendMessage = useCallback(async (content: string, sid: string, rid: string, traceId: string) => {
         expectUserTurnByRunRef.current[rid] = true
+        continuationNodeIdByRunRef.current[rid] = null
         eventSeenAfterSendByRunRef.current[rid] = false
         traceIdByRunRef.current[rid] = traceId
         blocksByRunRef.current[rid] = []
         setRunStreaming(rid, true)
         if (runIdRef.current === rid) {
             setBlocks([])
+            setContinuationNodeId(null)
         }
         logger.log('[useAiSession][发送链路] 准备调用后端发送消息', {
             traceId,
@@ -949,6 +997,35 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 content: '',
                 fatal: false,
             })
+        }
+    }, [setRunStreaming])
+
+    const continueGeneration = useCallback(async (
+        nodeId: number,
+        sid: string,
+        rid: string,
+        traceId: string,
+    ) => {
+        delete expectUserTurnByRunRef.current[rid]
+        eventSeenAfterSendByRunRef.current[rid] = false
+        traceIdByRunRef.current[rid] = traceId
+        blocksByRunRef.current[rid] = []
+        continuationNodeIdByRunRef.current[rid] = nodeId
+        setRunStreaming(rid, true)
+        if (runIdRef.current === rid) {
+            setBlocks([])
+            setContinuationNodeId(nodeId)
+        }
+        try {
+            await ai_continue_generation(sid, nodeId, traceId)
+        } catch (error) {
+            delete continuationNodeIdByRunRef.current[rid]
+            setRunStreaming(rid, false)
+            if (runIdRef.current === rid) {
+                setBlocks([])
+                setContinuationNodeId(null)
+            }
+            throw error
         }
     }, [setRunStreaming])
 
@@ -1083,6 +1160,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         isStreaming,
         streamingByRun,
         blocks,
+        continuationNodeId,
         /** 当前用户轮次的起始节点 ID（用于 checkout / 重说），state 版本供 effect 依赖 */
         lastUserNodeId,
         lastUserNodeIdRef,
@@ -1093,6 +1171,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
         cancelSession,
         isRunStreaming,
         sendMessage,
+        continueGeneration,
         checkout,
         checkoutForEdit,
         switchPlugin,

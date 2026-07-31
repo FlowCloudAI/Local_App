@@ -41,6 +41,9 @@ export interface Message {
     nodeId?: number
     usage?: AiUsage | null
     error?: ApiError
+    turnStatus?: string
+    finishReason?: string
+    continuationOfNodeId?: number
 }
 
 export interface ConversationSettings {
@@ -165,6 +168,7 @@ export interface AiContextValue {
     sendMessage: (content: string) => Promise<void>
     stopStreaming: () => void
     regenerateMessage: (messageId: string) => Promise<void>
+    continueMessage: (messageId: string) => Promise<void>
     editMessage: (messageId: string) => void
 
     inputValue: string
@@ -186,6 +190,7 @@ export interface AiContextValue {
 
     isStreaming: boolean
     streamingBlocks: MessageBoxBlock[]
+    continuationNodeId: number | null
     conversationRuntime: Record<string, ConversationRuntimeState>
 
     sidebarCollapsed: boolean

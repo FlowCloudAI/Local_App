@@ -1,12 +1,14 @@
-import {type RefObject} from 'react'
+import {Fragment, type RefObject} from 'react'
 import {Button, MessageBox} from 'flowcloudai-ui'
 import {type AiContextValue} from '../../../features/ai-chat/model/AiControllerTypes'
 import AiChatErrorNotice from '../../../features/ai-chat/components/AiChatErrorNotice'
+import {isIncompleteMessage} from '../../../features/ai-chat/model/conversationState'
 
 interface MobileAiMessageListProps {
     messages: AiContextValue['messages']
     streamingBlocks: AiContextValue['streamingBlocks']
     isStreaming: boolean
+    continuationNodeId: number | null
     focusEntryId: string | null
     hasActiveConversation: boolean
     conversationCreationDisabled: boolean
@@ -15,12 +17,14 @@ interface MobileAiMessageListProps {
     onNewConversation: () => void
     onOpenSettings: () => void
     onRetryMessage: (messageId: string) => void
+    onContinueMessage: (messageId: string) => void
 }
 
 export default function MobileAiMessageList({
     messages,
     streamingBlocks,
     isStreaming,
+    continuationNodeId,
     focusEntryId,
     hasActiveConversation,
     conversationCreationDisabled,
@@ -29,6 +33,7 @@ export default function MobileAiMessageList({
     onNewConversation,
     onOpenSettings,
     onRetryMessage,
+    onContinueMessage,
 }: MobileAiMessageListProps) {
     return (
         <main className="mobile-ai-chat__messages">
@@ -49,18 +54,38 @@ export default function MobileAiMessageList({
                 </div>
             )}
             {messages.map((message, messageIndex) => {
+                const isContinuing = Boolean(
+                    isStreaming
+                    && continuationNodeId != null
+                    && continuationNodeId === message.nodeId,
+                )
+                const canContinue = Boolean(
+                    !isStreaming
+                    && message.nodeId != null
+                    && isIncompleteMessage(message),
+                )
+                const visibleBlocks = isContinuing
+                    ? [...(message.blocks ?? []), ...streamingBlocks]
+                    : message.blocks
                 if (!message.error) {
                     return (
-                        <MessageBox
-                            key={message.id}
-                            role={message.role}
-                            blocks={message.blocks}
-                            content={message.content}
-                            markdown={message.role === 'assistant'}
-                            contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
-                            toolCallDetail="verbose"
-                            lineHeight={1.5}
-                        />
+                        <Fragment key={message.id}>
+                            <MessageBox
+                                role={message.role}
+                                blocks={visibleBlocks}
+                                content={message.content}
+                                markdown={message.role === 'assistant'}
+                                contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
+                                toolCallDetail="verbose"
+                                lineHeight={1.5}
+                                streaming={isContinuing}
+                            />
+                            {canContinue ? (
+                                <Button type="button" size="sm" onClick={() => onContinueMessage(message.id)}>
+                                    继续
+                                </Button>
+                            ) : null}
+                        </Fragment>
                     )
                 }
                 const canRetry = messages
@@ -74,24 +99,30 @@ export default function MobileAiMessageList({
                         {hasRenderableMessage ? (
                             <MessageBox
                                 role={message.role}
-                                blocks={message.blocks}
+                                blocks={visibleBlocks}
                                 content={message.content}
                                 markdown={message.role === 'assistant'}
                                 contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                 toolCallDetail="verbose"
                                 lineHeight={1.5}
+                                streaming={isContinuing}
                             />
                         ) : null}
                         <AiChatErrorNotice
                             compact
                             error={message.error}
-                            onRetry={canRetry ? () => onRetryMessage(message.id) : undefined}
+                            onRetry={canContinue
+                                ? () => onContinueMessage(message.id)
+                                : canRetry
+                                    ? () => onRetryMessage(message.id)
+                                    : undefined}
+                            retryLabel={canContinue ? '继续' : '重试'}
                             onOpenSettings={onOpenSettings}
                         />
                     </div>
                 )
             })}
-            {isStreaming && streamingBlocks.length > 0 && (
+            {isStreaming && continuationNodeId == null && streamingBlocks.length > 0 && (
                 <MessageBox
                     role="assistant"
                     blocks={streamingBlocks}

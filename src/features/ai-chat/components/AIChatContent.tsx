@@ -49,6 +49,7 @@ import {
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import {subscribeAppSettings} from '../../settings/appSettingsStore'
 import AiChatErrorNotice from './AiChatErrorNotice'
+import {isIncompleteMessage} from '../model/conversationState'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../../shared/ui/layout/DockPanelScaffold.css'
 import './AIChatContent.css'
@@ -1893,8 +1894,21 @@ export default function AIChatContent({
                                 const canRetry = ctx.messages
                                     .slice(0, messageIndex)
                                     .some(item => item.role === 'user' && item.nodeId != null)
+                                const isContinuing = Boolean(
+                                    ctx.isStreaming
+                                    && ctx.continuationNodeId != null
+                                    && ctx.continuationNodeId === message.nodeId,
+                                )
+                                const canContinue = Boolean(
+                                    !ctx.isStreaming
+                                    && message.nodeId != null
+                                    && isIncompleteMessage(message),
+                                )
+                                const visibleBlocks = isContinuing
+                                    ? [...(message.blocks ?? []), ...ctx.streamingBlocks]
+                                    : message.blocks
                                 const hasRenderableMessage = Boolean(
-                                    message.content || message.reasoning || message.blocks?.length,
+                                    message.content || message.reasoning || visibleBlocks?.length,
                                 )
                                 return (
                                     <div
@@ -1908,8 +1922,8 @@ export default function AIChatContent({
                                             <MessageBox
                                                 role={message.role}
                                                 blocks={message.role === 'assistant'
-                                                    ? buildRenderableAiChatBlocks(message.blocks, true)
-                                                    : message.blocks}
+                                                    ? buildRenderableAiChatBlocks(visibleBlocks, true)
+                                                    : visibleBlocks}
                                                 contextDisplay={message.role === 'assistant' ? 'compact' : 'full'}
                                                 content={message.role === 'assistant'
                                                     ? buildRenderableAiChatMarkdown(message.content)
@@ -1918,6 +1932,7 @@ export default function AIChatContent({
                                                 markdown={message.role === 'assistant'}
                                                 lineHeight={1.5}
                                                 reasoning={message.reasoning || undefined}
+                                                streaming={isContinuing}
                                                 rolePlaying={roleplayTtsEnabled && message.role === 'assistant'}
                                                 onCopy={() => navigator.clipboard.writeText(message.content)}
                                                 onPlay={roleplayTtsEnabled && message.role === 'assistant'
@@ -1929,7 +1944,9 @@ export default function AIChatContent({
                                                 onEdit={message.role === 'user'
                                                     ? () => ctx.editMessage(message.id)
                                                     : undefined}
-                                                onRegenerate={message.role === 'assistant' && !message.error
+                                                onRegenerate={message.role === 'assistant'
+                                                && !message.error
+                                                && !isIncompleteMessage(message)
                                                     ? () => {
                                                         logger.log('[AIChatContent] 点击重说', {
                                                             messageId: message.id,
@@ -1943,18 +1960,32 @@ export default function AIChatContent({
                                         {message.error ? (
                                             <AiChatErrorNotice
                                                 error={message.error}
-                                                onRetry={canRetry
-                                                    ? () => void ctx.regenerateMessage(message.id)
-                                                    : undefined}
+                                                onRetry={canContinue
+                                                    ? () => void ctx.continueMessage(message.id)
+                                                    : canRetry
+                                                        ? () => void ctx.regenerateMessage(message.id)
+                                                        : undefined}
+                                                retryLabel={canContinue ? '继续' : '重试'}
                                                 onOpenSettings={onOpenPluginManagement
                                                     ? () => onOpenPluginManagement('llm')
                                                     : undefined}
                                             />
                                         ) : null}
+                                        {!message.error && canContinue ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() => void ctx.continueMessage(message.id)}
+                                            >
+                                                继续
+                                            </Button>
+                                        ) : null}
                                     </div>
                                 )
                             })}
-                            {ctx.streamingBlocks.length > 0 && ctx.isStreaming && (
+                            {ctx.streamingBlocks.length > 0
+                            && ctx.isStreaming
+                            && ctx.continuationNodeId == null && (
                                 <MessageBox
                                     role="assistant"
                                     blocks={buildRenderableAiChatBlocks(ctx.streamingBlocks)}

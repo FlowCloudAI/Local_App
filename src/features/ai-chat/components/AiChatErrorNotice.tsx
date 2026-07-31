@@ -24,6 +24,7 @@ interface AiChatErrorNoticeProps {
     error: ApiError
     compact?: boolean
     onRetry?: () => void
+    retryLabel?: string
     onOpenSettings?: () => void
 }
 
@@ -31,6 +32,7 @@ export default function AiChatErrorNotice({
     error,
     compact = false,
     onRetry,
+    retryLabel = '重试',
     onOpenSettings,
 }: AiChatErrorNoticeProps) {
     const providerMessage = detailString(error, 'provider_message')
@@ -56,7 +58,7 @@ export default function AiChatErrorNotice({
             {(showRetry || showSettings) ? (
                 <div className="ai-chat-error-notice__actions">
                     {showRetry ? (
-                        <Button type="button" size="sm" onClick={onRetry}>重试</Button>
+                        <Button type="button" size="sm" onClick={onRetry}>{retryLabel}</Button>
                     ) : null}
                     {showSettings ? (
                         <Button type="button" size="sm" variant="outline" onClick={onOpenSettings}>

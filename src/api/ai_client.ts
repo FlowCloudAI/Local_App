@@ -188,7 +188,9 @@ export interface AiEventTurnEnd {
   run_id: string
   status: string
   error?: ApiError | null
-  node_id: number
+  node_id?: number | null
+  finish_reason?: string | null
+  continuation_of?: number | null
   usage?: AiUsage | null
 }
 
@@ -289,6 +291,9 @@ export const ai_build_character_project_snapshot = (projectId: string, entryId: 
 
 export const ai_send_message = (sessionId: string, message: string, clientTraceId?: string) =>
   command<void>('ai_send_message', { sessionId, message, clientTraceId })
+
+export const ai_continue_generation = (sessionId: string, nodeId: number, clientTraceId?: string) =>
+  command<void>('ai_continue_generation', { sessionId, nodeId, clientTraceId })
 
 export const ai_close_session = (sessionId: string) =>
   command<void>('ai_close_session', { sessionId })
@@ -418,6 +423,9 @@ export interface StoredMessage {
   reasoning: string | null
   timestamp: string
   work_seconds?: number | null
+  turn_status?: string | null
+  finish_reason?: string | null
+  continuation_of?: number | null
   tool_call_id?: string | null
   tool_calls?: {
     id?: string | null
