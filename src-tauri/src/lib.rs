@@ -222,35 +222,37 @@ pub fn run() {
                     .app_config_dir()
                     .unwrap_or_else(|_| std::env::current_dir().unwrap());
 
+                let stdout_target = tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::Stdout,
+                )
+                .filter(|meta| {
+                    // 过滤第三方依赖的高频诊断日志，避免启动时刷屏。
+                    let target = meta.target();
+                    !target.starts_with("sqlx::")
+                        && !target.starts_with("hyper")
+                        && !target.starts_with("hyper_util")
+                        && !target.starts_with("h2::")
+                        && !target.starts_with("reqwest::")
+                        && !target.starts_with("cranelift_codegen::timing")
+                });
+                #[cfg(all(debug_assertions, not(target_os = "android")))]
+                let log_targets = [stdout_target];
+                #[cfg(any(not(debug_assertions), target_os = "android"))]
+                let log_targets = [
+                    stdout_target,
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
+                        path: log_config_dir,
+                        file_name: Some("app".to_string()),
+                    })
+                    .filter(|meta| meta.level() <= log::Level::Info),
+                ];
                 let log_builder = tauri_plugin_log::Builder::new()
                     .level(log::LevelFilter::Info)
                     .level_for("app_lib", log::LevelFilter::Debug)
                     .level_for("FlowCloudAI", log::LevelFilter::Debug)
                     .level_for("flowcloudai_client", log::LevelFilter::Debug)
                     .level_for("worldflow_core", log::LevelFilter::Debug)
-                    .target(
-                        tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout).filter(
-                            |meta| {
-                                // 过滤第三方依赖的高频诊断日志，避免启动时刷屏。
-                                let target = meta.target();
-                                !target.starts_with("sqlx::")
-                                    && !target.starts_with("hyper")
-                                    && !target.starts_with("hyper_util")
-                                    && !target.starts_with("h2::")
-                                    && !target.starts_with("reqwest::")
-                                    && !target.starts_with("cranelift_codegen::timing")
-                            },
-                        ),
-                    );
-
-                #[cfg(any(not(debug_assertions), target_os = "android"))]
-                let log_builder = log_builder.target(
-                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
-                        path: log_config_dir,
-                        file_name: Some("app".to_string()),
-                    })
-                    .filter(|meta| meta.level() <= log::Level::Info),
-                );
+                    .targets(log_targets);
 
                 app.handle().plugin(log_builder.build())?;
             }
