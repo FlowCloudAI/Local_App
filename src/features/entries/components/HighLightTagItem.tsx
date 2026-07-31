@@ -1,3 +1,4 @@
+import {useEffect, useRef} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
 import './HighLightTagItem.css'
 
@@ -53,6 +54,14 @@ export default function HighLightTagItem({
     const isEditMode = mode === 'edit'
     const canRemove = isEditMode && !implanted && Boolean(onRemove)
     const rangeText = getRangeText(schema)
+    const numberInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        const input = numberInputRef.current
+        if (schema.type !== 'number' || !input || document.activeElement === input) return
+        const nextValue = value == null ? '' : String(value)
+        if (input.value !== nextValue) input.value = nextValue
+    }, [schema.type, value])
 
     return (
         <div
@@ -115,23 +124,31 @@ export default function HighLightTagItem({
                 ) : (
                     <div className="highlight-tag-item__editor highlight-tag-item__editor--edit">
                         <Input
+                            ref={numberInputRef}
                             className="highlight-tag-item__input"
                             type={schema.type === 'number' ? 'number' : 'text'}
                             inputMode={schema.type === 'number' ? 'decimal' : 'text'}
                             size="lg"
                             radius="lg"
-                            value={value == null ? '' : String(value)}
-                            onValueChange={(raw) => {
-                                if (!raw.trim()) {
-                                    onChange?.(null)
+                            value={schema.type === 'number' ? undefined : value == null ? '' : String(value)}
+                            defaultValue={schema.type === 'number' && value != null ? String(value) : undefined}
+                            onBlur={(event) => {
+                                if (schema.type !== 'number') return
+                                const raw = event.currentTarget.value.trim()
+                                const parsed = Number(raw)
+                                onChange?.(raw && Number.isFinite(parsed) ? parsed : null)
+                            }}
+                            onValueChange={(raw, meta) => {
+                                if (schema.type === 'number') {
+                                    if (meta?.source === 'click') {
+                                        const parsed = Number(raw)
+                                        onChange?.(Number.isFinite(parsed) ? parsed : null)
+                                    }
                                     return
                                 }
 
-                                if (schema.type === 'number') {
-                                    const parsed = Number(raw)
-                                    if (Number.isFinite(parsed)) {
-                                        onChange?.(parsed)
-                                    }
+                                if (!raw.trim()) {
+                                    onChange?.(null)
                                     return
                                 }
 
@@ -142,7 +159,10 @@ export default function HighLightTagItem({
                         <button
                             type="button"
                             className="highlight-tag-item__clear"
-                            onClick={() => onChange?.(null)}
+                            onClick={() => {
+                                if (numberInputRef.current) numberInputRef.current.value = ''
+                                onChange?.(null)
+                            }}
                             disabled={value == null || value === ''}
                         >
                             清空
