@@ -32,3 +32,4 @@ package-lock.json
 src-tauri/gen/
 
 bugreport-sdk_gphone*
+/.lingma/
