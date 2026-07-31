@@ -87,6 +87,7 @@ const PROJECT_ENTRY_LOOKUP_LIMIT = 1000
 export default function MobileEntryDetail({push, pop, replace, navigateToTab, setBeforeLeave, setAiFocus, params}: Props) {
     const projectId = params.projectId
     const entryId = params.entryId ?? ''
+    const saveSourceIdRef = useRef(globalThis.crypto.randomUUID())
     const {showAlert} = useAlert()
     const {theme} = useTheme()
     const pageRef = useRef<HTMLDivElement>(null)
@@ -284,6 +285,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     useEffect(() => {
         const updatedListener = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
             if (event.payload.entry_id !== entryId) return
+            if (event.payload.source_id === saveSourceIdRef.current) return
             if (mode === 'edit' && isDirty) {
                 void showAlert('词条已在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'nonInvasive', 2200)
                 return
@@ -422,6 +424,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
                 tags,
                 images,
                 relationDrafts,
+                sourceId: saveSourceIdRef.current,
             })
             setEntry(savedBundle.entry)
             syncForm(savedBundle.entry)

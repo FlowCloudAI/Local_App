@@ -628,6 +628,7 @@ export interface EntryEditRequestEvent {
 
 export interface EntryUpdatedEvent {
   entry_id: string
+  source_id?: string | null
 }
 
 export interface EntryDeleteRequestEvent {

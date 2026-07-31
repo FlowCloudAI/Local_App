@@ -3,6 +3,7 @@ use super::images::{copy_entry_images, use_derived_cover_thumbnails};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use tauri::Emitter;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +19,7 @@ pub struct SaveEntryRelationDraft {
 pub struct SaveEntryBundleInput {
     pub id: String,
     pub project_id: String,
+    pub source_id: Option<String>,
     pub category_id: Option<String>,
     pub title: String,
     pub summary: Option<String>,
@@ -369,6 +371,40 @@ fn resolve_relation_payload(
             RelationDirection::OneWay,
             content,
         )),
+    }
+}
+
+fn collect_affected_entry_ids(
+    entry_id: Uuid,
+    link_targets: impl IntoIterator<Item = Uuid>,
+    relation_endpoints: impl IntoIterator<Item = (Uuid, Uuid)>,
+) -> BTreeSet<Uuid> {
+    let mut entry_ids = BTreeSet::from([entry_id]);
+    entry_ids.extend(link_targets);
+    for (a_id, b_id) in relation_endpoints {
+        entry_ids.insert(a_id);
+        entry_ids.insert(b_id);
+    }
+    entry_ids
+}
+
+#[cfg(test)]
+mod entry_update_event_tests {
+    use super::*;
+
+    #[test]
+    fn affected_entries_include_link_and_relation_peers_without_duplicates() {
+        let current = Uuid::from_u128(1);
+        let linked = Uuid::from_u128(2);
+        let related = Uuid::from_u128(3);
+
+        let affected = collect_affected_entry_ids(
+            current,
+            [linked, linked],
+            [(current, related), (related, current)],
+        );
+
+        assert_eq!(affected, BTreeSet::from([current, linked, related]));
     }
 }
 
@@ -1073,6 +1109,7 @@ pub async fn db_update_entry(
 /// 保存词条主体、正文内链和关系草稿，减少前端多轮 IPC。
 #[tauri::command]
 pub async fn db_save_entry_bundle(
+    app_handle: AppHandle,
     state: State<'_, Arc<AppState>>,
     paths: State<'_, PathsState>,
     input: SaveEntryBundleInput,
@@ -1086,7 +1123,16 @@ pub async fn db_save_entry_bundle(
 
     let db = open_project_db(state.inner(), &project_id).await?;
     let current_entry = db.get_entry(&entry_id).await.map_err(|e| e.to_string())?;
+    let previous_outgoing_links = db
+        .list_outgoing_links(&entry_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let previous_relations = db
+        .list_relations_for_entry(&entry_id)
+        .await
+        .map_err(|e| e.to_string())?;
     let content = input.content.clone().unwrap_or_default();
+    let source_id = input.source_id.clone();
     let outgoing_link_targets = parse_internal_entry_links(&content)
         .into_iter()
         .map(|(entry_id, title)| SaveEntryLinkTarget { entry_id, title })
@@ -1106,6 +1152,10 @@ pub async fn db_save_entry_bundle(
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
+    let relation_patch_endpoints = relation_patches
+        .iter()
+        .map(|patch| (patch.a_id, patch.b_id))
+        .collect::<Vec<_>>();
 
     let images = copy_entry_images(paths.inner(), &current_entry.project_id, input.images)?;
     let cover_path = images.as_ref().map(|_| None);
@@ -1126,6 +1176,38 @@ pub async fn db_save_entry_bundle(
         })
         .await
         .map_err(|e| e.to_string())?;
+
+    let affected_entry_ids = collect_affected_entry_ids(
+        entry_id,
+        previous_outgoing_links
+            .iter()
+            .chain(result.outgoing_links.iter())
+            .map(|link| link.b_id),
+        previous_relations
+            .iter()
+            .map(|relation| (relation.a_id, relation.b_id))
+            .chain(relation_patch_endpoints),
+    );
+    #[derive(Clone, Serialize)]
+    struct EntryUpdatedEventPayload {
+        entry_id: String,
+        source_id: Option<String>,
+    }
+    for affected_entry_id in affected_entry_ids {
+        if let Err(error) = app_handle.emit(
+            "entry:updated",
+            EntryUpdatedEventPayload {
+                entry_id: affected_entry_id.to_string(),
+                source_id: source_id.clone(),
+            },
+        ) {
+            log::warn!(
+                "[db_save_entry_bundle] 广播词条更新失败 entry_id={}, error={}",
+                affected_entry_id,
+                error
+            );
+        }
+    }
 
     Ok(SaveEntryBundleResponse {
         entry: result.entry,

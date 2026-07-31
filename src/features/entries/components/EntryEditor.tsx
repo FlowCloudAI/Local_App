@@ -317,6 +317,7 @@ export default function EntryEditor({
     const historyInitializedRef = useRef<string | null>(null)
     const entryRef = useRef<Entry | null>(null)
     const hasChangesRef = useRef(false)
+    const saveSourceIdRef = useRef(globalThis.crypto.randomUUID())
     const onSavedRef = useRef(onSaved)
     const onTitleChangeRef = useRef(onTitleChange)
     const lastSuccessfulSaveAtRef = useRef(0)
@@ -1042,9 +1043,10 @@ export default function EntryEditor({
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
             if (event.payload.entry_id !== entryId) return
+            if (event.payload.source_id === saveSourceIdRef.current) return
 
             if (hasChangesRef.current) {
-                void showAlert('词条已被 AI 在后台更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'nonInvasive', 2200)
+                void showAlert('词条已在其他位置更新；当前页面存在未保存修改，已跳过自动覆盖。', 'warning', 'nonInvasive', 2200)
                 return
             }
 
@@ -1113,6 +1115,7 @@ export default function EntryEditor({
                 tags: buildEntryTagsPayload(draft.tags, entryTags.localTagSchemas, entry.tags),
                 images: draft.images,
                 relationDrafts,
+                sourceId: saveSourceIdRef.current,
             })
             setOutgoingLinks(savedBundle.outgoingLinks)
             setIncomingLinks(savedBundle.incomingLinks)

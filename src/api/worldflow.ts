@@ -352,6 +352,7 @@ export interface SaveEntryRelationDraftInput {
 export interface SaveEntryBundleInput extends UpdateEntryInput {
     projectId: string
     relationDrafts: SaveEntryRelationDraftInput[]
+    sourceId?: string
 }
 
 export interface SaveEntryBundleResponse {
@@ -622,6 +623,7 @@ export const db_save_entry_bundle = (input: SaveEntryBundleInput) => {
         tags,
         images,
         relationDrafts,
+        sourceId,
     } = input
     return command<SaveEntryBundleResponse>('db_save_entry_bundle', {
         input: {
@@ -635,6 +637,7 @@ export const db_save_entry_bundle = (input: SaveEntryBundleInput) => {
             tags,
             images,
             relationDrafts,
+            sourceId,
         },
     })
 }
