@@ -765,7 +765,7 @@
 }
 
 .ai-messages-list .message-box-item--assistant {
-    padding-inline: var(--fc-space-xl);
+    padding-inline: var(--fc-space-sm);
 }
 
 .ai-message-frame {
