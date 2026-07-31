@@ -8,6 +8,7 @@ import {resolveSelectionToolbarPlacement} from '../src/features/entries/componen
 import {ensureEntryDetailLoaded} from '../src/features/entries/lib/entryDetailLoading.ts'
 import {resolveMarkdownPreviewSourceContent} from '../src/features/entries/lib/entryMarkdownPreviewState.ts'
 import {resolveSavedState, shouldAutoSave} from '../src/features/entries/lib/entrySaveState.ts'
+import {resolveEditableNumberTagValue} from '../src/features/entries/lib/entryTagInput.ts'
 
 const history = new UndoRedoHistory('初始内容')
 history.setPending('刚输入的内容')
@@ -129,3 +130,7 @@ const concurrentDraft = {content: '保存期间继续输入'}
 assert.equal(resolveSavedState(concurrentDraft, submittedDraft, refreshedDraft), concurrentDraft)
 assert.equal(shouldAutoSave(true, true, false, true), false)
 assert.equal(shouldAutoSave(true, true, true, true), true)
+
+assert.equal(resolveEditableNumberTagValue('87'), 87)
+assert.equal(resolveEditableNumberTagValue(''), null)
+assert.equal(resolveEditableNumberTagValue('-'), undefined)

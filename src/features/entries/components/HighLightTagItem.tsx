@@ -1,5 +1,6 @@
 import {useEffect, useRef} from 'react'
 import {Button, Input} from 'flowcloudai-ui'
+import {resolveEditableNumberTagValue} from '../lib/entryTagInput'
 import './HighLightTagItem.css'
 
 type HighLightTagType = 'number' | 'string' | 'boolean'
@@ -134,16 +135,13 @@ export default function HighLightTagItem({
                             defaultValue={schema.type === 'number' && value != null ? String(value) : undefined}
                             onBlur={(event) => {
                                 if (schema.type !== 'number') return
-                                const raw = event.currentTarget.value.trim()
-                                const parsed = Number(raw)
-                                onChange?.(raw && Number.isFinite(parsed) ? parsed : null)
+                                const nextValue = resolveEditableNumberTagValue(event.currentTarget.value)
+                                onChange?.(nextValue ?? null)
                             }}
-                            onValueChange={(raw, meta) => {
+                            onValueChange={(raw) => {
                                 if (schema.type === 'number') {
-                                    if (meta?.source === 'click') {
-                                        const parsed = Number(raw)
-                                        onChange?.(Number.isFinite(parsed) ? parsed : null)
-                                    }
+                                    const nextValue = resolveEditableNumberTagValue(raw)
+                                    if (nextValue !== undefined) onChange?.(nextValue)
                                     return
                                 }
 
