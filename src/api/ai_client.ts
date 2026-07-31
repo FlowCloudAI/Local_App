@@ -192,6 +192,8 @@ export interface AiEventTurnEnd {
   finish_reason?: string | null
   continuation_of?: number | null
   usage?: AiUsage | null
+  calibration_factor?: number | null
+  calibration_key: string
 }
 
 export interface AiEventTurnBegin {

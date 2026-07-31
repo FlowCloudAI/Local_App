@@ -1,8 +1,9 @@
-use crate::apis::ai_client::{CreateLlmSessionResult, spawn_session_event_loop};
+use crate::apis::ai_client::{
+    CreateLlmSessionResult, build_llm_session_config, spawn_session_event_loop,
+};
 use crate::apis::worldflow::common::open_project_db;
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
-use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState};
-use flowcloudai_client::llm::config::SessionConfig;
+use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, AppState, SettingsState};
 use flowcloudai_client::{DefaultOrchestrator, ErrorCode, sense::Sense};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -381,6 +382,7 @@ pub async fn ai_build_character_project_snapshot(
 pub async fn ai_create_character_session(
     app: AppHandle,
     ai_state: State<'_, AiState>,
+    settings_state: State<'_, SettingsState>,
     input: CharacterSessionInput,
 ) -> Result<CreateLlmSessionResult, ApiError> {
     let api_key = ApiKeyStore::get(&input.plugin_id).ok_or_else(|| {
@@ -391,15 +393,19 @@ pub async fn ai_create_character_session(
         .with_kv("plugin_id", input.plugin_id.clone())
     })?;
 
+    let llm_defaults = settings_state.settings.lock().await.llm.clone();
     let client = ai_state.client.lock().await;
     let registry = client.tool_registry().clone();
     let sense = CharacterSense::new(input.character_name.clone(), input.project_snapshot.clone());
     let whitelist = sense.tool_whitelist();
-    let config = input.max_tool_rounds.map(|rounds| SessionConfig {
-        max_tool_rounds: rounds as usize,
-        ..Default::default()
-    });
-    let mut session = client.create_llm_session(&input.plugin_id, &api_key, config)?;
+    let (config, calibration_key) = build_llm_session_config(
+        &client,
+        &input.plugin_id,
+        input.model.as_deref(),
+        input.max_tool_rounds.map(|rounds| rounds as usize),
+        &llm_defaults,
+    );
+    let mut session = client.create_llm_session(&input.plugin_id, &api_key, Some(config))?;
     drop(client);
 
     session.load_sense(sense).await?;
@@ -424,7 +430,13 @@ pub async fn ai_create_character_session(
     let (event_stream, handle) = session.try_run(input_rx)?;
     let run_id = Uuid::new_v4().to_string();
 
-    spawn_session_event_loop(app, input.session_id.clone(), run_id.clone(), event_stream);
+    spawn_session_event_loop(
+        app,
+        input.session_id.clone(),
+        run_id.clone(),
+        calibration_key,
+        event_stream,
+    );
 
     let resolved_model = input.model.clone().unwrap_or_else(|| "default".to_string());
     ai_state.sessions.lock().await.insert(

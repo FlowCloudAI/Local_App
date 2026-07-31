@@ -47,7 +47,12 @@ import {
     toApiError,
 } from '../../../api'
 import {type SessionFailure, type SessionMessage, useAiSession} from './useAiSession'
-import {estimateMessagesTokens, estimateTextTokens} from '../lib/contextUsage'
+import {
+    estimateMessagesTokens,
+    estimateTextTokens,
+    resolveTokenCalibrationFactor,
+    tokensToConservativeCharBudget,
+} from '../lib/contextUsage'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import {
     getAiPluginSnapshot,
@@ -460,9 +465,15 @@ const resolveDocumentContextCharBudget = (
     const contextWindowTokens = plugin?.model_infos.find((item) => item.id === modelId)?.context_window_tokens ?? null
     if (!contextWindowTokens || contextWindowTokens <= 0) return DOCUMENT_CONTEXT_CHAR_BUDGET
 
-    const historyTokens = estimateMessagesTokens(conversation?.messages ?? [])
-    const promptTokens = estimateTextTokens(query)
-    const systemPromptTokens = estimateTextTokens(conversation?.settings.systemPrompt)
+    const calibrationFactor = resolveTokenCalibrationFactor(
+        getAppSettingsSnapshot().settings?.llm.token_calibration_factors,
+        pluginId,
+        modelId,
+    )
+
+    const historyTokens = estimateMessagesTokens(conversation?.messages ?? [], calibrationFactor)
+    const promptTokens = estimateTextTokens(query, calibrationFactor)
+    const systemPromptTokens = estimateTextTokens(conversation?.settings.systemPrompt, calibrationFactor)
     const reservedReplyTokens = Math.max(2_000, Math.floor(contextWindowTokens * 0.2))
     const availableTokens = contextWindowTokens - historyTokens - promptTokens - systemPromptTokens - reservedReplyTokens
     if (availableTokens <= 0) return DOCUMENT_CONTEXT_MIN_CHAR_BUDGET
@@ -470,7 +481,10 @@ const resolveDocumentContextCharBudget = (
     const documentTokens = Math.floor(availableTokens * 0.6)
     return Math.max(
         DOCUMENT_CONTEXT_MIN_CHAR_BUDGET,
-        Math.min(DOCUMENT_CONTEXT_MAX_CHAR_BUDGET, documentTokens * 2),
+        Math.min(
+            DOCUMENT_CONTEXT_MAX_CHAR_BUDGET,
+            tokensToConservativeCharBudget(documentTokens, calibrationFactor),
+        ),
     )
 }
 
@@ -875,7 +889,12 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const messagesForEstimate = conversation.messages.some((item) => item.id === message.id)
             ? conversation.messages
             : [...conversation.messages, {content: message.content}]
-        const estimatedTokens = estimateMessagesTokens(messagesForEstimate)
+        const calibrationFactor = message.calibrationFactor ?? resolveTokenCalibrationFactor(
+            compactSettings.token_calibration_factors,
+            conversation.pluginId,
+            conversation.model,
+        )
+        const estimatedTokens = estimateMessagesTokens(messagesForEstimate, calibrationFactor)
         const usageTokens = message.usage?.total_tokens ?? 0
         const usedTokens = Math.max(usageTokens, estimatedTokens)
         const usageRatio = usedTokens / contextWindowTokens
@@ -965,6 +984,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                     blocks: message.blocks,
                     nodeId: message.nodeId,
                     usage: message.usage,
+                    calibrationFactor: message.calibrationFactor,
                     turnStatus: message.turnStatus,
                     finishReason: message.finishReason,
                     continuationOfNodeId: message.continuationOfNodeId,

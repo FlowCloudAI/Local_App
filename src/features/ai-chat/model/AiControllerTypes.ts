@@ -40,6 +40,7 @@ export interface Message {
     attachments?: Attachment[]
     nodeId?: number
     usage?: AiUsage | null
+    calibrationFactor?: number
     error?: ApiError
     turnStatus?: string
     finishReason?: string

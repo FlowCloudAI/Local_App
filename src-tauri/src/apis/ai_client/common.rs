@@ -65,6 +65,9 @@ pub(crate) struct EventTurnEnd {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) continuation_of: Option<u64>,
     pub(crate) usage: Option<Usage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) calibration_factor: Option<f64>,
+    pub(crate) calibration_key: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -860,6 +863,91 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
     }
 }
 
+pub(crate) fn build_llm_session_config(
+    client: &flowcloudai_client::FlowCloudAIClient,
+    plugin_id: &str,
+    model: Option<&str>,
+    max_tool_rounds: Option<usize>,
+    defaults: &crate::settings::LlmDefaults,
+) -> (SessionConfig, String) {
+    let plugin = client
+        .list_plugins()
+        .into_iter()
+        .find(|plugin| plugin.id == plugin_id);
+    let metadata_model = model
+        .filter(|model| !model.is_empty() && *model != "default")
+        .map(str::to_string)
+        .or_else(|| {
+            plugin
+                .as_ref()
+                .and_then(|plugin| plugin.default_model().map(str::to_string))
+        });
+    let context_window_tokens = plugin.as_ref().and_then(|plugin| {
+        metadata_model
+            .as_deref()
+            .and_then(|model| plugin.model_info(model))
+            .and_then(|model| model.context_window_tokens)
+    });
+    let calibration_key = format!(
+        "{}:{}",
+        plugin_id,
+        metadata_model.as_deref().unwrap_or("default")
+    );
+    let mut config = SessionConfig {
+        context_window_tokens,
+        calibration_factor: defaults
+            .token_calibration_factors
+            .get(&calibration_key)
+            .copied(),
+        ..Default::default()
+    };
+    if let Some(rounds) = max_tool_rounds {
+        config.max_tool_rounds = rounds;
+    }
+    (config, calibration_key)
+}
+
+pub(crate) async fn save_token_calibration(app: &AppHandle, key: &str, factor: f64) {
+    if key.is_empty() || !factor.is_finite() || !(0.5..=2.0).contains(&factor) {
+        return;
+    }
+    let Some(state) = app.try_state::<SettingsState>() else {
+        return;
+    };
+    let mut settings = state.settings.lock().await;
+    if settings
+        .llm
+        .token_calibration_factors
+        .get(key)
+        .is_some_and(|current| (current - factor).abs() < f64::EPSILON)
+    {
+        return;
+    }
+
+    let previous = settings
+        .llm
+        .token_calibration_factors
+        .insert(key.to_string(), factor);
+    if let Err(error) = settings.save(&state.path) {
+        match previous {
+            Some(previous) => {
+                settings
+                    .llm
+                    .token_calibration_factors
+                    .insert(key.to_string(), previous);
+            }
+            None => {
+                settings.llm.token_calibration_factors.remove(key);
+            }
+        }
+        log::warn!(
+            "[ai:token_calibration_save_failed] key={} error={}",
+            key,
+            error
+        );
+    }
+}
+
 fn schedule_turn_begin_stall_watchdog(
     app: AppHandle,
     session_id: String,
@@ -961,6 +1049,7 @@ pub(crate) fn spawn_session_event_loop<S>(
     app: AppHandle,
     session_id: String,
     run_id: String,
+    calibration_key: String,
     event_stream: S,
 ) where
     S: futures::Stream<Item = SessionEvent> + Send + 'static,
@@ -1137,6 +1226,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                     finish_reason,
                     continuation_of,
                     usage,
+                    calibration_factor,
                 } => {
                     let status_text = turn_status_str(&status);
                     log::info!(
@@ -1159,6 +1249,9 @@ pub(crate) fn spawn_session_event_loop<S>(
                     if let Some(ref u) = usage {
                         save_api_usage(&app_clone, &sid, u).await;
                     }
+                    if let Some(factor) = calibration_factor {
+                        save_token_calibration(&app_clone, &calibration_key, factor).await;
+                    }
                     app_clone
                         .emit(
                             "ai:turn_end",
@@ -1171,6 +1264,8 @@ pub(crate) fn spawn_session_event_loop<S>(
                                 finish_reason,
                                 continuation_of,
                                 usage,
+                                calibration_factor,
+                                calibration_key: calibration_key.clone(),
                             },
                         )
                         .ok();

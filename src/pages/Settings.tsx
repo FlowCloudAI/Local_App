@@ -1508,7 +1508,8 @@ export default function Settings({
                 auto_compact_enabled: false,
                 auto_compact_threshold_ratio: 0.75,
                 auto_compact_recent_messages: 8,
-                auto_compact_detail: 'balanced'
+                auto_compact_detail: 'balanced',
+                token_calibration_factors: {},
             },
             image: {
                 plugin_id: null,

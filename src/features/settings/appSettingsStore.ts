@@ -61,6 +61,23 @@ export function getAppSettingsSnapshot() {
     return snapshot
 }
 
+export function applyTokenCalibrationFactor(key: string, factor: number) {
+    const settings = snapshot.settings
+    if (!settings || !key || !Number.isFinite(factor) || factor < 0.5 || factor > 2) return
+    setSnapshot({
+        settings: {
+            ...settings,
+            llm: {
+                ...settings.llm,
+                token_calibration_factors: {
+                    ...settings.llm.token_calibration_factors,
+                    [key]: factor,
+                },
+            },
+        },
+    })
+}
+
 export async function refreshAppSettings() {
     if (refreshPromise) return refreshPromise
     setSnapshot({loading: true, error: null})

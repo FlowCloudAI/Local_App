@@ -17,6 +17,7 @@ export interface LlmDefaults {
   auto_compact_threshold_ratio: number
   auto_compact_recent_messages: number
   auto_compact_detail: LlmCompactDetail
+  token_calibration_factors: Record<string, number>
 }
 
 export type LlmCompactDetail = 'brief' | 'balanced' | 'detailed'

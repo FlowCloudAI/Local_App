@@ -71,6 +71,7 @@ export function createMockSettings(): AppSettings {
             auto_compact_threshold_ratio: 0.8,
             auto_compact_recent_messages: 10,
             auto_compact_detail: 'balanced',
+            token_calibration_factors: {},
         },
         image: {plugin_id: null, default_model: null},
         tts: {plugin_id: null, default_model: null, voice_id: null, auto_play: false},

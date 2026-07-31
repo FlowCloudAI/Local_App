@@ -98,6 +98,13 @@ pub async fn ai_create_llm_session(
         session_id.clone()
     };
 
+    let model_to_apply = model
+        .clone()
+        .or_else(|| restored_model.filter(|m| !m.is_empty() && m != "default"));
+    let resolved_model = model_to_apply
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+
     let client = ai_state.client.lock().await;
     log::info!(
         "[ai_create_llm_session][lock_client_done] trace_id={} session_id={} plugin_id={}",
@@ -106,10 +113,13 @@ pub async fn ai_create_llm_session(
         plugin_id
     );
     let registry = client.tool_registry().clone();
-    let config = max_tool_rounds.map(|rounds| SessionConfig {
-        max_tool_rounds: rounds as usize,
-        ..Default::default()
-    });
+    let (config, calibration_key) = build_llm_session_config(
+        &client,
+        &plugin_id,
+        model_to_apply.as_deref(),
+        max_tool_rounds.map(|rounds| rounds as usize),
+        &global_llm_defaults,
+    );
     log::info!(
         "[ai_create_llm_session][create_start] trace_id={} session_id={} plugin_id={} conversation_id={} restored={}",
         trace_id,
@@ -119,7 +129,7 @@ pub async fn ai_create_llm_session(
         restored_history.is_some()
     );
     let mut session = client
-        .create_llm_session(&plugin_id, &api_key, config)
+        .create_llm_session(&plugin_id, &api_key, Some(config))
         .map_err(|e| {
             log::error!(
                 "[ai_create_llm_session][create_failed] trace_id={} session_id={} plugin_id={} error={}",
@@ -157,12 +167,6 @@ pub async fn ai_create_llm_session(
     ));
     let runtime_settings = settings.as_ref().or(restored_settings.as_ref());
 
-    let model_to_apply = model
-        .clone()
-        .or_else(|| restored_model.filter(|m| !m.is_empty() && m != "default"));
-    let resolved_model = model_to_apply
-        .clone()
-        .unwrap_or_else(|| "default".to_string());
     if let Some(m) = model_to_apply {
         session.set_model(&m).await;
     }
@@ -255,7 +259,13 @@ pub async fn ai_create_llm_session(
         resolved_model
     );
 
-    spawn_session_event_loop(app, session_id.clone(), run_id.clone(), event_stream);
+    spawn_session_event_loop(
+        app,
+        session_id.clone(),
+        run_id.clone(),
+        calibration_key,
+        event_stream,
+    );
 
     {
         let mut sessions = ai_state.sessions.lock().await;

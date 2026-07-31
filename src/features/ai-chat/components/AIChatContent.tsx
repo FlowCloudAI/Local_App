@@ -28,7 +28,12 @@ import type {
     ConversationSettings,
 } from '../model/AiControllerTypes'
 import {CONVERSATION_TEMPERATURE_MAX, normalizeConversationSettings} from '../model/AiControllerTypes'
-import {estimateMessagesTokens, estimateTextTokens, formatTokenCount} from '../lib/contextUsage'
+import {
+    estimateMessagesTokens,
+    estimateTextTokens,
+    formatTokenCount,
+    resolveTokenCalibrationFactor,
+} from '../lib/contextUsage'
 import type {DockableSidePanelMode} from '../../../shared/ui/layout/DockableSidePanel'
 import {DockPanelSearchInput, DockPanelSegmentedControl} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import {DockPanelIconButton, DockPanelMain, DockPanelSide, DockPanelTitle, DockPanelTopbar} from '../../../shared/ui/layout/DockPanelScaffold'
@@ -47,7 +52,7 @@ import {
     resolveMarkdownAnchor,
 } from '../../entries/lib/entryMarkdown'
 import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
-import {subscribeAppSettings} from '../../settings/appSettingsStore'
+import {subscribeAppSettings, useAppSettingsStore} from '../../settings/appSettingsStore'
 import AiChatErrorNotice from './AiChatErrorNotice'
 import {isIncompleteMessage} from '../model/conversationState'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
@@ -524,6 +529,7 @@ export default function AIChatContent({
                                        sidePortalTarget,
                                    }: AIChatContentProps) {
     const ctx = controller
+    const {settings: appSettings} = useAppSettingsStore()
     const {addDocumentContextFiles} = ctx
     const activeConversation = ctx.activeConversation
     const isCharacterConversation = activeConversation?.mode === 'character'
@@ -677,6 +683,11 @@ export default function AIChatContent({
     const contextModelId = activeConversation?.model || ctx.selectedModel
     const contextModelInfo = contextPluginInfo?.model_infos.find((modelInfo) => modelInfo.id === contextModelId)
     const contextWindowTokens = contextModelInfo?.context_window_tokens ?? null
+    const calibrationFactor = resolveTokenCalibrationFactor(
+        appSettings?.llm.token_calibration_factors,
+        contextPluginInfo?.id,
+        contextModelId,
+    )
     const latestUsage = useMemo(() => {
         for (let index = ctx.messages.length - 1; index >= 0; index -= 1) {
             const usage = ctx.messages[index].usage
@@ -685,10 +696,10 @@ export default function AIChatContent({
         return null
     }, [ctx.messages])
     const contextUsage = useMemo(() => {
-        const currentInputTokenEstimate = estimateTextTokens(ctx.inputValue)
+        const currentInputTokenEstimate = estimateTextTokens(ctx.inputValue, calibrationFactor)
         const estimatedTokens =
-            estimateMessagesTokens(ctx.messages)
-            + estimateTextTokens(activeConversation?.settings.systemPrompt)
+            estimateMessagesTokens(ctx.messages, calibrationFactor)
+            + estimateTextTokens(activeConversation?.settings.systemPrompt, calibrationFactor)
             + currentInputTokenEstimate
         const usageTokens = latestUsage?.total_tokens ?? 0
         const usedTokens = Math.max(usageTokens, estimatedTokens)
@@ -711,7 +722,7 @@ export default function AIChatContent({
             ringPercent: percent > 0 && percent < 1 ? 1 : percent,
             title: `对话记忆已用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)}）`,
         }
-    }, [activeConversation?.settings.systemPrompt, contextWindowTokens, ctx.inputValue, ctx.messages, latestUsage])
+    }, [activeConversation?.settings.systemPrompt, calibrationFactor, contextWindowTokens, ctx.inputValue, ctx.messages, latestUsage])
     const showContextUsageIndicator = Boolean(contextModelId)
     const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsage.ringPercent / 100)
     const conversationSettings = normalizeConversationSettings(activeConversation?.settings)

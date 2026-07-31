@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 // ── 应用设置 ───────────────────────────────────────────────────────────────
 
@@ -165,6 +165,8 @@ pub struct LlmDefaults {
     pub auto_compact_recent_messages: u32,
     /// 压缩文本详细程度："brief" | "balanced" | "detailed"
     pub auto_compact_detail: String,
+    /// 按 `plugin:model` 保存的 token 估算校准系数。
+    pub token_calibration_factors: HashMap<String, f64>,
 }
 
 impl Default for LlmDefaults {
@@ -185,6 +187,7 @@ impl Default for LlmDefaults {
             auto_compact_threshold_ratio: 0.75,
             auto_compact_recent_messages: 8,
             auto_compact_detail: "balanced".to_string(),
+            token_calibration_factors: HashMap::new(),
         }
     }
 }

@@ -7,14 +7,15 @@ use crate::ai_services::contradiction_loader::{
 use crate::ai_services::world_check::world_check_definition;
 use crate::apis::ai_client::{
     CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
-    EventTurnBegin, EventTurnEnd, cleanup_session_state, save_api_usage, turn_status_error,
-    turn_status_str,
+    EventTurnBegin, EventTurnEnd, build_llm_session_config, cleanup_session_state, save_api_usage,
+    save_token_calibration, turn_status_error, turn_status_str,
 };
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
 use crate::senses::contradiction_sense::ContradictionSense;
-use crate::{AiSessionKind, AiState, ApiError, ApiKeyStore, ContradictionSessionBinding};
-use flowcloudai_client::llm::config::SessionConfig;
+use crate::{
+    AiSessionKind, AiState, ApiError, ApiKeyStore, ContradictionSessionBinding, SettingsState,
+};
 use flowcloudai_client::{DefaultOrchestrator, ErrorCode, SessionEvent, TurnStatus};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -169,6 +170,7 @@ pub async fn ai_start_contradiction_session(
     app: AppHandle,
     ai_state: State<'_, AiState>,
     app_state: State<'_, Arc<AppState>>,
+    settings_state: State<'_, SettingsState>,
     request: ContradictionSessionRequest,
 ) -> Result<ContradictionSessionResult, ApiError> {
     let api_key = ApiKeyStore::get(&request.plugin_id).ok_or_else(|| {
@@ -191,15 +193,19 @@ pub async fn ai_start_contradiction_session(
     };
     let prompt = build_contradiction_prompt(&corpus);
 
+    let llm_defaults = settings_state.settings.lock().await.llm.clone();
     let client = ai_state.client.lock().await;
     let registry = client.tool_registry().clone();
     let sense = ContradictionSense::new();
     let whitelist = check_definition.tool_whitelist.clone();
-    let config = Some(SessionConfig {
-        max_tool_rounds: request.max_tool_rounds.unwrap_or(50),
-        ..Default::default()
-    });
-    let mut session = client.create_llm_session(&request.plugin_id, &api_key, config)?;
+    let (config, calibration_key) = build_llm_session_config(
+        &client,
+        &request.plugin_id,
+        request.model.as_deref(),
+        Some(request.max_tool_rounds.unwrap_or(50)),
+        &llm_defaults,
+    );
+    let mut session = client.create_llm_session(&request.plugin_id, &api_key, Some(config))?;
     drop(client);
 
     session.load_sense(sense).await?;
@@ -265,6 +271,7 @@ pub async fn ai_start_contradiction_session(
         app.clone(),
         request.session_id.clone(),
         run_id.clone(),
+        calibration_key,
         event_stream,
         first_turn_tx,
         corpus.entry_blocks.clone(),
@@ -448,6 +455,7 @@ fn spawn_contradiction_event_loop<S>(
     app: AppHandle,
     session_id: String,
     run_id: String,
+    calibration_key: String,
     event_stream: S,
     first_turn_tx: oneshot::Sender<Result<ContradictionReport, String>>,
     quote_sources: Vec<String>,
@@ -562,9 +570,13 @@ fn spawn_contradiction_event_loop<S>(
                     finish_reason,
                     continuation_of,
                     usage,
+                    calibration_factor,
                 } => {
                     if let Some(ref u) = usage {
                         save_api_usage(&app_clone, &sid, u).await;
+                    }
+                    if let Some(factor) = calibration_factor {
+                        save_token_calibration(&app_clone, &calibration_key, factor).await;
                     }
                     app_clone
                         .emit(
@@ -578,6 +590,8 @@ fn spawn_contradiction_event_loop<S>(
                                 finish_reason,
                                 continuation_of,
                                 usage,
+                                calibration_factor,
+                                calibration_key: calibration_key.clone(),
                             },
                         )
                         .ok();

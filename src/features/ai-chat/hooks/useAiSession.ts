@@ -31,6 +31,7 @@ import {
 } from '../../../api'
 import {isMissingBackendSessionError} from '../lib/sessionErrors'
 import type {AiToolAccessMode} from '../model/AiControllerTypes'
+import {applyTokenCalibrationFactor} from '../../settings/appSettingsStore'
 
 // ── 导出类型 ──────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ export interface SessionMessage {
     nodeId?: number
     /** 本轮 API 用量。供应商未返回 usage 时为空。 */
     usage?: AiUsage | null
+    calibrationFactor?: number
     turnStatus?: string
     finishReason?: string
     continuationOfNodeId?: number
@@ -625,7 +627,12 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 finish_reason,
                 continuation_of,
                 usage,
+                calibration_factor,
+                calibration_key,
             } = event.payload
+            if (calibration_factor != null) {
+                applyTokenCalibrationFactor(calibration_key, calibration_factor)
+            }
             markRunEvent('ai:turn_end', rid)
             logger.log('[useAiSession][turn_end]', {
                 sessionId: sid,
@@ -673,6 +680,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                         runId: rid,
                         nodeId: node_id ?? undefined,
                         usage,
+                        calibrationFactor: calibration_factor ?? undefined,
                         turnStatus: status,
                         finishReason: finish_reason ?? undefined,
                         continuationOfNodeId: continuation_of ?? undefined,
