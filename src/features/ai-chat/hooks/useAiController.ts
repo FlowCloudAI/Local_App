@@ -49,7 +49,6 @@ import {
 import {type SessionFailure, type SessionMessage, useAiSession} from './useAiSession'
 import {
     estimateMessagesTokens,
-    estimateTextTokens,
     resolveTokenCalibrationFactor,
     tokensToConservativeCharBudget,
 } from '../lib/contextUsage'
@@ -457,13 +456,13 @@ const mergeDocumentAttachmentItemIds = (...groups: Array<string[] | undefined>):
 const resolveDocumentContextCharBudget = (
     conversation: Conversation | null | undefined,
     query?: string,
-): number => {
+): Promise<number> => {
     const snapshot = getAiPluginSnapshot()
     const pluginId = conversation?.pluginId ?? snapshot.selectedPlugin
     const modelId = conversation?.model ?? snapshot.selectedModel
     const plugin = snapshot.plugins.find((item) => item.id === pluginId)
     const contextWindowTokens = plugin?.model_infos.find((item) => item.id === modelId)?.context_window_tokens ?? null
-    if (!contextWindowTokens || contextWindowTokens <= 0) return DOCUMENT_CONTEXT_CHAR_BUDGET
+    if (!contextWindowTokens || contextWindowTokens <= 0) return Promise.resolve(DOCUMENT_CONTEXT_CHAR_BUDGET)
 
     const calibrationFactor = resolveTokenCalibrationFactor(
         getAppSettingsSnapshot().settings?.llm.token_calibration_factors,
@@ -471,21 +470,28 @@ const resolveDocumentContextCharBudget = (
         modelId,
     )
 
-    const historyTokens = estimateMessagesTokens(conversation?.messages ?? [], calibrationFactor)
-    const promptTokens = estimateTextTokens(query, calibrationFactor)
-    const systemPromptTokens = estimateTextTokens(conversation?.settings.systemPrompt, calibrationFactor)
-    const reservedReplyTokens = Math.max(2_000, Math.floor(contextWindowTokens * 0.2))
-    const availableTokens = contextWindowTokens - historyTokens - promptTokens - systemPromptTokens - reservedReplyTokens
-    if (availableTokens <= 0) return DOCUMENT_CONTEXT_MIN_CHAR_BUDGET
-
-    const documentTokens = Math.floor(availableTokens * 0.6)
-    return Math.max(
-        DOCUMENT_CONTEXT_MIN_CHAR_BUDGET,
-        Math.min(
-            DOCUMENT_CONTEXT_MAX_CHAR_BUDGET,
-            tokensToConservativeCharBudget(documentTokens, calibrationFactor),
-        ),
-    )
+    const virtualMessages = [
+        ...(conversation?.messages ?? []),
+        ...(query?.trim() ? [{content: query}] : []),
+        ...(conversation?.settings.systemPrompt.trim()
+            ? [{content: conversation.settings.systemPrompt}]
+            : []),
+    ]
+    return estimateMessagesTokens(virtualMessages, calibrationFactor)
+        .then(usedTokens => {
+            const reservedReplyTokens = Math.max(2_000, Math.floor(contextWindowTokens * 0.2))
+            const availableTokens = contextWindowTokens - usedTokens - reservedReplyTokens
+            if (availableTokens <= 0) return DOCUMENT_CONTEXT_MIN_CHAR_BUDGET
+            const documentTokens = Math.floor(availableTokens * 0.6)
+            return Math.max(
+                DOCUMENT_CONTEXT_MIN_CHAR_BUDGET,
+                Math.min(
+                    DOCUMENT_CONTEXT_MAX_CHAR_BUDGET,
+                    tokensToConservativeCharBudget(documentTokens, calibrationFactor),
+                ),
+            )
+        })
+        .catch(() => DOCUMENT_CONTEXT_CHAR_BUDGET)
 }
 
 const collectDocumentAttachmentItemIds = (messages: Message[]): string[] =>
@@ -893,7 +899,18 @@ export function useAiController(focus: AiFocus): AiContextValue {
             conversation.pluginId,
             conversation.model,
         )
-        const estimatedTokens = estimateMessagesTokens([...messages, {content: pendingContent}], calibrationFactor)
+        const estimatedMessages = [
+            ...messages,
+            {content: pendingContent},
+            ...(conversation.settings.systemPrompt.trim()
+                ? [{content: conversation.settings.systemPrompt}]
+                : []),
+        ]
+        const estimatedTokens = await estimateMessagesTokens(estimatedMessages, calibrationFactor)
+            .catch(error => {
+                logger.warn('[useAiController][自动压缩] Token 预检失败，交由核心预算保护', {error})
+                return 0
+            })
         const usageTokens = headMessage.usage?.total_tokens ?? 0
         const usedTokens = Math.max(usageTokens, estimatedTokens)
         const usageRatio = usedTokens / contextWindowTokens
@@ -1406,7 +1423,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
             const result = await docctx_build_context({
                 conversationId,
                 itemIds: selectedItemIds,
-                maxChars: resolveDocumentContextCharBudget(conversation, query),
+                maxChars: await resolveDocumentContextCharBudget(conversation, query),
                 query: query?.trim() || null,
             })
             if (result.sources.length === 0 || !result.markdown.trim()) return ctx

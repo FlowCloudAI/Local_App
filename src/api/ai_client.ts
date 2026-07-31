@@ -729,6 +729,22 @@ export const CATEGORY_DELETED = 'category:deleted'
 export const confirm_entry_edit = (requestId: string, confirmed: boolean) =>
     command<void>('confirm_entry_edit', {requestId, confirmed})
 
+// ── Token 估算 ────────────────────────────────────────────────────────────────
+
+export interface AiTokenEstimateMessage {
+    content: string | null
+    reasoning_content: string | null
+    tool_payloads: string[]
+}
+
+export interface AiTokenEstimateRequest {
+    messages: AiTokenEstimateMessage[]
+    calibration_factor: number | null
+}
+
+export const ai_estimate_tokens = (request: AiTokenEstimateRequest) =>
+    command<number>('ai_estimate_tokens', {request})
+
 // ── 工具管理 ──────────────────────────────────────────────────────────────────
 
 export const ai_enable_tool = (name: string) =>

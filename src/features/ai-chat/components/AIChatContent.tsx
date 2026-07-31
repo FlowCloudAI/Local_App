@@ -30,7 +30,6 @@ import type {
 import {CONVERSATION_TEMPERATURE_MAX, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {
     estimateMessagesTokens,
-    estimateTextTokens,
     formatTokenCount,
     resolveTokenCalibrationFactor,
 } from '../lib/contextUsage'
@@ -696,15 +695,39 @@ export default function AIChatContent({
         }
         return null
     }, [ctx.messages])
+    const [estimatedContextTokens, setEstimatedContextTokens] = useState(0)
+    useEffect(() => {
+        const estimatedMessages = [
+            ...ctx.messages,
+            ...(activeConversation?.settings.systemPrompt.trim()
+                ? [{content: activeConversation.settings.systemPrompt}]
+                : []),
+            ...(ctx.inputValue.trim() ? [{content: ctx.inputValue}] : []),
+        ]
+        if (estimatedMessages.length === 0) {
+            setEstimatedContextTokens(0)
+            return
+        }
+
+        let active = true
+        const timer = window.setTimeout(() => {
+            void estimateMessagesTokens(estimatedMessages, calibrationFactor)
+                .then(tokens => {
+                    if (active) setEstimatedContextTokens(tokens)
+                })
+                .catch(() => {
+                    if (active) setEstimatedContextTokens(0)
+                })
+        }, 150)
+        return () => {
+            active = false
+            window.clearTimeout(timer)
+        }
+    }, [activeConversation?.settings.systemPrompt, calibrationFactor, ctx.inputValue, ctx.messages])
     const contextUsage = useMemo(() => {
-        const currentInputTokenEstimate = estimateTextTokens(ctx.inputValue, calibrationFactor)
-        const estimatedTokens =
-            estimateMessagesTokens(ctx.messages, calibrationFactor)
-            + estimateTextTokens(activeConversation?.settings.systemPrompt, calibrationFactor)
-            + currentInputTokenEstimate
         const usageTokens = latestUsage?.total_tokens ?? 0
-        const usedTokens = Math.max(usageTokens, estimatedTokens)
-        const source = latestUsage && usageTokens >= estimatedTokens ? '服务返回' : '本地估算'
+        const usedTokens = Math.max(usageTokens, estimatedContextTokens)
+        const source = latestUsage && usageTokens >= estimatedContextTokens ? '服务返回' : '核心估算'
         if (!contextWindowTokens || contextWindowTokens <= 0) {
             return {
                 label: usedTokens > 0 ? '?' : '0%',
@@ -723,7 +746,7 @@ export default function AIChatContent({
             ringPercent: percent > 0 && percent < 1 ? 1 : percent,
             title: `对话记忆已用约 ${label}（${source} ${formatTokenCount(usedTokens)} / ${formatTokenCount(contextWindowTokens)}）`,
         }
-    }, [activeConversation?.settings.systemPrompt, calibrationFactor, contextWindowTokens, ctx.inputValue, ctx.messages, latestUsage])
+    }, [contextWindowTokens, estimatedContextTokens, latestUsage])
     const showContextUsageIndicator = Boolean(contextModelId)
     const contextUsageDashOffset = CONTEXT_USAGE_RING_CIRCUMFERENCE * (1 - contextUsage.ringPercent / 100)
     const conversationSettings = normalizeConversationSettings(activeConversation?.settings)
