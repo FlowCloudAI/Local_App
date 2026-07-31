@@ -104,10 +104,6 @@ export default function EntryImageAddModal({
                     queueMicrotask(() => {
                         setSelectedPlugin(data[0].id)
                     })
-                } else if (!insertMode) {
-                    queueMicrotask(() => {
-                        setActiveTab('ai')
-                    })
                 }
             })
             .catch((err) => {

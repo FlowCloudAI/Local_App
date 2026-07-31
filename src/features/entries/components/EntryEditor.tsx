@@ -1263,7 +1263,6 @@ export default function EntryEditor({
                 images: nextImages,
             }
         })
-        setLightboxIndex((current) => Math.min(current, Math.max(0, draft.images.length - 2)))
     }
 
     function insertImageMarkdown(image: EntryImage | undefined, fallbackIndex = 0, closeLightbox = false) {

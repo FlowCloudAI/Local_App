@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from 'react'
+import {useCallback, useEffect, useMemo, useState} from 'react'
 import {type EntryImage, toEntryImageSrc} from '../lib/entryImage'
 
 export type ImageAddModalMode = 'add' | 'insert'
@@ -12,6 +12,10 @@ export default function useEntryImageState(images: EntryImage[]) {
         ...image,
         src: toEntryImageSrc(image),
     })), [images])
+
+    useEffect(() => {
+        setLightboxIndex((current) => Math.min(current, Math.max(0, lightboxImages.length - 1)))
+    }, [lightboxImages.length])
 
     const openImageAddModal = useCallback((mode: ImageAddModalMode) => {
         setImageAddModalMode(mode)
