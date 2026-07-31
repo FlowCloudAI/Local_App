@@ -107,6 +107,7 @@ import {
     normalizeComparableType,
     normalizeEntryContent,
     parseDateValue,
+    stripMarkdown,
 } from '../lib/entryCommon'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
@@ -983,6 +984,10 @@ export default function EntryEditor({
             : buildMarkdownPreviewSource(previewSourceContent, draft.images),
         [previewSourceContent, draft.images],
     )
+    const characterCount = useMemo(
+        () => stripMarkdown(debouncedContent).length,
+        [debouncedContent],
+    )
     const outlineItems = useMemo(
         () => buildMarkdownOutline(draft.content),
         [draft.content],
@@ -1633,6 +1638,7 @@ export default function EntryEditor({
                                         canRedo={undoRedo.canRedo}
                                         activeBlockStyle={activeBlockStyle}
                                         splitView={editorSplitView}
+                                        characterCount={characterCount}
                                         findBar={findBarOpen ? (
                                             <EntryMarkdownFindBar
                                                 ref={findBarRef}

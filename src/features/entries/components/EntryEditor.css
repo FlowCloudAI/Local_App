@@ -761,6 +761,14 @@
     flex: none;
 }
 
+.entry-editor-format-toolbar__count {
+    flex: none;
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-caption, 0.75rem);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .entry-editor-format-toolbar__outline {
     flex: none;
 }

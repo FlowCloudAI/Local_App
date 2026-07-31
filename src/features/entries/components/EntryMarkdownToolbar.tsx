@@ -45,6 +45,7 @@ interface EntryMarkdownToolbarProps {
     canRedo: boolean
     activeBlockStyle: MarkdownBlockStyle
     splitView: boolean
+    characterCount: number
     findBar?: ReactNode
     outlinePanel?: ReactNode
     outlineOpen: boolean
@@ -89,6 +90,7 @@ export default function EntryMarkdownToolbar({
     canRedo,
     activeBlockStyle,
     splitView,
+    characterCount,
     findBar,
     outlinePanel,
     outlineOpen,
@@ -174,6 +176,13 @@ export default function EntryMarkdownToolbar({
                 </div>
             </div>
 
+            <span
+                className="entry-editor-format-toolbar__count"
+                aria-label={`正文共 ${characterCount} 个字符`}
+                title="去掉 Markdown 标记后的字符数"
+            >
+                {characterCount} 字
+            </span>
             <Button
                 type="button"
                 variant="ghost"
