@@ -10,7 +10,7 @@ import {
     normalizeComparableText,
     normalizeComparableType,
 } from '../lib/entryCommon'
-import {getComparableTagValue, normalizeComparableTagValue} from '../lib/entryTag'
+import {getComparableTagValue} from '../lib/entryTag'
 import type {EntryImage} from '../lib/entryImage'
 import {getCoverImage, toEntryImageSrc} from '../lib/entryImage'
 import {
@@ -190,7 +190,7 @@ export default function EntryEditorMetaPanel({
                                 className={`entry-editor-title-input${trimmedTitle ? '' : ' is-missing'}`}
                                 value={draft.title}
                                 onChange={(event) => onDraftChange((current) => (
-                                    normalizeComparableText(current.title) === normalizeComparableText(event.target.value)
+                                    current.title === event.target.value
                                         ? current
                                         : {...current, title: event.target.value}
                                 ))}
@@ -232,7 +232,7 @@ export default function EntryEditorMetaPanel({
                             className="entry-editor-summary-input"
                             value={draft.summary}
                             onChange={(event) => onDraftChange((current) => (
-                                normalizeComparableText(current.summary) === normalizeComparableText(event.target.value)
+                                current.summary === event.target.value
                                     ? current
                                     : {...current, summary: event.target.value}
                             ))}
@@ -565,14 +565,13 @@ export default function EntryEditorMetaPanel({
                                                 mode="edit"
                                                 onRemove={isImplanted ? undefined : () => onRemoveVisibleTagSchema(schema)}
                                                 onChange={(value) => onDraftChange((current) => {
-                                                    const nextValue = normalizeComparableTagValue(value)
-                                                    const currentValue = getComparableTagValue(current.tags, schema)
-                                                    if (currentValue === nextValue) return current
+                                                    const currentValue = current.tags[schema.id] ?? current.tags[schema.name] ?? null
+                                                    if (currentValue === value) return current
                                                     return {
                                                         ...current,
                                                         tags: {
                                                             ...current.tags,
-                                                            [schema.id]: nextValue,
+                                                            [schema.id]: value,
                                                         },
                                                     }
                                                 })}
