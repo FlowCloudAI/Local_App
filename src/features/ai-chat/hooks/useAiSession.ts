@@ -14,6 +14,7 @@ import {
     ai_switch_plugin,
     ai_update_session,
     type AiEventBranchChanged,
+    type AiEventContextTrimmed,
     type AiEventDelta,
     type AiEventError,
     type AiEventReady,
@@ -131,6 +132,19 @@ const finalizePendingTools = (
     })
     return attachWorkSecondsToFirstBlock(finalized, workSeconds)
 }
+
+const CONTEXT_TRIM_NOTICE_PREFIX = 'context-trim-notice:'
+
+const isContextTrimNotice = (block: MessageBoxBlock): boolean => (
+    block.type === 'content' && block.id?.startsWith(CONTEXT_TRIM_NOTICE_PREFIX) === true
+)
+
+const collectAssistantContent = (blocks: MessageBoxBlock[]): string => blocks.reduce(
+    (content, block) => block.type === 'content' && !isContextTrimNotice(block)
+        ? content + block.content
+        : content,
+    '',
+)
 
 export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSessionOptions) {
     const [sessionId, setSessionId] = useState<string | null>(null)
@@ -292,10 +306,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             true,
             getRunWorkSeconds(rid),
         )
-        const content = finalBlocks
-            .filter(block => block.type === 'content')
-            .map(block => block.content)
-            .join('')
+        const content = collectAssistantContent(finalBlocks)
         const reasoning = finalBlocks
             .filter(block => block.type === 'reasoning')
             .map(block => block.content)
@@ -388,7 +399,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             const prev = blocksByRunRef.current[runKey] ?? []
             const next = [...prev]
             const last = next[next.length - 1]
-            if (last && last.type === 'content') {
+            if (last && last.type === 'content' && !isContextTrimNotice(last)) {
                 next[next.length - 1] = {...last, content: last.content + event.payload.text}
             } else {
                 next.push({type: 'content', content: event.payload.text, markdown: true, streaming: true})
@@ -617,6 +628,29 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             })
         })
 
+        const unlistenContextTrimmed = listen<AiEventContextTrimmed>('ai:context_trimmed', event => {
+            markRunEvent('ai:context_trimmed', event.payload.run_id)
+            const payload = event.payload
+            const notice = [
+                '> **系统提示**：上下文已自动裁剪',
+                `（截断 ${payload.truncated_messages} 条消息，省略 ${payload.dropped_rounds} 轮，`,
+                `估算 ${payload.before} → ${payload.after} tokens）`,
+                payload.suggest_compaction ? '；下次发送前将优先执行语义压缩。' : '。',
+            ].join('')
+            const runKey = payload.run_id
+            const next: MessageBoxBlock[] = [
+                ...(blocksByRunRef.current[runKey] ?? []),
+                {
+                    id: `${CONTEXT_TRIM_NOTICE_PREFIX}${payload.before}:${payload.after}`,
+                    type: 'content',
+                    content: notice,
+                    markdown: true,
+                },
+            ]
+            blocksByRunRef.current[runKey] = next
+            if (runIdRef.current === runKey) setBlocks(next)
+        })
+
         const unlistenTurnEnd = listen<AiEventTurnEnd>('ai:turn_end', event => {
             const {
                 session_id: sid,
@@ -653,10 +687,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 const workSeconds = getRunWorkSeconds(rid)
                 const finalBlocks = finalizePendingTools(prev, '会话已结束，未返回工具结果。', false, workSeconds)
                 blocksByRunRef.current[rid] = finalBlocks
-                const contentText = finalBlocks
-                    .filter(b => b.type === 'content')
-                    .map(b => (b as { content: string }).content)
-                    .join('')
+                const contentText = collectAssistantContent(finalBlocks)
                 const reasoningText = finalBlocks
                     .filter(b => b.type === 'reasoning')
                     .map(b => (b as { content: string }).content)
@@ -731,10 +762,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                     const workSeconds = getRunWorkSeconds(rid)
                     const finalBlocks = finalizePendingTools(prev, '会话已中断，未返回工具结果。', true, workSeconds)
                     blocksByRunRef.current[rid] = finalBlocks
-                    const contentText = finalBlocks
-                        .filter(b => b.type === 'content')
-                        .map(b => (b as { content: string }).content)
-                        .join('')
+                    const contentText = collectAssistantContent(finalBlocks)
                     const reasoningText = finalBlocks
                         .filter(b => b.type === 'reasoning')
                         .map(b => (b as { content: string }).content)
@@ -805,6 +833,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             unlistenReasoning.then(fn => fn())
             unlistenToolCall.then(fn => fn())
             unlistenToolResult.then(fn => fn())
+            unlistenContextTrimmed.then(fn => fn())
             unlistenTurnEnd.then(fn => fn())
             unlistenError.then(fn => fn())
             unlistenBranchChanged.then(fn => fn())

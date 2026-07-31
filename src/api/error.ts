@@ -42,6 +42,7 @@ export const ErrorCode = {
     LlmToolCallFailed: 'LLM_TOOL_CALL_FAILED',
     LlmToolCallTimeout: 'LLM_TOOL_CALL_TIMEOUT',
     LlmToolCallInvalid: 'LLM_TOOL_CALL_INVALID',
+    ContextBudgetExceeded: 'CONTEXT_BUDGET_EXCEEDED',
     HttpBadRequest: 'HTTP_BAD_REQUEST',
     HttpUnauthorized: 'HTTP_UNAUTHORIZED',
     HttpPaymentRequired: 'HTTP_PAYMENT_REQUIRED',

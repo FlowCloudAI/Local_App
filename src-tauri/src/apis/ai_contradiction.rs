@@ -629,6 +629,20 @@ fn spawn_contradiction_event_loop<S>(
                         let _ = sender.send(result);
                     }
                 }
+                SessionEvent::ContextTrimmed {
+                    dropped_rounds,
+                    truncated_messages,
+                    before,
+                    after,
+                    ..
+                } => log::warn!(
+                    "[ai:contradiction][context_trimmed] run_id={} dropped_rounds={} truncated_messages={} before={} after={}",
+                    rid,
+                    dropped_rounds,
+                    truncated_messages,
+                    before,
+                    after
+                ),
                 SessionEvent::Error(error) => {
                     let api_err: crate::ApiError = error.clone().into();
                     app_clone

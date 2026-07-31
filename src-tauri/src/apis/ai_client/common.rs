@@ -89,6 +89,17 @@ pub(crate) struct EventToolResult {
 }
 
 #[derive(Serialize, Clone)]
+pub(crate) struct EventContextTrimmed {
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) dropped_rounds: usize,
+    pub(crate) truncated_messages: usize,
+    pub(crate) before: u64,
+    pub(crate) after: u64,
+    pub(crate) suggest_compaction: bool,
+}
+
+#[derive(Serialize, Clone)]
 pub(crate) struct EventBranchChanged {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
@@ -1219,6 +1230,38 @@ pub(crate) fn spawn_session_event_loop<S>(
                             error
                         ),
                     }
+                }
+                SessionEvent::ContextTrimmed {
+                    dropped_rounds,
+                    truncated_messages,
+                    before,
+                    after,
+                    suggest_compaction,
+                } => {
+                    log::warn!(
+                        "[ai:context_trimmed] session_id={} run_id={} dropped_rounds={} truncated_messages={} before={} after={} suggest_compaction={}",
+                        sid,
+                        rid,
+                        dropped_rounds,
+                        truncated_messages,
+                        before,
+                        after,
+                        suggest_compaction
+                    );
+                    app_clone
+                        .emit(
+                            "ai:context_trimmed",
+                            EventContextTrimmed {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                dropped_rounds,
+                                truncated_messages,
+                                before,
+                                after,
+                                suggest_compaction,
+                            },
+                        )
+                        .ok();
                 }
                 SessionEvent::TurnEnd {
                     status,

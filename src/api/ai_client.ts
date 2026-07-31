@@ -177,6 +177,16 @@ export interface AiEventToolCall {
   arguments?: string
 }
 
+export interface AiEventContextTrimmed {
+  session_id: string
+  run_id: string
+  dropped_rounds: number
+  truncated_messages: number
+  before: number
+  after: number
+  suggest_compaction: boolean
+}
+
 export interface AiUsage {
   prompt_tokens: number
   completion_tokens: number
