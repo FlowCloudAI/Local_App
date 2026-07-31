@@ -746,6 +746,20 @@ fn spawn_world_check_event_loop<S>(
                         let _ = sender.send(result);
                     }
                 }
+                SessionEvent::ToolRetrying {
+                    name,
+                    attempt,
+                    max_retries,
+                    delay_ms,
+                    ..
+                } => log::warn!(
+                    "[ai:world_check][tool_retrying] run_id={} name={} attempt={}/{} delay_ms={}",
+                    rid,
+                    name,
+                    attempt,
+                    max_retries,
+                    delay_ms
+                ),
                 SessionEvent::ContextTrimmed {
                     dropped_rounds,
                     truncated_messages,

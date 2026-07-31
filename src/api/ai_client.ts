@@ -177,6 +177,16 @@ export interface AiEventToolCall {
   arguments?: string
 }
 
+export interface AiEventToolRetrying {
+  session_id: string
+  run_id: string
+  index: number
+  name: string
+  attempt: number
+  max_retries: number
+  delay_ms: number
+}
+
 export interface AiEventContextTrimmed {
   session_id: string
   run_id: string

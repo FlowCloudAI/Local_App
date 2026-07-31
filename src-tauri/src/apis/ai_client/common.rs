@@ -53,6 +53,17 @@ pub(crate) struct EventToolCall {
 }
 
 #[derive(Serialize, Clone)]
+pub(crate) struct EventToolRetrying {
+    pub(crate) session_id: String,
+    pub(crate) run_id: String,
+    pub(crate) index: usize,
+    pub(crate) name: String,
+    pub(crate) attempt: usize,
+    pub(crate) max_retries: usize,
+    pub(crate) delay_ms: u64,
+}
+
+#[derive(Serialize, Clone)]
 pub(crate) struct EventTurnEnd {
     pub(crate) session_id: String,
     pub(crate) run_id: String,
@@ -1188,6 +1199,37 @@ pub(crate) fn spawn_session_event_loop<S>(
                             error
                         ),
                     }
+                }
+                SessionEvent::ToolRetrying {
+                    index,
+                    name,
+                    attempt,
+                    max_retries,
+                    delay_ms,
+                } => {
+                    log::warn!(
+                        "[ai:tool_retrying] run_id={} index={} name={} attempt={}/{} delay_ms={}",
+                        rid,
+                        index,
+                        name,
+                        attempt,
+                        max_retries,
+                        delay_ms
+                    );
+                    app_clone
+                        .emit(
+                            "ai:tool_retrying",
+                            EventToolRetrying {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                index,
+                                name,
+                                attempt,
+                                max_retries,
+                                delay_ms,
+                            },
+                        )
+                        .ok();
                 }
                 SessionEvent::ToolResult {
                     index,

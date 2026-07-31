@@ -7,7 +7,7 @@ use crate::tools;
 use crate::tools::confirm::{request_confirmation, should_auto_confirm_writes};
 use anyhow::Result;
 use flowcloudai_client::llm::types::ToolFunctionArg;
-use flowcloudai_client::tool::{ToolRegistry, arg_str};
+use flowcloudai_client::tool::{ToolFailure, ToolRegistry, arg_str};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -112,7 +112,10 @@ async fn dispatch_edit_op(
             };
 
             if !confirmed {
-                return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
+                return Err(ToolFailure::Denied {
+                    reason: "用户取消了词条编辑确认".to_string(),
+                }
+                .into());
             }
             let entry =
                 tools::update_entry_content(app_state.as_ref(), &entry_id, Some(after_content))
@@ -176,7 +179,10 @@ async fn dispatch_edit_op(
             };
 
             if !confirmed {
-                return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
+                return Err(ToolFailure::Denied {
+                    reason: "用户取消了词条替换确认".to_string(),
+                }
+                .into());
             }
             let entry =
                 tools::update_entry_content(app_state.as_ref(), &entry_id, Some(new_content))
@@ -230,7 +236,10 @@ async fn dispatch_edit_op(
             .await?;
 
             if !confirmed {
-                return Ok("用户审核未通过，请停止任务并向用户确认需求".to_string());
+                return Err(ToolFailure::Denied {
+                    reason: "用户取消了词条删除确认".to_string(),
+                }
+                .into());
             }
             tools::delete_entry(app_state.as_ref(), &entry_id)
                 .await

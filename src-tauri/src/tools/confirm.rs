@@ -3,6 +3,7 @@
 //! 本模块用一次性通道关联确认请求与用户响应；超时、缺少窗口句柄或通道异常均按取消处理，
 //! 以避免模型在无人确认时继续修改数据。
 
+use flowcloudai_client::ToolFailure;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -43,14 +44,26 @@ pub async fn request_confirmation<P: serde::Serialize + Clone>(
     let payload = make_payload(request_id.clone());
     app_handle
         .emit(event, payload)
-        .map_err(|e| anyhow::anyhow!("emit 失败: {}", e))?;
+        .map_err(|error| ToolFailure::Denied {
+            reason: format!("无法发起用户确认，操作已取消：{error}"),
+        })?;
 
     match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), rx).await {
-        Ok(Ok(v)) => Ok(v),
-        Ok(Err(_)) => anyhow::bail!("确认通道异常关闭"),
+        Ok(Ok(true)) => Ok(true),
+        Ok(Ok(false)) => Err(ToolFailure::Denied {
+            reason: "用户取消了确认".to_string(),
+        }
+        .into()),
+        Ok(Err(_)) => Err(ToolFailure::Denied {
+            reason: "确认通道异常关闭，操作已取消".to_string(),
+        }
+        .into()),
         Err(_) => {
             pending_edits.lock().await.remove(&request_id);
-            anyhow::bail!("用户未在规定时间内响应，操作已自动取消");
+            Err(ToolFailure::Denied {
+                reason: "用户未在规定时间内响应，操作已自动取消".to_string(),
+            }
+            .into())
         }
     }
 }
@@ -70,7 +83,10 @@ pub async fn request_write_confirmation(
         return Ok(true);
     }
     let Some(app_handle) = app_handle else {
-        anyhow::bail!("缺少用户确认通道，操作已自动取消");
+        return Err(ToolFailure::Denied {
+            reason: "缺少用户确认通道，操作已自动取消".to_string(),
+        }
+        .into());
     };
     let title = title.into();
     request_confirmation(

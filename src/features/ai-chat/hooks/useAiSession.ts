@@ -20,6 +20,7 @@ import {
     type AiEventReady,
     type AiEventReasoning,
     type AiEventToolCall,
+    type AiEventToolRetrying,
     type AiEventToolResult,
     type AiEventTurnBegin,
     type AiEventTurnEnd,
@@ -134,13 +135,16 @@ const finalizePendingTools = (
 }
 
 const CONTEXT_TRIM_NOTICE_PREFIX = 'context-trim-notice:'
+const TOOL_RETRY_NOTICE_PREFIX = 'tool-retry-notice:'
 
-const isContextTrimNotice = (block: MessageBoxBlock): boolean => (
-    block.type === 'content' && block.id?.startsWith(CONTEXT_TRIM_NOTICE_PREFIX) === true
+const isSystemNotice = (block: MessageBoxBlock): boolean => (
+    block.type === 'content'
+    && (block.id?.startsWith(CONTEXT_TRIM_NOTICE_PREFIX) === true
+        || block.id?.startsWith(TOOL_RETRY_NOTICE_PREFIX) === true)
 )
 
 const collectAssistantContent = (blocks: MessageBoxBlock[]): string => blocks.reduce(
-    (content, block) => block.type === 'content' && !isContextTrimNotice(block)
+    (content, block) => block.type === 'content' && !isSystemNotice(block)
         ? content + block.content
         : content,
     '',
@@ -399,7 +403,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             const prev = blocksByRunRef.current[runKey] ?? []
             const next = [...prev]
             const last = next[next.length - 1]
-            if (last && last.type === 'content' && !isContextTrimNotice(last)) {
+            if (last && last.type === 'content' && !isSystemNotice(last)) {
                 next[next.length - 1] = {...last, content: last.content + event.payload.text}
             } else {
                 next.push({type: 'content', content: event.payload.text, markdown: true, streaming: true})
@@ -549,6 +553,23 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
                 action: last && (last.type === 'tool' || last.type === 'tool_use') ? 'append_or_group_tool' : 'append_tool',
                 blockCount: next.length,
             })
+        })
+
+        const unlistenToolRetrying = listen<AiEventToolRetrying>('ai:tool_retrying', event => {
+            markRunEvent('ai:tool_retrying', event.payload.run_id)
+            const payload = event.payload
+            const runKey = payload.run_id
+            const next: MessageBoxBlock[] = [
+                ...(blocksByRunRef.current[runKey] ?? []),
+                {
+                    id: `${TOOL_RETRY_NOTICE_PREFIX}${payload.index}:${payload.attempt}`,
+                    type: 'content',
+                    content: `> **系统提示**：工具 \`${payload.name}\` 暂时失败，正在重试（${payload.attempt}/${payload.max_retries}，等待 ${payload.delay_ms} ms）。`,
+                    markdown: true,
+                },
+            ]
+            blocksByRunRef.current[runKey] = next
+            if (runIdRef.current === runKey) setBlocks(next)
         })
 
         const unlistenToolResult = listen<AiEventToolResult>('ai:tool_result', event => {
@@ -832,6 +853,7 @@ export function useAiSession({onMessage, onUserTurnBegin, onError}: UseAiSession
             unlistenDelta.then(fn => fn())
             unlistenReasoning.then(fn => fn())
             unlistenToolCall.then(fn => fn())
+            unlistenToolRetrying.then(fn => fn())
             unlistenToolResult.then(fn => fn())
             unlistenContextTrimmed.then(fn => fn())
             unlistenTurnEnd.then(fn => fn())
