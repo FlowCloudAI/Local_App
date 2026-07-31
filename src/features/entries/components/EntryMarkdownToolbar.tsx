@@ -3,7 +3,8 @@
  */
 import {commands, type ICommand} from '@uiw/react-md-editor'
 import {Button} from 'flowcloudai-ui'
-import type {ReactNode} from 'react'
+import {type ReactNode, useEffect, useState} from 'react'
+import {stripMarkdown} from '../lib/entryCommon'
 import {
     buildBlockStyleEdit,
     buildWikiLinkEdit,
@@ -45,7 +46,7 @@ interface EntryMarkdownToolbarProps {
     canRedo: boolean
     activeBlockStyle: MarkdownBlockStyle
     splitView: boolean
-    characterCount: number
+    content: string
     findBar?: ReactNode
     outlinePanel?: ReactNode
     outlineOpen: boolean
@@ -85,12 +86,31 @@ function CommandButton({command, label, title = label, active, onCommand}: Comma
     )
 }
 
+function EntryMarkdownCharacterCount({content}: {content: string}) {
+    const [count, setCount] = useState(() => stripMarkdown(content).length)
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => setCount(stripMarkdown(content).length), 150)
+        return () => window.clearTimeout(timer)
+    }, [content])
+
+    return (
+        <span
+            className="entry-editor-format-toolbar__count"
+            aria-label={`正文共 ${count} 个字符`}
+            title="去掉 Markdown 标记后的字符数"
+        >
+            {count} 字
+        </span>
+    )
+}
+
 export default function EntryMarkdownToolbar({
     canUndo,
     canRedo,
     activeBlockStyle,
     splitView,
-    characterCount,
+    content,
     findBar,
     outlinePanel,
     outlineOpen,
@@ -176,13 +196,7 @@ export default function EntryMarkdownToolbar({
                 </div>
             </div>
 
-            <span
-                className="entry-editor-format-toolbar__count"
-                aria-label={`正文共 ${characterCount} 个字符`}
-                title="去掉 Markdown 标记后的字符数"
-            >
-                {characterCount} 字
-            </span>
+            <EntryMarkdownCharacterCount content={content}/>
             <Button
                 type="button"
                 variant="ghost"

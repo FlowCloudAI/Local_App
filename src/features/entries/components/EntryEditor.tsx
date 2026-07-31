@@ -108,7 +108,6 @@ import {
     normalizeComparableType,
     normalizeEntryContent,
     parseDateValue,
-    stripMarkdown,
 } from '../lib/entryCommon'
 import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
@@ -955,10 +954,10 @@ export default function EntryEditor({
     })
 
     useEffect(() => {
-        if (editorMode !== 'edit') return
+        if (editorMode !== 'edit' || !editorSplitView) return
         const timer = window.setTimeout(() => setDebouncedContent(draft.content), 150)
         return () => window.clearTimeout(timer)
-    }, [draft.content, editorMode])
+    }, [draft.content, editorMode, editorSplitView])
 
     const previewSourceContent = resolveMarkdownPreviewSourceContent(
         editorMode,
@@ -971,10 +970,6 @@ export default function EntryEditor({
             ? ''
             : buildMarkdownPreviewSource(previewSourceContent, draft.images),
         [previewSourceContent, draft.images],
-    )
-    const characterCount = useMemo(
-        () => stripMarkdown(debouncedContent).length,
-        [debouncedContent],
     )
     const outlineItems = useMemo(
         () => buildMarkdownOutline(draft.content),
@@ -1688,7 +1683,7 @@ export default function EntryEditor({
                                         canRedo={undoRedo.canRedo}
                                         activeBlockStyle={activeBlockStyle}
                                         splitView={editorSplitView}
-                                        characterCount={characterCount}
+                                        content={draft.content}
                                         findBar={findBarOpen ? (
                                             <EntryMarkdownFindBar
                                                 ref={findBarRef}
