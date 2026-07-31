@@ -980,8 +980,10 @@ export default function EntryEditor({
 
         const savedDraft = buildDraft(refreshed)
         const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation))
-        historyInitializedRef.current = null
-        undoRedo.reset(buildEditorHistory(savedDraft, savedRelationDrafts))
+        if (reason === 'external') {
+            historyInitializedRef.current = null
+            undoRedo.reset(buildEditorHistory(savedDraft, savedRelationDrafts))
+        }
         lastSuccessfulSaveAtRef.current = Date.now()
 
         if (reason === 'external') {
@@ -1056,6 +1058,7 @@ export default function EntryEditor({
                 return
             }
 
+            undoRedo.flushDebounced()
             const savedBundle = await db_save_entry_bundle({
                 id: entry.id,
                 projectId,
@@ -1098,7 +1101,7 @@ export default function EntryEditor({
             setSaving(false)
             onSavingChange?.(false)
         }
-    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations])
+    }, [entry, canSave, hasInvalidRelationDrafts, trimmedTitle, trimmedSummary, normalizedContent, draft.type, draft.tags, draft.images, draft.categoryId, entryTags.localTagSchemas, projectId, entryId, relationDrafts, onTitleChange, onSaved, onSavingChange, showAlert, reloadEntryFromDatabase, setEntryRelations, undoRedo])
 
     useEffect(() => {
         canSaveRef.current = canSave

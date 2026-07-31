@@ -33,6 +33,13 @@ selectionHistory.setPending({
 assert.deepEqual(selectionHistory.undo()?.selection, {start: 2, end: 4})
 assert.deepEqual(selectionHistory.redo()?.selection, {start: 6, end: 6})
 
+const savedHistory = new UndoRedoHistory('保存前')
+savedHistory.setPending('已提交保存')
+savedHistory.commitPending()
+savedHistory.push('数据库归一化结果')
+assert.equal(savedHistory.undo(), '已提交保存')
+assert.equal(savedHistory.undo(), '保存前')
+
 assert.deepEqual(
     resolveEntrySaveStatus({
         entryLoaded: true,
