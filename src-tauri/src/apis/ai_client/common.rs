@@ -59,7 +59,11 @@ pub(crate) struct EventTurnEnd {
     pub(crate) status: String, // "ok" | "cancelled" | "interrupted" | "error"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) error: Option<ApiError>,
-    pub(crate) node_id: u64,
+    pub(crate) node_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) finish_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) continuation_of: Option<u64>,
     pub(crate) usage: Option<Usage>,
 }
 
@@ -146,6 +150,12 @@ pub struct StoredMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_seconds: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub continuation_of: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
@@ -225,7 +235,7 @@ pub struct StoredConversation {
 }
 
 fn default_conversation_schema_version() -> u32 {
-    3
+    4
 }
 
 pub(super) fn character_conversation_meta_path(
@@ -538,6 +548,9 @@ fn conversation_nodes_to_stored_messages(nodes: Vec<ConversationNode>) -> Vec<St
                 reasoning: message.reasoning_content,
                 timestamp: node.timestamp,
                 work_seconds,
+                turn_status: None,
+                finish_reason: None,
+                continuation_of: None,
                 tool_call_id: message.tool_call_id,
                 tool_calls: message.tool_calls,
                 attachments: Vec::new(),
@@ -566,7 +579,7 @@ fn merge_compacted_runtime_snapshot(
     existing: StoredConversation,
     mut runtime_messages: Vec<StoredMessage>,
 ) -> Vec<StoredMessage> {
-    apply_existing_message_attachments(&existing.messages, &mut runtime_messages);
+    apply_existing_message_metadata(&existing.messages, &mut runtime_messages);
     let Some(compact) = existing.compact.as_ref() else {
         return runtime_messages;
     };
@@ -599,21 +612,16 @@ fn merge_compacted_runtime_snapshot(
     merged
 }
 
-fn apply_existing_message_attachments(
+fn apply_existing_message_metadata(
     existing_messages: &[StoredMessage],
     runtime_messages: &mut [StoredMessage],
 ) {
-    let attachments_by_node = existing_messages
+    let existing_by_node = existing_messages
         .iter()
-        .filter(|message| !message.attachments.is_empty())
-        .filter_map(|message| {
-            message
-                .node_id
-                .map(|node_id| (node_id, message.attachments.clone()))
-        })
+        .filter_map(|message| message.node_id.map(|node_id| (node_id, message)))
         .collect::<HashMap<_, _>>();
 
-    if attachments_by_node.is_empty() {
+    if existing_by_node.is_empty() {
         return;
     }
 
@@ -621,10 +629,41 @@ fn apply_existing_message_attachments(
         let Some(node_id) = message.node_id else {
             continue;
         };
-        if let Some(attachments) = attachments_by_node.get(&node_id) {
-            message.attachments = attachments.clone();
+        if let Some(existing) = existing_by_node.get(&node_id) {
+            if !existing.attachments.is_empty() {
+                message.attachments = existing.attachments.clone();
+            }
+            if message.turn_status.is_none() {
+                message.turn_status.clone_from(&existing.turn_status);
+            }
+            if message.finish_reason.is_none() {
+                message.finish_reason.clone_from(&existing.finish_reason);
+            }
+            if message.continuation_of.is_none() {
+                message.continuation_of = existing.continuation_of;
+            }
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct TurnSnapshotOutcome {
+    node_id: u64,
+    turn_status: String,
+    finish_reason: Option<String>,
+    continuation_of: Option<u64>,
+}
+
+fn apply_turn_outcome(messages: &mut [StoredMessage], outcome: &TurnSnapshotOutcome) {
+    let Some(message) = messages
+        .iter_mut()
+        .find(|message| message.node_id == Some(outcome.node_id))
+    else {
+        return;
+    };
+    message.turn_status = Some(outcome.turn_status.clone());
+    message.finish_reason.clone_from(&outcome.finish_reason);
+    message.continuation_of = outcome.continuation_of;
 }
 
 fn chat_store_save_snapshot(
@@ -635,6 +674,7 @@ fn chat_store_save_snapshot(
     requested_settings: Option<StoredConversationSettings>,
     nodes: Vec<ConversationNode>,
     head: Option<u64>,
+    outcome: Option<TurnSnapshotOutcome>,
 ) -> Result<(), String> {
     let messages = conversation_nodes_to_stored_messages(nodes);
     if messages.is_empty() {
@@ -643,7 +683,7 @@ fn chat_store_save_snapshot(
 
     let now = chrono::Utc::now().to_rfc3339();
     let existing = chat_store_get_conversation(paths, conversation_id)?;
-    let (title, created_at, compact, settings, messages) = match existing {
+    let (title, created_at, compact, settings, mut messages) = match existing {
         Some(conversation) => (
             conversation.meta.title.clone(),
             conversation.meta.created_at.clone(),
@@ -659,6 +699,9 @@ fn chat_store_save_snapshot(
             messages,
         ),
     };
+    if let Some(outcome) = outcome.as_ref() {
+        apply_turn_outcome(&mut messages, outcome);
+    }
 
     let conversation = StoredConversation {
         schema_version: default_conversation_schema_version(),
@@ -679,7 +722,11 @@ fn chat_store_save_snapshot(
     chat_store_save_conversation(paths, &conversation)
 }
 
-async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
+async fn save_session_snapshot(
+    app: &AppHandle,
+    session_id: &str,
+    outcome: Option<TurnSnapshotOutcome>,
+) {
     let snapshot_target = {
         let ai_state = app.state::<AiState>();
         let sessions = ai_state.sessions.lock().await;
@@ -710,6 +757,7 @@ async fn save_session_snapshot(app: &AppHandle, session_id: &str) {
         settings,
         nodes,
         head,
+        outcome,
     ) {
         Ok(()) => log::info!(
             "[chat_store] 已保存会话快照: session_id={} conversation_id={}",
@@ -960,7 +1008,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                         );
                     }
                     // 用户节点已经进入消息树；此时先落盘，避免回复失败或应用退出时丢失首条消息。
-                    save_session_snapshot(&app_clone, &sid).await;
+                    save_session_snapshot(&app_clone, &sid, None).await;
                     app_clone
                         .emit(
                             "ai:turn_begin",
@@ -1086,19 +1134,28 @@ pub(crate) fn spawn_session_event_loop<S>(
                 SessionEvent::TurnEnd {
                     status,
                     node_id,
+                    finish_reason,
+                    continuation_of,
                     usage,
                 } => {
+                    let status_text = turn_status_str(&status);
                     log::info!(
-                        "[ai:turn_end] session_id={} run_id={} status={} node_id={} has_usage={}",
+                        "[ai:turn_end] session_id={} run_id={} status={} node_id={:?} finish_reason={:?} continuation_of={:?} has_usage={}",
                         sid,
                         rid,
-                        turn_status_str(&status),
+                        status_text,
                         node_id,
+                        finish_reason,
+                        continuation_of,
                         usage.is_some()
                     );
-                    if matches!(&status, TurnStatus::Ok) {
-                        save_session_snapshot(&app_clone, &sid).await;
-                    }
+                    let snapshot_outcome = node_id.map(|node_id| TurnSnapshotOutcome {
+                        node_id,
+                        turn_status: status_text.clone(),
+                        finish_reason: finish_reason.clone(),
+                        continuation_of,
+                    });
+                    save_session_snapshot(&app_clone, &sid, snapshot_outcome).await;
                     if let Some(ref u) = usage {
                         save_api_usage(&app_clone, &sid, u).await;
                     }
@@ -1108,9 +1165,11 @@ pub(crate) fn spawn_session_event_loop<S>(
                             EventTurnEnd {
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
-                                status: turn_status_str(&status),
+                                status: status_text,
                                 error: turn_status_error(&status),
                                 node_id,
+                                finish_reason,
+                                continuation_of,
                                 usage,
                             },
                         )
@@ -1119,7 +1178,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                 SessionEvent::Error(e) => {
                     log::error!("[ai:error] session_id={} run_id={} error={}", sid, rid, e);
                     // 部分供应商会在 TurnBegin 后直接报错，保留已进入消息树的用户内容。
-                    save_session_snapshot(&app_clone, &sid).await;
+                    save_session_snapshot(&app_clone, &sid, None).await;
                     app_clone
                         .emit(
                             "ai:error",
@@ -1134,7 +1193,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                 }
                 SessionEvent::BranchChanged { node_id } => {
                     log::info!("[ai:branch_changed] run_id={} node_id={}", rid, node_id);
-                    save_session_snapshot(&app_clone, &sid).await;
+                    save_session_snapshot(&app_clone, &sid, None).await;
                     app_clone
                         .emit(
                             "ai:branch_changed",
@@ -1187,6 +1246,7 @@ mod tests {
                 timestamp,
             }],
             Some(1),
+            None,
         )
         .unwrap();
 
@@ -1197,6 +1257,121 @@ mod tests {
         assert_eq!(saved.messages.len(), 1);
         assert_eq!(saved.messages[0].role, "user");
         assert_eq!(saved.messages[0].content.as_deref(), Some("首条消息"));
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn v3_message_without_outcome_fields_still_loads() {
+        let conversation: StoredConversation = serde_json::from_value(serde_json::json!({
+            "schema_version": 3,
+            "id": "legacy",
+            "title": "旧对话",
+            "plugin_id": "deepseek",
+            "model": "deepseek-reasoner",
+            "created_at": "2026-07-31T00:00:00Z",
+            "updated_at": "2026-07-31T00:00:01Z",
+            "messages": [{
+                "node_id": 1,
+                "role": "assistant",
+                "reasoning": "旧思考",
+                "timestamp": "2026-07-31T00:00:01Z"
+            }],
+            "head": 1
+        }))
+        .unwrap();
+
+        assert_eq!(conversation.schema_version, 3);
+        assert_eq!(conversation.messages[0].turn_status, None);
+        assert_eq!(conversation.messages[0].finish_reason, None);
+        assert_eq!(conversation.messages[0].continuation_of, None);
+    }
+
+    #[test]
+    fn snapshot_preserves_previous_outcome_and_saves_continuation_relation() {
+        let root = std::env::temp_dir().join(format!(
+            "flowcloudai-outcome-snapshot-test-{}",
+            Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let paths = PathsState {
+            db_path: root.join("flowcloudai.db"),
+            plugins_path: root.join("plugins"),
+        };
+        let timestamp = "2026-07-31T00:00:00Z".to_string();
+        let user = ConversationNode {
+            id: 1,
+            message: Message::user("长文"),
+            parent: None,
+            turn_id: 1,
+            timestamp: timestamp.clone(),
+        };
+        let first = ConversationNode {
+            id: 2,
+            message: Message::assistant(Some("前半"), Some("思考"), None),
+            parent: Some(1),
+            turn_id: 1,
+            timestamp: timestamp.clone(),
+        };
+
+        chat_store_save_snapshot(
+            &paths,
+            "session_outcome",
+            "deepseek",
+            "deepseek-reasoner",
+            None,
+            vec![user.clone(), first.clone()],
+            Some(2),
+            Some(TurnSnapshotOutcome {
+                node_id: 2,
+                turn_status: "ok".to_string(),
+                finish_reason: Some("length".to_string()),
+                continuation_of: None,
+            }),
+        )
+        .unwrap();
+
+        let second = ConversationNode {
+            id: 3,
+            message: Message::assistant(Some("后半"), None::<String>, None),
+            parent: Some(2),
+            turn_id: 2,
+            timestamp,
+        };
+        chat_store_save_snapshot(
+            &paths,
+            "session_outcome",
+            "deepseek",
+            "deepseek-reasoner",
+            None,
+            vec![user, first, second],
+            Some(3),
+            Some(TurnSnapshotOutcome {
+                node_id: 3,
+                turn_status: "ok".to_string(),
+                finish_reason: Some("stop".to_string()),
+                continuation_of: Some(2),
+            }),
+        )
+        .unwrap();
+
+        let saved = chat_store_get_conversation(&paths, "session_outcome")
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.schema_version, 4);
+        let first = saved
+            .messages
+            .iter()
+            .find(|message| message.node_id == Some(2))
+            .unwrap();
+        assert_eq!(first.finish_reason.as_deref(), Some("length"));
+        let second = saved
+            .messages
+            .iter()
+            .find(|message| message.node_id == Some(3))
+            .unwrap();
+        assert_eq!(second.finish_reason.as_deref(), Some("stop"));
+        assert_eq!(second.continuation_of, Some(2));
 
         std::fs::remove_dir_all(root).unwrap();
     }

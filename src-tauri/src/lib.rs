@@ -523,6 +523,7 @@ pub fn run() {
             ai_generate_entry_summary,
             ai_fill_image_prompt,
             ai_send_message,
+            ai_continue_generation,
             ai_cancel_session,
             ai_close_session,
             ai_close_all_sessions,

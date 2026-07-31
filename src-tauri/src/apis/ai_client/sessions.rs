@@ -693,6 +693,43 @@ pub async fn ai_send_message(
     Ok(())
 }
 
+/// 从当前未完成的助手节点继续生成，不写入伪造的用户消息。
+#[tauri::command]
+pub async fn ai_continue_generation(
+    ai_state: State<'_, AiState>,
+    session_id: String,
+    node_id: u64,
+    client_trace_id: Option<String>,
+) -> Result<(), ApiError> {
+    let trace_id = client_trace_id.as_deref().unwrap_or("none");
+    let (handle, run_id) = {
+        let sessions = ai_state.sessions.lock().await;
+        let entry = sessions.get(&session_id).ok_or_else(|| {
+            ApiError::new(
+                ErrorCode::LlmSessionNotFound,
+                format!("Session '{}' 不存在", session_id),
+            )
+            .with_kv("session_id", session_id.clone())
+        })?;
+        (entry.handle.clone(), entry.run_id.clone())
+    };
+
+    handle.continue_generation(node_id).await.map_err(|error| {
+        ApiError::new(ErrorCode::ValidationFormatError, "无法继续当前回复")
+            .with_kv("session_id", session_id.clone())
+            .with_kv("node_id", node_id)
+            .with_kv("source", error)
+    })?;
+    log::info!(
+        "[ai_continue_generation][queued] trace_id={} session_id={} run_id={} node_id={}",
+        trace_id,
+        session_id,
+        run_id,
+        node_id
+    );
+    Ok(())
+}
+
 /// 取消当前进行中的 LLM 轮次
 #[tauri::command]
 pub async fn ai_cancel_session(

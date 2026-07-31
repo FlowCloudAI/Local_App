@@ -559,6 +559,8 @@ fn spawn_contradiction_event_loop<S>(
                 SessionEvent::TurnEnd {
                     status,
                     node_id,
+                    finish_reason,
+                    continuation_of,
                     usage,
                 } => {
                     if let Some(ref u) = usage {
@@ -573,6 +575,8 @@ fn spawn_contradiction_event_loop<S>(
                                 status: turn_status_str(&status),
                                 error: turn_status_error(&status),
                                 node_id,
+                                finish_reason,
+                                continuation_of,
                                 usage,
                             },
                         )
