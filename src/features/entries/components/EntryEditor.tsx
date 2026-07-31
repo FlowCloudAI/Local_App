@@ -972,8 +972,8 @@ export default function EntryEditor({
         [previewSourceContent, draft.images],
     )
     const outlineItems = useMemo(
-        () => buildMarkdownOutline(draft.content),
-        [draft.content],
+        () => outlineOpen ? buildMarkdownOutline(draft.content) : [],
+        [draft.content, outlineOpen],
     )
 
     const backlinks = useMemo(() => {
