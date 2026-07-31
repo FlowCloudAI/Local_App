@@ -856,6 +856,22 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
         plugin_id = entry.plugin_id.clone();
     }
 
+    let ai_state = app.state::<AiState>();
+    let manifest_model = {
+        let client = ai_state.client.lock().await;
+        client
+            .list_plugins()
+            .into_iter()
+            .find(|plugin| plugin.id == plugin_id)
+            .and_then(|plugin| plugin.model_info(&model).cloned())
+    };
+    let defaults = {
+        let settings_state = app.state::<SettingsState>();
+        settings_state.settings.lock().await.llm.clone()
+    };
+    let (prompt_price_per_m, completion_price_per_m, currency) =
+        resolve_usage_price(&defaults, &plugin_id, &model, manifest_model.as_ref());
+
     log::info!(
         "[usage] saving: session={} model={} plugin={} prompt={} completion={} total={}",
         session_id,
@@ -877,12 +893,57 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
         prompt_tokens: usage.prompt_tokens,
         completion_tokens: usage.completion_tokens,
         total_tokens: usage.total_tokens,
+        prompt_price_per_m,
+        completion_price_per_m,
+        currency,
     };
     if let Err(e) = worldflow_core::insert_api_usage(&db.pool, &input).await {
         log::error!("[usage] insert failed: {}", e);
     } else {
         log::info!("[usage] saved successfully for session {}", session_id);
     }
+}
+
+fn resolve_usage_price(
+    defaults: &crate::settings::LlmDefaults,
+    plugin_id: &str,
+    model: &str,
+    manifest_model: Option<&flowcloudai_client::plugin::types::ModelInfo>,
+) -> (Option<f64>, Option<f64>, Option<String>) {
+    let key = format!("{plugin_id}:{model}");
+    let overridden = defaults.model_price_overrides.get(&key).and_then(|price| {
+        normalize_usage_price(
+            Some(price.prompt_price_per_m),
+            Some(price.completion_price_per_m),
+            Some(price.currency.as_str()),
+        )
+    });
+    overridden
+        .or_else(|| {
+            let price = manifest_model?;
+            normalize_usage_price(
+                price.prompt_price_per_m,
+                price.completion_price_per_m,
+                price.currency.as_deref(),
+            )
+        })
+        .map_or((None, None, None), |(prompt, completion, currency)| {
+            (Some(prompt), Some(completion), Some(currency))
+        })
+}
+
+fn normalize_usage_price(
+    prompt: Option<f64>,
+    completion: Option<f64>,
+    currency: Option<&str>,
+) -> Option<(f64, f64, String)> {
+    let (prompt, completion, currency) = (prompt?, completion?, currency?.trim());
+    (prompt.is_finite()
+        && completion.is_finite()
+        && prompt >= 0.0
+        && completion >= 0.0
+        && !currency.is_empty())
+    .then(|| (prompt, completion, currency.to_uppercase()))
 }
 
 pub(crate) fn build_llm_session_config(
@@ -1400,6 +1461,31 @@ pub(crate) fn spawn_session_event_loop<S>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn usage_price_override_wins_and_is_normalized() {
+        let mut defaults = crate::settings::LlmDefaults::default();
+        defaults.model_price_overrides.insert(
+            "plugin:model".to_string(),
+            crate::settings::ModelPriceOverride {
+                prompt_price_per_m: 3.0,
+                completion_price_per_m: 6.0,
+                currency: " usd ".to_string(),
+            },
+        );
+        let manifest = flowcloudai_client::plugin::types::ModelInfo {
+            id: "model".to_string(),
+            prompt_price_per_m: Some(1.0),
+            completion_price_per_m: Some(2.0),
+            currency: Some("CNY".to_string()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            resolve_usage_price(&defaults, "plugin", "model", Some(&manifest)),
+            (Some(3.0), Some(6.0), Some("USD".to_string()))
+        );
+    }
 
     #[test]
     fn user_only_snapshot_is_persisted() {

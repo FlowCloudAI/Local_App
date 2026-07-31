@@ -3,6 +3,7 @@ import {useCallback, useEffect, useMemo, useState} from 'react'
 import {useAlert, useTheme} from 'flowcloudai-ui'
 import {
     ai_get_usage_by_model,
+    ai_get_usage_daily,
     ai_get_usage_summary,
     exit_app,
     formatApiError,
@@ -11,7 +12,9 @@ import {
     type AppLogSnapshot,
     type AppSettings,
     type ApiUsageByModel,
+    type ApiUsageDaily,
     type ApiUsageSummary,
+    type ModelPriceOverride,
     toApiError,
 } from '../../../api'
 import {openFileDialog} from '../../../api/dialog'
@@ -23,6 +26,10 @@ import {
     useAppSettingsStore,
 } from '../../../features/settings/appSettingsStore'
 import {resolveApiKeyPluginId} from '../../../features/settings/aiSettingsSelection'
+import {
+    currentMonthUsageAmount,
+    getUsageBudgetWarning,
+} from '../../../features/settings/usageCost'
 import {
     installLocalPlugin,
     installMarketPlugin,
@@ -135,6 +142,7 @@ export default function MobileSettings({push, pop, page}: Props) {
     const [logError, setLogError] = useState('')
     const [usageSummary, setUsageSummary] = useState<ApiUsageSummary | null>(null)
     const [usageByModel, setUsageByModel] = useState<ApiUsageByModel[]>([])
+    const [usageDaily, setUsageDaily] = useState<ApiUsageDaily[]>([])
     const [usageLoading, setUsageLoading] = useState(false)
     const [usageError, setUsageError] = useState('')
 
@@ -398,12 +406,14 @@ export default function MobileSettings({push, pop, page}: Props) {
         setUsageLoading(true)
         setUsageError('')
         try {
-            const [summary, byModel] = await Promise.all([
+            const [summary, byModel, daily] = await Promise.all([
                 ai_get_usage_summary(),
                 ai_get_usage_by_model(),
+                ai_get_usage_daily(),
             ])
             setUsageSummary(summary)
             setUsageByModel(byModel)
+            setUsageDaily(daily)
         } catch (error) {
             const message = formatApiError(toApiError(error))
             logger.error('[MobileSettings] 加载用量统计失败', error)
@@ -420,7 +430,7 @@ export default function MobileSettings({push, pop, page}: Props) {
         void loadUsageStats()
     }, [loadUsageStats, section])
 
-    if (loading) return <div className="mobile-page__loading">加载中…</div>
+    if (loading || !settings) return <div className="mobile-page__loading">加载中…</div>
 
     const pluginOptions = plugins.map(p => ({value: p.id, label: p.name}))
     const apiKeyPluginOptions = apiKeyPlugins.map(plugin => {
@@ -429,6 +439,42 @@ export default function MobileSettings({push, pop, page}: Props) {
         return {value: plugin.id, label: `${plugin.name} · ${kindLabel}`}
     })
     const currentPlugin = plugins.find(p => p.id === selectedPlugin)
+    const currentModelInfo = currentPlugin?.model_infos.find(model => model.id === selectedModel)
+    const modelPriceKey = currentPlugin && selectedModel ? `${currentPlugin.id}:${selectedModel}` : null
+    const modelPriceOverride = modelPriceKey ? settings.llm.model_price_overrides[modelPriceKey] : undefined
+    const updateLlmDraft = (patch: Partial<AppSettings['llm']>) => {
+        setSettings(current => current ? {...current, llm: {...current.llm, ...patch}} : current)
+    }
+    const toggleModelPriceOverride = (enabled: boolean) => {
+        if (!modelPriceKey) return
+        const next = {...settings.llm.model_price_overrides}
+        if (!enabled) {
+            delete next[modelPriceKey]
+        } else {
+            next[modelPriceKey] = {
+                prompt_price_per_m: currentModelInfo?.prompt_price_per_m ?? 0,
+                completion_price_per_m: currentModelInfo?.completion_price_per_m ?? 0,
+                currency: currentModelInfo?.currency ?? settings.llm.monthly_budget_currency,
+            }
+        }
+        updateLlmDraft({model_price_overrides: next})
+    }
+    const updateModelPriceOverride = (patch: Partial<ModelPriceOverride>) => {
+        if (!modelPriceKey || !modelPriceOverride) return
+        updateLlmDraft({
+            model_price_overrides: {
+                ...settings.llm.model_price_overrides,
+                [modelPriceKey]: {...modelPriceOverride, ...patch},
+            },
+        })
+    }
+    const monthlyUsageAmount = currentMonthUsageAmount(usageDaily, settings.llm.monthly_budget_currency)
+    const budgetWarning = getUsageBudgetWarning(
+        usageDaily,
+        settings.llm.monthly_budget_amount,
+        settings.llm.monthly_budget_currency,
+        settings.llm.budget_warn_ratio,
+    )
     const modelOptions = (currentPlugin?.models ?? []).map(m => ({value: m, label: m}))
     const apiKeyStatusLabel = getApiKeyStatusLabel(apiKeyStatus)
     const defaultPluginApiKeyStatusLabel = getApiKeyStatusLabel(!selectedPlugin
@@ -499,10 +545,20 @@ export default function MobileSettings({push, pop, page}: Props) {
                     apiKeyDraft={apiKeyDraft}
                     apiKeyBusy={apiKeyBusy}
                     apiKeyPlaceholder={apiKeyPlaceholder}
+                    modelPriceOverride={modelPriceOverride}
+                    manifestModelPrice={currentModelInfo}
+                    monthlyBudgetAmount={settings.llm.monthly_budget_amount}
+                    monthlyBudgetCurrency={settings.llm.monthly_budget_currency}
+                    budgetWarnRatio={settings.llm.budget_warn_ratio}
                     onSelectedPluginChange={setSelectedPlugin}
                     onSelectedModelChange={setSelectedModel}
                     onSelectedApiKeyPluginChange={setSelectedApiKeyPlugin}
                     onApiKeyDraftChange={setApiKeyDraft}
+                    onModelPriceOverrideToggle={toggleModelPriceOverride}
+                    onModelPriceOverrideChange={updateModelPriceOverride}
+                    onMonthlyBudgetAmountChange={value => updateLlmDraft({monthly_budget_amount: value})}
+                    onMonthlyBudgetCurrencyChange={value => updateLlmDraft({monthly_budget_currency: value})}
+                    onBudgetWarnRatioChange={value => updateLlmDraft({budget_warn_ratio: value})}
                     onSaveSettings={handleSave}
                     onSaveApiKey={handleSaveApiKey}
                     onDeleteApiKey={handleDeleteApiKey}
@@ -553,6 +609,9 @@ export default function MobileSettings({push, pop, page}: Props) {
                     byModel={usageByModel}
                     loading={usageLoading}
                     error={usageError}
+                    monthlyUsageAmount={monthlyUsageAmount}
+                    budgetCurrency={settings.llm.monthly_budget_currency}
+                    budgetWarning={budgetWarning}
                     onRefresh={loadUsageStats}
                 />
             )}

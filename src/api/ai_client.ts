@@ -21,6 +21,9 @@ export interface PluginModelInfo {
   description?: string | null
   context_window_tokens?: number | null
   max_output_tokens?: number | null
+  prompt_price_per_m?: number | null
+  completion_price_per_m?: number | null
+  currency?: string | null
 }
 
 export interface AiCreateLlmSessionParams {

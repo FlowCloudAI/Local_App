@@ -7,6 +7,9 @@ pub struct PluginModelInfo {
     pub description: Option<String>,
     pub context_window_tokens: Option<u64>,
     pub max_output_tokens: Option<u64>,
+    pub prompt_price_per_m: Option<f64>,
+    pub completion_price_per_m: Option<f64>,
+    pub currency: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -159,6 +162,9 @@ fn plugin_model_infos(
             description: model.description.clone(),
             context_window_tokens: model.context_window_tokens,
             max_output_tokens: model.max_output_tokens,
+            prompt_price_per_m: model.prompt_price_per_m,
+            completion_price_per_m: model.completion_price_per_m,
+            currency: model.currency.clone(),
         })
         .collect()
 }

@@ -3,8 +3,15 @@ import {
     type ApiUsageByModel,
     type ApiUsageSummary,
     type LocalPluginInfo,
+    type ModelPriceOverride,
+    type PluginModelInfo,
     type RemotePluginInfo,
 } from '../../../api'
+import {
+    formatUsageAmount,
+    formatUsageCosts,
+    type UsageBudgetWarning,
+} from '../../../features/settings/usageCost'
 import {convertFileSrc} from '../../../api/assets'
 import {MobileSearchIcon} from '../components/MobileTopControls'
 import {type MobileSettingsPageType} from '../usePageStack'
@@ -39,10 +46,20 @@ interface AiSectionProps {
     apiKeyDraft: string
     apiKeyBusy: boolean
     apiKeyPlaceholder: string
+    modelPriceOverride?: ModelPriceOverride
+    manifestModelPrice?: PluginModelInfo
+    monthlyBudgetAmount: number | null
+    monthlyBudgetCurrency: string
+    budgetWarnRatio: number
     onSelectedPluginChange: (value: string) => void
     onSelectedModelChange: (value: string) => void
     onSelectedApiKeyPluginChange: (value: string) => void
     onApiKeyDraftChange: (value: string) => void
+    onModelPriceOverrideToggle: (enabled: boolean) => void
+    onModelPriceOverrideChange: (patch: Partial<ModelPriceOverride>) => void
+    onMonthlyBudgetAmountChange: (value: number | null) => void
+    onMonthlyBudgetCurrencyChange: (value: string) => void
+    onBudgetWarnRatioChange: (value: number) => void
     onSaveSettings: () => void | Promise<void>
     onSaveApiKey: () => void | Promise<void>
     onDeleteApiKey: () => void | Promise<void>
@@ -87,6 +104,9 @@ interface UsageSectionProps {
     byModel: ApiUsageByModel[]
     loading: boolean
     error: string
+    monthlyUsageAmount: number
+    budgetCurrency: string
+    budgetWarning: UsageBudgetWarning | null
     onRefresh: () => void | Promise<void>
 }
 
@@ -262,10 +282,20 @@ export function MobileSettingsAiSection({
     apiKeyDraft,
     apiKeyBusy,
     apiKeyPlaceholder,
+    modelPriceOverride,
+    manifestModelPrice,
+    monthlyBudgetAmount,
+    monthlyBudgetCurrency,
+    budgetWarnRatio,
     onSelectedPluginChange,
     onSelectedModelChange,
     onSelectedApiKeyPluginChange,
     onApiKeyDraftChange,
+    onModelPriceOverrideToggle,
+    onModelPriceOverrideChange,
+    onMonthlyBudgetAmountChange,
+    onMonthlyBudgetCurrencyChange,
+    onBudgetWarnRatioChange,
     onSaveSettings,
     onSaveApiKey,
     onDeleteApiKey,
@@ -282,6 +312,88 @@ export function MobileSettingsAiSection({
                         placeholder="选择插件"
                         radius="full"
                     />
+                </div>
+                <div className="mobile-settings-api-key">
+                    <label className="mobile-settings-switch-field">
+                        <span>覆盖插件声明的模型价格</span>
+                        <input
+                            type="checkbox"
+                            checked={Boolean(modelPriceOverride)}
+                            disabled={!selectedPlugin || !selectedModel}
+                            onChange={event => onModelPriceOverrideToggle(event.currentTarget.checked)}
+                        />
+                    </label>
+                    {modelPriceOverride && (
+                        <>
+                            <div className="mobile-settings-field-label">输入价 / 百万 token</div>
+                            <Input
+                                type="number"
+                                min={0}
+                                step={0.0001}
+                                value={modelPriceOverride.prompt_price_per_m}
+                                onValueChange={value => onModelPriceOverrideChange({
+                                    prompt_price_per_m: Math.max(0, Number(value) || 0),
+                                })}
+                            />
+                            <div className="mobile-settings-field-label">输出价 / 百万 token</div>
+                            <Input
+                                type="number"
+                                min={0}
+                                step={0.0001}
+                                value={modelPriceOverride.completion_price_per_m}
+                                onValueChange={value => onModelPriceOverrideChange({
+                                    completion_price_per_m: Math.max(0, Number(value) || 0),
+                                })}
+                            />
+                            <div className="mobile-settings-field-label">币种</div>
+                            <Input
+                                value={modelPriceOverride.currency}
+                                onValueChange={value => onModelPriceOverrideChange({
+                                    currency: String(value).trim().toUpperCase(),
+                                })}
+                            />
+                        </>
+                    )}
+                    <div className="mobile-settings-api-key__desc">
+                        {manifestModelPrice?.prompt_price_per_m != null
+                        && manifestModelPrice.completion_price_per_m != null
+                        && manifestModelPrice.currency
+                            ? `插件声明：输入 ${formatUsageAmount(manifestModelPrice.prompt_price_per_m, manifestModelPrice.currency)}，输出 ${formatUsageAmount(manifestModelPrice.completion_price_per_m, manifestModelPrice.currency)} / 百万 token。`
+                            : '插件未声明价格；不覆盖时金额显示为“—”。'}
+                    </div>
+                </div>
+                <div className="mobile-settings-api-key">
+                    <div className="mobile-settings-field-label">月度预算</div>
+                    <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={monthlyBudgetAmount ?? ''}
+                        placeholder="不设置则不告警"
+                        onValueChange={value => {
+                            const amount = Number(value)
+                            onMonthlyBudgetAmountChange(Number.isFinite(amount) && amount > 0 ? amount : null)
+                        }}
+                    />
+                    <div className="mobile-settings-field-label">预算币种</div>
+                    <Input
+                        value={monthlyBudgetCurrency}
+                        onValueChange={value => onMonthlyBudgetCurrencyChange(String(value).trim().toUpperCase() || 'USD')}
+                    />
+                    <div className="mobile-settings-field-label">告警比例（%）</div>
+                    <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={Math.round(budgetWarnRatio * 100)}
+                        onValueChange={value => onBudgetWarnRatioChange(
+                            Math.min(1, Math.max(0.01, (Number(value) || 80) / 100)),
+                        )}
+                    />
+                    <div className="mobile-settings-api-key__desc">
+                        费用按调用时单价快照计算，不做汇率换算；预算只提醒，不中断服务。
+                    </div>
                 </div>
                 <div>
                     <div className="mobile-settings-field-label">默认对话模型</div>
@@ -590,6 +702,9 @@ export function MobileSettingsUsageSection({
     byModel,
     loading,
     error,
+    monthlyUsageAmount,
+    budgetCurrency,
+    budgetWarning,
     onRefresh,
 }: UsageSectionProps) {
     if (loading && !summary) {
@@ -615,6 +730,15 @@ export function MobileSettingsUsageSection({
                     {loading ? '刷新中…' : '刷新'}
                 </Button>
             </div>
+            <div className="mobile-settings-plugin-count">
+                本月已知费用：{formatUsageAmount(monthlyUsageAmount, budgetCurrency)}
+            </div>
+            {budgetWarning && (
+                <div className="mobile-settings-budget-warning" role="alert">
+                    已达到月度预算的 {Math.round((budgetWarning.spent / budgetWarning.budget) * 100)}%
+                    （{formatUsageAmount(budgetWarning.spent, budgetWarning.currency)} / {formatUsageAmount(budgetWarning.budget, budgetWarning.currency)}）。
+                </div>
+            )}
             {summary && (
                 <div className="mobile-settings-usage-grid">
                     <div className="mobile-settings-usage-card">
@@ -633,6 +757,12 @@ export function MobileSettingsUsageSection({
                         <div className="mobile-settings-usage-card__value">{formatUsageNumber(summary.total_completion_tokens)}</div>
                         <div className="mobile-settings-usage-card__label">应答消耗</div>
                     </div>
+                    <div className="mobile-settings-usage-card">
+                        <div className="mobile-settings-usage-card__value">
+                            {formatUsageCosts(summary.costs, summary.unknown_price_count)}
+                        </div>
+                        <div className="mobile-settings-usage-card__label">已知费用</div>
+                    </div>
                 </div>
             )}
             <div className="mobile-settings-subtitle">按模型统计</div>
@@ -649,6 +779,7 @@ export function MobileSettingsUsageSection({
                             <span>{row.provider}</span>
                             <span>{formatUsageNumber(row.call_count)} 次</span>
                             <span>{formatUsageNumber(row.total_tokens)} 消耗</span>
+                            <span>{formatUsageCosts(row.costs, row.unknown_price_count)}</span>
                         </div>
                     </div>
                 ))}

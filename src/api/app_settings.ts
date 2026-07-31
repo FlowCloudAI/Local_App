@@ -18,6 +18,16 @@ export interface LlmDefaults {
   auto_compact_recent_messages: number
   auto_compact_detail: LlmCompactDetail
   token_calibration_factors: Record<string, number>
+  model_price_overrides: Record<string, ModelPriceOverride>
+  monthly_budget_amount: number | null
+  monthly_budget_currency: string
+  budget_warn_ratio: number
+}
+
+export interface ModelPriceOverride {
+  prompt_price_per_m: number
+  completion_price_per_m: number
+  currency: string
 }
 
 export type LlmCompactDetail = 'brief' | 'balanced' | 'detailed'

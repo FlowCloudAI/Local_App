@@ -167,6 +167,21 @@ pub struct LlmDefaults {
     pub auto_compact_detail: String,
     /// 按 `plugin:model` 保存的 token 估算校准系数。
     pub token_calibration_factors: HashMap<String, f64>,
+    /// 按 `plugin:model` 保存的用户价格覆盖。
+    pub model_price_overrides: HashMap<String, ModelPriceOverride>,
+    /// 月度预算；None 表示不启用告警。
+    pub monthly_budget_amount: Option<f64>,
+    /// 月度预算的币种，不做汇率换算。
+    pub monthly_budget_currency: String,
+    /// 达到预算的该比例时开始告警。
+    pub budget_warn_ratio: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModelPriceOverride {
+    pub prompt_price_per_m: f64,
+    pub completion_price_per_m: f64,
+    pub currency: String,
 }
 
 impl Default for LlmDefaults {
@@ -188,6 +203,10 @@ impl Default for LlmDefaults {
             auto_compact_recent_messages: 8,
             auto_compact_detail: "balanced".to_string(),
             token_calibration_factors: HashMap::new(),
+            model_price_overrides: HashMap::new(),
+            monthly_budget_amount: None,
+            monthly_budget_currency: "USD".to_string(),
+            budget_warn_ratio: 0.8,
         }
     }
 }

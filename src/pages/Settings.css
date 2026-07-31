@@ -1180,6 +1180,27 @@
 
 /* ── 用量统计 ── */
 
+.usage-budget-panel {
+    display: grid;
+    gap: var(--fc-space-md);
+    margin-bottom: var(--fc-space-lg);
+}
+
+.usage-budget-summary {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-budget-warning {
+    padding: var(--fc-space-sm) var(--fc-space-md);
+    border: 1px solid var(--fc-color-warning-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-warning-bg);
+    color: var(--fc-color-text);
+    font-size: var(--fc-font-size-sm);
+}
+
 .usage-activity-panel,
 .usage-insight-panel {
     border: 1px solid var(--fc-color-border);
