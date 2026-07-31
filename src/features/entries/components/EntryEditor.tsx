@@ -96,7 +96,7 @@ import {
 } from '../lib/entryDraftRecovery'
 import {areTagMapsEqual, buildAutoVisibleTagSchemaIds,} from '../lib/entryTag'
 import {buildRelationDraft,} from '../lib/entryRelation'
-import {reserveMissingEntryDetailIds} from '../lib/entryDetailLoading'
+import {ensureEntryDetailLoaded} from '../lib/entryDetailLoading'
 import {useUndoRedo} from '../../../shared/hooks/useUndoRedo'
 import type {AiMissingPluginKind} from '../../../shared/ui/AiPluginMissingOverlay'
 import {
@@ -309,6 +309,7 @@ export default function EntryEditor({
     const projectEntriesRef = useRef(projectEntries)
     const projectEntriesStatusRef = useRef<'idle' | 'loading' | 'loaded'>('idle')
     const loadedDetailIdsRef = useRef(new Set<string>())
+    const entryDetailLoadPromisesRef = useRef(new Map<string, Promise<void>>())
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     const canSaveRef = useRef(false)
     const saveActionRef = useRef<((source: EntrySaveSource) => void) | null>(null)
@@ -324,6 +325,7 @@ export default function EntryEditor({
     const onTitleChangeRef = useRef(onTitleChange)
     const lastSuccessfulSaveAtRef = useRef(0)
     const userEditVersionRef = useRef(0)
+    const projectIdRef = useRef(projectId)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
@@ -352,6 +354,10 @@ export default function EntryEditor({
                 : undefined,
         }
     }, [])
+
+    useLayoutEffect(() => {
+        projectIdRef.current = projectId
+    }, [projectId])
 
     useLayoutEffect(() => {
         const workspace = workspaceRef.current
@@ -535,22 +541,18 @@ export default function EntryEditor({
     })
 
     const ensureEntryDetails = useCallback(async (ids: string[]) => {
-        const missingIds = reserveMissingEntryDetailIds(ids, loadedDetailIdsRef.current, entryId)
-        if (!missingIds.length) return
-
-        const results = await Promise.all(missingIds.map(async (targetEntryId) => {
-            try {
-                const detail = await db_get_entry(targetEntryId, projectId)
-                return [targetEntryId, detail] as const
-            } catch {
-                loadedDetailIdsRef.current.delete(targetEntryId)
-                return null
-            }
-        }))
-        setProjectEntryDetailsById((current) => ({
-            ...current,
-            ...Object.fromEntries(results.filter(Boolean) as Array<readonly [string, Entry]>),
-        }))
+        await Promise.all([...new Set(ids)]
+            .filter((targetEntryId) => targetEntryId !== entryId)
+            .map((targetEntryId) => ensureEntryDetailLoaded(
+                targetEntryId,
+                loadedDetailIdsRef.current,
+                entryDetailLoadPromisesRef.current,
+                async () => {
+                    const detail = await db_get_entry(targetEntryId, projectId)
+                    if (projectIdRef.current !== projectId) return
+                    setProjectEntryDetailsById((current) => ({...current, [targetEntryId]: detail}))
+                },
+            ).catch(() => undefined)))
     }, [entryId, projectId])
 
     const linkPreview = useLinkPreview({
@@ -647,6 +649,7 @@ export default function EntryEditor({
     useEffect(() => {
         projectEntriesStatusRef.current = 'idle'
         loadedDetailIdsRef.current.clear()
+        entryDetailLoadPromisesRef.current.clear()
         projectEntriesLoadPromiseRef.current = null
         projectEntriesRef.current = []
         setProjectEntries([])

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import {UndoRedoHistory} from '../src/shared/hooks/useUndoRedo.ts'
 import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySaveStatus.ts'
 import {resolveSelectionToolbarPlacement} from '../src/features/entries/components/entrySelectionToolbar.ts'
-import {reserveMissingEntryDetailIds} from '../src/features/entries/lib/entryDetailLoading.ts'
+import {ensureEntryDetailLoaded} from '../src/features/entries/lib/entryDetailLoading.ts'
 import {resolveMarkdownPreviewSourceContent} from '../src/features/entries/lib/entryMarkdownPreviewState.ts'
 import {resolveSavedState, shouldAutoSave} from '../src/features/entries/lib/entrySaveState.ts'
 
@@ -90,12 +90,33 @@ assert.equal(resolveSelectionToolbarPlacement({
     visibleBottom: 400,
 }), null)
 
-const loadedEntryDetailIds = new Set(['loaded'])
-assert.deepEqual(
-    reserveMissingEntryDetailIds(['current', 'new', 'new', 'loaded'], loadedEntryDetailIds, 'current'),
-    ['new'],
+const loadedEntryDetailIds = new Set()
+const pendingEntryDetailLoads = new Map()
+let entryDetailLoadCount = 0
+let finishEntryDetailLoad
+const loadEntryDetail = () => {
+    entryDetailLoadCount += 1
+    return new Promise((resolve) => {
+        finishEntryDetailLoad = resolve
+    })
+}
+const firstEntryDetailLoad = ensureEntryDetailLoaded(
+    'entry',
+    loadedEntryDetailIds,
+    pendingEntryDetailLoads,
+    loadEntryDetail,
 )
-assert.deepEqual(reserveMissingEntryDetailIds(['new'], loadedEntryDetailIds, 'current'), [])
+const secondEntryDetailLoad = ensureEntryDetailLoaded(
+    'entry',
+    loadedEntryDetailIds,
+    pendingEntryDetailLoads,
+    loadEntryDetail,
+)
+assert.equal(firstEntryDetailLoad, secondEntryDetailLoad)
+assert.equal(entryDetailLoadCount, 1)
+finishEntryDetailLoad()
+await firstEntryDetailLoad
+assert.equal(pendingEntryDetailLoads.size, 0)
 
 assert.equal(resolveMarkdownPreviewSourceContent('edit', false, '新内容', '旧内容'), null)
 assert.equal(resolveMarkdownPreviewSourceContent('edit', true, '新内容', '旧内容'), '旧内容')
