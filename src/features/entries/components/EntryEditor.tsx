@@ -112,6 +112,7 @@ import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/tts
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 
 type EditorMode = 'edit' | 'browse'
+type EntrySaveSource = 'manual' | 'auto'
 type TtsVoiceState = {
     options: { value: string; label: string }[]
     selectable: boolean
@@ -172,6 +173,7 @@ const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
 const ENTRY_MARKDOWN_PREVIEW_OPTIONS = {
     rehypePlugins: [rehypeSanitizeRawHtml],
 }
+const AUTO_SAVE_IDLE_MS = 30_000
 
 function buildDraft(entry: Entry): EntryDraft {
     return {
@@ -302,7 +304,7 @@ export default function EntryEditor({
     const loadedDetailIdsRef = useRef(new Set<string>())
     const projectEntriesLoadPromiseRef = useRef<Promise<void> | null>(null)
     const canSaveRef = useRef(false)
-    const saveActionRef = useRef<(() => void) | null>(null)
+    const saveActionRef = useRef<((source: EntrySaveSource) => void) | null>(null)
     const editorRef = useRef<MarkdownEditorRef>(null)
     const recoveryLoadKeyRef = useRef<string | null>(null)
     const recoveryWriteTimerRef = useRef<number | null>(null)
@@ -1043,7 +1045,7 @@ export default function EntryEditor({
         }
     }, [entry, onDelete, projectId, showAlert])
 
-    const handleSave = useCallback(async () => {
+    const handleSave = useCallback(async (source: EntrySaveSource = 'manual') => {
         if (!entry || !canSave) return
 
         setSaving(true)
@@ -1089,7 +1091,9 @@ export default function EntryEditor({
             }
             await onSaved?.(refreshed)
             lastSuccessfulSaveAtRef.current = Date.now()
-            void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
+            if (source === 'manual') {
+                void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
+            }
         } catch (e) {
             const message = String(e)
             setError(message)
@@ -1105,10 +1109,18 @@ export default function EntryEditor({
 
     useEffect(() => {
         canSaveRef.current = canSave
-        saveActionRef.current = () => {
-            void handleSave()
+        saveActionRef.current = (source) => {
+            void handleSave(source)
         }
     }, [canSave, handleSave])
+
+    useEffect(() => {
+        if (!active || editorMode !== 'edit' || !canSave) return
+        const timer = window.setTimeout(() => {
+            saveActionRef.current?.('auto')
+        }, AUTO_SAVE_IDLE_MS)
+        return () => window.clearTimeout(timer)
+    }, [active, canSave, draft, editorMode, relationDrafts])
 
     const applyHistory = useCallback((history: EditorHistory) => {
         isApplyingHistoryRef.current = true
@@ -1150,7 +1162,7 @@ export default function EntryEditor({
             if (key === 's') {
                 event.preventDefault()
                 if (!canSaveRef.current) return
-                saveActionRef.current?.()
+                saveActionRef.current?.('manual')
                 return
             }
 
