@@ -110,7 +110,7 @@ import {
     parseDateValue,
     stripMarkdown,
 } from '../lib/entryCommon'
-import {resolveSavedState} from '../lib/entrySaveState'
+import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
 
@@ -264,6 +264,7 @@ export default function EntryEditor({
     } | null>(null)
     const [outlineOpen, setOutlineOpen] = useState(false)
     const [activeBlockStyle, setActiveBlockStyle] = useState<MarkdownBlockStyle>('paragraph')
+    const [hasUserEdited, setHasUserEdited] = useState(false)
     const [recoveryReady, setRecoveryReady] = useState(false)
     const [relationsReady, setRelationsReady] = useState(false)
     const [recoveryNotice, setRecoveryNotice] = useState<{
@@ -323,9 +324,22 @@ export default function EntryEditor({
     const onSavedRef = useRef(onSaved)
     const onTitleChangeRef = useRef(onTitleChange)
     const lastSuccessfulSaveAtRef = useRef(0)
+    const userEditVersionRef = useRef(0)
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
+    const markUserEdited = useCallback(() => {
+        userEditVersionRef.current += 1
+        setHasUserEdited(true)
+    }, [])
+    const updateDraftFromUser = useCallback((updater: (current: EntryDraft) => EntryDraft) => {
+        markUserEdited()
+        setDraft(updater)
+    }, [markUserEdited])
+    const updateRelationDraftsFromUser = useCallback((next: EntryRelationDraft[]) => {
+        markUserEdited()
+        setRelationDrafts(next)
+    }, [markUserEdited, setRelationDrafts])
     const buildEditorHistory = useCallback((
         nextDraft: EntryDraft,
         nextRelationDrafts: EntryRelationDraft[],
@@ -474,7 +488,7 @@ export default function EntryEditor({
         content: draft.content,
         containerRef: markdownContainerRef,
         popoverRef: wikiPopoverRef,
-        onContentChange: (nextContent) => setDraft((current) => (
+        onContentChange: (nextContent) => updateDraftFromUser((current) => (
             current.content === nextContent ? current : {...current, content: nextContent}
         )),
         onCreateEntry: async (title) => {
@@ -562,6 +576,8 @@ export default function EntryEditor({
     useEffect(() => {
         onDirtyChangeRef.current?.(false)
         lastSuccessfulSaveAtRef.current = Date.now()
+        userEditVersionRef.current = 0
+        setHasUserEdited(false)
         recoveryLoadKeyRef.current = null
         setRecoveryReady(false)
         setRecoveryNotice(null)
@@ -735,12 +751,6 @@ export default function EntryEditor({
         setRecoveryReady(false)
         setRecoveryNotice(null)
 
-        // 当前进程内已有更新时，内存草稿比崩溃恢复快照更新，直接进入后续写入。
-        if (hasChanges) {
-            setRecoveryReady(true)
-            return
-        }
-
         let cancelled = false
         void getEntryDraftRecovery(projectId, entryId)
             .then((record) => {
@@ -774,7 +784,6 @@ export default function EntryEditor({
     }, [
         entry,
         entryId,
-        hasChanges,
         initialDraft,
         initialRelationDrafts,
         projectId,
@@ -786,7 +795,7 @@ export default function EntryEditor({
             window.clearTimeout(recoveryWriteTimerRef.current)
             recoveryWriteTimerRef.current = null
         }
-        if (!entry || !comparableInitial || !recoveryReady) return
+        if (!entry || !comparableInitial || !recoveryReady || !hasUserEdited) return
 
         if (!hasChanges) {
             void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
@@ -825,6 +834,7 @@ export default function EntryEditor({
         entry,
         entryId,
         hasChanges,
+        hasUserEdited,
         projectId,
         recoveryReady,
         relationDrafts,
@@ -832,6 +842,7 @@ export default function EntryEditor({
 
     const handleRestoreRecovery = useCallback((fields: EntryDraftRecoveryField[]) => {
         if (!recoveryNotice) return
+        markUserEdited()
         const snapshot = recoveryNotice.record.draft
         setDraft((current) => ({
             title: fields.includes('title') && snapshot.title !== undefined ? snapshot.title : current.title,
@@ -854,7 +865,7 @@ export default function EntryEditor({
         void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
             logger.error('delete restored entry recovery failed', recoveryError)
         })
-    }, [entryId, projectId, recoveryNotice, setRelationDrafts])
+    }, [entryId, markUserEdited, projectId, recoveryNotice, setRelationDrafts])
 
     const handleDiscardRecovery = useCallback(() => {
         setRecoveryNotice(null)
@@ -900,7 +911,7 @@ export default function EntryEditor({
                 throw new Error('AI 未返回可用摘要')
             }
 
-            setDraft((current) => (
+            updateDraftFromUser((current) => (
                 normalizeComparableText(current.summary) === nextSummary
                     ? current
                     : {...current, summary: nextSummary}
@@ -927,6 +938,7 @@ export default function EntryEditor({
         projectId,
         saving,
         showAlert,
+        updateDraftFromUser,
     ])
     useEffect(() => {
         hasChangesRef.current = hasChanges
@@ -1129,6 +1141,7 @@ export default function EntryEditor({
 
             undoRedo.flushDebounced()
             const submitted = {draft, relationDrafts}
+            const submittedEditVersion = userEditVersionRef.current
             const savedBundle = await db_save_entry_bundle({
                 id: entry.id,
                 projectId,
@@ -1160,6 +1173,9 @@ export default function EntryEditor({
             }
             await onSaved?.(refreshed)
             lastSuccessfulSaveAtRef.current = Date.now()
+            if (userEditVersionRef.current === submittedEditVersion) {
+                setHasUserEdited(false)
+            }
             if (source === 'manual') {
                 void showAlert('词条已保存', 'success', 'nonInvasive', 1000)
             }
@@ -1184,14 +1200,15 @@ export default function EntryEditor({
     }, [canSave, handleSave])
 
     useEffect(() => {
-        if (!active || editorMode !== 'edit' || !canSave) return
+        if (!shouldAutoSave(active, editorMode === 'edit', hasUserEdited, canSave)) return
         const timer = window.setTimeout(() => {
             saveActionRef.current?.('auto')
         }, AUTO_SAVE_IDLE_MS)
         return () => window.clearTimeout(timer)
-    }, [active, canSave, draft, editorMode, relationDrafts])
+    }, [active, canSave, draft, editorMode, hasUserEdited, relationDrafts])
 
     const applyHistory = useCallback((history: EditorHistory) => {
+        markUserEdited()
         isApplyingHistoryRef.current = true
         setDraft(history.draft)
         setRelationDrafts(history.relationDrafts)
@@ -1207,7 +1224,7 @@ export default function EntryEditor({
                 Math.min(selection.end, contentLength),
             )
         })
-    }, [setRelationDrafts])
+    }, [markUserEdited, setRelationDrafts])
 
     const handleUndo = useCallback(() => {
         const prev = undoRedo.undo()
@@ -1273,7 +1290,7 @@ export default function EntryEditor({
                 ...image,
                 alt: image.alt || (image.path?.split(/[\\/]/).pop() ?? `图片 ${index + 1}`),
             }))
-            setDraft((current) => {
+            updateDraftFromUser((current) => {
                 const nextImages = [...current.images]
                 nextImportedImages.forEach((image, index) => {
                     nextImages.push({
@@ -1294,7 +1311,7 @@ export default function EntryEditor({
     }
 
     function handleAddAiImages(aiImages: EntryImage[]) {
-        setDraft((current) => {
+        updateDraftFromUser((current) => {
             const nextImages = [...current.images]
             aiImages.forEach((image, index) => {
                 nextImages.push({
@@ -1310,7 +1327,7 @@ export default function EntryEditor({
     }
 
     function handleSetCover(targetIndex: number) {
-        setDraft((current) => ({
+        updateDraftFromUser((current) => ({
             ...current,
             images: current.images.map((image, index) => ({
                 ...image,
@@ -1320,7 +1337,7 @@ export default function EntryEditor({
     }
 
     function handleRemoveImage(targetIndex: number) {
-        setDraft((current) => {
+        updateDraftFromUser((current) => {
             const nextImages = current.images.filter((_, index) => index !== targetIndex)
             if (nextImages.length > 0 && !nextImages.some((image) => image.is_cover)) {
                 nextImages[0] = {
@@ -1347,7 +1364,7 @@ export default function EntryEditor({
         const markdown = `![${escapeMarkdownImageAlt(fallbackAlt)}](${imageRef})`
         let nextCursor = 0
 
-        setDraft((current) => {
+        updateDraftFromUser((current) => {
             const currentContent = current.content
             const start = textarea?.selectionStart ?? currentContent.length
             const end = textarea?.selectionEnd ?? start
@@ -1390,6 +1407,7 @@ export default function EntryEditor({
     }
 
     async function handleTagSchemaSaved(schema: TagSchema) {
+        markUserEdited()
         const nextSchemas = entryTags.handleTagSchemaSaved(schema)
         await onTagSchemasChange?.(nextSchemas)
         setTagCreatorOpen(false)
@@ -1451,7 +1469,7 @@ export default function EntryEditor({
     }, [selectMarkdownMatch])
 
     const replaceMarkdownMatch = useCallback((match: MarkdownTextMatch, replacement: string) => {
-        setDraft((current) => ({
+        updateDraftFromUser((current) => ({
             ...current,
             content: replaceMarkdownTextMatch(current.content, match, replacement),
         }))
@@ -1459,18 +1477,18 @@ export default function EntryEditor({
             start: match.start,
             end: match.start + replacement.length,
         }))
-    }, [selectMarkdownMatch])
+    }, [selectMarkdownMatch, updateDraftFromUser])
 
     const replaceAllMarkdownMatches = useCallback((
         matches: MarkdownTextMatch[],
         replacement: string,
     ) => {
-        setDraft((current) => ({
+        updateDraftFromUser((current) => ({
             ...current,
             content: replaceMarkdownTextMatches(current.content, matches, replacement),
         }))
         window.requestAnimationFrame(() => findBarRef.current?.focusSearch())
-    }, [])
+    }, [updateDraftFromUser])
 
     const syncActiveBlockStyle = useCallback((textarea?: HTMLTextAreaElement | null) => {
         const input = textarea ?? editorRef.current?.getTextareaElement()
@@ -1635,7 +1653,7 @@ export default function EntryEditor({
                                 }}
                                 ttsVoice={ttsVoiceState}
                                 actions={{
-                                    onDraftChange: setDraft,
+                                    onDraftChange: updateDraftFromUser,
                                     onOpenImageAddModal: () => openImageAddModal('add'),
                                     onViewImageSet: () => {
                                         const coverIndex = draft.images.findIndex((image) => image.is_cover)
@@ -1644,7 +1662,10 @@ export default function EntryEditor({
                                     },
                                     onGenerateSummary: handleGenerateSummary,
                                     onAddVisibleTagSchema: entryTags.handleAddVisibleTagSchema,
-                                    onRemoveVisibleTagSchema: entryTags.handleRemoveVisibleTagSchema,
+                                    onRemoveVisibleTagSchema: (schema) => {
+                                        markUserEdited()
+                                        entryTags.handleRemoveVisibleTagSchema(schema)
+                                    },
                                     onOpenTagCreator: () => setTagCreatorOpen(true),
                                     onStartCharacterChat: entry ? () => {
                                         void onStartCharacterChat?.(entry)
@@ -1709,7 +1730,7 @@ export default function EntryEditor({
                                             key={entryId}
                                             value={draft.content}
                                             onValueChange={(value) => {
-                                                setDraft((current) => (
+                                                updateDraftFromUser((current) => (
                                                     current.content === value
                                                         ? current
                                                         : {...current, content: value}
@@ -1766,7 +1787,7 @@ export default function EntryEditor({
                                                     const nextContent = textarea.value.slice(0, edit.start)
                                                         + edit.replacement
                                                         + textarea.value.slice(edit.end)
-                                                    setDraft((current) => (
+                                                    updateDraftFromUser((current) => (
                                                         current.content === nextContent
                                                             ? current
                                                             : {...current, content: nextContent}
@@ -1920,7 +1941,7 @@ export default function EntryEditor({
                         entryDetailsById={projectEntryDetailsById}
                         categories={categories}
                         onOpenEntry={onOpenEntry}
-                        onRelationDraftsChange={setRelationDrafts}
+                        onRelationDraftsChange={updateRelationDraftsFromUser}
                     />
 
                     {(error || loading) && (

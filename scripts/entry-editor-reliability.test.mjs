@@ -7,7 +7,7 @@ import {resolveEntrySaveStatus} from '../src/features/entries/hooks/useEntrySave
 import {resolveSelectionToolbarPlacement} from '../src/features/entries/components/entrySelectionToolbar.ts'
 import {reserveMissingEntryDetailIds} from '../src/features/entries/lib/entryDetailLoading.ts'
 import {resolveMarkdownPreviewSourceContent} from '../src/features/entries/lib/entryMarkdownPreviewState.ts'
-import {resolveSavedState} from '../src/features/entries/lib/entrySaveState.ts'
+import {resolveSavedState, shouldAutoSave} from '../src/features/entries/lib/entrySaveState.ts'
 
 const history = new UndoRedoHistory('初始内容')
 history.setPending('刚输入的内容')
@@ -106,3 +106,5 @@ const refreshedDraft = {content: '数据库结果'}
 assert.equal(resolveSavedState(submittedDraft, submittedDraft, refreshedDraft), refreshedDraft)
 const concurrentDraft = {content: '保存期间继续输入'}
 assert.equal(resolveSavedState(concurrentDraft, submittedDraft, refreshedDraft), concurrentDraft)
+assert.equal(shouldAutoSave(true, true, false, true), false)
+assert.equal(shouldAutoSave(true, true, true, true), true)

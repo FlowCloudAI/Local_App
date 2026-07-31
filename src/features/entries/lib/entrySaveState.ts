@@ -4,3 +4,12 @@
 export function resolveSavedState<T>(current: T, submitted: T, refreshed: T): T {
     return current === submitted ? refreshed : current
 }
+
+export function shouldAutoSave(
+    active: boolean,
+    editing: boolean,
+    hasUserEdited: boolean,
+    canSave: boolean,
+): boolean {
+    return active && editing && hasUserEdited && canSave
+}
