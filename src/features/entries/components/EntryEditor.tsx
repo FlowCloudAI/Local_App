@@ -1203,12 +1203,13 @@ export default function EntryEditor({
     }, [active, canSave, draft, editorMode, hasUserEdited, relationDrafts])
 
     const applyHistory = useCallback((history: EditorHistory) => {
+        const restoreEditorSelection = document.activeElement === editorRef.current?.getTextareaElement()
         markUserEdited()
         isApplyingHistoryRef.current = true
         setDraft(history.draft)
         setRelationDrafts(history.relationDrafts)
         const selection = history.selection
-        if (!selection) return
+        if (!selection || !restoreEditorSelection) return
         window.requestAnimationFrame(() => {
             const textarea = editorRef.current?.getTextareaElement()
             if (!textarea) return
