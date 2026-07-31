@@ -41,6 +41,19 @@ export const applyLatestTurnOutcome = (message: Message, outcome: TurnOutcome): 
     error: outcome.error,
 })
 
+const mergeContinuationUsage = (
+    current: Message['usage'],
+    incoming: Message['usage'],
+): Message['usage'] => {
+    if (!incoming) return current
+    if (!current) return incoming
+    return {
+        prompt_tokens: current.prompt_tokens + incoming.prompt_tokens,
+        completion_tokens: current.completion_tokens + incoming.completion_tokens,
+        total_tokens: current.total_tokens + incoming.total_tokens,
+    }
+}
+
 /** 将独立保存的续写节点合并到原气泡，同时把 checkpoint 推进到最新尾节点。 */
 export const appendOrMergeContinuation = (messages: Message[], incoming: Message): Message[] => {
     if (incoming.continuationOfNodeId == null) return [...messages, incoming]
@@ -56,7 +69,7 @@ export const appendOrMergeContinuation = (messages: Message[], incoming: Message
         blocks: [...(target.blocks ?? []), ...(incoming.blocks ?? [])],
         timestamp: incoming.timestamp,
         nodeId: incoming.nodeId ?? target.nodeId,
-        usage: incoming.usage,
+        usage: mergeContinuationUsage(target.usage, incoming.usage),
     }, incoming)
     return next
 }

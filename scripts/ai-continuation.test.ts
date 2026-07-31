@@ -20,6 +20,7 @@ const first: Message = {
     nodeId: 2,
     turnStatus: 'ok',
     finishReason: 'length',
+    usage: {prompt_tokens: 10, completion_tokens: 2, total_tokens: 12},
     error: {code: 'TEST', message: '已截断'},
 }
 
@@ -35,6 +36,7 @@ test('多次续写保留气泡并推进尾节点', () => {
         continuationOfNodeId: 2,
         turnStatus: 'ok',
         finishReason: 'length',
+        usage: {prompt_tokens: 20, completion_tokens: 3, total_tokens: 23},
     })
     const final = appendOrMergeContinuation(second, {
         id: 'final',
@@ -53,6 +55,11 @@ test('多次续写保留气泡并推进尾节点', () => {
     assert.equal(final[0]?.reasoning, '思考一思考二')
     assert.equal(final[0]?.nodeId, 4)
     assert.equal(final[0]?.finishReason, 'stop')
+    assert.deepEqual(final[0]?.usage, {
+        prompt_tokens: 30,
+        completion_tokens: 5,
+        total_tokens: 35,
+    })
     assert.equal(final[0]?.error, undefined)
 })
 
