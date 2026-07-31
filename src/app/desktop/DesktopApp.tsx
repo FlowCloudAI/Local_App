@@ -1279,7 +1279,8 @@ function DesktopAppContent() {
                         tabSizing="adaptive"
                         dragGutter="min(96px, 12%)"
                         tauriDragRegion
-                        minTabWidth="10rem"
+                        maxTabWidth="15rem"
+                        minTabWidth="8rem"
                         items={tabs}
                         selectedKey={activeKey}
                         onReorder={(nextTabs) => {
