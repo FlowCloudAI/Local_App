@@ -164,6 +164,10 @@ interface EntryDraft {
 interface EditorHistory {
     draft: EntryDraft
     relationDrafts: EntryRelationDraft[]
+    selection?: {
+        start: number
+        end: number
+    }
 }
 
 const DEFAULT_TTS_VOICE_STATE: TtsVoiceState = {
@@ -318,6 +322,19 @@ export default function EntryEditor({
 
     const undoRedo = useUndoRedo<EditorHistory>({draft, relationDrafts: []})
     const {showAlert} = useAlert()
+    const buildEditorHistory = useCallback((
+        nextDraft: EntryDraft,
+        nextRelationDrafts: EntryRelationDraft[],
+    ): EditorHistory => {
+        const textarea = editorRef.current?.getTextareaElement()
+        return {
+            draft: nextDraft,
+            relationDrafts: nextRelationDrafts,
+            selection: textarea
+                ? {start: textarea.selectionStart, end: textarea.selectionEnd}
+                : undefined,
+        }
+    }, [])
 
     useLayoutEffect(() => {
         const workspace = workspaceRef.current
@@ -550,10 +567,10 @@ export default function EntryEditor({
         }
         // 切换词条时重置历史追踪
         historyInitializedRef.current = null
-        undoRedo.reset({
-            draft: {title: '', summary: '', content: '', type: null, categoryId: null, tags: {}, images: []},
-            relationDrafts: []
-        })
+        undoRedo.reset(buildEditorHistory(
+            {title: '', summary: '', content: '', type: null, categoryId: null, tags: {}, images: []},
+            [],
+        ))
     }, [entryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
@@ -649,7 +666,7 @@ export default function EntryEditor({
         if (!entry || entry.id !== entryId) return
         if (historyInitializedRef.current === entryId) return
         historyInitializedRef.current = entryId
-        undoRedo.reset({draft, relationDrafts})
+        undoRedo.reset(buildEditorHistory(draft, relationDrafts))
     }, [entry, entryId, draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // 草稿/关联变更时自动推送历史快照（防抖以避免每次按键都记录）
@@ -660,7 +677,7 @@ export default function EntryEditor({
             isApplyingHistoryRef.current = false
             return
         }
-        undoRedo.pushDebounced({draft, relationDrafts})
+        undoRedo.pushDebounced(buildEditorHistory(draft, relationDrafts))
     }, [draft, relationDrafts]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // 按需加载：进入编辑模式或需要双链时调用
@@ -1009,7 +1026,7 @@ export default function EntryEditor({
         const savedDraft = buildDraft(refreshed)
         const savedRelationDrafts = refreshedRelations.map((relation) => buildRelationDraft(refreshed.id, relation))
         historyInitializedRef.current = null
-        undoRedo.reset({draft: savedDraft, relationDrafts: savedRelationDrafts})
+        undoRedo.reset(buildEditorHistory(savedDraft, savedRelationDrafts))
         lastSuccessfulSaveAtRef.current = Date.now()
 
         if (reason === 'external') {
@@ -1020,7 +1037,7 @@ export default function EntryEditor({
         }
 
         return refreshed
-    }, [applySavedRelations, ensureEntryDetails, entryId, projectId, undoRedo])
+    }, [applySavedRelations, buildEditorHistory, ensureEntryDetails, entryId, projectId, undoRedo])
 
     useEffect(() => {
         const unlisten = listen<EntryUpdatedEvent>(ENTRY_UPDATED, (event) => {
@@ -1139,6 +1156,18 @@ export default function EntryEditor({
         isApplyingHistoryRef.current = true
         setDraft(history.draft)
         setRelationDrafts(history.relationDrafts)
+        const selection = history.selection
+        if (!selection) return
+        window.requestAnimationFrame(() => {
+            const textarea = editorRef.current?.getTextareaElement()
+            if (!textarea) return
+            const contentLength = history.draft.content.length
+            textarea.focus()
+            textarea.setSelectionRange(
+                Math.min(selection.start, contentLength),
+                Math.min(selection.end, contentLength),
+            )
+        })
     }, [setRelationDrafts])
 
     const handleUndo = useCallback(() => {

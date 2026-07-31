@@ -21,6 +21,17 @@ assert.equal(history.canRedo, false)
 history.commitPending()
 assert.equal(history.redo(), null)
 
+const selectionHistory = new UndoRedoHistory({
+    content: '初始内容',
+    selection: {start: 2, end: 4},
+})
+selectionHistory.setPending({
+    content: '修改后的内容',
+    selection: {start: 6, end: 6},
+})
+assert.deepEqual(selectionHistory.undo()?.selection, {start: 2, end: 4})
+assert.deepEqual(selectionHistory.redo()?.selection, {start: 6, end: 6})
+
 assert.deepEqual(
     resolveEntrySaveStatus({
         entryLoaded: true,
