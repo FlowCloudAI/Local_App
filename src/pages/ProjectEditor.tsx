@@ -1395,6 +1395,7 @@ function ProjectEditorInner({
                                     entryId={entryId}
                                     projectId={projectId}
                                     projectName={project.name}
+                                    active={entryId === activeEntryId}
                                     aiPluginId={aiPluginId}
                                     aiModel={aiModel}
                                     categories={categories}

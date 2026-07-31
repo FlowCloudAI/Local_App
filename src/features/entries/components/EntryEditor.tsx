@@ -129,6 +129,7 @@ interface EntryEditorProps {
     entryId: string
     projectId: string
     projectName: string
+    active?: boolean
     aiPluginId?: string | null
     aiModel?: string | null
     categories: Category[]
@@ -201,6 +202,7 @@ export default function EntryEditor({
                                         entryId,
                                         projectId,
                                         projectName,
+                                        active = true,
                                         aiPluginId = null,
                                         aiModel = null,
                                         categories,
@@ -1149,6 +1151,8 @@ export default function EntryEditor({
     }, [undoRedo, applyHistory])
 
     useEffect(() => {
+        if (!active) return
+
         function handleKeyShortcut(event: KeyboardEvent) {
             if (event.defaultPrevented || event.repeat) return
             if (!(event.ctrlKey || event.metaKey)) return
@@ -1182,7 +1186,7 @@ export default function EntryEditor({
         return () => {
             window.removeEventListener('keydown', handleKeyShortcut)
         }
-    }, [handleUndo, handleRedo])
+    }, [active, handleUndo, handleRedo])
 
     async function handleUploadImages(): Promise<EntryImage[]> {
         try {
