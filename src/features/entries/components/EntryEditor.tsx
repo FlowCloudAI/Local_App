@@ -786,7 +786,7 @@ export default function EntryEditor({
             window.clearTimeout(recoveryWriteTimerRef.current)
             recoveryWriteTimerRef.current = null
         }
-        if (!entry || !comparableInitial || !recoveryReady || recoveryNotice) return
+        if (!entry || !comparableInitial || !recoveryReady) return
 
         if (!hasChanges) {
             void deleteEntryDraftRecovery(projectId, entryId).catch((recoveryError) => {
@@ -826,7 +826,6 @@ export default function EntryEditor({
         entryId,
         hasChanges,
         projectId,
-        recoveryNotice,
         recoveryReady,
         relationDrafts,
     ])
@@ -1652,6 +1651,15 @@ export default function EntryEditor({
                                     } : undefined,
                                 }}
                             />
+                            {recoveryNotice && (
+                                <EntryDraftRecoveryBanner
+                                    record={recoveryNotice.record}
+                                    kind={recoveryNotice.kind}
+                                    fields={recoveryNotice.fields}
+                                    onRestore={handleRestoreRecovery}
+                                    onDiscard={handleDiscardRecovery}
+                                />
+                            )}
                             {editorMode === 'edit' ? (
                                 <div className="entry-editor-markdown">
                                     <EntryMarkdownToolbar
@@ -1687,15 +1695,6 @@ export default function EntryEditor({
                                         onInsertImage={() => openImageAddModal('insert')}
                                         onSplitViewChange={setEditorSplitView}
                                     />
-                                    {recoveryNotice && (
-                                        <EntryDraftRecoveryBanner
-                                            record={recoveryNotice.record}
-                                            kind={recoveryNotice.kind}
-                                            fields={recoveryNotice.fields}
-                                            onRestore={handleRestoreRecovery}
-                                            onDiscard={handleDiscardRecovery}
-                                        />
-                                    )}
                                     {selectionToolbarPosition && (
                                         <EntryMarkdownSelectionToolbar
                                             left={selectionToolbarPosition.left}
