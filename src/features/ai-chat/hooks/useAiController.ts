@@ -2521,46 +2521,44 @@ export function useAiController(focus: AiFocus): AiContextValue {
             fatal: false,
         })
 
-        let target = conversation.sessionId && conversation.runId
-            ? {sid: conversation.sessionId, runId: conversation.runId, conversationId: conversation.id}
-            : await createBackendSession()
-        if (!target) {
-            finishSubmission()
-            return
-        }
-        session.activateSession(target.sid, target.runId)
-        setRuntimeConversation(target.sid, target.runId, conversation.id)
-        await syncContext(target)
-        setAutoScroll(true)
-
         try {
-            await session.continueGeneration(nodeId, target.sid, target.runId, traceId)
-        } catch (error) {
-            if (!isMissingBackendSessionError(error)) {
-                reportFailure(error, target)
-                finishSubmission()
-                return
-            }
-
-            deleteRuntimeConversation(target.sid, target.runId)
-            session.activateSession(null, null)
-            setAiConversations(prev => prev.map(item => item.id === conversation.id
-                ? {...item, sessionId: null, runId: null}
-                : item,
-            ))
-            target = await createBackendSession()
+            let target = conversation.sessionId && conversation.runId
+                ? {sid: conversation.sessionId, runId: conversation.runId, conversationId: conversation.id}
+                : await createBackendSession()
             if (!target) {
-                finishSubmission()
                 return
             }
+            session.activateSession(target.sid, target.runId)
+            setRuntimeConversation(target.sid, target.runId, conversation.id)
             await syncContext(target)
+            setAutoScroll(true)
+
             try {
                 await session.continueGeneration(nodeId, target.sid, target.runId, traceId)
-            } catch (retryError) {
-                reportFailure(retryError, target)
+            } catch (error) {
+                if (!isMissingBackendSessionError(error)) {
+                    reportFailure(error, target)
+                    return
+                }
+
+                deleteRuntimeConversation(target.sid, target.runId)
+                session.activateSession(null, null)
+                setAiConversations(prev => prev.map(item => item.id === conversation.id
+                    ? {...item, sessionId: null, runId: null}
+                    : item,
+                ))
+                target = await createBackendSession()
+                if (!target) return
+                await syncContext(target)
+                try {
+                    await session.continueGeneration(nodeId, target.sid, target.runId, traceId)
+                } catch (retryError) {
+                    reportFailure(retryError, target)
+                }
             }
+        } finally {
+            finishSubmission()
         }
-        finishSubmission()
     }, [
         appendDocumentContext,
         onError,
