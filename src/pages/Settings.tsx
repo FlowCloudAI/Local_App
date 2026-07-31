@@ -70,7 +70,7 @@ import '../shared/ui/layout/WorkspaceScaffold.css'
 import './Settings.css'
 
 export type SettingsTab = 'system' | 'ai' | 'plugins' | 'templates' | 'usage' | 'about'
-export type SettingsFocusTarget = 'writer-mode'
+export type SettingsFocusTarget = 'writer-mode' | 'api-key'
 export type SettingsPluginKindFilter = 'all' | 'llm' | 'image' | 'tts'
 type PluginKindFilter = SettingsPluginKindFilter
 type AiSettingsSection = 'models' | 'permissions' | 'keys'
@@ -1094,6 +1094,7 @@ export interface SettingsOpenIntent {
     tab?: SettingsTab
     pluginKind?: SettingsPluginKindFilter
     focus?: SettingsFocusTarget | null
+    apiKeyPluginId?: string | null
     requestId?: number
 }
 
@@ -1104,10 +1105,12 @@ export default function Settings({
     const initialTab = openIntent?.tab ?? 'system'
     const initialPluginKind = openIntent?.pluginKind ?? 'all'
     const initialFocus = openIntent?.focus ?? null
+    const initialApiKeyPluginId = openIntent?.apiKeyPluginId ?? null
     const focusRequestId = openIntent?.requestId ?? 0
     const {showAlert} = useAlert()
     const showAlertRef = useRef(showAlert)
     const writerModeFieldRef = useRef<HTMLDivElement>(null)
+    const apiKeyInputRef = useRef<HTMLInputElement>(null)
     const handledFocusRequestIdRef = useRef<number | null>(null)
     const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
     const [focusedSetting, setFocusedSetting] = useState<SettingsFocusTarget | null>(null)
@@ -1216,6 +1219,28 @@ export default function Settings({
             window.clearTimeout(timeoutId)
         }
     }, [activeTab, focusRequestId, initialFocus, loading, settings])
+
+    useEffect(() => {
+        if (loading || !settings || activeTab !== 'ai' || initialFocus !== 'api-key' || !initialApiKeyPluginId) return
+        if (![...llmPlugins, ...imagePlugins, ...ttsPlugins].some((plugin) => plugin.id === initialApiKeyPluginId)) return
+        if (handledFocusRequestIdRef.current === focusRequestId) return
+        handledFocusRequestIdRef.current = focusRequestId
+        setAiSettingsSection('keys')
+        setExpandedApiKeyPluginId(initialApiKeyPluginId)
+        setApiKeyDraft('')
+        const frameId = window.requestAnimationFrame(() => apiKeyInputRef.current?.focus())
+        return () => window.cancelAnimationFrame(frameId)
+    }, [
+        activeTab,
+        focusRequestId,
+        imagePlugins,
+        initialApiKeyPluginId,
+        initialFocus,
+        llmPlugins,
+        loading,
+        settings,
+        ttsPlugins,
+    ])
 
     // 切换到用量统计 tab 时自动加载
     useEffect(() => {
@@ -2378,6 +2403,7 @@ export default function Settings({
                                                                 <label className="settings-api-key-form-label">访问密钥</label>
                                                                 <Input
                                                                     type="password"
+                                                                    ref={isExpanded ? apiKeyInputRef : undefined}
                                                                     value={isExpanded ? apiKeyDraft : ''}
                                                                     onValueChange={(value) => setApiKeyDraft(String(value))}
                                                                     placeholder={`请输入 ${plugin.name} 的访问密钥`}

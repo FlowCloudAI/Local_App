@@ -113,6 +113,7 @@ interface Props {
         reportContext: ReportConversationContext
     }) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
+    onOpenAiSettings?: (pluginId: string) => void
     activeToolPanel?: ProjectPanel | null
     onOpenProjectPanel?: (panel: Exclude<ProjectPanel, 'overview'>, project: { id: string; name: string }) => void
     onProjectViewLabelChange?: (projectId: string, label: string) => void
@@ -215,6 +216,7 @@ function ProjectEditorInner({
                                  onStartCharacterChat,
                                  onStartReportDiscussion,
                                  onOpenPluginManagement,
+                                 onOpenAiSettings,
                                  activeToolPanel = null,
                                  onOpenProjectPanel,
                                  onProjectViewLabelChange,
@@ -1438,6 +1440,7 @@ function ProjectEditorInner({
                                         title: entry.title,
                                     })}
                                     onOpenPluginManagement={onOpenPluginManagement}
+                                    onOpenAiSettings={onOpenAiSettings}
                                 />
                             </div>
                         ))}

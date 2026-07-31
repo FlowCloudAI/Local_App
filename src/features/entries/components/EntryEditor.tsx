@@ -148,6 +148,7 @@ interface EntryEditorProps {
     onSavingChange?: (saving: boolean) => void
     onStartCharacterChat?: (entry: Entry) => void | Promise<void>
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
+    onOpenAiSettings?: (pluginId: string) => void
 }
 
 interface EntryDraft {
@@ -221,6 +222,7 @@ export default function EntryEditor({
                                         onSavingChange,
                                         onStartCharacterChat,
                                         onOpenPluginManagement,
+                                        onOpenAiSettings,
                                     }: EntryEditorProps) {
     const [entry, setEntry] = useState<Entry | null>(null)
     const [draft, setDraft] = useState<EntryDraft>({
@@ -1917,6 +1919,11 @@ export default function EntryEditor({
                     reopenLightboxAfterImageAddRef.current = false
                     setLightboxOpen(false)
                     onOpenPluginManagement(kind)
+                } : undefined}
+                onOpenAiSettings={onOpenAiSettings ? (pluginId) => {
+                    reopenLightboxAfterImageAddRef.current = false
+                    setLightboxOpen(false)
+                    onOpenAiSettings(pluginId)
                 } : undefined}
                 onAddAiImages={handleAddAiImages}
                 onInsertImage={(image) => insertImageMarkdown(image)}

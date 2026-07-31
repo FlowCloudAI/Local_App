@@ -824,6 +824,7 @@ function DesktopAppContent() {
             tab: options.tab ?? 'system',
             pluginKind: options.pluginKind ?? 'all',
             focus: options.focus ?? null,
+            apiKeyPluginId: options.apiKeyPluginId ?? null,
             requestId: options.focusRequest ? (current.requestId ?? 0) + 1 : (current.requestId ?? 0),
         }))
         setSelectedKey('settings')
@@ -866,6 +867,10 @@ function DesktopAppContent() {
 
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
         openSettings({tab: 'plugins', pluginKind: kind})
+    }, [openSettings])
+
+    const handleOpenAiSettings = useCallback((pluginId: string) => {
+        openSettings({tab: 'ai', focus: 'api-key', apiKeyPluginId: pluginId, focusRequest: true})
     }, [openSettings])
 
     const handleOpenWriterModeSettings = useCallback(() => {
@@ -1399,6 +1404,7 @@ function DesktopAppContent() {
                                             onStartCharacterChat={handleStartCharacterChat}
                                             onStartReportDiscussion={handleStartReportDiscussion}
                                             onOpenPluginManagement={handleOpenPluginManagement}
+                                            onOpenAiSettings={handleOpenAiSettings}
                                             onDeleteProject={handleDeleteProject}
                                             onDeleteEntry={handleDeleteEntry}
                                         />
