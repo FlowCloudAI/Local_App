@@ -76,7 +76,7 @@ export default function useEntryTags({
     )
     const browseVisibleTagSchemas = useMemo(
         () => visibleTagSchemas.filter((schema) => (
-            implantedTagSchemaIdSet.has(schema.id) || draftTags[schema.id] !== null || draftTags[schema.name] !== null
+            implantedTagSchemaIdSet.has(schema.id) || getComparableTagValue(draftTags, schema) !== null
         )),
         [draftTags, implantedTagSchemaIdSet, visibleTagSchemas],
     )

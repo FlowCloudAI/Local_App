@@ -24,7 +24,6 @@ import {
     type EntryDeletedEvent,
     type EntryLink,
     type EntryRelation,
-    entryTypeKey,
     type EntryTypeView,
     type EntryUpdatedEvent,
     import_entry_images,
@@ -119,14 +118,6 @@ type TtsVoiceState = {
     pluginName: string | null
     hint: string
 }
-type OpenEntryEditorState = {
-    entry: Entry
-    draft: EntryDraft
-    editorMode: EditorMode
-    relations: EntryRelation[]
-    relationDrafts: EntryRelationDraft[]
-    lastSuccessfulSaveAt: number
-}
 
 interface EntryEditorProps {
     entryId: string
@@ -138,7 +129,6 @@ interface EntryEditorProps {
     categories: Category[]
     entryTypes: EntryTypeView[]
     tagSchemas: TagSchema[]
-    openEntryIds?: string[]
     initialEditorMode?: EditorMode
     onOpenEntry?: (entry: { id: string; title: string }) => void
     onTitleChange?: (entry: Entry) => void | Promise<void>
@@ -220,7 +210,6 @@ export default function EntryEditor({
                                         categories,
                                         entryTypes,
                                         tagSchemas,
-                                        openEntryIds = [],
                                         initialEditorMode = 'browse',
                                         onOpenEntry,
                                         onTitleChange,
@@ -280,7 +269,6 @@ export default function EntryEditor({
         placement: SelectionToolbarPlacement
     } | null>(null)
     const {
-        entryRelations,
         setEntryRelations,
         relationDrafts,
         setRelationDrafts,
@@ -300,7 +288,6 @@ export default function EntryEditor({
         closeImageAddModal,
     } = useEntryImageState(draft.images)
     const reopenLightboxAfterImageAddRef = useRef(false)
-    const openEntryStateCacheRef = useRef<Record<string, OpenEntryEditorState>>({})
     const pageScrollRef = useRef<HTMLDivElement | null>(null)
     const workspaceRef = useRef<HTMLElement | null>(null)
     const workspaceHeaderRef = useRef<HTMLDivElement | null>(null)
@@ -581,15 +568,7 @@ export default function EntryEditor({
     }, [entryId]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        const openEntryIdSet = new Set(openEntryIds)
-        openEntryStateCacheRef.current = Object.fromEntries(
-            Object.entries(openEntryStateCacheRef.current).filter(([cachedEntryId]) => openEntryIdSet.has(cachedEntryId)),
-        )
-    }, [openEntryIds])
-
-    useEffect(() => {
         let cancelled = false
-        const cachedState = openEntryStateCacheRef.current[entryId]
         setLoading(true)
         setSaving(false)
         setError(null)
@@ -599,19 +578,6 @@ export default function EntryEditor({
         setOutgoingLinks([])
         setIncomingLinks([])
         clearRelations()
-
-        if (cachedState) {
-            setEntry(cachedState.entry)
-            setDraft(cachedState.draft)
-            setEditorMode(cachedState.editorMode)
-            setEntryRelations(cachedState.relations)
-            setRelationDrafts(cachedState.relationDrafts)
-            lastSuccessfulSaveAtRef.current = cachedState.lastSuccessfulSaveAt
-            setLoading(false)
-            return () => {
-                cancelled = true
-            }
-        }
 
         void db_get_entry(entryId, projectId)
             .then((result) => {
@@ -715,25 +681,6 @@ export default function EntryEditor({
         if (!active) return
         void ensureProjectEntriesLoaded()
     }, [active, ensureProjectEntriesLoaded])
-
-
-    const typeOptions = useMemo(
-        () => entryTypes.map((entryType) => ({
-            key: entryTypeKey(entryType),
-            entryType,
-        })),
-        [entryTypes],
-    )
-    useMemo(
-        () => typeOptions.filter(({entryType}) => entryType.kind === 'builtin'),
-        [typeOptions],
-    );
-    useMemo(
-        () => typeOptions
-            .filter(({entryType}) => entryType.kind === 'custom')
-            .map(({key, entryType}) => ({value: key, label: entryType.name})),
-        [typeOptions],
-    );
     const trimmedTitle = useMemo(() => normalizeComparableText(draft.title), [draft.title])
     const trimmedSummary = useMemo(() => normalizeComparableText(draft.summary), [draft.summary])
     const normalizedContent = useMemo(() => normalizeComparableContent(draft.content), [draft.content])
@@ -949,22 +896,6 @@ export default function EntryEditor({
         saving,
         saveError,
     })
-
-    useEffect(() => {
-        if (!entry) return
-        if (hasChanges) {
-            openEntryStateCacheRef.current[entryId] = {
-                entry,
-                draft,
-                editorMode,
-                relations: entryRelations,
-                relationDrafts,
-                lastSuccessfulSaveAt: lastSuccessfulSaveAtRef.current,
-            }
-            return
-        }
-        delete openEntryStateCacheRef.current[entryId]
-    }, [draft, editorMode, entry, entryId, entryRelations, hasChanges, relationDrafts])
 
     useEffect(() => {
         if (editorMode !== 'edit') return

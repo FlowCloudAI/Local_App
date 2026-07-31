@@ -1403,7 +1403,6 @@ function ProjectEditorInner({
                                     categories={categories}
                                     entryTypes={entryTypes}
                                     tagSchemas={tagSchemas}
-                                    openEntryIds={openEntryIds}
                                     initialEditorMode={placeholderEntryIds.has(entryId) ? 'edit' : 'browse'}
                                     onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                     onTitleChange={async (updatedEntry) => {
