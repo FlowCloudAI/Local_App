@@ -100,6 +100,7 @@ import type {
 } from '../model/AiControllerTypes'
 import {DEFAULT_CONVERSATION_SETTINGS, normalizeConversationSettings} from '../model/AiControllerTypes'
 import {
+    applyLatestTurnOutcome,
     appendOrMergeContinuation,
     isEmptyDraftConversation,
     isIncompleteMessage,
@@ -639,7 +640,7 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
                 nextBlocks.push({type: 'content', content: message.content, markdown: true})
             }
 
-            pendingAssistant = {
+            pendingAssistant = applyLatestTurnOutcome({
                 ...assistant,
                 content: assistant.content + (message.content ?? ''),
                 reasoning: assistant.reasoning
@@ -648,9 +649,10 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
                 timestamp: new Date(message.timestamp).getTime(),
                 nodeId: message.node_id ?? assistant.nodeId,
                 blocks: nextBlocks,
-                turnStatus: message.turn_status ?? assistant.turnStatus,
-                finishReason: message.finish_reason ?? assistant.finishReason,
-                continuationOfNodeId: message.continuation_of ?? assistant.continuationOfNodeId,
+            }, {
+                turnStatus: message.turn_status ?? undefined,
+                finishReason: message.finish_reason ?? undefined,
+                continuationOfNodeId: message.continuation_of ?? undefined,
                 error: message.turn_status === 'cancelled'
                     || message.turn_status === 'interrupted'
                     || message.turn_status === 'error'
@@ -662,7 +664,7 @@ const storedToMessages = (messages: StoredMessage[]): Message[] => {
                         detail: {retryable: true},
                     }
                     : undefined,
-            }
+            })
             return
         }
 
@@ -713,6 +715,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
 
     const [inputValue, setInputValue] = useState('')
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+    const [continuationSubmittingMessageId, setContinuationSubmittingMessageId] = useState<string | null>(null)
+    const continuationSubmittingRef = useRef(new Set<string>())
     const [sessionParams, setSessionParams] = useState<SessionParams>({thinking: true})
     const sessionParamsRef = useRef(sessionParams)
     useEffect(() => { sessionParamsRef.current = sessionParams }, [sessionParams])
@@ -2448,7 +2452,14 @@ export function useAiController(focus: AiFocus): AiContextValue {
         ) return
         const nodeId = message.nodeId
         if (conversation.runId && session.isRunStreaming(conversation.runId)) return
-
+        const submissionKey = `${conversation.id}:${nodeId}`
+        if (continuationSubmittingRef.current.has(submissionKey)) return
+        continuationSubmittingRef.current.add(submissionKey)
+        setContinuationSubmittingMessageId(messageId)
+        const finishSubmission = () => {
+            continuationSubmittingRef.current.delete(submissionKey)
+            setContinuationSubmittingMessageId(current => current === messageId ? null : current)
+        }
         const traceId = createAiTraceId()
         const settings = normalizeConversationSettings(conversation.settings)
         const documentAttachmentItemIds = collectDocumentAttachmentItemIdsUntilMessage(
@@ -2513,7 +2524,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
         let target = conversation.sessionId && conversation.runId
             ? {sid: conversation.sessionId, runId: conversation.runId, conversationId: conversation.id}
             : await createBackendSession()
-        if (!target) return
+        if (!target) {
+            finishSubmission()
+            return
+        }
         session.activateSession(target.sid, target.runId)
         setRuntimeConversation(target.sid, target.runId, conversation.id)
         await syncContext(target)
@@ -2524,6 +2538,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         } catch (error) {
             if (!isMissingBackendSessionError(error)) {
                 reportFailure(error, target)
+                finishSubmission()
                 return
             }
 
@@ -2534,7 +2549,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 : item,
             ))
             target = await createBackendSession()
-            if (!target) return
+            if (!target) {
+                finishSubmission()
+                return
+            }
             await syncContext(target)
             try {
                 await session.continueGeneration(nodeId, target.sid, target.runId, traceId)
@@ -2542,6 +2560,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 reportFailure(retryError, target)
             }
         }
+        finishSubmission()
     }, [
         appendDocumentContext,
         onError,
@@ -2796,6 +2815,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         isStreaming: session.isStreaming,
         streamingBlocks: session.blocks,
         continuationNodeId: session.continuationNodeId,
+        continuationSubmittingMessageId,
         conversationRuntime,
         sidebarCollapsed,
         setSidebarCollapsed,
@@ -2830,6 +2850,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         startCharacterConversation, startReportDiscussion, updateConversationCharacterAutoPlay,
         updateConversationSettings, switchActiveConversationModel,
         selectConversation, session.getBranchInfo, session.switchBranch, session.continuationNodeId,
+        continuationSubmittingMessageId,
     ])
 }
 

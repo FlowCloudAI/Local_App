@@ -103,6 +103,7 @@ export default function MobileAiChat({
         messages, sendMessage, stopStreaming,
         regenerateMessage, continueMessage,
         inputValue, setInputValue, isStreaming, streamingBlocks, continuationNodeId,
+        continuationSubmittingMessageId,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
         addDocumentContextFiles,
@@ -765,6 +766,7 @@ export default function MobileAiChat({
                 streamingBlocks={streamingBlocks}
                 isStreaming={isStreaming}
                 continuationNodeId={continuationNodeId}
+                continuationSubmittingMessageId={continuationSubmittingMessageId}
                 focusEntryId={focusContext.entryId}
                 hasActiveConversation={Boolean(activeConversation)}
                 conversationCreationDisabled={conversationCreationDisabled}

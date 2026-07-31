@@ -9,6 +9,7 @@ interface MobileAiMessageListProps {
     streamingBlocks: AiContextValue['streamingBlocks']
     isStreaming: boolean
     continuationNodeId: number | null
+    continuationSubmittingMessageId: string | null
     focusEntryId: string | null
     hasActiveConversation: boolean
     conversationCreationDisabled: boolean
@@ -25,6 +26,7 @@ export default function MobileAiMessageList({
     streamingBlocks,
     isStreaming,
     continuationNodeId,
+    continuationSubmittingMessageId,
     focusEntryId,
     hasActiveConversation,
     conversationCreationDisabled,
@@ -61,6 +63,7 @@ export default function MobileAiMessageList({
                 )
                 const canContinue = Boolean(
                     !isStreaming
+                    && continuationSubmittingMessageId !== message.id
                     && message.nodeId != null
                     && isIncompleteMessage(message),
                 )

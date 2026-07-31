@@ -191,6 +191,7 @@ export interface AiContextValue {
     isStreaming: boolean
     streamingBlocks: MessageBoxBlock[]
     continuationNodeId: number | null
+    continuationSubmittingMessageId: string | null
     conversationRuntime: Record<string, ConversationRuntimeState>
 
     sidebarCollapsed: boolean

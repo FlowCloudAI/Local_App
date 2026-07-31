@@ -1901,6 +1901,7 @@ export default function AIChatContent({
                                 )
                                 const canContinue = Boolean(
                                     !ctx.isStreaming
+                                    && ctx.continuationSubmittingMessageId !== message.id
                                     && message.nodeId != null
                                     && isIncompleteMessage(message),
                                 )

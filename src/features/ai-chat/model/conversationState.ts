@@ -27,6 +27,20 @@ export const isIncompleteMessage = (message: Message) => hasMessageOutput(messag
     || message.turnStatus === 'error'
 )
 
+type TurnOutcome = Pick<
+    Message,
+    'turnStatus' | 'finishReason' | 'continuationOfNodeId' | 'error'
+>
+
+/** 结果字段属于节点而非气泡；即使末节点缺字段，也必须覆盖前一段的旧值。 */
+export const applyLatestTurnOutcome = (message: Message, outcome: TurnOutcome): Message => ({
+    ...message,
+    turnStatus: outcome.turnStatus,
+    finishReason: outcome.finishReason,
+    continuationOfNodeId: outcome.continuationOfNodeId,
+    error: outcome.error,
+})
+
 /** 将独立保存的续写节点合并到原气泡，同时把 checkpoint 推进到最新尾节点。 */
 export const appendOrMergeContinuation = (messages: Message[], incoming: Message): Message[] => {
     if (incoming.continuationOfNodeId == null) return [...messages, incoming]
@@ -35,7 +49,7 @@ export const appendOrMergeContinuation = (messages: Message[], incoming: Message
 
     const target = messages[targetIndex]
     const next = [...messages]
-    next[targetIndex] = {
+    next[targetIndex] = applyLatestTurnOutcome({
         ...target,
         content: target.content + incoming.content,
         reasoning: `${target.reasoning ?? ''}${incoming.reasoning ?? ''}` || undefined,
@@ -43,10 +57,6 @@ export const appendOrMergeContinuation = (messages: Message[], incoming: Message
         timestamp: incoming.timestamp,
         nodeId: incoming.nodeId ?? target.nodeId,
         usage: incoming.usage,
-        error: incoming.error,
-        turnStatus: incoming.turnStatus,
-        finishReason: incoming.finishReason,
-        continuationOfNodeId: incoming.continuationOfNodeId,
-    }
+    }, incoming)
     return next
 }
