@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
-import {Button} from 'flowcloudai-ui'
+import {Button, useAlert} from 'flowcloudai-ui'
 import {listen} from '../../../api/events'
 import {
     AI_WRITE_REQUEST,
@@ -25,6 +25,7 @@ type ModalState =
 export default function AiConfirmModal() {
     const [pending, setPending] = useState<ModalState | null>(null)
     const [busy, setBusy] = useState(false)
+    const {showAlert} = useAlert()
 
     useEffect(() => {
         const u1 = listen<EntryDeleteRequestEvent>(ENTRY_DELETE_REQUEST, e =>
@@ -49,10 +50,30 @@ export default function AiConfirmModal() {
 
     const respond = async (confirmed: boolean) => {
         if (!pending || busy) return
+        const requestId = pending.data.request_id
         setBusy(true)
-        await confirm_entry_edit(pending.data.request_id, confirmed).catch(logger.error)
-        setPending(null)
-        setBusy(false)
+        try {
+            const delivered = await confirm_entry_edit(requestId, confirmed)
+            setPending(current => current?.data.request_id === requestId ? null : current)
+            if (!delivered) {
+                void showAlert(
+                    '确认请求已结束，操作未执行。',
+                    'info',
+                    'nonInvasive',
+                    2200,
+                )
+            }
+        } catch (error) {
+            logger.error('confirm AI operation failed', error)
+            void showAlert(
+                '响应确认失败，请重试。',
+                'error',
+                'nonInvasive',
+                2200,
+            )
+        } finally {
+            setBusy(false)
+        }
     }
 
     return (

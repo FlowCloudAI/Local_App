@@ -728,7 +728,7 @@ export const CATEGORY_DELETED = 'category:deleted'
 
 /** 统一确认回调，所有 AI 确认类型均复用此命令 */
 export const confirm_entry_edit = (requestId: string, confirmed: boolean) =>
-    command<void>('confirm_entry_edit', {requestId, confirmed})
+    command<boolean>('confirm_entry_edit', {requestId, confirmed})
 
 // ── Token 估算 ────────────────────────────────────────────────────────────────
 

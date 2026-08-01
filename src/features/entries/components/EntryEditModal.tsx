@@ -32,8 +32,16 @@ export default function EntryEditModal() {
         const requestId = pending.request_id
         setBusy(true)
         try {
-            await confirm_entry_edit(requestId, confirmed)
+            const delivered = await confirm_entry_edit(requestId, confirmed)
             setPending(current => current?.request_id === requestId ? null : current)
+            if (!delivered) {
+                void showAlert(
+                    '审阅请求已结束，修改未应用。',
+                    'info',
+                    'nonInvasive',
+                    2200,
+                )
+            }
         } catch (error) {
             logger.error('confirm entry edit failed', error)
             void showAlert(
