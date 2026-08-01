@@ -103,7 +103,7 @@ export default function MobileAiChat({
         isComposingNewConversation, setActiveConversationId,
         messages, sendMessage, stopStreaming,
         regenerateMessage, compactAndRetryMessage, continueMessage,
-        inputValue, setInputValue, isStreaming, streamingBlocks, continuationNodeId,
+        inputValue, setInputValue, isStreaming, isCompacting, streamingBlocks, continuationNodeId,
         continuationSubmittingMessageId,
         conversationRuntime, switchConversation, createNewConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
@@ -195,6 +195,7 @@ export default function MobileAiChat({
         || pluginSelectionIncomplete
         || llmApiKeyChecking
         || llmApiKeyMissing
+        || isCompacting
         || isComposingNewConversation
     const inputDisabled = !activeConversation
         || isArchivedConversation
@@ -217,7 +218,9 @@ export default function MobileAiChat({
                             ? '正在检查访问密钥…'
                             : llmApiKeyMissing
                                 ? '请先配置访问密钥'
-                                : '发消息或按住说话'
+                                : isCompacting
+                                    ? '正在压缩对话历史…'
+                                    : '发消息或按住说话'
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({behavior: 'smooth'})
@@ -376,7 +379,7 @@ export default function MobileAiChat({
     }, [activeConversation, updateConversationSettings])
 
     const handleSend = useCallback(async () => {
-        if (!inputValue.trim() || isStreaming) return
+        if (!inputValue.trim() || isStreaming || isCompacting) return
         if (!activeConversation) {
             await showAlert('请先新建对话。', 'warning', 'nonInvasive', 1800)
             return
@@ -411,6 +414,7 @@ export default function MobileAiChat({
         activeLlmPluginName,
         inputValue,
         isArchivedConversation,
+        isCompacting,
         isStreaming,
         llmApiKeyChecking,
         llmApiKeyMissing,
@@ -787,7 +791,7 @@ export default function MobileAiChat({
             <MobileAiComposer
                 pageRef={pageRef} topActionsRef={topActionsRef} toolModeMenuRef={toolModeMenuRef} modelMenuRef={modelMenuRef}
                 inputValue={inputValue} onInput={setInputValue} onSend={() => void handleSend()} inputPlaceholder={inputPlaceholder} inputDisabled={inputDisabled}
-                isStreaming={isStreaming} onStop={stopStreaming} thinking={sessionParams.thinking}
+                isStreaming={isStreaming} isCompacting={isCompacting} onStop={stopStreaming} thinking={sessionParams.thinking}
                 onToggleThinking={() => setSessionParams(current => ({...current, thinking: !current.thinking}))}
                 toolAccessMode={toolAccessMode} activeToolModeShortLabel={activeToolModeShortLabel}
                 toolModeMenuOpen={toolModeMenuOpen} onToolModeMenuOpen={setToolModeMenuOpen}

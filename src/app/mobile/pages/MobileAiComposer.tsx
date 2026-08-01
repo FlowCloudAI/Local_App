@@ -18,7 +18,7 @@ interface Props {
     pageRef: RefObject<HTMLDivElement | null>; topActionsRef: RefObject<HTMLDivElement | null>
     toolModeMenuRef: RefObject<HTMLButtonElement | null>; modelMenuRef: RefObject<HTMLButtonElement | null>
     inputValue: string; onInput: (value: string) => void; onSend: () => void; inputPlaceholder: string; inputDisabled: boolean
-    isStreaming: boolean; onStop: () => void; thinking: boolean; onToggleThinking: () => void
+    isStreaming: boolean; isCompacting: boolean; onStop: () => void; thinking: boolean; onToggleThinking: () => void
     toolAccessMode: AiToolAccessMode; activeToolModeShortLabel: string; toolModeMenuOpen: boolean; onToolModeMenuOpen: (open: boolean) => void; onBeforeToolModeMenuOpen: () => void
     toolModeOptions: ToolModeOption[]; onToolModeChange: (mode: AiToolAccessMode) => void
     morePanelOpen: boolean; onOpenMore: () => void; onCloseMore: () => void
@@ -34,6 +34,7 @@ interface Props {
 export default function MobileAiComposer(p: Props) {
     return <>
         <footer className="mobile-ai-chat__composer"><div className="mobile-ai-composer-card">
+            {p.isCompacting ? <div className="mobile-ai-composer-card__status" role="status">正在压缩对话历史…</div> : null}
             <textarea value={p.inputValue} onChange={event => p.onInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); p.onSend() } }} placeholder={p.inputPlaceholder} rows={1} disabled={p.inputDisabled && !p.isStreaming}/>
             <div className="mobile-ai-composer-card__bar"><div className="mobile-ai-composer-card__chips">
                 <button type="button" className={`mobile-ai-composer-card__chip${p.thinking ? ' active' : ''}`} disabled={p.isStreaming} onClick={p.onToggleThinking}><MobileAiIcon type="thinking"/><span>思考</span></button>

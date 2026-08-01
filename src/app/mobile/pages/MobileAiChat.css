@@ -480,6 +480,11 @@
     color: color-mix(in srgb, var(--fc-color-text-secondary) 72%, transparent);
 }
 
+.mobile-ai-composer-card__status {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
 .mobile-ai-composer-card__bar {
     display: flex;
     align-items: center;

@@ -964,11 +964,13 @@ export default function AIChatContent({
             ? '请先安装 AI 对话插件'
             : llmApiKeyMissing
                 ? `请先配置 ${activeLlmPluginName} 的访问密钥`
-                : ctx.isStreaming
-                    ? '正在生成中'
-                    : !ctx.inputValue.trim()
-                        ? '请输入消息'
-                        : ''
+                : ctx.isCompacting
+                    ? '正在压缩对话历史…'
+                    : ctx.isStreaming
+                        ? '正在生成中'
+                        : !ctx.inputValue.trim()
+                            ? '请输入消息'
+                            : ''
 
     useLayoutEffect(() => {
         if (!showFocusContext) {
@@ -1195,7 +1197,13 @@ export default function AIChatContent({
             await showAlert(`AI 对话插件「${activeLlmPluginName}」尚未配置访问密钥。`, 'warning', 'nonInvasive', 2600)
             return
         }
-        if (isArchivedConversation || llmUnavailable || !rawInput.trim() || ctx.isStreaming) return
+        if (
+            isArchivedConversation
+            || llmUnavailable
+            || !rawInput.trim()
+            || ctx.isStreaming
+            || ctx.isCompacting
+        ) return
         const nextInput = await standardizeInputWikiLinks(rawInput)
         await ctx.sendMessage(nextInput)
     }, [
@@ -1224,7 +1232,12 @@ export default function AIChatContent({
 
         if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
             event.preventDefault()
-            if (isArchivedConversation || !ctx.inputValue.trim() || ctx.isStreaming) return
+            if (
+                isArchivedConversation
+                || !ctx.inputValue.trim()
+                || ctx.isStreaming
+                || ctx.isCompacting
+            ) return
             void handleSendCurrentInput()
         }
     }
@@ -2321,15 +2334,27 @@ export default function AIChatContent({
                             onSelect={(event) => inputWikiLink.handleMarkdownCursorSync(event.currentTarget)}
                             onScroll={(event) => inputWikiLink.updateWikiPopoverPosition(event.currentTarget)}
                             onBlur={() => inputWikiLink.handleTextareaBlur()}
-                            disabled={isArchivedConversation || llmUnavailable || llmApiKeyMissing}
+                            disabled={
+                                isArchivedConversation
+                                || llmUnavailable
+                                || llmApiKeyMissing
+                                || ctx.isCompacting
+                            }
                             placeholder={isArchivedConversation
                                 ? '取消归档后继续对话'
                                 : llmUnavailable
                                     ? '安装 AI 对话插件后继续对话'
-                                : llmApiKeyMissing
+                                    : llmApiKeyMissing
                                         ? '配置访问密钥后继续对话'
-                                        : '请输入消息...'}
+                                        : ctx.isCompacting
+                                            ? '正在压缩对话历史…'
+                                            : '请输入消息...'}
                         />
+                        {ctx.isCompacting ? (
+                            <div className="ai-input-limit-hint" role="status">
+                                正在压缩对话历史…
+                            </div>
+                        ) : null}
                         {inputLimitMessage && (
                             <div className="ai-input-limit-hint" role="status">
                                 {inputLimitMessage}

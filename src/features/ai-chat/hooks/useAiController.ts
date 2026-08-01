@@ -127,6 +127,7 @@ const buildAiLogPreview = (content: string) => {
 }
 
 const CHARACTER_CONVERSATION_META_STORAGE_KEY = 'flowcloudai.characterConversationMeta.v1'
+const AUTO_COMPACT_RETRY_BACKOFF_MS = 5 * 60 * 1_000
 const CONVERSATION_SYSTEM_PROMPT_ATTRIBUTE = 'conversation_system_prompt'
 const DOCUMENT_CONTEXT_ATTRIBUTE = 'attached_documents'
 const DOCUMENT_CONTEXT_CHAR_BUDGET = 24_000
@@ -761,6 +762,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
     const entryTitleCacheRef = useRef<Map<string, string>>(new Map())
     const conversationSettingsSaveTimersRef = useRef<Record<string, ReturnType<typeof window.setTimeout>>>({})
     const autoCompactSuggestedConversationIdsRef = useRef(new Set<string>())
+    const autoCompactRetryAfterRef = useRef(new Map<string, number>())
+    const [compactingConversationId, setCompactingConversationId] = useState<string | null>(null)
     const {
         focusContext,
         documentContextItemsByConversation,
@@ -888,6 +891,9 @@ export function useAiController(focus: AiFocus): AiContextValue {
             || conversation.mode !== 'default'
             || (!force && !compactSettings.auto_compact_enabled)
         ) return false
+        const retryAfter = autoCompactRetryAfterRef.current.get(conversation.id) ?? 0
+        if (!force && retryAfter > Date.now()) return false
+        if (retryAfter > 0) autoCompactRetryAfterRef.current.delete(conversation.id)
 
         const headMessage = [...messages]
             .reverse()
@@ -934,6 +940,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const inFlightKey = `${conversation.id}:${headMessage.nodeId}:${force ? 'forced' : 'pre-send'}`
         if (!markAutoCompactInFlight(inFlightKey)) return false
 
+        setCompactingConversationId(conversation.id)
         try {
             const result = await ai_compact_conversation({
                 conversationId: conversation.id,
@@ -944,6 +951,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 detail: compactSettings.auto_compact_detail,
             })
             autoCompactSuggestedConversationIdsRef.current.delete(conversation.id)
+            autoCompactRetryAfterRef.current.delete(conversation.id)
             logger.log('[useAiController][自动压缩] 发送前压缩检查完成', {
                 conversationId: conversation.id,
                 applied: result.applied,
@@ -970,12 +978,19 @@ export function useAiController(focus: AiFocus): AiContextValue {
             setAiConversations((prev) => prev.map(clearRuntime))
             return true
         } catch (error) {
+            autoCompactRetryAfterRef.current.set(
+                conversation.id,
+                Date.now() + AUTO_COMPACT_RETRY_BACKOFF_MS,
+            )
             logger.warn('[useAiController][自动压缩] 发送前压缩失败，继续发送', {
                 conversationId: conversation.id,
                 error,
             })
             return false
         } finally {
+            setCompactingConversationId((current) =>
+                current === conversation.id ? null : current,
+            )
             clearAutoCompactInFlight(inFlightKey)
         }
     }, [])
@@ -2899,6 +2914,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         sessionParams,
         setSessionParams,
         isStreaming: session.isStreaming,
+        isCompacting: compactingConversationId === activeConversationId,
         streamingBlocks: session.blocks,
         continuationNodeId: session.continuationNodeId,
         continuationSubmittingMessageId,
@@ -2928,6 +2944,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         messages, inputValue, editingMessageId, tools, webSearchEnabled, toolAccessMode,
         writerModeAvailable, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
+        compactingConversationId,
         isComposingNewConversation,
         activeConversation, sendMessage, stopStreaming, regenerateMessage, compactAndRetryMessage,
         continueMessage, editMessage,

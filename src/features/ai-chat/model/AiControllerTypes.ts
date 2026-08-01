@@ -191,6 +191,7 @@ export interface AiContextValue {
     setSessionParams: (v: SessionParams | ((prev: SessionParams) => SessionParams)) => void
 
     isStreaming: boolean
+    isCompacting: boolean
     streamingBlocks: MessageBoxBlock[]
     continuationNodeId: number | null
     continuationSubmittingMessageId: string | null
