@@ -450,7 +450,7 @@ pub async fn ai_create_character_session(
         input.session_id.clone(),
         crate::SessionEntry {
             run_id: run_id.clone(),
-            input_tx,
+            input_tx: Some(input_tx),
             handle,
             kind: AiSessionKind::Character,
             model: resolved_model,

@@ -287,7 +287,7 @@ pub async fn ai_start_contradiction_session(
         request.session_id.clone(),
         crate::SessionEntry {
             run_id: run_id.clone(),
-            input_tx: input_tx.clone(),
+            input_tx: Some(input_tx.clone()),
             handle,
             kind: AiSessionKind::Contradiction,
             model: resolved_model,

@@ -280,7 +280,7 @@ pub async fn ai_create_llm_session(
             session_id.clone(),
             crate::SessionEntry {
                 run_id: run_id.clone(),
-                input_tx,
+                input_tx: Some(input_tx),
                 handle,
                 kind: AiSessionKind::General,
                 model: resolved_model.clone(),
@@ -649,6 +649,13 @@ pub async fn ai_send_message(
             )
             .with_kv("session_id", session_id.clone()));
         };
+        let Some(input_tx) = entry.input_tx.as_ref() else {
+            return Err(ApiError::new(
+                ErrorCode::LlmSessionClosed,
+                format!("Session '{}' 已关闭", session_id),
+            )
+            .with_kv("session_id", session_id.clone()));
+        };
         log::info!(
             "[ai_send_message][session_found] trace_id={} session_id={} run_id={} kind={:?} plugin_id={} model={} active_count={} channel_capacity={} channel_max_capacity={}",
             trace_id,
@@ -658,17 +665,17 @@ pub async fn ai_send_message(
             entry.plugin_id,
             entry.model,
             active_count,
-            entry.input_tx.capacity(),
-            entry.input_tx.max_capacity()
+            input_tx.capacity(),
+            input_tx.max_capacity()
         );
         (
-            entry.input_tx.clone(),
+            input_tx.clone(),
             entry.run_id.clone(),
             entry.plugin_id.clone(),
             entry.model.clone(),
             entry.kind.clone(),
-            entry.input_tx.capacity(),
-            entry.input_tx.max_capacity(),
+            input_tx.capacity(),
+            input_tx.max_capacity(),
         )
     };
 
@@ -774,32 +781,27 @@ pub async fn ai_close_session(
     ai_state: State<'_, AiState>,
     session_id: String,
 ) -> Result<(), ApiError> {
-    // 先触发取消，再移除 entry，避免流式请求继续向前端发送事件。
-    let removed = ai_state.sessions.lock().await.remove(&session_id);
-    if let Some(ref entry) = removed {
+    let mut sessions = ai_state.sessions.lock().await;
+    if let Some(entry) = sessions.get_mut(&session_id)
+        && entry.input_tx.is_some()
+    {
         entry.handle.cancel();
+        entry.input_tx.take();
     }
-    ai_state
-        .contradiction_bindings
-        .lock()
-        .await
-        .remove(&session_id);
     Ok(())
 }
 
 /// 关闭并释放所有 LLM 会话
 #[tauri::command]
 pub async fn ai_close_all_sessions(ai_state: State<'_, AiState>) -> Result<usize, ApiError> {
-    let removed = {
-        let mut sessions = ai_state.sessions.lock().await;
-        sessions.drain().map(|(_, entry)| entry).collect::<Vec<_>>()
-    };
-
-    let count = removed.len();
-    for entry in removed {
-        entry.handle.cancel();
+    let mut sessions = ai_state.sessions.lock().await;
+    let mut count = 0;
+    for entry in sessions.values_mut() {
+        if entry.input_tx.is_some() {
+            entry.handle.cancel();
+            entry.input_tx.take();
+            count += 1;
+        }
     }
-    ai_state.contradiction_bindings.lock().await.clear();
-
     Ok(count)
 }

@@ -831,6 +831,7 @@ pub(crate) async fn cleanup_session_state(app: &AppHandle, session_id: &str, run
         sessions.remove(session_id);
         drop(sessions);
         state.contradiction_bindings.lock().await.remove(session_id);
+        state.world_check_bindings.lock().await.remove(session_id);
     }
 }
 
