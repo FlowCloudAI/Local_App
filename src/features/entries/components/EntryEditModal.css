@@ -22,11 +22,17 @@
 }
 
 .eem-entry-name {
-    font-size: var(--fc-font-size-xs);
+    padding: 0 var(--fc-space-lg) var(--fc-space-sm);
+    font-size: var(--fc-font-size-sm);
     color: var(--fc-color-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.eem-entry-name strong {
+    color: var(--fc-color-text);
+    font-weight: var(--fc-font-weight-medium);
 }
 
 .eem-body {

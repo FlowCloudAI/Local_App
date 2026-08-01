@@ -1,6 +1,6 @@
 import {logger} from '../../../shared/logger'
 import {useEffect, useState} from 'react'
-import {Button} from 'flowcloudai-ui'
+import {Button, useAlert} from 'flowcloudai-ui'
 import {listen} from '../../../api/events'
 import {confirm_entry_edit, ENTRY_EDIT_REQUEST, type EntryEditRequestEvent,} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
@@ -9,6 +9,7 @@ import './EntryEditModal.css'
 export default function EntryEditModal() {
     const [pending, setPending] = useState<EntryEditRequestEvent | null>(null)
     const [busy, setBusy] = useState(false)
+    const {showAlert} = useAlert()
 
     useEffect(() => {
         const unlisten = listen<EntryEditRequestEvent>(ENTRY_EDIT_REQUEST, event => {
@@ -22,10 +23,22 @@ export default function EntryEditModal() {
 
     const respond = async (confirmed: boolean) => {
         if (!pending || busy) return
+        const requestId = pending.request_id
         setBusy(true)
-        await confirm_entry_edit(pending.request_id, confirmed).catch(logger.error)
-        setPending(null)
-        setBusy(false)
+        try {
+            await confirm_entry_edit(requestId, confirmed)
+            setPending(current => current?.request_id === requestId ? null : current)
+        } catch (error) {
+            logger.error('confirm entry edit failed', error)
+            void showAlert(
+                confirmed ? '应用修改失败，请重试。' : '未能拒绝此次修改，请重试。',
+                'error',
+                'nonInvasive',
+                2200,
+            )
+        } finally {
+            setBusy(false)
+        }
     }
 
     return (
@@ -39,7 +52,9 @@ export default function EntryEditModal() {
         >
             {pending && (
                 <>
-                <div className="eem-entry-name">{pending.entry_title}</div>
+                <div className="eem-entry-name" title={pending.entry_title}>
+                    正在修改：<strong>{pending.entry_title}</strong>
+                </div>
 
                 <div className="eem-body">
                     <DiffView before={pending.before_content} after={pending.after_content}/>
@@ -54,7 +69,7 @@ export default function EntryEditModal() {
                         onClick={() => void respond(false)}
                         disabled={busy}
                     >
-                        取消
+                        不应用
                     </Button>
                     <Button
                         type="button"
@@ -64,7 +79,7 @@ export default function EntryEditModal() {
                         onClick={() => void respond(true)}
                         disabled={busy}
                     >
-                        确认修改
+                        应用全部修改
                     </Button>
                 </div>
                 </>
