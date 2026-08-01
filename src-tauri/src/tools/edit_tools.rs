@@ -106,7 +106,6 @@ async fn dispatch_edit_op(
                         before_content: before_content.clone(),
                         after_content: after_content.clone(),
                     },
-                    180,
                 )
                 .await?
             };
@@ -173,7 +172,6 @@ async fn dispatch_edit_op(
                         before_content: before_content.clone(),
                         after_content: after.clone(),
                     },
-                    180,
                 )
                 .await?
             };
@@ -231,7 +229,6 @@ async fn dispatch_edit_op(
                     entry_title: entry_title.clone(),
                     entry_summary: entry_summary.clone(),
                 },
-                180,
             )
             .await?;
 

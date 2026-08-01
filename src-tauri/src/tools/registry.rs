@@ -114,7 +114,7 @@ pub fn register_worldflow_tools(
         "web_search",
         "open_url",
     ]);
-    registry.mark_write(&[
+    let interactive_write_tools = [
         "create_entry",
         "update_entry",
         "update_entry_tags",
@@ -130,7 +130,9 @@ pub fn register_worldflow_tools(
         "create_category",
         "delete_category",
         "create_project",
-    ]);
+    ];
+    registry.mark_write(&interactive_write_tools);
+    registry.mark_interactive(&interactive_write_tools);
 
     Ok(())
 }

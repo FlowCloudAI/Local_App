@@ -7,18 +7,43 @@ pub async fn confirm_entry_edit(
     pending_edits: State<'_, PendingEditsState>,
     request_id: String,
     confirmed: bool,
-) -> Result<(), ApiError> {
+) -> Result<bool, ApiError> {
     let mut map = pending_edits.pending.lock().await;
-    match map.remove(&request_id) {
-        Some(tx) => {
-            // send 失败说明 handler 已超时取消，静默忽略
-            let _ = tx.send(confirmed);
-            Ok(())
-        }
-        None => Err(ApiError::new(
-            flowcloudai_client::ErrorCode::ValidationFormatError,
-            format!("编辑请求 '{}' 不存在或已超时", request_id),
-        )
-        .with_kv("request_id", request_id.clone())),
+    Ok(deliver_confirmation(&mut map, &request_id, confirmed))
+}
+
+fn deliver_confirmation(
+    pending: &mut std::collections::HashMap<String, tokio::sync::oneshot::Sender<bool>>,
+    request_id: &str,
+    confirmed: bool,
+) -> bool {
+    pending
+        .remove(request_id)
+        .is_some_and(|sender| sender.send(confirmed).is_ok())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn confirmation_reports_delivery_and_missing_request() {
+        let mut pending = std::collections::HashMap::new();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        pending.insert("request".to_string(), sender);
+
+        assert!(deliver_confirmation(&mut pending, "request", true));
+        assert_eq!(receiver.blocking_recv(), Ok(true));
+        assert!(!deliver_confirmation(&mut pending, "missing", false));
+    }
+
+    #[test]
+    fn confirmation_reports_closed_receiver() {
+        let mut pending = std::collections::HashMap::new();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        drop(receiver);
+        pending.insert("request".to_string(), sender);
+
+        assert!(!deliver_confirmation(&mut pending, "request", true));
     }
 }

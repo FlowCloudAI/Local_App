@@ -1,13 +1,42 @@
 //! AI 写入操作的前端确认协议。
 //!
-//! 本模块用一次性通道关联确认请求与用户响应；超时、缺少窗口句柄或通道异常均按取消处理，
-//! 以避免模型在无人确认时继续修改数据。
+//! 本模块用一次性通道关联确认请求与用户响应；人工确认不设时限，但同一时间只展示一个请求，
+//! 会话取消或通道异常时会清理挂起状态，避免遗留无法响应的弹窗。
 
 use flowcloudai_client::ToolFailure;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{Mutex, oneshot};
+
+static CONFIRMATION_GATE: Mutex<()> = Mutex::const_new(());
+
+struct PendingRequestGuard {
+    request_id: String,
+    pending: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+}
+
+impl PendingRequestGuard {
+    fn new(
+        request_id: String,
+        pending: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+    ) -> Self {
+        Self {
+            request_id,
+            pending,
+        }
+    }
+}
+
+impl Drop for PendingRequestGuard {
+    fn drop(&mut self) {
+        let request_id = self.request_id.clone();
+        let pending = Arc::clone(&self.pending);
+        tauri::async_runtime::spawn(async move {
+            pending.lock().await.remove(&request_id);
+        });
+    }
+}
 
 #[derive(serde::Serialize, Clone)]
 /// 发往前端确认弹窗的操作摘要。
@@ -29,17 +58,18 @@ pub fn should_auto_confirm_writes() -> bool {
 
 /// 向前端发送确认事件，等待用户响应。
 /// `make_payload` 接收生成的 request_id，调用方负责将其嵌入 payload 结构体。
-/// 返回 Ok(true) = 用户确认，Ok(false) = 用户取消，Err = 超时或通道异常。
+/// 返回 Ok(true) = 用户确认，Err = 用户取消或通道异常。
 pub async fn request_confirmation<P: serde::Serialize + Clone>(
     app_handle: &AppHandle,
     pending_edits: &Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
     event: &str,
     make_payload: impl FnOnce(String) -> P,
-    timeout_secs: u64,
 ) -> anyhow::Result<bool> {
+    let _confirmation_gate = CONFIRMATION_GATE.lock().await;
     let request_id = uuid::Uuid::new_v4().to_string();
     let (tx, rx) = oneshot::channel::<bool>();
     pending_edits.lock().await.insert(request_id.clone(), tx);
+    let _pending_guard = PendingRequestGuard::new(request_id.clone(), Arc::clone(pending_edits));
 
     let payload = make_payload(request_id.clone());
     app_handle
@@ -48,23 +78,16 @@ pub async fn request_confirmation<P: serde::Serialize + Clone>(
             reason: format!("无法发起用户确认，操作已取消：{error}"),
         })?;
 
-    match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), rx).await {
-        Ok(Ok(true)) => Ok(true),
-        Ok(Ok(false)) => Err(ToolFailure::Denied {
+    match rx.await {
+        Ok(true) => Ok(true),
+        Ok(false) => Err(ToolFailure::Denied {
             reason: "用户取消了确认".to_string(),
         }
         .into()),
-        Ok(Err(_)) => Err(ToolFailure::Denied {
+        Err(_) => Err(ToolFailure::Denied {
             reason: "确认通道异常关闭，操作已取消".to_string(),
         }
         .into()),
-        Err(_) => {
-            pending_edits.lock().await.remove(&request_id);
-            Err(ToolFailure::Denied {
-                reason: "用户未在规定时间内响应，操作已自动取消".to_string(),
-            }
-            .into())
-        }
     }
 }
 
@@ -101,11 +124,35 @@ pub async fn request_write_confirmation(
             details: details.clone(),
             warning: warning.clone(),
         },
-        180,
     )
     .await
 }
 
 fn requires_manual_confirmation(operation: &str) -> bool {
     operation.starts_with("delete_") || operation.starts_with("remove_")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn abandoned_request_is_removed() {
+        let pending = Arc::new(Mutex::new(HashMap::new()));
+        let (tx, _rx) = oneshot::channel();
+        pending.lock().await.insert("request".to_string(), tx);
+
+        drop(PendingRequestGuard::new(
+            "request".to_string(),
+            Arc::clone(&pending),
+        ));
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while pending.lock().await.contains_key("request") {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("取消后的确认请求应被清理");
+    }
 }

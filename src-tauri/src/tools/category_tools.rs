@@ -139,7 +139,6 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                                 category_name: cat_name.clone(),
                                 mode: "move_to_parent".to_string(),
                             },
-                            180,
                         )
                         .await?;
 
@@ -201,7 +200,6 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                                 subcategory_count,
                                 step: 1,
                             },
-                            180,
                         )
                         .await?;
 
@@ -222,7 +220,6 @@ pub fn register_category_tools(registry: &mut ToolRegistry) -> Result<()> {
                                 subcategory_count,
                                 step: 2,
                             },
-                            180,
                         )
                         .await?;
 
