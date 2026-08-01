@@ -38,18 +38,17 @@
 }
 
 .eem-body {
-    overflow-y: auto;
+    display: flex;
+    overflow: hidden;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
     padding-bottom: var(--fc-space-md);
 }
 
 .eem-diff-toolbar-shell {
-    position: sticky;
-    top: 0;
-    z-index: 1;
+    flex: 0 0 auto;
     padding: var(--fc-space-sm) var(--fc-space-lg);
-    background: var(--fc-color-bg-elevated);
 }
 
 .eem-diff-toolbar {
@@ -60,8 +59,10 @@
     padding: var(--fc-space-sm) var(--fc-space-lg);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
-    background: var(--fc-color-bg-elevated);
+    background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
     box-shadow: var(--fc-shadow-sm);
+    backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
+    -webkit-backdrop-filter: var(--fc-effect-glass-blur, blur(var(--fc-space-xs)));
 }
 
 .eem-diff-summary,
@@ -111,6 +112,9 @@
 }
 
 .eem-diff {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
     margin: 0 var(--fc-space-lg);
     padding: var(--fc-space-xs);
     border: 1px solid var(--fc-color-border);

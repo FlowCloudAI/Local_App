@@ -112,16 +112,14 @@ function DiffView({before, after}: { before: string; after: string }) {
     const hasChanges = lines.some(l => l.type !== 'unchanged')
 
     useEffect(() => {
-        const scrollContainer = diffElement.current?.parentElement
+        const scrollContainer = diffElement.current
         if (!scrollContainer || presentation.hunkCount < 2) return
-        const toolbar = scrollContainer.querySelector<HTMLElement>('.eem-diff-toolbar')
         let frame = 0
 
         const syncActiveHunk = () => {
             cancelAnimationFrame(frame)
             frame = requestAnimationFrame(() => {
-                const anchorTop = toolbar?.getBoundingClientRect().bottom
-                    ?? scrollContainer.getBoundingClientRect().top
+                const anchorTop = scrollContainer.getBoundingClientRect().top
                 const hunkTops = hunkElements.current
                     .slice(0, presentation.hunkCount)
                     .map(element => element?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY)
