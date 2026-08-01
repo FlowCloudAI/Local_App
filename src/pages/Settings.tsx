@@ -21,7 +21,6 @@ import {listen} from '../api/events'
 import AboutSection from '../features/about/AboutSection'
 import ThemeColorPreview from './settings/ThemeColorPreview'
 import {
-    ai_close_all_sessions,
     ai_get_usage_by_model,
     ai_get_usage_daily,
     ai_get_usage_summary,
@@ -1256,14 +1255,6 @@ export default function Settings({
         }
     }, [activeTab, loadUsageStats])
 
-    const closeIdleAiSessions = useCallback(async () => {
-        try {
-            await ai_close_all_sessions()
-        } catch (error) {
-            logger.error('关闭 AI 会话失败:', error)
-        }
-    }, [])
-
     const getPluginsForType = useCallback((type: 'llm' | 'image' | 'tts') => {
         if (type === 'llm') return llmPlugins
         if (type === 'image') return imagePlugins
@@ -1325,10 +1316,6 @@ export default function Settings({
     useEffect(() => {
         loadData('mount').catch(logger.error)
     }, [loadData])
-
-    useEffect(() => {
-        closeIdleAiSessions().catch(logger.error)
-    }, [closeIdleAiSessions])
 
     // 后端异步初始化完成后重新加载（AiState 在 DB 就绪后才 manage）
     useEffect(() => {
