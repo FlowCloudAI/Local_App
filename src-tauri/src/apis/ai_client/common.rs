@@ -447,7 +447,9 @@ pub(super) fn active_message_path(
         .iter()
         .filter_map(|message| message.node_id.map(|node_id| (node_id, message)))
         .collect::<HashMap<_, _>>();
-    let mut current = head.or_else(|| messages.iter().rev().find_map(|message| message.node_id));
+    let mut current = head
+        .filter(|node_id| by_id.contains_key(node_id))
+        .or_else(|| messages.iter().rev().find_map(|message| message.node_id));
     let mut path = Vec::new();
     let mut visited = HashSet::new();
 
@@ -783,8 +785,7 @@ async fn save_session_snapshot(
     persistence: &SessionPersistence,
     outcome: Option<TurnSnapshotOutcome>,
 ) {
-    let nodes = persistence.handle.get_all_nodes().await;
-    let head = persistence.handle.head().await;
+    let (nodes, head) = persistence.handle.tree_snapshot().await;
     let ai_state = app.state::<AiState>();
     // owner 检查与写盘必须在同一临界区，避免检查后被新会话接管再迟到覆盖。
     let owners = ai_state.conversation_owners.lock().await;
@@ -1500,6 +1501,35 @@ pub(crate) fn spawn_session_event_loop<S>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn active_message_path_无效_head_退回最后一条消息() {
+        let messages: Vec<StoredMessage> = serde_json::from_value(serde_json::json!([
+            {
+                "node_id": 1,
+                "role": "user",
+                "content": "问题",
+                "timestamp": "2026-08-01T00:00:00Z"
+            },
+            {
+                "node_id": 2,
+                "parent": 1,
+                "role": "assistant",
+                "content": "回答",
+                "timestamp": "2026-08-01T00:00:01Z"
+            }
+        ]))
+        .unwrap();
+
+        let path = active_message_path(&messages, Some(999));
+
+        assert_eq!(
+            path.iter()
+                .filter_map(|message| message.node_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
+    }
 
     #[test]
     fn newer_session_keeps_conversation_ownership() {
