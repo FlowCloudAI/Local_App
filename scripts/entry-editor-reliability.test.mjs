@@ -9,6 +9,10 @@ import {ensureEntryDetailLoaded} from '../src/features/entries/lib/entryDetailLo
 import {resolveMarkdownPreviewSourceContent} from '../src/features/entries/lib/entryMarkdownPreviewState.ts'
 import {resolveSavedState, shouldAutoSave} from '../src/features/entries/lib/entrySaveState.ts'
 import {resolveEditableNumberTagValue} from '../src/features/entries/lib/entryTagInput.ts'
+import {
+    buildEntryContentDiffPresentation,
+    computeEntryContentDiff,
+} from '../src/features/entries/lib/entryContentDiff.ts'
 
 const history = new UndoRedoHistory('初始内容')
 history.setPending('刚输入的内容')
@@ -134,3 +138,21 @@ assert.equal(shouldAutoSave(true, true, true, true), true)
 assert.equal(resolveEditableNumberTagValue('87'), 87)
 assert.equal(resolveEditableNumberTagValue(''), null)
 assert.equal(resolveEditableNumberTagValue('-'), undefined)
+
+const contentDiff = computeEntryContentDiff(
+    '开头\n每日两次呼叫\n未修改甲\n未修改乙\n结尾',
+    '开头\n每日三次定时呼叫\n未修改甲\n未修改乙\n结尾',
+)
+const contentDiffPresentation = buildEntryContentDiffPresentation(contentDiff, false)
+assert.equal(contentDiffPresentation.hunkCount, 1)
+assert.equal(contentDiffPresentation.removedCount, 1)
+assert.equal(contentDiffPresentation.addedCount, 1)
+assert.equal(contentDiffPresentation.rows.some(row => row.kind === 'omitted'), true)
+const highlightedAddition = contentDiffPresentation.rows.find(
+    row => row.kind === 'line' && row.type === 'added',
+)
+assert.equal(
+    highlightedAddition?.kind === 'line'
+    && highlightedAddition.segments.some(segment => segment.changed && segment.text === '三次定时'),
+    true,
+)

@@ -1,9 +1,14 @@
 import {logger} from '../../../shared/logger'
-import {useEffect, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
 import {listen} from '../../../api/events'
 import {confirm_entry_edit, ENTRY_EDIT_REQUEST, type EntryEditRequestEvent,} from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
+import {
+    buildEntryContentDiffPresentation,
+    computeEntryContentDiff,
+    type EntryContentDiffDisplayLine,
+} from '../lib/entryContentDiff'
 import './EntryEditModal.css'
 
 export default function EntryEditModal() {
@@ -48,6 +53,7 @@ export default function EntryEditModal() {
             dismissible={!busy}
             title="AI 编辑请求"
             ariaLabel="AI 编辑请求"
+            closeLabel="不应用并关闭"
             className="eem-dialog"
         >
             {pending && (
@@ -57,7 +63,11 @@ export default function EntryEditModal() {
                 </div>
 
                 <div className="eem-body">
-                    <DiffView before={pending.before_content} after={pending.after_content}/>
+                    <DiffView
+                        key={pending.request_id}
+                        before={pending.before_content}
+                        after={pending.after_content}
+                    />
                 </div>
 
                 <div className="eem-footer">
@@ -88,114 +98,122 @@ export default function EntryEditModal() {
     )
 }
 
-// ── 简单行级 diff 展示 ────────────────────────────────────────────────────────
-
-interface DiffLine {
-    type: 'unchanged' | 'removed' | 'added'
-    text: string
-    lineNo?: number
-}
-
-function computeDiff(before: string, after: string): DiffLine[] {
-    const a = before === '' ? [] : before.split('\n')
-    const b = after === '' ? [] : after.split('\n')
-
-    // Myers diff (O(ND)) — 简化版 LCS
-    const m = a.length
-    const n = b.length
-    const max = m + n
-    const v: number[] = new Array(2 * max + 1).fill(0)
-    const trace: number[][] = []
-
-    outer: for (let d = 0; d <= max; d++) {
-        trace.push([...v])
-        for (let k = -d; k <= d; k += 2) {
-            const ki = k + max
-            let x: number
-            if (k === -d || (k !== d && v[ki - 1] < v[ki + 1])) {
-                x = v[ki + 1]
-            } else {
-                x = v[ki - 1] + 1
-            }
-            let y = x - k
-            while (x < m && y < n && a[x] === b[y]) {
-                x++;
-                y++
-            }
-            v[ki] = x
-            if (x >= m && y >= n) break outer
-        }
-    }
-
-    // 回溯
-    const ops: Array<[number, number, number, number]> = []
-    let x = m, y = n
-    for (let d = trace.length - 1; d >= 0; d--) {
-        const vd = trace[d]
-        const k = x - y
-        const ki = k + max
-        let prevK: number
-        if (k === -d || (k !== d && vd[ki - 1] < vd[ki + 1])) {
-            prevK = k + 1
-        } else {
-            prevK = k - 1
-        }
-        const prevX = vd[prevK + max]
-        const prevY = prevX - prevK
-        while (x > prevX && y > prevY) {
-            x--;
-            y--;
-            ops.unshift([0, x, y, 0])
-        }
-        if (d > 0) {
-            if (x === prevX) {
-                ops.unshift([1, prevX, prevY, 0]);
-                y--
-            } else {
-                ops.unshift([-1, prevX, prevY, 0]);
-                x--
-            }
-        }
-        x = prevX;
-        y = prevY
-    }
-
-    const result: DiffLine[] = []
-    let aIdx = 0, bIdx = 0
-    for (const [type] of ops) {
-        if (type === 0) {
-            result.push({type: 'unchanged', text: a[aIdx], lineNo: aIdx + 1})
-            aIdx++;
-            bIdx++
-        } else if (type === -1) {
-            result.push({type: 'removed', text: a[aIdx]})
-            aIdx++
-        } else {
-            result.push({type: 'added', text: b[bIdx]})
-            bIdx++
-        }
-    }
-    return result
-}
-
 function DiffView({before, after}: { before: string; after: string }) {
-    const lines = computeDiff(before, after)
+    const [expanded, setExpanded] = useState(false)
+    const [activeHunk, setActiveHunk] = useState(0)
+    const hunkElements = useRef<Array<HTMLDivElement | null>>([])
+    const lines = useMemo(() => computeEntryContentDiff(before, after), [after, before])
+    const presentation = useMemo(
+        () => buildEntryContentDiffPresentation(lines, expanded),
+        [expanded, lines],
+    )
     const hasChanges = lines.some(l => l.type !== 'unchanged')
 
     if (!hasChanges) {
         return <div className="eem-diff-empty">内容无变化</div>
     }
 
+    const jumpToHunk = (nextHunk: number) => {
+        const normalizedHunk = (nextHunk + presentation.hunkCount) % presentation.hunkCount
+        setActiveHunk(normalizedHunk)
+        hunkElements.current[normalizedHunk]?.scrollIntoView({behavior: 'smooth', block: 'center'})
+    }
+
     return (
-        <div className="eem-diff">
-            {lines.map((line, i) => (
-                <div key={i} className={`eem-diff-line eem-diff-${line.type}`}>
-                    <span className="eem-diff-marker">
-                        {line.type === 'removed' ? '−' : line.type === 'added' ? '+' : ' '}
-                    </span>
-                    <span className="eem-diff-text">{line.text}</span>
+        <>
+            <div className="eem-diff-toolbar">
+                <div className="eem-diff-summary">
+                    <strong>{presentation.hunkCount} 处变更</strong>
+                    <span className="eem-diff-summary-removed">删除 {presentation.removedCount} 行</span>
+                    <span className="eem-diff-summary-added">新增 {presentation.addedCount} 行</span>
                 </div>
-            ))}
+                <div className="eem-diff-actions">
+                    {presentation.hunkCount > 1 && (
+                        <>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => jumpToHunk(activeHunk - 1)}
+                            >
+                                上一处
+                            </Button>
+                            <span className="eem-diff-position">{activeHunk + 1}/{presentation.hunkCount}</span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => jumpToHunk(activeHunk + 1)}
+                            >
+                                下一处
+                            </Button>
+                        </>
+                    )}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpanded(current => !current)}
+                        aria-pressed={expanded}
+                    >
+                        {expanded ? '只看变更' : '展开全文'}
+                    </Button>
+                </div>
+            </div>
+            <div className="eem-diff" role="list" aria-label="正文修改差异">
+                {presentation.rows.map(row => row.kind === 'omitted' ? (
+                    <div key={`omitted-${row.sourceIndex}`} className="eem-diff-omitted">
+                        已收起 {row.count} 行未修改内容
+                    </div>
+                ) : (
+                    <DiffLine
+                        key={row.sourceIndex}
+                        line={row}
+                        hunkRef={element => {
+                            if (row.hunkStart && row.hunkIndex !== undefined) {
+                                hunkElements.current[row.hunkIndex] = element
+                            }
+                        }}
+                    />
+                ))}
+            </div>
+        </>
+    )
+}
+
+function DiffLine({
+                      line,
+                      hunkRef,
+                  }: {
+    line: EntryContentDiffDisplayLine
+    hunkRef: (element: HTMLDivElement | null) => void
+}) {
+    const changeLabel = line.type === 'removed'
+        ? `删除内容：${line.text}`
+        : line.type === 'added'
+            ? `新增内容：${line.text}`
+            : undefined
+
+    return (
+        <div
+            ref={hunkRef}
+            className={`eem-diff-line eem-diff-${line.type}`}
+            role="listitem"
+            aria-label={changeLabel}
+        >
+            <span className="eem-diff-marker" aria-hidden="true">
+                {line.type === 'removed' ? '−' : line.type === 'added' ? '+' : ' '}
+            </span>
+            <span className="eem-diff-text" aria-hidden={changeLabel ? 'true' : undefined}>
+                {line.segments.map((segment, index) => (
+                    <span
+                        key={index}
+                        className={segment.changed ? `eem-diff-inline-${line.type}` : undefined}
+                    >
+                        {segment.text}
+                    </span>
+                ))}
+            </span>
         </div>
     )
 }
