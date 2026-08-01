@@ -264,6 +264,13 @@ pub async fn ai_create_llm_session(
         session_id.clone(),
         run_id.clone(),
         calibration_key,
+        SessionPersistence {
+            conversation_id: resolved_conversation_id.clone(),
+            plugin_id: plugin_id.clone(),
+            model: resolved_model.clone(),
+            settings: conversation_settings,
+            handle: handle.clone(),
+        },
         event_stream,
     );
 
@@ -275,11 +282,9 @@ pub async fn ai_create_llm_session(
                 run_id: run_id.clone(),
                 input_tx,
                 handle,
-                conversation_id: resolved_conversation_id.clone(),
                 kind: AiSessionKind::General,
                 model: resolved_model.clone(),
                 plugin_id: plugin_id.clone(),
-                settings: conversation_settings,
             },
         );
         log::info!(

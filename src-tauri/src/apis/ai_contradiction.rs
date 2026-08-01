@@ -266,32 +266,32 @@ pub async fn ai_start_contradiction_session(
         .await
         .map_err(ApiError::internal)?;
 
+    let resolved_model = request
+        .model
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
     let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<ContradictionReport, String>>();
     spawn_contradiction_event_loop(
         app.clone(),
         request.session_id.clone(),
         run_id.clone(),
         calibration_key,
+        request.plugin_id.clone(),
+        resolved_model.clone(),
         event_stream,
         first_turn_tx,
         corpus.entry_blocks.clone(),
     );
 
-    let resolved_model = request
-        .model
-        .clone()
-        .unwrap_or_else(|| "default".to_string());
     ai_state.sessions.lock().await.insert(
         request.session_id.clone(),
         crate::SessionEntry {
             run_id: run_id.clone(),
             input_tx: input_tx.clone(),
             handle,
-            conversation_id: conversation_id.clone(),
             kind: AiSessionKind::Contradiction,
             model: resolved_model,
             plugin_id: request.plugin_id.clone(),
-            settings: None,
         },
     );
 
@@ -456,6 +456,8 @@ fn spawn_contradiction_event_loop<S>(
     session_id: String,
     run_id: String,
     calibration_key: String,
+    plugin_id: String,
+    model: String,
     event_stream: S,
     first_turn_tx: oneshot::Sender<Result<ContradictionReport, String>>,
     quote_sources: Vec<String>,
@@ -573,7 +575,7 @@ fn spawn_contradiction_event_loop<S>(
                     calibration_factor,
                 } => {
                     if let Some(ref u) = usage {
-                        save_api_usage(&app_clone, &sid, u).await;
+                        save_api_usage(&app_clone, &sid, &plugin_id, &model, u).await;
                     }
                     if let Some(factor) = calibration_factor {
                         save_token_calibration(&app_clone, &calibration_key, factor).await;

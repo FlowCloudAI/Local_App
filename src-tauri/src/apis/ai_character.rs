@@ -1,5 +1,5 @@
 use crate::apis::ai_client::{
-    CreateLlmSessionResult, build_llm_session_config, spawn_session_event_loop,
+    CreateLlmSessionResult, SessionPersistence, build_llm_session_config, spawn_session_event_loop,
 };
 use crate::apis::worldflow::common::open_project_db;
 use crate::senses::character_sense::{CharacterProjectSnapshot, CharacterSense};
@@ -429,27 +429,32 @@ pub async fn ai_create_character_session(
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
     let (event_stream, handle) = session.try_run(input_rx)?;
     let run_id = Uuid::new_v4().to_string();
+    let resolved_model = input.model.clone().unwrap_or_else(|| "default".to_string());
 
     spawn_session_event_loop(
         app,
         input.session_id.clone(),
         run_id.clone(),
         calibration_key,
+        SessionPersistence {
+            conversation_id: conversation_id.clone(),
+            plugin_id: input.plugin_id.clone(),
+            model: resolved_model.clone(),
+            settings: None,
+            handle: handle.clone(),
+        },
         event_stream,
     );
 
-    let resolved_model = input.model.clone().unwrap_or_else(|| "default".to_string());
     ai_state.sessions.lock().await.insert(
         input.session_id.clone(),
         crate::SessionEntry {
             run_id: run_id.clone(),
             input_tx,
             handle,
-            conversation_id: conversation_id.clone(),
             kind: AiSessionKind::Character,
             model: resolved_model,
             plugin_id: input.plugin_id.clone(),
-            settings: None,
         },
     );
 

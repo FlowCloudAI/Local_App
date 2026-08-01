@@ -8,7 +8,7 @@ pub(super) use crate::SettingsState;
 pub(super) use flowcloudai_client::llm::config::SessionConfig;
 pub(super) use flowcloudai_client::{
     AudioDecoder, AudioSource, ConversationNode, ConversationNodeSeed, DefaultOrchestrator,
-    ImageSession, PluginKind, SessionEvent, TaskContext, TurnStatus, Usage,
+    ImageSession, PluginKind, SessionEvent, SessionHandle, TaskContext, TurnStatus, Usage,
     image::ImageRequest,
     llm::types::{Message, ToolCall},
 };
@@ -239,6 +239,15 @@ impl StoredConversationSettings {
     pub fn is_default(value: &Self) -> bool {
         value == &Self::default()
     }
+}
+
+/// 事件循环收尾所需的会话数据，不依赖全局注册表中的条目生命周期。
+pub(crate) struct SessionPersistence {
+    pub(crate) conversation_id: String,
+    pub(crate) plugin_id: String,
+    pub(crate) model: String,
+    pub(crate) settings: Option<StoredConversationSettings>,
+    pub(crate) handle: SessionHandle,
 }
 
 /// App 侧对话文件结构，兼容旧 core v3 JSON。
@@ -751,36 +760,18 @@ fn chat_store_save_snapshot(
 async fn save_session_snapshot(
     app: &AppHandle,
     session_id: &str,
+    persistence: &SessionPersistence,
     outcome: Option<TurnSnapshotOutcome>,
 ) {
-    let snapshot_target = {
-        let ai_state = app.state::<AiState>();
-        let sessions = ai_state.sessions.lock().await;
-        sessions.get(session_id).map(|entry| {
-            (
-                entry.conversation_id.clone(),
-                entry.plugin_id.clone(),
-                entry.model.clone(),
-                entry.settings.clone(),
-                entry.handle.clone(),
-            )
-        })
-    };
-
-    let Some((conversation_id, plugin_id, model, settings, handle)) = snapshot_target else {
-        log::warn!("[chat_store] session '{}' 不存在，跳过快照保存", session_id);
-        return;
-    };
-
-    let nodes = handle.get_all_nodes().await;
-    let head = handle.head().await;
+    let nodes = persistence.handle.get_all_nodes().await;
+    let head = persistence.handle.head().await;
     let paths = app.state::<PathsState>();
     match chat_store_save_snapshot(
         paths.inner(),
-        &conversation_id,
-        &plugin_id,
-        &model,
-        settings,
+        &persistence.conversation_id,
+        &persistence.plugin_id,
+        &persistence.model,
+        persistence.settings.clone(),
         nodes,
         head,
         outcome,
@@ -788,12 +779,12 @@ async fn save_session_snapshot(
         Ok(()) => log::info!(
             "[chat_store] 已保存会话快照: session_id={} conversation_id={}",
             session_id,
-            conversation_id
+            persistence.conversation_id
         ),
         Err(error) => log::error!(
             "[chat_store] 保存会话快照失败: session_id={} conversation_id={} error={}",
             session_id,
-            conversation_id,
+            persistence.conversation_id,
             error
         ),
     }
@@ -843,20 +834,13 @@ pub(crate) async fn cleanup_session_state(app: &AppHandle, session_id: &str, run
     }
 }
 
-pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Usage) {
-    let model;
-    let plugin_id;
-    {
-        let ai_state = app.state::<AiState>();
-        let sessions = ai_state.sessions.lock().await;
-        let Some(entry) = sessions.get(session_id) else {
-            log::warn!("[usage] session '{}' not found, skipping save", session_id);
-            return;
-        };
-        model = entry.model.clone();
-        plugin_id = entry.plugin_id.clone();
-    }
-
+pub(crate) async fn save_api_usage(
+    app: &AppHandle,
+    session_id: &str,
+    plugin_id: &str,
+    model: &str,
+    usage: &Usage,
+) {
     let ai_state = app.state::<AiState>();
     let manifest_model = {
         let client = ai_state.client.lock().await;
@@ -864,14 +848,14 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
             .list_plugins()
             .into_iter()
             .find(|plugin| plugin.id == plugin_id)
-            .and_then(|plugin| plugin.model_info(&model).cloned())
+            .and_then(|plugin| plugin.model_info(model).cloned())
     };
     let defaults = {
         let settings_state = app.state::<SettingsState>();
         settings_state.settings.lock().await.llm.clone()
     };
     let (prompt_price_per_m, completion_price_per_m, currency) =
-        resolve_usage_price(&defaults, &plugin_id, &model, manifest_model.as_ref());
+        resolve_usage_price(&defaults, plugin_id, model, manifest_model.as_ref());
 
     log::info!(
         "[usage] saving: session={} model={} plugin={} prompt={} completion={} total={}",
@@ -888,8 +872,8 @@ pub(crate) async fn save_api_usage(app: &AppHandle, session_id: &str, usage: &Us
     let input = worldflow_core::models::CreateApiUsageLog {
         id: Uuid::new_v4().to_string(),
         session_id: session_id.to_string(),
-        model,
-        provider: plugin_id,
+        model: model.to_string(),
+        provider: plugin_id.to_string(),
         modality: "llm".to_string(),
         prompt_tokens: usage.prompt_tokens,
         completion_tokens: usage.completion_tokens,
@@ -1134,6 +1118,7 @@ pub(crate) fn spawn_session_event_loop<S>(
     session_id: String,
     run_id: String,
     calibration_key: String,
+    persistence: SessionPersistence,
     event_stream: S,
 ) where
     S: futures::Stream<Item = SessionEvent> + Send + 'static,
@@ -1181,7 +1166,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                         );
                     }
                     // 用户节点已经进入消息树；此时先落盘，避免回复失败或应用退出时丢失首条消息。
-                    save_session_snapshot(&app_clone, &sid, None).await;
+                    save_session_snapshot(&app_clone, &sid, &persistence, None).await;
                     app_clone
                         .emit(
                             "ai:turn_begin",
@@ -1395,9 +1380,16 @@ pub(crate) fn spawn_session_event_loop<S>(
                         finish_reason: finish_reason.clone(),
                         continuation_of,
                     });
-                    save_session_snapshot(&app_clone, &sid, snapshot_outcome).await;
+                    save_session_snapshot(&app_clone, &sid, &persistence, snapshot_outcome).await;
                     if let Some(ref u) = usage {
-                        save_api_usage(&app_clone, &sid, u).await;
+                        save_api_usage(
+                            &app_clone,
+                            &sid,
+                            &persistence.plugin_id,
+                            &persistence.model,
+                            u,
+                        )
+                        .await;
                     }
                     if let Some(factor) = calibration_factor {
                         save_token_calibration(&app_clone, &calibration_key, factor).await;
@@ -1423,7 +1415,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                 SessionEvent::Error(e) => {
                     log::error!("[ai:error] session_id={} run_id={} error={}", sid, rid, e);
                     // 部分供应商会在 TurnBegin 后直接报错，保留已进入消息树的用户内容。
-                    save_session_snapshot(&app_clone, &sid, None).await;
+                    save_session_snapshot(&app_clone, &sid, &persistence, None).await;
                     app_clone
                         .emit(
                             "ai:error",
@@ -1438,7 +1430,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                 }
                 SessionEvent::BranchChanged { node_id } => {
                     log::info!("[ai:branch_changed] run_id={} node_id={}", rid, node_id);
-                    save_session_snapshot(&app_clone, &sid, None).await;
+                    save_session_snapshot(&app_clone, &sid, &persistence, None).await;
                     app_clone
                         .emit(
                             "ai:branch_changed",

@@ -3,7 +3,6 @@
 //! 本文件只定义启动时注入的状态容器；API 和工具从中取得数据库、客户端、路径和确认通道，
 //! 因此各状态的初始化顺序由 `lib` 中的启动流程保证。
 
-use crate::apis::ai_client::StoredConversationSettings;
 use crate::reports::contradiction_report::ContradictionReport;
 use crate::reports::world_check_report::WorldCheckReport;
 use crate::settings::SearchSourceSettings;
@@ -179,12 +178,10 @@ pub(crate) struct SessionEntry {
     pub(crate) run_id: String,
     pub(crate) input_tx: mpsc::Sender<String>,
     pub(crate) handle: SessionHandle,
-    pub(crate) conversation_id: String,
     #[allow(dead_code)]
     pub(crate) kind: AiSessionKind,
     pub(crate) model: String,
     pub(crate) plugin_id: String,
-    pub(crate) settings: Option<StoredConversationSettings>,
 }
 
 /// AI 客户端全局状态（插件注册中心 + 活跃 LLM 会话）
