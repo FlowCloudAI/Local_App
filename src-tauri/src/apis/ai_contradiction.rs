@@ -684,6 +684,6 @@ fn spawn_contradiction_event_loop<S>(
             let _ = sender.send(Err("矛盾检测会话提前结束".to_string()));
         }
 
-        cleanup_session_state(&app_clone, &sid, &rid).await;
+        cleanup_session_state(&app_clone, &sid, &rid, None).await;
     });
 }

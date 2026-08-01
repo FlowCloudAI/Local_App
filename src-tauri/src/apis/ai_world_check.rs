@@ -801,6 +801,6 @@ fn spawn_world_check_event_loop<S>(
             let _ = sender.send(Err("检测会话提前结束".to_string()));
         }
 
-        cleanup_session_state(&app_clone, &sid, &rid).await;
+        cleanup_session_state(&app_clone, &sid, &rid, None).await;
     });
 }

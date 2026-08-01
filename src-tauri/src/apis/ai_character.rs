@@ -431,20 +431,13 @@ pub async fn ai_create_character_session(
     let run_id = Uuid::new_v4().to_string();
     let resolved_model = input.model.clone().unwrap_or_else(|| "default".to_string());
 
-    spawn_session_event_loop(
-        app,
-        input.session_id.clone(),
-        run_id.clone(),
-        calibration_key,
-        SessionPersistence {
-            conversation_id: conversation_id.clone(),
-            plugin_id: input.plugin_id.clone(),
-            model: resolved_model.clone(),
-            settings: None,
-            handle: handle.clone(),
-        },
-        event_stream,
-    );
+    let persistence = SessionPersistence {
+        conversation_id: conversation_id.clone(),
+        plugin_id: input.plugin_id.clone(),
+        model: resolved_model.clone(),
+        settings: None,
+        handle: handle.clone(),
+    };
 
     ai_state.sessions.lock().await.insert(
         input.session_id.clone(),
@@ -456,6 +449,19 @@ pub async fn ai_create_character_session(
             model: resolved_model,
             plugin_id: input.plugin_id.clone(),
         },
+    );
+    ai_state
+        .conversation_owners
+        .lock()
+        .await
+        .insert(conversation_id.clone(), input.session_id.clone());
+    spawn_session_event_loop(
+        app,
+        input.session_id.clone(),
+        run_id.clone(),
+        calibration_key,
+        persistence,
+        event_stream,
     );
 
     Ok(CreateLlmSessionResult {

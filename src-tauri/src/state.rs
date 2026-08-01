@@ -188,6 +188,7 @@ pub(crate) struct SessionEntry {
 pub struct AiState {
     pub client: Mutex<FlowCloudAIClient>,
     pub(crate) sessions: Mutex<HashMap<String, SessionEntry>>,
+    pub(crate) conversation_owners: Mutex<HashMap<String, String>>,
     pub(crate) contradiction_bindings: Mutex<HashMap<String, ContradictionSessionBinding>>,
     pub(crate) world_check_bindings: Mutex<HashMap<String, WorldCheckSessionBinding>>,
     pub(crate) contradiction_reports_dir: PathBuf,
@@ -233,6 +234,7 @@ impl AiState {
         Ok(Self {
             client: Mutex::new(client),
             sessions: Mutex::new(HashMap::new()),
+            conversation_owners: Mutex::new(HashMap::new()),
             contradiction_bindings: Mutex::new(HashMap::new()),
             world_check_bindings: Mutex::new(HashMap::new()),
             contradiction_reports_dir,

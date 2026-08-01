@@ -757,6 +757,26 @@ fn chat_store_save_snapshot(
     chat_store_save_conversation(paths, &conversation)
 }
 
+fn conversation_is_owned_by(
+    owners: &HashMap<String, String>,
+    conversation_id: &str,
+    session_id: &str,
+) -> bool {
+    owners
+        .get(conversation_id)
+        .is_some_and(|owner| owner == session_id)
+}
+
+fn release_conversation_owner(
+    owners: &mut HashMap<String, String>,
+    conversation_id: &str,
+    session_id: &str,
+) {
+    if conversation_is_owned_by(owners, conversation_id, session_id) {
+        owners.remove(conversation_id);
+    }
+}
+
 async fn save_session_snapshot(
     app: &AppHandle,
     session_id: &str,
@@ -765,6 +785,18 @@ async fn save_session_snapshot(
 ) {
     let nodes = persistence.handle.get_all_nodes().await;
     let head = persistence.handle.head().await;
+    let ai_state = app.state::<AiState>();
+    // owner 检查与写盘必须在同一临界区，避免检查后被新会话接管再迟到覆盖。
+    let owners = ai_state.conversation_owners.lock().await;
+    if !conversation_is_owned_by(&owners, &persistence.conversation_id, session_id) {
+        log::info!(
+            "[chat_store] 跳过过期会话快照: session_id={} conversation_id={} current_owner={:?}",
+            session_id,
+            persistence.conversation_id,
+            owners.get(&persistence.conversation_id)
+        );
+        return;
+    }
     let paths = app.state::<PathsState>();
     match chat_store_save_snapshot(
         paths.inner(),
@@ -788,6 +820,7 @@ async fn save_session_snapshot(
             error
         ),
     }
+    drop(owners);
 }
 
 #[derive(Serialize, Clone)]
@@ -813,7 +846,12 @@ pub(crate) fn turn_status_error(s: &TurnStatus) -> Option<ApiError> {
     }
 }
 
-pub(crate) async fn cleanup_session_state(app: &AppHandle, session_id: &str, run_id: &str) {
+pub(crate) async fn cleanup_session_state(
+    app: &AppHandle,
+    session_id: &str,
+    run_id: &str,
+    conversation_id: Option<&str>,
+) {
     let state = app.state::<AiState>();
     let mut sessions = state.sessions.lock().await;
     let current_entry_run_id = sessions.get(session_id).map(|entry| entry.run_id.clone());
@@ -832,6 +870,10 @@ pub(crate) async fn cleanup_session_state(app: &AppHandle, session_id: &str, run
         drop(sessions);
         state.contradiction_bindings.lock().await.remove(session_id);
         state.world_check_bindings.lock().await.remove(session_id);
+        if let Some(conversation_id) = conversation_id {
+            let mut owners = state.conversation_owners.lock().await;
+            release_conversation_owner(&mut owners, conversation_id, session_id);
+        }
     }
 }
 
@@ -1451,13 +1493,39 @@ pub(crate) fn spawn_session_event_loop<S>(
             sid,
             rid
         );
-        cleanup_session_state(&app_clone, &sid, &rid).await;
+        cleanup_session_state(&app_clone, &sid, &rid, Some(&persistence.conversation_id)).await;
     });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn newer_session_keeps_conversation_ownership() {
+        let mut owners = HashMap::from([("conversation".to_string(), "session-1".to_string())]);
+        assert!(conversation_is_owned_by(
+            &owners,
+            "conversation",
+            "session-1"
+        ));
+
+        owners.insert("conversation".to_string(), "session-2".to_string());
+        assert!(!conversation_is_owned_by(
+            &owners,
+            "conversation",
+            "session-1"
+        ));
+        release_conversation_owner(&mut owners, "conversation", "session-1");
+        assert!(conversation_is_owned_by(
+            &owners,
+            "conversation",
+            "session-2"
+        ));
+
+        release_conversation_owner(&mut owners, "conversation", "session-2");
+        assert!(!owners.contains_key("conversation"));
+    }
 
     #[test]
     fn usage_price_override_wins_and_is_normalized() {

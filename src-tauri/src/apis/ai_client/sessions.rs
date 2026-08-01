@@ -259,20 +259,13 @@ pub async fn ai_create_llm_session(
         resolved_model
     );
 
-    spawn_session_event_loop(
-        app,
-        session_id.clone(),
-        run_id.clone(),
-        calibration_key,
-        SessionPersistence {
-            conversation_id: resolved_conversation_id.clone(),
-            plugin_id: plugin_id.clone(),
-            model: resolved_model.clone(),
-            settings: conversation_settings,
-            handle: handle.clone(),
-        },
-        event_stream,
-    );
+    let persistence = SessionPersistence {
+        conversation_id: resolved_conversation_id.clone(),
+        plugin_id: plugin_id.clone(),
+        model: resolved_model.clone(),
+        settings: conversation_settings,
+        handle: handle.clone(),
+    };
 
     {
         let mut sessions = ai_state.sessions.lock().await;
@@ -295,6 +288,19 @@ pub async fn ai_create_llm_session(
             sessions.len()
         );
     }
+    ai_state
+        .conversation_owners
+        .lock()
+        .await
+        .insert(resolved_conversation_id.clone(), session_id.clone());
+    spawn_session_event_loop(
+        app,
+        session_id.clone(),
+        run_id.clone(),
+        calibration_key,
+        persistence,
+        event_stream,
+    );
 
     Ok(CreateLlmSessionResult {
         session_id,
