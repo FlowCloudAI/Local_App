@@ -12,6 +12,7 @@ import {resolveEditableNumberTagValue} from '../src/features/entries/lib/entryTa
 import {
     buildEntryContentDiffPresentation,
     computeEntryContentDiff,
+    resolveActiveEntryContentDiffHunk,
 } from '../src/features/entries/lib/entryContentDiff.ts'
 
 const history = new UndoRedoHistory('初始内容')
@@ -156,3 +157,5 @@ assert.equal(
     && highlightedAddition.segments.some(segment => segment.changed && segment.text === '三次定时'),
     true,
 )
+assert.equal(resolveActiveEntryContentDiffHunk([120, 480, 860], 100), 0)
+assert.equal(resolveActiveEntryContentDiffHunk([120, 480, 860], 500), 1)

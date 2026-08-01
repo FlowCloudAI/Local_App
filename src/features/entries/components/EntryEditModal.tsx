@@ -8,6 +8,7 @@ import {
     buildEntryContentDiffPresentation,
     computeEntryContentDiff,
     type EntryContentDiffDisplayLine,
+    resolveActiveEntryContentDiffHunk,
 } from '../lib/entryContentDiff'
 import './EntryEditModal.css'
 
@@ -102,12 +103,42 @@ function DiffView({before, after}: { before: string; after: string }) {
     const [expanded, setExpanded] = useState(false)
     const [activeHunk, setActiveHunk] = useState(0)
     const hunkElements = useRef<Array<HTMLDivElement | null>>([])
+    const diffElement = useRef<HTMLDivElement | null>(null)
     const lines = useMemo(() => computeEntryContentDiff(before, after), [after, before])
     const presentation = useMemo(
         () => buildEntryContentDiffPresentation(lines, expanded),
         [expanded, lines],
     )
     const hasChanges = lines.some(l => l.type !== 'unchanged')
+
+    useEffect(() => {
+        const scrollContainer = diffElement.current?.parentElement
+        if (!scrollContainer || presentation.hunkCount < 2) return
+        const toolbar = scrollContainer.querySelector<HTMLElement>('.eem-diff-toolbar')
+        let frame = 0
+
+        const syncActiveHunk = () => {
+            cancelAnimationFrame(frame)
+            frame = requestAnimationFrame(() => {
+                const anchorTop = toolbar?.getBoundingClientRect().bottom
+                    ?? scrollContainer.getBoundingClientRect().top
+                const hunkTops = hunkElements.current
+                    .slice(0, presentation.hunkCount)
+                    .map(element => element?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY)
+                setActiveHunk(current => {
+                    const next = resolveActiveEntryContentDiffHunk(hunkTops, anchorTop)
+                    return current === next ? current : next
+                })
+            })
+        }
+
+        syncActiveHunk()
+        scrollContainer.addEventListener('scroll', syncActiveHunk, {passive: true})
+        return () => {
+            cancelAnimationFrame(frame)
+            scrollContainer.removeEventListener('scroll', syncActiveHunk)
+        }
+    }, [expanded, presentation.hunkCount])
 
     if (!hasChanges) {
         return <div className="eem-diff-empty">内容无变化</div>
@@ -160,7 +191,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                     </Button>
                 </div>
             </div>
-            <div className="eem-diff" role="list" aria-label="正文修改差异">
+            <div ref={diffElement} className="eem-diff" role="list" aria-label="正文修改差异">
                 {presentation.rows.map(row => row.kind === 'omitted' ? (
                     <div key={`omitted-${row.sourceIndex}`} className="eem-diff-omitted">
                         已收起 {row.count} 行未修改内容

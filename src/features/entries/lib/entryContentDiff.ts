@@ -182,6 +182,15 @@ export function buildEntryContentDiffPresentation(
     }
 }
 
+export function resolveActiveEntryContentDiffHunk(hunkTops: number[], anchorTop: number): number {
+    let activeHunk = 0
+    for (let index = 0; index < hunkTops.length; index++) {
+        if (hunkTops[index] > anchorTop) break
+        activeHunk = index
+    }
+    return activeHunk
+}
+
 function splitChangedMiddle(before: string, after: string): {
     before: EntryContentDiffSegment[]
     after: EntryContentDiffSegment[]
