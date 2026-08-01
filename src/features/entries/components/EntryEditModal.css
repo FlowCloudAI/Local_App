@@ -22,8 +22,10 @@
 }
 
 .eem-entry-name {
-    padding: 0 var(--fc-space-lg) var(--fc-space-sm);
+    flex: 0 0 auto;
+    padding: var(--fc-space-xs) var(--fc-space-lg) var(--fc-space-sm);
     font-size: var(--fc-font-size-sm);
+    line-height: var(--fc-line-height-normal);
     color: var(--fc-color-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -38,18 +40,23 @@
 .eem-body {
     overflow-y: auto;
     flex: 1;
-    padding: var(--fc-space-sm) 0 var(--fc-space-md);
+    min-height: 0;
+    padding-bottom: var(--fc-space-md);
+}
+
+.eem-diff-toolbar-shell {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: var(--fc-space-sm) var(--fc-space-lg);
+    background: var(--fc-color-bg-elevated);
 }
 
 .eem-diff-toolbar {
-    position: sticky;
-    top: var(--fc-space-sm);
-    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--fc-space-md);
-    margin: 0 var(--fc-space-lg);
     padding: var(--fc-space-sm) var(--fc-space-lg);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
@@ -104,7 +111,7 @@
 }
 
 .eem-diff {
-    margin: var(--fc-space-sm) var(--fc-space-lg) 0;
+    margin: 0 var(--fc-space-lg);
     padding: var(--fc-space-xs);
     border: 1px solid var(--fc-color-border);
     border-radius: var(--fc-radius-lg);
@@ -242,10 +249,13 @@
 }
 
 @media (max-width: 720px) {
+    .eem-diff-toolbar-shell {
+        padding-inline: var(--fc-space-sm);
+    }
+
     .eem-diff-toolbar {
         align-items: flex-start;
         flex-direction: column;
-        margin-inline: var(--fc-space-sm);
     }
 
     .eem-diff-actions {

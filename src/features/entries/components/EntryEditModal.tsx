@@ -152,43 +152,45 @@ function DiffView({before, after}: { before: string; after: string }) {
 
     return (
         <>
-            <div className="eem-diff-toolbar">
-                <div className="eem-diff-summary">
-                    <strong>{presentation.hunkCount} 处变更</strong>
-                    <span className="eem-diff-summary-removed">删除 {presentation.removedCount} 行</span>
-                    <span className="eem-diff-summary-added">新增 {presentation.addedCount} 行</span>
-                </div>
-                <div className="eem-diff-actions">
-                    {presentation.hunkCount > 1 && (
-                        <>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => jumpToHunk(activeHunk - 1)}
-                            >
-                                上一处
-                            </Button>
-                            <span className="eem-diff-position">{activeHunk + 1}/{presentation.hunkCount}</span>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => jumpToHunk(activeHunk + 1)}
-                            >
-                                下一处
-                            </Button>
-                        </>
-                    )}
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setExpanded(current => !current)}
-                        aria-pressed={expanded}
-                    >
-                        {expanded ? '只看变更' : '展开全文'}
-                    </Button>
+            <div className="eem-diff-toolbar-shell">
+                <div className="eem-diff-toolbar">
+                    <div className="eem-diff-summary">
+                        <strong>{presentation.hunkCount} 处变更</strong>
+                        <span className="eem-diff-summary-removed">删除 {presentation.removedCount} 行</span>
+                        <span className="eem-diff-summary-added">新增 {presentation.addedCount} 行</span>
+                    </div>
+                    <div className="eem-diff-actions">
+                        {presentation.hunkCount > 1 && (
+                            <>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => jumpToHunk(activeHunk - 1)}
+                                >
+                                    上一处
+                                </Button>
+                                <span className="eem-diff-position">{activeHunk + 1}/{presentation.hunkCount}</span>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => jumpToHunk(activeHunk + 1)}
+                                >
+                                    下一处
+                                </Button>
+                            </>
+                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setExpanded(current => !current)}
+                            aria-pressed={expanded}
+                        >
+                            {expanded ? '只看变更' : '展开全文'}
+                        </Button>
+                    </div>
                 </div>
             </div>
             <div ref={diffElement} className="eem-diff" role="list" aria-label="正文修改差异">
