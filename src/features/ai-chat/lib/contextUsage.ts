@@ -43,7 +43,12 @@ export function resolveTokenCalibrationFactor(
     return normalizeCalibrationFactor(key ? factors?.[key] : null)
 }
 
-export function estimateMessagesTokens(messages: EstimatableMessage[], factor = 1): Promise<number> {
+export function estimateMessagesTokens(
+    messages: EstimatableMessage[],
+    factor = 1,
+    pluginId?: string | null,
+    model?: string | null,
+): Promise<number> {
     return ai_estimate_tokens({
         messages: messages.map(message => ({
             content: message.content || null,
@@ -51,6 +56,8 @@ export function estimateMessagesTokens(messages: EstimatableMessage[], factor = 
             tool_payloads: serializeToolBlocks(message.blocks),
         })),
         calibration_factor: normalizeCalibrationFactor(factor),
+        plugin_id: pluginId || null,
+        model: model || null,
     })
 }
 

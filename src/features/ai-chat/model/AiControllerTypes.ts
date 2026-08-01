@@ -169,6 +169,7 @@ export interface AiContextValue {
     sendMessage: (content: string) => Promise<void>
     stopStreaming: () => void
     regenerateMessage: (messageId: string) => Promise<void>
+    compactAndRetryMessage: (messageId: string) => Promise<void>
     continueMessage: (messageId: string) => Promise<void>
     editMessage: (messageId: string) => void
 

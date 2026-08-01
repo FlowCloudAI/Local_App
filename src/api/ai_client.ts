@@ -198,6 +198,7 @@ export interface AiEventContextTrimmed {
   before: number
   after: number
   suggest_compaction: boolean
+  estimate_source: 'baseline' | 'full'
 }
 
 export interface AiUsage {
@@ -740,6 +741,8 @@ export interface AiTokenEstimateMessage {
 export interface AiTokenEstimateRequest {
     messages: AiTokenEstimateMessage[]
     calibration_factor: number | null
+    plugin_id?: string | null
+    model?: string | null
 }
 
 export const ai_estimate_tokens = (request: AiTokenEstimateRequest) =>

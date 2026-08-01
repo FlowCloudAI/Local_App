@@ -108,6 +108,7 @@ pub(crate) struct EventContextTrimmed {
     pub(crate) before: u64,
     pub(crate) after: u64,
     pub(crate) suggest_compaction: bool,
+    pub(crate) estimate_source: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -1340,16 +1341,18 @@ pub(crate) fn spawn_session_event_loop<S>(
                     before,
                     after,
                     suggest_compaction,
+                    estimate_source,
                 } => {
                     log::warn!(
-                        "[ai:context_trimmed] session_id={} run_id={} dropped_rounds={} truncated_messages={} before={} after={} suggest_compaction={}",
+                        "[ai:context_trimmed] session_id={} run_id={} dropped_rounds={} truncated_messages={} before={} after={} suggest_compaction={} estimate_source={}",
                         sid,
                         rid,
                         dropped_rounds,
                         truncated_messages,
                         before,
                         after,
-                        suggest_compaction
+                        suggest_compaction,
+                        estimate_source
                     );
                     app_clone
                         .emit(
@@ -1362,6 +1365,7 @@ pub(crate) fn spawn_session_event_loop<S>(
                                 before,
                                 after,
                                 suggest_compaction,
+                                estimate_source,
                             },
                         )
                         .ok();

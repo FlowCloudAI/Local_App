@@ -15,6 +15,7 @@ import {
     type DocumentContextItem,
     type PluginInfo,
     type ConversationExportFormat,
+    ErrorCode,
     formatApiError,
     setting_get_settings,
     setting_has_api_key,
@@ -711,7 +712,12 @@ export default function AIChatContent({
 
         let active = true
         const timer = window.setTimeout(() => {
-            void estimateMessagesTokens(estimatedMessages, calibrationFactor)
+            void estimateMessagesTokens(
+                estimatedMessages,
+                calibrationFactor,
+                contextPluginInfo?.id,
+                contextModelId,
+            )
                 .then(tokens => {
                     if (active) setEstimatedContextTokens(tokens)
                 })
@@ -723,7 +729,14 @@ export default function AIChatContent({
             active = false
             window.clearTimeout(timer)
         }
-    }, [activeConversation?.settings.systemPrompt, calibrationFactor, ctx.inputValue, ctx.messages])
+    }, [
+        activeConversation?.settings.systemPrompt,
+        calibrationFactor,
+        contextModelId,
+        contextPluginInfo?.id,
+        ctx.inputValue,
+        ctx.messages,
+    ])
     const contextUsage = useMemo(() => {
         const usageTokens = latestUsage?.total_tokens ?? 0
         const usedTokens = Math.max(usageTokens, estimatedContextTokens)
@@ -1998,12 +2011,16 @@ export default function AIChatContent({
                                         {message.error ? (
                                             <AiChatErrorNotice
                                                 error={message.error}
-                                                onRetry={canContinue
+                                                onRetry={message.error.code === ErrorCode.ContextBudgetExceeded
+                                                    ? () => void ctx.compactAndRetryMessage(message.id)
+                                                    : canContinue
                                                     ? () => void ctx.continueMessage(message.id)
                                                     : canRetry
                                                         ? () => void ctx.regenerateMessage(message.id)
                                                         : undefined}
-                                                retryLabel={canContinue ? '继续' : '重试'}
+                                                retryLabel={message.error.code === ErrorCode.ContextBudgetExceeded
+                                                    ? '立即压缩并重试'
+                                                    : canContinue ? '继续' : '重试'}
                                                 onOpenSettings={onOpenPluginManagement
                                                     ? () => onOpenPluginManagement('llm')
                                                     : undefined}

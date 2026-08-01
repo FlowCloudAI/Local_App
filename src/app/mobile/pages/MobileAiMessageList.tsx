@@ -3,6 +3,7 @@ import {Button, MessageBox} from 'flowcloudai-ui'
 import {type AiContextValue} from '../../../features/ai-chat/model/AiControllerTypes'
 import AiChatErrorNotice from '../../../features/ai-chat/components/AiChatErrorNotice'
 import {isIncompleteMessage} from '../../../features/ai-chat/model/conversationState'
+import {ErrorCode} from '../../../api'
 
 interface MobileAiMessageListProps {
     messages: AiContextValue['messages']
@@ -18,6 +19,7 @@ interface MobileAiMessageListProps {
     onNewConversation: () => void
     onOpenSettings: () => void
     onRetryMessage: (messageId: string) => void
+    onCompactRetryMessage: (messageId: string) => void
     onContinueMessage: (messageId: string) => void
 }
 
@@ -35,6 +37,7 @@ export default function MobileAiMessageList({
     onNewConversation,
     onOpenSettings,
     onRetryMessage,
+    onCompactRetryMessage,
     onContinueMessage,
 }: MobileAiMessageListProps) {
     return (
@@ -114,12 +117,16 @@ export default function MobileAiMessageList({
                         <AiChatErrorNotice
                             compact
                             error={message.error}
-                            onRetry={canContinue
+                            onRetry={message.error.code === ErrorCode.ContextBudgetExceeded
+                                ? () => onCompactRetryMessage(message.id)
+                                : canContinue
                                 ? () => onContinueMessage(message.id)
                                 : canRetry
                                     ? () => onRetryMessage(message.id)
                                     : undefined}
-                            retryLabel={canContinue ? '继续' : '重试'}
+                            retryLabel={message.error.code === ErrorCode.ContextBudgetExceeded
+                                ? '立即压缩并重试'
+                                : canContinue ? '继续' : '重试'}
                             onOpenSettings={onOpenSettings}
                         />
                     </div>

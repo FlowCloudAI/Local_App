@@ -477,7 +477,7 @@ const resolveDocumentContextCharBudget = (
             ? [{content: conversation.settings.systemPrompt}]
             : []),
     ]
-    return estimateMessagesTokens(virtualMessages, calibrationFactor)
+    return estimateMessagesTokens(virtualMessages, calibrationFactor, pluginId, modelId)
         .then(usedTokens => {
             const reservedReplyTokens = Math.max(2_000, Math.floor(contextWindowTokens * 0.2))
             const availableTokens = contextWindowTokens - usedTokens - reservedReplyTokens
@@ -878,46 +878,60 @@ export function useAiController(focus: AiFocus): AiContextValue {
         conversation: Conversation,
         messages: Message[],
         pendingContent: string,
+        force = false,
     ): Promise<boolean> => {
         const settings = await setting_get_settings().catch(() => appSettingsRef.current)
         if (settings) appSettingsRef.current = settings
         const compactSettings = settings?.llm
-        if (!compactSettings?.auto_compact_enabled || conversation.mode !== 'default') return false
+        if (
+            !compactSettings
+            || conversation.mode !== 'default'
+            || (!force && !compactSettings.auto_compact_enabled)
+        ) return false
 
         const headMessage = [...messages]
             .reverse()
-            .find((item) => item.role === 'assistant' && item.nodeId != null)
+            .find((item) => item.nodeId != null && (force || item.role === 'assistant'))
         if (!headMessage?.nodeId) return false
 
         const plugin = getAiPluginSnapshot().plugins.find((item) => item.id === conversation.pluginId)
         const modelInfo = plugin?.model_infos.find((item) => item.id === conversation.model)
         const contextWindowTokens = modelInfo?.context_window_tokens ?? null
-        if (!contextWindowTokens || contextWindowTokens <= 0) return false
+        if (!force && (!contextWindowTokens || contextWindowTokens <= 0)) return false
 
         const calibrationFactor = headMessage.calibrationFactor ?? resolveTokenCalibrationFactor(
             compactSettings.token_calibration_factors,
             conversation.pluginId,
             conversation.model,
         )
-        const estimatedMessages = [
-            ...messages,
-            {content: pendingContent},
-            ...(conversation.settings.systemPrompt.trim()
-                ? [{content: conversation.settings.systemPrompt}]
-                : []),
-        ]
-        const estimatedTokens = await estimateMessagesTokens(estimatedMessages, calibrationFactor)
-            .catch(error => {
-                logger.warn('[useAiController][自动压缩] Token 预检失败，交由核心预算保护', {error})
-                return 0
-            })
-        const usageTokens = headMessage.usage?.total_tokens ?? 0
-        const usedTokens = Math.max(usageTokens, estimatedTokens)
-        const usageRatio = usedTokens / contextWindowTokens
-        const suggested = autoCompactSuggestedConversationIdsRef.current.has(conversation.id)
-        if (!suggested && usageRatio < compactSettings.auto_compact_threshold_ratio) return false
+        let estimatedTokens = 0
+        let usageRatio = 0
+        const suggested = force || autoCompactSuggestedConversationIdsRef.current.has(conversation.id)
+        if (!force && contextWindowTokens) {
+            const estimatedMessages = [
+                ...messages,
+                {content: pendingContent},
+                ...(conversation.settings.systemPrompt.trim()
+                    ? [{content: conversation.settings.systemPrompt}]
+                    : []),
+            ]
+            estimatedTokens = await estimateMessagesTokens(
+                estimatedMessages,
+                calibrationFactor,
+                conversation.pluginId,
+                conversation.model,
+            )
+                .catch(error => {
+                    logger.warn('[useAiController][自动压缩] Token 预检失败，交由核心预算保护', {error})
+                    return 0
+                })
+            const usageTokens = headMessage.usage?.total_tokens ?? 0
+            const usedTokens = Math.max(usageTokens, estimatedTokens)
+            usageRatio = usedTokens / contextWindowTokens
+            if (!suggested && usageRatio < compactSettings.auto_compact_threshold_ratio) return false
+        }
 
-        const inFlightKey = `${conversation.id}:${headMessage.nodeId}:pre-send`
+        const inFlightKey = `${conversation.id}:${headMessage.nodeId}:${force ? 'forced' : 'pre-send'}`
         if (!markAutoCompactInFlight(inFlightKey)) return false
 
         try {
@@ -939,6 +953,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 usageRatio,
                 usageTokens: headMessage.usage?.total_tokens ?? null,
                 estimatedTokens,
+                force,
             })
             if (!result.applied) return false
 
@@ -949,9 +964,10 @@ export function useAiController(focus: AiFocus): AiContextValue {
                 deleteRuntimeConversation(conversation.sessionId, conversation.runId)
             }
             getAiSessionApi()?.activateSession(null, null)
-            setAiConversations((prev) => prev.map((item) =>
-                item.id === conversation.id ? {...item, sessionId: null, runId: null} : item,
-            ))
+            const clearRuntime = (item: Conversation) =>
+                item.id === conversation.id ? {...item, sessionId: null, runId: null} : item
+            conversationsRef.current = conversationsRef.current.map(clearRuntime)
+            setAiConversations((prev) => prev.map(clearRuntime))
             return true
         } catch (error) {
             logger.warn('[useAiController][自动压缩] 发送前压缩失败，继续发送', {
@@ -2756,6 +2772,27 @@ export function useAiController(focus: AiFocus): AiContextValue {
         webSearchEnabled,
     ])
 
+    const compactAndRetryMessage = useCallback(async (messageId: string) => {
+        const conversation = conversationsRef.current.find(
+            item => item.id === activeConversationIdRef.current,
+        )
+        const messageIndex = conversation?.messages.findIndex(item => item.id === messageId) ?? -1
+        const target = messageIndex >= 0 ? conversation?.messages[messageIndex] : null
+        if (
+            !conversation
+            || messageIndex < 0
+            || target?.error?.code !== ErrorCode.ContextBudgetExceeded
+        ) return
+
+        const compacted = await maybeAutoCompactBeforeSend(
+            conversation,
+            conversation.messages.slice(0, messageIndex),
+            '',
+            true,
+        )
+        if (compacted) await regenerateMessage(messageId)
+    }, [maybeAutoCompactBeforeSend, regenerateMessage])
+
     const editMessage = useCallback((messageId: string) => {
         const conv = conversations.find((conversation) => conversation.id === activeConversationIdRef.current)
         const message = conv?.messages.find((item) => item.id === messageId)
@@ -2843,6 +2880,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
         sendMessage,
         stopStreaming,
         regenerateMessage,
+        compactAndRetryMessage,
         continueMessage,
         editMessage,
         inputValue,
@@ -2891,7 +2929,8 @@ export function useAiController(focus: AiFocus): AiContextValue {
         writerModeAvailable, editModeEnabled, focusContext,
         sessionParams, session.isStreaming, session.blocks, conversationRuntime, sidebarCollapsed, autoScroll,
         isComposingNewConversation,
-        activeConversation, sendMessage, stopStreaming, regenerateMessage, continueMessage, editMessage,
+        activeConversation, sendMessage, stopStreaming, regenerateMessage, compactAndRetryMessage,
+        continueMessage, editMessage,
         addDocumentContextFiles, removeDocumentContextItem, retryDocumentContextItem,
         toggleWebSearch, setToolAccessMode, toggleEditMode, createNewConversation, switchConversation, deleteConversation,
         renameConversation, toggleConversationPinned, toggleConversationArchived,
