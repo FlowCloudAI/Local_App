@@ -473,8 +473,8 @@ export default function MobileProjectHome({
                     <div className="mobile-page__error-banner" role="alert">{descriptionError}</div>
                 )}
                 <div className="fc-rename-dialog__actions">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setDescriptionOpen(false)} disabled={descriptionSaving}>取消</Button>
-                    <Button type="button" size="sm" onClick={() => void handleSaveDescription()} disabled={descriptionSaving}>
+                    <Button type="button" variant="ghost" size="sm" radius="full" onClick={() => setDescriptionOpen(false)} disabled={descriptionSaving}>取消</Button>
+                    <Button type="button" size="sm" radius="full" onClick={() => void handleSaveDescription()} disabled={descriptionSaving}>
                         {descriptionSaving ? '保存中…' : '保存'}
                     </Button>
                 </div>

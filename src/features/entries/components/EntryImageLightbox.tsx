@@ -395,6 +395,7 @@ export default function EntryImageLightbox({
                             type="button"
                             variant="ghost"
                             size="sm"
+                            radius="full"
                             aria-pressed={viewMode === 'preview'}
                             onClick={() => setViewMode('preview')}
                         >
@@ -404,6 +405,7 @@ export default function EntryImageLightbox({
                             type="button"
                             variant="ghost"
                             size="sm"
+                            radius="full"
                             aria-pressed={viewMode === 'gallery'}
                             onClick={() => setViewMode('gallery')}
                         >
@@ -460,6 +462,7 @@ export default function EntryImageLightbox({
                             <Button
                                 type="button"
                                 size="sm"
+                                radius="full"
                                 onClick={() => onInsertMarkdown(safeIndex)}
                             >
                                 插入正文
@@ -469,6 +472,7 @@ export default function EntryImageLightbox({
                             <Button
                                 type="button"
                                 size="sm"
+                                radius="full"
                                 onClick={() => onSetCover?.(safeIndex)}
                             >
                                 设为主图
@@ -479,6 +483,7 @@ export default function EntryImageLightbox({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
+                                radius="full"
                                 onClick={() => setMoreMenuOpen(true)}
                             >
                                 更多

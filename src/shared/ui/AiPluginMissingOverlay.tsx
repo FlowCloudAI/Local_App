@@ -60,6 +60,7 @@ export default function AiPluginMissingOverlay({
                     <Button
                         type="button"
                         size="sm"
+                        radius="full"
                         variant="primary"
                         onClick={() => onOpenPluginManagement(kind)}
                     >

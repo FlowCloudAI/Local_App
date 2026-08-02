@@ -62,8 +62,8 @@ export default function RenameDialog({
                 className="fc-rename-dialog__input"
             />
             <div className="fc-rename-dialog__actions">
-                <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={busy}>取消</Button>
-                <Button type="button" size="sm" disabled={!canConfirm} onClick={() => void onConfirm(trimmed)}>
+                <Button type="button" variant="ghost" size="sm" radius="full" onClick={onClose} disabled={busy}>取消</Button>
+                <Button type="button" size="sm" radius="full" disabled={!canConfirm} onClick={() => void onConfirm(trimmed)}>
                     {busy ? '处理中…' : confirmText}
                 </Button>
             </div>

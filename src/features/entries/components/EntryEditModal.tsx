@@ -85,6 +85,7 @@ export default function EntryEditModal() {
                         className="eem-btn eem-btn-cancel"
                         variant="outline"
                         size="sm"
+                        radius="full"
                         onClick={() => void respond(false)}
                         disabled={busy}
                     >
@@ -95,6 +96,7 @@ export default function EntryEditModal() {
                         className="eem-btn eem-btn-confirm"
                         variant="primary"
                         size="sm"
+                        radius="full"
                         onClick={() => void respond(true)}
                         disabled={busy}
                     >
@@ -172,6 +174,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                                     type="button"
                                     variant="ghost"
                                     size="sm"
+                                    radius="full"
                                     onClick={() => jumpToHunk(activeHunk - 1)}
                                 >
                                     上一处
@@ -181,6 +184,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                                     type="button"
                                     variant="ghost"
                                     size="sm"
+                                    radius="full"
                                     onClick={() => jumpToHunk(activeHunk + 1)}
                                 >
                                     下一处
@@ -191,6 +195,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                             type="button"
                             variant="ghost"
                             size="sm"
+                            radius="full"
                             onClick={() => setExpanded(current => !current)}
                             aria-pressed={expanded}
                         >

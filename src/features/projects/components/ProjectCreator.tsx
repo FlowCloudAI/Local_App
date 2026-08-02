@@ -127,10 +127,10 @@ export default function ProjectCreator({open, onClose, onCreated, existingNames 
                 </div>
 
                 <div className="project-creator-footer">
-                    <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+                    <Button type="button" variant="ghost" size="sm" radius="full" onClick={onClose} disabled={submitting}>
                         取消
                     </Button>
-                    <Button type="button" size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()} data-tour-id="project-creator-submit">
+                    <Button type="button" size="sm" radius="full" disabled={!canSubmit} onClick={() => void handleSubmit()} data-tour-id="project-creator-submit">
                         {submitting ? '创建中…' : '创建'}
                     </Button>
                 </div>

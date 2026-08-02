@@ -97,6 +97,7 @@ export default function AiConfirmModal() {
                             className="acm-btn acm-btn-cancel"
                             variant="ghost"
                             size="sm"
+                            radius="full"
                             onClick={() => void respond(false)}
                             disabled={busy}
                         >
@@ -107,6 +108,7 @@ export default function AiConfirmModal() {
                             className={`acm-btn ${pending.kind === 'cascade' && pending.data.step === 2 ? 'acm-btn-danger' : 'acm-btn-confirm'}`}
                             variant={pending.kind === 'cascade' && pending.data.step === 2 ? 'danger' : 'primary'}
                             size="sm"
+                            radius="full"
                             onClick={() => void respond(true)}
                             disabled={busy}
                         >

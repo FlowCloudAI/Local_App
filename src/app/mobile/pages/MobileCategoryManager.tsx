@@ -297,7 +297,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                     ))}
                 </div>
                 <div className="mobile-category-dialog__actions">
-                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setMoveTarget(null)}>
+                    <Button type="button" variant="ghost" size="sm" radius="full" disabled={busy} onClick={() => setMoveTarget(null)}>
                         取消
                     </Button>
                 </div>
@@ -320,6 +320,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                         type="button"
                         variant="outline"
                         size="sm"
+                        radius="full"
                         block
                         disabled={busy}
                         onClick={() => void handleDelete('empty')}
@@ -330,6 +331,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                         type="button"
                         variant="secondary"
                         size="sm"
+                        radius="full"
                         block
                         disabled={busy}
                         onClick={() => void handleDelete('lift')}
@@ -340,6 +342,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                         type="button"
                         variant="danger"
                         size="sm"
+                        radius="full"
                         block
                         disabled={busy}
                         onClick={() => void handleDelete('cascade')}
@@ -353,7 +356,7 @@ export default function MobileCategoryManager({push, params}: Props) {
                     </div>
                 )}
                 <div className="mobile-category-dialog__actions">
-                    <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setDeleteTarget(null)}>
+                    <Button type="button" variant="ghost" size="sm" radius="full" disabled={busy} onClick={() => setDeleteTarget(null)}>
                         取消
                     </Button>
                 </div>

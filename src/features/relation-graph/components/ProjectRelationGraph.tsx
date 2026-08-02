@@ -716,13 +716,13 @@ export default function ProjectRelationGraph({projectId, sidebarContainer}: Proj
                     </div>
 
                     <ButtonToolbar align="right" className="rg-layout-dialog__footer">
-                        <Button type="button" size="sm" variant="outline" onClick={handleResetLayoutParams}>
+                        <Button type="button" size="sm" radius="full" variant="outline" onClick={handleResetLayoutParams}>
                             恢复默认
                         </Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => setLayoutPanelOpen(false)}>
+                        <Button type="button" size="sm" radius="full" variant="outline" onClick={() => setLayoutPanelOpen(false)}>
                             取消
                         </Button>
-                        <Button type="button" size="sm" onClick={handleApplyLayoutParams}>
+                        <Button type="button" size="sm" radius="full" onClick={handleApplyLayoutParams}>
                             应用并重新布局
                         </Button>
                     </ButtonToolbar>

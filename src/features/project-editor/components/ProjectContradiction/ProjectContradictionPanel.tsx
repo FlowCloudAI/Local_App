@@ -841,10 +841,10 @@ function ProjectContradictionPanel({
                             </label>
                         </div>
                         <div className="pe-contradiction-modal__footer">
-                            <Button type="button" variant="outline" size="sm" onClick={() => setGenerateDialogOpen(false)} disabled={generating}>
+                    <Button type="button" variant="outline" size="sm" radius="full" onClick={() => setGenerateDialogOpen(false)} disabled={generating}>
                                 取消
                             </Button>
-                            <Button type="button" variant="primary" size="sm" onClick={() => void handleGenerate()} disabled={generating}>
+                    <Button type="button" variant="primary" size="sm" radius="full" onClick={() => void handleGenerate()} disabled={generating}>
                                 {generating ? (progressMessage ?? '检测中…') : '开始生成'}
                             </Button>
                         </div>

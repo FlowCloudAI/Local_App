@@ -236,17 +236,17 @@ export default function EntryTypeCreator({
 
                 <div className="entry-type-creator-footer">
                     {isEditMode ? (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => void handleDelete()} disabled={submitting}>
+                        <Button type="button" variant="ghost" size="sm" radius="full" onClick={() => void handleDelete()} disabled={submitting}>
                             删除
                         </Button>
                     ) : (
                         <span/>
                     )}
                     <div className="entry-type-creator-footer__actions">
-                        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+                        <Button type="button" variant="ghost" size="sm" radius="full" onClick={onClose} disabled={submitting}>
                             取消
                         </Button>
-                        <Button type="button" size="sm" disabled={!canSubmit} onClick={() => void handleSubmit()}>
+                        <Button type="button" size="sm" radius="full" disabled={!canSubmit} onClick={() => void handleSubmit()}>
                             {submitting ? (isEditMode ? '保存中…' : '创建中…') : (isEditMode ? '保存' : '创建')}
                         </Button>
                     </div>

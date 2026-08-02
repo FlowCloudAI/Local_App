@@ -70,12 +70,13 @@ export default function ProjectImportConflictDialog({
                 )}
             </div>
             <div className="project-import-conflict-footer">
-                <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
+                <Button type="button" variant="ghost" size="sm" radius="full" onClick={onCancel} disabled={busy}>
                     取消
                 </Button>
                 <Button
                     type="button"
                     size="sm"
+                    radius="full"
                     disabled={!canRename}
                     onClick={() => onRename(trimmedName)}
                 >
@@ -85,6 +86,7 @@ export default function ProjectImportConflictDialog({
                     type="button"
                     variant="outline"
                     size="sm"
+                    radius="full"
                     onClick={() => onOverwrite()}
                     disabled={busy}
                 >

@@ -1,6 +1,7 @@
 import {type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {
+    Button,
     RollingBox,
     Slider,
     useAlert,
@@ -2085,12 +2086,12 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             </div>
                         </div>
                         <div className="wm-create-map-dialog__footer">
-                            <button type="button" className="wm-chip" onClick={() => setNewMapForm(null)}>
+                            <Button type="button" size="sm" radius="full" variant="outline" onClick={() => setNewMapForm(null)}>
                                 取消
-                            </button>
-                            <button type="button" className="wm-chip is-active" onClick={() => void handleSubmitCreateMap()}>
+                            </Button>
+                            <Button type="button" size="sm" radius="full" onClick={() => void handleSubmitCreateMap()}>
                                 创建地图
-                            </button>
+                            </Button>
                         </div>
                 </FloatingPanel>
             )}
@@ -2115,19 +2116,21 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                         <>
                             {coastlineParamFields}
                             <div className="wm-create-map-dialog__footer">
-                                <button
+                                <Button
                                     type="button"
-                                    className="wm-chip"
+                                    size="sm"
+                                    radius="full"
+                                    variant="outline"
                                     onClick={() => {
                                         setCoastlineParams(DEFAULT_COASTLINE_PARAMS)
                                         markMapUnsaved()
                                     }}
                                 >
                                     恢复默认
-                                </button>
-                                <button type="button" className="wm-chip is-active" onClick={() => setUtilityPanel(null)}>
+                                </Button>
+                                <Button type="button" size="sm" radius="full" onClick={() => setUtilityPanel(null)}>
                                     完成
-                                </button>
+                                </Button>
                             </div>
                         </>
                     )}

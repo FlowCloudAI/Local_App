@@ -52,17 +52,17 @@ export default function MobileCategoryDrawerDialogs(props: Props) {
                 <button type="button" className={`mobile-category-drawer-parent-list__item${(moveTarget?.parent_id ?? null) === null ? ' is-current' : ''}`} disabled={busy} onClick={() => onMove(null)}>根级分类</button>
                 {moveCandidates.map(row => <button type="button" key={row.category.id} className={`mobile-category-drawer-parent-list__item${moveTarget?.parent_id === row.category.id ? ' is-current' : ''}`} style={{'--mobile-category-drawer-depth': row.depth} as CSSProperties} disabled={busy} onClick={() => onMove(row.category.id)}>{row.category.name}</button>)}
             </div>
-            <div className="mobile-category-drawer-dialog__actions"><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onCloseMove}>取消</Button></div>
+            <div className="mobile-category-drawer-dialog__actions"><Button type="button" variant="ghost" size="sm" radius="full" disabled={busy} onClick={onCloseMove}>取消</Button></div>
         </FloatingPanel>
         <FloatingPanel open={!!deleteTarget} onClose={onCloseDelete} dismissible={!busy} title="删除分类" ariaLabel="删除分类" className="mobile-category-drawer-dialog">
             <div className="mobile-category-drawer-dialog__summary">「{deleteTarget?.name ?? ''}」包含 {deleteImpact?.categoryCount ?? 0} 个分类节点、{deleteImpact?.entryCount ?? 0} 个词条。</div>
             <div className="mobile-category-drawer-delete-options">
-                <Button type="button" variant="outline" size="sm" block disabled={busy} onClick={() => onDelete('empty')}>仅删除空分类</Button>
-                <Button type="button" variant="secondary" size="sm" block disabled={busy} onClick={() => onDelete('lift')}>子项上移保留</Button>
-                <Button type="button" variant="danger" size="sm" block disabled={busy} onClick={() => onDelete('cascade')}>连同子分类和词条删除</Button>
+                <Button type="button" variant="outline" size="sm" radius="full" block disabled={busy} onClick={() => onDelete('empty')}>仅删除空分类</Button>
+                <Button type="button" variant="secondary" size="sm" radius="full" block disabled={busy} onClick={() => onDelete('lift')}>子项上移保留</Button>
+                <Button type="button" variant="danger" size="sm" radius="full" block disabled={busy} onClick={() => onDelete('cascade')}>连同子分类和词条删除</Button>
             </div>
             {deleteImpact && deleteImpact.childCount > 0 && <div className="mobile-category-drawer-dialog__hint">“子项上移保留”会把直接子分类和词条移动到当前分类的父级。</div>}
-            <div className="mobile-category-drawer-dialog__actions"><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={onCloseDelete}>取消</Button></div>
+            <div className="mobile-category-drawer-dialog__actions"><Button type="button" variant="ghost" size="sm" radius="full" disabled={busy} onClick={onCloseDelete}>取消</Button></div>
         </FloatingPanel>
     </>
 }

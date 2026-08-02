@@ -430,7 +430,7 @@ export default function ProjectCoverPickerModal({
                             <p className="pe-cover-picker__hint">
                                 从本地文件系统导入一张图片，导入后会直接设为项目封面。
                             </p>
-                            <Button type="button" size="sm" onClick={() => void handleLocalUpload()} disabled={applying}>
+                            <Button type="button" size="sm" radius="full" onClick={() => void handleLocalUpload()} disabled={applying}>
                                 选择本地图片
                             </Button>
                         </div>
@@ -508,6 +508,7 @@ export default function ProjectCoverPickerModal({
                             <div className="pe-cover-picker__actions">
                                 <Button type="button"
                                     size="sm"
+                                    radius="full"
                                     onClick={() => void handleFillPrompt()}
                                     disabled={fillingPrompt || generateState === 'generating' || applying}
                                 >
@@ -515,6 +516,7 @@ export default function ProjectCoverPickerModal({
                                 </Button>
                                 <Button type="button"
                                     size="sm"
+                                    radius="full"
                                     onClick={() => void handleGenerate()}
                                     disabled={!canGenerate || generateState === 'generating' || fillingPrompt || applying}
                                 >
@@ -529,6 +531,7 @@ export default function ProjectCoverPickerModal({
                                         <Button
                                             type="button"
                                             size="sm"
+                                            radius="full"
                                             variant="ghost"
                                             className="pe-cover-picker__error-action"
                                             onClick={handleOpenAiSettings}
@@ -569,6 +572,7 @@ export default function ProjectCoverPickerModal({
                                     <div className="pe-cover-picker__results-footer">
                                         <Button type="button"
                                             size="sm"
+                                            radius="full"
                                             variant="primary"
                                             onClick={() => void handleAddAiCover()}
                                             disabled={!results[selectedResultIndex]?.url || applying}

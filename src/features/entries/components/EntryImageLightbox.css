@@ -96,7 +96,7 @@
     gap: var(--fc-space-xs);
     padding: var(--fc-space-xs);
     border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-lg);
+    border-radius: var(--fc-radius-full);
     background: var(--fc-color-bg);
 }
 
@@ -428,7 +428,7 @@
         gap: var(--fc-space-xs);
     }
 
-    .entry-editor-lightbox__header-actions .fc-btn {
+    .entry-editor-lightbox__header-actions .fc-btn:not(.fc-btn--radius-full) {
         padding-inline: var(--fc-space-sm);
     }
 

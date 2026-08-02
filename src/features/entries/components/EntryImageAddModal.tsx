@@ -359,7 +359,7 @@ export default function EntryImageAddModal({
                             <p className="entry-image-add-local-desc">
                                 从本地文件系统选择图片文件，支持 PNG、JPG、JPEG、GIF、WebP、BMP 格式。
                             </p>
-                            <Button type="button" size="sm" onClick={handleLocalUpload}>
+                            <Button type="button" size="sm" radius="full" onClick={handleLocalUpload}>
                                 选择本地图片
                             </Button>
                         </div>
@@ -438,6 +438,7 @@ export default function EntryImageAddModal({
                             <div className="entry-image-add-ai__actions">
                                 <Button type="button"
                                     size="sm"
+                                    radius="full"
                                     disabled={fillingPrompt || generateState === 'generating'}
                                     onClick={() => void handleFillPrompt()}
                                 >
@@ -445,6 +446,7 @@ export default function EntryImageAddModal({
                                 </Button>
                                 <Button type="button"
                                     size="sm"
+                                    radius="full"
                                     disabled={!canGenerate || generateState === 'generating' || fillingPrompt}
                                     onClick={() => void handleGenerate()}
                                 >
@@ -459,6 +461,7 @@ export default function EntryImageAddModal({
                                         <Button
                                             type="button"
                                             size="sm"
+                                            radius="full"
                                             variant="ghost"
                                             className="entry-image-add-ai__error-action"
                                             onClick={handleOpenAiSettings}
@@ -496,6 +499,7 @@ export default function EntryImageAddModal({
                                     <div className="entry-image-add-ai__results-footer">
                                         <Button type="button"
                                             size="sm"
+                                            radius="full"
                                             variant="primary"
                                             onClick={handleAddToEntry}
                                         >

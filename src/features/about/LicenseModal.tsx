@@ -28,7 +28,7 @@ export default function LicenseModal({open, onClose}: LicenseModalProps) {
             </RollingBox>
 
             <div className="license-modal-footer">
-                <Button type="button" size="sm" onClick={onClose}>已阅读</Button>
+                <Button type="button" size="sm" radius="full" onClick={onClose}>已阅读</Button>
             </div>
         </FloatingPanel>
     )

@@ -111,7 +111,7 @@ function ProjectDashboardRiskPanel({projectStats, riskSummary, onOpenEntry}: Pro
                     </div>
                 </RollingBox>
                 <div className="pe-risk-entry-footer">
-                    <Button type="button" variant="primary" size="sm" onClick={() => setActiveIssue(null)}>
+                <Button type="button" variant="primary" size="sm" radius="full" onClick={() => setActiveIssue(null)}>
                         确认
                     </Button>
                 </div>

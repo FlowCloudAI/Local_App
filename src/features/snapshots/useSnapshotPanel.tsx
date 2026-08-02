@@ -678,6 +678,7 @@ export function useSnapshotPanel({
                         type="button"
                         variant="ghost"
                         size="sm"
+                        radius="full"
                         disabled={branchCreating}
                         onClick={closeBranchDialog}
                     >
@@ -687,6 +688,7 @@ export function useSnapshotPanel({
                         type="submit"
                         variant="primary"
                         size="sm"
+                        radius="full"
                         disabled={branchCreating || branchNameDraft.trim().length === 0}
                     >
                         创建并切换
