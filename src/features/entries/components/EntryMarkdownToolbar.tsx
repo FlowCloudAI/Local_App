@@ -223,6 +223,7 @@ export default function EntryMarkdownToolbar({
                     type="button"
                     variant="ghost"
                     size="sm"
+                    radius="full"
                     className={!splitView ? 'is-active' : undefined}
                     aria-pressed={!splitView}
                     onClick={() => onSplitViewChange(false)}
@@ -233,6 +234,7 @@ export default function EntryMarkdownToolbar({
                     type="button"
                     variant="ghost"
                     size="sm"
+                    radius="full"
                     className={splitView ? 'is-active' : undefined}
                     aria-pressed={splitView}
                     onClick={() => onSplitViewChange(true)}

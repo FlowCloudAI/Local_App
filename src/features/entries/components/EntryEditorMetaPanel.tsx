@@ -161,12 +161,18 @@ export default function EntryEditorMetaPanel({
 
                 <div className="entry-editor-cover__toolbar">
                     {!isBrowseMode && (
-                        <Button type="button" variant="outline" size="sm" onClick={() => onOpenImageAddModal()}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            radius="full"
+                            onClick={() => onOpenImageAddModal()}
+                        >
                             添加图片
                         </Button>
                     )}
                     {coverImage && (
-                        <Button type="button" variant="ghost" size="sm" onClick={onViewImageSet}>
+                        <Button type="button" variant="ghost" size="sm" radius="full" onClick={onViewImageSet}>
                             查看设定集
                         </Button>
                     )}
@@ -214,6 +220,7 @@ export default function EntryEditorMetaPanel({
                             <Button
                                 variant="outline"
                                 size="sm"
+                                radius="full"
                                 type="button"
                                 disabled={saving || loading || generatingSummary}
                                 onClick={onGenerateSummary}
@@ -504,7 +511,13 @@ export default function EntryEditorMetaPanel({
                                         />
                                     </div>
                                 )}
-                                <Button type="button" variant="ghost" size="sm" onClick={onOpenTagCreator}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    radius="full"
+                                    onClick={onOpenTagCreator}
+                                >
                                     + 新建标签
                                 </Button>
                             </div>

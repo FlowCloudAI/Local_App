@@ -1606,7 +1606,13 @@ export default function EntryEditor({
                                             {saveStatus.text}
                                         </span>
                                     )}
-                                    <Button type="button" size="sm" disabled={!canSave} onClick={() => void handleSave()}>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        radius="full"
+                                        disabled={!canSave}
+                                        onClick={() => void handleSave()}
+                                    >
                                         {saving ? '保存中…' : '保存修改'}
                                     </Button>
                                     {onDelete && (
@@ -1614,6 +1620,7 @@ export default function EntryEditor({
                                             type="button"
                                             variant="outline"
                                             size="sm"
+                                            radius="full"
                                             className="entry-editor-more-button"
                                             aria-label="更多词条操作"
                                             disabled={loading || saving}

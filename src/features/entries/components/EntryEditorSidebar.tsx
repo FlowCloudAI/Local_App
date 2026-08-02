@@ -136,6 +136,7 @@ export default function EntryEditorSidebar({
                             type="button"
                             size="sm"
                             variant="outline"
+                            radius="full"
                             className="entry-editor-relations__add"
                             disabled={relationPanelDisabled}
                             onClick={openCreateRelationPanel}
@@ -332,6 +333,7 @@ export default function EntryEditorSidebar({
                                 <Button
                                     type="button"
                                     size="sm"
+                                    radius="full"
                                     variant="outline"
                                     disabled={relationPanelDisabled}
                                     onClick={() => void deleteRelationFromPanel()}
@@ -340,12 +342,19 @@ export default function EntryEditorSidebar({
                                 </Button>
                             )}
                             <span className="entry-relation-panel__spacer"/>
-                            <Button type="button" size="sm" variant="ghost" onClick={closeRelationPanel}>
+                            <Button
+                                type="button"
+                                size="sm"
+                                radius="full"
+                                variant="ghost"
+                                onClick={closeRelationPanel}
+                            >
                                 取消
                             </Button>
                             <Button
                                 type="button"
                                 size="sm"
+                                radius="full"
                                 disabled={!relationPanelCanSave}
                                 onClick={saveRelationPanel}
                             >

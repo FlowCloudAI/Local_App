@@ -662,7 +662,7 @@
     gap: 0.1rem;
     padding: 0.15rem;
     border: 1px solid var(--fc-color-border);
-    border-radius: var(--fc-radius-md);
+    border-radius: var(--fc-radius-full);
     background: color-mix(in srgb, var(--fc-color-bg) 88%, var(--fc-color-bg-secondary));
 }
 
@@ -779,7 +779,6 @@
 
 .entry-editor-format-toolbar__view .fc-btn {
     min-height: 1.7rem;
-    padding-inline: var(--fc-space-sm);
 }
 
 .entry-editor-format-toolbar__view .fc-btn.is-active {
@@ -876,32 +875,17 @@
 
 @container (max-width: 52rem) {
     .entry-editor-meta-layout {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
         grid-template-areas:
-            "primary"
-            "cover"
-            "auxiliary"
-            "secondary";
+            "primary primary"
+            "cover auxiliary"
+            "secondary secondary";
     }
 
     .entry-editor-cover-panel {
-        display: grid;
-        grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
-        gap: var(--fc-space-md);
-        align-items: end;
-        max-width: none;
+        display: flex;
         padding-top: var(--fc-space-lg);
         border-top: 1px solid var(--fc-color-border);
-    }
-
-    .entry-editor-cover__toolbar {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .entry-editor-cover__toolbar .fc-button {
-        width: 100%;
-        white-space: nowrap;
     }
 
     .entry-editor-cover {
@@ -922,6 +906,21 @@
 
     .entry-editor-tags-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@container (max-width: 30rem) {
+    .entry-editor-meta-layout {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "primary"
+            "cover"
+            "auxiliary"
+            "secondary";
+    }
+
+    .entry-editor-cover-panel {
+        width: min(100%, 12rem);
     }
 }
 
@@ -1478,10 +1477,6 @@
 
     .entry-editor-format-toolbar {
         padding-inline: var(--fc-space-lg);
-    }
-
-    .entry-editor-format-toolbar__view .fc-btn {
-        padding-inline: 0.45rem;
     }
 
     .entry-editor-wikilink-popover,
