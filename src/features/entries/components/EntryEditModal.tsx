@@ -1,3 +1,4 @@
+/* 全局 AI 词条编辑确认器：展示正文差异，并将用户决定回传给等待中的后端请求。 */
 import {logger} from '../../../shared/logger'
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {Button, useAlert} from 'flowcloudai-ui'
@@ -76,6 +77,7 @@ export default function EntryEditModal() {
                         key={pending.request_id}
                         before={pending.before_content}
                         after={pending.after_content}
+                        disabled={busy}
                     />
                 </div>
 
@@ -100,7 +102,7 @@ export default function EntryEditModal() {
                         onClick={() => void respond(true)}
                         disabled={busy}
                     >
-                        应用全部修改
+                        {busy ? '应用中…' : '应用全部修改'}
                     </Button>
                 </div>
                 </>
@@ -109,7 +111,7 @@ export default function EntryEditModal() {
     )
 }
 
-function DiffView({before, after}: { before: string; after: string }) {
+function DiffView({before, after, disabled}: { before: string; after: string; disabled: boolean }) {
     const [expanded, setExpanded] = useState(false)
     const [activeHunk, setActiveHunk] = useState(0)
     const hunkElements = useRef<Array<HTMLDivElement | null>>([])
@@ -176,6 +178,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                                     size="sm"
                                     radius="full"
                                     onClick={() => jumpToHunk(activeHunk - 1)}
+                                    disabled={disabled}
                                 >
                                     上一处
                                 </Button>
@@ -186,6 +189,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                                     size="sm"
                                     radius="full"
                                     onClick={() => jumpToHunk(activeHunk + 1)}
+                                    disabled={disabled}
                                 >
                                     下一处
                                 </Button>
@@ -198,6 +202,7 @@ function DiffView({before, after}: { before: string; after: string }) {
                             radius="full"
                             onClick={() => setExpanded(current => !current)}
                             aria-pressed={expanded}
+                            disabled={disabled}
                         >
                             {expanded ? '只看变更' : '展开全文'}
                         </Button>
