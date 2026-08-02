@@ -1,5 +1,5 @@
 import {logger} from '../../../../shared/logger'
-import {memo, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {memo, useCallback, useEffect, useMemo, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {Button, Input, RollingBox, Select, useAlert} from 'flowcloudai-ui'
 import {
@@ -7,7 +7,6 @@ import {
     ai_get_world_check_report_entry,
     ai_list_world_check_reports,
     ai_list_plugins,
-    ai_start_world_check_session,
     db_list_entries,
     db_get_entry,
     type EntryBrief,
@@ -18,10 +17,17 @@ import {
     type WorldCheckReport,
     type WorldCheckReportHistoryItem,
 } from '../../../../api'
-import {listen} from '../../../../api/events'
 import type {ReportConversationContext} from '../../../ai-chat/model/AiControllerTypes'
 import {normalizeEntryLookupTitle} from '../../../entries/lib/entryCommon'
 import {FloatingPanel} from '../../../../shared/ui/overlay'
+import {
+    cancelWorldCheckTask,
+    closeWorldCheckTaskMonitor,
+    openWorldCheckTaskMonitor,
+    startWorldCheckTask,
+    useWorldCheckTaskStore,
+} from '../../stores/worldCheckTaskStore'
+import {WorldCheckTaskCard, WorldCheckTaskMonitor} from './WorldCheckTaskViews'
 import '../../../../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectContradictionPanel.css'
 
@@ -47,6 +53,12 @@ const CHECK_KIND_OPTIONS: Array<{ value: WorldCheckKind; label: string }> = [
     {value: 'entry_alignment', label: '单词条契合度'},
     {value: 'publication_risk', label: '出版风险'},
 ]
+
+const CHECK_KIND_DESCRIPTIONS: Record<WorldCheckKind, string> = {
+    contradiction: '核对词条、关系与时间线中的冲突证据',
+    entry_alignment: '评估指定词条与整体世界规则的匹配程度',
+    publication_risk: '检查公开发布前的敏感、争议与合规风险',
+}
 
 function checkKindLabel(kind: WorldCheckKind): string {
     return CHECK_KIND_OPTIONS.find((item) => item.value === kind)?.label ?? '设定检测'
@@ -184,10 +196,10 @@ function ProjectContradictionPanel({
     const [activeRecord, setActiveRecord] = useState<StoredWorldCheckReport | null>(null)
     const [historyLoading, setHistoryLoading] = useState(false)
     const [detailLoading, setDetailLoading] = useState(false)
-    const [generating, setGenerating] = useState(false)
     const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
-    const [progressMessage, setProgressMessage] = useState<string | null>(null)
-    const debugRawRef = useRef<string | null>(null)
+    const {tasks: worldCheckTasks} = useWorldCheckTaskStore()
+    const task = worldCheckTasks[projectId] ?? null
+    const taskRunning = task?.status === 'running' || task?.status === 'cancelling'
 
     const selectedTargetEntry = useMemo(
         () => projectEntries.find((entry) => entry.id === targetEntryId) ?? null,
@@ -201,24 +213,6 @@ function ProjectContradictionPanel({
             : projectEntries
         return entries.slice(0, 3)
     }, [projectEntries, targetEntryQuery])
-
-    // 监听进度报告事件
-    useEffect(() => {
-        let unlistenFn: (() => void) | null = null
-        listen('ai:world_check_progress', (event) => {
-            const payload = event.payload as Record<string, unknown>
-            const msg = String(payload?.message ?? '')
-            if (msg) {
-                setProgressMessage(msg)
-                logger.log('[WorldCheckPanel] 进度:', msg)
-            }
-        }).then((fn) => {
-            unlistenFn = fn
-        })
-        return () => {
-            unlistenFn?.()
-        }
-    }, [])
 
     useEffect(() => {
         if (checkKind === 'entry_alignment' && !targetEntryId && activeEntryId) {
@@ -259,26 +253,6 @@ function ProjectContradictionPanel({
         setTargetEntryQuery(selectedTargetEntry.title)
     }, [selectedTargetEntry, targetEntryQuery])
 
-    // 监听 Rust 端发出的原始 AI 响应，用于调试
-    useEffect(() => {
-        let unlistenFn: (() => void) | null = null
-        listen('ai:debug_raw_response', (event) => {
-            const payload = event.payload as Record<string, unknown>
-            const text = String(payload?.text ?? '')
-            debugRawRef.current = text
-            logger.log('[ContradictionPanel] 原始 AI 响应（完整）:', text)
-            const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) ?? text.match(/{[\s\S]*"overview"[\s\S]*}/)
-            if (jsonMatch) {
-                logger.log('[ContradictionPanel] 提取的 JSON 候选:', jsonMatch[1] ?? jsonMatch[0])
-            }
-        }).then((fn) => {
-            unlistenFn = fn
-        })
-        return () => {
-            unlistenFn?.()
-        }
-    }, [])
-
     const loadHistory = useCallback(async () => {
         setHistoryLoading(true)
         try {
@@ -302,6 +276,13 @@ function ProjectContradictionPanel({
     useEffect(() => {
         void loadHistory()
     }, [loadHistory])
+
+    useEffect(() => {
+        if (task?.status !== 'success' || !task.record) return
+        setSelectedReportId(task.record.reportId)
+        setActiveRecord(task.record)
+        void loadHistory()
+    }, [loadHistory, task?.record, task?.status])
 
     useEffect(() => {
         if (!selectedReportId) return
@@ -336,61 +317,23 @@ function ProjectContradictionPanel({
             return
         }
 
-        setGenerating(true)
-        setProgressMessage(null)
-        try {
-            const startInput = {
-                sessionId: `world_check_${checkKind}_${Date.now()}`,
-                pluginId: effectivePluginId,
-                model: effectiveModel,
-                projectId,
-                checkKind,
-                targetEntryId: checkKind === 'entry_alignment' ? resolvedTargetEntryId : null,
-            }
-            logger.log('[ProjectContradictionPanel] start world check session', startInput)
-            const result = await ai_start_world_check_session(startInput)
-            logger.log('[ProjectContradictionPanel] 设定检测原始返回（完整）:', JSON.stringify(result, null, 2))
-            logger.log('[ProjectContradictionPanel] report 字段:', JSON.stringify(result.report, null, 2))
-            const record = await ai_get_world_check_report_entry(result.reportId)
-            logger.log('[ProjectContradictionPanel] 持久化报告记录（完整）:', JSON.stringify(record, null, 2))
-            if (debugRawRef.current) {
-                logger.log('[ProjectContradictionPanel] 本次检测的原始 AI 输出:', debugRawRef.current)
-            }
-            if (!record) {
-                throw new Error('新生成的检测报告未能写入历史记录')
-            }
-            await loadHistory()
-            setSelectedReportId(record.reportId)
-            setActiveRecord(record)
-            if (onStartDiscussion) {
-                onStartDiscussion({
-                    title: `${checkKindLabel(checkKind)}：${projectName}`,
-                    pluginId: result.pluginId,
-                    model: result.model ?? effectiveModel,
-                    reportContext: buildReportConversationContext(record),
-                })
-            }
-            setGenerateDialogOpen(false)
-            await showAlert('设定检测完成，右侧已为这份报告新建讨论对话。', 'success', 'nonInvasive', 1500)
-        } catch (error) {
-            logger.error('[ProjectContradictionPanel] 生成设定检测报告失败', {
-                error,
-                message: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined,
-                effectivePluginId,
-                effectiveModel,
-                projectId,
-                checkKind,
-            })
-            const errorMsg = error instanceof Error ? error.message : String(error)
-            const userFriendly = errorMsg === 'error decoding response body'
-                ? 'AI 返回的内容格式异常，无法生成检测报告。请检查 AI 模型返回是否符合预期格式，或换一个模型重试。'
-                : `生成设定检测报告失败：${errorMsg}`
-            await showAlert(userFriendly, 'error', 'nonInvasive', 3000)
-        } finally {
-            setGenerating(false)
+        const startInput = {
+            sessionId: `world_check_${checkKind}_${Date.now()}`,
+            pluginId: effectivePluginId,
+            model: effectiveModel,
+            projectId,
+            checkKind,
+            targetEntryId: checkKind === 'entry_alignment' ? resolvedTargetEntryId : null,
         }
-    }, [checkKind, effectiveModel, effectivePluginId, loadHistory, onStartDiscussion, projectId, projectName, showAlert, setSelectedReportId, targetEntryId])
+        logger.log('[ProjectContradictionPanel] start world check session', startInput)
+        setGenerateDialogOpen(false)
+        try {
+            await startWorldCheckTask({request: startInput, projectName})
+        } catch (error) {
+            logger.error('[ProjectContradictionPanel] 启动设定检测失败', error)
+            await showAlert(`启动设定检测失败：${String(error)}`, 'error', 'nonInvasive', 2600)
+        }
+    }, [checkKind, effectiveModel, effectivePluginId, projectId, projectName, showAlert, targetEntryId])
 
     const handleDelete = useCallback(async (reportId: string) => {
         const confirmed = await showAlert('删除后将无法在历史中恢复这份报告。是否继续？', 'warning', 'confirm')
@@ -412,20 +355,48 @@ function ProjectContradictionPanel({
         }
     }, [historyItems, selectedReportId, showAlert, setSelectedReportId])
 
-    const handleStartDiscussion = useCallback(async () => {
-        if (!activeRecord || !onStartDiscussion) return
-        const model = activeRecord.model ?? effectiveModel
+    const startDiscussionForRecord = useCallback(async (record: StoredWorldCheckReport) => {
+        if (!onStartDiscussion) return
+        const model = record.model ?? effectiveModel
         if (!model) {
             await showAlert('当前缺少可用模型，无法创建报告讨论对话。', 'warning', 'nonInvasive', 2200)
             return
         }
         onStartDiscussion({
-            title: `${checkKindLabel(activeRecord.checkKind)}：${activeRecord.projectName}`,
-            pluginId: activeRecord.pluginId,
+            title: `${checkKindLabel(record.checkKind)}：${record.projectName}`,
+            pluginId: record.pluginId,
             model,
-            reportContext: buildReportConversationContext(activeRecord),
+            reportContext: buildReportConversationContext(record),
         })
-    }, [activeRecord, effectiveModel, onStartDiscussion, showAlert])
+    }, [effectiveModel, onStartDiscussion, showAlert])
+
+    const handleStartDiscussion = useCallback(async () => {
+        if (!activeRecord) return
+        await startDiscussionForRecord(activeRecord)
+    }, [activeRecord, startDiscussionForRecord])
+
+    const handleOpenGenerate = useCallback((kind?: WorldCheckKind) => {
+        if (taskRunning) {
+            openWorldCheckTaskMonitor(projectId)
+            return
+        }
+        if (kind) setCheckKind(kind)
+        setGenerateDialogOpen(true)
+    }, [projectId, taskRunning])
+
+    const handleOpenTaskReport = useCallback(() => {
+        if (!task?.record) return
+        setSelectedReportId(task.record.reportId)
+        setActiveRecord(task.record)
+        closeWorldCheckTaskMonitor(projectId)
+    }, [projectId, task])
+
+    const handleRetryTask = useCallback(() => {
+        if (!task) return
+        closeWorldCheckTaskMonitor(projectId)
+        setCheckKind(task.checkKind)
+        setGenerateDialogOpen(true)
+    }, [projectId, task])
 
     const [entryTitleMap, setEntryTitleMap] = useState<Record<string, string>>({})
 
@@ -527,28 +498,57 @@ function ProjectContradictionPanel({
                 <div className="pe-contradiction-toolbar__left">
                     <div className="fc-op-header__title-block">
                         <h2 className="pe-contradiction-title fc-op-header__title">设定检测</h2>
-                        <p className="pe-contradiction-desc fc-op-header__subtitle">生成结构化检测报告，保留历史记录，并可在右侧聊天区继续讨论这份报告。</p>
+                        <p className="pe-contradiction-desc fc-op-header__subtitle">检查项目设定的一致性、契合度与公开发布风险；检测可收起到后台继续运行。</p>
                     </div>
                 </div>
                 <div className="pe-contradiction-toolbar__actions fc-op-header__actions">
                     <Button type="button" variant="outline" size="sm" onClick={() => void loadHistory()}
-                            disabled={historyLoading || generating}>
+                            disabled={historyLoading}>
                         刷新历史
                     </Button>
-                    <Button type="button" variant="primary" size="sm" onClick={() => setGenerateDialogOpen(true)} disabled={generating}>
-                        {generating ? (
-                            <span>{progressMessage ?? '检测中…'}</span>
-                        ) : '生成新报告'}
+                    <Button type="button" variant="primary" size="sm" onClick={() => handleOpenGenerate()}>
+                        {taskRunning ? '查看检测进度' : '生成新报告'}
                     </Button>
                 </div>
             </div>
+
+            {task && (
+                <div className="pe-contradiction-task-summary">
+                    <WorldCheckTaskCard task={task} onOpen={() => openWorldCheckTaskMonitor(projectId)}/>
+                </div>
+            )}
 
             <div className={`pe-contradiction-layout${renderSidebarExternally ? ' pe-contradiction-layout--single' : ''}`}>
                 {!renderSidebarExternally && historyPanel}
                 <section className="pe-contradiction-report">
                     {!activeRecord ? (
-                        <div className="pe-contradiction-empty pe-contradiction-empty--large">
-                            请选择一份历史报告，或直接生成新的检测结果。
+                        <div className="pe-contradiction-launch">
+                            <div className="pe-contradiction-launch__header">
+                                <h3>开始检测</h3>
+                                <p>同一项目同时运行一个 AI 检测任务，开始后可收起并继续其他工作。</p>
+                            </div>
+                            <div className="pe-contradiction-launch__list">
+                                {CHECK_KIND_OPTIONS.map((option) => {
+                                    const isCurrentTask = taskRunning && task?.checkKind === option.value
+                                    return (
+                                        <div key={option.value} className="pe-contradiction-launch__item">
+                                            <div>
+                                                <strong>{option.label}</strong>
+                                                <span>{CHECK_KIND_DESCRIPTIONS[option.value]}</span>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant={isCurrentTask ? 'primary' : 'outline'}
+                                                size="sm"
+                                                disabled={taskRunning && !isCurrentTask}
+                                                onClick={() => handleOpenGenerate(option.value)}
+                                            >
+                                                {isCurrentTask ? '查看当前任务' : taskRunning ? '等待当前任务' : '开始检测'}
+                                            </Button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         </div>
                     ) : detailLoading ? (
                         <div className="pe-contradiction-empty pe-contradiction-empty--large">
@@ -730,16 +730,28 @@ function ProjectContradictionPanel({
                     )}
                 </section>
             </div>
+            {task && (
+                <WorldCheckTaskMonitor
+                    task={task}
+                    onClose={() => closeWorldCheckTaskMonitor(projectId)}
+                    onCancel={() => void cancelWorldCheckTask(projectId)}
+                    onRetry={handleRetryTask}
+                    onOpenReport={handleOpenTaskReport}
+                    onDiscuss={() => {
+                        if (task.record) void startDiscussionForRecord(task.record)
+                    }}
+                />
+            )}
             {generateDialogOpen && (
                 <FloatingPanel
-            open
-            onClose={() => setGenerateDialogOpen(false)}
-            dismissible={!generating}
-            title="生成新报告"
-            className="pe-contradiction-modal"
-        >
-            <p className="pe-contradiction-modal__desc">选择检测方式、AI 插件和模型后开始生成。</p>
-            <div className="pe-contradiction-modal__body">
+                    open
+                    onClose={() => setGenerateDialogOpen(false)}
+                    dismissible
+                    title="生成新报告"
+                    className="pe-contradiction-modal"
+                >
+                    <p className="pe-contradiction-modal__desc">选择检测方式、AI 插件和模型后开始生成。</p>
+                    <div className="pe-contradiction-modal__body">
                             <label className="pe-contradiction-field">
                                 <span>检测类型</span>
                                 <Select
@@ -840,14 +852,14 @@ function ProjectContradictionPanel({
                                 />
                             </label>
                         </div>
-                        <div className="pe-contradiction-modal__footer">
-                    <Button type="button" variant="outline" size="sm" radius="full" onClick={() => setGenerateDialogOpen(false)} disabled={generating}>
+                    <div className="pe-contradiction-modal__footer">
+                        <Button type="button" variant="outline" size="sm" radius="full" onClick={() => setGenerateDialogOpen(false)}>
                                 取消
-                            </Button>
-                    <Button type="button" variant="primary" size="sm" radius="full" onClick={() => void handleGenerate()} disabled={generating}>
-                                {generating ? (progressMessage ?? '检测中…') : '开始生成'}
-                            </Button>
-                        </div>
+                        </Button>
+                        <Button type="button" variant="primary" size="sm" radius="full" onClick={() => void handleGenerate()}>
+                            开始检测
+                        </Button>
+                    </div>
                 </FloatingPanel>
             )}
         </div>

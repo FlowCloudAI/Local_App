@@ -327,6 +327,30 @@ body {
     height: var(--app-sidebar-icon-size);
 }
 
+.world-check-task-nav-icon {
+    position: relative;
+    display: inline-flex;
+}
+
+.world-check-task-nav-icon > span {
+    position: absolute;
+    top: calc(var(--fc-space-xs) * -1);
+    right: calc(var(--fc-space-xs) * -1);
+    min-width: var(--fc-space-md);
+    height: var(--fc-space-md);
+    padding-inline: var(--fc-space-xs);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border-radius: var(--fc-radius-full);
+    background: var(--fc-color-danger);
+    color: var(--fc-color-text-on-primary);
+    font-size: var(--fc-font-size-xs);
+    font-weight: var(--fc-font-weight-semibold);
+    line-height: 1;
+}
+
 .fc-sidebar__footer {
     border-top: 0 !important;
 }

@@ -29,6 +29,11 @@ import {
 import {invalidateProjectList} from '../../features/projects/projectListStore'
 import {parseHelpTarget} from '../../shared/help/helpCatalog'
 import {groupEntryIdsByProject, type EntryTabMeta} from './entryTabMounting'
+import {
+    getLatestWorldCheckTask,
+    openWorldCheckTaskMonitor,
+    useWorldCheckTaskStore,
+} from '../../features/project-editor/stores/worldCheckTaskStore'
 
 interface DesktopAppProps {
     platformInfo: PlatformInfo
@@ -50,6 +55,14 @@ const AI_MIN_PANEL_WIDTH = 500
 const FULLSCREEN_SIDE_DEFAULT_WIDTH = 320
 const RECENT_PAGE_LIMIT = 10
 let desktopWindowShown = false
+
+function worldCheckTaskStatusLabel(status: 'running' | 'cancelling' | 'failed' | 'success' | 'cancelled') {
+    if (status === 'failed') return '检测失败'
+    if (status === 'success') return '报告已完成'
+    if (status === 'cancelled') return '检测已取消'
+    if (status === 'cancelling') return '正在停止检测'
+    return '后台检测中'
+}
 
 type DesktopTabState = {
     tabs: TabItem[]
@@ -395,6 +408,15 @@ function DesktopAppContent() {
     const dirtyEntryCount = useMemo(
         () => Object.values(entryDirtyMap).filter(Boolean).length,
         [entryDirtyMap],
+    )
+    const {tasks: worldCheckTasks} = useWorldCheckTaskStore()
+    const latestWorldCheckTask = useMemo(
+        () => getLatestWorldCheckTask(worldCheckTasks),
+        [worldCheckTasks],
+    )
+    const activeWorldCheckTaskCount = useMemo(
+        () => Object.values(worldCheckTasks).filter((task) => task.status === 'running' || task.status === 'cancelling').length,
+        [worldCheckTasks],
     )
 
     const aiController = useAiController(aiFocus)
@@ -845,6 +867,16 @@ function DesktopAppContent() {
     }, [handleWindowClose, win])
 
     const handleSideBarSelect = useCallback((key: string, options?: { forceOpen?: boolean }) => {
+        if (key === 'world-check-task' && latestWorldCheckTask) {
+            setSelectedKey('')
+            collapseAiPanel()
+            handleOpenProjectTool('contradiction', {
+                id: latestWorldCheckTask.projectId,
+                name: latestWorldCheckTask.projectName,
+            })
+            openWorldCheckTaskMonitor(latestWorldCheckTask.projectId)
+            return
+        }
         if (key === 'idea' || key === 'ai-chat' || key === 'snapshot' || key === 'help') {
             if (!aiPanelCollapsed && sidePanelContentKey === key && !options?.forceOpen) {
                 collapseAiPanel()
@@ -863,7 +895,7 @@ function DesktopAppContent() {
         if (key === 'settings') {
             openSettings()
         }
-    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, openSettings, sidePanelContentKey])
+    }, [aiPanelCollapsed, collapseAiPanel, expandAiPanelToMinWidth, handleOpenProjectTool, latestWorldCheckTask, openSettings, sidePanelContentKey])
 
     const handleOpenPluginManagement = useCallback((kind: AiMissingPluginKind) => {
         openSettings({tab: 'plugins', pluginKind: kind})
@@ -1204,6 +1236,16 @@ function DesktopAppContent() {
             />
         </svg>)
 
+    const WorldCheckTaskIcon = latestWorldCheckTask ? (
+        <span className="world-check-task-nav-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+                <path d="M5 5h14v14H5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="m8 12 2.5 2.5L16 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>{activeWorldCheckTaskCount || (latestWorldCheckTask.status === 'failed' ? '!' : '✓')}</span>
+        </span>
+    ) : null
+
     const menuItems: SideBarItem[] = [
         {key: 'idea', label: '灵感便签', icon: IdeaIcon},
         {key: 'ai-chat', label: 'AI 对话', icon: AiChatIcon},
@@ -1211,6 +1253,11 @@ function DesktopAppContent() {
         {key: 'help', label: '帮助', icon: HelpIcon},
     ]
     const bottomItems: SideBarItem[] = [
+        ...(latestWorldCheckTask && WorldCheckTaskIcon ? [{
+            key: 'world-check-task',
+            label: worldCheckTaskStatusLabel(latestWorldCheckTask.status),
+            icon: WorldCheckTaskIcon,
+        }] : []),
         {key: 'settings', label: '设置', icon: SettingsIcon},
     ]
 
