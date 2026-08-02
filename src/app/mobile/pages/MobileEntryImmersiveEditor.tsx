@@ -1,5 +1,6 @@
+/* 移动端沉浸正文编辑器：跟随可视视口避让系统键盘，并承载常用 Markdown 工具。 */
 import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
-import {type ComponentProps, type ReactNode, type RefObject} from 'react'
+import {type ComponentProps, type ReactNode, type RefObject, useEffect, useRef} from 'react'
 import {
     MobileBackIcon,
     MobilePageTopBar,
@@ -36,8 +37,30 @@ export function MobileEntryImmersiveEditor({
     onSave,
     onMarkdownTool,
 }: MobileEntryImmersiveEditorProps) {
+    const viewportRootRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const viewport = window.visualViewport
+        if (!viewport) return undefined
+
+        const syncViewport = () => {
+            const root = viewportRootRef.current
+            if (!root) return
+            root.style.setProperty('--mobile-entry-viewport-height', `${viewport.height}px`)
+            root.style.setProperty('--mobile-entry-viewport-offset-top', `${viewport.offsetTop}px`)
+        }
+
+        syncViewport()
+        viewport.addEventListener('resize', syncViewport)
+        viewport.addEventListener('scroll', syncViewport)
+        return () => {
+            viewport.removeEventListener('resize', syncViewport)
+            viewport.removeEventListener('scroll', syncViewport)
+        }
+    }, [])
+
     return (
-        <div className="mobile-entry-detail__immersive" role="dialog" aria-label="沉浸正文编辑">
+        <div ref={viewportRootRef} className="mobile-entry-detail__immersive" role="dialog" aria-label="沉浸正文编辑">
             <MobilePageTopBar
                 className="mobile-entry-detail__immersive-topbar"
                 ariaLabel="沉浸正文编辑操作"

@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/refs -- 仅透传父组件 refs 与组件 props，不读取 ref.current */
+/* 移动端词条编辑视图：保留标题与正文主链路，低频属性统一收口。 */
 import type {ComponentProps, RefObject} from 'react'
 import {Input, Select} from 'flowcloudai-ui'
 import type {Category, EntryTypeView} from '../../../api'
@@ -40,6 +41,12 @@ interface Props {
 export default function MobileEntryDetailEditView(p: Props) {
     const categoryOptions = [{value: '', label: '无分类'}, ...p.categories.map(category => ({value: category.id, label: category.name}))]
     const typeOptions = [{value: '', label: '无类型'}, ...p.entryTypes.map(type => ({value: entryTypeKey(type), label: type.name}))]
+    const additionalSummary = [
+        p.summary.trim() ? '摘要已填' : '无摘要',
+        `图片 ${p.imagesProps.images.length}`,
+        `标签 ${p.tagsProps.editTagSchemas.length}`,
+        `关系 ${p.relationsProps.relationDrafts.length}`,
+    ].join(' · ')
     const wikiPanel = p.wikiDraft ? <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
         <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
         {p.wikiOptions.length > 0 ? <div className="mobile-entry-detail__wiki-options">{p.wikiOptions.map((option, index) => {
@@ -55,9 +62,10 @@ export default function MobileEntryDetailEditView(p: Props) {
             left={<MobileTopActionPill actions={[{key: 'cancel', label: '取消编辑', icon: <MobileBackIcon/>, disabled: p.saving, onClick: p.onCancel}]}/>} center={<div className="mobile-entry-detail__edit-heading"><span>编辑词条</span><small>{p.saving ? '保存中…' : p.isDirty ? '有未保存修改' : '已同步'}</small></div>} right={<MobileTopActionPill actions={[{key: 'save', label: p.saving ? '保存中' : '保存词条', icon: <MobileEntryDetailActionIcon type={p.saving ? 'more' : 'save'}/>, kind: 'add', disabled: p.saving, onClick: p.onSave}]}/>}/>
         {p.error && <div className="mobile-page__error-banner" role="alert"><span>{p.error}</span></div>}
         <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--identity">
-            <div className="mobile-entry-detail__section-header"><span>基础信息</span></div>
-            <Input placeholder="词条标题" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
-            <textarea placeholder="摘要（可选）" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
+            <label className="mobile-entry-detail__title-field">
+                <span>标题</span>
+                <Input placeholder="词条标题" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
+            </label>
             <div className="mobile-entry-detail__meta-row"><label className="mobile-entry-detail__field"><span>类型</span><Select value={p.entryType ?? ''} onValueChange={value => p.onEntryType(value ? String(value) : null)} options={typeOptions} placeholder="类型" className="mobile-entry-detail__meta-select"/></label><label className="mobile-entry-detail__field"><span>分类</span><Select value={p.categoryId ?? ''} onValueChange={value => p.onCategory(value ? String(value) : null)} options={categoryOptions} placeholder="分类" className="mobile-entry-detail__meta-select"/></label></div>
             <button type="button" className="mobile-entry-detail__add-type" onClick={p.onOpenTypeCreator}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型</button>
         </section>
@@ -65,7 +73,21 @@ export default function MobileEntryDetailEditView(p: Props) {
             <div className="mobile-entry-detail__section-header"><span>正文</span><button type="button" className="mobile-entry-detail__section-action" onClick={p.onOpenImmersive}>沉浸</button></div>
             <div className="mobile-entry-detail__content-field"><MarkdownEditor ref={p.editorRef} value={p.content} onValueChange={p.onContentChange} placeholder="正文内容…输入 [[ 插入词条双链" minHeight={260} maxHeight={560} showSplitToggle={false} hideFullscreen toolbarCommands={[]} extraCommands={[]} textareaProps={p.textareaProps} tokens={{background: 'transparent', toolbarBackground: 'transparent', borderColor: 'transparent', editorTextBackground: 'transparent', previewBackground: 'transparent', textColor: 'var(--fc-color-text)', mutedTextColor: 'var(--fc-color-text-secondary)'}} className="mobile-entry-detail__content-input"/>{!p.immersiveOpen && wikiPanel}</div>
         </section>
-        <MobileEntryImagesSection {...p.imagesProps}/><MobileEntryTagsSection {...p.tagsProps}/><MobileEntryRelationsSection {...p.relationsProps}/>
+        <details className="mobile-entry-detail__additional">
+            <summary className="mobile-entry-detail__additional-summary">
+                <strong>附加内容</strong>
+                <span>{additionalSummary}</span>
+            </summary>
+            <div className="mobile-entry-detail__additional-body">
+                <label className="mobile-entry-detail__summary-field">
+                    <span>摘要</span>
+                    <textarea placeholder="摘要（可选）" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={2}/>
+                </label>
+                <MobileEntryImagesSection {...p.imagesProps}/>
+                <MobileEntryTagsSection {...p.tagsProps}/>
+                <MobileEntryRelationsSection {...p.relationsProps}/>
+            </div>
+        </details>
         {p.immersiveOpen && <MobileEntryImmersiveEditor {...p.immersiveProps} wikiPanel={wikiPanel}/>}<EntryTypeCreator {...p.typeCreatorProps}/><TagCreator {...p.tagCreatorProps}/><EntryImageLightbox {...p.lightboxProps}/><EntryImageAddModal {...p.imageAddProps}/>
     </div>
 }
