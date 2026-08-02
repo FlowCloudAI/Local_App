@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCloudAI · 移动端词条展示态设计稿</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --fc-color-primary: #378add;
+            --fc-color-primary-subtle: #ebf4fd;
+            --fc-color-bg: #fffdfa;
+            --fc-color-bg-secondary: #f5f4f3;
+            --fc-color-bg-elevated: #ffffff;
+            --fc-color-text: #1a1a1a;
+            --fc-color-text-secondary: #646464;
+            --fc-color-text-tertiary: #8a8a8a;
+            --fc-color-border: #d4d4d4;
+            --fc-color-cover: #d9e1e8;
+            --fc-radius-lg: 14px;
+            --fc-radius-xl: 20px;
+            --frame-width: 390px;
+            --frame-height: 844px;
+            font-family: "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --fc-color-primary: #5da4e8;
+            --fc-color-primary-subtle: rgba(55, 138, 221, 0.14);
+            --fc-color-bg: #101010;
+            --fc-color-bg-secondary: #1a1a1a;
+            --fc-color-bg-elevated: #222222;
+            --fc-color-text: #ededeb;
+            --fc-color-text-secondary: #aaa9a4;
+            --fc-color-text-tertiary: #77756f;
+            --fc-color-border: #3b3b38;
+            --fc-color-cover: #34404b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--fc-color-bg-secondary);
+            color: var(--fc-color-text);
+        }
+
+        button { font: inherit; }
+
+        .design-shell {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: minmax(270px, 340px) minmax(0, 1fr);
+        }
+
+        .design-notes {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow: auto;
+            padding: 28px;
+            border-right: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .design-notes h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+        }
+
+        .design-notes > p {
+            margin: 0 0 24px;
+            color: var(--fc-color-text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .control-group {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 22px;
+        }
+
+        .control-group strong { font-size: 13px; }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .control-row button {
+            min-height: 40px;
+            padding: 0 14px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            cursor: pointer;
+        }
+
+        .control-row button[aria-pressed="true"] {
+            border-color: var(--fc-color-primary);
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .decision-list {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .decision-list li {
+            padding-top: 12px;
+            border-top: 1px solid var(--fc-color-border);
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .decision-list b {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--fc-color-text);
+        }
+
+        .stage {
+            display: grid;
+            min-width: 0;
+            min-height: 100vh;
+            padding: 32px;
+            place-items: center;
+            overflow: auto;
+        }
+
+        .phone {
+            position: relative;
+            width: min(var(--frame-width), calc(100vw - 64px));
+            height: var(--frame-height);
+            max-height: calc(100vh - 64px);
+            overflow: hidden;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 24px;
+            background: var(--fc-color-bg);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.16);
+        }
+
+        .page-scroll {
+            height: 100%;
+            overflow-y: auto;
+            padding-bottom: 86px;
+            scrollbar-width: none;
+            scroll-behavior: smooth;
+        }
+
+        .page-scroll::-webkit-scrollbar,
+        .horizontal-list::-webkit-scrollbar { display: none; }
+
+        .topbar {
+            position: sticky;
+            z-index: 5;
+            top: 0;
+            display: grid;
+            min-height: 64px;
+            grid-template-columns: 74px minmax(0, 1fr) 150px;
+            align-items: center;
+            padding: 8px 14px;
+            border-bottom: 1px solid transparent;
+            background: var(--fc-color-bg);
+            transition: min-height 160ms ease, border-color 160ms ease;
+        }
+
+        .phone[data-scrolled="true"] .topbar {
+            min-height: 54px;
+            border-color: var(--fc-color-border);
+        }
+
+        .topbar-title {
+            overflow: hidden;
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 160ms ease;
+        }
+
+        .phone[data-scrolled="true"] .topbar-title { opacity: 1; }
+
+        .top-action,
+        .top-actions button,
+        .outline-button {
+            min-height: 44px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            background: var(--fc-color-bg-elevated);
+            color: var(--fc-color-text);
+            cursor: pointer;
+        }
+
+        .top-action { padding: 0 14px; }
+
+        .top-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .top-actions button {
+            min-width: 44px;
+            padding: 0 11px;
+            color: var(--fc-color-primary);
+        }
+
+        .entry-header { padding: 12px 18px 0; }
+
+        .eyebrow {
+            margin: 0 0 7px;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .entry-header h2 {
+            margin: 0;
+            font-size: 34px;
+            line-height: 1.18;
+            letter-spacing: -0.04em;
+        }
+
+        .summary {
+            margin: 14px 0 0;
+            color: var(--fc-color-text-secondary);
+            font-size: 15px;
+            line-height: 1.7;
+        }
+
+        .chip-strip,
+        .stat-strip,
+        .horizontal-list {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .chip-strip { margin-top: 15px; }
+
+        .chip {
+            min-height: 34px;
+            flex: 0 0 auto;
+            padding: 7px 12px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+        }
+
+        .chip.primary {
+            border-color: color-mix(in srgb, var(--fc-color-primary) 60%, var(--fc-color-border));
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .cover-media {
+            display: flex;
+            height: 176px;
+            align-items: flex-end;
+            margin: 18px 18px 0;
+            padding: 16px;
+            overflow: hidden;
+            border-radius: var(--fc-radius-xl);
+            background: var(--fc-color-cover);
+            color: var(--fc-color-text);
+        }
+
+        .cover-caption {
+            padding: 8px 11px;
+            border-radius: 10px;
+            background: var(--fc-color-bg-elevated);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .stat-strip { padding: 12px 18px 0; }
+
+        .stat {
+            min-width: 104px;
+            flex: 1 0 104px;
+            padding: 11px 12px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-lg);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .stat span,
+        .stat strong { display: block; }
+
+        .stat span {
+            margin-bottom: 4px;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+        }
+
+        .stat strong { font-size: 15px; }
+
+        .reading-tools {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 18px 18px 0;
+            padding: 12px 0;
+            border-top: 1px solid var(--fc-color-border);
+            border-bottom: 1px solid var(--fc-color-border);
+        }
+
+        .reading-tools span {
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .outline-button {
+            min-height: 38px;
+            padding: 0 13px;
+            color: var(--fc-color-primary);
+        }
+
+        .article {
+            padding: 22px 18px 4px;
+            font-size: 16.5px;
+            line-height: 1.82;
+        }
+
+        .article h1,
+        .article h2 {
+            margin: 28px 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--fc-color-border);
+            line-height: 1.3;
+        }
+
+        .article h1 {
+            margin-top: 0;
+            font-size: 26px;
+        }
+
+        .article h2 { font-size: 22px; }
+
+        .article p { margin: 0 0 16px; }
+
+        .article a {
+            color: var(--fc-color-primary);
+            text-decoration: none;
+        }
+
+        .connections {
+            margin-top: 24px;
+            padding: 22px 0 8px;
+            border-top: 8px solid var(--fc-color-bg-secondary);
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 18px 12px;
+        }
+
+        .section-title h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .section-title span {
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .horizontal-list {
+            padding: 0 18px 20px;
+            scroll-snap-type: x mandatory;
+        }
+
+        .relation-card {
+            width: calc(100% - 38px);
+            min-width: calc(100% - 38px);
+            padding: 14px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-lg);
+            background: var(--fc-color-bg-elevated);
+            scroll-snap-align: start;
+        }
+
+        .relation-card strong,
+        .relation-card span { display: block; }
+
+        .relation-card strong { font-size: 15px; }
+
+        .relation-card span {
+            margin-top: 4px;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .bottom-nav {
+            position: absolute;
+            z-index: 6;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: grid;
+            height: 72px;
+            grid-template-columns: repeat(4, 1fr);
+            border-top: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg);
+        }
+
+        .bottom-nav button {
+            border: 0;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .bottom-nav button[aria-current="page"] {
+            color: var(--fc-color-primary);
+            font-weight: 700;
+        }
+
+        @media (max-width: 800px) {
+            .design-shell { grid-template-columns: 1fr; }
+            .design-notes {
+                position: static;
+                height: auto;
+                border-right: 0;
+                border-bottom: 1px solid var(--fc-color-border);
+            }
+            .stage { padding: 18px 10px; }
+            .phone {
+                width: min(var(--frame-width), calc(100vw - 20px));
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="design-shell">
+    <aside class="design-notes">
+        <h1>移动端词条展示态</h1>
+        <p>所属板块：项目 Tab → 词条详情。只设计阅读与关联浏览，不包含编辑表单或 AI 审阅浮层。</p>
+
+        <div class="control-group">
+            <strong>查看位置</strong>
+            <div class="control-row" data-control="anchor">
+                <button type="button" data-value="top" aria-pressed="true">词条概览</button>
+                <button type="button" data-value="body" aria-pressed="false">正文阅读</button>
+                <button type="button" data-value="connections" aria-pressed="false">关联内容</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <strong>预览条件</strong>
+            <div class="control-row" data-control="width">
+                <button type="button" data-value="390" aria-pressed="true">390 × 844</button>
+                <button type="button" data-value="360" aria-pressed="false">360 × 740</button>
+            </div>
+            <div class="control-row" data-control="theme">
+                <button type="button" data-value="light" aria-pressed="true">浅色</button>
+                <button type="button" data-value="dark" aria-pressed="false">深色</button>
+            </div>
+        </div>
+
+        <ul class="decision-list">
+            <li><b>顶部不遮正文</b>操作栏参与布局并保持实色；滚动后只收紧高度和显示词条名。</li>
+            <li><b>首屏先交代身份</b>标题、摘要、类型、分类、标签和主图都保留，但不再套多层大卡片。</li>
+            <li><b>长文提高扫描效率</b>收紧字号与段间距，并提供大纲入口，不把正文放大成逐句翻页。</li>
+            <li><b>关联内容横向浏览</b>非空关系以单行卡片呈现；空分组直接隐藏，不制造无意义高度。</li>
+        </ul>
+    </aside>
+
+    <section class="stage" aria-label="移动端词条展示态设计稿">
+        <div class="phone" data-scrolled="false">
+            <div class="page-scroll">
+                <header class="topbar">
+                    <button type="button" class="top-action">返回</button>
+                    <div class="topbar-title">孙悟空</div>
+                    <div class="top-actions" aria-label="词条操作">
+                        <button type="button">AI</button>
+                        <button type="button">编辑</button>
+                        <button type="button">更多</button>
+                    </div>
+                </header>
+
+                <section id="entry-top" class="entry-header">
+                    <p class="eyebrow">人物 · 主要人物</p>
+                    <h2>孙悟空</h2>
+                    <p class="summary">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</p>
+                    <div class="chip-strip" aria-label="词条类型与标签">
+                        <span class="chip primary">人物</span>
+                        <span class="chip">年龄 1200</span>
+                        <span class="chip">齐天大圣</span>
+                        <span class="chip">斗战胜佛</span>
+                    </div>
+                </section>
+
+                <div class="cover-media" role="img" aria-label="词条主图：孙悟空设定图">
+                    <span class="cover-caption">主图 · 查看设定集</span>
+                </div>
+
+                <div class="stat-strip" aria-label="词条辅助信息">
+                    <div class="stat"><span>所属分类</span><strong>主要人物</strong></div>
+                    <div class="stat"><span>图片</span><strong>1 张</strong></div>
+                    <div class="stat"><span>关系</span><strong>4 条</strong></div>
+                </div>
+
+                <div class="reading-tools">
+                    <span>约 1,240 字 · 预计阅读 5 分钟</span>
+                    <button type="button" class="outline-button" data-go-body>大纲 6</button>
+                </div>
+
+                <article id="entry-body" class="article">
+                    <h1>基本档案</h1>
+                    <p><strong>别名：</strong>美猴王、齐天大圣、孙行者、斗战胜佛。</p>
+                    <p><strong>身份：</strong>花果山水帘洞美猴王，西天取经队伍核心成员。</p>
+                    <p><strong>兵器：</strong>如意金箍棒，重一万三千五百斤。</p>
+
+                    <h2>生平经历</h2>
+                    <p>仙石迸裂而生，为群猴寻得水帘洞，被尊为“美猴王”。漂洋过海拜师学艺，习得七十二变与筋斗云。</p>
+                    <p>闯东海龙宫取走金箍棒，后因大闹天宫被压五行山下。五百年后护送唐僧西行，历经九九八十一难，最终修成正果。</p>
+
+                    <h2>性格特点</h2>
+                    <p>桀骜不驯、敢于挑战权威；忠义护师、嫉恶如仇，同时机智果敢、应变极快。</p>
+                    <p>与<a href="#entry-connections">唐僧、猪八戒和沙悟净</a>共同构成取经队伍，其行动也牵动多个事件与地点词条。</p>
+                </article>
+
+                <section id="entry-connections" class="connections">
+                    <div class="section-title"><h3>词条关系</h3><span>4 条</span></div>
+                    <div class="horizontal-list" data-mobile-horizontal-scroll="true">
+                        <article class="relation-card"><strong>唐僧</strong><span>师徒 · 双向<br>西行取经队伍的师父。</span></article>
+                        <article class="relation-card"><strong>猪八戒</strong><span>同伴 · 双向<br>取经队伍成员，常与孙悟空争辩。</span></article>
+                    </div>
+
+                    <div class="section-title"><h3>正向链接</h3><span>3 个</span></div>
+                    <div class="horizontal-list" data-mobile-horizontal-scroll="true">
+                        <article class="relation-card"><strong>花果山</strong><span>出生地<br>孙悟空统领群猴的故乡。</span></article>
+                        <article class="relation-card"><strong>如意金箍棒</strong><span>兵器<br>取自东海龙宫的神兵。</span></article>
+                    </div>
+                </section>
+            </div>
+
+            <nav class="bottom-nav" aria-label="应用主导航">
+                <button type="button" aria-current="page">首页</button>
+                <button type="button">AI</button>
+                <button type="button">灵感</button>
+                <button type="button">设置</button>
+            </nav>
+        </div>
+    </section>
+</main>
+
+<script>
+    const phone = document.querySelector('.phone')
+    const scroller = document.querySelector('.page-scroll')
+
+    function selectControl(group, value) {
+        document.querySelectorAll(`[data-control="${group}"] button`).forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.value === value))
+        })
+    }
+
+    function scrollToSection(value) {
+        const target = document.querySelector(value === 'top' ? '#entry-top' : `#entry-${value}`)
+        scroller.scrollTo({top: Math.max(0, target.offsetTop - 56), behavior: 'smooth'})
+        selectControl('anchor', value)
+    }
+
+    document.querySelectorAll('[data-control] button').forEach(button => {
+        button.addEventListener('click', () => {
+            const group = button.closest('[data-control]').dataset.control
+            const value = button.dataset.value
+            selectControl(group, value)
+            if (group === 'anchor') scrollToSection(value)
+            if (group === 'theme') document.documentElement.dataset.theme = value
+            if (group === 'width') {
+                document.documentElement.style.setProperty('--frame-width', `${value}px`)
+                document.documentElement.style.setProperty('--frame-height', value === '360' ? '740px' : '844px')
+            }
+        })
+    })
+
+    document.querySelector('[data-go-body]').addEventListener('click', () => scrollToSection('body'))
+    scroller.addEventListener('scroll', () => {
+        phone.dataset.scrolled = String(scroller.scrollTop > 36)
+    }, {passive: true})
+</script>
+</body>
+</html>
