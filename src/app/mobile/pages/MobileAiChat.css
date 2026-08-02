@@ -12,6 +12,10 @@
     color: var(--fc-color-text);
 }
 
+.mobile-ai-chat[hidden] {
+    display: none;
+}
+
 .mobile-ai-chat__topbar {
     position: absolute;
     top: 0;
