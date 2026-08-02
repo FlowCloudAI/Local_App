@@ -272,26 +272,46 @@
       line-height: 1.75;
     }
 
-    .details-toggle {
+    .section-details {
+      overflow: hidden;
+      border: 1px solid var(--fc-border);
+      border-radius: 16px;
+      scroll-margin-top: 12px;
+    }
+
+    .section-details > summary {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: center;
       gap: 12px;
-      width: 100%;
       min-height: 64px;
       padding: 10px 12px;
       text-align: left;
-      border: 1px solid var(--fc-border);
-      border-radius: 16px;
-      background: transparent;
+      list-style: none;
+      cursor: pointer;
     }
 
-    .details-toggle .count {
+    .section-details > summary::-webkit-details-marker { display: none; }
+
+    .section-details[open] > summary { border-bottom: 1px solid var(--fc-border); }
+
+    .section-details .count {
       color: var(--fc-text-secondary);
       font-size: 12px;
     }
 
-    .details-toggle .chevron { color: var(--fc-primary); }
+    .section-details .chevron {
+      color: var(--fc-primary);
+    }
+
+    .section-details .chevron::after { content: "展开"; }
+    .section-details[open] .chevron::after { content: "收起"; }
+
+    .section-body {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+    }
 
     .save-state {
       display: flex;
@@ -330,28 +350,6 @@
     }
 
     .bottom-nav button.active { color: var(--fc-primary); }
-
-    .extras {
-      display: grid;
-      gap: 18px;
-      padding: 16px 16px 104px;
-    }
-
-    .section {
-      display: grid;
-      gap: 10px;
-      padding-bottom: 18px;
-      border-bottom: 1px solid var(--fc-border);
-    }
-
-    .section-heading {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .section-heading h2 { margin: 0; font-size: 15px; }
-    .section-heading span { color: var(--fc-text-secondary); font-size: 12px; }
 
     .summary-input {
       min-height: 92px;
@@ -442,6 +440,27 @@
     .relation-row { border-style: solid; }
     .relation-row span { color: var(--fc-text-secondary); }
 
+    .relation-list {
+      overflow: hidden;
+      border: 1px solid var(--fc-border);
+      border-radius: 14px;
+    }
+
+    .relation-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      min-height: 52px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .relation-item:last-child { border-bottom: 0; }
+    .relation-item strong,
+    .relation-item span { display: block; }
+    .relation-item span { color: var(--fc-text-secondary); font-size: 12px; }
+    .relation-kind { align-self: center; color: var(--fc-primary); }
+
     .focus-screen {
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
@@ -516,18 +535,8 @@
     .key.space { grid-column: span 6; }
     .key.wide { grid-column: span 2; }
 
-    .phone[data-view="main"] .extras,
     .phone[data-view="main"] .focus-screen,
-    .phone[data-view="extras"] .screen,
-    .phone[data-view="extras"] .focus-screen,
-    .phone[data-view="focus"] .screen,
-    .phone[data-view="focus"] .extras-screen { display: none; }
-
-    .extras-screen {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
-      height: 100%;
-    }
+    .phone[data-view="focus"] .screen { display: none; }
 
     .phone[data-view="focus"][data-keyboard="open"] .keyboard { display: block; }
     .phone[data-view="focus"][data-keyboard="open"] .focus-screen { grid-template-rows: auto minmax(0, 1fr) auto auto; }
@@ -548,8 +557,15 @@
       <h2>查看状态</h2>
       <div class="switches" aria-label="设计状态">
         <button type="button" data-view="main" aria-pressed="true">主编辑</button>
-        <button type="button" data-view="extras" aria-pressed="false">附加内容</button>
         <button type="button" data-view="focus" aria-pressed="false">沉浸正文</button>
+      </div>
+
+      <h2>查看板块</h2>
+      <div class="switches" aria-label="编辑板块">
+        <button type="button" data-section="summary" aria-pressed="true">摘要</button>
+        <button type="button" data-section="media" aria-pressed="false">图片</button>
+        <button type="button" data-section="properties" aria-pressed="false">属性与标签</button>
+        <button type="button" data-section="relations" aria-pressed="false">词条关系</button>
       </div>
 
       <h2>输入状态</h2>
@@ -570,12 +586,12 @@
 
       <h2>设计取舍</h2>
       <div class="decision">
-        <strong>主编辑先写，不先填表</strong>
-        <p>首屏只留标题、类型、分类与正文；摘要、图片、标签、关系集中到一个可折叠入口。</p>
+        <strong>摘要属于核心内容</strong>
+        <p>摘要紧邻标题，进入编辑页即可查看和修改，不藏进二级入口。</p>
       </div>
       <div class="decision">
-        <strong>附加内容改成紧凑列表</strong>
-        <p>封面改横向缩略行，标签一项一行，清空是尾部轻操作，不再占满整行。</p>
+        <strong>业务板块保持独立</strong>
+        <p>图片、属性与标签、词条关系分别折叠；只减少默认高度，不改变业务层级。</p>
       </div>
       <div class="decision">
         <strong>正文工具栏跟键盘走</strong>
@@ -599,6 +615,11 @@
                 <input class="input" value="孙悟空" aria-label="标题" />
               </label>
 
+              <label class="field" id="summary-section">
+                <span class="field-label"><span>摘要</span><span>84 / 200</span></span>
+                <textarea class="summary-input" aria-label="摘要">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</textarea>
+              </label>
+
               <div class="field">
                 <div class="field-label"><span>词条类型</span><span>影响标签重点显示</span></div>
                 <div class="chips" data-mobile-horizontal-scroll>
@@ -613,7 +634,7 @@
               <div class="field">
                 <span class="field-label">所属分类</span>
                 <div class="category-row">
-                  <button class="select-like" type="button"><span>主要人物</span><span>⌄</span></button>
+                  <button class="select-like" type="button"><span>主要人物</span><span>展开</span></button>
                   <button class="compact-action" type="button">新建</button>
                 </div>
               </div>
@@ -637,64 +658,57 @@
                 </div>
               </div>
 
-              <button class="details-toggle" type="button" data-jump="extras">
-                <span>＋</span>
-                <span><strong>附加内容</strong><br><span class="count">摘要 · 1 张图片 · 4 个标签 · 3 条关系</span></span>
-                <span class="chevron">进入</span>
-              </button>
+              <details class="section-details" id="media-section">
+                <summary>
+                  <strong>图片</strong>
+                  <span class="count">1 张 · 已设主图</span>
+                  <span class="chevron"></span>
+                </summary>
+                <div class="section-body">
+                  <div class="cover-row">
+                    <div class="cover-thumb">主图</div>
+                    <div class="cover-copy"><strong>孙悟空设定图</strong><span>作为词条主图显示</span></div>
+                    <button class="icon-button" type="button">更换</button>
+                  </div>
+                  <button class="add-row" type="button"><span>添加图片</span><span>最多 9 张</span></button>
+                </div>
+              </details>
+
+              <details class="section-details" id="properties-section">
+                <summary>
+                  <strong>属性与标签</strong>
+                  <span class="count">4 项</span>
+                  <span class="chevron"></span>
+                </summary>
+                <div class="section-body">
+                  <div class="tag-list">
+                    <div class="tag-row"><div class="tag-main"><strong>别名</strong><span>文本 · <b class="tag-value">美猴王</b></span></div><button class="clear-button" type="button">清空</button></div>
+                    <div class="tag-row"><div class="tag-main"><strong>年龄</strong><span>数值 · <b class="tag-value">1200</b></span></div><button class="clear-button" type="button">清空</button></div>
+                    <div class="tag-row"><div class="tag-main"><strong>所属势力</strong><span>词条 · <b class="tag-value">取经队伍</b></span></div><button class="clear-button" type="button">清空</button></div>
+                    <div class="tag-row"><div class="tag-main"><strong>身份</strong><span>文本 · <b class="tag-value">齐天大圣</b></span></div><button class="clear-button" type="button">清空</button></div>
+                  </div>
+                  <button class="add-row" type="button"><span>添加已有标签</span><span>新建标签</span></button>
+                </div>
+              </details>
+
+              <details class="section-details" id="relations-section">
+                <summary>
+                  <strong>词条关系</strong>
+                  <span class="count">3 条</span>
+                  <span class="chevron"></span>
+                </summary>
+                <div class="section-body">
+                  <div class="relation-list">
+                    <div class="relation-item"><div><strong>唐僧</strong><span>主要人物</span></div><span class="relation-kind">师徒</span></div>
+                    <div class="relation-item"><div><strong>猪八戒</strong><span>主要人物</span></div><span class="relation-kind">同伴</span></div>
+                    <div class="relation-item"><div><strong>花果山</strong><span>地点</span></div><span class="relation-kind">归属</span></div>
+                  </div>
+                  <button class="relation-row" type="button"><strong>管理词条关系</strong><span>进入完整关系编辑</span></button>
+                </div>
+              </details>
 
               <div class="save-state">所有更改已保存</div>
             </form>
-          </div>
-
-          <nav class="bottom-nav" aria-label="主导航">
-            <button class="active" type="button">首页</button>
-            <button type="button">AI</button>
-            <button type="button">灵感</button>
-            <button type="button">设置</button>
-          </nav>
-        </section>
-
-        <section class="extras-screen" aria-label="附加内容编辑">
-          <header class="topbar">
-            <button class="top-action" type="button" data-jump="main">返回</button>
-            <strong>附加内容</strong>
-            <button class="top-action" type="button">完成</button>
-          </header>
-
-          <div class="scroll">
-            <div class="extras">
-              <section class="section">
-                <div class="section-heading"><h2>摘要</h2><span>84 / 200</span></div>
-                <textarea class="summary-input" aria-label="摘要">花果山水帘洞美猴王，西天取经队伍核心成员。机敏果敢、神通广大，也因率性冲动屡生波折。</textarea>
-              </section>
-
-              <section class="section">
-                <div class="section-heading"><h2>图片</h2><span>1 张</span></div>
-                <div class="cover-row">
-                  <div class="cover-thumb">主图</div>
-                  <div class="cover-copy"><strong>孙悟空设定图</strong><span>作为词条主图显示</span></div>
-                  <button class="icon-button" type="button">更换</button>
-                </div>
-                <button class="add-row" type="button"><span>＋ 添加图片</span><span>最多 9 张</span></button>
-              </section>
-
-              <section class="section">
-                <div class="section-heading"><h2>标签</h2><span>4 项</span></div>
-                <div class="tag-list">
-                  <div class="tag-row"><div class="tag-main"><strong>别名</strong><span>文本 · <b class="tag-value">美猴王</b></span></div><button class="clear-button" type="button">清空</button></div>
-                  <div class="tag-row"><div class="tag-main"><strong>年龄</strong><span>数值 · <b class="tag-value">1200</b></span></div><button class="clear-button" type="button">清空</button></div>
-                  <div class="tag-row"><div class="tag-main"><strong>所属势力</strong><span>词条 · <b class="tag-value">取经队伍</b></span></div><button class="clear-button" type="button">清空</button></div>
-                  <div class="tag-row"><div class="tag-main"><strong>身份</strong><span>文本 · <b class="tag-value">齐天大圣</b></span></div><button class="clear-button" type="button">清空</button></div>
-                </div>
-                <button class="add-row" type="button"><span>＋ 添加已有标签</span><span>新建标签</span></button>
-              </section>
-
-              <section class="section">
-                <div class="section-heading"><h2>词条关系</h2><span>3 条</span></div>
-                <button class="relation-row" type="button"><strong>查看与编辑关系</strong><span>唐僧、猪八戒等 ›</span></button>
-              </section>
-            </div>
           </div>
 
           <nav class="bottom-nav" aria-label="主导航">
@@ -767,9 +781,21 @@
       if (button) select('[data-keyboard]', button);
     }
 
+    function showSection(section) {
+      setView('main');
+      const target = document.querySelector(`#${section}-section`);
+      document.querySelectorAll('.section-details').forEach((details) => {
+        details.open = details === target;
+      });
+      const button = document.querySelector(`[data-section="${section}"]`);
+      if (button) select('[data-section]', button);
+      requestAnimationFrame(() => target?.scrollIntoView({ block: 'start' }));
+    }
+
     controls.forEach((button) => {
       button.addEventListener('click', () => {
         if (button.dataset.view) setView(button.dataset.view);
+        if (button.dataset.section) showSection(button.dataset.section);
         if (button.dataset.keyboard) setKeyboard(button.dataset.keyboard);
         if (button.dataset.size) {
           document.documentElement.style.setProperty('--phone-width', `${button.dataset.size}px`);
@@ -788,8 +814,9 @@
     });
 
     const query = new URLSearchParams(location.search);
-    if (['main', 'extras', 'focus'].includes(query.get('view'))) setView(query.get('view'));
+    if (['main', 'focus'].includes(query.get('view'))) setView(query.get('view'));
     if (['open', 'closed'].includes(query.get('keyboard'))) setKeyboard(query.get('keyboard'));
+    if (['summary', 'media', 'properties', 'relations'].includes(query.get('section'))) showSection(query.get('section'));
   </script>
 </body>
 </html>
