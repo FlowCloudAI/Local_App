@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-glass="enabled">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCloudAI · AI Tab 词条修改审阅视觉规划</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --fc-color-primary: #378add;
+            --fc-color-primary-subtle: #ebf4fd;
+            --fc-color-danger: #e24b4a;
+            --fc-color-success: #639922;
+            --fc-color-bg: #fffdfa;
+            --fc-color-bg-secondary: #f5f4f3;
+            --fc-color-bg-elevated: #ffffff;
+            --fc-color-text: #1a1a1a;
+            --fc-color-text-secondary: #5f5f5f;
+            --fc-color-text-tertiary: #808080;
+            --fc-color-border: #d0d0d0;
+            --fc-radius-lg: 12px;
+            --fc-radius-xl: 16px;
+            --fc-space-sm: 8px;
+            --fc-space-md: 12px;
+            --fc-space-lg: 16px;
+            --frame-width: 390px;
+            --frame-height: 844px;
+            --panel-background: color-mix(in srgb, var(--fc-color-bg-elevated) 75%, transparent);
+            --panel-filter: blur(8px) saturate(1.3);
+            font-family: "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --fc-color-primary: #5da4e8;
+            --fc-color-primary-subtle: rgba(55, 138, 221, 0.12);
+            --fc-color-danger: #ff7774;
+            --fc-color-success: #91c955;
+            --fc-color-bg: #101010;
+            --fc-color-bg-secondary: #1b1b1b;
+            --fc-color-bg-elevated: #282828;
+            --fc-color-text: #e8e8e6;
+            --fc-color-text-secondary: #9c9a92;
+            --fc-color-text-tertiary: #636158;
+            --fc-color-border: #3d3d3a;
+        }
+
+        :root[data-glass="disabled"] {
+            --panel-background: var(--fc-color-bg-elevated);
+            --panel-filter: none;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--fc-color-bg-secondary);
+            color: var(--fc-color-text);
+        }
+
+        button,
+        textarea { font: inherit; }
+
+        button { cursor: pointer; }
+
+        .design-shell {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+        }
+
+        .design-notes {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow: auto;
+            padding: 28px;
+            border-right: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .design-notes h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+        }
+
+        .design-notes > p {
+            margin: 0 0 24px;
+            color: var(--fc-color-text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .control-group {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 22px;
+        }
+
+        .control-group strong { font-size: 13px; }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .control-row button {
+            min-height: 40px;
+            padding: 0 14px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .control-row button[aria-pressed="true"] {
+            border-color: var(--fc-color-primary);
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .decision-list {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .decision-list li {
+            padding-top: 12px;
+            border-top: 1px solid var(--fc-color-border);
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .decision-list b {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--fc-color-text);
+        }
+
+        .stage {
+            display: grid;
+            min-width: 0;
+            min-height: 100vh;
+            padding: 32px;
+            place-items: center;
+            overflow: auto;
+        }
+
+        .phone {
+            position: relative;
+            width: min(var(--frame-width), calc(100vw - 64px));
+            height: var(--frame-height);
+            max-height: calc(100vh - 64px);
+            overflow: hidden;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 24px;
+            background: var(--fc-color-bg);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.16);
+        }
+
+        .ai-page {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            background: var(--fc-color-bg);
+        }
+
+        .ai-topbar {
+            display: grid;
+            min-height: 64px;
+            grid-template-columns: 72px minmax(0, 1fr) 72px;
+            align-items: center;
+            padding: 8px 14px;
+            border-bottom: 1px solid var(--fc-color-border);
+        }
+
+        .ai-topbar button {
+            min-height: 44px;
+            border: 0;
+            background: transparent;
+            color: var(--fc-color-primary);
+        }
+
+        .ai-topbar strong {
+            min-width: 0;
+            overflow: hidden;
+            text-align: center;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .messages {
+            display: flex;
+            min-height: 0;
+            flex: 1;
+            flex-direction: column;
+            gap: 16px;
+            overflow: hidden;
+            padding: 18px 18px 150px;
+        }
+
+        .message {
+            max-width: 88%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            color: var(--fc-color-text);
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .message--user {
+            align-self: flex-end;
+            background: var(--fc-color-primary-subtle);
+        }
+
+        .message--assistant {
+            align-self: flex-start;
+            padding-inline: 0;
+        }
+
+        .message small {
+            display: block;
+            margin-top: 8px;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .composer {
+            position: absolute;
+            right: 12px;
+            bottom: 70px;
+            left: 12px;
+            padding: 12px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 18px;
+            background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+            backdrop-filter: blur(8px) saturate(1.3);
+        }
+
+        .composer textarea {
+            width: 100%;
+            height: 44px;
+            resize: none;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .mobile-nav {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: grid;
+            height: 62px;
+            grid-template-columns: repeat(4, 1fr);
+            border-top: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .mobile-nav button {
+            border: 0;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .mobile-nav button[aria-current="page"] {
+            color: var(--fc-color-primary);
+            font-weight: 700;
+        }
+
+        .overlay {
+            position: absolute;
+            z-index: 20;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+            background: color-mix(in srgb, #000000 48%, transparent);
+        }
+
+        .review-panel {
+            display: flex;
+            width: 100%;
+            max-height: calc(100% - 28px);
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--fc-color-border) 76%, transparent);
+            border-radius: 20px;
+            background: var(--panel-background);
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+            backdrop-filter: var(--panel-filter);
+        }
+
+        .panel-header {
+            display: grid;
+            min-height: 60px;
+            grid-template-columns: minmax(0, 1fr) 44px;
+            align-items: center;
+            padding: 8px 10px 8px 18px;
+            border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+        }
+
+        .panel-header strong { font-size: 18px; }
+
+        .panel-header button {
+            width: 44px;
+            height: 44px;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .entry-name {
+            padding: 10px 18px 4px;
+            overflow: hidden;
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .entry-name b { color: var(--fc-color-text); }
+
+        .review-toolbar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            min-height: 58px;
+            padding: 8px 12px 10px 18px;
+            border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 54%, transparent);
+        }
+
+        .change-summary {
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .change-summary .removed { color: var(--fc-color-danger); }
+        .change-summary .added { color: var(--fc-color-success); }
+
+        .hunk-nav {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .hunk-nav button {
+            min-width: 44px;
+            min-height: 44px;
+            padding: 0 8px;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-primary);
+        }
+
+        .hunk-nav span {
+            min-width: 34px;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .diff {
+            min-height: 0;
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px 18px;
+            background: transparent;
+            scrollbar-width: none;
+        }
+
+        .diff::-webkit-scrollbar { display: none; }
+
+        .diff-line {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 7px;
+            margin: 3px 0;
+            padding: 7px 9px;
+            border-left: 3px solid transparent;
+            border-radius: 8px;
+            color: var(--fc-color-text);
+            font-family: "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .diff-line--same {
+            color: var(--fc-color-text-secondary);
+        }
+
+        .diff-line--removed {
+            border-left-color: var(--fc-color-danger);
+            background: color-mix(in srgb, var(--fc-color-danger) 9%, transparent);
+        }
+
+        .diff-line--added {
+            border-left-color: var(--fc-color-success);
+            background: color-mix(in srgb, var(--fc-color-success) 9%, transparent);
+        }
+
+        .diff-marker {
+            color: var(--fc-color-text-tertiary);
+            font-weight: 700;
+        }
+
+        .diff-line--removed .diff-marker { color: var(--fc-color-danger); }
+        .diff-line--added .diff-marker { color: var(--fc-color-success); }
+
+        mark {
+            padding: 0 2px;
+            border-radius: 4px;
+            background: transparent;
+            color: inherit;
+        }
+
+        .diff-line--removed mark {
+            background: color-mix(in srgb, var(--fc-color-danger) 15%, transparent);
+        }
+
+        .diff-line--added mark {
+            background: color-mix(in srgb, var(--fc-color-success) 15%, transparent);
+        }
+
+        .panel-footer {
+            display: grid;
+            grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.45fr);
+            gap: 10px;
+            padding: 12px 14px 14px;
+            border-top: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+        }
+
+        .panel-footer button {
+            min-height: 46px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+
+        .cancel-button {
+            border: 1px solid var(--fc-color-border);
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .apply-button {
+            border: 1px solid var(--fc-color-primary);
+            background: var(--fc-color-primary);
+            color: #ffffff;
+        }
+
+        .phone[data-state="busy"] .review-panel button { cursor: wait; }
+        .phone[data-state="busy"] .panel-header button,
+        .phone[data-state="busy"] .cancel-button,
+        .phone[data-state="busy"] .hunk-nav button {
+            opacity: 0.42;
+            pointer-events: none;
+        }
+
+        .phone[data-state="busy"] .apply-button {
+            opacity: 0.76;
+        }
+
+        @supports not (backdrop-filter: blur(8px)) {
+            .review-panel,
+            .composer { background: var(--fc-color-bg-elevated); }
+        }
+
+        @media (max-width: 800px) {
+            .design-shell { grid-template-columns: 1fr; }
+            .design-notes {
+                position: static;
+                height: auto;
+                border-right: 0;
+                border-bottom: 1px solid var(--fc-color-border);
+            }
+            .stage { padding: 18px 10px; }
+            .phone {
+                width: min(var(--frame-width), calc(100vw - 20px));
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="design-shell">
+    <aside class="design-notes">
+        <h1>AI 词条修改审阅</h1>
+        <p>所属板块：AI Tab。由 AI 工具请求触发，浮层背后必须是对话页面，不是项目编辑页。</p>
+
+        <div class="control-group">
+            <strong>请求状态</strong>
+            <div class="control-row" data-control="state">
+                <button type="button" data-value="idle" aria-pressed="true">等待确认</button>
+                <button type="button" data-value="busy" aria-pressed="false">应用中</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <strong>视觉条件</strong>
+            <div class="control-row" data-control="glass">
+                <button type="button" data-value="enabled" aria-pressed="true">毛玻璃开启</button>
+                <button type="button" data-value="disabled" aria-pressed="false">实色回退</button>
+            </div>
+            <div class="control-row" data-control="theme">
+                <button type="button" data-value="light" aria-pressed="true">浅色</button>
+                <button type="button" data-value="dark" aria-pressed="false">深色</button>
+            </div>
+            <div class="control-row" data-control="width">
+                <button type="button" data-value="390" aria-pressed="true">390 × 844</button>
+                <button type="button" data-value="360" aria-pressed="false">360 × 740</button>
+            </div>
+        </div>
+
+        <ul class="decision-list">
+            <li><b>真实上下文</b>审阅请求覆盖 AI 对话，但不切走 AI Tab；对话与输入框仍可从遮罩后辨认。</li>
+            <li><b>单一玻璃面</b>标题、导航、diff 和操作区属于同一 FloatingPanel，不再叠加大块不透明背景。</li>
+            <li><b>语义色例外</b>只给新增、删除及行内变化着色；未变化正文保持透明。</li>
+            <li><b>忙碌态完整</b>应用过程中关闭、拒绝、导航均禁用，返回键也不能关闭。</li>
+            <li><b>窄屏可用</b>两种宽度下保留 44px 触控目标，diff 成为唯一滚动区。</li>
+        </ul>
+    </aside>
+
+    <section class="stage" aria-label="AI Tab 词条修改审阅设计稿">
+        <div class="phone" data-state="idle">
+            <section class="ai-page">
+                <header class="ai-topbar">
+                    <button type="button">对话</button>
+                    <strong>Flow GPT · 对话模式</strong>
+                    <button type="button">更多</button>
+                </header>
+
+                <div class="messages">
+                    <div class="message message--user">请把“雾港守望者”的正文整理得更连贯，并保留原来的设定。</div>
+                    <div class="message message--assistant">
+                        已完成正文调整。我合并了重复描述，并补足了守望者传承方式的因果关系。
+                        <small>正在等待你审阅差异。</small>
+                    </div>
+                </div>
+
+                <div class="composer"><textarea disabled>发消息或按住说话</textarea></div>
+                <nav class="mobile-nav" aria-label="主导航">
+                    <button type="button">首页</button>
+                    <button type="button" aria-current="page">AI</button>
+                    <button type="button">灵感</button>
+                    <button type="button">设置</button>
+                </nav>
+            </section>
+
+            <div class="overlay">
+                <section class="review-panel" role="dialog" aria-modal="true" aria-label="AI 编辑请求">
+                    <header class="panel-header">
+                        <strong>AI 编辑请求</strong>
+                        <button type="button" aria-label="不应用并关闭">关闭</button>
+                    </header>
+
+                    <div class="entry-name">正在修改：<b>雾港守望者</b></div>
+
+                    <div class="review-toolbar">
+                        <div class="change-summary"><span class="removed">删除 3</span> · <span class="added">新增 5</span></div>
+                        <div class="hunk-nav">
+                            <button type="button">上一处</button>
+                            <span>1 / 3</span>
+                            <button type="button">下一处</button>
+                        </div>
+                    </div>
+
+                    <div class="diff" tabindex="0" aria-label="正文修改差异">
+                        <div class="diff-line diff-line--same"><span class="diff-marker"></span><span>雾港位于群岛的西缘，常年被浓雾笼罩。</span></div>
+                        <div class="diff-line diff-line--removed"><span class="diff-marker">−</span><span>这里的雾来自深海的低语，<mark>码头在雾中若隐若现。</mark></span></div>
+                        <div class="diff-line diff-line--added"><span class="diff-marker">+</span><span>潮汐是这里最忠诚的钟表，涨落之间决定了船只的出入，也决定了人们的生计。</span></div>
+                        <div class="diff-line diff-line--same"><span class="diff-marker"></span><span>守望者并非正式组织，而是代代自发承担瞭望与预警之责的人们。</span></div>
+                        <div class="diff-line diff-line--removed"><span class="diff-marker">−</span><span>他们站在塔上，等风暴过去。</span></div>
+                        <div class="diff-line diff-line--added"><span class="diff-marker">+</span><span>他们在高塔与礁石之间传递烟火与号音，在风暴来临前将预兆刻进木牌，留给下一任守望者。</span></div>
+                        <div class="diff-line diff-line--same"><span class="diff-marker"></span><span>传说最早的守望者在一场没有月亮的风暴中失踪，只留下一盏未熄灭的灯。</span></div>
+                        <div class="diff-line diff-line--removed"><span class="diff-marker">−</span><span>那盏灯由黑曜石制成，传闻能熄灭一切迷雾。</span></div>
+                        <div class="diff-line diff-line--added"><span class="diff-marker">+</span><span>自那以后，灯光便成了雾港的约定：无论何时熄灭，都意味着有人需要帮助。</span></div>
+                    </div>
+
+                    <footer class="panel-footer">
+                        <button type="button" class="cancel-button">不应用</button>
+                        <button type="button" class="apply-button" data-apply>应用全部修改</button>
+                    </footer>
+                </section>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script>
+    const phone = document.querySelector('.phone')
+    const applyButton = document.querySelector('[data-apply]')
+
+    function selectControl(group, value) {
+        document.querySelectorAll(`[data-control="${group}"] button`).forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.value === value))
+        })
+    }
+
+    function setState(value) {
+        phone.dataset.state = value
+        applyButton.textContent = value === 'busy' ? '应用中…' : '应用全部修改'
+        applyButton.disabled = value === 'busy'
+    }
+
+    document.querySelectorAll('[data-control] button').forEach(button => {
+        button.addEventListener('click', () => {
+            const group = button.closest('[data-control]').dataset.control
+            const value = button.dataset.value
+            selectControl(group, value)
+            if (group === 'state') setState(value)
+            if (group === 'theme') document.documentElement.dataset.theme = value
+            if (group === 'glass') document.documentElement.dataset.glass = value
+            if (group === 'width') {
+                document.documentElement.style.setProperty('--frame-width', `${value}px`)
+                document.documentElement.style.setProperty('--frame-height', value === '360' ? '740px' : '844px')
+            }
+        })
+    })
+
+    applyButton.addEventListener('click', () => {
+        setState('busy')
+        selectControl('state', 'busy')
+    })
+</script>
+</body>
+</html>
