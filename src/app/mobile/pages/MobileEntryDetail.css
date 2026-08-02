@@ -940,6 +940,10 @@
     display: none;
 }
 
+.mobile-entry-detail__immersive[data-keyboard-visible] .mobile-entry-detail__markdown-toolbar {
+    padding-bottom: 0.55rem;
+}
+
 .mobile-entry-detail__markdown-tool {
     display: inline-grid;
     width: var(--mobile-entry-markdown-tool-width);

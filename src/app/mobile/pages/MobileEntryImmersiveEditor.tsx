@@ -48,6 +48,7 @@ export function MobileEntryImmersiveEditor({
             if (!root) return
             root.style.setProperty('--mobile-entry-viewport-height', `${viewport.height}px`)
             root.style.setProperty('--mobile-entry-viewport-offset-top', `${viewport.offsetTop}px`)
+            root.toggleAttribute('data-keyboard-visible', viewport.height < window.innerHeight - 80)
         }
 
         syncViewport()
