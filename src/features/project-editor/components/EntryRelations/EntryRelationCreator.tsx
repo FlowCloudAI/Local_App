@@ -74,19 +74,35 @@ export function EntryRelationDraftForm({
             <div className="entry-relation-editor__row">
                 <div className="entry-relation-editor__field entry-relation-editor__field--entry">
                     <label className="entry-relation-editor__label">关联词条</label>
-                    <Select
-                        className="entry-relation-editor__select"
-                        options={entryOptions}
-                        value={draft.otherEntryId ?? undefined}
-                        onValueChange={(value) => {
-                            onChange({
-                                ...draft,
-                                otherEntryId: typeof value === 'string' ? value : null,
-                            })
-                        }}
-                        placeholder="搜索并选择关联词条"
-                        searchable
-                    />
+                    <div className="entry-relation-editor__entry-control">
+                        <Select
+                            className="entry-relation-editor__select"
+                            options={entryOptions}
+                            value={draft.otherEntryId ?? undefined}
+                            onValueChange={(value) => {
+                                onChange({
+                                    ...draft,
+                                    otherEntryId: typeof value === 'string' ? value : null,
+                                })
+                            }}
+                            placeholder="搜索并选择关联词条"
+                            searchable
+                        />
+                        <Button
+                            type="button"
+                            size="sm"
+                            radius="full"
+                            variant="outline"
+                            className="entry-relation-editor__open-entry"
+                            disabled={!otherEntry}
+                            onClick={() => {
+                                if (!otherEntry) return
+                                onOpenEntry?.({id: otherEntry.id, title: otherEntry.title})
+                            }}
+                        >
+                            打开关联词条
+                        </Button>
+                    </div>
                     <div className="entry-relation-editor__field-note">
                         {otherEntry ? getCategoryName(categories, otherEntry.category_id) : '未选择词条'}
                     </div>
@@ -112,29 +128,19 @@ export function EntryRelationDraftForm({
                     />
                 </div>
 
-                <div className="entry-relation-editor__actions">
-                    <Button type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={!otherEntry}
-                            onClick={() => {
-                                if (!otherEntry) return
-                                onOpenEntry?.({id: otherEntry.id, title: otherEntry.title})
-                            }}
-                    >
-                        打开关联词条
-                    </Button>
-                    {onDelete && (
+                {onDelete && (
+                    <div className="entry-relation-editor__actions">
                         <Button type="button"
                                 size="sm"
+                                radius="full"
                                 variant="outline"
                                 disabled={disabled}
                                 onClick={onDelete}
                         >
                             删除
                         </Button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
             <div className="entry-relation-editor__row">

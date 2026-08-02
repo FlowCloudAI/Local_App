@@ -85,6 +85,22 @@
     flex: 0 0 10rem;
 }
 
+.entry-relation-editor__entry-control {
+    display: flex;
+    align-items: stretch;
+    gap: var(--fc-space-sm);
+    min-width: 0;
+}
+
+.entry-relation-editor__entry-control .entry-relation-editor__select {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.entry-relation-editor__open-entry {
+    flex: 0 0 auto;
+}
+
 .entry-relation-editor__input {
     width: 100%;
     border: 1px solid var(--fc-color-border);
@@ -218,6 +234,10 @@
     .entry-relation-editor__field--direction {
         width: 100%;
         flex-basis: auto;
+    }
+
+    .entry-relation-editor__entry-control {
+        flex-direction: column;
     }
 
     .entry-relation-editor__actions {
