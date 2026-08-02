@@ -1,19 +1,24 @@
 import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
 import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
 import {
+    db_export_project_fcworld,
     db_get_entry,
     db_get_project,
     db_delete_project,
     db_update_project,
+    formatApiError,
     type FcworldImportResult,
     type Project,
     setting_get_settings,
+    toApiError,
 } from '../api'
+import {saveFileDialog} from '../api/dialog'
 import {saveAppSettings} from '../features/settings/appSettingsStore'
 import ProjectCreator from '../features/projects/components/ProjectCreator'
 import FcworldProgressDialog from '../features/projects/components/FcworldProgressDialog'
 import ProjectImportConflictDialog from '../features/projects/components/ProjectImportConflictDialog'
 import {useProjectImportController} from '../features/projects/hooks/useProjectImportController'
+import {useFcworldProgress} from '../features/projects/hooks/useFcworldProgress'
 import {invalidateProjectList, useProjectListStore} from '../features/projects/projectListStore'
 import {
     getHomeActivityTargetKey,
@@ -30,7 +35,12 @@ import {
 } from '../features/home/homeActivity'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
-import {formatProjectDate, parseProjectDateMs, toProjectImageSrc} from '../features/projects/projectDisplay'
+import {
+    buildProjectExportFileName,
+    formatProjectDate,
+    parseProjectDateMs,
+    toProjectImageSrc,
+} from '../features/projects/projectDisplay'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -135,6 +145,12 @@ function collectDashboardTargets(dashboard: HomeDashboardData) {
 function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
+    const {
+        progress: exportProgress,
+        startProgress: startExportProgress,
+        closeProgress: closeExportProgress,
+        finishProgress: finishExportProgress,
+    } = useFcworldProgress()
     const {registerTour, startTour} = useTour()
     const [searchText, setSearchText] = useState('')
     const [sortMode, setSortMode] = useState<SortMode>('updated-desc')
@@ -466,6 +482,23 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
     }, [showAlert])
 
+    const handleExportProject = useCallback(async (project: Project) => {
+        const selectedPath = await saveFileDialog({
+            defaultPath: buildProjectExportFileName(project.name),
+            filters: [{name: '流云AI World', extensions: ['fcworld']}],
+        })
+        if (!selectedPath) return
+
+        try {
+            const operationId = startExportProgress('export', '导出世界')
+            await db_export_project_fcworld(project.id, selectedPath, operationId)
+            finishExportProgress()
+        } catch (error) {
+            closeExportProgress()
+            await showAlert(`导出世界失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3200)
+        }
+    }, [closeExportProgress, finishExportProgress, showAlert, startExportProgress])
+
     const handleProjectContextMenu = useCallback((event: MouseEvent<HTMLDivElement>, project: Project) => {
         showContextMenu(event, [
             {
@@ -474,9 +507,14 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             },
             {label: '复制链接', onClick: () => void copyProjectLink(project)},
             {label: '重命名', onClick: () => setRenameProject(project)},
+            {
+                label: '导出世界',
+                disabled: exportProgress !== null,
+                onClick: () => void handleExportProject(project),
+            },
             {label: '删除', danger: true, onClick: () => void handleDeleteProject(project)},
         ])
-    }, [copyProjectLink, handleDeleteProject, showContextMenu, starredProjectIdSet, toggleProjectStar])
+    }, [copyProjectLink, exportProgress, handleDeleteProject, handleExportProject, showContextMenu, starredProjectIdSet, toggleProjectStar])
 
     const projectCountLabel = hasLoadedProjects ? projects.length : '-'
     const filteredProjectCountLabel = hasLoadedProjects ? filteredProjects.length : '-'
@@ -719,10 +757,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                         </p>
                     </div>
                     <div className="project-home-welcome__actions">
-                        <Button type="button" variant="ghost" onClick={() => finishWelcome(false)}>
+                        <Button type="button" variant="ghost" radius="full" onClick={() => finishWelcome(false)}>
                             暂不需要
                         </Button>
-                        <Button type="button" onClick={() => finishWelcome(true)}>
+                        <Button type="button" radius="full" onClick={() => finishWelcome(true)}>
                             开启教程
                         </Button>
                     </div>
@@ -755,7 +793,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 }}
                 onConfirm={name => void handleRenameProject(name)}
             />
-            <FcworldProgressDialog progress={fcworldProgress} />
+            <FcworldProgressDialog progress={exportProgress ?? fcworldProgress} />
             <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
                 <div className="project-list-page fc-page-shell">
                     <section className="project-home-hero" data-tour-id="home-overview">
