@@ -4,8 +4,8 @@
  * 页面摘要负责在浮层收起后保留进度入口；监视器负责完整阶段、运行记录、错误与终态操作。
  * 两者只消费后台任务快照，不启动命令，也不持有任务生命周期。
  */
-import {useEffect, useMemo, useState} from 'react'
-import {Button} from 'flowcloudai-ui'
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
+import {Button, RollingBox} from 'flowcloudai-ui'
 import {FloatingPanel} from '../../../../shared/ui/overlay'
 import {
     getWorldCheckPhaseStatus,
@@ -142,10 +142,42 @@ export function WorldCheckTaskMonitor({
     const elapsed = formatElapsed(task.startedAt, currentAt)
     const copy = taskStatusCopy(task)
     const primaryError = task.errors[0] ?? null
+    const eventFrameRef = useRef<HTMLDivElement>(null)
+    const eventScrollRef = useRef<HTMLDivElement>(null)
+    const eventContentRef = useRef<HTMLOListElement>(null)
     const technicalDetail = useMemo(
         () => primaryError?.detail ? JSON.stringify(primaryError.detail, null, 2) : null,
         [primaryError],
     )
+    const updateEventOverflow = useCallback(() => {
+        const frame = eventFrameRef.current
+        const scroll = eventScrollRef.current
+        if (!frame || !scroll) return
+
+        frame.toggleAttribute('data-overflow-top', scroll.scrollTop > 1)
+        frame.toggleAttribute(
+            'data-overflow-bottom',
+            scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 1,
+        )
+    }, [])
+
+    useLayoutEffect(() => {
+        const frame = eventFrameRef.current
+        const scroll = eventScrollRef.current
+        const content = eventContentRef.current
+        if (!frame || !scroll || !content) return
+
+        updateEventOverflow()
+        const animationFrame = requestAnimationFrame(updateEventOverflow)
+        const observer = new ResizeObserver(updateEventOverflow)
+        observer.observe(frame)
+        observer.observe(scroll)
+        observer.observe(content)
+        return () => {
+            cancelAnimationFrame(animationFrame)
+            observer.disconnect()
+        }
+    }, [task.events, updateEventOverflow])
 
     const handleCopyDiagnostics = async () => {
         const diagnostics = {
@@ -222,20 +254,28 @@ export function WorldCheckTaskMonitor({
                         <h3>{task.status === 'failed' ? '本次异常与运行记录' : '运行记录'}</h3>
                         <span>{task.events.length} 条</span>
                     </div>
-                    <div className="pe-world-check-monitor__event-scroll">
-                        <ol className="pe-world-check-monitor__events">
-                            {task.events.map((event) => (
-                                <li key={event.id} data-level={event.level}>
-                                    <time>{formatElapsed(task.startedAt, event.at)}</time>
-                                    <span className="pe-world-check-monitor__event-dot"/>
-                                    <div>
-                                        <strong>{event.title}</strong>
-                                        <p>{event.detail}</p>
-                                    </div>
-                                    <span>{event.status}</span>
-                                </li>
-                            ))}
-                        </ol>
+                    <div ref={eventFrameRef} className="pe-world-check-monitor__event-frame">
+                        <RollingBox
+                            ref={eventScrollRef}
+                            axis="y"
+                            className="pe-world-check-monitor__event-scroll"
+                            thumbSize="thin"
+                            onScroll={updateEventOverflow}
+                        >
+                            <ol ref={eventContentRef} className="pe-world-check-monitor__events">
+                                {task.events.map((event) => (
+                                    <li key={event.id} data-level={event.level}>
+                                        <time>{formatElapsed(task.startedAt, event.at)}</time>
+                                        <span className="pe-world-check-monitor__event-dot"/>
+                                        <div>
+                                            <strong>{event.title}</strong>
+                                            <p>{event.detail}</p>
+                                        </div>
+                                        <span>{event.status}</span>
+                                    </li>
+                                ))}
+                            </ol>
+                        </RollingBox>
                     </div>
                 </section>
 

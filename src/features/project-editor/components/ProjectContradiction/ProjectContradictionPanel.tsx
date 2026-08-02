@@ -440,6 +440,14 @@ function ProjectContradictionPanel({
     const renderSidebarExternally = Boolean(sidebarContainer)
     const historyPanel = (
         <div className="pe-contradiction-sidebar">
+            {task && !taskRunning && (
+                <section className="pe-contradiction-recent-task" aria-label="最近检测任务">
+                    <div className="pe-contradiction-section__header">
+                        <h3 className="pe-contradiction-section__title fc-section-title">最近任务</h3>
+                    </div>
+                    <WorldCheckTaskCard task={task} onOpen={() => openWorldCheckTaskMonitor(projectId)}/>
+                </section>
+            )}
             <section className="pe-contradiction-history">
                 <div className="pe-contradiction-section__header">
                     <h3 className="pe-contradiction-section__title fc-section-title">历史报告</h3>
@@ -512,7 +520,7 @@ function ProjectContradictionPanel({
                 </div>
             </div>
 
-            {task && (
+            {task && taskRunning && (
                 <div className="pe-contradiction-task-summary">
                     <WorldCheckTaskCard task={task} onOpen={() => openWorldCheckTaskMonitor(projectId)}/>
                 </div>

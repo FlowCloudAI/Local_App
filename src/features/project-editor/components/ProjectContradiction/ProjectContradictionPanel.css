@@ -67,6 +67,45 @@
     background: transparent;
 }
 
+.pe-contradiction-recent-task {
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--fc-color-border);
+}
+
+.pe-contradiction-recent-task .pe-contradiction-section__header {
+    border-bottom: 0;
+}
+
+.pe-contradiction-recent-task .pe-world-check-task-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--fc-space-sm);
+    margin: 0 var(--fc-space-sm) var(--fc-space-sm);
+    padding: var(--fc-space-sm);
+    border-radius: var(--fc-radius-md);
+}
+
+.pe-contradiction-recent-task .pe-world-check-task-card__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--fc-space-xs);
+}
+
+.pe-contradiction-recent-task .pe-world-check-task-card__main > p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.pe-contradiction-recent-task .pe-world-check-task-card__metrics,
+.pe-contradiction-recent-task .pe-world-check-task-card__phases {
+    display: none;
+}
+
+.pe-contradiction-recent-task .pe-world-check-task-card > button {
+    justify-self: start;
+}
+
 /* ── 历史与报告区域 ─────────────────────────────────────────────── */
 
 .pe-contradiction-history,
@@ -996,10 +1035,42 @@ button.fc-op-item__content {
     list-style: none;
 }
 
-.pe-world-check-monitor__event-scroll {
+.pe-world-check-monitor__event-frame {
+    position: relative;
     flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
+}
+
+.pe-world-check-monitor__event-frame::before,
+.pe-world-check-monitor__event-frame::after {
+    position: absolute;
+    z-index: 2;
+    right: var(--fc-space-sm);
+    left: 0;
+    height: var(--fc-space-xl);
+    pointer-events: none;
+    opacity: 0;
+    content: '';
+    transition: opacity var(--fc-transition);
+}
+
+.pe-world-check-monitor__event-frame::before {
+    top: 0;
+    background: linear-gradient(to bottom, var(--fc-color-bg), transparent);
+}
+
+.pe-world-check-monitor__event-frame::after {
+    bottom: 0;
+    background: linear-gradient(to top, var(--fc-color-bg), transparent);
+}
+
+.pe-world-check-monitor__event-frame[data-overflow-top]::before,
+.pe-world-check-monitor__event-frame[data-overflow-bottom]::after {
+    opacity: 1;
+}
+
+.pe-world-check-monitor__event-scroll {
+    height: 100%;
     padding-right: var(--fc-space-sm);
 }
 
