@@ -32,6 +32,30 @@
 5. severity 只能是 low、medium、high、critical 之一。
 6. evidence 中每一项必须包含：entryId、entryTitle、quote、note。
 7. 没有问题时 findings 使用空数组。
+8. overview、findingId、severity、category、title、description、entryId、entryTitle、quote 必须是字符串。
+9. relatedEntryIds、unresolvedQuestions、suggestions 必须是字符串数组；数组项不得使用对象。
+10. recommendation、note 必须是字符串或 null；metadata 必须是对象或 null；score 必须是数字或 null。
+
+【JSON 结构示例】仅用于说明字段类型，禁止照抄示例内容：
+{
+  "checkKind": "{{ check_kind }}",
+  "overview": "一两句纯文字摘要",
+  "score": null,
+  "findings": [{
+    "findingId": "finding-1",
+    "severity": "medium",
+    "category": "timeline",
+    "title": "问题标题",
+    "description": "问题说明",
+    "relatedEntryIds": ["entry-id"],
+    "evidence": [{"entryId": "entry-id", "entryTitle": "词条标题", "quote": "原文片段", "note": null}],
+    "recommendation": "修订建议",
+    "metadata": {}
+  }],
+  "unresolvedQuestions": ["需要确认的问题"],
+  "suggestions": ["整体修订建议"],
+  "metadata": {}
+}
 
 资料如下：
 

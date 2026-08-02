@@ -353,6 +353,7 @@ pub fn build_world_check_prompt(
     prompt.push_str("顶层字段必须包含：checkKind、overview、score、findings、unresolvedQuestions、suggestions、metadata。\n");
     prompt.push_str("findings 中每一项必须包含：findingId、severity、category、title、description、relatedEntryIds、evidence、recommendation、metadata。\n");
     prompt.push_str("evidence 中每一项必须包含：entryId、entryTitle、quote、note。\n");
+    prompt.push_str("overview、findingId、severity、category、title、description、entryId、entryTitle、quote 必须是字符串；relatedEntryIds、unresolvedQuestions、suggestions 必须是字符串数组；recommendation、note 必须是字符串或 null；metadata 必须是对象或 null；score 必须是数字或 null。\n");
     prompt.push_str(
         "severity 只能是 low、medium、high、critical 之一；没有问题时 findings 使用空数组。\n\n",
     );

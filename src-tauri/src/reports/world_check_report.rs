@@ -241,6 +241,12 @@ fn validate_report_value_shape(value: &Value) -> Result<(), String> {
             "metadata",
         ],
     )?;
+    validate_string_field(value, "checkKind", "$.checkKind")?;
+    validate_string_field(value, "overview", "$.overview")?;
+    validate_nullable_number_field(value, "score", "$.score")?;
+    validate_string_array_field(value, "unresolvedQuestions", "$.unresolvedQuestions")?;
+    validate_string_array_field(value, "suggestions", "$.suggestions")?;
+    validate_nullable_object_field(value, "metadata", "$.metadata")?;
     let Some(findings) = value.get("findings").and_then(Value::as_array) else {
         return Err("检测报告 findings 必须是数组".to_string());
     };
@@ -261,15 +267,131 @@ fn validate_report_value_shape(value: &Value) -> Result<(), String> {
                 "metadata",
             ],
         )?;
+        validate_string_field(finding, "findingId", &format!("{}.findingId", path))?;
+        validate_string_field(finding, "severity", &format!("{}.severity", path))?;
+        validate_string_field(finding, "category", &format!("{}.category", path))?;
+        validate_string_field(finding, "title", &format!("{}.title", path))?;
+        validate_string_field(finding, "description", &format!("{}.description", path))?;
+        validate_string_array_field(
+            finding,
+            "relatedEntryIds",
+            &format!("{}.relatedEntryIds", path),
+        )?;
+        validate_nullable_string_field(
+            finding,
+            "recommendation",
+            &format!("{}.recommendation", path),
+        )?;
+        validate_nullable_object_field(finding, "metadata", &format!("{}.metadata", path))?;
         let Some(evidence_items) = finding.get("evidence").and_then(Value::as_array) else {
             return Err(format!("{}.evidence 必须是数组", path));
         };
         for (evidence_index, evidence) in evidence_items.iter().enumerate() {
+            let evidence_path = format!("{}.evidence[{}]", path, evidence_index);
             validate_object_keys(
                 evidence,
-                &format!("{}.evidence[{}]", path, evidence_index),
+                &evidence_path,
                 &["entryId", "entryTitle", "quote", "note"],
             )?;
+            validate_string_field(evidence, "entryId", &format!("{}.entryId", evidence_path))?;
+            validate_string_field(
+                evidence,
+                "entryTitle",
+                &format!("{}.entryTitle", evidence_path),
+            )?;
+            validate_string_field(evidence, "quote", &format!("{}.quote", evidence_path))?;
+            validate_nullable_string_field(evidence, "note", &format!("{}.note", evidence_path))?;
+        }
+    }
+    Ok(())
+}
+
+fn required_field<'a>(value: &'a Value, field: &str, path: &str) -> Result<&'a Value, String> {
+    value
+        .get(field)
+        .ok_or_else(|| format!("{} 为必填字段", path))
+}
+
+fn json_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "布尔值",
+        Value::Number(_) => "数字",
+        Value::String(_) => "字符串",
+        Value::Array(_) => "数组",
+        Value::Object(_) => "对象",
+    }
+}
+
+fn validate_string_field(value: &Value, field: &str, path: &str) -> Result<(), String> {
+    let field_value = required_field(value, field, path)?;
+    if field_value.is_string() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} 必须是字符串，实际为{}",
+            path,
+            json_type_name(field_value)
+        ))
+    }
+}
+
+fn validate_nullable_string_field(value: &Value, field: &str, path: &str) -> Result<(), String> {
+    let field_value = required_field(value, field, path)?;
+    if field_value.is_null() || field_value.is_string() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} 必须是字符串或 null，实际为{}",
+            path,
+            json_type_name(field_value)
+        ))
+    }
+}
+
+fn validate_nullable_number_field(value: &Value, field: &str, path: &str) -> Result<(), String> {
+    let field_value = required_field(value, field, path)?;
+    if field_value.is_null() || field_value.is_number() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} 必须是数字或 null，实际为{}",
+            path,
+            json_type_name(field_value)
+        ))
+    }
+}
+
+fn validate_nullable_object_field(value: &Value, field: &str, path: &str) -> Result<(), String> {
+    let field_value = required_field(value, field, path)?;
+    if field_value.is_null() || field_value.is_object() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} 必须是对象或 null，实际为{}",
+            path,
+            json_type_name(field_value)
+        ))
+    }
+}
+
+fn validate_string_array_field(value: &Value, field: &str, path: &str) -> Result<(), String> {
+    let field_value = required_field(value, field, path)?;
+    let Some(items) = field_value.as_array() else {
+        return Err(format!(
+            "{} 必须是字符串数组，实际为{}",
+            path,
+            json_type_name(field_value)
+        ));
+    };
+    for (index, item) in items.iter().enumerate() {
+        if !item.is_string() {
+            return Err(format!(
+                "{}[{}] 必须是字符串，实际为{}",
+                path,
+                index,
+                json_type_name(item)
+            ));
         }
     }
     Ok(())
@@ -437,5 +559,24 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn reports_path_when_string_field_contains_object() {
+        let value = json!({
+            "checkKind": "entry_alignment",
+            "overview": {"summary": "目标词条整体契合。"},
+            "score": 82.0,
+            "findings": [],
+            "unresolvedQuestions": [],
+            "suggestions": [],
+            "metadata": null
+        });
+
+        let error =
+            WorldCheckReport::from_value_and_validate(value, WorldCheckKind::EntryAlignment, &[])
+                .expect_err("对象类型的 overview 应被拒绝");
+
+        assert_eq!(error, "$.overview 必须是字符串，实际为对象");
     }
 }
