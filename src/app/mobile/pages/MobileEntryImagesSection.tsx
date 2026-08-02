@@ -23,7 +23,7 @@ export function MobileEntryImagesSection({
                 </Button>
             </div>
             {images.length > 0 ? (
-                <div className="mobile-entry-detail__image-grid">
+                <div className="mobile-entry-detail__image-grid" data-mobile-horizontal-scroll="true">
                     {images.map((image, index) => {
                         const src = toEntryImageSrc(image)
                         return (

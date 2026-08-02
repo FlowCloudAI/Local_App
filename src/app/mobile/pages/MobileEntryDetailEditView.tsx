@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/refs -- 仅透传父组件 refs 与组件 props，不读取 ref.current */
-/* 移动端词条编辑视图：保留标题与正文主链路，低频属性统一收口。 */
+/* 移动端词条编辑视图：按内容、媒体、属性和关系的业务层级组织表单。 */
 import type {ComponentProps, RefObject} from 'react'
 import {Input, Select} from 'flowcloudai-ui'
 import type {Category, EntryTypeView} from '../../../api'
@@ -40,13 +40,6 @@ interface Props {
 
 export default function MobileEntryDetailEditView(p: Props) {
     const categoryOptions = [{value: '', label: '无分类'}, ...p.categories.map(category => ({value: category.id, label: category.name}))]
-    const typeOptions = [{value: '', label: '无类型'}, ...p.entryTypes.map(type => ({value: entryTypeKey(type), label: type.name}))]
-    const additionalSummary = [
-        p.summary.trim() ? '摘要已填' : '无摘要',
-        `图片 ${p.imagesProps.images.length}`,
-        `标签 ${p.tagsProps.editTagSchemas.length}`,
-        `关系 ${p.relationsProps.relationDrafts.length}`,
-    ].join(' · ')
     const wikiPanel = p.wikiDraft ? <div className="mobile-entry-detail__wiki-panel" role="listbox" aria-label="词条链接候选">
         <div className="mobile-entry-detail__wiki-panel-title">插入词条链接</div>
         {p.wikiOptions.length > 0 ? <div className="mobile-entry-detail__wiki-options">{p.wikiOptions.map((option, index) => {
@@ -66,28 +59,69 @@ export default function MobileEntryDetailEditView(p: Props) {
                 <span>标题</span>
                 <Input placeholder="词条标题" value={p.title} onValueChange={p.onTitle} className="mobile-entry-detail__title-input"/>
             </label>
-            <div className="mobile-entry-detail__meta-row"><label className="mobile-entry-detail__field"><span>类型</span><Select value={p.entryType ?? ''} onValueChange={value => p.onEntryType(value ? String(value) : null)} options={typeOptions} placeholder="类型" className="mobile-entry-detail__meta-select"/></label><label className="mobile-entry-detail__field"><span>分类</span><Select value={p.categoryId ?? ''} onValueChange={value => p.onCategory(value ? String(value) : null)} options={categoryOptions} placeholder="分类" className="mobile-entry-detail__meta-select"/></label></div>
-            <button type="button" className="mobile-entry-detail__add-type" onClick={p.onOpenTypeCreator}><MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型</button>
+            <label className="mobile-entry-detail__summary-field">
+                <span className="mobile-entry-detail__field-heading">
+                    <span>摘要</span>
+                    <small>{p.summary.length} 字</small>
+                </span>
+                <textarea placeholder="用一两句话概括词条" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={3}/>
+            </label>
+            <div className="mobile-entry-detail__type-field">
+                <div className="mobile-entry-detail__field-heading">
+                    <span>词条类型</span>
+                    <button type="button" className="mobile-entry-detail__add-type" onClick={p.onOpenTypeCreator}>
+                        <MobileAddIcon className="mobile-top-control-svg--inline"/>新建类型
+                    </button>
+                </div>
+                <div className="mobile-entry-detail__type-options" data-mobile-horizontal-scroll="true">
+                    <button type="button" aria-pressed={p.entryType === null} className={`mobile-entry-detail__type-option${p.entryType === null ? ' is-active' : ''}`} onClick={() => p.onEntryType(null)}>不设置</button>
+                    {p.entryTypes.map(type => {
+                        const key = entryTypeKey(type)
+                        return <button type="button" key={key} aria-pressed={p.entryType === key} className={`mobile-entry-detail__type-option${p.entryType === key ? ' is-active' : ''}`} onClick={() => p.onEntryType(key)}>{type.name}</button>
+                    })}
+                </div>
+            </div>
+            <label className="mobile-entry-detail__field">
+                <span>所属分类</span>
+                <Select value={p.categoryId ?? ''} onValueChange={value => p.onCategory(value ? String(value) : null)} options={categoryOptions} placeholder="分类" className="mobile-entry-detail__meta-select"/>
+            </label>
         </section>
         <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
             <div className="mobile-entry-detail__section-header"><span>正文</span><button type="button" className="mobile-entry-detail__section-action" onClick={p.onOpenImmersive}>沉浸</button></div>
             <div className="mobile-entry-detail__content-field"><MarkdownEditor ref={p.editorRef} value={p.content} onValueChange={p.onContentChange} placeholder="正文内容…输入 [[ 插入词条双链" minHeight={260} maxHeight={560} showSplitToggle={false} hideFullscreen toolbarCommands={[]} extraCommands={[]} textareaProps={p.textareaProps} tokens={{background: 'transparent', toolbarBackground: 'transparent', borderColor: 'transparent', editorTextBackground: 'transparent', previewBackground: 'transparent', textColor: 'var(--fc-color-text)', mutedTextColor: 'var(--fc-color-text-secondary)'}} className="mobile-entry-detail__content-input"/>{!p.immersiveOpen && wikiPanel}</div>
         </section>
-        <details className="mobile-entry-detail__additional">
-            <summary className="mobile-entry-detail__additional-summary">
-                <strong>附加内容</strong>
-                <span>{additionalSummary}</span>
-            </summary>
-            <div className="mobile-entry-detail__additional-body">
-                <label className="mobile-entry-detail__summary-field">
-                    <span>摘要</span>
-                    <textarea placeholder="摘要（可选）" value={p.summary} onChange={event => p.onSummary(event.target.value)} className="mobile-entry-detail__summary-input" rows={2}/>
-                </label>
-                <MobileEntryImagesSection {...p.imagesProps}/>
-                <MobileEntryTagsSection {...p.tagsProps}/>
-                <MobileEntryRelationsSection {...p.relationsProps}/>
-            </div>
-        </details>
+        <div className="mobile-entry-detail__edit-disclosures">
+            <details className="mobile-entry-detail__edit-disclosure">
+                <summary className="mobile-entry-detail__edit-disclosure-summary">
+                    <strong>图片</strong>
+                    <span>{p.imagesProps.images.length} 张</span>
+                    <small aria-hidden="true"/>
+                </summary>
+                <div className="mobile-entry-detail__edit-disclosure-body">
+                    <MobileEntryImagesSection {...p.imagesProps}/>
+                </div>
+            </details>
+            <details className="mobile-entry-detail__edit-disclosure">
+                <summary className="mobile-entry-detail__edit-disclosure-summary">
+                    <strong>属性与标签</strong>
+                    <span>{p.tagsProps.editTagSchemas.length} 项</span>
+                    <small aria-hidden="true"/>
+                </summary>
+                <div className="mobile-entry-detail__edit-disclosure-body">
+                    <MobileEntryTagsSection {...p.tagsProps}/>
+                </div>
+            </details>
+            <details className="mobile-entry-detail__edit-disclosure">
+                <summary className="mobile-entry-detail__edit-disclosure-summary">
+                    <strong>词条关系</strong>
+                    <span>{p.relationsProps.relationDrafts.length} 条</span>
+                    <small aria-hidden="true"/>
+                </summary>
+                <div className="mobile-entry-detail__edit-disclosure-body">
+                    <MobileEntryRelationsSection {...p.relationsProps}/>
+                </div>
+            </details>
+        </div>
         {p.immersiveOpen && <MobileEntryImmersiveEditor {...p.immersiveProps} wikiPanel={wikiPanel}/>}<EntryTypeCreator {...p.typeCreatorProps}/><TagCreator {...p.tagCreatorProps}/><EntryImageLightbox {...p.lightboxProps}/><EntryImageAddModal {...p.imageAddProps}/>
     </div>
 }
