@@ -1,0 +1,1747 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCloudAI · 桌面端设定检测任务监视器</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --fc-color-primary: #378add;
+            --fc-color-primary-subtle: #ebf4fd;
+            --fc-color-bg: #fffdfa;
+            --fc-color-bg-secondary: #f5f4f3;
+            --fc-color-bg-elevated: #ffffff;
+            --fc-color-bg-overlay: rgba(19, 24, 31, 0.34);
+            --fc-color-text: #1a1a1a;
+            --fc-color-text-secondary: #626262;
+            --fc-color-text-tertiary: #8a8a8a;
+            --fc-color-border: #d7d7d5;
+            --fc-color-success: #2f8a57;
+            --fc-color-success-subtle: #edf8f1;
+            --fc-color-warning: #a56a14;
+            --fc-color-warning-subtle: #fff6e6;
+            --fc-color-danger: #c94d4d;
+            --fc-color-danger-subtle: #fff0f0;
+            --fc-radius-sm: 6px;
+            --fc-radius-md: 9px;
+            --fc-radius-lg: 12px;
+            --fc-radius-xl: 16px;
+            --fc-space-xs: 4px;
+            --fc-space-sm: 8px;
+            --fc-space-md: 12px;
+            --fc-space-lg: 16px;
+            --fc-space-xl: 24px;
+            --fc-shadow-overlay: 0 24px 72px rgba(31, 37, 44, 0.2);
+            --frame-width: 1180px;
+            --frame-height: 760px;
+            font-family: "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --fc-color-primary: #65a9ec;
+            --fc-color-primary-subtle: rgba(74, 148, 221, 0.16);
+            --fc-color-bg: #111111;
+            --fc-color-bg-secondary: #1a1a1a;
+            --fc-color-bg-elevated: #242424;
+            --fc-color-bg-overlay: rgba(0, 0, 0, 0.58);
+            --fc-color-text: #ececea;
+            --fc-color-text-secondary: #aaa8a1;
+            --fc-color-text-tertiary: #76736d;
+            --fc-color-border: #3b3b38;
+            --fc-color-success: #67bf88;
+            --fc-color-success-subtle: rgba(72, 164, 106, 0.14);
+            --fc-color-warning: #e1a84f;
+            --fc-color-warning-subtle: rgba(202, 137, 32, 0.15);
+            --fc-color-danger: #ef7777;
+            --fc-color-danger-subtle: rgba(213, 76, 76, 0.14);
+            --fc-shadow-overlay: 0 28px 78px rgba(0, 0, 0, 0.42);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--fc-color-bg-secondary);
+            color: var(--fc-color-text);
+        }
+
+        button,
+        input { font: inherit; }
+
+        button { cursor: pointer; }
+
+        button:focus-visible,
+        summary:focus-visible {
+            outline: 2px solid color-mix(in srgb, var(--fc-color-primary) 72%, transparent);
+            outline-offset: 2px;
+        }
+
+        .design-shell {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: minmax(290px, 360px) minmax(0, 1fr);
+        }
+
+        .design-notes {
+            position: sticky;
+            z-index: 20;
+            top: 0;
+            height: 100vh;
+            overflow: auto;
+            padding: 28px;
+            border-right: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .design-notes h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            line-height: 1.35;
+        }
+
+        .design-notes > p {
+            margin: 0 0 22px;
+            color: var(--fc-color-text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .control-group {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .control-group strong {
+            font-size: 13px;
+        }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .control-row button {
+            min-height: 36px;
+            padding: 0 12px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+        }
+
+        .control-row button[aria-pressed="true"] {
+            border-color: var(--fc-color-primary);
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .decision-list {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .decision-list li {
+            padding-top: 12px;
+            border-top: 1px solid var(--fc-color-border);
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .decision-list b {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--fc-color-text);
+        }
+
+        .stage {
+            display: grid;
+            min-width: 0;
+            min-height: 100vh;
+            padding: 32px;
+            place-items: center;
+            overflow: auto;
+        }
+
+        .app-window {
+            position: relative;
+            width: min(var(--frame-width), calc(100vw - 424px));
+            min-width: 760px;
+            height: var(--frame-height);
+            min-height: 620px;
+            overflow: hidden;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-xl);
+            background: var(--fc-color-bg);
+            box-shadow: var(--fc-shadow-overlay);
+        }
+
+        .window-bar {
+            display: grid;
+            height: 40px;
+            grid-template-columns: 160px minmax(0, 1fr) 160px;
+            align-items: center;
+            border-bottom: 1px solid var(--fc-color-border);
+            background: color-mix(in srgb, var(--fc-color-bg-elevated) 92%, transparent);
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .window-brand {
+            padding-left: 14px;
+            color: var(--fc-color-text);
+            font-weight: 700;
+        }
+
+        .window-title {
+            overflow: hidden;
+            text-align: center;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .window-controls {
+            display: flex;
+            height: 100%;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 16px;
+            padding-right: 16px;
+        }
+
+        .app-body {
+            display: grid;
+            height: calc(100% - 40px);
+            grid-template-columns: 56px minmax(0, 1fr);
+        }
+
+        .app-rail {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 8px;
+            border-right: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-secondary);
+        }
+
+        .rail-mark,
+        .rail-item {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            place-items: center;
+            border: 0;
+            border-radius: var(--fc-radius-md);
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+        }
+
+        .rail-mark {
+            margin-bottom: 8px;
+            background: var(--fc-color-primary);
+            color: white;
+            font-weight: 800;
+        }
+
+        .rail-item.is-active {
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .rail-spacer { flex: 1; }
+
+        .rail-task {
+            position: relative;
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .rail-task-count {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            display: grid;
+            width: 16px;
+            height: 16px;
+            place-items: center;
+            border: 2px solid var(--fc-color-bg-secondary);
+            border-radius: 999px;
+            background: var(--fc-color-primary);
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        .workspace {
+            display: grid;
+            min-width: 0;
+            grid-template-rows: 44px minmax(0, 1fr);
+        }
+
+        .workspace-tabs {
+            display: flex;
+            min-width: 0;
+            align-items: end;
+            gap: 2px;
+            padding: 0 10px;
+            border-bottom: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .workspace-tab {
+            max-width: 220px;
+            height: 36px;
+            padding: 0 14px;
+            overflow: hidden;
+            border: 0;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .workspace-tab.is-active {
+            border-bottom-color: var(--fc-color-primary);
+            color: var(--fc-color-text);
+        }
+
+        .project-page {
+            display: grid;
+            min-height: 0;
+            grid-template-columns: 230px minmax(0, 1fr);
+        }
+
+        .project-tree {
+            min-height: 0;
+            padding: 16px 12px;
+            border-right: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-secondary);
+        }
+
+        .tree-title,
+        .report-title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .tree-search {
+            width: 100%;
+            height: 32px;
+            margin: 12px 0;
+            padding: 0 10px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-md);
+            background: var(--fc-color-bg);
+            color: var(--fc-color-text-secondary);
+        }
+
+        .tree-row {
+            padding: 8px 10px;
+            border-radius: var(--fc-radius-md);
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+        }
+
+        .tree-row.is-active {
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .report-surface {
+            min-width: 0;
+            padding: 20px 24px;
+            overflow: auto;
+        }
+
+        .report-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--fc-color-border);
+        }
+
+        .report-subtitle {
+            margin-top: 5px;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .background-button {
+            min-height: 34px;
+            padding: 0 12px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-md);
+            background: var(--fc-color-bg-elevated);
+            color: var(--fc-color-text-secondary);
+        }
+
+        .background-task {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px 18px;
+            align-items: center;
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid color-mix(in srgb, var(--fc-color-primary) 42%, var(--fc-color-border));
+            border-radius: var(--fc-radius-lg);
+            background: var(--fc-color-primary-subtle);
+        }
+
+        .background-task-copy {
+            min-width: 0;
+        }
+
+        .background-task-heading {
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .background-task-heading h3 {
+            margin: 0;
+            overflow: hidden;
+            font-size: 14px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .background-task-badge {
+            flex-shrink: 0;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--fc-color-bg-elevated) 76%, transparent);
+            color: var(--fc-color-primary);
+            font-size: 10px;
+            font-weight: 650;
+        }
+
+        .background-task-copy p {
+            margin: 5px 0 0;
+            overflow: hidden;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+            line-height: 1.5;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .background-task-action {
+            min-height: 34px;
+            padding: 0 12px;
+            border: 1px solid var(--fc-color-primary);
+            border-radius: var(--fc-radius-md);
+            background: var(--fc-color-primary);
+            color: white;
+        }
+
+        .page-phase-rail {
+            display: grid;
+            grid-column: 1 / -1;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .page-phase {
+            display: grid;
+            gap: 5px;
+            color: var(--fc-color-text-tertiary);
+            font-size: 10px;
+        }
+
+        .page-phase::before {
+            height: 3px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--fc-color-border) 82%, transparent);
+            content: "";
+        }
+
+        .page-phase[data-status="done"]::before { background: var(--fc-color-success); }
+        .page-phase[data-status="active"]::before { background: var(--fc-color-primary); }
+        .page-phase[data-status="failed"]::before { background: var(--fc-color-danger); }
+        .page-phase[data-status="cancelled"]::before { background: var(--fc-color-warning); }
+
+        .page-section {
+            margin-top: 22px;
+        }
+
+        .page-section-header {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .page-section-header h3 {
+            margin: 0;
+            font-size: 13px;
+        }
+
+        .page-section-header p {
+            margin: 0;
+            color: var(--fc-color-text-tertiary);
+            font-size: 10px;
+        }
+
+        .detector-list,
+        .report-list {
+            border-top: 1px solid var(--fc-color-border);
+        }
+
+        .detector-row,
+        .report-row {
+            display: grid;
+            min-width: 0;
+            align-items: center;
+            border-bottom: 1px solid var(--fc-color-border);
+        }
+
+        .detector-row {
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            padding: 10px 2px;
+        }
+
+        .detector-copy strong,
+        .detector-copy span {
+            display: block;
+        }
+
+        .detector-copy strong { font-size: 12px; }
+
+        .detector-copy span {
+            margin-top: 3px;
+            color: var(--fc-color-text-secondary);
+            font-size: 10px;
+        }
+
+        .detector-action {
+            min-height: 30px;
+            padding: 0 10px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-sm);
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+        }
+
+        .detector-action:disabled {
+            cursor: not-allowed;
+            opacity: 0.58;
+        }
+
+        .report-row {
+            grid-template-columns: minmax(130px, 1fr) 86px 72px 76px;
+            gap: 12px;
+            min-height: 42px;
+            color: var(--fc-color-text-secondary);
+            font-size: 10px;
+        }
+
+        .report-row strong {
+            overflow: hidden;
+            color: var(--fc-color-text);
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .report-link {
+            border: 0;
+            background: transparent;
+            color: var(--fc-color-primary);
+            font-size: 10px;
+            text-align: right;
+        }
+
+        .app-window[data-state="failed"] .background-task {
+            border-color: color-mix(in srgb, var(--fc-color-danger) 42%, var(--fc-color-border));
+            background: var(--fc-color-danger-subtle);
+        }
+
+        .app-window[data-state="failed"] .background-task-badge { color: var(--fc-color-danger); }
+
+        .app-window[data-state="success"] .background-task {
+            border-color: color-mix(in srgb, var(--fc-color-success) 42%, var(--fc-color-border));
+            background: var(--fc-color-success-subtle);
+        }
+
+        .app-window[data-state="success"] .background-task-badge { color: var(--fc-color-success); }
+
+        .app-window[data-state="cancelled"] .background-task {
+            border-color: color-mix(in srgb, var(--fc-color-warning) 42%, var(--fc-color-border));
+            background: var(--fc-color-warning-subtle);
+        }
+
+        .app-window[data-state="cancelled"] .background-task-badge { color: var(--fc-color-warning); }
+
+        .overlay {
+            position: absolute;
+            z-index: 10;
+            inset: 40px 0 0;
+            display: grid;
+            padding: 24px;
+            place-items: center;
+            background: var(--fc-color-bg-overlay);
+            backdrop-filter: blur(3px);
+        }
+
+        .app-window[data-surface="page"] .overlay { display: none; }
+
+        .task-panel {
+            display: grid;
+            width: min(920px, calc(100% - 12px));
+            max-height: calc(100% - 12px);
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+            overflow: hidden;
+            border: 1px solid color-mix(in srgb, var(--fc-color-border) 86%, transparent);
+            border-radius: var(--fc-radius-xl);
+            background: var(--fc-color-bg-elevated);
+            box-shadow: var(--fc-shadow-overlay);
+        }
+
+        .task-header {
+            display: flex;
+            min-width: 0;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--fc-color-border);
+        }
+
+        .task-heading {
+            min-width: 0;
+        }
+
+        .task-heading h2 {
+            margin: 0;
+            overflow: hidden;
+            font-size: 17px;
+            line-height: 1.35;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .task-heading p {
+            margin: 4px 0 0;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .task-header-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .panel-dismiss {
+            min-height: 30px;
+            padding: 0 9px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-md);
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+        }
+
+        .state-badge {
+            display: inline-flex;
+            min-height: 27px;
+            align-items: center;
+            padding: 0 9px;
+            border-radius: 999px;
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+            font-size: 12px;
+            font-weight: 650;
+        }
+
+        .elapsed {
+            min-width: 50px;
+            color: var(--fc-color-text-secondary);
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+            text-align: right;
+        }
+
+        .phase-rail {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--fc-color-border);
+            background: color-mix(in srgb, var(--fc-color-bg-secondary) 62%, transparent);
+        }
+
+        .phase {
+            position: relative;
+            display: grid;
+            min-width: 0;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            padding-right: 12px;
+        }
+
+        .phase:not(:last-child)::after {
+            position: absolute;
+            z-index: 0;
+            top: 8px;
+            right: 5px;
+            left: 20px;
+            height: 1px;
+            background: var(--fc-color-border);
+            content: "";
+        }
+
+        .phase-dot {
+            position: relative;
+            z-index: 1;
+            width: 17px;
+            height: 17px;
+            border: 2px solid var(--fc-color-border);
+            border-radius: 50%;
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .phase-copy {
+            position: relative;
+            z-index: 1;
+            min-width: 0;
+            background: color-mix(in srgb, var(--fc-color-bg-secondary) 88%, transparent);
+        }
+
+        .phase-copy strong,
+        .phase-copy small {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .phase-copy strong {
+            font-size: 12px;
+            font-weight: 650;
+        }
+
+        .phase-copy small {
+            margin-top: 2px;
+            color: var(--fc-color-text-tertiary);
+            font-size: 10px;
+        }
+
+        .phase[data-status="done"] .phase-dot {
+            border-color: var(--fc-color-success);
+            background: var(--fc-color-success);
+        }
+
+        .phase[data-status="active"] .phase-dot {
+            border: 5px solid color-mix(in srgb, var(--fc-color-primary) 30%, var(--fc-color-bg-elevated));
+            background: var(--fc-color-primary);
+            box-shadow: 0 0 0 3px var(--fc-color-primary-subtle);
+        }
+
+        .phase[data-status="failed"] .phase-dot {
+            border-color: var(--fc-color-danger);
+            background: var(--fc-color-danger);
+        }
+
+        .phase[data-status="cancelled"] .phase-dot {
+            border-color: var(--fc-color-warning);
+            background: var(--fc-color-warning);
+        }
+
+        .task-body {
+            display: grid;
+            min-height: 0;
+            grid-template-columns: minmax(0, 1.62fr) minmax(245px, 0.78fr);
+        }
+
+        .run-main {
+            min-width: 0;
+            min-height: 0;
+            overflow: auto;
+            padding: 16px 18px;
+        }
+
+        .run-context {
+            min-width: 0;
+            overflow: auto;
+            padding: 16px;
+            border-left: 1px solid var(--fc-color-border);
+            background: color-mix(in srgb, var(--fc-color-bg-secondary) 50%, transparent);
+        }
+
+        .state-pane { display: none; }
+
+        .app-window[data-state="running"] [data-pane="running"],
+        .app-window[data-state="failed"] [data-pane="failed"],
+        .app-window[data-state="success"] [data-pane="success"],
+        .app-window[data-state="cancelled"] [data-pane="cancelled"] { display: block; }
+
+        .section-kicker {
+            margin: 0 0 10px;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+            font-weight: 650;
+            letter-spacing: 0.02em;
+        }
+
+        .current-activity {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 14px;
+            padding: 12px;
+            border-radius: var(--fc-radius-lg);
+            background: var(--fc-color-primary-subtle);
+        }
+
+        .activity-pulse {
+            width: 10px;
+            height: 10px;
+            margin-top: 5px;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: var(--fc-color-primary);
+            box-shadow: 0 0 0 0 color-mix(in srgb, var(--fc-color-primary) 34%, transparent);
+            animation: pulse 1.8s ease-out infinite;
+        }
+
+        @keyframes pulse {
+            70% { box-shadow: 0 0 0 7px transparent; }
+            100% { box-shadow: 0 0 0 0 transparent; }
+        }
+
+        .current-activity strong {
+            display: block;
+            font-size: 13px;
+        }
+
+        .current-activity p {
+            margin: 3px 0 0;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .event-list {
+            display: grid;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .event-row {
+            display: grid;
+            min-width: 0;
+            grid-template-columns: 54px 12px minmax(0, 1fr) auto;
+            gap: 8px;
+            align-items: start;
+            padding: 9px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 72%, transparent);
+        }
+
+        .event-time {
+            color: var(--fc-color-text-tertiary);
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .event-marker {
+            width: 9px;
+            height: 9px;
+            margin-top: 4px;
+            border: 2px solid var(--fc-color-border);
+            border-radius: 50%;
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .event-row[data-level="success"] .event-marker {
+            border-color: var(--fc-color-success);
+            background: var(--fc-color-success);
+        }
+
+        .event-row[data-level="active"] .event-marker {
+            border-color: var(--fc-color-primary);
+            background: var(--fc-color-primary);
+        }
+
+        .event-row[data-level="warning"] .event-marker {
+            border-color: var(--fc-color-warning);
+            background: var(--fc-color-warning);
+        }
+
+        .event-row[data-level="error"] .event-marker {
+            border-color: var(--fc-color-danger);
+            background: var(--fc-color-danger);
+        }
+
+        .event-copy {
+            min-width: 0;
+        }
+
+        .event-copy strong {
+            display: block;
+            overflow: hidden;
+            font-size: 12px;
+            font-weight: 650;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .event-copy p {
+            margin: 3px 0 0;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .event-status {
+            min-height: 23px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: var(--fc-color-bg-secondary);
+            color: var(--fc-color-text-secondary);
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .error-hero,
+        .cancel-hero,
+        .success-hero {
+            margin-bottom: 14px;
+            padding: 14px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-lg);
+        }
+
+        .error-hero {
+            border-color: color-mix(in srgb, var(--fc-color-danger) 38%, var(--fc-color-border));
+            background: var(--fc-color-danger-subtle);
+        }
+
+        .cancel-hero {
+            border-color: color-mix(in srgb, var(--fc-color-warning) 34%, var(--fc-color-border));
+            background: var(--fc-color-warning-subtle);
+        }
+
+        .success-hero {
+            border-color: color-mix(in srgb, var(--fc-color-success) 34%, var(--fc-color-border));
+            background: var(--fc-color-success-subtle);
+        }
+
+        .error-hero h3,
+        .cancel-hero h3,
+        .success-hero h3 {
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .error-hero p,
+        .cancel-hero p,
+        .success-hero p {
+            margin: 6px 0 0;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .error-code {
+            display: inline-flex;
+            margin-top: 9px;
+            padding: 3px 7px;
+            border-radius: var(--fc-radius-sm);
+            background: color-mix(in srgb, var(--fc-color-danger) 9%, var(--fc-color-bg-elevated));
+            color: var(--fc-color-danger);
+            font-family: Consolas, monospace;
+            font-size: 10px;
+        }
+
+        details {
+            margin-top: 10px;
+            font-size: 11px;
+        }
+
+        summary {
+            color: var(--fc-color-text-secondary);
+            cursor: pointer;
+        }
+
+        .technical-detail {
+            margin-top: 8px;
+            padding: 9px;
+            border-radius: var(--fc-radius-sm);
+            background: color-mix(in srgb, var(--fc-color-bg) 62%, transparent);
+            color: var(--fc-color-text-secondary);
+            font-family: Consolas, "Microsoft YaHei UI", monospace;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+
+        .result-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin: 14px 0;
+        }
+
+        .result-metric {
+            padding: 10px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-md);
+            background: var(--fc-color-bg);
+        }
+
+        .result-metric strong {
+            display: block;
+            font-size: 18px;
+        }
+
+        .result-metric span {
+            color: var(--fc-color-text-secondary);
+            font-size: 10px;
+        }
+
+        .context-section + .context-section {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid var(--fc-color-border);
+        }
+
+        .context-title {
+            margin: 0 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .context-table {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+        }
+
+        .context-row {
+            display: grid;
+            grid-template-columns: 68px minmax(0, 1fr);
+            gap: 8px;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .context-row dt {
+            color: var(--fc-color-text-tertiary);
+        }
+
+        .context-row dd {
+            margin: 0;
+            overflow: hidden;
+            color: var(--fc-color-text-secondary);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .mini-list {
+            display: grid;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .mini-list li {
+            padding-left: 9px;
+            border-left: 2px solid var(--fc-color-border);
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .mini-list li.is-warning { border-left-color: var(--fc-color-warning); }
+        .mini-list li.is-error { border-left-color: var(--fc-color-danger); }
+        .mini-list li.is-success { border-left-color: var(--fc-color-success); }
+
+        .task-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 58px;
+            padding: 10px 18px;
+            border-top: 1px solid var(--fc-color-border);
+            background: color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent);
+        }
+
+        .footer-note {
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .footer-actions {
+            display: none;
+            flex-shrink: 0;
+            gap: 8px;
+        }
+
+        .app-window[data-state="running"] [data-actions="running"],
+        .app-window[data-state="failed"] [data-actions="failed"],
+        .app-window[data-state="success"] [data-actions="success"],
+        .app-window[data-state="cancelled"] [data-actions="cancelled"] { display: flex; }
+
+        .action-button {
+            min-height: 36px;
+            padding: 0 13px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-md);
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .action-button.is-primary {
+            border-color: var(--fc-color-primary);
+            background: var(--fc-color-primary);
+            color: white;
+        }
+
+        .action-button.is-danger {
+            border-color: color-mix(in srgb, var(--fc-color-danger) 50%, var(--fc-color-border));
+            color: var(--fc-color-danger);
+        }
+
+        .app-window[data-state="failed"] .state-badge {
+            background: var(--fc-color-danger-subtle);
+            color: var(--fc-color-danger);
+        }
+
+        .app-window[data-state="success"] .state-badge {
+            background: var(--fc-color-success-subtle);
+            color: var(--fc-color-success);
+        }
+
+        .app-window[data-state="cancelled"] .state-badge {
+            background: var(--fc-color-warning-subtle);
+            color: var(--fc-color-warning);
+        }
+
+        .app-window[data-viewport="compact"] .project-page {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .app-window[data-viewport="compact"] .project-tree { display: none; }
+
+        .app-window[data-viewport="compact"] .report-surface { padding: 16px; }
+
+        .app-window[data-viewport="compact"] .report-row {
+            grid-template-columns: minmax(120px, 1fr) 72px 70px;
+        }
+
+        .app-window[data-viewport="compact"] .report-row > :nth-child(3) { display: none; }
+
+        .app-window[data-viewport="compact"] .overlay { padding: 12px; }
+
+        .app-window[data-viewport="compact"] .task-panel {
+            width: 100%;
+            max-height: 100%;
+        }
+
+        .app-window[data-viewport="compact"] .task-body {
+            display: block;
+            overflow: auto;
+        }
+
+        .app-window[data-viewport="compact"] .run-main {
+            min-height: 350px;
+            overflow: visible;
+        }
+
+        .app-window[data-viewport="compact"] .run-context {
+            overflow: visible;
+            border-top: 1px solid var(--fc-color-border);
+            border-left: 0;
+        }
+
+        .app-window[data-viewport="compact"] .phase-rail {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            row-gap: 12px;
+        }
+
+        .app-window[data-viewport="compact"] .task-header {
+            align-items: flex-start;
+        }
+
+        @supports not (backdrop-filter: blur(3px)) {
+            .overlay { background: color-mix(in srgb, var(--fc-color-bg-overlay) 92%, var(--fc-color-bg)); }
+        }
+
+        @media (max-width: 1080px) {
+            .design-shell { grid-template-columns: 1fr; }
+            .design-notes {
+                position: static;
+                height: auto;
+                border-right: 0;
+                border-bottom: 1px solid var(--fc-color-border);
+            }
+            .stage { padding: 20px; }
+            .app-window {
+                width: min(var(--frame-width), calc(100vw - 40px));
+                min-width: 760px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="design-shell">
+    <aside class="design-notes">
+        <h1>设定检测任务监视器</h1>
+        <p>检测任务可以收起到后台继续运行。设定检测页保留紧凑进度与重新进入入口，右侧 AI 对话只在报告成功后由用户主动进入。</p>
+
+        <div class="control-group">
+            <strong>查看层级</strong>
+            <div class="control-row" data-control="surface">
+                <button type="button" data-value="monitor" aria-pressed="true">浮层展开</button>
+                <button type="button" data-value="page" aria-pressed="false">后台运行页</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <strong>任务状态</strong>
+            <div class="control-row" data-control="state">
+                <button type="button" data-value="running" aria-pressed="true">运行中</button>
+                <button type="button" data-value="failed" aria-pressed="false">失败</button>
+                <button type="button" data-value="success" aria-pressed="false">成功</button>
+                <button type="button" data-value="cancelled" aria-pressed="false">已取消</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <strong>视觉条件</strong>
+            <div class="control-row" data-control="theme">
+                <button type="button" data-value="light" aria-pressed="true">浅色</button>
+                <button type="button" data-value="dark" aria-pressed="false">深色</button>
+            </div>
+            <div class="control-row" data-control="viewport">
+                <button type="button" data-value="wide" aria-pressed="true">1180 × 760</button>
+                <button type="button" data-value="compact" aria-pressed="false">930 × 700</button>
+            </div>
+        </div>
+
+        <ul class="decision-list">
+            <li><b>收起不是停止</b>浮层提供明确的“收起并继续工作”；只有“停止检测”才会取消 AI 会话。</li>
+            <li><b>页面持续可见</b>设定检测页显示当前阶段、活动摘要、耗时和“查看进度”，无需重新发起任务。</li>
+            <li><b>跨页面可返回</b>应用主导航保留一个轻量任务入口，用户处理其他词条时仍能回到监视器。</li>
+            <li><b>不用虚假百分比</b>任务进度由确定性阶段、实时工具活动、输出字符数和耗时共同表达。</li>
+            <li><b>错误不再覆盖</b>主错误突出显示，工具失败、重试和终止原因按时间保留并去除重复广播。</li>
+            <li><b>会话严格归属</b>普通聊天只接收已登记的 sessionId 与 runId；未知运行不得回退到当前对话。</li>
+            <li><b>成功后再分流</b>报告落盘后先回到检测结果；“讨论这份报告”是用户的显式二次操作。</li>
+            <li><b>取消不等于失败</b>停止检测使用中性状态，不创建报告、不弹错误，也不打开 AI 面板。</li>
+        </ul>
+    </aside>
+
+    <section class="stage" aria-label="桌面端设定检测任务进度设计稿">
+        <div class="app-window" data-state="running" data-surface="monitor" data-viewport="wide">
+            <header class="window-bar">
+                <div class="window-brand">FlowCloudAI</div>
+                <div class="window-title">云海纪元 · 设定检测</div>
+                <div class="window-controls" aria-hidden="true"><span>最小化</span><span>关闭</span></div>
+            </header>
+
+            <div class="app-body">
+                <nav class="app-rail" aria-label="主导航">
+                    <div class="rail-mark">FC</div>
+                    <button type="button" class="rail-item">首页</button>
+                    <button type="button" class="rail-item is-active">项目</button>
+                    <button type="button" class="rail-item">AI</button>
+                    <button type="button" class="rail-item">设置</button>
+                    <span class="rail-spacer"></span>
+                    <button type="button" class="rail-item rail-task" data-open-monitor title="查看后台检测任务">
+                        任务
+                        <span class="rail-task-count" aria-label="1 个后台任务">1</span>
+                    </button>
+                </nav>
+
+                <section class="workspace">
+                    <div class="workspace-tabs">
+                        <button type="button" class="workspace-tab">云海纪元</button>
+                        <button type="button" class="workspace-tab is-active">云海纪元 · 设定检测</button>
+                    </div>
+
+                    <div class="project-page">
+                        <aside class="project-tree">
+                            <h2 class="tree-title">历史报告</h2>
+                            <input id="history-search" name="history-search" class="tree-search" value="搜索历史报告" readonly aria-label="搜索历史报告">
+                            <div class="tree-row is-active">矛盾检测 · 今天 22:14</div>
+                            <div class="tree-row">出版风险 · 昨天 18:32</div>
+                            <div class="tree-row">契合度 · 7 月 31 日</div>
+                        </aside>
+
+                        <section class="report-surface">
+                            <header class="report-header">
+                                <div>
+                                    <h2 class="report-title">设定检测</h2>
+                                    <div class="report-subtitle">检查项目设定的一致性、契合度与公开发布风险</div>
+                                </div>
+                                <button type="button" class="background-button" id="page-primary-action" data-start-new disabled title="当前项目已有检测任务运行中">检测运行中</button>
+                            </header>
+
+                            <section class="background-task" aria-labelledby="background-task-title">
+                                <div class="background-task-copy">
+                                    <div class="background-task-heading">
+                                        <h3 id="background-task-title">矛盾检测正在后台运行</h3>
+                                        <span class="background-task-badge" id="background-task-badge">AI 分析 · 00:38</span>
+                                    </div>
+                                    <p id="background-task-activity">正在核对人物关系与阵营立场 · 已完成 3 次工具调用，1 次重试已恢复</p>
+                                </div>
+                                <button type="button" class="background-task-action" id="background-task-action" data-open-monitor>查看进度</button>
+                                <div class="page-phase-rail" aria-label="后台检测阶段">
+                                    <span class="page-phase" data-page-phase="prepare" data-status="done">准备资料</span>
+                                    <span class="page-phase" data-page-phase="analyze" data-status="active">AI 分析</span>
+                                    <span class="page-phase" data-page-phase="validate" data-status="pending">校验报告</span>
+                                    <span class="page-phase" data-page-phase="persist" data-status="pending">保存完成</span>
+                                </div>
+                            </section>
+
+                            <section class="page-section" aria-labelledby="detector-list-title">
+                                <header class="page-section-header">
+                                    <h3 id="detector-list-title">开始检测</h3>
+                                    <p>同一项目同时运行一个 AI 检测任务</p>
+                                </header>
+                                <div class="detector-list">
+                                    <div class="detector-row">
+                                        <div class="detector-copy"><strong>矛盾检测</strong><span>核对词条、关系与时间线中的冲突证据</span></div>
+                                        <button type="button" class="detector-action" id="detector-current-action" data-open-monitor>查看当前任务</button>
+                                    </div>
+                                    <div class="detector-row">
+                                        <div class="detector-copy"><strong>设定契合度</strong><span>评估选定内容与整体世界规则的匹配程度</span></div>
+                                        <button type="button" class="detector-action" data-start-new disabled>等待当前任务</button>
+                                    </div>
+                                    <div class="detector-row">
+                                        <div class="detector-copy"><strong>出版风险</strong><span>检查公开发布前的敏感、争议与合规风险</span></div>
+                                        <button type="button" class="detector-action" data-start-new disabled>等待当前任务</button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="page-section" aria-labelledby="recent-report-title">
+                                <header class="page-section-header">
+                                    <h3 id="recent-report-title">最近报告</h3>
+                                    <p>全部记录保留在左侧历史报告中</p>
+                                </header>
+                                <div class="report-list">
+                                    <div class="report-row"><strong>人物阵营矛盾检测</strong><span>矛盾检测</span><span>4 个问题</span><button class="report-link" type="button">查看报告</button></div>
+                                    <div class="report-row"><strong>公开发布风险复核</strong><span>出版风险</span><span>2 个风险</span><button class="report-link" type="button">查看报告</button></div>
+                                    <div class="report-row"><strong>北境航线契合度</strong><span>设定契合度</span><span>86 分</span><button class="report-link" type="button">查看报告</button></div>
+                                </div>
+                            </section>
+                        </section>
+                    </div>
+                </section>
+            </div>
+
+            <div class="overlay">
+                <section class="task-panel" role="dialog" aria-modal="true" aria-labelledby="task-title">
+                    <header class="task-header">
+                        <div class="task-heading">
+                            <h2 id="task-title">矛盾检测 · 云海纪元</h2>
+                            <p id="task-subtitle">正在分析项目词条与关系证据</p>
+                        </div>
+                        <div class="task-header-meta">
+                            <span class="state-badge" id="state-badge" aria-live="polite">运行中</span>
+                            <span class="elapsed" id="elapsed">00:38</span>
+                            <button type="button" class="panel-dismiss" data-dismiss aria-label="收起并继续后台运行">收起</button>
+                        </div>
+                    </header>
+
+                    <div class="phase-rail" aria-label="检测阶段">
+                        <div class="phase" data-phase="prepare" data-status="done">
+                            <span class="phase-dot"></span>
+                            <div class="phase-copy"><strong>准备资料</strong><small>已载入 12 个词条</small></div>
+                        </div>
+                        <div class="phase" data-phase="analyze" data-status="active">
+                            <span class="phase-dot"></span>
+                            <div class="phase-copy"><strong>AI 分析</strong><small>读取关系证据</small></div>
+                        </div>
+                        <div class="phase" data-phase="validate" data-status="pending">
+                            <span class="phase-dot"></span>
+                            <div class="phase-copy"><strong>校验报告</strong><small>等待模型输出</small></div>
+                        </div>
+                        <div class="phase" data-phase="persist" data-status="pending">
+                            <span class="phase-dot"></span>
+                            <div class="phase-copy"><strong>保存完成</strong><small>尚未写入历史</small></div>
+                        </div>
+                    </div>
+
+                    <div class="task-body">
+                        <section class="run-main">
+                            <div class="state-pane" data-pane="running">
+                                <p class="section-kicker">当前活动</p>
+                                <div class="current-activity">
+                                    <span class="activity-pulse"></span>
+                                    <div>
+                                        <strong>正在核对人物关系与阵营立场</strong>
+                                        <p>AI 正在读取“澜川”“浮空议会”之间的关系记录。工具完成后会继续生成结构化报告。</p>
+                                    </div>
+                                </div>
+                                <p class="section-kicker">运行记录</p>
+                                <ol class="event-list">
+                                    <li class="event-row" data-level="success">
+                                        <span class="event-time">00:01</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>检测资料已准备</strong><p>载入 12 个词条，共 16,842 字；未发生字符裁剪。</p></div>
+                                        <span class="event-status">完成</span>
+                                    </li>
+                                    <li class="event-row" data-level="success">
+                                        <span class="event-time">00:08</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>读取项目摘要</strong><p>get_project_summary · 返回世界规则、主时间线与 6 个词条类型。</p></div>
+                                        <span class="event-status">0.3 秒</span>
+                                    </li>
+                                    <li class="event-row" data-level="warning">
+                                        <span class="event-time">00:19</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>关系查询重试</strong><p>get_entry_relations 第 1 次响应超时，600 ms 后自动重试。</p></div>
+                                        <span class="event-status">已恢复</span>
+                                    </li>
+                                    <li class="event-row" data-level="active">
+                                        <span class="event-time">00:34</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>读取人物关系</strong><p>get_entry_relations · 澜川、浮空议会、北境航线。</p></div>
+                                        <span class="event-status">进行中</span>
+                                    </li>
+                                </ol>
+                            </div>
+
+                            <div class="state-pane" data-pane="failed">
+                                <div class="error-hero">
+                                    <h3>报告校验失败</h3>
+                                    <p>AI 返回了一条无法从输入资料或工具结果中回查的引用。报告没有保存，现有历史记录未受影响。</p>
+                                    <span class="error-code">REPORT_VALIDATION_FAILED · stage: report</span>
+                                    <details>
+                                        <summary>查看技术详情</summary>
+                                        <div class="technical-detail">findings[2].evidence[0].quote 无法在输入资料或工具返回中回查：“议会于霜月十二日正式解散”。</div>
+                                    </details>
+                                </div>
+                                <p class="section-kicker">本次异常与重试</p>
+                                <ol class="event-list">
+                                    <li class="event-row" data-level="warning">
+                                        <span class="event-time">00:19</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>关系查询曾重试</strong><p>首次调用超时，第二次调用成功；该异常未终止任务。</p></div>
+                                        <span class="event-status">已恢复</span>
+                                    </li>
+                                    <li class="event-row" data-level="warning">
+                                        <span class="event-time">00:41</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>外部搜索不可用</strong><p>web_search 未配置搜索源；检测继续使用项目内证据。</p></div>
+                                        <span class="event-status">已跳过</span>
+                                    </li>
+                                    <li class="event-row" data-level="error">
+                                        <span class="event-time">01:06</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>证据引用校验失败</strong><p>终止原因为结构化报告不满足证据回查约束。</p></div>
+                                        <span class="event-status">终止</span>
+                                    </li>
+                                </ol>
+                            </div>
+
+                            <div class="state-pane" data-pane="success">
+                                <div class="success-hero">
+                                    <h3>检测报告已生成并保存</h3>
+                                    <p>报告已进入当前项目的历史记录。不会自动打开 AI 对话；你可以先查看结果，再决定是否继续讨论。</p>
+                                </div>
+                                <div class="result-metrics">
+                                    <div class="result-metric"><strong>4</strong><span>发现的问题</span></div>
+                                    <div class="result-metric"><strong>2</strong><span>未决问题</span></div>
+                                    <div class="result-metric"><strong>12</strong><span>来源词条</span></div>
+                                </div>
+                                <p class="section-kicker">最终运行记录</p>
+                                <ol class="event-list">
+                                    <li class="event-row" data-level="success">
+                                        <span class="event-time">00:01</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>准备检测资料</strong><p>载入项目摘要、12 个词条与目标关系。</p></div>
+                                        <span class="event-status">完成</span>
+                                    </li>
+                                    <li class="event-row" data-level="success">
+                                        <span class="event-time">00:58</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>AI 分析完成</strong><p>共执行 7 次只读工具调用，生成 3,412 字报告。</p></div>
+                                        <span class="event-status">完成</span>
+                                    </li>
+                                    <li class="event-row" data-level="success">
+                                        <span class="event-time">01:04</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>报告校验通过</strong><p>检测类型、分数、分类和 9 条引用证据全部通过校验。</p></div>
+                                        <span class="event-status">完成</span>
+                                    </li>
+                                </ol>
+                            </div>
+
+                            <div class="state-pane" data-pane="cancelled">
+                                <div class="cancel-hero">
+                                    <h3>检测已停止</h3>
+                                    <p>任务在 AI 分析阶段被用户取消，没有生成或修改报告。已完成的运行记录保留到关闭本窗口为止。</p>
+                                </div>
+                                <p class="section-kicker">停止前的运行记录</p>
+                                <ol class="event-list">
+                                    <li class="event-row" data-level="success">
+                                        <span class="event-time">00:01</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>检测资料已准备</strong><p>载入 12 个词条，共 16,842 字。</p></div>
+                                        <span class="event-status">完成</span>
+                                    </li>
+                                    <li class="event-row" data-level="warning">
+                                        <span class="event-time">00:32</span><span class="event-marker"></span>
+                                        <div class="event-copy"><strong>用户停止检测</strong><p>当前 AI 会话已取消，后续工具调用不再执行。</p></div>
+                                        <span class="event-status">已停止</span>
+                                    </li>
+                                </ol>
+                            </div>
+                        </section>
+
+                        <aside class="run-context">
+                            <section class="context-section">
+                                <h3 class="context-title">本次检测</h3>
+                                <dl class="context-table">
+                                    <div class="context-row"><dt>项目</dt><dd>云海纪元</dd></div>
+                                    <div class="context-row"><dt>类型</dt><dd>矛盾检测</dd></div>
+                                    <div class="context-row"><dt>插件</dt><dd>OpenAI Compatible</dd></div>
+                                    <div class="context-row"><dt>模型</dt><dd>gpt-5.2</dd></div>
+                                    <div class="context-row"><dt>范围</dt><dd>12 个词条 · 16,842 字</dd></div>
+                                    <div class="context-row"><dt>会话</dt><dd>world_check_contradiction_…</dd></div>
+                                </dl>
+                            </section>
+
+                            <section class="context-section">
+                                <h3 class="context-title" id="summary-title">实时摘要</h3>
+                                <ul class="mini-list" id="summary-list">
+                                    <li class="is-success">已完成 3 次工具调用</li>
+                                    <li class="is-warning">1 次重试，已自动恢复</li>
+                                    <li>报告输出 824 字符</li>
+                                </ul>
+                            </section>
+
+                            <section class="context-section">
+                                <h3 class="context-title">显示规则</h3>
+                                <ul class="mini-list">
+                                    <li>默认隐藏完整工具参数和原始 JSON。</li>
+                                    <li>模型推理仅在插件实际返回时折叠展示。</li>
+                                    <li>同一终止错误只显示一次，工具错误不合并。</li>
+                                </ul>
+                            </section>
+                        </aside>
+                    </div>
+
+                    <footer class="task-footer">
+                        <span class="footer-note" id="footer-note">收起浮层或离开页面不会终止检测；退出应用仍会结束任务。</span>
+                        <div class="footer-actions" data-actions="running">
+                            <button type="button" class="action-button is-danger" data-stop>停止检测</button>
+                            <button type="button" class="action-button is-primary" data-dismiss>收起并继续工作</button>
+                        </div>
+                        <div class="footer-actions" data-actions="failed">
+                            <button type="button" class="action-button">复制诊断</button>
+                            <button type="button" class="action-button is-primary" data-retry>重新检测</button>
+                        </div>
+                        <div class="footer-actions" data-actions="success">
+                            <button type="button" class="action-button" data-dismiss>回到检测页</button>
+                            <button type="button" class="action-button is-primary">讨论这份报告</button>
+                        </div>
+                        <div class="footer-actions" data-actions="cancelled">
+                            <button type="button" class="action-button" data-dismiss>关闭</button>
+                            <button type="button" class="action-button is-primary" data-retry>重新检测</button>
+                        </div>
+                    </footer>
+                </section>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script>
+    const appWindow = document.querySelector('.app-window')
+    const stateBadge = document.querySelector('#state-badge')
+    const taskSubtitle = document.querySelector('#task-subtitle')
+    const elapsed = document.querySelector('#elapsed')
+    const footerNote = document.querySelector('#footer-note')
+    const summaryTitle = document.querySelector('#summary-title')
+    const summaryList = document.querySelector('#summary-list')
+    const backgroundTaskTitle = document.querySelector('#background-task-title')
+    const backgroundTaskBadge = document.querySelector('#background-task-badge')
+    const backgroundTaskActivity = document.querySelector('#background-task-activity')
+    const backgroundTaskAction = document.querySelector('#background-task-action')
+    const detectorCurrentAction = document.querySelector('#detector-current-action')
+    const pagePrimaryAction = document.querySelector('#page-primary-action')
+    const phases = Object.fromEntries(
+        [...document.querySelectorAll('[data-phase]')].map(phase => [phase.dataset.phase, phase]),
+    )
+    const pagePhases = Object.fromEntries(
+        [...document.querySelectorAll('[data-page-phase]')].map(phase => [phase.dataset.pagePhase, phase]),
+    )
+
+    const states = {
+        running: {
+            badge: '运行中',
+            subtitle: '正在分析项目词条与关系证据',
+            elapsed: '00:38',
+            footer: '收起浮层或离开页面不会终止检测；退出应用仍会结束任务。',
+            pageTitle: '矛盾检测正在后台运行',
+            pageBadge: 'AI 分析 · 00:38',
+            pageActivity: '正在核对人物关系与阵营立场 · 已完成 3 次工具调用，1 次重试已恢复',
+            pageAction: '查看进度',
+            allowsNew: false,
+            summaryTitle: '实时摘要',
+            summary: [
+                ['is-success', '已完成 3 次工具调用'],
+                ['is-warning', '1 次重试，已自动恢复'],
+                ['', '报告输出 824 字符'],
+            ],
+            phases: {prepare: 'done', analyze: 'active', validate: 'pending', persist: 'pending'},
+            phaseDetails: {prepare: '已载入 12 个词条', analyze: '读取关系证据', validate: '等待模型输出', persist: '尚未写入历史'},
+        },
+        failed: {
+            badge: '检测失败',
+            subtitle: '报告未保存，运行记录已保留',
+            elapsed: '01:06',
+            footer: '错误仅保留在本检测任务中，不会写入右侧 AI 对话。',
+            pageTitle: '矛盾检测需要处理',
+            pageBadge: '校验失败 · 01:06',
+            pageActivity: '报告没有保存；主错误、重试与工具异常已保留在任务记录中',
+            pageAction: '查看错误',
+            allowsNew: true,
+            summaryTitle: '失败摘要',
+            summary: [
+                ['is-warning', '2 个非终止异常'],
+                ['is-error', '1 个报告校验错误'],
+                ['', '报告历史未发生变化'],
+            ],
+            phases: {prepare: 'done', analyze: 'done', validate: 'failed', persist: 'pending'},
+            phaseDetails: {prepare: '资料准备完成', analyze: '分析已完成', validate: '引用校验失败', persist: '未写入历史'},
+        },
+        success: {
+            badge: '已完成',
+            subtitle: '报告已校验并写入历史记录',
+            elapsed: '01:07',
+            footer: '报告讨论是独立操作，只有点击后才会打开右侧 AI 面板。',
+            pageTitle: '矛盾检测报告已完成',
+            pageBadge: '已保存 · 01:07',
+            pageActivity: '发现 4 个设定问题与 2 个未决问题；报告已写入历史记录',
+            pageAction: '查看结果',
+            allowsNew: true,
+            summaryTitle: '结果摘要',
+            summary: [
+                ['is-success', '4 个设定问题'],
+                ['is-warning', '2 个未决问题'],
+                ['', '3,412 字报告已保存'],
+            ],
+            phases: {prepare: 'done', analyze: 'done', validate: 'done', persist: 'done'},
+            phaseDetails: {prepare: '资料准备完成', analyze: '分析已完成', validate: '报告结构有效', persist: '已写入历史'},
+        },
+        cancelled: {
+            badge: '已取消',
+            subtitle: 'AI 会话已停止，没有生成报告',
+            elapsed: '00:32',
+            footer: '取消属于用户操作，不显示为错误，也不会触发报告讨论。',
+            pageTitle: '矛盾检测已停止',
+            pageBadge: '已取消 · 00:32',
+            pageActivity: '没有创建或修改报告；停止前的运行记录仍可查看',
+            pageAction: '查看记录',
+            allowsNew: true,
+            summaryTitle: '停止摘要',
+            summary: [
+                ['is-success', '资料准备已完成'],
+                ['is-warning', 'AI 分析由用户停止'],
+                ['', '没有创建报告文件'],
+            ],
+            phases: {prepare: 'done', analyze: 'cancelled', validate: 'pending', persist: 'pending'},
+            phaseDetails: {prepare: '资料准备完成', analyze: '用户已停止', validate: '未开始', persist: '未写入历史'},
+        },
+    }
+
+    function selectControl(group, value) {
+        document.querySelectorAll(`[data-control="${group}"] button`).forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.value === value))
+        })
+    }
+
+    function setState(value) {
+        const state = states[value]
+        appWindow.dataset.state = value
+        stateBadge.textContent = state.badge
+        taskSubtitle.textContent = state.subtitle
+        elapsed.textContent = state.elapsed
+        footerNote.textContent = state.footer
+        summaryTitle.textContent = state.summaryTitle
+        summaryList.innerHTML = state.summary
+            .map(([className, text]) => `<li${className ? ` class="${className}"` : ''}>${text}</li>`)
+            .join('')
+        backgroundTaskTitle.textContent = state.pageTitle
+        backgroundTaskBadge.textContent = state.pageBadge
+        backgroundTaskActivity.textContent = state.pageActivity
+        backgroundTaskAction.textContent = state.pageAction
+        detectorCurrentAction.textContent = state.pageAction
+        pagePrimaryAction.disabled = !state.allowsNew
+        pagePrimaryAction.textContent = state.allowsNew ? '开始新检测' : '检测运行中'
+        pagePrimaryAction.title = state.allowsNew ? '' : '当前项目已有检测任务运行中'
+        document.querySelectorAll('[data-start-new]').forEach(button => {
+            button.disabled = !state.allowsNew
+            if (button !== pagePrimaryAction) button.textContent = state.allowsNew ? '开始检测' : '等待当前任务'
+        })
+        Object.entries(state.phases).forEach(([phase, status]) => {
+            phases[phase].dataset.status = status
+            phases[phase].querySelector('small').textContent = state.phaseDetails[phase]
+            pagePhases[phase].dataset.status = status
+        })
+        selectControl('state', value)
+    }
+
+    function setSurface(value) {
+        appWindow.dataset.surface = value
+        selectControl('surface', value)
+    }
+
+    document.querySelectorAll('[data-control] button').forEach(button => {
+        button.addEventListener('click', () => {
+            const group = button.closest('[data-control]').dataset.control
+            const value = button.dataset.value
+            selectControl(group, value)
+            if (group === 'state') setState(value)
+            if (group === 'surface') setSurface(value)
+            if (group === 'theme') document.documentElement.dataset.theme = value
+            if (group === 'viewport') {
+                appWindow.dataset.viewport = value
+                document.documentElement.style.setProperty('--frame-width', value === 'compact' ? '930px' : '1180px')
+                document.documentElement.style.setProperty('--frame-height', value === 'compact' ? '700px' : '760px')
+            }
+        })
+    })
+
+    document.querySelector('[data-stop]').addEventListener('click', () => setState('cancelled'))
+    document.querySelectorAll('[data-dismiss]').forEach(button => {
+        button.addEventListener('click', () => setSurface('page'))
+    })
+    document.querySelectorAll('[data-open-monitor]').forEach(button => {
+        button.addEventListener('click', () => setSurface('monitor'))
+    })
+    document.querySelectorAll('[data-start-new]').forEach(button => {
+        button.addEventListener('click', () => {
+            if (button.disabled) return
+            setState('running')
+            setSurface('monitor')
+        })
+    })
+    document.querySelectorAll('[data-retry]').forEach(button => {
+        button.addEventListener('click', () => {
+            setState('running')
+            setSurface('monitor')
+        })
+    })
+</script>
+</body>
+</html>
