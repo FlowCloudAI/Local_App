@@ -222,19 +222,21 @@ export function WorldCheckTaskMonitor({
                         <h3>{task.status === 'failed' ? '本次异常与运行记录' : '运行记录'}</h3>
                         <span>{task.events.length} 条</span>
                     </div>
-                    <ol className="pe-world-check-monitor__events">
-                        {task.events.map((event) => (
-                            <li key={event.id} data-level={event.level}>
-                                <time>{formatElapsed(task.startedAt, event.at)}</time>
-                                <span className="pe-world-check-monitor__event-dot"/>
-                                <div>
-                                    <strong>{event.title}</strong>
-                                    <p>{event.detail}</p>
-                                </div>
-                                <span>{event.status}</span>
-                            </li>
-                        ))}
-                    </ol>
+                    <div className="pe-world-check-monitor__event-scroll">
+                        <ol className="pe-world-check-monitor__events">
+                            {task.events.map((event) => (
+                                <li key={event.id} data-level={event.level}>
+                                    <time>{formatElapsed(task.startedAt, event.at)}</time>
+                                    <span className="pe-world-check-monitor__event-dot"/>
+                                    <div>
+                                        <strong>{event.title}</strong>
+                                        <p>{event.detail}</p>
+                                    </div>
+                                    <span>{event.status}</span>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
                 </section>
 
                 <aside className="pe-world-check-monitor__aside">
@@ -257,14 +259,6 @@ export function WorldCheckTaskMonitor({
                             <li>报告输出 {task.outputChars} 字符</li>
                             {task.truncated && <li className="is-warning">检测资料达到字符上限</li>}
                             {task.errors.length > 0 && <li className="is-error">{task.errors.length} 个终止错误</li>}
-                        </ul>
-                    </section>
-                    <section>
-                        <h3>显示规则</h3>
-                        <ul>
-                            <li>完整工具参数和原始 JSON 默认隐藏。</li>
-                            <li>相同终止错误只显示一次，工具异常按时间保留。</li>
-                            <li>错误只属于本检测任务，不会写入右侧 AI 对话。</li>
                         </ul>
                     </section>
                 </aside>
