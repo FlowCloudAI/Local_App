@@ -78,7 +78,6 @@ pub fn world_check_tool_whitelist() -> Vec<String> {
         "list_entry_types",
         "web_search",
         "open_url",
-        "report_progress",
     ]
     .into_iter()
     .map(str::to_string)

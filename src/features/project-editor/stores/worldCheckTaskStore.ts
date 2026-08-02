@@ -19,7 +19,6 @@ import {
     type AiEventToolRetrying,
     type AiEventTurnBegin,
     type AiEventTurnEnd,
-    type ApiError,
     type WorldCheckSessionRequest,
 } from '../../../api'
 import {listen} from '../../../api/events'
@@ -543,8 +542,4 @@ export function useWorldCheckTaskStore() {
 
 export function getLatestWorldCheckTask(tasks: Record<string, WorldCheckTask>) {
     return Object.values(tasks).sort((a, b) => b.startedAt - a.startedAt)[0] ?? null
-}
-
-export function formatWorldCheckTaskError(error: ApiError) {
-    return safeDetail(error.detail) || error.message
 }

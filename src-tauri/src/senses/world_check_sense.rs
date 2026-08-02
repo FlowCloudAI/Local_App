@@ -45,7 +45,6 @@ impl Sense for WorldCheckSense {
             self.definition.purpose.to_string(),
             "必须优先给出基于原文证据的结论；没有足够证据时，不要硬判定。".to_string(),
             "首轮检测时请严格输出 JSON，不要输出 Markdown、解释文字或代码块标题。".to_string(),
-            "在每完成一个阶段的分析后，调用 report_progress 工具向用户报告当前进度。进度汇报应简短，不要替代最终 JSON 输出。".to_string(),
         ]
     }
 

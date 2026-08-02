@@ -4,9 +4,10 @@ use crate::ai_services::world_check::{
     WorldCheckLoadRequest, load_world_check_corpus, world_check_definition,
 };
 use crate::apis::ai_client::{
-    CreateLlmSessionResult, EventDelta, EventError, EventReady, EventToolCall, EventToolResult,
-    EventTurnBegin, EventTurnEnd, build_llm_session_config, cleanup_session_state, save_api_usage,
-    save_token_calibration, turn_status_error, turn_status_str,
+    CreateLlmSessionResult, EventContextTrimmed, EventDelta, EventError, EventReady, EventToolCall,
+    EventToolResult, EventToolRetrying, EventTurnBegin, EventTurnEnd, build_llm_session_config,
+    cleanup_session_state, save_api_usage, save_token_calibration, turn_status_error,
+    turn_status_str,
 };
 use crate::apis::ai_contradiction::StoredContradictionReport;
 use crate::reports::world_check_report::{WorldCheckKind, WorldCheckReport};
@@ -255,6 +256,7 @@ pub async fn ai_start_world_check_session(
             ),
         )
         .with_kv("plugin_id", request.plugin_id.clone())
+        .with_kv("stage", "prepare")
     })?;
 
     let check_definition = world_check_definition(request.check_kind);
@@ -262,20 +264,21 @@ pub async fn ai_start_world_check_session(
         return Err(ApiError::internal(format!(
             "{}需要传入 targetEntryId",
             check_definition.title
-        )));
+        ))
+        .with_kv("stage", "prepare"));
     }
 
     let corpus = {
         let app_state = app_state.inner().as_ref();
         load_world_check_corpus(app_state, &request.load)
             .await
-            .map_err(ApiError::internal)?
+            .map_err(|error| ApiError::internal(error).with_kv("stage", "prepare"))?
     };
     if check_definition.requires_target_entry && corpus.target_entry_block.is_none() {
-        return Err(ApiError::internal(format!(
-            "{}未能载入目标词条",
-            check_definition.title
-        )));
+        return Err(
+            ApiError::internal(format!("{}未能载入目标词条", check_definition.title))
+                .with_kv("stage", "prepare"),
+        );
     }
 
     let prompt = build_world_check_prompt(&check_definition, &corpus);
@@ -292,10 +295,15 @@ pub async fn ai_start_world_check_session(
         Some(request.max_tool_rounds.unwrap_or(50)),
         &llm_defaults,
     );
-    let mut session = client.create_llm_session(&request.plugin_id, &api_key, Some(config))?;
+    let mut session = client
+        .create_llm_session(&request.plugin_id, &api_key, Some(config))
+        .map_err(|error| ApiError::from(error).with_kv("stage", "analyze"))?;
     drop(client);
 
-    session.load_sense(sense).await?;
+    session
+        .load_sense(sense)
+        .await
+        .map_err(|error| ApiError::from(error).with_kv("stage", "analyze"))?;
     session.set_orchestrator(Box::new(
         DefaultOrchestrator::new(registry).with_whitelist(Some(whitelist)),
     ));
@@ -320,7 +328,9 @@ pub async fn ai_start_world_check_session(
 
     let conversation_id = request.session_id.clone();
     let (input_tx, input_rx) = mpsc::channel::<String>(32);
-    let (event_stream, handle) = session.try_run(input_rx)?;
+    let (event_stream, handle) = session
+        .try_run(input_rx)
+        .map_err(|error| ApiError::from(error).with_kv("stage", "analyze"))?;
     let run_id = Uuid::new_v4().to_string();
     let handle_for_error = handle.clone();
 
@@ -350,9 +360,9 @@ pub async fn ai_start_world_check_session(
             HashMap::from([("read_only".to_string(), true)]),
         ))
         .await
-        .map_err(ApiError::internal)?;
+        .map_err(|error| ApiError::internal(error).with_kv("stage", "analyze"))?;
 
-    let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<WorldCheckReport, String>>();
+    let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<WorldCheckReport, ApiError>>();
     let mut quote_sources = corpus.entry_blocks.clone();
     if let Some(target_entry_block) = &corpus.target_entry_block {
         quote_sources.push(target_entry_block.clone());
@@ -386,15 +396,13 @@ pub async fn ai_start_world_check_session(
         },
     );
 
-    input_tx
-        .send(prompt)
-        .await
-        .map_err(|_| ApiError::new(ErrorCode::LlmSessionClosed, "检测会话已关闭"))?;
+    input_tx.send(prompt).await.map_err(|_| {
+        ApiError::new(ErrorCode::LlmSessionClosed, "检测会话已关闭").with_kv("stage", "analyze")
+    })?;
 
     let report = match first_turn_rx.await {
         Ok(Ok(report)) => report,
-        Ok(Err(error)) => {
-            let api_err = ApiError::internal(error);
+        Ok(Err(api_err)) => {
             app.emit(
                 "ai:error",
                 EventError {
@@ -409,7 +417,7 @@ pub async fn ai_start_world_check_session(
             return Err(api_err);
         }
         Err(_) => {
-            let api_err = ApiError::internal("检测首轮未返回结果");
+            let api_err = ApiError::internal("检测首轮未返回结果").with_kv("stage", "analyze");
             app.emit(
                 "ai:error",
                 EventError {
@@ -458,7 +466,7 @@ pub async fn ai_start_world_check_session(
         report: report.clone(),
     };
     save_report_record(&ai_state.world_check_reports_dir, &stored_record)
-        .map_err(ApiError::internal)?;
+        .map_err(|error| ApiError::internal(error).with_kv("stage", "persist"))?;
 
     ai_state.world_check_bindings.lock().await.insert(
         request.session_id.clone(),
@@ -575,7 +583,7 @@ fn spawn_world_check_event_loop<S>(
     plugin_id: String,
     model: String,
     event_stream: S,
-    first_turn_tx: oneshot::Sender<Result<WorldCheckReport, String>>,
+    first_turn_tx: oneshot::Sender<Result<WorldCheckReport, ApiError>>,
     expected_kind: WorldCheckKind,
     quote_sources: Vec<String>,
 ) where
@@ -732,64 +740,108 @@ fn spawn_world_check_event_loop<S>(
                         .ok();
 
                     if let Some(sender) = first_turn_sender.take() {
-                        let result = match status {
-                            TurnStatus::Ok => parse_json_value_artifact(&first_turn_buffer)
-                                .and_then(|value| {
-                                    WorldCheckReport::from_value_and_validate(
-                                        value,
-                                        expected_kind,
-                                        &quote_sources,
-                                    )
-                                }),
-                            TurnStatus::Cancelled => Err("检测首轮已取消".to_string()),
-                            TurnStatus::Interrupted => Err("检测首轮被中断".to_string()),
-                            TurnStatus::Error(error) => Err(error.to_string()),
-                        };
+                        let result =
+                            match status {
+                                TurnStatus::Ok => parse_json_value_artifact(&first_turn_buffer)
+                                    .and_then(|value| {
+                                        WorldCheckReport::from_value_and_validate(
+                                            value,
+                                            expected_kind,
+                                            &quote_sources,
+                                        )
+                                    })
+                                    .map_err(|error| {
+                                        ApiError::internal(error).with_kv("stage", "validate")
+                                    }),
+                                TurnStatus::Cancelled => Err(ApiError::internal("检测首轮已取消")
+                                    .with_kv("stage", "analyze")),
+                                TurnStatus::Interrupted => {
+                                    Err(ApiError::internal("检测首轮被中断")
+                                        .with_kv("stage", "analyze"))
+                                }
+                                TurnStatus::Error(error) => {
+                                    Err(ApiError::from(error).with_kv("stage", "analyze"))
+                                }
+                            };
                         let _ = sender.send(result);
                     }
                 }
                 SessionEvent::ToolRetrying {
+                    index,
                     name,
                     attempt,
                     max_retries,
                     delay_ms,
-                    ..
-                } => log::warn!(
-                    "[ai:world_check][tool_retrying] run_id={} name={} attempt={}/{} delay_ms={}",
-                    rid,
-                    name,
-                    attempt,
-                    max_retries,
-                    delay_ms
-                ),
+                } => {
+                    log::warn!(
+                        "[ai:world_check][tool_retrying] run_id={} name={} attempt={}/{} delay_ms={}",
+                        rid,
+                        name,
+                        attempt,
+                        max_retries,
+                        delay_ms
+                    );
+                    app_clone
+                        .emit(
+                            "ai:tool_retrying",
+                            EventToolRetrying {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                index,
+                                name,
+                                attempt,
+                                max_retries,
+                                delay_ms,
+                            },
+                        )
+                        .ok();
+                }
                 SessionEvent::ContextTrimmed {
                     dropped_rounds,
                     truncated_messages,
                     before,
                     after,
-                    ..
-                } => log::warn!(
-                    "[ai:world_check][context_trimmed] run_id={} dropped_rounds={} truncated_messages={} before={} after={}",
-                    rid,
-                    dropped_rounds,
-                    truncated_messages,
-                    before,
-                    after
-                ),
+                    suggest_compaction,
+                    estimate_source,
+                } => {
+                    log::warn!(
+                        "[ai:world_check][context_trimmed] run_id={} dropped_rounds={} truncated_messages={} before={} after={}",
+                        rid,
+                        dropped_rounds,
+                        truncated_messages,
+                        before,
+                        after
+                    );
+                    app_clone
+                        .emit(
+                            "ai:context_trimmed",
+                            EventContextTrimmed {
+                                session_id: sid.clone(),
+                                run_id: rid.clone(),
+                                dropped_rounds,
+                                truncated_messages,
+                                before,
+                                after,
+                                suggest_compaction,
+                                estimate_source,
+                            },
+                        )
+                        .ok();
+                }
                 SessionEvent::Error(error) => {
-                    let api_err: crate::ApiError = error.clone().into();
+                    let api_err = ApiError::from(error.clone()).with_kv("stage", "analyze");
                     app_clone
                         .emit(
                             "ai:error",
                             EventError {
                                 session_id: sid.clone(),
                                 run_id: rid.clone(),
-                                error: api_err,
+                                error: api_err.clone(),
                             },
                         )
                         .ok();
                     if let Some(sender) = first_turn_sender.take() {
-                        let _ = sender.send(Err(error.to_string()));
+                        let _ = sender.send(Err(api_err));
                     }
                     break;
                 }
@@ -798,7 +850,9 @@ fn spawn_world_check_event_loop<S>(
         }
 
         if let Some(sender) = first_turn_sender.take() {
-            let _ = sender.send(Err("检测会话提前结束".to_string()));
+            let _ = sender.send(Err(
+                ApiError::internal("检测会话提前结束").with_kv("stage", "analyze")
+            ));
         }
 
         cleanup_session_state(&app_clone, &sid, &rid, None).await;
