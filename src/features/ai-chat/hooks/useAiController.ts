@@ -1123,11 +1123,15 @@ export function useAiController(focus: AiFocus): AiContextValue {
         const mappedConversationId = failure.sessionId && failure.runId
             ? findRuntimeConversation(failure.sessionId, failure.runId)
             : null
-        const targetConversationId = mappedConversationId
+        const ownedConversationId = mappedConversationId
             ?? conversationsRef.current.find((conversation) => (
                 conversation.sessionId === failure.sessionId
                 && (!failure.runId || conversation.runId === failure.runId)
             ))?.id
+            ?? null
+        // 带 runId 的错误只能写入拥有该运行实例的对话；设定检测等独立 AI 任务不得回退到当前对话。
+        if (failure.runId && !ownedConversationId) return
+        const targetConversationId = ownedConversationId
             ?? activeConversationIdRef.current
         if (!targetConversationId) return
 
