@@ -190,6 +190,14 @@ export interface AiEventToolRetrying {
   delay_ms: number
 }
 
+export interface AiEventWorldCheckRetrying {
+  session_id: string
+  run_id: string
+  attempt: number
+  max_attempts: number
+  error: string
+}
+
 export interface AiEventContextTrimmed {
   session_id: string
   run_id: string

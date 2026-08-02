@@ -19,6 +19,7 @@ import {
     type AiEventToolRetrying,
     type AiEventTurnBegin,
     type AiEventTurnEnd,
+    type AiEventWorldCheckRetrying,
     type WorldCheckSessionRequest,
 } from '../../../api'
 import {listen} from '../../../api/events'
@@ -46,6 +47,7 @@ const listeners = new Set<() => void>()
 const inFlightByProject = new Map<string, Promise<WorldCheckTask>>()
 const cancellationByProject = new Map<string, Promise<void>>()
 const toolStartedAt = new Map<string, number>()
+const reportAttemptBySession = new Map<string, number>()
 
 let snapshot: WorldCheckTaskSnapshot = {tasks: {}, version: 0}
 let eventListenersPromise: Promise<void> | null = null
@@ -243,48 +245,63 @@ function ensureWorldCheckEventListeners() {
     if (eventListenersPromise) return eventListenersPromise
     eventListenersPromise = Promise.all([
         listen<AiEventReady>('ai:ready', (event) => {
+            const reportAttempt = reportAttemptBySession.get(event.payload.session_id) ?? 1
             const task = updateTaskBySession(event.payload.session_id, (current) => ({
                 ...current,
                 runId: event.payload.run_id,
-                currentActivity: current.status === 'cancelling' ? current.currentActivity : 'AI 会话已就绪，正在开始分析',
+                currentActivity: current.status === 'cancelling'
+                    ? current.currentActivity
+                    : reportAttempt > 1
+                        ? 'AI 会话已就绪，准备修正报告'
+                        : 'AI 会话已就绪，正在开始分析',
             }))
             retryPendingCancellation(task)
         }),
         listen<AiEventTurnBegin>('ai:turn_begin', (event) => {
             const at = Date.now()
-            const task = updateTaskBySession(event.payload.session_id, (current) => ({
-                ...current,
-                runId: event.payload.run_id,
-                phase: 'analyze',
-                currentActivity: current.status === 'cancelling' ? current.currentActivity : 'AI 正在分析项目资料',
-                events: appendEvent(current, {
-                    id: 'prepare-complete',
-                    at,
-                    level: 'success',
-                    title: '检测资料已准备',
-                    detail: '项目资料已载入，AI 开始执行只读分析。',
-                    status: '完成',
-                }),
-            }))
+            const reportAttempt = reportAttemptBySession.get(event.payload.session_id) ?? 1
+            const task = updateTaskBySession(event.payload.session_id, (current) => {
+                const preparedAt = current.events.find((item) => item.id === 'prepare-complete')?.at ?? at
+                return {
+                    ...current,
+                    runId: event.payload.run_id,
+                    phase: reportAttempt > 1 ? 'validate' : 'analyze',
+                    currentActivity: current.status === 'cancelling'
+                        ? current.currentActivity
+                        : reportAttempt > 1
+                            ? 'AI 正在修正报告结构'
+                            : 'AI 正在分析项目资料',
+                    events: appendEvent(current, {
+                        id: 'prepare-complete',
+                        at: preparedAt,
+                        level: 'success',
+                        title: '检测资料已准备',
+                        detail: '项目资料已载入，AI 开始执行只读分析。',
+                        status: '完成',
+                    }),
+                }
+            })
             retryPendingCancellation(task)
         }),
         listen<AiEventDelta>('ai:delta', (event) => {
+            const reportAttempt = reportAttemptBySession.get(event.payload.session_id) ?? 1
             updateTaskBySession(event.payload.session_id, (task) => ({
                 ...task,
-                phase: 'analyze',
+                phase: reportAttempt > 1 ? 'validate' : 'analyze',
                 outputChars: task.outputChars + [...event.payload.text].length,
-                currentActivity: '正在生成结构化检测报告',
+                currentActivity: reportAttempt > 1 ? '正在重新生成结构化报告' : '正在生成结构化检测报告',
             }))
         }),
         listen<AiEventToolCall>('ai:tool_call', (event) => {
             const at = Date.now()
+            const reportAttempt = reportAttemptBySession.get(event.payload.session_id) ?? 1
             toolStartedAt.set(toolEventKey(event.payload.session_id, event.payload.index), at)
             updateTaskBySession(event.payload.session_id, (task) => {
                 const id = `tool:${event.payload.index}`
                 const existed = task.events.some((item) => item.id === id)
                 return {
                     ...task,
-                    phase: 'analyze',
+                    phase: reportAttempt > 1 ? 'validate' : 'analyze',
                     toolCallCount: task.toolCallCount + (existed ? 0 : 1),
                     currentActivity: toolLabel(event.payload.name),
                     events: appendEvent(task, {
@@ -313,6 +330,28 @@ function ensureWorldCheckEventListeners() {
                     status: '重试中',
                 }),
             }))
+        }),
+        listen<AiEventWorldCheckRetrying>('ai:world_check_retrying', (event) => {
+            const at = Date.now()
+            reportAttemptBySession.set(event.payload.session_id, event.payload.attempt)
+            updateTaskBySession(event.payload.session_id, (task) => {
+                const id = `report-retry:${event.payload.attempt}`
+                const existed = task.events.some((item) => item.id === id)
+                return {
+                    ...task,
+                    phase: 'validate',
+                    retryCount: task.retryCount + (existed ? 0 : 1),
+                    currentActivity: '报告结构未通过校验，AI 正在重新输出',
+                    events: appendEvent(task, {
+                        id,
+                        at,
+                        level: 'warning',
+                        title: '重新生成检测报告',
+                        detail: `第 ${event.payload.attempt - 1} 次输出未通过校验：${safeDetail(event.payload.error)}。AI 正在重新输出完整报告。`,
+                        status: `${event.payload.attempt}/${event.payload.max_attempts}`,
+                    }),
+                }
+            })
         }),
         listen<AiEventToolResult>('ai:tool_result', (event) => {
             const at = Date.now()
@@ -367,16 +406,19 @@ function ensureWorldCheckEventListeners() {
                 return
             }
             const at = Date.now()
+            const reportAttempt = reportAttemptBySession.get(event.payload.session_id) ?? 1
             updateTaskBySession(event.payload.session_id, (task) => ({
                 ...task,
                 phase: 'validate',
                 currentActivity: '正在校验报告结构与引用证据',
                 events: appendEvent(task, {
-                    id: 'analysis-complete',
+                    id: `analysis-complete:${reportAttempt}`,
                     at,
                     level: 'success',
-                    title: 'AI 分析完成',
-                    detail: `已生成 ${task.outputChars} 个字符，正在校验结构化报告。`,
+                    title: reportAttempt > 1 ? '报告修正输出完成' : 'AI 分析完成',
+                    detail: reportAttempt > 1
+                        ? `AI 已完成第 ${reportAttempt} 次输出，正在重新校验报告。`
+                        : `已生成 ${task.outputChars} 个字符，正在校验结构化报告。`,
                     status: '完成',
                 }),
             }))
@@ -407,6 +449,7 @@ export async function startWorldCheckTask({
     }
 
     const startedAt = Date.now()
+    reportAttemptBySession.delete(request.sessionId)
     putTask({
         projectId: request.projectId,
         projectName,
@@ -504,6 +547,7 @@ export async function startWorldCheckTask({
         return snapshot.tasks[request.projectId]
     })().finally(() => {
         inFlightByProject.delete(request.projectId)
+        reportAttemptBySession.delete(request.sessionId)
     })
     inFlightByProject.set(request.projectId, taskPromise)
     return taskPromise

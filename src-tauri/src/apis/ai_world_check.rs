@@ -24,8 +24,42 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use uuid::Uuid;
+
+const WORLD_CHECK_MAX_REPORT_ATTEMPTS: usize = 3;
+
+enum WorldCheckTurnOutcome {
+    Valid(WorldCheckReport),
+    Invalid(String),
+    Failed(ApiError),
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct EventWorldCheckRetrying {
+    session_id: String,
+    run_id: String,
+    attempt: usize,
+    max_attempts: usize,
+    error: String,
+}
+
+fn next_world_check_attempt(failed_attempt: usize) -> Option<usize> {
+    (failed_attempt < WORLD_CHECK_MAX_REPORT_ATTEMPTS).then_some(failed_attempt + 1)
+}
+
+fn build_world_check_repair_prompt(
+    validation_error: &str,
+    expected_kind: WorldCheckKind,
+    next_attempt: usize,
+) -> String {
+    format!(
+        "上一次检测报告未通过程序校验：{validation_error}\n\
+         现在进行第 {next_attempt}/{WORLD_CHECK_MAX_REPORT_ATTEMPTS} 次输出。请直接修正错误并重新输出完整 JSON 对象，无需再次调用工具；不要解释、不要使用 Markdown，也不要只输出局部字段。\n\
+         checkKind 必须为 \"{}\"。overview 及发现、证据中的文本字段必须是字符串；relatedEntryIds、unresolvedQuestions、suggestions 必须是字符串数组；recommendation、note 必须是字符串或 null；metadata 必须是对象或 null；score 必须是数字或 null。",
+        expected_kind.as_str()
+    )
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -362,7 +396,8 @@ pub async fn ai_start_world_check_session(
         .await
         .map_err(|error| ApiError::internal(error).with_kv("stage", "analyze"))?;
 
-    let (first_turn_tx, first_turn_rx) = oneshot::channel::<Result<WorldCheckReport, ApiError>>();
+    let (turn_result_tx, mut turn_result_rx) =
+        mpsc::channel::<WorldCheckTurnOutcome>(WORLD_CHECK_MAX_REPORT_ATTEMPTS);
     let mut quote_sources = corpus.entry_blocks.clone();
     if let Some(target_entry_block) = &corpus.target_entry_block {
         quote_sources.push(target_entry_block.clone());
@@ -379,7 +414,7 @@ pub async fn ai_start_world_check_session(
         request.plugin_id.clone(),
         resolved_model.clone(),
         event_stream,
-        first_turn_tx,
+        turn_result_tx,
         request.check_kind,
         quote_sources,
     );
@@ -400,24 +435,57 @@ pub async fn ai_start_world_check_session(
         ApiError::new(ErrorCode::LlmSessionClosed, "检测会话已关闭").with_kv("stage", "analyze")
     })?;
 
-    let report = match first_turn_rx.await {
-        Ok(Ok(report)) => report,
-        Ok(Err(api_err)) => {
-            app.emit(
-                "ai:error",
-                EventError {
-                    session_id: request.session_id.clone(),
-                    run_id: run_id.clone(),
-                    error: api_err.clone(),
-                },
-            )
-            .ok();
-            ai_state.sessions.lock().await.remove(&request.session_id);
-            handle_for_error.cancel();
-            return Err(api_err);
+    let mut attempt = 1;
+    let report_result = loop {
+        match turn_result_rx.recv().await {
+            Some(WorldCheckTurnOutcome::Valid(report)) => break Ok(report),
+            Some(WorldCheckTurnOutcome::Invalid(error)) => {
+                let Some(next_attempt) = next_world_check_attempt(attempt) else {
+                    break Err(ApiError::new(
+                        ErrorCode::ValidationFormatError,
+                        format!(
+                            "AI 连续 {} 次未能输出有效检测报告：{}",
+                            WORLD_CHECK_MAX_REPORT_ATTEMPTS, error
+                        ),
+                    )
+                    .with_kv("stage", "validate")
+                    .with_kv("attempts", WORLD_CHECK_MAX_REPORT_ATTEMPTS)
+                    .with_kv("last_error", error));
+                };
+
+                app.emit(
+                    "ai:world_check_retrying",
+                    EventWorldCheckRetrying {
+                        session_id: request.session_id.clone(),
+                        run_id: run_id.clone(),
+                        attempt: next_attempt,
+                        max_attempts: WORLD_CHECK_MAX_REPORT_ATTEMPTS,
+                        error: error.clone(),
+                    },
+                )
+                .ok();
+                let repair_prompt =
+                    build_world_check_repair_prompt(&error, request.check_kind, next_attempt);
+                if input_tx.send(repair_prompt).await.is_err() {
+                    break Err(ApiError::new(
+                        ErrorCode::LlmSessionClosed,
+                        "检测会话在修正报告时已关闭",
+                    )
+                    .with_kv("stage", "validate")
+                    .with_kv("attempt", next_attempt));
+                }
+                attempt = next_attempt;
+            }
+            Some(WorldCheckTurnOutcome::Failed(error)) => break Err(error),
+            None => {
+                break Err(ApiError::internal("检测会话未返回结果").with_kv("stage", "analyze"));
+            }
         }
-        Err(_) => {
-            let api_err = ApiError::internal("检测首轮未返回结果").with_kv("stage", "analyze");
+    };
+
+    let report = match report_result {
+        Ok(report) => report,
+        Err(api_err) => {
             app.emit(
                 "ai:error",
                 EventError {
@@ -583,7 +651,7 @@ fn spawn_world_check_event_loop<S>(
     plugin_id: String,
     model: String,
     event_stream: S,
-    first_turn_tx: oneshot::Sender<Result<WorldCheckReport, ApiError>>,
+    turn_result_tx: mpsc::Sender<WorldCheckTurnOutcome>,
     expected_kind: WorldCheckKind,
     quote_sources: Vec<String>,
 ) where
@@ -594,8 +662,8 @@ fn spawn_world_check_event_loop<S>(
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         futures::pin_mut!(event_stream);
-        let mut first_turn_sender = Some(first_turn_tx);
-        let mut first_turn_buffer = String::new();
+        let mut report_resolved = false;
+        let mut turn_buffer = String::new();
         let mut quote_sources = quote_sources;
 
         while let Some(event) = event_stream.next().await {
@@ -612,6 +680,9 @@ fn spawn_world_check_event_loop<S>(
                         .ok();
                 }
                 SessionEvent::TurnBegin { turn_id, node_id } => {
+                    if !report_resolved {
+                        turn_buffer.clear();
+                    }
                     app_clone
                         .emit(
                             "ai:turn_begin",
@@ -625,8 +696,8 @@ fn spawn_world_check_event_loop<S>(
                         .ok();
                 }
                 SessionEvent::ContentDelta(text) => {
-                    if first_turn_sender.is_some() {
-                        first_turn_buffer.push_str(&text);
+                    if !report_resolved {
+                        turn_buffer.push_str(&text);
                     }
                     app_clone
                         .emit(
@@ -723,47 +794,59 @@ fn spawn_world_check_event_loop<S>(
                         )
                         .ok();
 
-                    log::info!(
-                        "[world_check] 原始响应 ({} chars): {}",
-                        first_turn_buffer.len(),
-                        first_turn_buffer
-                    );
-                    app_clone
-                        .emit(
-                            "ai:debug_raw_response",
-                            EventDelta {
-                                session_id: sid.clone(),
-                                run_id: rid.clone(),
-                                text: first_turn_buffer.clone(),
-                            },
-                        )
-                        .ok();
+                    if !report_resolved {
+                        let raw_response = std::mem::take(&mut turn_buffer);
+                        log::info!(
+                            "[world_check] 原始响应 ({} chars): {}",
+                            raw_response.len(),
+                            raw_response
+                        );
+                        app_clone
+                            .emit(
+                                "ai:debug_raw_response",
+                                EventDelta {
+                                    session_id: sid.clone(),
+                                    run_id: rid.clone(),
+                                    text: raw_response.clone(),
+                                },
+                            )
+                            .ok();
 
-                    if let Some(sender) = first_turn_sender.take() {
-                        let result =
-                            match status {
-                                TurnStatus::Ok => parse_json_value_artifact(&first_turn_buffer)
-                                    .and_then(|value| {
-                                        WorldCheckReport::from_value_and_validate(
-                                            value,
-                                            expected_kind,
-                                            &quote_sources,
-                                        )
-                                    })
-                                    .map_err(|error| {
-                                        ApiError::internal(error).with_kv("stage", "validate")
-                                    }),
-                                TurnStatus::Cancelled => Err(ApiError::internal("检测首轮已取消")
-                                    .with_kv("stage", "analyze")),
-                                TurnStatus::Interrupted => {
-                                    Err(ApiError::internal("检测首轮被中断")
-                                        .with_kv("stage", "analyze"))
+                        let outcome = match status {
+                            TurnStatus::Ok => match parse_json_value_artifact(&raw_response)
+                                .and_then(|value| {
+                                    WorldCheckReport::from_value_and_validate(
+                                        value,
+                                        expected_kind,
+                                        &quote_sources,
+                                    )
+                                }) {
+                                Ok(report) => {
+                                    report_resolved = true;
+                                    WorldCheckTurnOutcome::Valid(report)
                                 }
-                                TurnStatus::Error(error) => {
-                                    Err(ApiError::from(error).with_kv("stage", "analyze"))
-                                }
-                            };
-                        let _ = sender.send(result);
+                                Err(error) => WorldCheckTurnOutcome::Invalid(error),
+                            },
+                            TurnStatus::Cancelled => {
+                                report_resolved = true;
+                                WorldCheckTurnOutcome::Failed(
+                                    ApiError::internal("检测已取消").with_kv("stage", "analyze"),
+                                )
+                            }
+                            TurnStatus::Interrupted => {
+                                report_resolved = true;
+                                WorldCheckTurnOutcome::Failed(
+                                    ApiError::internal("检测被中断").with_kv("stage", "analyze"),
+                                )
+                            }
+                            TurnStatus::Error(error) => {
+                                report_resolved = true;
+                                WorldCheckTurnOutcome::Failed(
+                                    ApiError::from(error).with_kv("stage", "analyze"),
+                                )
+                            }
+                        };
+                        let _ = turn_result_tx.send(outcome).await;
                     }
                 }
                 SessionEvent::ToolRetrying {
@@ -840,8 +923,11 @@ fn spawn_world_check_event_loop<S>(
                             },
                         )
                         .ok();
-                    if let Some(sender) = first_turn_sender.take() {
-                        let _ = sender.send(Err(api_err));
+                    if !report_resolved {
+                        report_resolved = true;
+                        let _ = turn_result_tx
+                            .send(WorldCheckTurnOutcome::Failed(api_err))
+                            .await;
                     }
                     break;
                 }
@@ -849,12 +935,35 @@ fn spawn_world_check_event_loop<S>(
             }
         }
 
-        if let Some(sender) = first_turn_sender.take() {
-            let _ = sender.send(Err(
-                ApiError::internal("检测会话提前结束").with_kv("stage", "analyze")
-            ));
+        if !report_resolved {
+            let _ = turn_result_tx
+                .send(WorldCheckTurnOutcome::Failed(
+                    ApiError::internal("检测会话提前结束").with_kv("stage", "analyze"),
+                ))
+                .await;
         }
 
         cleanup_session_state(&app_clone, &sid, &rid, None).await;
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retries_invalid_report_twice_before_final_failure() {
+        assert_eq!(next_world_check_attempt(1), Some(2));
+        assert_eq!(next_world_check_attempt(2), Some(3));
+        assert_eq!(next_world_check_attempt(3), None);
+
+        let prompt = build_world_check_repair_prompt(
+            "$.overview 必须是字符串，实际为对象",
+            WorldCheckKind::EntryAlignment,
+            2,
+        );
+        assert!(prompt.contains("$.overview 必须是字符串，实际为对象"));
+        assert!(prompt.contains("第 2/3 次输出"));
+        assert!(prompt.contains("checkKind 必须为 \"entry_alignment\""));
+    }
 }
