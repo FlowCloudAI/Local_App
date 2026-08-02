@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCloudAI · 移动端词条编辑视觉规划</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --fc-color-primary: #378add;
+            --fc-color-primary-subtle: #ebf4fd;
+            --fc-color-bg: #fffdfa;
+            --fc-color-bg-secondary: #f5f4f3;
+            --fc-color-bg-elevated: #ffffff;
+            --fc-color-text: #1a1a1a;
+            --fc-color-text-secondary: #5f5f5f;
+            --fc-color-text-tertiary: #808080;
+            --fc-color-border: #d0d0d0;
+            --fc-radius-lg: 12px;
+            --fc-radius-xl: 16px;
+            --fc-space-sm: 8px;
+            --fc-space-md: 12px;
+            --fc-space-lg: 16px;
+            --frame-width: 390px;
+            --frame-height: 844px;
+            --ime-height: 0px;
+            font-family: "Microsoft YaHei UI", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --fc-color-primary: #5da4e8;
+            --fc-color-primary-subtle: rgba(55, 138, 221, 0.12);
+            --fc-color-bg: #101010;
+            --fc-color-bg-secondary: #1b1b1b;
+            --fc-color-bg-elevated: #282828;
+            --fc-color-text: #e8e8e6;
+            --fc-color-text-secondary: #9c9a92;
+            --fc-color-text-tertiary: #636158;
+            --fc-color-border: #3d3d3a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--fc-color-bg-secondary);
+            color: var(--fc-color-text);
+        }
+
+        button,
+        input,
+        textarea { font: inherit; }
+
+        button { cursor: pointer; }
+
+        .design-shell {
+            display: grid;
+            min-height: 100vh;
+            grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+        }
+
+        .design-notes {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow: auto;
+            padding: 28px;
+            border-right: 1px solid var(--fc-color-border);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .design-notes h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+        }
+
+        .design-notes > p {
+            margin: 0 0 24px;
+            color: var(--fc-color-text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .control-group {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 22px;
+        }
+
+        .control-group strong {
+            font-size: 13px;
+        }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .control-row button {
+            min-height: 40px;
+            padding: 0 14px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .control-row button[aria-pressed="true"] {
+            border-color: var(--fc-color-primary);
+            background: var(--fc-color-primary-subtle);
+            color: var(--fc-color-primary);
+        }
+
+        .decision-list {
+            display: grid;
+            gap: 12px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .decision-list li {
+            padding-top: 12px;
+            border-top: 1px solid var(--fc-color-border);
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+            line-height: 1.65;
+        }
+
+        .decision-list b {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--fc-color-text);
+        }
+
+        .stage {
+            display: grid;
+            min-width: 0;
+            min-height: 100vh;
+            padding: 32px;
+            place-items: center;
+            overflow: auto;
+        }
+
+        .phone {
+            position: relative;
+            width: min(var(--frame-width), calc(100vw - 64px));
+            height: var(--frame-height);
+            max-height: calc(100vh - 64px);
+            overflow: hidden;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 24px;
+            background: var(--fc-color-bg);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, 0.16);
+        }
+
+        .phone[data-keyboard="open"] { --ime-height: 286px; }
+
+        .mobile-topbar {
+            position: absolute;
+            z-index: 4;
+            top: 0;
+            right: 0;
+            left: 0;
+            display: grid;
+            min-height: 64px;
+            grid-template-columns: 72px minmax(0, 1fr) 72px;
+            align-items: center;
+            padding: 8px 14px;
+            border-bottom: 1px solid color-mix(in srgb, var(--fc-color-border) 62%, transparent);
+            background: color-mix(in srgb, var(--fc-color-bg) 88%, transparent);
+            backdrop-filter: blur(8px) saturate(1.3);
+        }
+
+        .top-action {
+            min-height: 44px;
+            padding: 0 8px;
+            border: 0;
+            background: transparent;
+            color: var(--fc-color-text-secondary);
+        }
+
+        .top-action:last-child {
+            color: var(--fc-color-primary);
+            font-weight: 700;
+        }
+
+        .top-title {
+            min-width: 0;
+            text-align: center;
+        }
+
+        .top-title strong,
+        .top-title small { display: block; }
+
+        .top-title strong { font-size: 15px; }
+
+        .top-title small {
+            margin-top: 2px;
+            color: var(--fc-color-text-secondary);
+            font-size: 11px;
+        }
+
+        .editor-page {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .editor-scroll {
+            height: 100%;
+            overflow-y: auto;
+            padding: 80px 18px 28px;
+            scrollbar-width: none;
+        }
+
+        .editor-scroll::-webkit-scrollbar { display: none; }
+
+        .field-label {
+            display: block;
+            margin-bottom: 7px;
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+            font-weight: 650;
+        }
+
+        .title-input,
+        .summary-input {
+            width: 100%;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: var(--fc-color-text);
+        }
+
+        .title-input {
+            padding: 6px 0 10px;
+            border-bottom: 1px solid var(--fc-color-border);
+            font-size: 25px;
+            font-weight: 720;
+        }
+
+        .meta-strip {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin: 16px 0;
+        }
+
+        .meta-control {
+            display: flex;
+            min-height: 48px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 13px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-lg);
+            background: var(--fc-color-bg-elevated);
+            color: var(--fc-color-text);
+        }
+
+        .meta-control span {
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .body-section {
+            margin-top: 12px;
+        }
+
+        .section-heading {
+            display: flex;
+            min-height: 44px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .section-heading strong { font-size: 15px; }
+
+        .section-heading button {
+            min-height: 40px;
+            padding: 0 12px;
+            border: 0;
+            background: transparent;
+            color: var(--fc-color-primary);
+        }
+
+        .body-editor {
+            width: 100%;
+            min-height: 310px;
+            resize: none;
+            padding: 14px 0;
+            border: 0;
+            border-top: 1px solid var(--fc-color-border);
+            border-bottom: 1px solid var(--fc-color-border);
+            outline: 0;
+            background: transparent;
+            color: var(--fc-color-text);
+            font-size: 16px;
+            line-height: 1.72;
+        }
+
+        .more-properties {
+            margin-top: 14px;
+            border-bottom: 1px solid var(--fc-color-border);
+        }
+
+        .more-properties summary {
+            display: flex;
+            min-height: 54px;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            list-style: none;
+        }
+
+        .more-properties summary::-webkit-details-marker { display: none; }
+
+        .more-properties summary span {
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .property-list {
+            display: grid;
+            gap: 1px;
+            padding-bottom: 12px;
+            background: var(--fc-color-border);
+        }
+
+        .property-row {
+            display: flex;
+            min-height: 48px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .property-row span {
+            color: var(--fc-color-text-secondary);
+            font-size: 13px;
+        }
+
+        .focus-page { display: none; }
+
+        .phone[data-view="focus"] .compact-page { display: none; }
+
+        .phone[data-view="focus"] .focus-page {
+            display: flex;
+        }
+
+        .focus-page .editor-scroll {
+            padding: 78px 18px calc(72px + var(--ime-height));
+        }
+
+        .focus-page .body-editor {
+            min-height: calc(var(--frame-height) - 170px - var(--ime-height));
+            border-bottom: 0;
+        }
+
+        .markdown-toolbar {
+            position: absolute;
+            z-index: 6;
+            right: 0;
+            bottom: var(--ime-height);
+            left: 0;
+            display: flex;
+            min-height: 66px;
+            gap: 8px;
+            padding: 10px 14px 12px;
+            overflow-x: auto;
+            border-top: 1px solid var(--fc-color-border);
+            background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
+            backdrop-filter: blur(8px) saturate(1.3);
+            scrollbar-width: none;
+        }
+
+        .markdown-toolbar::-webkit-scrollbar { display: none; }
+
+        .markdown-toolbar button {
+            min-width: 60px;
+            min-height: 44px;
+            flex: 1 0 60px;
+            padding: 0 10px;
+            border: 1px solid var(--fc-color-border);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--fc-color-text);
+            font-size: 13px;
+        }
+
+        .ime-preview {
+            position: absolute;
+            z-index: 5;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: none;
+            height: var(--ime-height);
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 18px;
+            border-top: 2px dashed var(--fc-color-text-tertiary);
+            background: var(--fc-color-bg-secondary);
+            color: var(--fc-color-text-secondary);
+            font-size: 12px;
+        }
+
+        .phone[data-keyboard="open"] .ime-preview { display: flex; }
+
+        @media (max-width: 800px) {
+            .design-shell { grid-template-columns: 1fr; }
+            .design-notes {
+                position: static;
+                height: auto;
+                border-right: 0;
+                border-bottom: 1px solid var(--fc-color-border);
+            }
+            .stage { padding: 18px 10px; }
+            .phone {
+                width: min(var(--frame-width), calc(100vw - 20px));
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="design-shell">
+    <aside class="design-notes">
+        <h1>移动端词条编辑</h1>
+        <p>所属板块：项目 Tab → 词条详情 → 编辑。只规划词条编辑，不包含 AI 审阅。</p>
+
+        <div class="control-group">
+            <strong>页面状态</strong>
+            <div class="control-row" data-control="view">
+                <button type="button" data-value="compact" aria-pressed="true">紧凑编辑</button>
+                <button type="button" data-value="focus" aria-pressed="false">沉浸正文</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <strong>软键盘</strong>
+            <div class="control-row" data-control="keyboard">
+                <button type="button" data-value="closed" aria-pressed="true">收起</button>
+                <button type="button" data-value="open" aria-pressed="false">弹出</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <strong>预览条件</strong>
+            <div class="control-row" data-control="width">
+                <button type="button" data-value="390" aria-pressed="true">390 × 844</button>
+                <button type="button" data-value="360" aria-pressed="false">360 × 740</button>
+            </div>
+            <div class="control-row" data-control="theme">
+                <button type="button" data-value="light" aria-pressed="true">浅色</button>
+                <button type="button" data-value="dark" aria-pressed="false">深色</button>
+            </div>
+        </div>
+
+        <ul class="decision-list">
+            <li><b>正文优先</b>标题与正文保留在主页面；图片、标签、关系不再各占一张空卡。</li>
+            <li><b>属性收口</b>类型和分类保留为高频字段，其余内容进入同一个“附加内容”折叠区。</li>
+            <li><b>键盘契约</b>沉浸态按可视视口缩高，宏栏固定在系统键盘上沿，正文滚动区同步补足底部空间。</li>
+            <li><b>触控下限</b>顶部动作和宏栏按钮均不低于 44px。</li>
+        </ul>
+    </aside>
+
+    <section class="stage" aria-label="移动端词条编辑设计稿">
+        <div class="phone" data-view="compact" data-keyboard="closed">
+            <section class="editor-page compact-page">
+                <header class="mobile-topbar">
+                    <button type="button" class="top-action">取消</button>
+                    <div class="top-title"><strong>编辑词条</strong><small>有未保存修改</small></div>
+                    <button type="button" class="top-action">保存</button>
+                </header>
+                <div class="editor-scroll">
+                    <label class="field-label" for="entry-title">标题</label>
+                    <input id="entry-title" class="title-input" value="雾港守望者">
+
+                    <div class="meta-strip">
+                        <button type="button" class="meta-control"><span>类型</span><strong>角色</strong></button>
+                        <button type="button" class="meta-control"><span>分类</span><strong>雾港</strong></button>
+                    </div>
+
+                    <section class="body-section">
+                        <div class="section-heading">
+                            <strong>正文</strong>
+                            <button type="button" data-open-focus>沉浸编辑</button>
+                        </div>
+                        <textarea class="body-editor">雾港位于群岛的西缘，常年被浓雾笼罩。
+
+守望者并非正式组织，而是代代自发承担瞭望与预警之责的人们。他们在高塔与礁石之间传递烟火与号音，在风暴来临前将预兆刻进木牌，留给下一任守望者。</textarea>
+                    </section>
+
+                    <details class="more-properties">
+                        <summary><strong>附加内容</strong><span>摘要 · 图片 2 · 标签 3 · 关系 1</span></summary>
+                        <div class="property-list">
+                            <div class="property-row"><strong>摘要</strong><span>已填写</span></div>
+                            <div class="property-row"><strong>图片</strong><span>2 张</span></div>
+                            <div class="property-row"><strong>标签</strong><span>3 个</span></div>
+                            <div class="property-row"><strong>关系</strong><span>1 条</span></div>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <section class="editor-page focus-page">
+                <header class="mobile-topbar">
+                    <button type="button" class="top-action" data-close-focus>返回</button>
+                    <div class="top-title"><strong>正文编辑</strong><small>有未保存修改</small></div>
+                    <button type="button" class="top-action">保存</button>
+                </header>
+                <div class="editor-scroll">
+                    <textarea class="body-editor" autofocus>雾港位于群岛的西缘，常年被浓雾笼罩。
+
+守望者并非正式组织，而是代代自发承担瞭望与预警之责的人们。他们在高塔与礁石之间传递烟火与号音，在风暴来临前将预兆刻进木牌，留给下一任守望者。
+
+传说最早的守望者在一场没有月亮的风暴中失踪，只留下一盏未熄灭的灯。</textarea>
+                </div>
+                <nav class="markdown-toolbar" aria-label="Markdown 常用工具">
+                    <button type="button">粗体</button>
+                    <button type="button">标题</button>
+                    <button type="button">链接</button>
+                    <button type="button">列表</button>
+                    <button type="button">引用</button>
+                    <button type="button">图片</button>
+                </nav>
+            </section>
+
+            <div class="ime-preview">系统键盘区域，仅用于验证应用内容避让</div>
+        </div>
+    </section>
+</main>
+
+<script>
+    const phone = document.querySelector('.phone')
+
+    function selectControl(group, value) {
+        document.querySelectorAll(`[data-control="${group}"] button`).forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.value === value))
+        })
+    }
+
+    document.querySelectorAll('[data-control] button').forEach(button => {
+        button.addEventListener('click', () => {
+            const group = button.closest('[data-control]').dataset.control
+            const value = button.dataset.value
+            selectControl(group, value)
+            if (group === 'view') phone.dataset.view = value
+            if (group === 'keyboard') phone.dataset.keyboard = value
+            if (group === 'theme') document.documentElement.dataset.theme = value
+            if (group === 'width') {
+                document.documentElement.style.setProperty('--frame-width', `${value}px`)
+                document.documentElement.style.setProperty('--frame-height', value === '360' ? '740px' : '844px')
+            }
+        })
+    })
+
+    document.querySelector('[data-open-focus]').addEventListener('click', () => {
+        phone.dataset.view = 'focus'
+        selectControl('view', 'focus')
+    })
+
+    document.querySelector('[data-close-focus]').addEventListener('click', () => {
+        phone.dataset.view = 'compact'
+        phone.dataset.keyboard = 'closed'
+        selectControl('view', 'compact')
+        selectControl('keyboard', 'closed')
+    })
+</script>
+</body>
+</html>
