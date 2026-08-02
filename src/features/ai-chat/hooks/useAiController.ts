@@ -67,6 +67,7 @@ import {
     subscribeAppSettings,
 } from '../../settings/appSettingsStore'
 import {
+    getAiConversationSnapshot,
     setAiActiveConversationId,
     setAiConversationMetaLoaded,
     setAiConversations,
@@ -1522,6 +1523,7 @@ export function useAiController(focus: AiFocus): AiContextValue {
     }, [refreshAiSidebarState])
 
     useEffect(() => {
+        if (getAiConversationSnapshot().conversationMetaLoaded) return
         let mounted = true
         const init = async () => {
             const [metas, fileMetaMap, uiStateMap] = await Promise.all([

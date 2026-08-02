@@ -66,6 +66,7 @@ import {
 import './MobileAiChat.css'
 interface Props {
     aiFocus: AiFocus
+    active: boolean
     navigateToTab: (tab: MobileTab) => void
     conversationDrawerOpen?: boolean
     onOpenConversationDrawer?: () => void
@@ -87,6 +88,7 @@ function runAiMenuContentTransition(update: () => void) {
 
 export default function MobileAiChat({
     aiFocus,
+    active,
     navigateToTab,
     conversationDrawerOpen = false,
     onOpenConversationDrawer,
@@ -715,7 +717,7 @@ export default function MobileAiChat({
 
 
     return (
-        <div ref={pageRef} className="mobile-ai-chat">
+        <div ref={pageRef} className="mobile-ai-chat" hidden={!active}>
             {drawerRoot ? createPortal(conversationDrawer, drawerRoot) : null}
             <MobilePageTopBar
                 className="mobile-ai-chat__topbar"

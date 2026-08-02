@@ -459,14 +459,13 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                         )}
 
                         {/* AI Tab */}
-                        {activeTab === 'ai' && (
-                            <MobileAiChat
-                                {...pageProps}
-                                conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
-                                onOpenConversationDrawer={openAiConversationDrawer}
-                                onCloseConversationDrawer={closeCategoryDrawer}
-                            />
-                        )}
+                        <MobileAiChat
+                            {...pageProps}
+                            active={activeTab === 'ai'}
+                            conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
+                            onOpenConversationDrawer={openAiConversationDrawer}
+                            onCloseConversationDrawer={closeCategoryDrawer}
+                        />
 
                         {/* 灵感 Tab */}
                         {activeTab === 'ideas' && (
