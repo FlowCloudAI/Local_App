@@ -275,7 +275,7 @@
 }
 
 .mobile-entry-detail__content-input {
-    flex: 1 1 15rem;
+    flex: 0 0 auto;
     min-height: 12.5rem;
     width: 100%;
     padding: var(--fc-space-sm);
