@@ -2,7 +2,9 @@ import {type ChangeEvent, type CSSProperties, useCallback, useEffect, useMemo, u
 import {createPortal} from 'react-dom'
 import {
     Button,
+    Input,
     RollingBox,
+    Select,
     Slider,
     useAlert,
     useContextMenu,
@@ -47,7 +49,6 @@ import {
     type MapEntry,
 } from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
-import {DockPanelSearchInput} from '../../../shared/ui/layout/DockPanelSidebarControls'
 import '../../../shared/ui/layout/DockPanelScaffold.css'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
@@ -525,7 +526,6 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     const [maps, setMaps] = useState<MapEntry[]>([])
     const [activeMapId, setActiveMapId] = useState<string | null>(null)
     const [entryOptions, setEntryOptions] = useState<EntryBrief[]>([])
-    const [linkedEntrySearch, setLinkedEntrySearch] = useState('')
 
     // ── 当前地图编辑状态 ───────────────────────────────────────────────
     const [draft, setDraft] = useState<MapShapeEditorDraft>(emptyDraft)
@@ -1455,15 +1455,10 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     }, [style])
     const selectedLinkedEntryId = readLinkedEntryId(selectedLocation)
     const selectedLinkedEntry = entryOptions.find(entry => entry.id === selectedLinkedEntryId) ?? null
-    const normalizedLinkedEntrySearch = linkedEntrySearch.trim().toLocaleLowerCase()
-    const matchingEntryOptions = useMemo(() => normalizedLinkedEntrySearch
-        ? entryOptions.filter(entry => entry.title.toLocaleLowerCase().includes(normalizedLinkedEntrySearch))
-        : entryOptions,
-    [entryOptions, normalizedLinkedEntrySearch])
-    const visibleEntryOptions = selectedLinkedEntry
-        && !matchingEntryOptions.some(entry => entry.id === selectedLinkedEntry.id)
-        ? [selectedLinkedEntry, ...matchingEntryOptions]
-        : matchingEntryOptions
+    const linkedEntryOptions = useMemo(() => [
+        {value: '', label: '未关联'},
+        ...entryOptions.map(entry => ({value: entry.id, label: entry.title})),
+    ], [entryOptions])
 
     const saveStatusLabel = useMemo(() => {
         if (saveStatus === 'saving') return '保存中…'
@@ -1924,13 +1919,17 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                         <>
                             <div className="wm-field">
                                 <label>名称</label>
-                                <input value={selectedLocation.name}
-                                       onChange={e => updateSelectedLocation('name', e.target.value)}/>
+                                <Input
+                                    value={selectedLocation.name}
+                                    onValueChange={value => updateSelectedLocation('name', value)}
+                                />
                             </div>
                             <div className="wm-field">
                                 <label>类型</label>
-                                <input value={selectedLocation.type}
-                                       onChange={e => updateSelectedLocation('type', e.target.value)}/>
+                                <Input
+                                    value={selectedLocation.type}
+                                    onValueChange={value => updateSelectedLocation('type', value)}
+                                />
                             </div>
                             <div className="wm-field">
                                 <label>显示元素</label>
@@ -1955,53 +1954,40 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             </div>
                             <div className="wm-field">
                                 <label>关联词条</label>
-                                {entryOptions.length > 0 && (
-                                    <DockPanelSearchInput
-                                        value={linkedEntrySearch}
-                                        onChange={setLinkedEntrySearch}
-                                        placeholder="搜索地点词条"
-                                    />
-                                )}
-                                <select
+                                <Select
+                                    options={linkedEntryOptions}
                                     value={selectedLinkedEntryId}
-                                    onChange={e => updateSelectedLocationLinkedEntryId(e.target.value || null)}
+                                    onValueChange={value => updateSelectedLocationLinkedEntryId(
+                                        typeof value === 'string' && value ? value : null,
+                                    )}
+                                    searchable={entryOptions.length > 0}
                                     disabled={entryOptions.length === 0}
-                                >
-                                    <option value="">未关联</option>
-                                    {visibleEntryOptions.map(entry => (
-                                        <option key={entry.id} value={entry.id}>
-                                            {entry.title}
-                                        </option>
-                                    ))}
-                                </select>
+                                />
                             </div>
                             {entryOptions.length === 0 && (
                                 <div className="wm-sidebar-hint">
                                     当前项目还没有类型为 location 的词条，暂时无法关联地点。
                                 </div>
                             )}
-                            {entryOptions.length > 0 && normalizedLinkedEntrySearch && matchingEntryOptions.length === 0 && (
-                                <div className="wm-sidebar-hint">没有匹配的地点词条。</div>
-                            )}
                             {selectedLinkedEntry && (
                                 <div className="wm-sidebar-actions">
-                                    <button
-                                        type="button"
-                                        className="wm-chip"
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
                                         onClick={() => onOpenEntry?.({
                                             id: selectedLinkedEntry.id,
                                             title: selectedLinkedEntry.title
                                         })}
                                     >
                                         打开词条
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="wm-chip"
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
                                         onClick={() => updateSelectedLocationLinkedEntryId(null)}
                                     >
                                         清除关联
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                             <div className="wm-meta-row">
@@ -2009,9 +1995,14 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                 <strong>{selectedLocation.x.toFixed(1)} / {selectedLocation.y.toFixed(1)}</strong>
                             </div>
                             <div className="wm-sidebar-sep"/>
-                            <button type="button" className="wm-chip is-danger is-full"
-                                    onClick={() => void requestDeleteLocation(selectedLocation.id)}>删除地点
-                            </button>
+                            <Button
+                                size="sm"
+                                variant="danger"
+                                block
+                                onClick={() => void requestDeleteLocation(selectedLocation.id)}
+                            >
+                                删除地点
+                            </Button>
                         </>
                     )}
                 </RollingBox>

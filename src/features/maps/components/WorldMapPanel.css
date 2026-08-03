@@ -540,7 +540,7 @@
     font-weight: var(--fc-font-weight-medium);
 }
 
-.wm-field input:not(.dock-panel-search__input),
+.wm-field input:not(.fc-input__field),
 .wm-field select {
     width: 100%;
     box-sizing: border-box;
@@ -554,7 +554,7 @@
     transition: border-color var(--fc-transition);
 }
 
-.wm-field input:not(.dock-panel-search__input):focus,
+.wm-field input:not(.fc-input__field):focus,
 .wm-field select:focus {
     outline: none;
     border-color: var(--fc-color-primary);
@@ -676,7 +676,7 @@
     display: flex;
     gap: var(--fc-space-sm);
     flex-wrap: wrap;
-    margin-bottom: var(--fc-space-sm);
+    margin-block: var(--fc-space-sm);
 }
 
 .wm-coastline-fields {
