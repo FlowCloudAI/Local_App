@@ -1,0 +1,50 @@
+/* 词条地图位置浮层：限制预览尺寸，并保持地图与操作区层级清晰。 */
+.entry-map-location-overlay {
+    width: min(760px, calc(100vw - var(--fc-space-xl) * 2));
+    padding-bottom: var(--fc-space-lg);
+}
+
+.entry-map-location-overlay__viewport {
+    height: clamp(280px, 56vh, 520px);
+    margin-inline: var(--fc-space-lg);
+    overflow: hidden;
+    border: 1px solid var(--fc-color-border);
+    border-radius: var(--fc-radius-md);
+    background: var(--fc-color-bg-secondary);
+}
+
+.entry-map-location-overlay__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fc-space-md);
+    padding: var(--fc-space-md) var(--fc-space-lg) 0;
+}
+
+.entry-map-location-overlay__meta {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--fc-space-xs);
+    color: var(--fc-color-text);
+}
+
+.entry-map-location-overlay__meta span {
+    color: var(--fc-color-text-secondary);
+    font-size: var(--fc-font-size-xs);
+}
+
+@media (max-width: 640px) {
+    .entry-map-location-overlay {
+        width: 100%;
+    }
+
+    .entry-map-location-overlay__viewport {
+        height: 48vh;
+        margin-inline: var(--fc-space-md);
+    }
+
+    .entry-map-location-overlay__footer {
+        padding-inline: var(--fc-space-md);
+    }
+}

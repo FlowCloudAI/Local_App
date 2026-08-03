@@ -509,6 +509,7 @@ function ImageIcon() {
 interface WorldMapPanelProps {
     projectId: string
     projectName: string
+    initialMapId?: string | null
     onOpenEntry?: (entry: { id: string; title: string }) => void
     sidebarContainer?: HTMLElement | null
 }
@@ -518,7 +519,13 @@ function readLinkedEntryId(location: MapKeyLocationDraft | MapPreviewKeyLocation
     return typeof value === 'string' ? value : ''
 }
 
-export default function WorldMapPanel({projectId, projectName, onOpenEntry, sidebarContainer}: WorldMapPanelProps) {
+export default function WorldMapPanel({
+                                          projectId,
+                                          projectName,
+                                          initialMapId,
+                                          onOpenEntry,
+                                          sidebarContainer,
+                                      }: WorldMapPanelProps) {
     const {showAlert} = useAlert()
     const {showContextMenu} = useContextMenu()
     const imageInputRef = useRef<HTMLInputElement>(null)
@@ -583,7 +590,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             if (cancelled) return
             setMaps(entries)
             if (entries.length > 0) {
-                loadMapDataRef.current(entries[0])
+                loadMapDataRef.current(entries.find(entry => entry.id === initialMapId) ?? entries[0])
             }
             setIsLoading(false)
         }).catch((e: unknown) => {
@@ -596,7 +603,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         return () => {
             cancelled = true
         }
-    }, [projectId])
+    }, [initialMapId, projectId])
 
     useEffect(() => {
         let cancelled = false

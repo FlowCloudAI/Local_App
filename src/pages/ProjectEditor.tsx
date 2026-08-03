@@ -239,6 +239,7 @@ function ProjectEditorInner({
         collapseThresholdRatio: TREE_COLLAPSE_THRESHOLD_RATIO,
     })
     const [worldMapSidebarHost, setWorldMapSidebarHost] = useState<HTMLDivElement | null>(null)
+    const [worldMapInitialMapId, setWorldMapInitialMapId] = useState<string | null>(null)
     const [relationGraphSidebarHost, setRelationGraphSidebarHost] = useState<HTMLDivElement | null>(null)
     const [contradictionSidebarHost, setContradictionSidebarHost] = useState<HTMLDivElement | null>(null)
     const [timelineSidebarHost, setTimelineSidebarHost] = useState<HTMLDivElement | null>(null)
@@ -552,6 +553,11 @@ function ProjectEditorInner({
             onOpenProjectPanel(panel, {id: projectId, name: project.name})
         }
     }, [onOpenProjectPanel, project, projectId])
+
+    const handleOpenBoundLocationMap = useCallback((target: {mapId: string}) => {
+        setWorldMapInitialMapId(target.mapId)
+        handleOpenProjectPanel('world-map')
+    }, [handleOpenProjectPanel])
 
     const handleRename = async (key: string, newName: string) => {
         if (key === ROOT_ID) {
@@ -1381,6 +1387,7 @@ function ProjectEditorInner({
                             <WorldMapPanel
                                 projectId={projectId}
                                 projectName={project.name}
+                                initialMapId={worldMapInitialMapId}
                                 onOpenEntry={(entry) => onOpenEntry?.(projectId, entry)}
                                 sidebarContainer={worldMapSidebarHost}
                             />
@@ -1438,6 +1445,7 @@ function ProjectEditorInner({
                                         id: entry.id,
                                         title: entry.title,
                                     })}
+                                    onOpenWorldMap={handleOpenBoundLocationMap}
                                     onOpenPluginManagement={onOpenPluginManagement}
                                     onOpenAiSettings={onOpenAiSettings}
                                 />

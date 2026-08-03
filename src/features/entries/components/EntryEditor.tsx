@@ -112,6 +112,7 @@ import {
 import {resolveSavedState, shouldAutoSave} from '../lib/entrySaveState'
 import {buildTtsVoiceOptions, resolvePreferredTtsPlugin} from '../../plugins/ttsVoice'
 import type {EntryRelationDraft} from '../../project-editor/components/EntryRelations/EntryRelationCreator.tsx'
+import EntryMapLocationOverlay from '../../maps/components/EntryMapLocationOverlay'
 
 type EditorMode = 'edit' | 'browse'
 type EntrySaveSource = 'manual' | 'auto'
@@ -142,6 +143,7 @@ interface EntryEditorProps {
     onDirtyChange?: (dirty: boolean) => void
     onSavingChange?: (saving: boolean) => void
     onStartCharacterChat?: (entry: Entry) => void | Promise<void>
+    onOpenWorldMap?: (target: {mapId: string; locationId: string}) => void
     onOpenPluginManagement?: (kind: AiMissingPluginKind) => void
     onOpenAiSettings?: (pluginId: string) => void
 }
@@ -224,6 +226,7 @@ export default function EntryEditor({
                                         onDirtyChange,
                                         onSavingChange,
                                         onStartCharacterChat,
+                                        onOpenWorldMap,
                                         onOpenPluginManagement,
                                         onOpenAiSettings,
                                     }: EntryEditorProps) {
@@ -1597,6 +1600,14 @@ export default function EntryEditor({
                                     </div>
                                 </div>
                                 <div className="entry-editor-workspace__toolbar-actions">
+                                    {onOpenWorldMap && (
+                                        <EntryMapLocationOverlay
+                                            active={active}
+                                            projectId={projectId}
+                                            entryId={entryId}
+                                            onEnterMap={onOpenWorldMap}
+                                        />
+                                    )}
                                     {editorMode === 'edit' && (
                                         <span
                                             className={`entry-editor-save-state is-${saveStatus.kind}`}
