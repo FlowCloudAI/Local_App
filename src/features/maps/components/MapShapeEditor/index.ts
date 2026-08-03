@@ -3,6 +3,7 @@ export * from './api';
 export * from './geometry';
 export * from './validation';
 export * from './mapShapeEditorSvgUtils';
+export * from './previewMarkers';
 export * from './MapDeckPreview';
 export * from './MapPixiPreview';
 export * from './MapShapeSvgEditor';

@@ -1,7 +1,8 @@
-import {type CSSProperties, useState} from 'react';
+import {type CSSProperties, useMemo, useState} from 'react';
 
 import type {
     MapEditorCanvas,
+    MapPreviewKeyLocation,
     MapPreviewKeyLocationStyle,
     MapPreviewLabelStyle,
     MapPreviewScene,
@@ -15,6 +16,7 @@ import {MapPixiPreview} from './MapPixiPreview';
 import type {MapShapeSvgEditorProps} from './MapShapeSvgEditor';
 import {MapShapeSvgEditor} from './MapShapeSvgEditor';
 import {createInitialMapShapeEditorViewBox} from './mapShapeEditorSvgUtils';
+import {appendMapPreviewMarkers} from './previewMarkers';
 import './MapShapeEditor.css';
 
 export type MapShapeViewportMode = 'edit' | 'preview';
@@ -25,6 +27,11 @@ export interface MapShapeViewportProps {
     renderer?: MapShapeViewportRenderer;
     canvas: MapEditorCanvas;
     scene: MapPreviewScene | null;
+    /**
+     * 仅参与本次渲染的临时标记。复用关键地点渲染与 picking，但不会写回 scene。
+     * 调用方应使用稳定且不与持久化地点冲突的 id。
+     */
+    markers?: readonly MapPreviewKeyLocation[];
     /**
      * 编辑图层的受控 viewBox。编辑模式下必需，以使
      * SVG 编辑器与预览层保持同步。预览模式下忽略。
@@ -77,6 +84,7 @@ export function MapShapeViewport({
                                      renderer = 'pixi',
                                      canvas,
                                      scene,
+                                     markers,
                                      viewBox: viewBoxProp,
                                      onViewBoxChange,
                                      svgProps,
@@ -99,6 +107,10 @@ export function MapShapeViewport({
     const panZoomEnabled = !isEditMode && (enablePreviewPanZoom ?? true);
     const pickingEnabled = !isEditMode && (enablePreviewPicking ?? true);
     const viewBox = viewBoxProp ?? internalViewBox;
+    const displayScene = useMemo(
+        () => appendMapPreviewMarkers(scene, markers),
+        [markers, scene],
+    );
     const svgEditorClassName = [
         'fc-map-shape-viewport__svg-editor',
         svgProps?.className,
@@ -136,7 +148,7 @@ export function MapShapeViewport({
                 {renderer === 'pixi' ? (
                     <MapPixiPreview
                         {...pixiProps}
-                        scene={scene}
+                        scene={displayScene}
                         syncViewBox={isEditMode ? viewBox : undefined}
                         enablePanZoom={panZoomEnabled}
                         enablePicking={pickingEnabled}
@@ -149,7 +161,7 @@ export function MapShapeViewport({
                 ) : (
                     <MapDeckPreview
                         {...deckProps}
-                        scene={scene}
+                        scene={displayScene}
                         syncViewBox={isEditMode ? viewBox : undefined}
                         disableTooltip={isEditMode}
                         enablePanZoom={panZoomEnabled}
