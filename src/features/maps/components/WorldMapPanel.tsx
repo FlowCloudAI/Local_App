@@ -25,6 +25,8 @@ import {
     type MapEditorCanvas,
     type MapKeyLocationDraft,
     type MapMarkerClass,
+    type MapPreviewKeyLocation,
+    type MapPreviewPickDetail,
     type MapPreviewScene,
     type MapPixiLodSetting,
     type MapPixiPerfStats,
@@ -511,7 +513,7 @@ interface WorldMapPanelProps {
     sidebarContainer?: HTMLElement | null
 }
 
-function readLinkedEntryId(location: MapKeyLocationDraft | null): string {
+function readLinkedEntryId(location: MapKeyLocationDraft | MapPreviewKeyLocation | null): string {
     const value = location?.ext?.linkedEntryId
     return typeof value === 'string' ? value : ''
 }
@@ -1321,6 +1323,23 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     const renderedScene = previewRenderer === 'pixi'
         ? compiledPixiStyle.scene
         : deckScene
+    const entryOptionById = useMemo(
+        () => new Map(entryOptions.map(entry => [entry.id, entry])),
+        [entryOptions],
+    )
+    const getLinkedEntryTooltip = useCallback((detail: MapPreviewPickDetail) => {
+        if (detail.kind !== 'keyLocation') return undefined
+        const entry = entryOptionById.get(readLinkedEntryId(detail.object))
+        if (!entry) return undefined
+        return {
+            text: [
+                `词条：${entry.title}`,
+                entry.type ? `类型：${entry.type}` : '',
+                entry.summary?.trim() ?? '',
+            ].filter(Boolean).join('\n'),
+            className: 'wm-linked-entry-tooltip',
+        }
+    }, [entryOptionById])
 
     const deckProps = useMemo(() => {
         if (previewRenderer !== 'deck') {
@@ -1336,8 +1355,9 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
             showLabels: true,
             keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
             extraLayers,
+            getTooltip: getLinkedEntryTooltip,
         }
-    }, [previewRenderer, style, deckScene, activeCanvas])
+    }, [previewRenderer, style, deckScene, activeCanvas, getLinkedEntryTooltip])
 
     const pixiProps = compiledPixiStyle.pixiProps
     const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined
@@ -1350,6 +1370,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         const pixiPropsWithLod = {
             ...pixiProps,
             lodLevel: pixiLodLevel,
+            getTooltip: getLinkedEntryTooltip,
         }
         const originalOnPerfStats = pixiPropsWithLod.onPerfStats
         const basePixiProps = pixiPerfDebugEnabled
@@ -1384,7 +1405,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                 return result
             }
         }
-    }, [pixiLodLevel, pixiProps, pixiPerfDebugEnabled])
+    }, [getLinkedEntryTooltip, pixiLodLevel, pixiProps, pixiPerfDebugEnabled])
 
     const viewportRenderKey = `${previewRenderer}-${viewportMode}-${style}-${activeCanvas.width}x${activeCanvas.height}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
@@ -1454,7 +1475,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
         })
     }, [style])
     const selectedLinkedEntryId = readLinkedEntryId(selectedLocation)
-    const selectedLinkedEntry = entryOptions.find(entry => entry.id === selectedLinkedEntryId) ?? null
+    const selectedLinkedEntry = entryOptionById.get(selectedLinkedEntryId) ?? null
     const linkedEntryOptions = useMemo(() => [
         {value: '', label: '未关联'},
         ...entryOptions.map(entry => ({value: entry.id, label: entry.title})),

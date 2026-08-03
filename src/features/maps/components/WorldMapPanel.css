@@ -679,6 +679,11 @@
     margin-block: var(--fc-space-sm);
 }
 
+.wm-linked-entry-tooltip {
+    max-width: 280px;
+    white-space: pre-line;
+}
+
 .wm-coastline-fields {
     flex: 1 1 auto;
     max-height: 320px;
