@@ -1,6 +1,5 @@
-/* eslint-disable react-hooks/refs -- 仅透传父组件 refs 与组件 props，不读取 ref.current */
 /* 移动端词条编辑视图：按内容、媒体、属性和关系的业务层级组织表单。 */
-import type {ComponentProps, RefObject} from 'react'
+import type {ComponentProps} from 'react'
 import {Input, Select} from 'flowcloudai-ui'
 import type {Category, EntryTypeView} from '../../../api'
 import {entryTypeKey} from '../../../api'
@@ -8,7 +7,6 @@ import EntryTypeCreator from '../../../features/entries/components/EntryTypeCrea
 import TagCreator from '../../../features/entries/components/TagCreator'
 import EntryImageAddModal from '../../../features/entries/components/EntryImageAddModal'
 import EntryImageLightbox from '../../../features/entries/components/EntryImageLightbox'
-import {MarkdownEditor, type MarkdownEditorRef} from '../../../features/entries/components/MarkdownEditor/MarkdownEditor'
 import {MobileAddIcon, MobileBackIcon, MobilePageTopBar, MobileTopActionPill} from '../components/MobileTopControls'
 import {MobileEntryDetailActionIcon} from './MobileEntryDetailActionIcon'
 import {MobileEntryImmersiveEditor} from './MobileEntryImmersiveEditor'
@@ -24,8 +22,7 @@ interface Props {
     title: string; onTitle: (value: string) => void; summary: string; onSummary: (value: string) => void
     entryType: string | null; onEntryType: (value: string | null) => void; categoryId: string | null; onCategory: (value: string | null) => void
     categories: Category[]; entryTypes: EntryTypeView[]; onOpenTypeCreator: () => void
-    content: string; editorRef: RefObject<MarkdownEditorRef | null>; onContentChange: (value: string) => void
-    textareaProps: ComponentProps<typeof MarkdownEditor>['textareaProps']; immersiveOpen: boolean; onOpenImmersive: () => void
+    immersiveOpen: boolean; onOpenImmersive: () => void
     wikiDraft: MobileWikiDraft | null; wikiOptions: MobileWikiOption[]; activeWikiIndex: number; categoryNameById: Map<string, string>; creatingLinkedEntry: boolean
     onWikiIndex: (index: number) => void; onWikiCommit: (option: MobileWikiOption) => void
     imagesProps: ComponentProps<typeof MobileEntryImagesSection>
@@ -88,7 +85,6 @@ export default function MobileEntryDetailEditView(p: Props) {
         </section>
         <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
             <div className="mobile-entry-detail__section-header"><span>正文</span><button type="button" className="mobile-entry-detail__section-action" onClick={p.onOpenImmersive}>沉浸编辑</button></div>
-            <div className="mobile-entry-detail__content-field"><MarkdownEditor ref={p.editorRef} value={p.content} onValueChange={p.onContentChange} placeholder="正文内容…输入 [[ 插入词条双链" minHeight={260} maxHeight={560} showSplitToggle={false} hideFullscreen toolbarCommands={[]} extraCommands={[]} textareaProps={p.textareaProps} tokens={{background: 'transparent', toolbarBackground: 'transparent', borderColor: 'transparent', editorTextBackground: 'transparent', previewBackground: 'transparent', textColor: 'var(--fc-color-text)', mutedTextColor: 'var(--fc-color-text-secondary)'}} className="mobile-entry-detail__content-input"/>{!p.immersiveOpen && wikiPanel}</div>
         </section>
         <div className="mobile-entry-detail__edit-disclosures">
             <details className="mobile-entry-detail__edit-disclosure">

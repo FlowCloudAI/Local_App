@@ -92,7 +92,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const {theme} = useTheme()
     const pageRef = useRef<HTMLDivElement>(null)
     const topActionsRef = useRef<HTMLDivElement>(null)
-    const contentEditorRef = useRef<MarkdownEditorRef>(null)
     const immersiveContentEditorRef = useRef<MarkdownEditorRef>(null)
     const projectEntriesRequestRef = useRef<Promise<EntryBrief[]> | null>(null)
 
@@ -149,7 +148,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         projectEntries,
         setProjectEntries,
         immersiveEditorOpen,
-        contentEditorRef,
         immersiveContentEditorRef,
         setImageAddModalOpen,
     })
@@ -574,7 +572,6 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
             title={title} onTitle={setTitle} summary={summary} onSummary={setSummary}
             entryType={entryType} onEntryType={setEntryType} categoryId={categoryId} onCategory={setCategoryId}
             categories={categories} entryTypes={entryTypes} onOpenTypeCreator={() => setTypeCreatorOpen(true)}
-            content={content} editorRef={contentEditorRef} onContentChange={handleContentChange} textareaProps={textareaProps}
             immersiveOpen={immersiveEditorOpen} onOpenImmersive={() => setImmersiveEditorOpen(true)}
             wikiDraft={wikiDraft} wikiOptions={wikiLinkOptions} activeWikiIndex={activeWikiOptionIndex}
             categoryNameById={categoryNameById} creatingLinkedEntry={creatingLinkedEntry}
