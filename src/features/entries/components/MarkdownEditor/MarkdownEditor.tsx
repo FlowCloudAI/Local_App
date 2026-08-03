@@ -409,7 +409,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             className={["fc-md-wrap", className].filter(Boolean).join(" ")}
             style={overrideStyle}
             data-color-mode={resolvedTheme}
-            data-auto-height={autoHeight ? "true" : "false"}
+            data-auto-height={autoHeight && maxHeight === undefined ? "true" : "false"}
             data-mode={mode}
         >
             <MDEditor

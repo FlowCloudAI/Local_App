@@ -87,7 +87,7 @@ export default function MobileEntryDetailEditView(p: Props) {
             </label>
         </section>
         <section className="mobile-entry-detail__form-section mobile-entry-detail__form-section--content">
-            <div className="mobile-entry-detail__section-header"><span>正文</span><button type="button" className="mobile-entry-detail__section-action" onClick={p.onOpenImmersive}>沉浸</button></div>
+            <div className="mobile-entry-detail__section-header"><span>正文</span><button type="button" className="mobile-entry-detail__section-action" onClick={p.onOpenImmersive}>沉浸编辑</button></div>
             <div className="mobile-entry-detail__content-field"><MarkdownEditor ref={p.editorRef} value={p.content} onValueChange={p.onContentChange} placeholder="正文内容…输入 [[ 插入词条双链" minHeight={260} maxHeight={560} showSplitToggle={false} hideFullscreen toolbarCommands={[]} extraCommands={[]} textareaProps={p.textareaProps} tokens={{background: 'transparent', toolbarBackground: 'transparent', borderColor: 'transparent', editorTextBackground: 'transparent', previewBackground: 'transparent', textColor: 'var(--fc-color-text)', mutedTextColor: 'var(--fc-color-text-secondary)'}} className="mobile-entry-detail__content-input"/>{!p.immersiveOpen && wikiPanel}</div>
         </section>
         <div className="mobile-entry-detail__edit-disclosures">
