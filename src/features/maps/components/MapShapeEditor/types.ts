@@ -269,10 +269,6 @@ export interface MapShapeSaveResponse {
     meta?: MapShapeResponseMeta;
 }
 
-export interface MapShapeEditorApi {
-    saveScene: (request: MapShapeSaveRequest) => Promise<MapShapeSaveResponse>;
-}
-
 export type MapValidationSeverity = 'error';
 
 export type MapValidationSource = 'shape' | 'keyLocation' | 'draft';
@@ -320,8 +316,6 @@ export interface MapValidationResult {
     draftResult: MapDraftValidationResult;
     isValid: boolean;
 }
-
-export type MapShapeSubmitErrorKind = 'timeout' | 'transport' | 'invalid_response';
 
 export type MapShapeServiceErrorCode =
     | 'MAP_SHAPE_VALIDATION_FAILED'

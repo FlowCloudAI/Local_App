@@ -5,12 +5,8 @@ import type {
     MapRgbaColor,
     MapKeyLocationDraft,
     MapShapeDraft,
-    MapShapeEditorApi,
     MapShapeSaveRequest,
-    MapShapeSaveResponse,
-    MapShapeSubmitErrorKind,
 } from './types';
-import {MAP_SHAPE_PROTOCOL_VERSION as PROTOCOL_VERSION} from './types';
 
 const SHAPE_FILL_PALETTE: MapRgbaColor[] = [
     [55, 138, 221, 88],
@@ -82,108 +78,4 @@ export function buildPreviewSceneFromDraft(request: MapShapeSaveRequest): MapPre
         terrainStrokes: request.terrainStrokes ?? [],
         ext: request.meta?.ext,
     };
-}
-
-export function createMockMapShapeEditorApi(options?: { delayMs?: number }): MapShapeEditorApi {
-    const delayMs = Math.max(0, options?.delayMs ?? 320);
-
-    return {
-        async saveScene(request: MapShapeSaveRequest): Promise<MapShapeSaveResponse> {
-            if (delayMs > 0) {
-                await new Promise(resolve => {
-                    window.setTimeout(resolve, delayMs);
-                });
-            }
-
-            return {
-                scene: buildPreviewSceneFromDraft(request),
-                savedAt: new Date().toISOString(),
-                message: '已通过 mock 接口同步到 deck 展示层。',
-                meta: {
-                    protocolVersion: request.meta?.protocolVersion ?? PROTOCOL_VERSION,
-                    scenario: request.meta?.scenario ?? 'coastline_mvp',
-                    requestId: request.meta?.requestId,
-                    persisted: false,
-                    ext: request.meta?.ext,
-                },
-            };
-        },
-    };
-}
-
-export const defaultMapShapeEditorApi = createMockMapShapeEditorApi();
-
-export class MapShapeSubmitError extends Error {
-    kind: MapShapeSubmitErrorKind;
-
-    constructor(kind: MapShapeSubmitErrorKind, message: string) {
-        super(message);
-        this.name = 'MapShapeSubmitError';
-        this.kind = kind;
-    }
-}
-
-function isValidPreviewScene(value: unknown): value is MapPreviewScene {
-    if (!value || typeof value !== 'object') return false;
-
-    const scene = value as MapPreviewScene;
-    return !!scene.canvas
-        && Array.isArray(scene.shapes)
-        && Array.isArray(scene.keyLocations);
-}
-
-function normalizeSaveResponse(value: unknown): MapShapeSaveResponse {
-    if (!value || typeof value !== 'object') {
-        throw new MapShapeSubmitError('invalid_response', '后端返回结构异常，无法解析地图结果。');
-    }
-
-    const response = value as Partial<MapShapeSaveResponse>;
-    if (!isValidPreviewScene(response.scene) || typeof response.savedAt !== 'string') {
-        throw new MapShapeSubmitError('invalid_response', '后端返回结构异常，缺少有效的 scene 或 savedAt 字段。');
-    }
-
-    return {
-        scene: response.scene,
-        savedAt: response.savedAt,
-        message: response.message,
-        meta: response.meta,
-    };
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-        const timerId = window.setTimeout(() => {
-            reject(new MapShapeSubmitError('timeout', `后端处理超时（>${timeoutMs}ms），请稍后重试。`));
-        }, timeoutMs);
-
-        promise
-            .then(value => {
-                window.clearTimeout(timerId);
-                resolve(value);
-            })
-            .catch(error => {
-                window.clearTimeout(timerId);
-                reject(error);
-            });
-    });
-}
-
-export async function submitMapShapeScene(
-    api: MapShapeEditorApi,
-    request: MapShapeSaveRequest,
-    options?: { timeoutMs?: number },
-): Promise<MapShapeSaveResponse> {
-    const timeoutMs = Math.max(1, options?.timeoutMs ?? 6000);
-
-    try {
-        const response = await withTimeout(api.saveScene(request), timeoutMs);
-        return normalizeSaveResponse(response);
-    } catch (error) {
-        if (error instanceof MapShapeSubmitError) {
-            throw error;
-        }
-
-        const message = error instanceof Error ? error.message : String(error);
-        throw new MapShapeSubmitError('transport', `后端处理失败：${message}`);
-    }
 }

@@ -7,5 +7,4 @@ export * from './previewMarkers';
 export * from './MapDeckPreview';
 export * from './MapPixiPreview';
 export * from './MapShapeSvgEditor';
-export * from './MapShapeEditorWorkbench';
 export * from './MapShapeViewport';
