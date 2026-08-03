@@ -534,13 +534,13 @@
     gap: var(--fc-space-xs);
 }
 
-.wm-field label {
+.wm-field > label {
     font-size: var(--fc-font-size-xs);
     color: var(--fc-color-text-secondary);
     font-weight: var(--fc-font-weight-medium);
 }
 
-.wm-field input,
+.wm-field input:not(.dock-panel-search__input),
 .wm-field select {
     width: 100%;
     box-sizing: border-box;
@@ -554,7 +554,7 @@
     transition: border-color var(--fc-transition);
 }
 
-.wm-field input:focus,
+.wm-field input:not(.dock-panel-search__input):focus,
 .wm-field select:focus {
     outline: none;
     border-color: var(--fc-color-primary);
@@ -676,6 +676,7 @@
     display: flex;
     gap: var(--fc-space-sm);
     flex-wrap: wrap;
+    margin-bottom: var(--fc-space-sm);
 }
 
 .wm-coastline-fields {

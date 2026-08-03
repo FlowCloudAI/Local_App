@@ -47,6 +47,8 @@ import {
     type MapEntry,
 } from '../../../api'
 import {FloatingPanel} from '../../../shared/ui/overlay'
+import {DockPanelSearchInput} from '../../../shared/ui/layout/DockPanelSidebarControls'
+import '../../../shared/ui/layout/DockPanelScaffold.css'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import './WorldMapPanel.css'
 import {buildPixiLocationIconAsset, compilePixiMapStyle, getPixiMapStyle} from '../styles/pixi'
@@ -523,6 +525,7 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     const [maps, setMaps] = useState<MapEntry[]>([])
     const [activeMapId, setActiveMapId] = useState<string | null>(null)
     const [entryOptions, setEntryOptions] = useState<EntryBrief[]>([])
+    const [linkedEntrySearch, setLinkedEntrySearch] = useState('')
 
     // ── 当前地图编辑状态 ───────────────────────────────────────────────
     const [draft, setDraft] = useState<MapShapeEditorDraft>(emptyDraft)
@@ -1452,6 +1455,15 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
     }, [style])
     const selectedLinkedEntryId = readLinkedEntryId(selectedLocation)
     const selectedLinkedEntry = entryOptions.find(entry => entry.id === selectedLinkedEntryId) ?? null
+    const normalizedLinkedEntrySearch = linkedEntrySearch.trim().toLocaleLowerCase()
+    const matchingEntryOptions = useMemo(() => normalizedLinkedEntrySearch
+        ? entryOptions.filter(entry => entry.title.toLocaleLowerCase().includes(normalizedLinkedEntrySearch))
+        : entryOptions,
+    [entryOptions, normalizedLinkedEntrySearch])
+    const visibleEntryOptions = selectedLinkedEntry
+        && !matchingEntryOptions.some(entry => entry.id === selectedLinkedEntry.id)
+        ? [selectedLinkedEntry, ...matchingEntryOptions]
+        : matchingEntryOptions
 
     const saveStatusLabel = useMemo(() => {
         if (saveStatus === 'saving') return '保存中…'
@@ -1943,13 +1955,20 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                             </div>
                             <div className="wm-field">
                                 <label>关联词条</label>
+                                {entryOptions.length > 0 && (
+                                    <DockPanelSearchInput
+                                        value={linkedEntrySearch}
+                                        onChange={setLinkedEntrySearch}
+                                        placeholder="搜索地点词条"
+                                    />
+                                )}
                                 <select
                                     value={selectedLinkedEntryId}
                                     onChange={e => updateSelectedLocationLinkedEntryId(e.target.value || null)}
                                     disabled={entryOptions.length === 0}
                                 >
                                     <option value="">未关联</option>
-                                    {entryOptions.map(entry => (
+                                    {visibleEntryOptions.map(entry => (
                                         <option key={entry.id} value={entry.id}>
                                             {entry.title}
                                         </option>
@@ -1960,6 +1979,9 @@ export default function WorldMapPanel({projectId, projectName, onOpenEntry, side
                                 <div className="wm-sidebar-hint">
                                     当前项目还没有类型为 location 的词条，暂时无法关联地点。
                                 </div>
+                            )}
+                            {entryOptions.length > 0 && normalizedLinkedEntrySearch && matchingEntryOptions.length === 0 && (
+                                <div className="wm-sidebar-hint">没有匹配的地点词条。</div>
                             )}
                             {selectedLinkedEntry && (
                                 <div className="wm-sidebar-actions">
