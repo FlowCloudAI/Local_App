@@ -15,7 +15,7 @@
 - 前端在 SVG 层完成基础描点与编辑
 - 提交给 Tauri Rust 后端
 - Rust 后端完成最小必要校验与展示态转换
-- deck 展示层只消费后端返回的 `scene`
+- Pixi 展示层只消费后端返回的 `scene`
 
 当前实现明确不做：
 
@@ -30,7 +30,7 @@
 - `MapShapeSaveRequest -> MapShapeSaveResponse` 的 Tauri 命令
 - 最小可用几何校验
 - 关键地点关联图形的合法性判断
-- deck 预览色彩归一
+- 地图预览色彩归一
 - 基于草稿轮廓的“自然海岸线 MVP”生成
 
 ## 入口与模块分工
@@ -67,7 +67,7 @@
     - 点在多边形内
 
 - [color.rs](../src-tauri/src/map/color.rs)
-  负责 `fill / stroke` 十六进制颜色转 deck RGBA，以及关键地点类型颜色映射。
+  负责 `fill / stroke` 十六进制颜色转地图 RGBA，以及关键地点类型颜色映射。
 
 - [coastline.rs](../src-tauri/src/map/coastline.rs)
   负责“自然海岸线 MVP”生成（v1，默认算法）。
@@ -272,7 +272,7 @@
 
 ## 当前颜色逻辑
 
-为避免前端 deck 层额外推导颜色，后端当前会补齐 RGBA：
+为避免前端预览层额外推导颜色，后端当前会补齐 RGBA：
 
 - shape fill 来自：
     - 传入 `fill` 的十六进制颜色
@@ -286,7 +286,7 @@
     - `type -> color` 的固定映射
     - 否则退回默认颜色
 
-目标是让前端 deck 层保持“只渲染，不推导”。
+目标是让前端预览层保持“只渲染，不推导”。
 
 ## 错误响应现状
 
@@ -318,7 +318,7 @@
 - `map_save_scene` 已存在
 - 只要成功返回 `scene + savedAt`，前端就可以当作最新展示结果
 - 后端当前会主动生成自然海岸线 polygon
-- deck 回显不要再自己推导海岸线
+- 地图回显不要再自己推导海岸线
 
 ### 当前前端不要假设的事实
 

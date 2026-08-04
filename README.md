@@ -39,7 +39,7 @@ cargo test
 ## 技术栈
 
 - Tauri 2、Rust 2024、React 19、TypeScript、Vite  
-- `flowcloudai-ui`、`deck.gl`、`pixi.js`  
+- `flowcloudai-ui`、`pixi.js`
 
 ## 目录结构（仅顶层）
 

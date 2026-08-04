@@ -73,7 +73,7 @@ pub fn save_map_shape_scene(
     Ok(MapShapeSaveResponse {
         scene,
         saved_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-        message: Some("已按海岸线 MVP v1 完成后端计算，并同步 deck 展示场景。".to_string()),
+        message: Some("已按海岸线 MVP v1 完成后端计算，并同步地图预览场景。".to_string()),
         meta: Some(MapSaveMeta {
             protocol_version: Some(MapProtocolVersion::MapShapeMvpV1),
             scenario: Some(MapScenario::CoastlineMvp),

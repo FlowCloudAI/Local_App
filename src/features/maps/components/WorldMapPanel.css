@@ -121,11 +121,6 @@
     flex-shrink: 0;
 }
 
-.wm-toolbar-meta {
-    font-size: var(--fc-font-size-sm);
-    color: var(--fc-color-text-secondary);
-}
-
 .wm-toolbar-select {
     display: inline-flex;
     align-items: center;
@@ -469,12 +464,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.wm-map-item__meta {
-    font-size: var(--fc-font-size-xs);
-    color: var(--fc-color-text-secondary);
-    flex-shrink: 0;
 }
 
 .wm-map-item__delete {

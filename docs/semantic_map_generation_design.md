@@ -38,8 +38,8 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        前端 (React + TS)                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ MapShapeSvg  │  │ MapDeckPreview│  │ 语义化参数面板    │  │
-│  │   Editor     │  │   (deck.gl)   │  │ 标准/专业/档位   │  │
+│  │ MapShapeSvg  │  │ MapPixiPreview│  │ 语义化参数面板    │  │
+│  │   Editor     │  │   (PixiJS)    │  │ 标准/专业/档位   │  │
 │  └──────┬───────┘  └──────────────┘  └──────────────────┘  │
 │         │ draft (shapes + keyLocations + viewBox)           │
 │         └────────────────────────────────────────────────┐  │
@@ -60,8 +60,7 @@
 
 ### 3.1 前端：完全受控的状态托管
 
-参考 `MapShapeEditorDemo.tsx` 的实现，前端不再依赖旧的一体式工作台，而是显式组合 `MapShapeSvgEditor`、`MapDeckPreview`
-与外部状态：
+前端通过 `MapShapeViewport` 组合 `MapShapeSvgEditor`、`MapPixiPreview` 与外部状态：
 
 - `draft`：当前可编辑的 shapes 与 keyLocations
 - `selectedShapeId / selectedLocationId`：当前选中项
@@ -80,7 +79,7 @@
 | `types.rs`     | 请求/响应协议、预览场景结构             |
 | `service.rs`   | 保存主流程、校验、场景组装              |
 | `geometry.rs`  | 点线关系、线段相交、多边形自交、点在多边形内     |
-| `color.rs`     | 十六进制转 deck RGBA、地点类型颜色映射   |
+| `color.rs`     | 十六进制转地图 RGBA、地点类型颜色映射     |
 | `coastline.rs` | 自然海岸线生成（细分 + 噪声 + 平滑 + 回退） |
 | `constants.rs` | 底层算法常量集中管理                 |
 
@@ -267,7 +266,7 @@
 - **可扩展**：语义化参数面板可以直接读写同一层外部状态，无需穿透组件层级。
 - **可调试**：所有中间状态对用户透明，便于在 Demo 页面验证算法行为。
 
-预览区则通过 `MapDeckPreview` 消费后端返回的 `MapPreviewScene`，保持“编辑层只管草稿，渲染层只管场景”的清晰边界。
+预览区通过 `MapShapeViewport` 内的 `MapPixiPreview` 消费后端返回的 `MapPreviewScene`，保持“编辑层只管草稿，渲染层只管场景”的清晰边界。
 
 ---
 

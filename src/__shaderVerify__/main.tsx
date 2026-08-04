@@ -297,7 +297,6 @@ function TerrainEditorHarness() {
     return (
         <MapShapeViewport
             mode="edit"
-            renderer="pixi"
             canvas={canvas}
             scene={liveCompiled.scene}
             viewBox={viewBox}
@@ -327,7 +326,6 @@ createRoot(document.getElementById('root')!).render(
             {editMode ? <TerrainEditorHarness/> : (
                 <MapShapeViewport
                     mode="preview"
-                    renderer="pixi"
                     canvas={canvas}
                     scene={compiled.scene}
                     shapeStyle={compiled.shapeStyle}

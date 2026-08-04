@@ -34,11 +34,9 @@ import {
     type MapShapeEditorDraft,
     type MapTerrainBrush,
     MapShapeViewport,
-    type MapShapeViewportRenderer,
     moveShapeInOrder,
     validateMapEditorDraft,
 } from './MapShapeEditor'
-import * as deckStyleApi from '../styles/deck/presets'
 import {
     type CoastlineParamsPayload,
     db_list_entries,
@@ -148,11 +146,6 @@ const PIXI_LOD_LABELS: Record<MapPixiLodSetting, string> = {
     high: '高',
     original: '原始',
 }
-const MAP_RENDERER_LABELS: Record<MapShapeViewportRenderer, string> = {
-    pixi: 'Pixi 风格化',
-    deck: 'Deck 精确制图',
-}
-
 const COASTLINE_BASE_PARAMS: Required<Pick<CoastlineParamsPayload,
     'amplitudeBase' |
     'amplitudeMin' |
@@ -411,7 +404,6 @@ function normalizeCoastlineParams(value: CoastlineParamsPayload | null | undefin
 
 interface NewMapFormState {
     name: string
-    renderer: MapShapeViewportRenderer
     presetId: string
     width: string
     height: string
@@ -428,22 +420,17 @@ function normalizeMapCanvas(canvas: MapEditorCanvas | null | undefined): MapEdit
     return DEFAULT_CANVAS
 }
 
-function normalizeMapRenderer(renderer: string | null | undefined): MapShapeViewportRenderer {
-    return renderer === 'deck' ? 'deck' : 'pixi'
-}
-
 function createDefaultNewMapForm(nextIndex: number): NewMapFormState {
     const preset = MAP_SIZE_PRESETS[0]
     return {
         name: `地图 ${nextIndex}`,
-        renderer: 'pixi',
         presetId: preset.id,
         width: String(preset.width),
         height: String(preset.height),
     }
 }
 
-function newMapEntry(name: string, renderer: MapShapeViewportRenderer, canvas: MapEditorCanvas): MapEntry {
+function newMapEntry(name: string, canvas: MapEditorCanvas): MapEntry {
     const now = new Date().toISOString()
     return {
         id: createMapShapeEditorLocalId('map'),
@@ -453,7 +440,6 @@ function newMapEntry(name: string, renderer: MapShapeViewportRenderer, canvas: M
         coastlineParamsJson: JSON.stringify(DEFAULT_COASTLINE_PARAMS),
         style: 'flat',
         canvas,
-        renderer,
         backgroundImageUrl: null,
         createdAt: now,
         updatedAt: now,
@@ -553,7 +539,6 @@ export default function WorldMapPanel({
     const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
     const [viewBox, setViewBox] = useState(() => createInitialMapShapeEditorViewBox(DEFAULT_CANVAS))
     const [viewportMode, setViewportMode] = useState<ViewportMode>('preview')
-    const [previewRenderer, setPreviewRenderer] = useState<MapShapeViewportRenderer>('pixi')
     const [pixiLodLevel, setPixiLodLevel] = useState<MapPixiLodSetting>('auto')
     const [newMapForm, setNewMapForm] = useState<NewMapFormState | null>(null)
     const [utilityPanel, setUtilityPanel] = useState<MapUtilityPanel>(null)
@@ -654,7 +639,6 @@ export default function WorldMapPanel({
         setStyle((entry.style as MapStyle) ?? 'flat')
         const nextCanvas = normalizeMapCanvas(entry.canvas)
         setActiveCanvas(nextCanvas)
-        setPreviewRenderer(normalizeMapRenderer(entry.renderer))
         setBackgroundImageUrl(entry.backgroundImageUrl)
         setActiveMapName(entry.name)
         setActiveMapId(entry.id)
@@ -681,7 +665,6 @@ export default function WorldMapPanel({
         currentScene: MapPreviewScene | null,
         currentDraft: MapShapeEditorDraft,
         currentStyle: MapStyle,
-        currentRenderer: MapShapeViewportRenderer,
         currentCanvas: MapEditorCanvas,
         currentBg: string | null,
         currentName: string,
@@ -700,7 +683,6 @@ export default function WorldMapPanel({
         }) : existingEntry.sceneJson,
         coastlineParamsJson: JSON.stringify(currentCoastlineParams),
         style: currentStyle,
-        renderer: currentRenderer,
         canvas: currentCanvas,
         backgroundImageUrl: currentBg,
         updatedAt: new Date().toISOString(),
@@ -713,7 +695,6 @@ export default function WorldMapPanel({
         currentDraft: MapShapeEditorDraft,
         currentScene: MapPreviewScene | null,
         currentStyle: MapStyle,
-        currentRenderer: MapShapeViewportRenderer,
         currentCanvas: MapEditorCanvas,
         currentBg: string | null,
         currentName: string,
@@ -735,7 +716,7 @@ export default function WorldMapPanel({
             }
             : null
 
-        const entry = buildCurrentEntry(existing, sceneToSave, currentDraft, currentStyle, currentRenderer, currentCanvas, currentBg, currentName, currentCoastlineParams)
+        const entry = buildCurrentEntry(existing, sceneToSave, currentDraft, currentStyle, currentCanvas, currentBg, currentName, currentCoastlineParams)
         try {
             const saved = await map_save_map_entry(projectId, entry)
             setMaps(prev => prev.map(m => m.id === mapId ? saved : m))
@@ -749,10 +730,10 @@ export default function WorldMapPanel({
     const handleSwitchMap = useCallback(async (entry: MapEntry) => {
         if (entry.id === activeMapId) return
         if (activeMapId && hasUnsavedChanges) {
-            await autoSave(activeMapId, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
+            await autoSave(activeMapId, draft, scene, style, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
         }
         loadMapData(entry)
-    }, [activeMapId, hasUnsavedChanges, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams, autoSave, loadMapData])
+    }, [activeMapId, hasUnsavedChanges, draft, scene, style, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams, autoSave, loadMapData])
 
     // ── 新建地图 ────────────────────────────────────────────────────────
 
@@ -789,10 +770,10 @@ export default function WorldMapPanel({
         }
 
         if (activeMapId && hasUnsavedChanges) {
-            await autoSave(activeMapId, draft, scene, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
+            await autoSave(activeMapId, draft, scene, style, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
         }
 
-        const entry = newMapEntry(name, newMapForm.renderer, {width, height})
+        const entry = newMapEntry(name, {width, height})
         setErrorMsg(null)
         try {
             const saved = await map_save_map_entry(projectId, entry)
@@ -802,7 +783,7 @@ export default function WorldMapPanel({
         } catch (e) {
             setErrorMsg(`新建地图失败：${e instanceof Error ? e.message : String(e)}`)
         }
-    }, [activeCanvas, activeMapId, activeMapName, autoSave, backgroundImageUrl, coastlineParams, draft, hasUnsavedChanges, loadMapData, maps.length, newMapForm, previewRenderer, projectId, scene, style])
+    }, [activeCanvas, activeMapId, activeMapName, autoSave, backgroundImageUrl, coastlineParams, draft, hasUnsavedChanges, loadMapData, maps.length, newMapForm, projectId, scene, style])
 
     // ── 删除地图 ──────────────────────────────────────────────────────────
 
@@ -829,7 +810,6 @@ export default function WorldMapPanel({
                     setScene(null)
                     setStyle('flat')
                     setActiveCanvas(DEFAULT_CANVAS)
-                    setPreviewRenderer('pixi')
                     setBackgroundImageUrl(null)
                     setActiveMapName('')
                     setSceneDirty(false)
@@ -897,7 +877,7 @@ export default function WorldMapPanel({
             if (draftToSave.shapes.length > 0) {
                 sceneToSave = await generateMapScene(draftToSave)
             }
-            const entry = buildCurrentEntry(existing, sceneToSave, draftToSave, style, previewRenderer, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
+            const entry = buildCurrentEntry(existing, sceneToSave, draftToSave, style, activeCanvas, backgroundImageUrl, activeMapName, coastlineParams)
             const saved = await map_save_map_entry(projectId, entry)
             setMaps(prev => prev.map(m => m.id === activeMapId ? saved : m))
             setScene(sceneToSave)
@@ -910,7 +890,7 @@ export default function WorldMapPanel({
         } finally {
             setIsGenerating(false)
         }
-    }, [activeCanvas, activeMapId, draft, scene, style, previewRenderer, backgroundImageUrl, activeMapName, coastlineParams, maps, projectId, buildCurrentEntry, generateMapScene, validation.isValid])
+    }, [activeCanvas, activeMapId, draft, scene, style, backgroundImageUrl, activeMapName, coastlineParams, maps, projectId, buildCurrentEntry, generateMapScene, validation.isValid])
 
     // ── 重命名当前地图 ─────────────────────────────────────────────────────
 
@@ -1233,14 +1213,7 @@ export default function WorldMapPanel({
         setSelectedLocationId(loc.id)
     }, [activeCanvas, draft, selectedShapeId, updateDraft])
 
-    // ── 场景与渲染器属性 ────────────────────────────────────────────────
-
-    const styleTextureUrl = useMemo(() => {
-        if (previewRenderer !== 'deck') return null
-        if (backgroundImageUrl) return null
-        const def = deckStyleApi.getStyleDefinition(style)
-        return def.createBackgroundTexture?.(activeCanvas) ?? null
-    }, [previewRenderer, style, backgroundImageUrl, activeCanvas])
+    // ── 场景与 Pixi 属性 ─────────────────────────────────────────────────
 
     const previewShapes = useMemo(() => buildPreviewShapes(draft.shapes), [draft.shapes])
     const previewKeyLocations = useMemo(
@@ -1269,17 +1242,6 @@ export default function WorldMapPanel({
         mapLog(`baseScene: shapes=${result.shapes?.length ?? 0} keyLocations=${result.keyLocations?.length ?? 0} hasBg=${!!result.backgroundImage} viewportMode=${viewportMode}`)
         return result
     }, [activeCanvas, scene, previewShapes, previewKeyLocations, draft.terrainStrokes, viewportMode])
-
-    const deckScene = useMemo(() => {
-        const def = deckStyleApi.getStyleDefinition(style)
-        const oceanUrl = deckStyleApi.makeOceanSvgUrl(def.oceanColor)
-        const bgUrl = backgroundImageUrl ?? styleTextureUrl ?? oceanUrl
-        const withBg: MapPreviewScene = {
-            ...baseScene,
-            backgroundImage: {url: bgUrl, fit: backgroundImageUrl ? 'cover' as const : 'fill' as const},
-        }
-        return def.transformScene?.(withBg) ?? withBg
-    }, [baseScene, style, backgroundImageUrl, styleTextureUrl])
 
     const pixiStyle = useMemo(() => {
         const preset = getPixiMapStyle(style)
@@ -1327,9 +1289,7 @@ export default function WorldMapPanel({
         return result
     }, [activeCanvas, pixiStyle, baseScene])
 
-    const renderedScene = previewRenderer === 'pixi'
-        ? compiledPixiStyle.scene
-        : deckScene
+    const renderedScene = compiledPixiStyle.scene
     const entryOptionById = useMemo(
         () => new Map(entryOptions.map(entry => [entry.id, entry])),
         [entryOptions],
@@ -1348,28 +1308,10 @@ export default function WorldMapPanel({
         }
     }, [entryOptionById])
 
-    const deckProps = useMemo(() => {
-        if (previewRenderer !== 'deck') {
-            return undefined
-        }
-
-        const def = deckStyleApi.getStyleDefinition(style)
-        const decorations = def.buildDecorations?.({canvas: activeCanvas, scene: deckScene}) ?? {}
-        const extraLayers = def.createExtraLayers?.({canvas: activeCanvas, scene: deckScene, decorations}) ?? []
-        return {
-            ...def.deckConfig,
-            style: {backgroundColor: def.oceanColor},
-            showLabels: true,
-            keyLocationRenderMode: (style === 'flat' ? 'circle' : 'auto') as 'circle' | 'auto',
-            extraLayers,
-            getTooltip: getLinkedEntryTooltip,
-        }
-    }, [previewRenderer, style, deckScene, activeCanvas, getLinkedEntryTooltip])
-
     const pixiProps = compiledPixiStyle.pixiProps
-    const viewportShapeStyle = previewRenderer === 'pixi' ? compiledPixiStyle.shapeStyle : undefined
-    const viewportKeyLocationStyle = previewRenderer === 'pixi' ? compiledPixiStyle.keyLocationStyle : undefined
-    const viewportLabelStyle = previewRenderer === 'pixi' ? compiledPixiStyle.labelStyle : undefined
+    const viewportShapeStyle = compiledPixiStyle.shapeStyle
+    const viewportKeyLocationStyle = compiledPixiStyle.keyLocationStyle
+    const viewportLabelStyle = compiledPixiStyle.labelStyle
     const pixiPerfDebugEnabled = useMemo(() => isPixiPerfDebugEnabled(), [])
 
     // DEBUG：包装 renderOverlay 以追踪 MapShapeViewport 是否实际调用了它
@@ -1414,11 +1356,10 @@ export default function WorldMapPanel({
         }
     }, [getLinkedEntryTooltip, pixiLodLevel, pixiProps, pixiPerfDebugEnabled])
 
-    const viewportRenderKey = `${previewRenderer}-${viewportMode}-${style}-${activeCanvas.width}x${activeCanvas.height}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
+    const viewportRenderKey = `${viewportMode}-${style}-${activeCanvas.width}x${activeCanvas.height}-${backgroundImageUrl ? 'custom-bg' : 'style-bg'}`
 
     useEffect(() => {
         const mspLog = {
-            renderer: previewRenderer,
             mode: viewportMode,
             sceneShapes: renderedScene?.shapes?.length ?? 0,
             sceneKeyLocs: renderedScene?.keyLocations?.length ?? 0,
@@ -1432,7 +1373,7 @@ export default function WorldMapPanel({
             labelStyle: viewportLabelStyle,
         }
         mapLog(`renderEffect: ${JSON.stringify(mspLog)}`)
-    }, [viewportRenderKey, previewRenderer, style, viewportMode, renderedScene, pixiProps, viewportShapeStyle, viewportKeyLocationStyle, viewportLabelStyle])
+    }, [viewportRenderKey, style, viewportMode, renderedScene, pixiProps, viewportShapeStyle, viewportKeyLocationStyle, viewportLabelStyle])
 
     const svgProps = useMemo(() => ({
         draft,
@@ -1793,8 +1734,6 @@ export default function WorldMapPanel({
                          onClick={() => void handleSwitchMap(m)}
                     >
                         <span className="wm-map-item__name">{m.name}</span>
-                        <span
-                            className="wm-map-item__meta">{MAP_RENDERER_LABELS[normalizeMapRenderer(m.renderer)]}</span>
                         <button
                             type="button"
                             className="wm-map-item__delete"
@@ -1838,9 +1777,6 @@ export default function WorldMapPanel({
                             <div className="wm-field">
                                 <label>地图名称</label>
                                 <input value={activeMapName} onChange={e => handleRename(e.target.value)}/>
-                            </div>
-                            <div className="wm-meta-row">
-                                <span>使用引擎</span><strong>{MAP_RENDERER_LABELS[previewRenderer]}</strong>
                             </div>
                             <div className="wm-meta-row">
                                 <span>地图大小</span><strong>{activeCanvas.width} × {activeCanvas.height}</strong>
@@ -2067,24 +2003,6 @@ export default function WorldMapPanel({
                                 />
                             </div>
                             <div className="wm-field">
-                                <label>使用引擎</label>
-                                <div className="wm-segmented">
-                                    {(['pixi', 'deck'] as MapShapeViewportRenderer[]).map(renderer => (
-                                        <button
-                                            key={renderer}
-                                            type="button"
-                                            className={`wm-segmented__item${newMapForm.renderer === renderer ? ' is-active' : ''}`}
-                                            onClick={() => setNewMapForm(current => current ? {
-                                                ...current,
-                                                renderer,
-                                            } : current)}
-                                        >
-                                            {MAP_RENDERER_LABELS[renderer]}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="wm-field">
                                 <label>地图大小</label>
                                 <select value={newMapForm.presetId} onChange={event => handleNewMapPresetChange(event.target.value)}>
                                     {MAP_SIZE_PRESETS.map(preset => (
@@ -2213,25 +2131,22 @@ export default function WorldMapPanel({
                     {viewportMode === 'edit' ? '切换预览' : '切换编辑'}
                 </button>
                 <div className="wm-toolbar-sep"/>
-                <span className="wm-toolbar-meta">{MAP_RENDERER_LABELS[previewRenderer]}</span>
                 <button type="button" className="wm-chip" onClick={() => setUtilityPanel('help')}>
                     操作说明
                 </button>
-                {previewRenderer === 'pixi' && (
-                    <label className="wm-toolbar-select">
-                        <span>LOD</span>
-                        <select
-                            value={pixiLodLevel}
-                            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                setPixiLodLevel(event.target.value as MapPixiLodSetting)
-                            }}
-                        >
-                            {(Object.keys(PIXI_LOD_LABELS) as MapPixiLodSetting[]).map(level => (
-                                <option key={level} value={level}>{PIXI_LOD_LABELS[level]}</option>
-                            ))}
-                        </select>
-                    </label>
-                )}
+                <label className="wm-toolbar-select">
+                    <span>LOD</span>
+                    <select
+                        value={pixiLodLevel}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                            setPixiLodLevel(event.target.value as MapPixiLodSetting)
+                        }}
+                    >
+                        {(Object.keys(PIXI_LOD_LABELS) as MapPixiLodSetting[]).map(level => (
+                            <option key={level} value={level}>{PIXI_LOD_LABELS[level]}</option>
+                        ))}
+                    </select>
+                </label>
                 {viewportMode === 'edit' && (
                     <>
                         <div className="wm-toolbar-sep"/>
@@ -2247,9 +2162,7 @@ export default function WorldMapPanel({
                         <button
                             type="button"
                             className={`wm-chip${terrainBrush ? ' is-active' : ''}`}
-                            title={previewRenderer === 'pixi'
-                                ? '地形笔刷'
-                                : '地形笔刷目前仅支持 Pixi 渲染器'}
+                            title="地形笔刷"
                             aria-pressed={Boolean(terrainBrush)}
                             onClick={() => {
                                 setDrawingShape(null)
@@ -2257,7 +2170,7 @@ export default function WorldMapPanel({
                                 setSelectedLocationId(null)
                                 setTerrainBrush(current => current ? null : {...DEFAULT_TERRAIN_BRUSH})
                             }}
-                            disabled={!activeMapId || previewRenderer !== 'pixi'}
+                            disabled={!activeMapId}
                         >
                             地形笔刷
                         </button>
@@ -2394,7 +2307,6 @@ export default function WorldMapPanel({
                         <MapShapeViewport
                             key={viewportRenderKey}
                             mode={viewportMode}
-                            renderer={previewRenderer}
                             canvas={activeCanvas}
                             scene={renderedScene}
                             viewBox={viewBox}
@@ -2403,7 +2315,6 @@ export default function WorldMapPanel({
                             keyLocationStyle={viewportKeyLocationStyle}
                             labelStyle={viewportLabelStyle}
                             svgProps={svgProps}
-                            deckProps={deckProps}
                             pixiProps={wrappedPixiProps}
                         />
                     ) : (

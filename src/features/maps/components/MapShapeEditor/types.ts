@@ -165,9 +165,6 @@ import type {CSSProperties} from 'react';
 
 export type MapRgbaColor = [number, number, number, number];
 
-/** @deprecated 使用 {@link MapRgbaColor}。 */
-export type DeckColor = MapRgbaColor;
-
 export type MapKeyLocationRenderMode = 'circle' | 'icon' | 'auto';
 
 export interface MapPreviewShapeStyle {
@@ -238,7 +235,7 @@ export interface MapPreviewBackgroundImage {
     url: string;
     /**
      * 生成型纹理的 canvas 直通源：存在时优先于 url（url 可为空串），
-     * 免去 dataURL 的 PNG 编解码往返。仅 Pixi 渲染器消费；Deck 侧忽略。
+ * 免去 dataURL 的 PNG 编解码往返，仅由 Pixi 渲染器消费。
      */
     source?: HTMLCanvasElement;
     /** 0–1，默认 1 */

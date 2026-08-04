@@ -1,15 +1,15 @@
 use crate::map::constants::{DEFAULT_LOCATION_COLOR, SHAPE_FILL_PALETTE, SHAPE_LINE_PALETTE};
-use crate::map::types::DeckColor;
+use crate::map::types::MapRgbaColor;
 
-pub fn shape_fill_color(index: usize, value: Option<&str>) -> DeckColor {
-    hex_to_deck_color(value, SHAPE_FILL_PALETTE[index % SHAPE_FILL_PALETTE.len()])
+pub fn shape_fill_color(index: usize, value: Option<&str>) -> MapRgbaColor {
+    hex_to_rgba_color(value, SHAPE_FILL_PALETTE[index % SHAPE_FILL_PALETTE.len()])
 }
 
-pub fn shape_line_color(index: usize, value: Option<&str>) -> DeckColor {
-    hex_to_deck_color(value, SHAPE_LINE_PALETTE[index % SHAPE_LINE_PALETTE.len()])
+pub fn shape_line_color(index: usize, value: Option<&str>) -> MapRgbaColor {
+    hex_to_rgba_color(value, SHAPE_LINE_PALETTE[index % SHAPE_LINE_PALETTE.len()])
 }
 
-pub fn location_color(kind: &str) -> DeckColor {
+pub fn location_color(kind: &str) -> MapRgbaColor {
     match kind.trim() {
         "入口" => [226, 75, 74, 255],
         "补给点" => [99, 153, 34, 255],
@@ -19,7 +19,7 @@ pub fn location_color(kind: &str) -> DeckColor {
     }
 }
 
-fn hex_to_deck_color(value: Option<&str>, fallback: DeckColor) -> DeckColor {
+fn hex_to_rgba_color(value: Option<&str>, fallback: MapRgbaColor) -> MapRgbaColor {
     let Some(value) = value else {
         return fallback;
     };

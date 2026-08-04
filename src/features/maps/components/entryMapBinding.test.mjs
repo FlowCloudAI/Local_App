@@ -7,7 +7,6 @@ const mapBase = {
     sceneJson: null,
     coastlineParamsJson: null,
     style: 'flat',
-    renderer: 'deck',
     backgroundImageUrl: null,
     createdAt: '2026-08-04T00:00:00.000Z',
     updatedAt: '2026-08-04T00:00:00.000Z',

@@ -1,4 +1,4 @@
-use crate::map::types::DeckColor;
+use crate::map::types::MapRgbaColor;
 
 /// 几何判断中的浮点容差。
 /// 调大：共线、落点在线段上的判定更宽松；调小：几何判断更严格，但更容易受浮点误差影响。
@@ -298,7 +298,7 @@ pub const HASH_UNIT_INCREMENT: u64 = 0xBF58_476D_1CE4_E5B9;
 
 /// 预览层默认填充色调色板，与前端 mock 保持一致。
 /// 修改：直接改变地图预览层填充色的视觉表现，需与前端同步。
-pub const SHAPE_FILL_PALETTE: [DeckColor; 4] = [
+pub const SHAPE_FILL_PALETTE: [MapRgbaColor; 4] = [
     [55, 138, 221, 88],
     [99, 153, 34, 88],
     [232, 113, 26, 88],
@@ -307,7 +307,7 @@ pub const SHAPE_FILL_PALETTE: [DeckColor; 4] = [
 
 /// 预览层默认描边色调色板，与前端 mock 保持一致。
 /// 修改：直接改变地图预览层描边色的视觉表现，需与前端同步。
-pub const SHAPE_LINE_PALETTE: [DeckColor; 4] = [
+pub const SHAPE_LINE_PALETTE: [MapRgbaColor; 4] = [
     [24, 95, 165, 255],
     [66, 104, 21, 255],
     [170, 78, 12, 255],
@@ -316,7 +316,7 @@ pub const SHAPE_LINE_PALETTE: [DeckColor; 4] = [
 
 /// 未命中类型映射时的关键地点默认颜色。
 /// 修改：改变默认地点标记的颜色，需与前端设计规范保持一致。
-pub const DEFAULT_LOCATION_COLOR: DeckColor = [212, 48, 106, 255];
+pub const DEFAULT_LOCATION_COLOR: MapRgbaColor = [212, 48, 106, 255];
 
 /// 海岸线参数兼容占位，保留给旧配置读取。
 pub const COASTLINE_V2_BAND_C_WAVELENGTH_DIVISOR_MAX: f64 = 0.0;

@@ -24,7 +24,6 @@ pub struct MapEntry {
     pub coastline_params_json: Option<String>,
     pub style: String,
     pub canvas: Option<MapEntryCanvas>,
-    pub renderer: Option<String>,
     /// data: URL 或 null
     pub background_image_url: Option<String>,
     pub created_at: String,
@@ -98,7 +97,6 @@ fn parse_store_content(content: &str, project_id: &str) -> Result<ProjectMapStor
                 coastline_params_json: None,
                 style: legacy["style"].as_str().unwrap_or("flat").to_string(),
                 canvas: None,
-                renderer: None,
                 background_image_url: None,
                 created_at: legacy["savedAt"].as_str().unwrap_or_else(|| "").to_string(),
                 updated_at: legacy["savedAt"].as_str().unwrap_or_else(|| "").to_string(),

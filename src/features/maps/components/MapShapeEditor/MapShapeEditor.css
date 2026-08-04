@@ -105,7 +105,6 @@
     pointer-events: none;
 }
 
-.fc-map-deck-preview,
 .fc-map-pixi-preview {
     position: relative;
     width: 100%;
@@ -118,7 +117,6 @@
         linear-gradient(180deg, color-mix(in srgb, var(--fc-color-bg-secondary) 72%, transparent) 0%, transparent 100%);
 }
 
-.fc-map-deck-preview__empty,
 .fc-map-pixi-preview__empty {
     position: absolute;
     inset: 0;
@@ -364,14 +362,12 @@
 }
 
 /* 预览填满其所在层 */
-.fc-map-shape-viewport__preview-layer .fc-map-deck-preview,
 .fc-map-shape-viewport__preview-layer .fc-map-pixi-preview {
     width: 100%;
     height: 100%;
     border-radius: 0;
 }
 
-.fc-map-shape-viewport__preview-layer .fc-map-shape-viewport__deck-preview,
 .fc-map-shape-viewport__preview-layer .fc-map-shape-viewport__pixi-preview {
     min-height: 0;
 }

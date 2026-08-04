@@ -57,7 +57,6 @@ export default function EntryMapLocationOverlay({
                 <div className="entry-map-location-overlay__viewport">
                     <MapShapeViewport
                         mode="preview"
-                        renderer="deck"
                         canvas={binding.scene.canvas}
                         scene={binding.scene}
                         markers={[binding.marker]}

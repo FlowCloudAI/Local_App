@@ -9,8 +9,6 @@ import type {
     MapPreviewShapeStyle,
     MapShapeEditorViewBox,
 } from './types';
-import type {MapDeckPreviewProps} from './MapDeckPreview';
-import {MapDeckPreview} from './MapDeckPreview';
 import type {MapPixiPreviewProps} from './MapPixiPreview';
 import {MapPixiPreview} from './MapPixiPreview';
 import type {MapShapeSvgEditorProps} from './MapShapeSvgEditor';
@@ -20,11 +18,9 @@ import {appendMapPreviewMarkers} from './previewMarkers';
 import './MapShapeEditor.css';
 
 export type MapShapeViewportMode = 'edit' | 'preview';
-export type MapShapeViewportRenderer = 'deck' | 'pixi';
 
 export interface MapShapeViewportProps {
     mode: MapShapeViewportMode;
-    renderer?: MapShapeViewportRenderer;
     canvas: MapEditorCanvas;
     scene: MapPreviewScene | null;
     /**
@@ -44,20 +40,12 @@ export interface MapShapeViewportProps {
      * `onViewBoxChange` 由视口控制，不可在此设置。
      */
     svgProps?: Omit<MapShapeSvgEditorProps, 'canvas' | 'viewBox' | 'onViewBoxChange'>;
-    /** 通用图形样式，会转发给当前预览渲染器。 */
+    /** 通用图形样式，会转发给 Pixi 预览。 */
     shapeStyle?: MapPreviewShapeStyle;
-    /** 通用关键地点样式，会转发给当前预览渲染器。 */
+    /** 通用关键地点样式，会转发给 Pixi 预览。 */
     keyLocationStyle?: MapPreviewKeyLocationStyle;
-    /** 通用标签样式，会转发给当前预览渲染器。 */
+    /** 通用标签样式，会转发给 Pixi 预览。 */
     labelStyle?: MapPreviewLabelStyle;
-    /**
-     * Props forwarded to `MapDeckPreview`. `scene`、`syncViewBox`、`disableTooltip`、
-     * `interactive`、交互开关、`onPreviewViewBoxChange` 和通用样式由 viewport 托管，不能在这里设置。
-     */
-    deckProps?: Omit<
-        MapDeckPreviewProps,
-        'scene' | 'syncViewBox' | 'disableTooltip' | 'interactive' | 'enablePanZoom' | 'enablePicking' | 'shapeStyle' | 'keyLocationStyle' | 'labelStyle' | 'onPreviewViewBoxChange'
-    >;
     /**
      * Props forwarded to `MapPixiPreview`. `scene`、`syncViewBox`、`interactive`、
      * 交互开关、`onPreviewViewBoxChange` 和通用样式由 viewport 托管，不能在这里设置。
@@ -81,7 +69,6 @@ export interface MapShapeViewportProps {
 
 export function MapShapeViewport({
                                      mode,
-                                     renderer = 'pixi',
                                      canvas,
                                      scene,
                                      markers,
@@ -91,7 +78,6 @@ export function MapShapeViewport({
                                      shapeStyle,
                                      keyLocationStyle,
                                      labelStyle,
-                                     deckProps,
                                      pixiProps,
                                      onPreviewViewBoxChange,
                                      enablePreviewPanZoom,
@@ -114,10 +100,6 @@ export function MapShapeViewport({
     const svgEditorClassName = [
         'fc-map-shape-viewport__svg-editor',
         svgProps?.className,
-    ].filter(Boolean).join(' ');
-    const deckPreviewClassName = [
-        'fc-map-shape-viewport__deck-preview',
-        deckProps?.className,
     ].filter(Boolean).join(' ');
     const pixiPreviewClassName = [
         'fc-map-shape-viewport__pixi-preview',
@@ -145,34 +127,18 @@ export function MapShapeViewport({
         >
             {/* 预览层始终渲染，编辑模式下位于 SVG 下方。 */}
             <div className="fc-map-shape-viewport__layer fc-map-shape-viewport__preview-layer">
-                {renderer === 'pixi' ? (
-                    <MapPixiPreview
-                        {...pixiProps}
-                        scene={displayScene}
-                        syncViewBox={isEditMode ? viewBox : undefined}
-                        enablePanZoom={panZoomEnabled}
-                        enablePicking={pickingEnabled}
-                        shapeStyle={shapeStyle}
-                        keyLocationStyle={keyLocationStyle}
-                        labelStyle={labelStyle}
-                        onPreviewViewBoxChange={onPreviewViewBoxChange}
-                        className={pixiPreviewClassName}
-                    />
-                ) : (
-                    <MapDeckPreview
-                        {...deckProps}
-                        scene={displayScene}
-                        syncViewBox={isEditMode ? viewBox : undefined}
-                        disableTooltip={isEditMode}
-                        enablePanZoom={panZoomEnabled}
-                        enablePicking={pickingEnabled}
-                        shapeStyle={shapeStyle}
-                        keyLocationStyle={keyLocationStyle}
-                        labelStyle={labelStyle}
-                        onPreviewViewBoxChange={onPreviewViewBoxChange}
-                        className={deckPreviewClassName}
-                    />
-                )}
+                <MapPixiPreview
+                    {...pixiProps}
+                    scene={displayScene}
+                    syncViewBox={isEditMode ? viewBox : undefined}
+                    enablePanZoom={panZoomEnabled}
+                    enablePicking={pickingEnabled}
+                    shapeStyle={shapeStyle}
+                    keyLocationStyle={keyLocationStyle}
+                    labelStyle={labelStyle}
+                    onPreviewViewBoxChange={onPreviewViewBoxChange}
+                    className={pixiPreviewClassName}
+                />
             </div>
 
             {/* SVG 编辑层仅在编辑模式下显示，始终覆盖在预览层上方。 */}

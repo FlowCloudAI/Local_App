@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, de::Visitor};
 
-pub type DeckColor = [u8; 4];
+pub type MapRgbaColor = [u8; 4];
 
 fn deserialize_u64_from_string_or_number<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
 where
@@ -303,8 +303,8 @@ pub struct MapPreviewShape {
     pub id: String,
     pub name: String,
     pub polygon: Vec<[f64; 2]>,
-    pub fill_color: DeckColor,
-    pub line_color: DeckColor,
+    pub fill_color: MapRgbaColor,
+    pub line_color: MapRgbaColor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub biz_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -325,7 +325,7 @@ pub struct MapPreviewKeyLocation {
     /// 旧数据兼容字段；渲染与编辑不再要求显式关联。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shape_id: Option<String>,
-    pub color: DeckColor,
+    pub color: MapRgbaColor,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub biz_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -107,18 +107,7 @@ export default defineConfig({
                         return 'i18n-vendor'
                     }
 
-                    // Deck 回退链较重，仅在用户切换到 Deck 渲染器时加载。
-                    if (matchesNodeModulePrefix(normalized, [
-                        '@deck.gl/',
-                        '@loaders.gl/',
-                        '@luma.gl/',
-                        '@math.gl/',
-                        '@probe.gl/',
-                    ])) {
-                        return 'deck-vendor'
-                    }
-
-                    // Pixi 是地图默认预览引擎，和 Deck 分离，避免打开地图时拉取 Deck 回退链。
+                    // Pixi 地图渲染链独立打包，避免进入非地图页面时加载。
                     if (matchesNodeModulePrefix(normalized, [
                         '@pixi/react/',
                         'pixi.js/',
