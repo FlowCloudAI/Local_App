@@ -98,7 +98,6 @@
     --mobile-entry-card-color: var(--fc-color-primary);
 
     position: relative;
-    aspect-ratio: 3 / 4;
     border: var(--mobile-border-strong);
     border-radius: var(--mobile-radius-card);
     overflow: hidden;
@@ -112,7 +111,8 @@
 
 .mobile-entry-card .fc-card__image-wrapper {
     position: relative;
-    flex: 0 0 57%;
+    flex: 0 0 auto;
+    aspect-ratio: 4 / 3;
     height: auto !important;
     min-height: 0;
     background: var(--fc-color-bg-secondary);
