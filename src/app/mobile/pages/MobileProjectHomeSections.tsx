@@ -158,7 +158,7 @@ export function ProjectHomeResourceList({
 
 interface ProjectHomeToolGridProps {
     tools: ProjectHomeTool[]
-    onSelectTool: (label: string) => void
+    onSelectTool: (tool: ProjectHomeTool) => void
 }
 
 export function ProjectHomeToolGrid({tools, onSelectTool}: ProjectHomeToolGridProps) {
@@ -173,7 +173,7 @@ export function ProjectHomeToolGrid({tools, onSelectTool}: ProjectHomeToolGridPr
                         type="button"
                         key={tool.key}
                         className="mobile-project-home__tool"
-                        onClick={() => onSelectTool(tool.label)}
+                        onClick={() => onSelectTool(tool)}
                     >
                         <span>{tool.label}</span>
                         <small>{tool.meta}</small>

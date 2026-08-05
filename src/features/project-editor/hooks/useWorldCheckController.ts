@@ -136,7 +136,7 @@ interface UseWorldCheckControllerOptions {
     aiModel?: string | null
     activeEntryId?: string | null
     activeEntryTitle?: string | null
-    onStartDiscussion?: (params: WorldCheckDiscussionParams) => void
+    onStartDiscussion?: (params: WorldCheckDiscussionParams) => void | Promise<void>
 }
 
 export function useWorldCheckController({
@@ -340,7 +340,7 @@ export function useWorldCheckController({
             await showAlert('当前缺少可用模型，无法创建报告讨论对话。', 'warning', 'nonInvasive', 2200)
             return
         }
-        onStartDiscussion({
+        await onStartDiscussion({
             title: `${worldCheckKindLabel(record.checkKind)}：${record.projectName}`,
             pluginId: record.pluginId,
             model,

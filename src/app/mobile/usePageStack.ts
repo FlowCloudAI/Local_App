@@ -29,6 +29,7 @@ export interface MobilePageParamsMap {
     typeManager: MobileProjectScopedPageParams
     tagManager: MobileProjectScopedPageParams
     categoryManager: MobileProjectScopedPageParams
+    worldCheck: MobileProjectScopedPageParams
     settingsAi: MobileAiSettingsPageParams
     settingsPlugins: undefined
     settingsAppearance: undefined

@@ -31,6 +31,7 @@ import {
     toApiError,
 } from '../../../api'
 import {logger} from '../../../shared/logger'
+import type {WorldCheckDiscussionParams} from '../../../features/project-editor/hooks/useWorldCheckController'
 import {type MobileTab} from '../MobileNav'
 import {
     type MobileAnchoredMenuItem,
@@ -71,6 +72,9 @@ interface Props {
     conversationDrawerOpen?: boolean
     onOpenConversationDrawer?: () => void
     onCloseConversationDrawer?: () => void
+    onStartReportDiscussionReady?: (
+        handler: ((params: WorldCheckDiscussionParams) => Promise<void>) | null,
+    ) => void
 }
 
 function runAiMenuContentTransition(update: () => void) {
@@ -93,6 +97,7 @@ export default function MobileAiChat({
     conversationDrawerOpen = false,
     onOpenConversationDrawer,
     onCloseConversationDrawer,
+    onStartReportDiscussionReady,
 }: Props) {
     const {showAlert} = useAlert()
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -117,7 +122,13 @@ export default function MobileAiChat({
         toolAccessMode, writerModeAvailable, setToolAccessMode, sessionParams, setSessionParams,
         updateConversationSettings, switchActiveConversationModel, focusContext,
         autoScroll, setAutoScroll,
+        startReportDiscussion,
     } = controller
+
+    useEffect(() => {
+        onStartReportDiscussionReady?.(startReportDiscussion)
+        return () => onStartReportDiscussionReady?.(null)
+    }, [onStartReportDiscussionReady, startReportDiscussion])
 
     const [apiKeyRefreshTick, setApiKeyRefreshTick] = useState(0)
     const [llmApiKeyAvailability, setLlmApiKeyAvailability] = useState<ApiKeyAvailability>('unknown')

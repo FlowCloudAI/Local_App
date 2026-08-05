@@ -171,9 +171,13 @@ export default function MobileProjectHome({
         navigateToTab('ai')
     }, [navigateToTab, projectId, setAiFocus])
 
-    const handleUnavailableTool = useCallback((label: string) => {
-        void showAlert(`移动端暂未开放「${label}」，可以先在桌面端使用。`, 'info', 'nonInvasive', 2400)
-    }, [showAlert])
+    const handleSelectTool = useCallback((tool: ProjectHomeTool) => {
+        if (tool.key === 'check') {
+            push({type: 'worldCheck', params: {projectId, displayName: '设定检测'}})
+            return
+        }
+        void showAlert(`移动端暂未开放「${tool.label}」，可以先在桌面端使用。`, 'info', 'nonInvasive', 2400)
+    }, [projectId, push, showAlert])
 
     const handleRename = useCallback(async (name: string) => {
         setRenaming(true)
@@ -431,7 +435,7 @@ export default function MobileProjectHome({
 
             <ProjectHomeToolGrid
                 tools={advancedTools}
-                onSelectTool={handleUnavailableTool}
+                onSelectTool={handleSelectTool}
             />
 
             <MobileAnchoredActionMenu

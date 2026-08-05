@@ -22,6 +22,7 @@ import {
 } from '../../api'
 import {useProjectContextStore} from '../../features/projects/projectContextStore'
 import {type AiFocus} from '../../features/ai-chat/hooks/useAiController'
+import type {WorldCheckDiscussionParams} from '../../features/project-editor/hooks/useWorldCheckController'
 import MobileCategoryDrawer, {type MobileCategoryDrawerSelection} from './components/MobileCategoryDrawer'
 import MobileNav, {type MobileTab} from './MobileNav'
 import MobileAiChat from './pages/MobileAiChat'
@@ -35,6 +36,7 @@ import MobileProjectHome from './pages/MobileProjectHome'
 import MobileProjectList from './pages/MobileProjectList'
 import MobileSettings from './pages/MobileSettings'
 import MobileTagManager from './pages/MobileTagManager'
+import MobileWorldCheck from './pages/MobileWorldCheck'
 import {
     type MobileBeforeLeave,
     type MobileNavigationIntent,
@@ -59,6 +61,7 @@ type PageProps = {
     pageKey: string
     aiFocus: AiFocus
     setAiFocus: (focus: AiFocus) => void
+    startReportDiscussion: (params: WorldCheckDiscussionParams) => Promise<void>
 }
 
 export default function MobileApp({platformInfo}: MobileAppProps) {
@@ -87,6 +90,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
     // 开发期浏览器预览没有后端，直接视为就绪，避免卡在启动屏。
     const [backendReady, setBackendReady] = useState(() => isBrowserPreview())
     const [aiFocus, setAiFocus] = useState<AiFocus>({projectId: null, entryId: null})
+    const reportDiscussionRef = useRef<((params: WorldCheckDiscussionParams) => Promise<void>) | null>(null)
     const [categoryDrawerWidth, setCategoryDrawerWidth] = useState(getMobileSideDrawerWidth)
 
     const categoryDrawerProjectId = activeTab === 'home'
@@ -199,7 +203,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         }
     }, [])
 
-    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave' | 'pageKey'>>(() => ({
+    const navigation = useMemo<Omit<PageProps, 'aiFocus' | 'setAiFocus' | 'setBeforeLeave' | 'pageKey' | 'startReportDiscussion'>>(() => ({
         push: (page: MobilePage) => stacks[activeTab].push(page),
         pop: () => stacks[activeTab].pop(),
         replace: (page: MobilePage) => stacks[activeTab].replace(page),
@@ -216,6 +220,19 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
             })()
         },
     }), [activeTab, runLeaveGuard, stacks])
+
+    const registerReportDiscussion = useCallback((
+        handler: ((params: WorldCheckDiscussionParams) => Promise<void>) | null,
+    ) => {
+        reportDiscussionRef.current = handler
+    }, [])
+
+    const startReportDiscussion = useCallback(async (params: WorldCheckDiscussionParams) => {
+        const handler = reportDiscussionRef.current
+        if (!handler) throw new Error('AI 对话尚未准备好，请稍后重试。')
+        await handler(params)
+        navigation.navigateToTab('ai')
+    }, [navigation])
 
     const closeCategoryDrawer = useCallback(() => {
         closeSideDrawer()
@@ -345,7 +362,8 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
         pageKey: activeStack.currentPageKey,
         aiFocus,
         setAiFocus,
-    }), [activeStack.currentPageKey, navigation, setBeforeLeave, aiFocus])
+        startReportDiscussion,
+    }), [activeStack.currentPageKey, navigation, setBeforeLeave, aiFocus, startReportDiscussion])
 
     if (!backendReady) {
         return (
@@ -455,6 +473,9 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                                 {currentPage?.type === 'categoryManager' && (
                                     <MobileCategoryManager {...pageProps} params={currentPage.params}/>
                                 )}
+                                {currentPage?.type === 'worldCheck' && (
+                                    <MobileWorldCheck {...pageProps} params={currentPage.params}/>
+                                )}
                             </div>
                         )}
 
@@ -465,6 +486,7 @@ export default function MobileApp({platformInfo}: MobileAppProps) {
                             conversationDrawerOpen={sideDrawerOpen && aiConversationDrawerEnabled}
                             onOpenConversationDrawer={openAiConversationDrawer}
                             onCloseConversationDrawer={closeCategoryDrawer}
+                            onStartReportDiscussionReady={registerReportDiscussion}
                         />
 
                         {/* 灵感 Tab */}
