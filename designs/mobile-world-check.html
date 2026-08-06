@@ -1,0 +1,1141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>移动端设定检测设计稿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --fc-bg: #f6f5f3;
+      --fc-surface: #fffdfa;
+      --fc-surface-muted: #f1f0ed;
+      --fc-text: #171717;
+      --fc-text-secondary: #65635f;
+      --fc-text-tertiary: #96938d;
+      --fc-border: #d9d6d0;
+      --fc-primary: #1677ff;
+      --fc-primary-soft: #eaf3ff;
+      --fc-primary-border: #9fc7f7;
+      --fc-warning: #b76400;
+      --fc-danger: #c63b3b;
+      --fc-success: #318a57;
+      --fc-shadow: 0 22px 64px rgb(29 28 26 / 16%);
+      --phone-width: 390px;
+      --phone-height: 844px;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --fc-bg: #151515;
+      --fc-surface: #1c1c1c;
+      --fc-surface-muted: #252525;
+      --fc-text: #f2f1ef;
+      --fc-text-secondary: #aaa7a1;
+      --fc-text-tertiary: #79766f;
+      --fc-border: #3a3936;
+      --fc-primary: #66a8ff;
+      --fc-primary-soft: #19324f;
+      --fc-primary-border: #385e87;
+      --fc-warning: #ffb25e;
+      --fc-danger: #ff8d8d;
+      --fc-success: #79d59c;
+      --fc-shadow: 0 22px 70px rgb(0 0 0 / 42%);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body { margin: 0; min-height: 100%; }
+
+    body {
+      color: var(--fc-text);
+      background: var(--fc-bg);
+      font: 14px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button { font: inherit; color: inherit; cursor: pointer; }
+
+    button:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--fc-primary) 38%, transparent);
+      outline-offset: 2px;
+    }
+
+    svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .notes {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 26px 28px;
+      border-right: 1px solid var(--fc-border);
+      background: color-mix(in srgb, var(--fc-surface) 94%, transparent);
+    }
+
+    .notes h1 { margin: 0 0 4px; font-size: 21px; }
+    .notes h2 { margin: 22px 0 8px; font-size: 13px; }
+    .notes p { margin: 0; color: var(--fc-text-secondary); }
+
+    .switches { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .switches button {
+      min-height: 44px;
+      padding: 8px 14px;
+      border: 1px solid var(--fc-border);
+      border-radius: 999px;
+      background: var(--fc-surface);
+    }
+
+    .switches button[aria-pressed="true"] {
+      color: var(--fc-primary);
+      border-color: var(--fc-primary);
+      background: var(--fc-primary-soft);
+    }
+
+    .decision {
+      padding: 12px 0;
+      border-top: 1px solid var(--fc-border);
+    }
+
+    .decision strong { display: block; margin-bottom: 2px; }
+
+    .stage {
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 100vh;
+      padding: 42px;
+    }
+
+    .phone {
+      position: relative;
+      width: var(--phone-width);
+      height: var(--phone-height);
+      overflow: hidden;
+      border: 1px solid var(--fc-border);
+      border-radius: 26px;
+      background: var(--fc-surface);
+      box-shadow: var(--fc-shadow);
+    }
+
+    .app-screen {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      height: 100%;
+      background: var(--fc-surface);
+    }
+
+    .topbar {
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 78px minmax(0, 1fr) 78px;
+      align-items: center;
+      min-height: 66px;
+      padding: 8px 14px 6px;
+      background: var(--fc-surface);
+    }
+
+    .topbar strong {
+      overflow: hidden;
+      text-align: center;
+      font-size: 18px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .top-button,
+    .top-actions button,
+    .more-button,
+    .panel-close {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      padding: 0;
+      color: var(--fc-primary);
+      border: 1px solid var(--fc-border);
+      border-radius: 999px;
+      background: var(--fc-surface);
+    }
+
+    .top-button { justify-self: start; }
+
+    .top-actions {
+      justify-self: end;
+      display: grid;
+      grid-template-columns: repeat(2, 38px);
+      overflow: hidden;
+      border: 1px solid var(--fc-border);
+      border-radius: 999px;
+    }
+
+    .top-actions button {
+      width: 38px;
+      min-width: 38px;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .top-actions button + button { border-left: 1px solid var(--fc-border); }
+
+    .more-button { justify-self: end; }
+
+    .scroll {
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+    }
+
+    .scroll::-webkit-scrollbar { display: none; }
+
+    .list-content {
+      display: grid;
+      gap: 28px;
+      padding: 18px 20px 32px;
+    }
+
+    .task-strip {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      min-height: 54px;
+      padding: 8px 14px;
+      color: var(--fc-primary);
+      text-align: left;
+      border: 1px solid var(--fc-primary-border);
+      border-radius: 13px;
+      background: var(--fc-primary-soft);
+    }
+
+    .task-strip__mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--fc-primary) 12%, transparent);
+    }
+
+    .task-strip strong {
+      overflow: hidden;
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .task-strip .chevron { margin-left: 8px; }
+
+    .list-section { display: grid; gap: 14px; }
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      min-height: 32px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    .section-heading span { color: var(--fc-text-tertiary); font-size: 15px; }
+
+    .featured-report {
+      display: grid;
+      grid-template-columns: 50px minmax(0, 1fr) auto;
+      gap: 14px;
+      width: 100%;
+      min-height: 122px;
+      padding: 16px;
+      text-align: left;
+      border: 0;
+      border-radius: 19px;
+      background: var(--fc-primary-soft);
+    }
+
+    .report-icon {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      color: var(--fc-primary);
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--fc-primary) 15%, var(--fc-surface));
+    }
+
+    .featured-report > .report-icon {
+      color: white;
+      background: var(--fc-primary);
+    }
+
+    .report-copy { min-width: 0; }
+
+    .report-copy strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 20px;
+      line-height: 1.35;
+    }
+
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 9px;
+      color: var(--fc-text-secondary);
+      font-size: 14px;
+    }
+
+    .report-meta b { color: var(--fc-primary); font-weight: 600; }
+
+    .report-overview {
+      display: block;
+      overflow: hidden;
+      margin: 10px 0 0;
+      color: var(--fc-text-secondary);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .featured-end {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      justify-items: end;
+      gap: 12px;
+      color: var(--fc-primary);
+    }
+
+    .featured-end strong {
+      padding-top: 2px;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .featured-end .chevron { align-self: center; }
+
+    .history-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 44px;
+      padding: 0;
+      text-align: left;
+      border: 0;
+      background: transparent;
+    }
+
+    .history-toggle strong { font-size: 19px; }
+
+    .history-toggle span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--fc-text-tertiary);
+      font-size: 15px;
+    }
+
+    .history-toggle svg { width: 18px; height: 18px; transition: transform 160ms ease; }
+    .history.is-collapsed .history-toggle svg { transform: rotate(180deg); }
+    .history.is-collapsed .history-list { display: none; }
+
+    .history-list {
+      overflow: hidden;
+      border-top: 1px solid var(--fc-border);
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .history-row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      min-height: 76px;
+      padding: 10px 0;
+      text-align: left;
+      border: 0;
+      background: transparent;
+    }
+
+    .history-row + .history-row { border-top: 1px solid var(--fc-border); }
+
+    .history-row .report-icon {
+      width: 40px;
+      height: 40px;
+      color: var(--fc-text-secondary);
+      background: var(--fc-surface-muted);
+    }
+
+    .history-row strong { display: block; font-size: 17px; }
+
+    .history-row small {
+      display: block;
+      margin-top: 1px;
+      color: var(--fc-warning);
+      font-size: 14px;
+    }
+
+    .history-row time { color: var(--fc-text-tertiary); white-space: nowrap; }
+
+    .chevron {
+      display: inline-grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+    }
+
+    .chevron svg { width: 18px; height: 18px; }
+
+    .bottom-nav {
+      z-index: 3;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      min-height: 80px;
+      border-top: 1px solid var(--fc-border);
+      background: var(--fc-surface);
+    }
+
+    .bottom-nav button {
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 2px;
+      min-height: 72px;
+      padding: 5px 2px;
+      color: var(--fc-text-secondary);
+      border: 0;
+      background: transparent;
+      font-size: 12px;
+    }
+
+    .bottom-nav button.active { color: var(--fc-primary); }
+    .bottom-nav svg { width: 24px; height: 24px; }
+
+    .detail-content {
+      display: grid;
+      gap: 22px;
+      padding: 12px 20px 36px;
+    }
+
+    .detail-task {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      padding: 0 12px;
+      color: var(--fc-primary);
+      border: 1px solid var(--fc-primary-border);
+      border-radius: 12px;
+      background: var(--fc-primary-soft);
+    }
+
+    .detail-hero { padding: 4px 0 2px; }
+
+    .detail-eyebrow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      color: var(--fc-text-secondary);
+      font-size: 13px;
+    }
+
+    .detail-hero h1 {
+      margin: 12px 0 6px;
+      font-size: 29px;
+      line-height: 1.2;
+    }
+
+    .detail-hero p {
+      margin: 0;
+      color: var(--fc-text-secondary);
+      font-size: 15px;
+    }
+
+    .detail-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .primary-button,
+    .outline-button {
+      min-height: 46px;
+      padding: 0 18px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .primary-button {
+      color: white;
+      border: 1px solid var(--fc-primary);
+      background: var(--fc-primary);
+    }
+
+    .outline-button {
+      color: var(--fc-primary);
+      border: 1px solid var(--fc-primary);
+      background: transparent;
+    }
+
+    .detail-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid var(--fc-border);
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .detail-stats div { padding: 14px 4px; text-align: center; }
+    .detail-stats div + div { border-left: 1px solid var(--fc-border); }
+    .detail-stats strong { display: block; font-size: 21px; line-height: 1.2; }
+    .detail-stats span { color: var(--fc-text-secondary); font-size: 12px; }
+
+    .detail-section { display: grid; gap: 10px; }
+    .detail-section h2 { margin: 0; font-size: 19px; }
+    .detail-section p { margin: 0; color: var(--fc-text-secondary); }
+
+    .finding-list {
+      overflow: hidden;
+      border-top: 1px solid var(--fc-border);
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .finding-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      padding: 14px 0;
+    }
+
+    .finding-row + .finding-row { border-top: 1px solid var(--fc-border); }
+
+    .finding-mark {
+      width: 9px;
+      height: 9px;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--fc-success);
+    }
+
+    .finding-row strong { display: block; }
+    .finding-row p { margin-top: 2px; font-size: 13px; }
+
+    .source-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .source-list span {
+      padding: 7px 11px;
+      color: var(--fc-primary);
+      border-radius: 999px;
+      background: var(--fc-primary-soft);
+    }
+
+    .overlay-layer {
+      position: absolute;
+      z-index: 10;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgb(15 15 15 / 45%);
+    }
+
+    .overlay-layer[hidden] { display: none; }
+
+    .floating-panel {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      width: 100%;
+      max-height: calc(100% - 56px);
+      overflow: hidden;
+      border: 1px solid var(--fc-border);
+      border-radius: 20px;
+      background: var(--fc-surface);
+      box-shadow: var(--fc-shadow);
+    }
+
+    .floating-panel.generate-panel { max-height: 510px; }
+
+    .panel-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      min-height: 62px;
+      padding: 8px 12px 8px 18px;
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .panel-header strong { font-size: 17px; }
+    .panel-close { color: var(--fc-text-secondary); }
+
+    .monitor-scroll,
+    .generate-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px;
+    }
+
+    .monitor-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .status-badge {
+      padding: 4px 9px;
+      color: var(--fc-primary);
+      border-radius: 999px;
+      background: var(--fc-primary-soft);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .monitor-status time { color: var(--fc-text-secondary); }
+
+    .phase-list {
+      display: grid;
+      margin: 0 0 20px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .phase-list li {
+      position: relative;
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      gap: 10px;
+      min-height: 58px;
+    }
+
+    .phase-list li:not(:last-child)::after {
+      position: absolute;
+      top: 19px;
+      bottom: -2px;
+      left: 7px;
+      width: 2px;
+      background: var(--fc-border);
+      content: "";
+    }
+
+    .phase-dot {
+      z-index: 1;
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      border: 2px solid var(--fc-border);
+      border-radius: 50%;
+      background: var(--fc-surface);
+    }
+
+    .phase-list li.done .phase-dot {
+      border-color: var(--fc-primary);
+      background: var(--fc-primary);
+    }
+
+    .phase-list li.active .phase-dot {
+      border-color: var(--fc-primary);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--fc-primary) 18%, transparent);
+    }
+
+    .phase-list strong { display: block; }
+    .phase-list small { color: var(--fc-text-secondary); }
+
+    .activity {
+      padding: 15px;
+      border-radius: 14px;
+      background: var(--fc-primary-soft);
+    }
+
+    .activity strong { display: block; margin-bottom: 3px; }
+    .activity p { margin: 0; color: var(--fc-text-secondary); }
+
+    .event-title {
+      display: flex;
+      justify-content: space-between;
+      margin: 20px 0 8px;
+    }
+
+    .event-title span { color: var(--fc-text-secondary); }
+
+    .event-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-top: 1px solid var(--fc-border);
+    }
+
+    .event-list li {
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr);
+      gap: 8px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .event-list time { color: var(--fc-text-tertiary); font-size: 12px; }
+    .event-list strong { display: block; font-size: 13px; }
+    .event-list p { margin: 1px 0 0; color: var(--fc-text-secondary); font-size: 12px; }
+
+    .panel-footer {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--fc-border);
+      background: var(--fc-surface);
+    }
+
+    .panel-footer .primary-button,
+    .panel-footer .outline-button { min-height: 44px; padding-inline: 12px; }
+
+    .generate-intro { margin: 0 0 16px; color: var(--fc-text-secondary); }
+
+    .generate-options {
+      overflow: hidden;
+      border-top: 1px solid var(--fc-border);
+      border-bottom: 1px solid var(--fc-border);
+    }
+
+    .generate-option {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      width: 100%;
+      min-height: 78px;
+      padding: 12px 0;
+      text-align: left;
+      border: 0;
+      background: transparent;
+    }
+
+    .generate-option + .generate-option { border-top: 1px solid var(--fc-border); }
+    .generate-option strong { display: block; }
+    .generate-option small { color: var(--fc-text-secondary); }
+    .generate-option b { align-self: center; color: var(--fc-primary); }
+
+    .app-screen[data-screen="list"],
+    .app-screen[data-screen="detail"] { display: none; }
+
+    .phone[data-view="list"] .app-screen[data-screen="list"],
+    .phone[data-view="detail"] .app-screen[data-screen="detail"] { display: grid; }
+
+    .flash { animation: flash 420ms ease; }
+
+    @keyframes flash {
+      50% { background: color-mix(in srgb, var(--fc-primary-soft) 76%, var(--fc-surface)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+
+    [data-capture="phone"] body { overflow: hidden; background: var(--fc-surface); }
+    [data-capture="phone"] .workspace { display: block; min-height: 0; }
+    [data-capture="phone"] .notes { display: none; }
+    [data-capture="phone"] .stage { min-height: 0; padding: 0; }
+    [data-capture="phone"] .phone {
+      position: fixed;
+      inset: 0 auto auto 0;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    @media (max-width: 840px) {
+      .workspace { grid-template-columns: 1fr; }
+      .notes { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--fc-border); }
+      .stage { padding: 24px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="workspace">
+    <aside class="notes">
+      <h1>移动端设定检测</h1>
+      <p>方案 2：最新报告优先。列表、详情和任务监控是三个独立状态，不在一条滚动页面里混排。</p>
+
+      <h2>查看状态</h2>
+      <div class="switches" aria-label="设计状态">
+        <button type="button" data-view-choice="list" aria-pressed="true">报告列表</button>
+        <button type="button" data-view-choice="detail" aria-pressed="false">报告详情</button>
+        <button type="button" data-overlay-choice="task" aria-pressed="false">任务监控</button>
+      </div>
+
+      <h2>预览条件</h2>
+      <div class="switches" aria-label="屏幕宽度">
+        <button type="button" data-size="390" aria-pressed="true">390 × 844</button>
+        <button type="button" data-size="360" aria-pressed="false">360 × 740</button>
+      </div>
+      <div class="switches" aria-label="主题" style="margin-top: 8px">
+        <button type="button" data-theme-choice="light" aria-pressed="true">浅色</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">深色</button>
+      </div>
+
+      <h2>设计取舍</h2>
+      <div class="decision">
+        <strong>最新报告是首要入口</strong>
+        <p>只展示摘要和状态，点击后进入独立详情，不在列表页展开正文。</p>
+      </div>
+      <div class="decision">
+        <strong>历史报告是导航</strong>
+        <p>以前的报告使用轻量列表行，避免每条记录都变成一张大卡片。</p>
+      </div>
+      <div class="decision">
+        <strong>阶段只属于任务监控</strong>
+        <p>主页面只显示当前阶段 2/4；完整四阶段进入 FloatingPanel 后查看。</p>
+      </div>
+
+      <h2>可操作路径</h2>
+      <p>点任务条查看进度；点任一报告进入详情；详情返回报告列表；右上角“新增”可选择检测类型。</p>
+    </aside>
+
+    <section class="stage">
+      <div class="phone" id="phone" data-view="list" role="region" aria-label="移动端设定检测预览">
+        <section class="app-screen" data-screen="list" aria-label="设定检测报告列表">
+          <header class="topbar">
+            <button class="top-button" type="button" aria-label="返回项目">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+            </button>
+            <strong>设定检测</strong>
+            <div class="top-actions">
+              <button type="button" data-action="refresh" aria-label="刷新报告">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5" /><path d="M19 11a8 8 0 1 0 1 5" /></svg>
+              </button>
+              <button type="button" data-open-overlay="generate" aria-label="生成新报告">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+            </div>
+          </header>
+
+          <div class="scroll" id="list-scroll">
+            <div class="list-content">
+              <button class="task-strip" type="button" data-open-overlay="task">
+                <span class="task-strip__mark" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3" /><path d="m5.6 5.6 2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" /></svg>
+                </span>
+                <strong>矛盾检测 · AI 分析 2/4</strong>
+                <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></span>
+              </button>
+
+              <section class="list-section" id="latest-section">
+                <div class="section-heading"><h2>最新报告</h2></div>
+                <button class="featured-report" type="button" data-report="contradiction">
+                  <span class="report-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-3Z" /><path d="m8.5 12 2.2 2.2 4.8-5" /></svg>
+                  </span>
+                  <span class="report-copy">
+                    <strong>矛盾检测</strong>
+                    <span class="report-meta"><b>整体稳定</b><span>·</span><span>今天 13:40</span></span>
+                    <span class="report-overview">项目内仅有一个有效词条“孙悟空”，无其他可形成对比的设定。</span>
+                  </span>
+                  <span class="featured-end"><strong>0项问题</strong><span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></span></span>
+                </button>
+              </section>
+
+              <section class="history" id="history-section">
+                <button class="history-toggle" type="button" aria-expanded="true">
+                  <strong>以前的报告</strong>
+                  <span>2份 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg></span>
+                </button>
+                <div class="history-list">
+                  <button class="history-row" type="button" data-report="alignment">
+                    <span class="report-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></svg>
+                    </span>
+                    <span><strong>契合度检测</strong><small>2项需要确认</small></span>
+                    <time datetime="2026-08-02">8月2日</time>
+                    <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></span>
+                  </button>
+                  <button class="history-row" type="button" data-report="publication">
+                    <span class="report-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="M12 3 21 20H3L12 3Z" /><path d="M12 9v5M12 17h.01" /></svg>
+                    </span>
+                    <span><strong>发布风险检测</strong><small>发现1项风险</small></span>
+                    <time datetime="2026-07-29">7月29日</time>
+                    <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7" /></svg></span>
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <nav class="bottom-nav" aria-label="主导航">
+            <button class="active" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V20h5v-5.5h3V20h5V9.5" /></svg><span>首页</span></button>
+            <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c2 5 4 7 9 9-5 2-7 4-9 9-2-5-4-7-9-9 5-2 7-4 9-9Z" /></svg><span>AI</span></button>
+            <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5Z" /></svg><span>灵感</span></button>
+            <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 15 6.2L14.7 3h-4L10 6.2a7 7 0 0 0-1.5.9l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 6 12c0 .3 0 .7.1 1l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.5.9l.7 3.2h4l.3-3.2a7 7 0 0 0 1.5-.9l2.4 1 2-3.4-2-1.5c.1-.3.1-.7.1-1Z" /></svg><span>设置</span></button>
+          </nav>
+        </section>
+
+        <section class="app-screen" data-screen="detail" aria-label="设定检测报告详情">
+          <header class="topbar">
+            <button class="top-button" type="button" data-go="list" aria-label="返回检测报告">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>
+            </button>
+            <strong>报告详情</strong>
+            <button class="more-button" type="button" aria-label="更多报告操作">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg>
+            </button>
+          </header>
+
+          <div class="scroll" id="detail-scroll">
+            <article class="detail-content">
+              <button class="detail-task" type="button" data-open-overlay="task"><strong>AI 分析 2/4</strong><span>查看进度</span></button>
+
+              <header class="detail-hero">
+                <div class="detail-eyebrow"><span id="detail-kind">矛盾检测</span><span id="detail-date">2026/08/06 13:40</span></div>
+                <h1 id="detail-status">整体稳定</h1>
+                <p id="detail-overview">项目内仅有一个有效词条“孙悟空”，无其他可形成对比的设定，未发现矛盾。</p>
+                <div class="detail-actions">
+                  <button class="primary-button" type="button">讨论报告</button>
+                  <button class="outline-button" type="button" data-go="list">返回列表</button>
+                </div>
+              </header>
+
+              <div class="detail-stats" aria-label="报告统计">
+                <div><strong id="detail-findings">0</strong><span>问题</span></div>
+                <div><strong id="detail-unresolved">0</strong><span>待确认</span></div>
+                <div><strong id="detail-sources">1</strong><span>来源词条</span></div>
+              </div>
+
+              <section class="detail-section">
+                <h2>检测结论</h2>
+                <div class="finding-list" id="detail-conclusions">
+                  <div class="finding-row"><span class="finding-mark"></span><div><strong>当前设定内部一致</strong><p>已检查标题、摘要、正文和关联信息，没有发现互相冲突的表述。</p></div></div>
+                  <div class="finding-row"><span class="finding-mark"></span><div><strong>对比范围有限</strong><p>项目内只有一个可用词条；增加相关人物、地点或事件后，报告会更有价值。</p></div></div>
+                </div>
+              </section>
+
+              <section class="detail-section">
+                <h2>资料范围</h2>
+                <p id="detail-scope">项目“test”，共载入 1 个有效词条，资料未裁剪。</p>
+                <div class="source-list" id="detail-source-list"><span>孙悟空</span></div>
+              </section>
+            </article>
+          </div>
+
+          <nav class="bottom-nav" aria-label="主导航">
+            <button class="active" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V20h5v-5.5h3V20h5V9.5" /></svg><span>首页</span></button>
+            <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c2 5 4 7 9 9-5 2-7 4-9 9-2-5-4-7-9-9 5-2 7-4 9-9Z" /></svg><span>AI</span></button>
+            <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16.5 3.5 4 4L7 21H3v-4L16.5 3.5Z" /></svg><span>灵感</span></button>
+            <button type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 15 6.2L14.7 3h-4L10 6.2a7 7 0 0 0-1.5.9l-2.4-1-2 3.4 2 1.5A7 7 0 0 0 6 12c0 .3 0 .7.1 1l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.5.9l.7 3.2h4l.3-3.2a7 7 0 0 0 1.5-.9l2.4 1 2-3.4-2-1.5c.1-.3.1-.7.1-1Z" /></svg><span>设置</span></button>
+          </nav>
+        </section>
+
+        <div class="overlay-layer" id="task-overlay" hidden>
+          <section class="floating-panel" role="dialog" aria-modal="true" aria-labelledby="task-title">
+            <header class="panel-header"><strong id="task-title">矛盾检测 · test</strong><button class="panel-close" type="button" data-close-overlay aria-label="收起并继续后台运行"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button></header>
+            <div class="monitor-scroll">
+              <div class="monitor-status"><span class="status-badge" aria-live="polite">运行中</span><time>01:26</time></div>
+              <ol class="phase-list" aria-label="检测阶段">
+                <li class="done"><span class="phase-dot"></span><div><strong>准备资料</strong><small>已载入 24 个词条</small></div></li>
+                <li class="active"><span class="phase-dot"></span><div><strong>AI 分析</strong><small>正在核对人物关系与时间线</small></div></li>
+                <li><span class="phase-dot"></span><div><strong>校验报告</strong><small>等待模型输出</small></div></li>
+                <li><span class="phase-dot"></span><div><strong>保存完成</strong><small>尚未写入历史</small></div></li>
+              </ol>
+              <div class="activity"><strong>正在分析项目设定</strong><p>浮层可以随时收起，任务会继续在后台运行。</p></div>
+              <div class="event-title"><strong>运行记录</strong><span>3条</span></div>
+              <ol class="event-list">
+                <li><time>00:00</time><div><strong>开始检测</strong><p>已创建矛盾检测任务。</p></div></li>
+                <li><time>00:18</time><div><strong>资料载入完成</strong><p>载入 24 个词条，资料未裁剪。</p></div></li>
+                <li><time>00:42</time><div><strong>AI 开始分析</strong><p>正在核对人物关系与时间线。</p></div></li>
+              </ol>
+            </div>
+            <footer class="panel-footer"><button class="outline-button" type="button">停止检测</button><button class="primary-button" type="button" data-close-overlay>收起并继续</button></footer>
+          </section>
+        </div>
+
+        <div class="overlay-layer" id="generate-overlay" hidden>
+          <section class="floating-panel generate-panel" role="dialog" aria-modal="true" aria-labelledby="generate-title">
+            <header class="panel-header"><strong id="generate-title">生成新报告</strong><button class="panel-close" type="button" data-close-overlay aria-label="关闭"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg></button></header>
+            <div class="generate-body">
+              <p class="generate-intro">同一项目同时运行一个检测任务。开始后可以收起并继续其他工作。</p>
+              <div class="generate-options">
+                <button class="generate-option" type="button" data-start-task><span><strong>矛盾检测</strong><small>查找项目内互相冲突的设定</small></span><b>开始</b></button>
+                <button class="generate-option" type="button" data-start-task><span><strong>契合度检测</strong><small>核对单个词条与世界规则</small></span><b>开始</b></button>
+                <button class="generate-option" type="button" data-start-task><span><strong>发布风险检测</strong><small>评估公开发布前的内容风险</small></span><b>开始</b></button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const phone = document.querySelector('#phone');
+    const taskOverlay = document.querySelector('#task-overlay');
+    const generateOverlay = document.querySelector('#generate-overlay');
+    const viewControls = [...document.querySelectorAll('[data-view-choice]')];
+    const overlayControl = document.querySelector('[data-overlay-choice="task"]');
+    let overlayTrigger = null;
+    const reports = {
+      contradiction: {
+        kind: '矛盾检测', date: '2026/08/06 13:40', status: '整体稳定', findings: '0', unresolved: '0', sources: '1',
+        overview: '项目内仅有一个有效词条“孙悟空”，无其他可形成对比的设定，未发现矛盾。',
+        scope: '项目“test”，共载入 1 个有效词条，资料未裁剪。',
+        sourceNames: ['孙悟空'],
+      },
+      alignment: {
+        kind: '契合度检测', date: '2026/08/02 09:12', status: '2项需要确认', findings: '2', unresolved: '2', sources: '8',
+        overview: '“长风前哨站”的补给周期与北境航线设定存在两处需要人工确认的偏差。',
+        scope: '项目“test”，载入目标词条及 7 个关联词条，资料未裁剪。',
+        sourceNames: ['长风前哨站', '北境航线', '补给制度'],
+      },
+      publication: {
+        kind: '发布风险检测', date: '2026/07/29 18:34', status: '发现1项风险', findings: '1', unresolved: '1', sources: '12',
+        overview: '一处现实组织名称与虚构机构过于接近，公开发布前建议改写。',
+        scope: '项目“test”，共载入 12 个公开可见词条，资料未裁剪。',
+        sourceNames: ['北境考察团', '公开设定集'],
+      },
+    };
+
+    function selectButtons(selector, active) {
+      document.querySelectorAll(selector).forEach((button) => {
+        button.setAttribute('aria-pressed', String(button === active));
+      });
+    }
+
+    function syncQuery() {
+      const query = new URLSearchParams(location.search);
+      query.set('view', phone.dataset.view);
+      query.set('theme', document.documentElement.dataset.theme || 'light');
+      if (!taskOverlay.hidden) query.set('overlay', 'task');
+      else if (!generateOverlay.hidden) query.set('overlay', 'generate');
+      else query.delete('overlay');
+      history.replaceState(null, '', `${location.pathname}?${query}`);
+    }
+
+    function setView(view) {
+      phone.dataset.view = view;
+      document.querySelector(`#${view}-scroll`)?.scrollTo({ top: 0 });
+      const button = document.querySelector(`[data-view-choice="${view}"]`);
+      if (button) selectButtons('[data-view-choice]', button);
+      syncQuery();
+    }
+
+    function setBackgroundInert(inert) {
+      document.querySelector('.notes').inert = inert;
+      document.querySelectorAll('.app-screen').forEach((screen) => { screen.inert = inert; });
+    }
+
+    function closeOverlays(restoreFocus = true) {
+      taskOverlay.hidden = true;
+      generateOverlay.hidden = true;
+      setBackgroundInert(false);
+      overlayControl?.setAttribute('aria-pressed', 'false');
+      if (restoreFocus && overlayTrigger) overlayTrigger.focus();
+      overlayTrigger = null;
+      syncQuery();
+    }
+
+    function openOverlay(name, moveFocus = true) {
+      const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      closeOverlays(false);
+      overlayTrigger = trigger === document.body ? null : trigger;
+      const target = name === 'task' ? taskOverlay : generateOverlay;
+      target.hidden = false;
+      setBackgroundInert(true);
+      if (name === 'task') overlayControl?.setAttribute('aria-pressed', 'true');
+      if (moveFocus) target.querySelector('[data-close-overlay]')?.focus();
+      syncQuery();
+    }
+
+    function openReport(key) {
+      const report = reports[key] || reports.contradiction;
+      document.querySelector('#detail-kind').textContent = report.kind;
+      document.querySelector('#detail-date').textContent = report.date;
+      document.querySelector('#detail-status').textContent = report.status;
+      document.querySelector('#detail-overview').textContent = report.overview;
+      document.querySelector('#detail-findings').textContent = report.findings;
+      document.querySelector('#detail-unresolved').textContent = report.unresolved;
+      document.querySelector('#detail-sources').textContent = report.sources;
+      document.querySelector('#detail-scope').textContent = report.scope;
+      document.querySelector('#detail-source-list').innerHTML = report.sourceNames.map((name) => `<span>${name}</span>`).join('');
+      setView('detail');
+    }
+
+    viewControls.forEach((button) => button.addEventListener('click', () => setView(button.dataset.viewChoice)));
+    overlayControl?.addEventListener('click', () => openOverlay('task'));
+    document.querySelectorAll('[data-go="list"]').forEach((button) => button.addEventListener('click', () => setView('list')));
+    document.querySelectorAll('[data-report]').forEach((button) => button.addEventListener('click', () => openReport(button.dataset.report)));
+    document.querySelectorAll('[data-open-overlay]').forEach((button) => button.addEventListener('click', () => openOverlay(button.dataset.openOverlay)));
+    document.querySelectorAll('[data-close-overlay]').forEach((button) => button.addEventListener('click', closeOverlays));
+    document.querySelectorAll('[data-start-task]').forEach((button) => button.addEventListener('click', () => openOverlay('task')));
+
+    document.querySelector('.history-toggle').addEventListener('click', (event) => {
+      const section = document.querySelector('#history-section');
+      section.classList.toggle('is-collapsed');
+      event.currentTarget.setAttribute('aria-expanded', String(!section.classList.contains('is-collapsed')));
+    });
+
+    document.querySelector('[data-action="refresh"]').addEventListener('click', () => {
+      const latest = document.querySelector('#latest-section');
+      latest.classList.remove('flash');
+      requestAnimationFrame(() => latest.classList.add('flash'));
+    });
+
+    document.querySelectorAll('[data-size]').forEach((button) => button.addEventListener('click', () => {
+      const compact = button.dataset.size === '360';
+      document.documentElement.style.setProperty('--phone-width', compact ? '360px' : '390px');
+      document.documentElement.style.setProperty('--phone-height', compact ? '740px' : '844px');
+      selectButtons('[data-size]', button);
+    }));
+
+    document.querySelectorAll('[data-theme-choice]').forEach((button) => button.addEventListener('click', () => {
+      document.documentElement.dataset.theme = button.dataset.themeChoice;
+      selectButtons('[data-theme-choice]', button);
+      syncQuery();
+    }));
+
+    [taskOverlay, generateOverlay].forEach((overlay) => overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) closeOverlays();
+    }));
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (!taskOverlay.hidden || !generateOverlay.hidden) closeOverlays();
+      else if (phone.dataset.view === 'detail') setView('list');
+    });
+
+    const query = new URLSearchParams(location.search);
+    if (query.get('capture') === 'phone') document.documentElement.dataset.capture = 'phone';
+    const compactPreview = query.get('size') === '360';
+    document.documentElement.style.setProperty('--phone-width', compactPreview ? '360px' : '390px');
+    document.documentElement.style.setProperty('--phone-height', compactPreview ? '740px' : '844px');
+    selectButtons('[data-size]', document.querySelector(`[data-size="${compactPreview ? '360' : '390'}"]`));
+    const theme = query.get('theme') === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    selectButtons('[data-theme-choice]', document.querySelector(`[data-theme-choice="${theme}"]`));
+    setView(query.get('view') === 'detail' ? 'detail' : 'list');
+    if (query.get('overlay') === 'task') openOverlay('task', false);
+    if (query.get('overlay') === 'generate') openOverlay('generate', false);
+  </script>
+</body>
+</html>
