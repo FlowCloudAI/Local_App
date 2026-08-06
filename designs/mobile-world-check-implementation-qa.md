@@ -1,0 +1,66 @@
+# 移动端设定检测实现 QA
+
+## 对照证据
+
+- 设计源：`E:\Projects\FlowCloudAI\app_main\designs\mobile-world-check.html`
+- 设计列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-list-v3.png`
+- 设计详情截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-detail.png`
+- 设计任务截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-design\mobile-world-check-task-v2.png`
+- 真机列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\12-list-final.png`
+- 真机详情截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\13-detail-final.png`
+- 真机任务截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\10-task-error-wrapped.png`
+- 列表并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-list-final.png`
+- 详情并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-detail-final.png`
+- 任务并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-task-final.png`
+
+## 环境与归一化
+
+- 目标：Android debug 原生应用，设备 `24129RT7CC`，物理截图 `1220 × 2712`。
+- 系统字号：`1.25`，用于覆盖大字号下的换行、遮挡和触控密度。
+- 对照处理：设计稿保持 `390 × 844`；真机截图裁去系统状态栏和系统导航栏后按宽度归一到 `390`，内容高度不拉伸。
+- 数据状态：使用 Android 本地数据库的真实项目与报告；桌面数据未参与推断。
+- 状态差异：任务设计稿为运行中，真机任务截图为已完成；仅对照同一浮层的标题、阶段轴、运行记录入口和底部操作区。列表设计稿包含运行中任务，最终真机截图中的任务已完成，因此按产品规则不再重复显示任务横幅。
+
+## 对照结论
+
+### 列表
+
+- 层级与设计一致：页面标题、可选任务横幅、最新报告主卡、以前的报告轻量列表各自独立。
+- 最新报告保持唯一强卡片；历史报告不再与当前报告竞争视觉重量。
+- 在 125% 系统字号下，报告名、状态、时间、摘要和问题数均无重叠或横向溢出。
+- 真实历史只有一份，因此数量与设计稿示例不同；列表结构、行高、分隔线与进入详情的行为一致。
+
+### 详情
+
+- 顶部标题固定为“报告详情”，当前报告信息不再与历史报告或任务阶段处在同一层级。
+- 阅读顺序为报告摘要、主操作、统计、检测结论、资料范围；空报告使用真实的零问题状态，不伪造设计稿里的示例结论。
+- 顶栏使用不透明主题背景，滚动时正文不会透到标题后方。
+- 主操作、返回列表、更多菜单均可用，且在大字号下没有挤压。
+
+### 任务浮层
+
+- 复用现有 `FloatingPanel` 与任务状态机，没有新建弹窗外壳。
+- 阶段轴、完成状态、运行记录入口、查看报告与讨论报告操作完整。
+- Android 返回键优先关闭浮层；报告详情中的 Android 返回键返回报告列表。
+
+## 真机发现并已修复
+
+1. **P1 · 完成任务与最新报告重复**：任务成功后横幅和最新报告表达同一结果，已改为仅在非成功终态显示任务横幅。
+2. **P1 · 长错误文本可能横向溢出**：失败任务返回的长错误码曾撑开浮层，已给错误容器补 `min-width: 0`，正文补 `overflow-wrap: anywhere`。
+3. **P2 · 历史日期过长**：完整时间在历史轻量行中占用过多宽度，已收敛为 `M月d日`。
+
+## 功能与门禁
+
+- 真机：最新报告进入详情、更多菜单打开、详情按钮返回列表、Android 返回键返回列表、任务浮层打开及返回键关闭均通过。
+- 真机：实际调用 AI 生成一份报告并保存，列表与历史状态随后正确刷新。
+- `npm run lint`：通过。
+- `npm run build`：通过；仅有项目既有的大 chunk 提示。
+- `npm run test:world-check-task`：通过，1 项测试。
+
+## 未纳入本轮
+
+- 未执行 release APK 构建；本轮按约定使用已运行的 Android debug 服务与 HMR 验证。
+- 未删除任何真实报告，也未触发“讨论报告”创建新会话；这两项会产生额外业务数据，不属于视觉实现验收。
+- 当前真机为浅色主题；样式全部使用现有 `--fc-*` token，未新增硬编码色值，但深色主题未做本轮真机截图。
+
+final result: passed
