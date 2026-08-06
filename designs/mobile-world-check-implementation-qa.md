@@ -9,6 +9,7 @@
 - 真机列表截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\12-list-final.png`
 - 真机详情截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\13-detail-final.png`
 - 真机任务截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\10-task-error-wrapped.png`
+- 真机详情滚动遮罩截图：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\20-detail-gradient-scrolled.png`
 - 列表并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-list-final.png`
 - 详情并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-detail-final.png`
 - 任务并排对照：`C:\Users\f1779\.codex\visualizations\2026\08\02\019fc218-fd10-7570-9a67-09d52a01fdea\world-check-implementation\comparison-task-final.png`
@@ -34,7 +35,7 @@
 
 - 顶部标题固定为“报告详情”，当前报告信息不再与历史报告或任务阶段处在同一层级。
 - 阅读顺序为报告摘要、主操作、统计、检测结论、资料范围；空报告使用真实的零问题状态，不伪造设计稿里的示例结论。
-- 顶栏使用不透明主题背景，滚动时正文不会透到标题后方。
+- 顶栏复用公共五段渐变遮罩，滚动内容会在标题区域逐级淡出，不干扰标题和操作按钮。
 - 主操作、返回列表、更多菜单均可用，且在大字号下没有挤压。
 
 ### 任务浮层
