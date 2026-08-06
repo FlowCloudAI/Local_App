@@ -55,6 +55,7 @@ import {normalizeEntryLookupTitle} from '../../entries/lib/entryCommon'
 import {subscribeAppSettings, useAppSettingsStore} from '../../settings/appSettingsStore'
 import AiChatErrorNotice from './AiChatErrorNotice'
 import AiBudgetWarning from './AiBudgetWarning'
+import AiResponsePendingIndicator from './AiResponsePendingIndicator'
 import {isIncompleteMessage} from '../model/conversationState'
 import '../../../shared/ui/layout/WorkspaceScaffold.css'
 import '../../../shared/ui/layout/DockPanelScaffold.css'
@@ -2051,6 +2052,11 @@ export default function AIChatContent({
                                     </div>
                                 )
                             })}
+                            {ctx.isStreaming
+                            && ctx.continuationNodeId == null
+                            && ctx.streamingBlocks.length === 0 && (
+                                <AiResponsePendingIndicator/>
+                            )}
                             {ctx.streamingBlocks.length > 0
                             && ctx.isStreaming
                             && ctx.continuationNodeId == null && (

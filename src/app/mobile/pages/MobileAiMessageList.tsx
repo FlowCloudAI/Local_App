@@ -2,6 +2,7 @@ import {Fragment, type RefObject} from 'react'
 import {Button, MessageBox} from 'flowcloudai-ui'
 import {type AiContextValue} from '../../../features/ai-chat/model/AiControllerTypes'
 import AiChatErrorNotice from '../../../features/ai-chat/components/AiChatErrorNotice'
+import AiResponsePendingIndicator from '../../../features/ai-chat/components/AiResponsePendingIndicator'
 import {isIncompleteMessage} from '../../../features/ai-chat/model/conversationState'
 import {ErrorCode} from '../../../api'
 
@@ -132,6 +133,9 @@ export default function MobileAiMessageList({
                     </div>
                 )
             })}
+            {isStreaming && continuationNodeId == null && streamingBlocks.length === 0 && (
+                <AiResponsePendingIndicator/>
+            )}
             {isStreaming && continuationNodeId == null && streamingBlocks.length > 0 && (
                 <MessageBox
                     role="assistant"

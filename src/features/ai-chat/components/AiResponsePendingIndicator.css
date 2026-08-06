@@ -1,0 +1,53 @@
+/* AI 首个响应到达前的三点反馈；动画保持首尾同态，并尊重系统的减弱动态效果设置。 */
+.ai-response-pending {
+    display: flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--fc-space-xs);
+    padding: var(--fc-space-sm);
+}
+
+.ai-response-pending > span {
+    width: var(--fc-space-sm);
+    height: var(--fc-space-sm);
+    border-radius: var(--fc-radius-full);
+    background: color-mix(in srgb, var(--fc-color-primary) 42%, var(--fc-color-bg));
+    opacity: 0.55;
+    animation: ai-response-pending-wave 1.2s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.ai-response-pending > span:nth-child(2) {
+    animation-delay: 0.14s;
+}
+
+.ai-response-pending > span:nth-child(3) {
+    animation-delay: 0.28s;
+}
+
+@keyframes ai-response-pending-wave {
+    0%, 50%, 100% {
+        transform: translateY(0);
+        background: color-mix(in srgb, var(--fc-color-primary) 42%, var(--fc-color-bg));
+        opacity: 0.55;
+    }
+
+    25% {
+        transform: translateY(calc(var(--fc-space-xs) * -1));
+        background: var(--fc-color-primary);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-response-pending > span {
+        animation: none;
+    }
+
+    .ai-response-pending > span:nth-child(2) {
+        opacity: 0.72;
+    }
+
+    .ai-response-pending > span:nth-child(3) {
+        opacity: 1;
+    }
+}
