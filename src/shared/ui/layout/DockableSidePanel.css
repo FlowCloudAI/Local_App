@@ -68,6 +68,11 @@
     outline-color: transparent;
 }
 
+.dockable-side-panel--floating.is-collapsed .dockable-side-panel__body {
+    content-visibility: hidden;
+    pointer-events: none;
+}
+
 .dockable-side-panel--floating.is-collapse-preview {
     border-left-color: transparent;
 }
