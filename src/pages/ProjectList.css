@@ -395,11 +395,6 @@
   background: transparent;
 }
 
-.project-home-resume-card .fc-card__image,
-.project-list-card .fc-card__image {
-  object-fit: contain;
-}
-
 .project-list-card .fc-card__image-wrapper {
   min-height: var(--fc-home-project-cover-height);
 }
