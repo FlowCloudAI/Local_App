@@ -241,7 +241,6 @@
     min-height: 0;
     overflow-y: auto;
     padding: var(--dock-panel-list-padding);
-    background: var(--dock-panel-sidebar-bg);
 }
 
 .idea-page__empty {

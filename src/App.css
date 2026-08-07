@@ -232,7 +232,9 @@ body {
 }
 
 .page-container.is-hidden-for-dock-fullscreen {
-    visibility: hidden;
+    /* 子页面会自行恢复 visibility；由父层统一隐藏并停止绘制。 */
+    opacity: 0;
+    content-visibility: hidden;
     pointer-events: none;
 }
 

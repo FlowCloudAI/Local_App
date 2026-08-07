@@ -16,7 +16,6 @@
 
 .help-side__controls {
     padding: var(--fc-space-md) var(--dock-panel-list-padding) var(--fc-space-lg);
-    background: var(--dock-panel-sidebar-bg);
 }
 
 .help-side__list {
@@ -24,7 +23,6 @@
     min-height: 0;
     overflow-y: auto;
     padding: var(--fc-space-sm) 0 var(--fc-space-lg);
-    background: var(--dock-panel-sidebar-bg);
 }
 
 .help-side__module {
