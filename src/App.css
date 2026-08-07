@@ -231,10 +231,7 @@ body {
     box-sizing: border-box;
 }
 
-.page-container.is-hidden-for-ai-chat {
-    flex: 0 0 0;
-    width: 0;
-    min-width: 0;
+.page-container.is-hidden-for-dock-fullscreen {
     visibility: hidden;
     pointer-events: none;
 }
@@ -377,7 +374,7 @@ body {
 }
 
 [data-backdrop="acrylic"] .dockable-side-panel--fullscreen {
-    --dockable-side-panel-fullscreen-bg: var(--fc-color-bg-secondary);
+    --dockable-side-panel-fullscreen-bg: transparent;
 }
 
 /* 组件库外层 chrome：右侧图标栏与浮动标签栏底色透明，露出磨砂层。

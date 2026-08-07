@@ -1417,7 +1417,7 @@ function DesktopAppContent() {
             </div>
             <div className="main-content">
                 <div className="workspace-content">
-                    <div className={`page-container ${mainContentKey === 'home' && activeHomeProjectId ? 'page-container--project-editor' : ''} ${mainContentKey === 'settings' ? 'page-container--settings' : ''}`}>
+                    <div className={`page-container ${mainContentKey === 'home' && activeHomeProjectId ? 'page-container--project-editor' : ''} ${mainContentKey === 'settings' ? 'page-container--settings' : ''} ${aiPanelMode === 'fullscreen' ? 'is-hidden-for-dock-fullscreen' : ''}`}>
                         <div className={`page-wrapper ${mainContentKey === 'home' ? 'active' : ''}`}>
                             <div className="home-page-stack">
                                 <div className={`home-page-layer ${!activeHomeProjectId ? 'active' : ''}`}>
