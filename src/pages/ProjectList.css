@@ -178,8 +178,43 @@
   min-height: 0;
 }
 
-.project-home-resume-card .fc-card__image {
-  transform: none;
+.project-cover-media {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--fc-color-bg-tertiary);
+}
+
+.project-cover-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--fc-color-bg) 32%, transparent);
+  pointer-events: none;
+}
+
+.project-cover-media__backdrop,
+.project-cover-media__foreground {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.project-cover-media__backdrop {
+  object-fit: cover;
+  filter: var(--fc-effect-glass-blur);
+  opacity: 0.72;
+  transform: scale(1.12);
+}
+
+.project-cover-media__foreground {
+  z-index: 2;
+  object-fit: contain;
 }
 
 .project-home-resume-card .fc-card__content {
