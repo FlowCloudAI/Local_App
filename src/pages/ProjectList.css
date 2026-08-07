@@ -248,7 +248,6 @@
 .project-home-resume-meta,
 .project-home-resume-actions,
 .project-list-stats,
-.project-list-card__actions,
 .project-home-help-links {
   display: flex;
   flex-wrap: wrap;
@@ -371,6 +370,11 @@
   background: var(--fc-color-bg-elevated);
 }
 
+.project-list-card.fc-card:focus-visible {
+  outline: var(--fc-home-border-width) solid var(--fc-color-primary);
+  outline-offset: var(--fc-space-xs);
+}
+
 .project-list-card .fc-card__content {
   color: var(--fc-color-text);
 }
@@ -383,11 +387,6 @@
   color: var(--fc-color-text-tertiary);
   font-size: var(--fc-font-size-sm);
   font-weight: var(--fc-font-weight-regular);
-}
-
-.project-list-card .fc-card__actions {
-  padding-top: var(--fc-space-md);
-  border-top-color: var(--fc-color-border-light);
 }
 
 .project-list-star-button {

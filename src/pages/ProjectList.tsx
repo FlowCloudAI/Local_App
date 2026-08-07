@@ -962,6 +962,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                             >
                                                 <Card
                                                     className="project-list-card"
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    aria-label={`打开世界：${project.name}`}
+                                                    onClick={() => onOpenProject?.(project)}
+                                                    onKeyDown={event => {
+                                                        if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+                                                        event.preventDefault()
+                                                        onOpenProject?.(project)
+                                                    }}
                                                     image={image}
                                                     imageSlot={!image ? (
                                                         <div className="project-list-placeholder">
@@ -977,7 +986,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                             variant="ghost"
                                                             aria-label={isStarred ? `取消标星${project.name}` : `标星${project.name}`}
                                                             aria-pressed={isStarred}
-                                                            onClick={() => void toggleProjectStar(project)}
+                                                            onClick={event => {
+                                                                event.stopPropagation()
+                                                                void toggleProjectStar(project)
+                                                            }}
                                                         >
                                                             {isStarred ? '★' : '☆'}
                                                         </Button>
@@ -989,7 +1001,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                                 <button
                                                                     type="button"
                                                                     className="project-list-recent-link"
-                                                                    onClick={() => openDashboardTarget(recentTarget)}
+                                                                    onClick={event => {
+                                                                        event.stopPropagation()
+                                                                        openDashboardTarget(recentTarget)
+                                                                    }}
                                                                 >
                                                                     <span>最近：{recentTarget.title}</span>
                                                                     <span aria-hidden="true">→</span>
@@ -1010,23 +1025,19 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                                 <button
                                                                     type="button"
                                                                     className="project-list-nudge"
-                                                                    onClick={() => openProjectCheck(project)}
+                                                                    onClick={event => {
+                                                                        event.stopPropagation()
+                                                                        openProjectCheck(project)
+                                                                    }}
                                                                 >
                                                                     {nudge.label}
                                                                 </button>
                                                             )}
                                                         </div>
                                                     )}
-                                                    actions={(
-                                                        <div className="project-list-card__actions">
-                                                            <Button type="button" size="sm" onClick={() => onOpenProject?.(project)}>
-                                                                打开世界
-                                                            </Button>
-                                                        </div>
-                                                    )}
                                                     variant="shadow"
                                                     hoverable
-                                                    contentAreaRatio={0.64}
+                                                    contentAreaRatio={0.58}
                                                 />
                                             </div>
                                         )
