@@ -5,7 +5,7 @@
 .project-list-page {
   --fc-home-page-max-width: 84rem;
   --fc-home-resume-cover-height: 20rem;
-  --fc-home-project-cover-height: 9.5rem;
+  --fc-home-project-card-height: 27rem;
   --fc-home-card-min-width: 18rem;
   --fc-home-border-width: 1px;
 
@@ -157,10 +157,16 @@
 }
 
 .project-home-resume-card.fc-card {
+  --fc-card-overlay-background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 98%, transparent),
+    color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent) 48%,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 62%, transparent) 72%,
+    transparent 100%
+  );
+
   height: var(--fc-home-resume-cover-height);
   min-height: var(--fc-home-resume-cover-height);
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
   border: var(--fc-home-border-width) solid var(--fc-color-border);
   border-radius: var(--fc-radius-xl);
   background: var(--fc-color-bg-elevated);
@@ -168,38 +174,25 @@
 }
 
 .project-home-resume-card.fc-card[data-has-media="true"]::before {
-  display: none;
+  inset: 0;
+  height: auto;
 }
 
 .project-home-resume-card .fc-card__image-wrapper {
-  grid-column: 2;
-  grid-row: 1;
   height: var(--fc-home-resume-cover-height) !important;
-  min-height: 0;
-}
-
-.project-home-resume-card .fc-card__image {
-  transform: none;
+  min-height: var(--fc-home-resume-cover-height);
 }
 
 .project-home-resume-card .fc-card__content {
-  position: relative;
-  grid-column: 1;
-  grid-row: 1;
+  inset: 0 auto 0 0;
+  width: min(68%, 48rem);
   height: auto;
   min-height: 0;
   justify-content: center;
   gap: var(--fc-space-lg);
   padding: clamp(var(--fc-space-xl), 4vw, var(--fc-space-3xl));
   color: var(--fc-color-text);
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent),
-    color-mix(in srgb, var(--fc-color-bg-elevated) 90%, transparent) 58%,
-    color-mix(in srgb, var(--fc-color-bg-elevated) 64%, transparent) 84%,
-    transparent
-  );
-  overflow: visible;
+  background: none;
 }
 
 .project-home-resume-card .fc-card__title {
@@ -363,65 +356,30 @@
 }
 
 .project-list-card.fc-card {
+  --fc-card-overlay-background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 58%, transparent) 34%,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 96%, transparent)
+  );
+
   height: 100%;
-  min-height: 27rem;
+  min-height: var(--fc-home-project-card-height);
   border: var(--fc-home-border-width) solid var(--fc-color-border);
   border-radius: var(--fc-radius-lg);
   color: var(--fc-color-text);
   background: var(--fc-color-bg-elevated);
 }
 
-.project-list-card.fc-card[data-has-media="true"]::before {
-  display: none;
-}
-
-.project-home-resume-card.fc-card[data-home-cover="true"]::before,
-.project-list-card.fc-card[data-home-cover="true"]::before {
-  display: block;
-  inset: calc(var(--fc-space-xl) * -1);
-  z-index: 0;
-  width: auto;
-  height: auto;
-  background: var(--fc-home-cover-image) center / cover no-repeat;
-  filter: var(--fc-effect-glass-blur) brightness(0.62) saturate(0.85);
-  opacity: 0.72;
-  transform: scale(1.1);
-  pointer-events: none;
-}
-
-.project-home-resume-card .fc-card__image-wrapper,
-.project-list-card .fc-card__image-wrapper {
-  z-index: 1;
-  background: transparent;
-}
-
-.project-list-card .fc-card__image-wrapper {
-  min-height: var(--fc-home-project-cover-height);
-}
-
 .project-list-card .fc-card__content {
-  position: relative;
-  height: auto;
-  min-height: calc(27rem - var(--fc-home-project-cover-height));
-  justify-content: flex-start;
-  padding: var(--fc-space-lg);
   color: var(--fc-color-text);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--fc-color-bg-elevated) 78%, transparent),
-    color-mix(in srgb, var(--fc-color-bg-elevated) 91%, transparent) 38%,
-    color-mix(in srgb, var(--fc-color-bg-elevated) 97%, transparent)
-  );
-  overflow: visible;
 }
 
 .project-list-card .fc-card__description {
   color: var(--fc-color-text-secondary);
-  overflow: visible;
 }
 
 .project-list-card .fc-card__extra-info {
-  margin-top: auto;
   color: var(--fc-color-text-tertiary);
   font-size: var(--fc-font-size-sm);
   font-weight: var(--fc-font-weight-regular);
@@ -439,20 +397,8 @@
   backdrop-filter: var(--fc-effect-glass-blur);
 }
 
-.project-list-card__description {
-  display: grid;
-  gap: var(--fc-space-md);
-}
-
-.project-list-card__description p,
 .project-list-nudge {
   margin-bottom: 0;
-}
-
-.project-list-card__description p {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .project-list-recent-link {
@@ -465,7 +411,7 @@
   border: 0;
   border-radius: var(--fc-radius-md);
   color: var(--fc-color-text-secondary);
-  background: var(--fc-color-bg-secondary);
+  background: color-mix(in srgb, var(--fc-color-bg-elevated) 72%, transparent);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -473,7 +419,7 @@
 
 .project-list-recent-link:hover {
   color: var(--fc-color-text);
-  background: var(--fc-color-bg-tertiary);
+  background: color-mix(in srgb, var(--fc-color-bg-elevated) 88%, transparent);
 }
 
 .project-list-meta {
@@ -498,14 +444,14 @@
 }
 
 .project-list-create-card.fc-card {
-  min-height: 27rem;
+  min-height: var(--fc-home-project-card-height);
   border: var(--fc-home-border-width) dashed var(--fc-color-border);
   color: var(--fc-color-text);
   background: transparent;
 }
 
 .project-list-create-card.fc-card[data-has-media="false"] .fc-card__content {
-  min-height: 27rem;
+  min-height: var(--fc-home-project-card-height);
   align-items: center;
   justify-content: center;
   padding: var(--fc-space-xl);
@@ -564,10 +510,6 @@
 }
 
 @media (max-width: 64rem) {
-  .project-home-resume-card.fc-card {
-    grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.7fr);
-  }
-
   .project-list-header {
     align-items: stretch;
     flex-direction: column;
@@ -584,21 +526,15 @@
   }
 
   .project-home-resume-card.fc-card {
-    height: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .project-home-resume-card .fc-card__image-wrapper {
-    grid-column: 1;
-    grid-row: 1;
-    height: 12rem !important;
-    min-height: 12rem;
+    --fc-card-overlay-background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--fc-color-bg-elevated) 72%, transparent),
+      color-mix(in srgb, var(--fc-color-bg-elevated) 96%, transparent)
+    );
   }
 
   .project-home-resume-card .fc-card__content {
-    grid-column: 1;
-    grid-row: 2;
-    min-height: auto;
+    width: 100%;
   }
 
   .project-home-start-grid {

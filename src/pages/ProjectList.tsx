@@ -831,10 +831,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                             imageSlot={!resumeCover ? (
                                                 <div className="project-home-resume-placeholder" aria-hidden="true" />
                                             ) : undefined}
-                                            data-home-cover={Boolean(resumeCover)}
-                                            style={resumeCover ? ({
-                                                '--fc-home-cover-image': `url(${JSON.stringify(resumeCover)})`,
-                                            } as CSSProperties) : undefined}
                                             imageHeight="var(--fc-home-resume-cover-height)"
                                             tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
                                             title={resumeTarget.title}
@@ -971,11 +967,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                         <div className="project-list-placeholder">
                                                         </div>
                                                     ) : undefined}
-                                                    data-home-cover={Boolean(image)}
-                                                    style={image ? ({
-                                                        '--fc-home-cover-image': `url(${JSON.stringify(image)})`,
-                                                    } as CSSProperties) : undefined}
-                                                    imageHeight="var(--fc-home-project-cover-height)"
+                                                    imageHeight="var(--fc-home-project-card-height)"
                                                     title={project.name}
                                                     tag={(
                                                         <Button
@@ -990,9 +982,9 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                             {isStarred ? '★' : '☆'}
                                                         </Button>
                                                     )}
-                                                    description={description || recentTarget ? (
-                                                        <div className="project-list-card__description">
-                                                            {description && <p title={description}>{description}</p>}
+                                                    description={description || undefined}
+                                                    extraInfo={(
+                                                        <div className="project-list-meta">
                                                             {recentTarget && (
                                                                 <button
                                                                     type="button"
@@ -1003,10 +995,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                                     <span aria-hidden="true">→</span>
                                                                 </button>
                                                             )}
-                                                        </div>
-                                                    ) : undefined}
-                                                    extraInfo={(
-                                                        <div className="project-list-meta">
                                                             <div className="project-list-stats">
                                                                 {stats ? (
                                                                     <>
@@ -1038,6 +1026,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                     )}
                                                     variant="shadow"
                                                     hoverable
+                                                    contentAreaRatio={0.64}
                                                 />
                                             </div>
                                         )
