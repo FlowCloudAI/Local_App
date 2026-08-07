@@ -590,6 +590,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const resumeTarget = continueItem
     const resumeProjectId = resumeTarget ? getHomeTargetProjectId(resumeTarget) : null
     const resumeProject = resumeProjectId ? projects.find(project => project.id === resumeProjectId) ?? null : null
+    const resumeCover = toProjectImageSrc(asOptionalString(resumeProject?.cover_path))
     const resumeEntry = resumeTarget?.type === 'entry' && continueKey
         ? entryByTargetKey.get(continueKey) ?? null
         : null
@@ -826,10 +827,14 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
                                         <Card
                                             className="project-home-resume-card"
-                                            image={toProjectImageSrc(asOptionalString(resumeProject?.cover_path))}
-                                            imageSlot={!asOptionalString(resumeProject?.cover_path) ? (
+                                            image={resumeCover}
+                                            imageSlot={!resumeCover ? (
                                                 <div className="project-home-resume-placeholder" aria-hidden="true" />
                                             ) : undefined}
+                                            data-home-cover={Boolean(resumeCover)}
+                                            style={resumeCover ? ({
+                                                '--fc-home-cover-image': `url(${JSON.stringify(resumeCover)})`,
+                                            } as CSSProperties) : undefined}
                                             imageHeight="var(--fc-home-resume-cover-height)"
                                             tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
                                             title={resumeTarget.title}
@@ -966,6 +971,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                         <div className="project-list-placeholder">
                                                         </div>
                                                     ) : undefined}
+                                                    data-home-cover={Boolean(image)}
+                                                    style={image ? ({
+                                                        '--fc-home-cover-image': `url(${JSON.stringify(image)})`,
+                                                    } as CSSProperties) : undefined}
                                                     imageHeight="var(--fc-home-project-cover-height)"
                                                     title={project.name}
                                                     tag={(

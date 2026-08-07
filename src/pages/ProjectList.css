@@ -192,7 +192,13 @@
   gap: var(--fc-space-lg);
   padding: clamp(var(--fc-space-xl), 4vw, var(--fc-space-3xl));
   color: var(--fc-color-text);
-  background: var(--fc-color-bg-elevated);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 94%, transparent),
+    color-mix(in srgb, var(--fc-color-bg-elevated) 90%, transparent) 58%,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 64%, transparent) 84%,
+    transparent
+  );
   overflow: visible;
 }
 
@@ -369,6 +375,31 @@
   display: none;
 }
 
+.project-home-resume-card.fc-card[data-home-cover="true"]::before,
+.project-list-card.fc-card[data-home-cover="true"]::before {
+  display: block;
+  inset: calc(var(--fc-space-xl) * -1);
+  z-index: 0;
+  width: auto;
+  height: auto;
+  background: var(--fc-home-cover-image) center / cover no-repeat;
+  filter: var(--fc-effect-glass-blur) brightness(0.62) saturate(0.85);
+  opacity: 0.72;
+  transform: scale(1.1);
+  pointer-events: none;
+}
+
+.project-home-resume-card .fc-card__image-wrapper,
+.project-list-card .fc-card__image-wrapper {
+  z-index: 1;
+  background: transparent;
+}
+
+.project-home-resume-card .fc-card__image,
+.project-list-card .fc-card__image {
+  object-fit: contain;
+}
+
 .project-list-card .fc-card__image-wrapper {
   min-height: var(--fc-home-project-cover-height);
 }
@@ -380,7 +411,12 @@
   justify-content: flex-start;
   padding: var(--fc-space-lg);
   color: var(--fc-color-text);
-  background: var(--fc-color-bg-elevated);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 78%, transparent),
+    color-mix(in srgb, var(--fc-color-bg-elevated) 91%, transparent) 38%,
+    color-mix(in srgb, var(--fc-color-bg-elevated) 97%, transparent)
+  );
   overflow: visible;
 }
 
