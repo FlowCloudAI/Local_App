@@ -10,6 +10,7 @@ import {
     db_get_entry,
     db_get_project,
     db_get_project_stats,
+    db_list_idea_notes,
     db_delete_project,
     db_update_project,
     formatApiError,
@@ -41,7 +42,7 @@ import {
     type HomeDashboardData,
     useHomeDashboard,
 } from '../features/home/homeActivity'
-import {refreshIdeas} from '../features/ideas/ideaStore'
+import {refreshIdeas, useIdeaInboxRevision} from '../features/ideas/ideaStore'
 import {stripMarkdown} from '../features/entries/lib/entryMarkdown'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
@@ -51,10 +52,7 @@ import {
     parseProjectDateMs,
     toProjectImageSrc,
 } from '../features/projects/projectDisplay'
-import {
-    formatProjectStatCount,
-    getProjectHomeNudge,
-} from './projectListHomeModel'
+import {formatProjectStatCount} from './projectListHomeModel'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -73,6 +71,7 @@ const SORT_OPTIONS: Array<{value: SortMode; label: string}> = [
 ]
 const HOME_WELCOME_STORAGE_KEY = 'fc:onboarding:home-welcome:v1'
 const WELCOME_TOUR_START_DELAY_MS = 300
+const HOME_IDEA_PAGE_SIZE = 200
 const AI_ASSISTANT_TARGET: HomeActivityTarget = {
     type: 'conversation',
     id: 'ai-chat-panel',
@@ -158,6 +157,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [projectStatsById, setProjectStatsById] = useState<ReadonlyMap<string, ProjectStats | null>>(
         () => new Map(),
     )
+    const [inboxIdeaCountByProject, setInboxIdeaCountByProject] = useState<ReadonlyMap<string, number>>(
+        () => new Map(),
+    )
+    const ideaInboxRevision = useIdeaInboxRevision()
     const ideaComposingRef = useRef(false)
     const dashboard = useHomeDashboard()
     const [entryByTargetKey, setEntryByTargetKey] = useState<ReadonlyMap<string, Entry>>(() => new Map())
@@ -300,6 +303,41 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             cancelled = true
         }
     }, [hasLoadedProjects, projects])
+
+    useEffect(() => {
+        if (!hasLoadedProjects) return
+        if (projects.length === 0) {
+            setInboxIdeaCountByProject(new Map())
+            return
+        }
+
+        let cancelled = false
+        void (async () => {
+            const counts = new Map<string, number>()
+            let offset = 0
+            while (true) {
+                const ideas = await db_list_idea_notes({
+                    status: 'inbox',
+                    limit: HOME_IDEA_PAGE_SIZE,
+                    offset,
+                })
+                for (const idea of ideas) {
+                    if (idea.project_id && projectIdSet.has(idea.project_id)) {
+                        counts.set(idea.project_id, (counts.get(idea.project_id) ?? 0) + 1)
+                    }
+                }
+                if (ideas.length < HOME_IDEA_PAGE_SIZE) break
+                offset += ideas.length
+            }
+            if (!cancelled) setInboxIdeaCountByProject(counts)
+        })().catch(() => {
+            if (!cancelled) setInboxIdeaCountByProject(new Map())
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [hasLoadedProjects, ideaInboxRevision, projectIdSet, projects.length])
 
     useEffect(() => {
         if (!hasLoadedProjects) return
@@ -630,17 +668,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         void onOpenHomeTarget?.(target)
     }, [hasLoadedProjects, onOpenHomeTarget, onOpenProject, projectIdSet, projects, showAlert])
 
-    const openProjectCheck = useCallback((project: Project) => {
-        openDashboardTarget({
-            type: 'tool',
-            id: `contradiction:${project.id}`,
-            projectId: project.id,
-            panel: 'contradiction',
-            title: '设定检测',
-            subtitle: project.name,
-        })
-    }, [openDashboardTarget])
-
     const handleIdeaSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault()
         if (ideaComposingRef.current || ideaSaving) return
@@ -951,7 +978,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         const timestampLabel = formatProjectDate(updatedAt ?? createdAt)
                                         const isStarred = starredProjectIdSet.has(project.id)
                                         const stats = projectStatsById.get(project.id)
-                                        const nudge = getProjectHomeNudge(stats)
+                                        const inboxIdeaCount = inboxIdeaCountByProject.get(project.id) ?? 0
                                         const recentTarget = recentTargetByProjectId.get(project.id)
                                         const description = project.description?.trim()
 
@@ -1021,16 +1048,23 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                                 )}
                                                                 <span>{timestampLabel}</span>
                                                             </div>
-                                                            {nudge && (
+                                                            {inboxIdeaCount > 0 && (
                                                                 <button
                                                                     type="button"
-                                                                    className="project-list-nudge"
+                                                                    className="project-list-inbox-link"
                                                                     onClick={event => {
                                                                         event.stopPropagation()
-                                                                        openProjectCheck(project)
+                                                                        openDashboardTarget({
+                                                                            type: 'idea',
+                                                                            id: 'project-inbox',
+                                                                            projectId: project.id,
+                                                                            title: '待整理灵感',
+                                                                            subtitle: project.name,
+                                                                        })
                                                                     }}
                                                                 >
-                                                                    {nudge.label}
+                                                                    <span>{formatProjectStatCount(inboxIdeaCount)} 条灵感待整理</span>
+                                                                    <span aria-hidden="true">→</span>
                                                                 </button>
                                                             )}
                                                         </div>

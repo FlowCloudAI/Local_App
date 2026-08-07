@@ -396,10 +396,6 @@
   backdrop-filter: var(--fc-effect-glass-blur);
 }
 
-.project-list-nudge {
-  margin-bottom: 0;
-}
-
 .project-list-recent-link {
   width: 100%;
   display: flex;
@@ -426,19 +422,24 @@
   gap: var(--fc-space-md);
 }
 
-.project-list-nudge {
+.project-list-inbox-link {
   width: 100%;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fc-space-sm);
   padding: var(--fc-space-md) 0 0;
   border: 0;
   border-top: var(--fc-home-border-width) solid var(--fc-color-border-light);
-  color: var(--fc-color-warning);
+  color: var(--fc-color-primary);
   background: transparent;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.project-list-nudge:hover {
+.project-list-inbox-link:hover {
   text-decoration: underline;
 }
 

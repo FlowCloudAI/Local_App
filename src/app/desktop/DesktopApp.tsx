@@ -26,6 +26,7 @@ import {
     saveHomeLastSession,
     type HomeActivityTarget,
 } from '../../features/home/homeActivity'
+import {setIdeaFilters, setIdeaSearchText} from '../../features/ideas/ideaStore'
 import {invalidateProjectList} from '../../features/projects/projectListStore'
 import {parseHelpTarget} from '../../shared/help/helpCatalog'
 import {groupEntryIdsByProject, type EntryTabMeta} from './entryTabMounting'
@@ -1004,7 +1005,12 @@ function DesktopAppContent() {
                 }
                 return
             case 'idea':
-                recordHomeActivity(target)
+                if (target.id === 'project-inbox' && target.projectId) {
+                    setIdeaSearchText('')
+                    setIdeaFilters('inbox', target.projectId)
+                } else {
+                    recordHomeActivity(target)
+                }
                 handleSideBarSelect('idea')
                 return
             case 'conversation':

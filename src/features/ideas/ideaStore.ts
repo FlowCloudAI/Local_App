@@ -37,6 +37,7 @@ interface IdeaSnapshot {
     saveState: IdeaSaveState
     lastSavedAt: string | null
     statusMessage: string
+    inboxRevision: number
     version: number
 }
 
@@ -62,6 +63,7 @@ let snapshot: IdeaSnapshot = {
     saveState: 'idle',
     lastSavedAt: null,
     statusMessage: '输入内容后会自动保存',
+    inboxRevision: 0,
     version: 0,
 }
 let loadPromise: Promise<void> | null = null
@@ -77,6 +79,10 @@ function emit() {
 function setSnapshot(patch: Partial<Omit<IdeaSnapshot, 'version'>>) {
     snapshot = {...snapshot, ...patch, version: snapshot.version + 1}
     emit()
+}
+
+function bumpInboxRevision() {
+    setSnapshot({inboxRevision: snapshot.inboxRevision + 1})
 }
 
 function subscribe(listener: () => void) {
@@ -211,6 +217,11 @@ export async function flushIdeaDraft(): Promise<void> {
     const draft = snapshot.draft
     const draftKey = JSON.stringify(draft)
     const selectedIdeaId = snapshot.selectedIdeaId
+    const previousDraft = JSON.parse(lastSavedDraft) as IdeaDraft
+    const previousInboxProjectId = selectedIdeaId && previousDraft.status === 'inbox'
+        ? previousDraft.projectId
+        : null
+    const nextInboxProjectId = draft.status === 'inbox' ? draft.projectId : null
     const hasContent = draft.title.trim() || draft.content.trim()
     if (!selectedIdeaId && !hasContent) return
 
@@ -244,6 +255,7 @@ export async function flushIdeaDraft(): Promise<void> {
                 lastSavedAt: saved.updated_at,
                 statusMessage: `已保存于 ${new Date(saved.updated_at).toLocaleString('zh-CN')}`,
             })
+            if (previousInboxProjectId !== nextInboxProjectId) bumpInboxRevision()
         } catch (error) {
             logger.error('保存灵感便签失败', error)
             setSnapshot({
@@ -292,7 +304,14 @@ export async function updateSelectedIdea(patch: Partial<Pick<IdeaNote, 'status' 
 }
 
 export async function updateIdeaNote(params: UpdateIdeaNoteParams) {
+    const previous = params.id === snapshot.selectedIdeaId
+        ? snapshot.draft
+        : snapshot.ideas.find(idea => idea.id === params.id)
+    const previousInboxProjectId = previous?.status === 'inbox'
+        ? 'projectId' in previous ? previous.projectId : previous.project_id ?? null
+        : null
     const updated = await db_update_idea_note(params)
+    const nextInboxProjectId = updated.status === 'inbox' ? updated.project_id ?? null : null
     const draft = draftFromIdea(updated)
     if (updated.id === snapshot.selectedIdeaId) {
         lastSavedDraft = JSON.stringify(draft)
@@ -300,27 +319,38 @@ export async function updateIdeaNote(params: UpdateIdeaNoteParams) {
     }
     if (matchesFilters(updated)) replaceIdea(updated)
     else await refreshIdeas(updated.id)
+    if (previousInboxProjectId !== nextInboxProjectId) bumpInboxRevision()
     return updated
 }
 
 export async function deleteSelectedIdea() {
     await flushIdeaDraft()
     if (!snapshot.selectedIdeaId) return
+    const removedProjectInbox = snapshot.draft.status === 'inbox' && snapshot.draft.projectId !== null
     await db_delete_idea_note(snapshot.selectedIdeaId)
     resetDraft()
     await refreshIdeas()
+    if (removedProjectInbox) bumpInboxRevision()
+}
+
+function refreshIdeasAfterFilterChange() {
+    const activeLoad = loadPromise
+    void (activeLoad ? activeLoad.then(() => refreshIdeas()) : refreshIdeas())
 }
 
 export function setIdeaStatusFilter(statusFilter: IdeaStatusFilter) {
     setSnapshot({statusFilter})
-    const activeLoad = loadPromise
-    void (activeLoad ? activeLoad.then(() => refreshIdeas()) : refreshIdeas())
+    refreshIdeasAfterFilterChange()
 }
 
 export function setIdeaProjectFilter(projectFilter: IdeaProjectFilter) {
     setSnapshot({projectFilter})
-    const activeLoad = loadPromise
-    void (activeLoad ? activeLoad.then(() => refreshIdeas()) : refreshIdeas())
+    refreshIdeasAfterFilterChange()
+}
+
+export function setIdeaFilters(statusFilter: IdeaStatusFilter, projectFilter: IdeaProjectFilter) {
+    setSnapshot({statusFilter, projectFilter})
+    refreshIdeasAfterFilterChange()
 }
 
 export function setIdeaSearchText(searchText: string) {
@@ -329,6 +359,14 @@ export function setIdeaSearchText(searchText: string) {
 
 export function setIdeaFeedback(saveState: IdeaSaveState, statusMessage: string) {
     setSnapshot({saveState, statusMessage})
+}
+
+export function useIdeaInboxRevision() {
+    return useSyncExternalStore(
+        subscribe,
+        () => snapshot.inboxRevision,
+        () => snapshot.inboxRevision,
+    )
 }
 
 export function useIdeaStore() {
