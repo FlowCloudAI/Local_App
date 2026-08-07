@@ -124,15 +124,6 @@ function markHomeWelcomeSeen() {
     }
 }
 
-function ProjectCoverMedia({src, alt}: {src: string; alt: string}) {
-    return (
-        <div className="project-cover-media">
-            <img className="project-cover-media__backdrop" src={src} alt="" aria-hidden="true" loading="lazy" />
-            <img className="project-cover-media__foreground" src={src} alt={alt} loading="lazy" />
-        </div>
-    )
-}
-
 function collectDashboardTargets(dashboard: HomeDashboardData) {
     const targets: HomeActivityTarget[] = [
         ...dashboard.recentItems,
@@ -599,7 +590,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const resumeTarget = continueItem
     const resumeProjectId = resumeTarget ? getHomeTargetProjectId(resumeTarget) : null
     const resumeProject = resumeProjectId ? projects.find(project => project.id === resumeProjectId) ?? null : null
-    const resumeCover = toProjectImageSrc(asOptionalString(resumeProject?.cover_path))
     const resumeEntry = resumeTarget?.type === 'entry' && continueKey
         ? entryByTargetKey.get(continueKey) ?? null
         : null
@@ -836,11 +826,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
                                         <Card
                                             className="project-home-resume-card"
-                                            imageSlot={resumeCover ? (
-                                                <ProjectCoverMedia src={resumeCover} alt={resumeProject?.name ?? resumeTarget.title} />
-                                            ) : (
+                                            image={toProjectImageSrc(asOptionalString(resumeProject?.cover_path))}
+                                            imageSlot={!asOptionalString(resumeProject?.cover_path) ? (
                                                 <div className="project-home-resume-placeholder" aria-hidden="true" />
-                                            )}
+                                            ) : undefined}
                                             imageHeight="var(--fc-home-resume-cover-height)"
                                             tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
                                             title={resumeTarget.title}
@@ -972,12 +961,11 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                             >
                                                 <Card
                                                     className="project-list-card"
-                                                    imageSlot={image ? (
-                                                        <ProjectCoverMedia src={image} alt={project.name} />
-                                                    ) : (
+                                                    image={image}
+                                                    imageSlot={!image ? (
                                                         <div className="project-list-placeholder">
                                                         </div>
-                                                    )}
+                                                    ) : undefined}
                                                     imageHeight="var(--fc-home-project-cover-height)"
                                                     title={project.name}
                                                     tag={(
