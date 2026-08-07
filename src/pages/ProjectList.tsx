@@ -1,14 +1,21 @@
-import {type CSSProperties, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState} from 'react'
-import {Button, Card, Input, RollingBox, useAlert, useContextMenu} from 'flowcloudai-ui'
+/**
+ * 桌面创作首页：汇总继续创作、灵感速记、世界项目与近期关注事项。
+ * 页面只编排既有领域能力，项目数据、灵感和 Dock 跳转分别由现有 store、API 与 DesktopApp 负责。
+ */
+import {type CSSProperties, type FormEvent, memo, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {Button, Card, Input, RollingBox, Select, useAlert, useContextMenu} from 'flowcloudai-ui'
 import {
+    db_create_idea_note,
     db_export_project_fcworld,
     db_get_entry,
     db_get_project,
+    db_get_project_stats,
     db_delete_project,
     db_update_project,
     formatApiError,
     type FcworldImportResult,
     type Project,
+    type ProjectStats,
     setting_get_settings,
     toApiError,
 } from '../api'
@@ -33,6 +40,7 @@ import {
     type HomeDashboardData,
     useHomeDashboard,
 } from '../features/home/homeActivity'
+import {refreshIdeas} from '../features/ideas/ideaStore'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
 import {
@@ -41,6 +49,11 @@ import {
     parseProjectDateMs,
     toProjectImageSrc,
 } from '../features/projects/projectDisplay'
+import {
+    buildProjectHomeAttentionItems,
+    formatProjectStatCount,
+    getProjectHomeNudge,
+} from './projectListHomeModel'
 import '../shared/ui/layout/WorkspaceScaffold.css'
 import './ProjectList.css'
 
@@ -51,12 +64,20 @@ interface ProjectListProps {
 
 type SortMode = 'updated-desc' | 'updated-asc' | 'name-asc' | 'name-desc'
 
-const SORT_OPTIONS: Array<{ key: Exclude<SortMode, 'name-asc' | 'name-desc'>; label: string }> = [
-    {key: 'updated-desc', label: '最近更新'},
-    {key: 'updated-asc', label: '最早更新'},
+const SORT_OPTIONS: Array<{value: SortMode; label: string}> = [
+    {value: 'updated-desc', label: '最近更新'},
+    {value: 'updated-asc', label: '最早更新'},
+    {value: 'name-asc', label: '标题 A-Z'},
+    {value: 'name-desc', label: '标题 Z-A'},
 ]
 const HOME_WELCOME_STORAGE_KEY = 'fc:onboarding:home-welcome:v1'
 const WELCOME_TOUR_START_DELAY_MS = 300
+const AI_ASSISTANT_TARGET: HomeActivityTarget = {
+    type: 'conversation',
+    id: 'ai-chat-panel',
+    title: 'AI 助手',
+    subtitle: '创作辅助',
+}
 
 function formatRelativeTime(value?: string | null): string {
     const timestamp = parseProjectDateMs(value)
@@ -100,16 +121,6 @@ function markHomeWelcomeSeen() {
     } catch {
         // 本地存储不可用时只影响欢迎弹窗是否重复出现。
     }
-}
-
-function ProjectStarTag() {
-    return (
-        <span className="project-list-star-tag" aria-label="已标星">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3.3 14.8 9l6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.9 9.2 9 12 3.3Z" />
-            </svg>
-        </span>
-    )
 }
 
 function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
@@ -159,6 +170,14 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [starredProjectIds, setStarredProjectIds] = useState<string[]>([])
     const [renameProject, setRenameProject] = useState<Project | null>(null)
     const [projectActionBusy, setProjectActionBusy] = useState(false)
+    const [ideaText, setIdeaText] = useState('')
+    const [ideaSaving, setIdeaSaving] = useState(false)
+    const [helpTipIndex, setHelpTipIndex] = useState(0)
+    const [dismissedAttentionKeys, setDismissedAttentionKeys] = useState<Set<string>>(() => new Set())
+    const [projectStatsById, setProjectStatsById] = useState<ReadonlyMap<string, ProjectStats | null>>(
+        () => new Map(),
+    )
+    const ideaComposingRef = useRef(false)
     const dashboard = useHomeDashboard()
     const [validEntryTargetKeys, setValidEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
@@ -193,15 +212,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
             {
                 id: 'home-actions',
                 target: '[data-tour-id="home-quick-actions"]',
-                title: '先选一个入口',
-                content: '重点功能会按当前状态给出入口。新用户先从“开始一个新世界”进入，其他能力可以以后再看。',
+                title: '先选一个起点',
+                content: '没有项目时可以使用基础模板、让 AI 帮你梳理骨架或导入世界包；已有项目时会优先展示继续创作。',
                 placement: 'bottom',
             },
             {
                 id: 'new-world-action',
                 target: '[data-tour-id="home-new-world-action"]',
-                title: '创建第一个世界观',
-                content: '这个入口会打开新建窗口。调试版点击下一步会自动打开窗口，方便继续看后面的步骤。',
+                title: '使用基础模板',
+                content: '这个入口会打开新建窗口，并默认生成常用分类和标签。点击下一步会自动打开窗口，方便继续查看。',
                 placement: 'bottom',
             },
             {
@@ -283,6 +302,24 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
     const projectIdSet = useMemo(() => new Set(projects.map(project => project.id)), [projects])
     const starredProjectIdSet = useMemo(() => new Set(starredProjectIds), [starredProjectIds])
+
+    useEffect(() => {
+        if (!hasLoadedProjects || projects.length === 0) return
+
+        let cancelled = false
+        void Promise.allSettled(projects.map(project => db_get_project_stats(project.id)))
+            .then(results => {
+                if (cancelled) return
+                setProjectStatsById(new Map(projects.map((project, index) => {
+                    const result = results[index]
+                    return [project.id, result?.status === 'fulfilled' ? result.value : null]
+                })))
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [hasLoadedProjects, projects])
 
     useEffect(() => {
         if (!hasLoadedProjects) return
@@ -378,15 +415,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
     }, [dashboard, hasLoadedProjects, projectIdSet])
 
-    const query = searchText.trim().toLowerCase()
-    const filteredProjects = projects
-        .filter(project => {
-            if (!query) return true
-            const name = project.name.toLowerCase()
-            const description = (project.description ?? '').toLowerCase()
-            return name.includes(query) || description.includes(query)
-        })
-        .sort((a, b) => {
+    const sortedProjects = useMemo(() => [...projects].sort((a, b) => {
             const starOrder = Number(starredProjectIdSet.has(b.id)) - Number(starredProjectIdSet.has(a.id))
             if (starOrder !== 0) return starOrder
 
@@ -405,7 +434,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 default:
                     return timeB - timeA || nameOrder
             }
-        })
+        }), [projects, sortMode, starredProjectIdSet])
+    const filteredProjects = useMemo(() => {
+        const query = searchText.trim().toLocaleLowerCase('zh-CN')
+        if (!query) return sortedProjects
+        return sortedProjects.filter(project => [project.name, project.description ?? '']
+            .join(' ')
+            .toLocaleLowerCase('zh-CN')
+            .includes(query))
+    }, [searchText, sortedProjects])
 
     const saveStarredProjectIds = useCallback(async (projectIds: string[]) => {
         const nextIds = normalizeStarredProjectIds(projectIds)
@@ -518,101 +555,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
     const projectCountLabel = hasLoadedProjects ? projects.length : '-'
     const filteredProjectCountLabel = hasLoadedProjects ? filteredProjects.length : '-'
-    const quickActions = useMemo<Array<{
-        key: string
-        title: string
-        description: string
-        tone: 'world' | 'idea' | 'ai' | 'snapshot'
-        icon: ReactNode
-        target?: HomeActivityTarget
-        onClick?: () => void
-    }>>(() => [
-        {
-            key: 'new-world',
-            title: '开始一个新世界',
-            description: '从项目名称、简介和封面开始，先搭好世界观的创作容器。',
-            tone: 'world',
-            icon: (
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
-                    <circle cx="11" cy="13" r="7.5" stroke="currentColor" strokeWidth="1.5"/>
-                    <path
-                        d="M3.5 13h15M11 5.5c1.8 2.1 2.8 4.6 2.8 7.5s-1 5.4-2.8 7.5M11 5.5c-1.8 2.1-2.8 4.6-2.8 7.5s1 5.4 2.8 7.5"
-                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                    <path d="M19 3.5v4M17 5.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-            ),
-            onClick: () => setCreatorOpen(true),
-        },
-        {
-            key: 'idea',
-            title: '记录灵感',
-            description: '把片段、角色点子和待整理设定先收进灵感箱，稍后归档。',
-            tone: 'idea',
-            icon: (
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
-                    <path
-                        d="M12 3C14 8 16 10 21 12C16 14 14 16 12 21C10 16 8 14 3 12C8 10 10 8 12 3Z"
-                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                </svg>
-            ),
-            target: {
-                type: 'idea',
-                id: 'idea-panel',
-                title: '灵感收件箱',
-                subtitle: '快速记录',
-            },
-        },
-        {
-            key: 'ai-chat',
-            title: '打开 AI 助手',
-            description: '让 AI 帮你拆解世界框架、扩写设定片段，或检查内容里的冲突。',
-            tone: 'ai',
-            icon: (
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
-                    <path
-                        d="M5 9.5A3.5 3.5 0 0 1 8.5 6h7A3.5 3.5 0 0 1 19 9.5v4A3.5 3.5 0 0 1 15.5 17H10l-4 3v-3.6A3.48 3.48 0 0 1 5 13.5v-4Z"
-                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                    <path d="M9 10h5M9 13h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    <path
-                        d="M17.5 4.5 18 6l1.5.5-1.5.5-.5 1.5-.5-1.5L15.5 6.5 17 6l.5-1.5Z"
-                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                </svg>
-            ),
-            target: {
-                type: 'conversation',
-                id: 'ai-chat-panel',
-                title: 'AI 助手',
-                subtitle: '创作辅助',
-            },
-        },
-        {
-            key: 'snapshot',
-            title: '查看快照',
-            description: '回看最近保存的版本，适合在大改设定前确认可回退节点。',
-            tone: 'snapshot',
-            icon: (
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
-                    <circle cx="8" cy="6" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                    <circle cx="8" cy="18" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                    <circle cx="16" cy="12" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                    <path
-                        d="M8 8v8m2-10h3.5A2.5 2.5 0 0 1 16 8.5v1.5M10 18h3.5A2.5 2.5 0 0 0 16 15.5V14"
-                        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                    />
-                </svg>
-            ),
-            target: {
-                type: 'snapshot',
-                id: 'snapshot-panel',
-                title: '快照',
-                subtitle: '版本记录',
-            },
-        },
-    ], [])
     const isVisibleHomeTarget = useCallback((target: HomeActivityTarget) => {
         const key = getHomeActivityTargetKey(target)
         if (invalidHomeTargetKeys.has(key)) return false
@@ -651,13 +593,42 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const continueTimestamp = isLastSessionContinue
         ? dashboard.lastSession?.savedAt
         : continueActivity?.lastOpenedAt
-    const recentItems = useMemo(() => {
-        return visibleRecentItems
-            .filter(item => !continueKey || getHomeActivityTargetKey(item) !== continueKey)
-            .slice(0, continueItem ? 4 : 5)
-    }, [continueItem, continueKey, visibleRecentItems])
-    const aiAssistantAction = quickActions.find(action => action.key === 'ai-chat')
-    const ideaAction = quickActions.find(action => action.key === 'idea')
+    const recentTargetByProjectId = useMemo(() => {
+        const targets = new Map<string, HomeActivityRecord>()
+        for (const item of visibleRecentItems) {
+            const projectId = getHomeTargetProjectId(item)
+            if (projectId && item.type !== 'project' && !targets.has(projectId)) targets.set(projectId, item)
+        }
+        return targets
+    }, [visibleRecentItems])
+    const fallbackProject = sortedProjects[0] ?? null
+    const resumeTarget = continueItem ?? (fallbackProject ? {
+        type: 'project' as const,
+        id: fallbackProject.id,
+        projectId: fallbackProject.id,
+        title: fallbackProject.name,
+        description: fallbackProject.description,
+        updatedAt: asOptionalString(fallbackProject.updated_at),
+    } : null)
+    const resumeProjectId = resumeTarget ? getHomeTargetProjectId(resumeTarget) : null
+    const resumeProject = resumeProjectId ? projects.find(project => project.id === resumeProjectId) ?? null : null
+    const resumeTimestamp = continueTimestamp
+        ?? resumeTarget?.updatedAt
+        ?? asOptionalString(resumeProject?.updated_at)
+        ?? asOptionalString(resumeProject?.created_at)
+    const projectStatsLoading = hasLoadedProjects
+        && projects.length > 0
+        && projects.some(project => !projectStatsById.has(project.id))
+    const attentionItems = useMemo(
+        () => buildProjectHomeAttentionItems(sortedProjects, projectStatsById),
+        [projectStatsById, sortedProjects],
+    )
+    const visibleAttentionItems = attentionItems
+        .filter(item => !dismissedAttentionKeys.has(item.key))
+        .slice(0, 3)
+    const activeHelpLink = dashboard.helpLinks.length > 0
+        ? dashboard.helpLinks[helpTipIndex % dashboard.helpLinks.length]
+        : null
 
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
         const projectId = getHomeTargetProjectId(target)
@@ -680,6 +651,39 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
         void onOpenHomeTarget?.(target)
     }, [hasLoadedProjects, onOpenHomeTarget, onOpenProject, projectIdSet, projects, showAlert])
+
+    const openProjectCheck = useCallback((project: Project) => {
+        openDashboardTarget({
+            type: 'tool',
+            id: `contradiction:${project.id}`,
+            projectId: project.id,
+            panel: 'contradiction',
+            title: '设定检测',
+            subtitle: project.name,
+        })
+    }, [openDashboardTarget])
+
+    const handleIdeaSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        if (ideaComposingRef.current || ideaSaving) return
+        const content = ideaText.trim()
+        if (!content) {
+            await showAlert('先写下一条灵感。好点子不必完整。', 'info', 'nonInvasive', 2200)
+            return
+        }
+
+        setIdeaSaving(true)
+        try {
+            await db_create_idea_note({content})
+            await refreshIdeas()
+            setIdeaText('')
+            await showAlert('灵感已存入收件箱', 'success', 'nonInvasive', 1800)
+        } catch (error) {
+            await showAlert(`保存灵感失败：${String(error)}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setIdeaSaving(false)
+        }
+    }, [ideaSaving, ideaText, showAlert])
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
         await invalidateProjectList()
@@ -726,19 +730,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         if (confirmed !== 'yes') return
         await importConflictOverwrite()
     }, [importConflict, importConflictOverwrite, importing, showAlert])
-
-    const renderRecentItem = (item: HomeActivityRecord) => (
-        <button
-            key={item.key}
-            type="button"
-            className="project-home-recent-item"
-            onClick={() => openDashboardTarget(item)}
-        >
-            <span className="project-home-recent-item__type">{getTargetTypeLabel(item.type)}</span>
-            <span className="project-home-recent-item__title">{item.title}</span>
-            <span className="project-home-recent-item__time">{formatRelativeTime(item.lastOpenedAt)}</span>
-        </button>
-    )
 
     return (
         <>
@@ -794,157 +785,149 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 onConfirm={name => void handleRenameProject(name)}
             />
             <FcworldProgressDialog progress={exportProgress ?? fcworldProgress} />
-            <RollingBox axis="y" style={{padding: '0.35rem'} as CSSProperties} thumbSize="thin">
-                <div className="project-list-page fc-page-shell">
-                    <section className="project-home-hero" data-tour-id="home-overview">
-                        <div className="project-home-hero__main">
-                            <div className="project-list-title-block fc-page-title-block">
-                                <h1 className="project-list-title fc-page-title">创作首页</h1>
-                                <p className="project-list-subtitle fc-page-subtitle">
-                                    从世界项目开始组织创作：继续上次进度、记录突然出现的灵感，或让 AI 先帮你搭出设定骨架。
-                                </p>
+            <RollingBox axis="y" style={{padding: 'var(--fc-space-xs)'} as CSSProperties} thumbSize="thin">
+                <div className="project-list-page fc-page-shell" onContextMenu={handlePageContextMenu}>
+                    {hasLoadedProjects && projects.length === 0 && !loading && !error ? (
+                        <section className="project-home-empty" data-tour-id="home-overview">
+                            <div className="project-home-empty__intro">
+                                <span className="project-home-empty__symbol" aria-hidden="true">✦</span>
+                                <span className="project-home-eyebrow">第一次创作</span>
+                                <h1>开始你的第一个世界</h1>
+                                <p>先选一种起点。名称、结构和内容之后都能修改，不需要现在做完所有决定。</p>
                             </div>
-                            <div className="project-home-hero__actions">
-                                <Button
-                                    type="button"
-                                    size="lg"
-                                    onClick={() => {
-                                        if (continueItem) {
-                                            openDashboardTarget(continueItem)
-                                            return
-                                        }
-                                        setCreatorOpen(true)
-                                    }}
-                                >
-                                    {continueItem ? `继续创作：${continueItem.title}` : '创建你的第一个世界'}
-                                </Button>
-                                {aiAssistantAction?.target && (
-                                    <Button
-                                        type="button"
-                                        size="lg"
-                                        variant="outline"
-                                        onClick={() => openDashboardTarget(aiAssistantAction.target!)}
-                                    >
-                                        打开 AI 助手
+                            <div className="project-home-start-grid" data-tour-id="home-quick-actions">
+                                <Card
+                                    className="project-home-start-card"
+                                    title="使用基础模板"
+                                    description="带人物、地点与事件分类，适合直接开始"
+                                    extraInfo="▦"
+                                    actions={(
+                                        <Button type="button" data-tour-id="home-new-world-action" onClick={() => setCreatorOpen(true)}>
+                                            创建世界
+                                        </Button>
+                                    )}
+                                    variant="bordered"
+                                />
+                                <Card
+                                    className="project-home-start-card"
+                                    title="让 AI 搭骨架"
+                                    description="通过对话整理主题、冲突与核心设定"
+                                    extraInfo="✦"
+                                    actions={(
+                                        <Button type="button" variant="outline" onClick={() => openDashboardTarget(AI_ASSISTANT_TARGET)}>
+                                            打开 AI 助手
+                                        </Button>
+                                    )}
+                                    variant="bordered"
+                                />
+                                <Card
+                                    className="project-home-start-card"
+                                    title="导入世界包"
+                                    description="从已有的 FlowCloudAI 世界包继续创作"
+                                    extraInfo="⇧"
+                                    actions={(
+                                        <Button type="button" variant="outline" disabled={importing} onClick={() => void handleImportProject()}>
+                                            {importing ? '导入中…' : '选择世界包'}
+                                        </Button>
+                                    )}
+                                    variant="bordered"
+                                />
+                            </div>
+                            {activeHelpLink && (
+                                <div className="project-home-empty__help">
+                                    第一次使用？
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => openDashboardTarget(activeHelpLink.target)}>
+                                        查看快速开始
                                     </Button>
-                                )}
-                                {ideaAction?.target && (
-                                    <Button
-                                        type="button"
-                                        size="lg"
-                                        variant="ghost"
-                                        onClick={() => openDashboardTarget(ideaAction.target!)}
-                                    >
-                                        记录灵感
-                                    </Button>
-                                )}
-                            </div>
-                            <div className="project-home-path-hint" aria-label="推荐创作流程">
-                                <span className="project-home-path-hint__label">建议路径</span>
-                                {hasLoadedProjects && projects.length === 0 ? (
-                                    <ol className="project-home-path-list">
-                                        <li>创建世界</li>
-                                        <li>写第一条词条</li>
-                                        <li>让 AI 梳理设定</li>
-                                    </ol>
-                                ) : (
-                                    <p>继续当前项目后，可以从词条、地图、时间线或 AI 讨论接着推进。</p>
-                                )}
-                            </div>
-                        </div>
-                    </section>
-
-                    <section className="project-home-panel project-home-panel--quick" data-tour-id="home-quick-actions">
-                        <div className="project-home-panel__heading">
-                            <h2>重点功能</h2>
-                            <p>根据你现在的状态选择入口：新项目先建世界，零散想法先记灵感，已有材料可以直接交给 AI 梳理。</p>
-                        </div>
-                        <div className="project-home-action-list">
-                            {quickActions.map(action => (
-                                <button
-                                    key={action.key}
-                                    type="button"
-                                    className={`project-home-action-item project-home-action-item--${action.tone}`}
-                                    data-tour-id={action.key === 'new-world' ? 'home-new-world-action' : undefined}
-                                    onClick={() => {
-                                        if (action.onClick) {
-                                            action.onClick()
-                                            return
-                                        }
-                                        if (action.target) {
-                                            openDashboardTarget(action.target)
-                                        }
-                                    }}
-                                >
-                                    <span className="project-home-action-item__icon" aria-hidden="true">
-                                        {action.icon}
-                                    </span>
-                                    <span className="project-home-action-item__title">{action.title}</span>
-                                    <small className="project-home-action-item__desc">{action.description}</small>
-                                </button>
-                            ))}
-                        </div>
-                    </section>
-
-                    <div className="project-home-side">
-                            <section className="project-home-panel">
-                                <h2>最近内容</h2>
-                                {continueItem || recentItems.length > 0 ? (
-                                    <div className="project-home-recent-list">
-                                        {continueItem && (
-                                            <button
-                                                type="button"
-                                                className="project-home-recent-item project-home-recent-item--continue"
-                                                onClick={() => openDashboardTarget(continueItem)}
-                                            >
-                                                <span className="project-home-recent-item__continue-label">
-                                                    {isLastSessionContinue ? '上次停在这里' : '最近打开'}
-                                                </span>
-                                                <span className="project-home-recent-item__time">
-                                                    {formatRelativeTime(continueTimestamp)}
-                                                </span>
-                                                <span className="project-home-recent-item__type">
-                                                    {getTargetTypeLabel(continueItem.type)}
-                                                </span>
-                                                <span className="project-home-recent-item__title">{continueItem.title}</span>
-                                            </button>
-                                        )}
-                                        {recentItems.map(renderRecentItem)}
-                                    </div>
-                                ) : (
-                                    <p className="project-home-muted">打开项目或词条后，会在这里保留回到现场的入口。</p>
-                                )}
-                            </section>
-                            <section className="project-home-panel">
-                                <h2>帮助</h2>
-                                <div className="project-home-help-list">
-                                    {dashboard.helpLinks.map(link => (
-                                        <button
-                                            key={link.key}
-                                            type="button"
-                                            className="project-home-help-item"
-                                            onClick={() => openDashboardTarget(link.target)}
-                                        >
-                                            <span>{link.title}</span>
-                                            <small>{link.description}</small>
-                                        </button>
-                                    ))}
                                 </div>
+                            )}
+                        </section>
+                    ) : (
+                        <>
+                            <section className="project-home-resume" data-tour-id="home-overview">
+                                <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
+                                <Card
+                                    className="project-home-resume-card"
+                                    image={toProjectImageSrc(asOptionalString(resumeProject?.cover_path))}
+                                    imageSlot={!asOptionalString(resumeProject?.cover_path) ? (
+                                        <div className="project-home-resume-placeholder" aria-hidden="true" />
+                                    ) : undefined}
+                                    imageHeight="var(--fc-home-resume-cover-height)"
+                                    tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
+                                    title={resumeTarget?.title ?? (loading ? '正在整理你的创作现场' : '从一个世界开始')}
+                                    description={resumeTarget?.description
+                                        ?? resumeProject?.description
+                                        ?? '打开一个世界后，这里会保留回到最近创作现场的入口。'}
+                                    extraInfo={resumeTarget ? (
+                                        <div className="project-home-resume-meta">
+                                            <span>{getTargetTypeLabel(resumeTarget.type)}</span>
+                                            <span>{formatRelativeTime(resumeTimestamp)}</span>
+                                        </div>
+                                    ) : undefined}
+                                    actions={(
+                                        <div className="project-home-resume-actions">
+                                            <Button
+                                                type="button"
+                                                size="lg"
+                                                onClick={() => resumeTarget ? openDashboardTarget(resumeTarget) : setCreatorOpen(true)}
+                                            >
+                                                {resumeTarget ? '继续创作' : '创建一个世界'}
+                                            </Button>
+                                            <Button type="button" size="lg" variant="outline" onClick={() => openDashboardTarget(AI_ASSISTANT_TARGET)}>
+                                                和 AI 讨论
+                                            </Button>
+                                        </div>
+                                    )}
+                                    variant="shadow"
+                                />
+                                <form className="project-home-idea-form" data-tour-id="home-quick-actions" onSubmit={event => void handleIdeaSubmit(event)}>
+                                    <span className="project-home-idea-form__icon" aria-hidden="true">✦</span>
+                                    <Input
+                                        className="project-home-idea-input"
+                                        value={ideaText}
+                                        placeholder="突然想到什么？按 Enter 存进灵感"
+                                        aria-label="快速记录灵感"
+                                        disabled={ideaSaving}
+                                        onValueChange={setIdeaText}
+                                        onCompositionStart={() => {
+                                            ideaComposingRef.current = true
+                                        }}
+                                        onCompositionEnd={() => {
+                                            ideaComposingRef.current = false
+                                        }}
+                                    />
+                                    <Button type="submit" variant="ghost" disabled={ideaSaving}>
+                                        {ideaSaving ? '保存中…' : '存入灵感'}
+                                    </Button>
+                                </form>
                             </section>
-                    </div>
 
-                    <section className="project-home-workbench" onContextMenu={handlePageContextMenu}>
-                        <div className="project-list-header fc-page-header">
-                            <div className="project-list-title-block fc-page-title-block">
+                    <section className="project-home-workbench">
+                        <div className="project-list-header">
+                            <div className="project-list-title-block">
                                 <h2 className="project-list-section-title">我的世界</h2>
-                                <p className="project-list-subtitle fc-page-subtitle">
-                                    你正在构建 {projectCountLabel} 个世界。
+                                <p className="project-list-subtitle">
+                                    {projectCountLabel} 个世界 · 当前显示 {filteredProjectCountLabel} 个
                                 </p>
                             </div>
-                            <div className="project-list-header-actions fc-page-header-actions">
-                                <Button type="button" size="sm" onClick={() => setCreatorOpen(true)}>
-                                    开始一个新世界
-                                </Button>
+                            <div className="project-list-header-actions">
+                                <Input
+                                    className="project-list-search"
+                                    placeholder="搜索世界"
+                                    value={searchText}
+                                    aria-label="搜索世界"
+                                    onValueChange={setSearchText}
+                                />
+                                <Select
+                                    className="project-list-sort"
+                                    options={SORT_OPTIONS}
+                                    value={sortMode}
+                                    aria-label="世界排序"
+                                    onValueChange={value => {
+                                        const nextValue = Array.isArray(value) ? value[0] : value
+                                        setSortMode(nextValue as SortMode)
+                                    }}
+                                />
                                 <Button
                                     type="button"
                                     size="sm"
@@ -952,12 +935,15 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     disabled={importing}
                                     onClick={() => void handleImportProject()}
                                 >
-                                    {importing ? '导入中…' : '导入世界'}
+                                    {importing ? '导入中…' : '导入'}
+                                </Button>
+                                <Button type="button" size="sm" data-tour-id="home-new-world-action" onClick={() => setCreatorOpen(true)}>
+                                    新建世界
                                 </Button>
                                 <Button
                                     type="button"
                                     className="project-list-refresh"
-                                    variant="outline"
+                                    variant="ghost"
                                     size="sm"
                                     disabled={loading}
                                     onClick={() => void refreshProjects()}
@@ -967,55 +953,13 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                             </div>
                         </div>
 
-                        <div className="project-list-toolbar">
-                            <Input
-                                className="project-list-search"
-                                placeholder="搜索项目名称或描述…"
-                                value={searchText}
-                                onValueChange={setSearchText}
-                            />
-                            <div className="project-list-sort-tabs">
-                                {SORT_OPTIONS.map(option => (
-                                    <button
-                                        key={option.key}
-                                        className={`project-list-sort-tab${sortMode === option.key ? ' active' : ''}`}
-                                        onClick={() => setSortMode(option.key)}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                                <button
-                                    className={`project-list-sort-tab${sortMode === 'name-asc' || sortMode === 'name-desc' ? ' active' : ''}`}
-                                    onClick={() => setSortMode(current => current === 'name-asc' ? 'name-desc' : 'name-asc')}
-                                >
-                                    {sortMode === 'name-desc' ? '标题 Z-A' : '标题 A-Z'}
-                                </button>
-                            </div>
-                        </div>
-
                         {error && (
                             <div className="project-list-feedback fc-status-banner fc-status-banner--error error">
                                 项目列表加载失败：{error}
                             </div>
                         )}
 
-                        {!error && (
-                            <div className="project-list-feedback fc-status-banner">
-                                共 {projectCountLabel} 个项目，当前显示 {filteredProjectCountLabel} 个。
-                            </div>
-                        )}
-
-                        {hasLoadedProjects && projects.length === 0 && !loading ? (
-                            <section className="project-list-empty-state">
-                                <div className="project-list-empty-panel fc-empty-state-card">
-                                    <h2 className="project-list-empty-title fc-empty-state-title">给灵感一个安放之处</h2>
-                                    <p className="project-list-empty-copy fc-empty-state-copy">
-                                        从一名角色、一个物品、一处地点开始，构建属于你的世界
-                                    </p>
-                                    <Button type="button" size="lg" onClick={() => setCreatorOpen(true)}>创建你的第一个世界</Button>
-                                </div>
-                            </section>
-                        ) : hasLoadedProjects || loading || error ? (
+                        {hasLoadedProjects || loading || error ? (
                             <div className="project-list-grid">
                                 {filteredProjects.length === 0 && !loading ? (
                                     <div className="project-list-feedback fc-status-banner">
@@ -1029,12 +973,13 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         const image = toProjectImageSrc(coverPath)
                                         const timestampLabel = formatProjectDate(updatedAt ?? createdAt)
                                         const isStarred = starredProjectIdSet.has(project.id)
+                                        const stats = projectStatsById.get(project.id)
+                                        const nudge = getProjectHomeNudge(stats)
+                                        const recentTarget = recentTargetByProjectId.get(project.id)
 
                                         return (
                                             <div
                                                 key={project.id}
-                                                style={{cursor: onOpenProject ? 'pointer' : undefined}}
-                                                onClick={() => onOpenProject?.(project)}
                                                 onContextMenu={event => handleProjectContextMenu(event, project)}
                                             >
                                                 <Card
@@ -1044,36 +989,142 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                         <div className="project-list-placeholder">
                                                         </div>
                                                     ) : undefined}
+                                                    imageHeight="var(--fc-home-project-cover-height)"
                                                     title={project.name}
-                                                    tag={isStarred ? <ProjectStarTag /> : undefined}
-                                                    description={project.description || '你的世界在等你回来，继续把新的角色、地点和事件写进去。'}
+                                                    tag={(
+                                                        <Button
+                                                            type="button"
+                                                            className="project-list-star-button"
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            aria-label={isStarred ? `取消标星${project.name}` : `标星${project.name}`}
+                                                            aria-pressed={isStarred}
+                                                            onClick={() => void toggleProjectStar(project)}
+                                                        >
+                                                            {isStarred ? '★' : '☆'}
+                                                        </Button>
+                                                    )}
+                                                    description={(
+                                                        <div className="project-list-card__description">
+                                                            <p>{project.description || '你的世界在等你回来，继续写下新的角色、地点和事件。'}</p>
+                                                            {recentTarget && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="project-list-recent-link"
+                                                                    onClick={() => openDashboardTarget(recentTarget)}
+                                                                >
+                                                                    <span>最近：{recentTarget.title}</span>
+                                                                    <span aria-hidden="true">→</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     extraInfo={(
                                                         <div className="project-list-meta">
-                                                            <span>最近更新 {timestampLabel}</span>
+                                                            <div className="project-list-stats">
+                                                                {stats ? (
+                                                                    <>
+                                                                        <span>{formatProjectStatCount(stats.entryCount)} 个词条</span>
+                                                                        <span>{formatProjectStatCount(stats.wordCount)} 字</span>
+                                                                    </>
+                                                                ) : (
+                                                                    <span>{projectStatsById.has(project.id) ? '统计暂不可用' : '正在读取统计…'}</span>
+                                                                )}
+                                                                <span>{timestampLabel}</span>
+                                                            </div>
+                                                            {nudge && <p className="project-list-nudge">{nudge.label}</p>}
+                                                        </div>
+                                                    )}
+                                                    actions={(
+                                                        <div className="project-list-card__actions">
+                                                            <Button type="button" size="sm" onClick={() => onOpenProject?.(project)}>
+                                                                打开世界
+                                                            </Button>
+                                                            <Button type="button" size="sm" variant="ghost" onClick={() => openProjectCheck(project)}>
+                                                                设定检测
+                                                            </Button>
                                                         </div>
                                                     )}
                                                     variant="shadow"
                                                     hoverable
-                                                    expandContentOnHover
-                                                    imageHeight="100%"
-                                                    contentAreaRatio={0.2}
-                                                    hoverContentAreaRatio={0.8}
                                                 />
                                             </div>
                                         )
                                     })
                                 )}
-                                <button
-                                    type="button"
+                                <Card
                                     className="project-list-create-card"
-                                    onClick={() => setCreatorOpen(true)}
-                                >
-                                    <span className="project-list-create-card__plus">+</span>
-                                    <span className="project-list-create-card__label">新建世界观</span>
-                                </button>
+                                    title="创建一个新世界"
+                                    description="从基础结构开始，稍后再补细节"
+                                    extraInfo={<span className="project-list-create-card__plus" aria-hidden="true">＋</span>}
+                                    actions={<Button type="button" variant="ghost" onClick={() => setCreatorOpen(true)}>新建世界</Button>}
+                                    variant="outline"
+                                />
                             </div>
                         ) : null}
                     </section>
+                    <section className="project-home-attention" aria-labelledby="project-home-attention-title">
+                        <div className="project-home-section-heading">
+                            <div>
+                                <h2 id="project-home-attention-title">需要关注</h2>
+                                <p>来自世界内容统计，不阻断创作</p>
+                            </div>
+                        </div>
+                        <div className="project-home-attention-list">
+                            {projectStatsLoading ? (
+                                <p className="project-home-attention-status">正在汇总项目状态…</p>
+                            ) : projectStatsById.size > 0 && [...projectStatsById.values()].every(stats => stats === null) ? (
+                                <p className="project-home-attention-status">项目统计暂不可用，不影响继续创作。</p>
+                            ) : visibleAttentionItems.length > 0 ? visibleAttentionItems.map(item => (
+                                <article key={item.key} className="project-home-attention-row">
+                                    <span className="project-home-attention-dot" aria-hidden="true" />
+                                    <div className="project-home-attention-copy">
+                                        <strong>{item.title}</strong>
+                                        <span>{item.description}</span>
+                                    </div>
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => openProjectCheck(item.project)}>
+                                        处理
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`忽略提醒：${item.title}`}
+                                        onClick={() => setDismissedAttentionKeys(current => new Set(current).add(item.key))}
+                                    >
+                                        忽略
+                                    </Button>
+                                </article>
+                            )) : (
+                                <p className="project-home-attention-status project-home-attention-status--success">
+                                    近期没有需要关注的事项，可以专心创作。
+                                </p>
+                            )}
+                        </div>
+                    </section>
+
+                    {activeHelpLink && (
+                        <section className="project-home-help-strip" aria-label="帮助与技巧">
+                            <span className="project-home-help-strip__icon" aria-hidden="true">?</span>
+                            <div className="project-home-help-strip__content">
+                                <p>技巧：{activeHelpLink.description}</p>
+                                <div className="project-home-help-links">
+                                    {dashboard.helpLinks.map(link => (
+                                        <Button key={link.key} type="button" size="sm" variant="ghost" onClick={() => openDashboardTarget(link.target)}>
+                                            {link.title}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                            {dashboard.helpLinks.length > 1 && (
+                                <Button type="button" size="sm" variant="ghost" onClick={() => setHelpTipIndex(index => index + 1)}>
+                                    换一条
+                                </Button>
+                            )}
+                        </section>
+                    )}
+                        </>
+                    )}
                 </div>
             </RollingBox>
         </>
