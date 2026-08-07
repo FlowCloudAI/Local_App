@@ -13,6 +13,7 @@ import {
     db_delete_project,
     db_update_project,
     formatApiError,
+    type Entry,
     type FcworldImportResult,
     type Project,
     type ProjectStats,
@@ -41,6 +42,7 @@ import {
     useHomeDashboard,
 } from '../features/home/homeActivity'
 import {refreshIdeas} from '../features/ideas/ideaStore'
+import {stripMarkdown} from '../features/entries/lib/entryMarkdown'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
 import {HOME_ONBOARDING_TOUR_ID, type TourDefinition, type TourStepLeaveContext, useTour} from '../features/onboarding'
 import {
@@ -50,7 +52,6 @@ import {
     toProjectImageSrc,
 } from '../features/projects/projectDisplay'
 import {
-    buildProjectHomeAttentionItems,
     formatProjectStatCount,
     getProjectHomeNudge,
 } from './projectListHomeModel'
@@ -123,25 +124,6 @@ function markHomeWelcomeSeen() {
     }
 }
 
-function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
-    switch (type) {
-        case 'project':
-            return '世界'
-        case 'entry':
-            return '词条'
-        case 'tool':
-            return '工具'
-        case 'idea':
-            return '灵感'
-        case 'conversation':
-            return '对话'
-        case 'snapshot':
-            return '快照'
-        case 'help':
-            return '帮助'
-    }
-}
-
 function collectDashboardTargets(dashboard: HomeDashboardData) {
     const targets: HomeActivityTarget[] = [
         ...dashboard.recentItems,
@@ -173,13 +155,12 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const [ideaText, setIdeaText] = useState('')
     const [ideaSaving, setIdeaSaving] = useState(false)
     const [helpTipIndex, setHelpTipIndex] = useState(0)
-    const [dismissedAttentionKeys, setDismissedAttentionKeys] = useState<Set<string>>(() => new Set())
     const [projectStatsById, setProjectStatsById] = useState<ReadonlyMap<string, ProjectStats | null>>(
         () => new Map(),
     )
     const ideaComposingRef = useRef(false)
     const dashboard = useHomeDashboard()
-    const [validEntryTargetKeys, setValidEntryTargetKeys] = useState<Set<string>>(() => new Set())
+    const [entryByTargetKey, setEntryByTargetKey] = useState<ReadonlyMap<string, Entry>>(() => new Map())
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
     const [pendingEntryTargetKeys, setPendingEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const {
@@ -187,7 +168,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         loading,
         error,
         hasLoaded: hasLoadedProjects,
-        refresh: refreshProjects,
     } = useProjectListStore()
     const openCreatorForTour = useCallback(() => {
         setCreatorOpen(true)
@@ -372,6 +352,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         let cancelled = false
         void (async () => {
             const validKeys = new Set<string>()
+            const validEntries = new Map<string, Entry>()
             const invalidEntryKeys = new Set<string>()
 
             await Promise.all(entryTargets.map(async item => {
@@ -383,6 +364,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                         return
                     }
                     validKeys.add(item.key)
+                    validEntries.set(item.key, entry)
                 } catch {
                     invalidEntryKeys.add(item.key)
                     removeHomeEntryActivity(item.projectId, item.entryId)
@@ -396,10 +378,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                 for (const key of validationKeys) next.delete(key)
                 return next
             })
-            setValidEntryTargetKeys(prev => {
-                const next = new Set(prev)
+            setEntryByTargetKey(prev => {
+                const next = new Map(prev)
                 for (const key of invalidEntryKeys) next.delete(key)
-                for (const key of validKeys) next.add(key)
+                for (const [key, entry] of validEntries) next.set(key, entry)
                 return next
             })
             setInvalidHomeTargetKeys(prev => {
@@ -566,19 +548,23 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
 
         if (target.type === 'entry' && hasLoadedProjects) {
             if (pendingEntryTargetKeys.has(key)) return false
-            return validEntryTargetKeys.has(key)
+            return entryByTargetKey.has(key)
         }
 
         return true
-    }, [hasLoadedProjects, invalidHomeTargetKeys, pendingEntryTargetKeys, projectIdSet, validEntryTargetKeys])
+    }, [entryByTargetKey, hasLoadedProjects, invalidHomeTargetKeys, pendingEntryTargetKeys, projectIdSet])
     const visibleRecentItems = useMemo(() => (
         dashboard.recentItems.filter(item => isVisibleHomeTarget(item))
     ), [dashboard.recentItems, isVisibleHomeTarget])
     const continueItem = useMemo(() => {
-        if (dashboard.continueItem && isVisibleHomeTarget(dashboard.continueItem)) {
+        if (
+            dashboard.continueItem
+            && (dashboard.continueItem.type === 'entry' || dashboard.continueItem.type === 'tool')
+            && isVisibleHomeTarget(dashboard.continueItem)
+        ) {
             return dashboard.continueItem
         }
-        return visibleRecentItems[0] ?? null
+        return visibleRecentItems.find(item => item.type === 'entry' || item.type === 'tool') ?? null
     }, [dashboard.continueItem, isVisibleHomeTarget, visibleRecentItems])
     const continueKey = continueItem ? getHomeActivityTargetKey(continueItem) : null
     const continueActivity = continueKey
@@ -601,31 +587,22 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
         return targets
     }, [visibleRecentItems])
-    const fallbackProject = sortedProjects[0] ?? null
-    const resumeTarget = continueItem ?? (fallbackProject ? {
-        type: 'project' as const,
-        id: fallbackProject.id,
-        projectId: fallbackProject.id,
-        title: fallbackProject.name,
-        description: fallbackProject.description,
-        updatedAt: asOptionalString(fallbackProject.updated_at),
-    } : null)
+    const resumeTarget = continueItem
     const resumeProjectId = resumeTarget ? getHomeTargetProjectId(resumeTarget) : null
     const resumeProject = resumeProjectId ? projects.find(project => project.id === resumeProjectId) ?? null : null
+    const resumeEntry = resumeTarget?.type === 'entry' && continueKey
+        ? entryByTargetKey.get(continueKey) ?? null
+        : null
+    const resumeEntryText = stripMarkdown(resumeEntry?.content || resumeEntry?.summary || '')
+    const resumeExcerpt = resumeEntryText.length > 70 ? `${resumeEntryText.slice(0, 70)}…` : resumeEntryText
+    const resumeDescription = resumeTarget?.type === 'entry'
+        ? (resumeExcerpt ? `上次写到「${resumeExcerpt}」` : undefined)
+        : resumeTarget?.description || undefined
+    const resumeWordCount = resumeEntry ? Array.from(resumeEntry.content ?? '').length : null
     const resumeTimestamp = continueTimestamp
         ?? resumeTarget?.updatedAt
         ?? asOptionalString(resumeProject?.updated_at)
         ?? asOptionalString(resumeProject?.created_at)
-    const projectStatsLoading = hasLoadedProjects
-        && projects.length > 0
-        && projects.some(project => !projectStatsById.has(project.id))
-    const attentionItems = useMemo(
-        () => buildProjectHomeAttentionItems(sortedProjects, projectStatsById),
-        [projectStatsById, sortedProjects],
-    )
-    const visibleAttentionItems = attentionItems
-        .filter(item => !dismissedAttentionKeys.has(item.key))
-        .slice(0, 3)
     const activeHelpLink = dashboard.helpLinks.length > 0
         ? dashboard.helpLinks[helpTipIndex % dashboard.helpLinks.length]
         : null
@@ -714,11 +691,10 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
         }
 
         showContextMenu(event, [
-            {label: '刷新', disabled: loading, onClick: () => void refreshProjects()},
             {label: '新建世界', onClick: () => setCreatorOpen(true)},
             {label: '导入世界', disabled: importing, onClick: () => void handleImportProject()},
         ])
-    }, [handleImportProject, importing, loading, refreshProjects, showContextMenu])
+    }, [handleImportProject, importing, showContextMenu])
 
     const handleImportConflictOverwrite = useCallback(async () => {
         if (!importConflict?.duplicateProject || importing) return
@@ -845,41 +821,51 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                     ) : (
                         <>
                             <section className="project-home-resume" data-tour-id="home-overview">
-                                <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
-                                <Card
-                                    className="project-home-resume-card"
-                                    image={toProjectImageSrc(asOptionalString(resumeProject?.cover_path))}
-                                    imageSlot={!asOptionalString(resumeProject?.cover_path) ? (
-                                        <div className="project-home-resume-placeholder" aria-hidden="true" />
-                                    ) : undefined}
-                                    imageHeight="var(--fc-home-resume-cover-height)"
-                                    tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
-                                    title={resumeTarget?.title ?? (loading ? '正在整理你的创作现场' : '从一个世界开始')}
-                                    description={resumeTarget?.description
-                                        ?? resumeProject?.description
-                                        ?? '打开一个世界后，这里会保留回到最近创作现场的入口。'}
-                                    extraInfo={resumeTarget ? (
-                                        <div className="project-home-resume-meta">
-                                            <span>{getTargetTypeLabel(resumeTarget.type)}</span>
-                                            <span>{formatRelativeTime(resumeTimestamp)}</span>
-                                        </div>
-                                    ) : undefined}
-                                    actions={(
-                                        <div className="project-home-resume-actions">
-                                            <Button
-                                                type="button"
-                                                size="lg"
-                                                onClick={() => resumeTarget ? openDashboardTarget(resumeTarget) : setCreatorOpen(true)}
-                                            >
-                                                {resumeTarget ? '继续创作' : '创建一个世界'}
-                                            </Button>
-                                            <Button type="button" size="lg" variant="outline" onClick={() => openDashboardTarget(AI_ASSISTANT_TARGET)}>
-                                                和 AI 讨论
-                                            </Button>
-                                        </div>
-                                    )}
-                                    variant="shadow"
-                                />
+                                {resumeTarget && (
+                                    <>
+                                        <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
+                                        <Card
+                                            className="project-home-resume-card"
+                                            image={toProjectImageSrc(asOptionalString(resumeProject?.cover_path))}
+                                            imageSlot={!asOptionalString(resumeProject?.cover_path) ? (
+                                                <div className="project-home-resume-placeholder" aria-hidden="true" />
+                                            ) : undefined}
+                                            imageHeight="var(--fc-home-resume-cover-height)"
+                                            tag={resumeProject?.name ? <span className="project-home-resume-project">{resumeProject.name}</span> : undefined}
+                                            title={resumeTarget.title}
+                                            description={resumeDescription}
+                                            extraInfo={(
+                                                <div className="project-home-resume-meta">
+                                                    <span>{formatRelativeTime(resumeTimestamp)}</span>
+                                                    {resumeWordCount !== null && <span>本篇 {formatProjectStatCount(resumeWordCount)} 字</span>}
+                                                </div>
+                                            )}
+                                            actions={(
+                                                <div className="project-home-resume-actions">
+                                                    <Button type="button" size="lg" onClick={() => openDashboardTarget(resumeTarget)}>
+                                                        {resumeTarget.type === 'entry' ? '继续写作' : '继续使用'}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => {
+                                                            if (resumeProject) onOpenProject?.(resumeProject)
+                                                            openDashboardTarget({
+                                                                ...AI_ASSISTANT_TARGET,
+                                                                projectId: resumeProject?.id,
+                                                                subtitle: resumeProject?.name,
+                                                            })
+                                                        }}
+                                                    >
+                                                        和 AI 讨论这个世界
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            variant="shadow"
+                                        />
+                                    </>
+                                )}
                                 <form className="project-home-idea-form" data-tour-id="home-quick-actions" onSubmit={event => void handleIdeaSubmit(event)}>
                                     <span className="project-home-idea-form__icon" aria-hidden="true">✦</span>
                                     <Input
@@ -940,16 +926,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                 <Button type="button" size="sm" data-tour-id="home-new-world-action" onClick={() => setCreatorOpen(true)}>
                                     新建世界
                                 </Button>
-                                <Button
-                                    type="button"
-                                    className="project-list-refresh"
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={loading}
-                                    onClick={() => void refreshProjects()}
-                                >
-                                    刷新
-                                </Button>
                             </div>
                         </div>
 
@@ -976,6 +952,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         const stats = projectStatsById.get(project.id)
                                         const nudge = getProjectHomeNudge(stats)
                                         const recentTarget = recentTargetByProjectId.get(project.id)
+                                        const description = project.description?.trim()
 
                                         return (
                                             <div
@@ -1004,9 +981,9 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                             {isStarred ? '★' : '☆'}
                                                         </Button>
                                                     )}
-                                                    description={(
+                                                    description={description || recentTarget ? (
                                                         <div className="project-list-card__description">
-                                                            <p>{project.description || '你的世界在等你回来，继续写下新的角色、地点和事件。'}</p>
+                                                            {description && <p title={description}>{description}</p>}
                                                             {recentTarget && (
                                                                 <button
                                                                     type="button"
@@ -1018,7 +995,7 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                                 </button>
                                                             )}
                                                         </div>
-                                                    )}
+                                                    ) : undefined}
                                                     extraInfo={(
                                                         <div className="project-list-meta">
                                                             <div className="project-list-stats">
@@ -1032,16 +1009,21 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                                                 )}
                                                                 <span>{timestampLabel}</span>
                                                             </div>
-                                                            {nudge && <p className="project-list-nudge">{nudge.label}</p>}
+                                                            {nudge && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="project-list-nudge"
+                                                                    onClick={() => openProjectCheck(project)}
+                                                                >
+                                                                    {nudge.label}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                     actions={(
                                                         <div className="project-list-card__actions">
                                                             <Button type="button" size="sm" onClick={() => onOpenProject?.(project)}>
                                                                 打开世界
-                                                            </Button>
-                                                            <Button type="button" size="sm" variant="ghost" onClick={() => openProjectCheck(project)}>
-                                                                设定检测
                                                             </Button>
                                                         </div>
                                                     )}
@@ -1057,52 +1039,21 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                     title="创建一个新世界"
                                     description="从基础结构开始，稍后再补细节"
                                     extraInfo={<span className="project-list-create-card__plus" aria-hidden="true">＋</span>}
-                                    actions={<Button type="button" variant="ghost" onClick={() => setCreatorOpen(true)}>新建世界</Button>}
                                     variant="outline"
+                                    hoverable
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label="创建一个新世界"
+                                    onClick={() => setCreatorOpen(true)}
+                                    onKeyDown={event => {
+                                        if (event.key !== 'Enter' && event.key !== ' ') return
+                                        event.preventDefault()
+                                        setCreatorOpen(true)
+                                    }}
                                 />
                             </div>
                         ) : null}
                     </section>
-                    <section className="project-home-attention" aria-labelledby="project-home-attention-title">
-                        <div className="project-home-section-heading">
-                            <div>
-                                <h2 id="project-home-attention-title">需要关注</h2>
-                                <p>来自世界内容统计，不阻断创作</p>
-                            </div>
-                        </div>
-                        <div className="project-home-attention-list">
-                            {projectStatsLoading ? (
-                                <p className="project-home-attention-status">正在汇总项目状态…</p>
-                            ) : projectStatsById.size > 0 && [...projectStatsById.values()].every(stats => stats === null) ? (
-                                <p className="project-home-attention-status">项目统计暂不可用，不影响继续创作。</p>
-                            ) : visibleAttentionItems.length > 0 ? visibleAttentionItems.map(item => (
-                                <article key={item.key} className="project-home-attention-row">
-                                    <span className="project-home-attention-dot" aria-hidden="true" />
-                                    <div className="project-home-attention-copy">
-                                        <strong>{item.title}</strong>
-                                        <span>{item.description}</span>
-                                    </div>
-                                    <Button type="button" size="sm" variant="ghost" onClick={() => openProjectCheck(item.project)}>
-                                        处理
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        aria-label={`忽略提醒：${item.title}`}
-                                        onClick={() => setDismissedAttentionKeys(current => new Set(current).add(item.key))}
-                                    >
-                                        忽略
-                                    </Button>
-                                </article>
-                            )) : (
-                                <p className="project-home-attention-status project-home-attention-status--success">
-                                    近期没有需要关注的事项，可以专心创作。
-                                </p>
-                            )}
-                        </div>
-                    </section>
-
                     {activeHelpLink && (
                         <section className="project-home-help-strip" aria-label="帮助与技巧">
                             <span className="project-home-help-strip__icon" aria-hidden="true">?</span>
