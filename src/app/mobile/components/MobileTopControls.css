@@ -8,12 +8,12 @@
     --mobile-page-topbar-x: var(--mobile-page-x);
     --mobile-page-topbar-bg-stop-1: 0%;
     --mobile-page-topbar-bg-visible-1: 100%;
-    --mobile-page-topbar-bg-stop-2: 30%;
+    --mobile-page-topbar-bg-stop-2: 20%;
     --mobile-page-topbar-bg-visible-2: 90%;
-    --mobile-page-topbar-bg-stop-3: 70%;
+    --mobile-page-topbar-bg-stop-3: 30%;
     --mobile-page-topbar-bg-visible-3: 80%;
-    --mobile-page-topbar-bg-stop-4: 85%;
-    --mobile-page-topbar-bg-visible-4: 60%;
+    --mobile-page-topbar-bg-stop-4: 60%;
+    --mobile-page-topbar-bg-visible-4: 50%;
     --mobile-page-topbar-bg-stop-5: 100%;
     --mobile-page-topbar-bg-visible-5: 0%;
 
