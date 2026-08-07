@@ -1,5 +1,6 @@
 import {useEffect, useSyncExternalStore} from 'react'
 import {buildHelpTargetId, HELP_HOME_LINKS} from '../../shared/help/helpCatalog'
+import {findHomeContinueTarget} from './homeContinueTarget'
 
 const HOME_ACTIVITY_STORAGE_KEY = 'flowcloudai.home.activity.v1'
 const HOME_SESSION_STORAGE_KEY = 'flowcloudai.home.last-session.v1'
@@ -256,7 +257,7 @@ export function loadHomeDashboardData(): HomeDashboardData {
     const recentEntries = records.filter(record => record.type === 'entry').slice(0, 8)
     const recentItems = records.slice(0, 12)
     const lastSession = loadHomeLastSession()
-    const continueItem = lastSession?.target ?? recentItems[0] ?? null
+    const continueItem = findHomeContinueTarget([lastSession?.target, ...recentItems])
 
     return {
         lastSession,
