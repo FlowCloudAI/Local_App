@@ -1,65 +1,42 @@
+/**
+ * 移动端首页的纯展示组件与筛选常量。
+ * 数据校验、分页和导航留在 MobileHome，避免展示层反向依赖页面状态。
+ */
 /* eslint-disable react-refresh/only-export-components */
 import {Button} from 'flowcloudai-ui'
 import type {HomeActivityTarget, HomeDashboardData} from '../../../features/home/homeActivity'
 import {formatProjectDate, parseProjectDateMs} from '../../../features/projects/projectDisplay'
 
-export type WorldSortMode = 'updated-desc' | 'created-desc' | 'name-asc' | 'size-desc'
+export type WorldSortMode = 'updated-desc' | 'created-desc' | 'name-asc'
 export type WorldDisplayMode = 'card' | 'list'
 
-export const PANEL_SWITCH_THRESHOLD = 72
-
 interface MobileHomeContinueCardProps {
-    continueItem: HomeActivityTarget | null
-    lastSavedAt?: string | null
-    hasLoadedProjects: boolean
-    projectError: string | null
-    projectCount: number
+    continueItem: HomeActivityTarget
+    projectName?: string | null
+    lastOpenedAt?: string | null
     onOpenTarget: (target: HomeActivityTarget) => void
-    onOpenWorlds: () => void
-    onCreateWorld: () => void
-    onRetry: () => void
 }
 
 export function MobileHomeContinueCard({
     continueItem,
-    lastSavedAt,
-    hasLoadedProjects,
-    projectError,
-    projectCount,
+    projectName,
+    lastOpenedAt,
     onOpenTarget,
-    onOpenWorlds,
-    onCreateWorld,
-    onRetry,
 }: MobileHomeContinueCardProps) {
-    if (continueItem) return <button type="button" className="mobile-home__continue" onClick={() => onOpenTarget(continueItem)}>
-        <span className="mobile-home__eyebrow">上次停在这里</span>
-        <span className="mobile-home__continue-title">{continueItem.title}</span>
-        <span className="mobile-home__continue-desc">
-            {continueItem.subtitle || getTargetTypeLabel(continueItem.type)}
-            {lastSavedAt ? ` · ${formatRelativeTime(lastSavedAt)}` : ''}
-        </span>
-    </button>
-
-    if (!hasLoadedProjects) return <div className="mobile-home__continue mobile-home__continue--empty" role="status">
-        <span className="mobile-home__continue-title">正在加载世界列表</span>
-        <span className="mobile-home__continue-desc">请稍候…</span>
-    </div>
-
-    if (projectError && projectCount === 0) return <div className="mobile-home__continue mobile-home__continue--empty" role="alert">
-        <span className="mobile-home__continue-title">世界列表加载失败</span>
-        <span className="mobile-home__continue-desc">{projectError}</span>
-        <Button type="button" size="sm" variant="outline" onClick={onRetry}>重试</Button>
-    </div>
-
-    if (projectCount > 0) return <button type="button" className="mobile-home__continue mobile-home__continue--empty" onClick={onOpenWorlds}>
-        <span className="mobile-home__continue-title">选择一个世界继续</span>
-        <span className="mobile-home__continue-desc">已有 {projectCount} 个世界，打开后继续创作。</span>
-    </button>
-
-    return <button type="button" className="mobile-home__continue mobile-home__continue--empty" onClick={onCreateWorld}>
-        <span className="mobile-home__continue-title">创建你的第一个世界</span>
-        <span className="mobile-home__continue-desc">从世界观容器开始，再补词条、关系和图片。</span>
-    </button>
+    const meta = projectName || continueItem.subtitle || '词条'
+    return (
+        <article className="mobile-home__continue">
+            <span className="mobile-home__eyebrow">继续创作</span>
+            <h2 className="mobile-home__continue-title">{continueItem.title}</h2>
+            <p className="mobile-home__continue-meta">
+                {meta}{lastOpenedAt ? ` · ${formatRelativeTime(lastOpenedAt)}` : ''}
+            </p>
+            {continueItem.description ? (
+                <p className="mobile-home__continue-desc">{continueItem.description}</p>
+            ) : null}
+            <Button type="button" onClick={() => onOpenTarget(continueItem)}>继续写作</Button>
+        </article>
+    )
 }
 
 export const WORLD_DISPLAY_OPTIONS: Array<{key: WorldDisplayMode; label: string; desc: string}> = [
@@ -71,14 +48,12 @@ export const WORLD_SORT_OPTIONS: Array<{key: WorldSortMode; label: string}> = [
     {key: 'updated-desc', label: '更新日期'},
     {key: 'created-desc', label: '创建日期'},
     {key: 'name-asc', label: '名称排序'},
-    {key: 'size-desc', label: '项目体量'},
 ]
 
 export const WORLD_SORT_DETAILS: Record<WorldSortMode, string> = {
     'updated-desc': '最新到最旧',
     'created-desc': '新建到较早',
     'name-asc': 'A 到 Z',
-    'size-desc': '词条多到少',
 }
 
 export function FilterCheckIcon() {
@@ -98,7 +73,9 @@ function FilterCardIcon() {
 
 function FilterListIcon() {
     return <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
-        <circle cx="5" cy="6" r="1.25" fill="currentColor"/><circle cx="5" cy="12" r="1.25" fill="currentColor"/><circle cx="5" cy="18" r="1.25" fill="currentColor"/>
+        <circle cx="5" cy="6" r="1.25" fill="currentColor"/>
+        <circle cx="5" cy="12" r="1.25" fill="currentColor"/>
+        <circle cx="5" cy="18" r="1.25" fill="currentColor"/>
         <path d="M9 6h10" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
         <path d="M9 12h10" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
         <path d="M9 18h10" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
@@ -110,15 +87,6 @@ export function FilterImportIcon() {
         <path d="M12 4v10.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
         <path d="M7.8 10.4 12 14.6l4.2-4.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"/>
         <path d="M5.8 18.2h12.4" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
-    </svg>
-}
-
-export function FilterRefreshIcon() {
-    return <svg className="mobile-home-filter__svg" viewBox="0 0 24 24" focusable="false">
-        <path d="M18.4 8.1A6.7 6.7 0 0 0 6.5 7" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
-        <path d="M18.5 4.9v3.6h-3.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"/>
-        <path d="M5.6 15.9A6.7 6.7 0 0 0 17.5 17" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2"/>
-        <path d="M5.5 19.1v-3.6h3.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2"/>
     </svg>
 }
 
@@ -138,14 +106,6 @@ export function formatRelativeTime(value?: string | null): string {
     if (diffMs < day) return `${Math.floor(diffMs / hour)} 小时前`
     if (diffMs < 7 * day) return `${Math.floor(diffMs / day)} 天前`
     return formatProjectDate(value)
-}
-
-export function getTargetTypeLabel(type: HomeActivityTarget['type']): string {
-    const labels: Record<HomeActivityTarget['type'], string> = {
-        project: '世界', entry: '词条', tool: '工具', idea: '灵感', conversation: '对话',
-        snapshot: '快照', help: '帮助',
-    }
-    return labels[type]
 }
 
 export function collectDashboardTargets(dashboard: HomeDashboardData) {

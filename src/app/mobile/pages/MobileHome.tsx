@@ -1,14 +1,19 @@
+/**
+ * 移动端公共首页：汇总最近词条、全局灵感速记和世界列表。
+ * 项目内部报告与工具状态留在对应世界页面，本页只负责跨项目返回和进入。
+ */
 import {
+    type FormEvent,
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
 } from 'react'
-import {useDrag, useWheel} from '@use-gesture/react'
 import {Button, Card, Input, useAlert} from 'flowcloudai-ui'
 import {
     db_count_entries,
+    db_create_idea_note,
     db_get_entry,
     db_get_project,
     formatApiError,
@@ -16,13 +21,6 @@ import {
     type Project,
     toApiError,
 } from '../../../api'
-import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
-import ProjectCreator from '../../../features/projects/components/ProjectCreator'
-import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
-import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
-import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
-import {useProjectImportController} from '../../../features/projects/hooks/useProjectImportController'
-import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
 import {
     getHomeActivityTargetKey,
     getHomeTargetEntryId,
@@ -35,26 +33,32 @@ import {
     type HomeActivityTarget,
     useHomeDashboard,
 } from '../../../features/home/homeActivity'
+import {refreshIdeas} from '../../../features/ideas/ideaStore'
+import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
+import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
+import ProjectCreator from '../../../features/projects/components/ProjectCreator'
+import ProjectImportConflictDialog from '../../../features/projects/components/ProjectImportConflictDialog'
+import {useProjectImportController} from '../../../features/projects/hooks/useProjectImportController'
+import ProjectDefaultCover from '../../../features/projects/ProjectDefaultCover'
+import {invalidateProjectList, useProjectListStore} from '../../../features/projects/projectListStore'
+import {parseProjectDateMs} from '../../../features/projects/projectDisplay'
+import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {type MobilePage} from '../usePageStack'
 import {type MobileBeforeLeave} from '../mobileBackNavigation'
 import {type MobileTab} from '../MobileNav'
-import {type AiFocus} from '../../../features/ai-chat/hooks/useAiController'
 import {
     MobileAddIcon,
     MobileAnchoredMenu,
     MobileMoreIcon,
+    MobilePageTopBar,
     MobileTopActionPill,
 } from '../components/MobileTopControls'
-import {formatProjectDate, parseProjectDateMs} from '../../../features/projects/projectDisplay'
 import {
     collectDashboardTargets,
     FilterCheckIcon,
     FilterImportIcon,
-    FilterRefreshIcon,
     formatRelativeTime,
-    getTargetTypeLabel,
     MobileHomeContinueCard,
-    PANEL_SWITCH_THRESHOLD,
     renderDisplayIcon,
     WORLD_DISPLAY_OPTIONS,
     WORLD_SORT_DETAILS,
@@ -64,24 +68,20 @@ import {
 } from './MobileHomeUi'
 import './MobileHome.css'
 
+const WORLD_PAGE_SIZE = 4
+
 interface Props {
     push: (page: MobilePage) => void
     navigateToTab: (tab: MobileTab, page?: MobilePage) => void
     setAiFocus: (focus: AiFocus) => void
     setBeforeLeave: (handler: MobileBeforeLeave | null) => void
-    activePanel: MobileHomePanel
-    onActivePanelChange: (panel: MobileHomePanel) => void
 }
-
-export type MobileHomePanel = 'dashboard' | 'worlds'
 
 export default function MobileHome({
     push,
     navigateToTab,
     setAiFocus,
     setBeforeLeave,
-    activePanel,
-    onActivePanelChange,
 }: Props) {
     const {showAlert} = useAlert()
     const {
@@ -92,9 +92,8 @@ export default function MobileHome({
         refresh: refreshProjects,
     } = useProjectListStore()
     const homeRef = useRef<HTMLDivElement | null>(null)
-    const worldPanelRef = useRef<HTMLElement | null>(null)
     const worldActionsRef = useRef<HTMLDivElement | null>(null)
-    const touchWorldScrollTopRef = useRef(0)
+    const ideaComposingRef = useRef(false)
 
     const dashboard = useHomeDashboard()
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
@@ -105,44 +104,22 @@ export default function MobileHome({
     const [searchText, setSearchText] = useState('')
     const [displayMode, setDisplayMode] = useState<WorldDisplayMode>('card')
     const [sortMode, setSortMode] = useState<WorldSortMode>('updated-desc')
+    const [worldPage, setWorldPage] = useState(1)
     const [filterOpen, setFilterOpen] = useState(false)
     const [creatorOpen, setCreatorOpen] = useState(false)
+    const [ideaText, setIdeaText] = useState('')
+    const [ideaSaving, setIdeaSaving] = useState(false)
 
     useEffect(() => {
         if (!filterOpen) return undefined
         setBeforeLeave((intent) => {
-            // 返回键收起筛选菜单并留在原地；切 Tab 时本页会整体卸载，不拦。
+            // 返回键收起菜单并留在首页；切换 Tab 时页面会整体卸载，不拦截。
             if (intent !== 'back') return true
             setFilterOpen(false)
             return false
         })
         return () => setBeforeLeave(null)
     }, [filterOpen, setBeforeLeave])
-
-    useEffect(() => {
-        if (projects.length === 0) {
-            setEntryCounts({})
-            setCountsError(null)
-            return
-        }
-
-        let cancelled = false
-        setCountsError(null)
-        const loadCounts = async () => {
-            try {
-                const counts = await Promise.all(
-                    projects.map(async project => [project.id, await db_count_entries({projectId: project.id})] as const)
-                )
-                if (!cancelled) setEntryCounts(Object.fromEntries(counts))
-            } catch (e) {
-                if (!cancelled) setCountsError(formatApiError(toApiError(e)))
-            }
-        }
-        void loadCounts()
-        return () => {
-            cancelled = true
-        }
-    }, [projects])
 
     const projectIdSet = useMemo(() => new Set(projects.map(project => project.id)), [projects])
 
@@ -164,35 +141,29 @@ export default function MobileHome({
 
             if (isHomeProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
                 invalidKeys.add(key)
-                if (projectId) {
-                    missingProjectIds.add(projectId)
-                } else {
-                    removeHomeActivityTarget(target)
-                }
+                if (projectId) missingProjectIds.add(projectId)
+                else removeHomeActivityTarget(target)
                 continue
             }
 
-            if (target.type === 'entry') {
-                const entryId = getHomeTargetEntryId(target)
-                if (!projectId || !entryId) {
-                    invalidKeys.add(key)
-                    removeHomeActivityTarget(target)
-                    continue
-                }
-                entryTargets.push({key, projectId, entryId, target})
+            if (target.type !== 'entry') continue
+            const entryId = getHomeTargetEntryId(target)
+            if (!projectId || !entryId) {
+                invalidKeys.add(key)
+                removeHomeActivityTarget(target)
+                continue
             }
+            entryTargets.push({key, projectId, entryId, target})
         }
 
         if (invalidKeys.size > 0) {
-            setInvalidHomeTargetKeys(prev => new Set([...prev, ...invalidKeys]))
+            setInvalidHomeTargetKeys(previous => new Set([...previous, ...invalidKeys]))
         }
-        for (const projectId of missingProjectIds) {
-            removeHomeProjectActivity(projectId)
-        }
+        for (const projectId of missingProjectIds) removeHomeProjectActivity(projectId)
         if (entryTargets.length === 0) return
 
         const validationKeys = new Set(entryTargets.map(item => item.key))
-        setPendingEntryTargetKeys(prev => new Set([...prev, ...validationKeys]))
+        setPendingEntryTargetKeys(previous => new Set([...previous, ...validationKeys]))
 
         let cancelled = false
         void (async () => {
@@ -215,20 +186,19 @@ export default function MobileHome({
             }))
 
             if (cancelled) return
-
-            setPendingEntryTargetKeys(prev => {
-                const next = new Set(prev)
+            setPendingEntryTargetKeys(previous => {
+                const next = new Set(previous)
                 for (const key of validationKeys) next.delete(key)
                 return next
             })
-            setValidEntryTargetKeys(prev => {
-                const next = new Set(prev)
+            setValidEntryTargetKeys(previous => {
+                const next = new Set(previous)
                 for (const key of invalidEntryKeys) next.delete(key)
                 for (const key of validKeys) next.add(key)
                 return next
             })
-            setInvalidHomeTargetKeys(prev => {
-                const next = new Set(prev)
+            setInvalidHomeTargetKeys(previous => {
+                const next = new Set(previous)
                 for (const key of validKeys) next.delete(key)
                 for (const key of invalidEntryKeys) next.add(key)
                 return next
@@ -243,17 +213,14 @@ export default function MobileHome({
     const isVisibleHomeTarget = useCallback((target: HomeActivityTarget) => {
         const key = getHomeActivityTargetKey(target)
         if (invalidHomeTargetKeys.has(key)) return false
-
         if (hasLoadedProjects && isHomeProjectBackedTarget(target)) {
             const projectId = getHomeTargetProjectId(target)
             if (!projectId || !projectIdSet.has(projectId)) return false
         }
-
         if (target.type === 'entry') {
             if (pendingEntryTargetKeys.has(key)) return false
             return validEntryTargetKeys.has(key)
         }
-
         return true
     }, [hasLoadedProjects, invalidHomeTargetKeys, pendingEntryTargetKeys, projectIdSet, validEntryTargetKeys])
 
@@ -262,27 +229,47 @@ export default function MobileHome({
     ), [dashboard.recentItems, isVisibleHomeTarget])
 
     const continueItem = useMemo(() => {
-        if (dashboard.continueItem && isVisibleHomeTarget(dashboard.continueItem)) {
+        if (dashboard.continueItem?.type === 'entry' && isVisibleHomeTarget(dashboard.continueItem)) {
             return dashboard.continueItem
         }
-        return visibleRecentItems[0] ?? null
+        return visibleRecentItems.find(item => item.type === 'entry') ?? null
     }, [dashboard.continueItem, isVisibleHomeTarget, visibleRecentItems])
 
-    const recentItems = useMemo(() => {
-        const continueKey = continueItem ? getHomeActivityTargetKey(continueItem) : null
-        return visibleRecentItems
-            .filter(item => !continueKey || getHomeActivityTargetKey(item) !== continueKey)
-            .slice(0, 5)
-    }, [continueItem, visibleRecentItems])
+    const continueProjectName = useMemo(() => {
+        if (!continueItem) return null
+        const projectId = getHomeTargetProjectId(continueItem)
+        return projects.find(project => project.id === projectId)?.name ?? continueItem.subtitle ?? null
+    }, [continueItem, projects])
+
+    const continueLastOpenedAt = useMemo(() => {
+        if (!continueItem) return null
+        const key = getHomeActivityTargetKey(continueItem)
+        if (dashboard.lastSession?.target && getHomeActivityTargetKey(dashboard.lastSession.target) === key) {
+            return dashboard.lastSession.savedAt
+        }
+        return dashboard.recentItems.find(item => item.key === key)?.lastOpenedAt
+            ?? continueItem.updatedAt
+            ?? null
+    }, [continueItem, dashboard.lastSession, dashboard.recentItems])
+
+    const recentEntryByProject = useMemo(() => {
+        const result = new Map<string, HomeActivityRecord>()
+        for (const item of visibleRecentItems) {
+            if (item.type !== 'entry') continue
+            const projectId = getHomeTargetProjectId(item)
+            if (projectId && !result.has(projectId)) result.set(projectId, item)
+        }
+        return result
+    }, [visibleRecentItems])
 
     const worldProjects = useMemo(() => {
         const query = searchText.trim().toLowerCase()
         return projects
-            .filter(project => {
-                if (!query) return true
-                return project.name.toLowerCase().includes(query)
-                    || (project.description ?? '').toLowerCase().includes(query)
-            })
+            .filter(project => (
+                !query
+                || project.name.toLowerCase().includes(query)
+                || (project.description ?? '').toLowerCase().includes(query)
+            ))
             .sort((a, b) => {
                 const nameOrder = a.name.localeCompare(b.name, 'zh-CN')
                 switch (sortMode) {
@@ -290,14 +277,47 @@ export default function MobileHome({
                         return parseProjectDateMs(b.created_at) - parseProjectDateMs(a.created_at) || nameOrder
                     case 'name-asc':
                         return nameOrder
-                    case 'size-desc':
-                        return (entryCounts[b.id] ?? 0) - (entryCounts[a.id] ?? 0) || nameOrder
                     case 'updated-desc':
                     default:
                         return parseProjectDateMs(b.updated_at ?? b.created_at) - parseProjectDateMs(a.updated_at ?? a.created_at) || nameOrder
                 }
             })
-    }, [entryCounts, projects, searchText, sortMode])
+    }, [projects, searchText, sortMode])
+
+    const worldPageCount = Math.max(1, Math.ceil(worldProjects.length / WORLD_PAGE_SIZE))
+    const currentWorldPage = Math.min(worldPage, worldPageCount)
+    const paginatedWorldProjects = useMemo(() => {
+        const start = (currentWorldPage - 1) * WORLD_PAGE_SIZE
+        return worldProjects.slice(start, start + WORLD_PAGE_SIZE)
+    }, [currentWorldPage, worldProjects])
+
+    useEffect(() => {
+        if (worldPage !== currentWorldPage) setWorldPage(currentWorldPage)
+    }, [currentWorldPage, worldPage])
+
+    useEffect(() => {
+        if (paginatedWorldProjects.length === 0) {
+            if (projects.length === 0) setEntryCounts({})
+            setCountsError(null)
+            return
+        }
+
+        let cancelled = false
+        setCountsError(null)
+        void Promise.all(
+            paginatedWorldProjects.map(async project => [
+                project.id,
+                await db_count_entries({projectId: project.id}),
+            ] as const),
+        ).then(counts => {
+            if (!cancelled) setEntryCounts(previous => ({...previous, ...Object.fromEntries(counts)}))
+        }).catch(countError => {
+            if (!cancelled) setCountsError(formatApiError(toApiError(countError)))
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [paginatedWorldProjects, projects.length])
 
     const loadingWorlds = loading && projects.length === 0
     const worldError = error ?? countsError
@@ -313,11 +333,8 @@ export default function MobileHome({
     const openDashboardTarget = useCallback((target: HomeActivityTarget) => {
         const projectId = getHomeTargetProjectId(target)
         if (hasLoadedProjects && isHomeProjectBackedTarget(target) && (!projectId || !projectIdSet.has(projectId))) {
-            if (projectId) {
-                removeHomeProjectActivity(projectId)
-            } else {
-                removeHomeActivityTarget(target)
-            }
+            if (projectId) removeHomeProjectActivity(projectId)
+            else removeHomeActivityTarget(target)
             void showAlert('这个首页入口指向的内容已不存在，已从首页移除。', 'warning', 'nonInvasive', 3000)
             return
         }
@@ -348,27 +365,38 @@ export default function MobileHome({
             }
         }
 
-        if (target.type === 'tool' && projectId) {
-            const project = projects.find(item => item.id === projectId)
-            if (project) {
-                handleOpenProject(project)
-                void showAlert('移动端暂未单独打开该工具面板，已进入对应世界。', 'info', 'nonInvasive', 2200)
-                return
-            }
-        }
-
         if (target.type === 'idea') {
             navigateToTab('ideas')
             return
         }
-
         if (target.type === 'conversation') {
             navigateToTab('ai')
             return
         }
-
         void showAlert(target.description || '该入口暂未接入移动端。', 'info', 'nonInvasive', 2600)
     }, [handleOpenProject, hasLoadedProjects, navigateToTab, projectIdSet, projects, push, setAiFocus, showAlert])
+
+    const handleIdeaSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        if (ideaComposingRef.current || ideaSaving) return
+        const content = ideaText.trim()
+        if (!content) {
+            await showAlert('先写下一条灵感。好点子不必完整。', 'info', 'nonInvasive', 2200)
+            return
+        }
+
+        setIdeaSaving(true)
+        try {
+            await db_create_idea_note({content})
+            await refreshIdeas()
+            setIdeaText('')
+            await showAlert('灵感已存入收件箱', 'success', 'nonInvasive', 1800)
+        } catch (ideaError) {
+            await showAlert(`保存灵感失败：${formatApiError(toApiError(ideaError))}`, 'error', 'nonInvasive', 3000)
+        } finally {
+            setIdeaSaving(false)
+        }
+    }, [ideaSaving, ideaText, showAlert])
 
     const openImportedProject = useCallback(async (result: FcworldImportResult) => {
         await invalidateProjectList()
@@ -377,7 +405,7 @@ export default function MobileHome({
     }, [handleOpenProject])
 
     const handleImportError = useCallback(
-        (error: unknown) => showAlert(`导入世界失败：${formatApiError(toApiError(error))}`, 'error', 'nonInvasive', 3200),
+        (importError: unknown) => showAlert(`导入世界失败：${formatApiError(toApiError(importError))}`, 'error', 'nonInvasive', 3200),
         [showAlert],
     )
     const {
@@ -402,65 +430,16 @@ export default function MobileHome({
     }, [importConflict, importConflictOverwrite, importing, showAlert])
 
     const handleHelp = useCallback(() => {
-        void showAlert('首页展示桌面端同一套继续创作和最近内容；向上滑动即可进入世界观列表。', 'info', 'nonInvasive', 2800)
+        void showAlert('首页只保留跨世界的继续创作、灵感速记和世界入口；项目报告请进入对应世界查看。', 'info', 'nonInvasive', 3000)
     }, [showAlert])
 
-    const settlePagerDrag = useCallback((deltaY: number, worldStartScrollTop: number) => {
-        if (Math.abs(deltaY) < PANEL_SWITCH_THRESHOLD) return
-
-        if (activePanel === 'dashboard' && deltaY < 0) {
-            onActivePanelChange('worlds')
-            return
-        }
-
-        if (activePanel === 'worlds' && deltaY > 0 && worldStartScrollTop <= 4) {
-            onActivePanelChange('dashboard')
-        }
-    }, [activePanel, onActivePanelChange])
-
-    const bindPagerDrag = useDrag(({
-        first,
-        last,
-        movement: [, deltaY],
-    }) => {
-        if (first) {
-            touchWorldScrollTopRef.current = worldPanelRef.current?.scrollTop ?? 0
-        }
-        if (!last) return
-        settlePagerDrag(deltaY, touchWorldScrollTopRef.current)
-    }, {
-        axis: 'y',
-        filterTaps: true,
-        pointer: {keys: false, touch: true},
-        threshold: 8,
-    })
-
-    const bindPagerWheel = useWheel(({event}) => {
-        if (Math.abs(event.deltaY) < 32) return
-        if (activePanel === 'dashboard' && event.deltaY > 0) {
-            onActivePanelChange('worlds')
-            return
-        }
-        if (activePanel === 'worlds' && event.deltaY < 0 && (worldPanelRef.current?.scrollTop ?? 0) <= 4) {
-            onActivePanelChange('dashboard')
-        }
-    })
-
-    const renderRecentItem = (item: HomeActivityRecord) => (
-        <button
-            key={item.key}
-            type="button"
-            className="mobile-home-recent-item"
-            onClick={() => openDashboardTarget(item)}
-        >
-            <span className="mobile-home-recent-item__type">{getTargetTypeLabel(item.type)}</span>
-            <span className="mobile-home-recent-item__title">{item.title}</span>
-            <span className="mobile-home-recent-item__time">{formatRelativeTime(item.lastOpenedAt)}</span>
-        </button>
-    )
-
     const renderWorldCard = (project: Project) => {
-        const meta = `${entryCounts[project.id] ?? 0} 词条 · 更新于 ${formatProjectDate(project.updated_at ?? project.created_at)}`
+        const entryCount = entryCounts[project.id]
+        const countLabel = entryCount == null ? '词条统计中' : `${entryCount} 个词条`
+        const updatedLabel = formatRelativeTime(project.updated_at ?? project.created_at)
+        const recentEntry = recentEntryByProject.get(project.id)
+        const recentLabel = recentEntry ? `${updatedLabel} · ${recentEntry.title}` : updatedLabel
+
         if (displayMode === 'list') {
             return (
                 <button
@@ -470,8 +449,8 @@ export default function MobileHome({
                     onClick={() => handleOpenProject(project)}
                 >
                     <span className="mobile-list-card__title">{project.name}</span>
-                    <span className="mobile-list-card__description">{project.description || meta}</span>
-                    <span className="mobile-list-card__meta">{meta}</span>
+                    <span className="mobile-list-card__description">{project.description || recentLabel}</span>
+                    <span className="mobile-list-card__meta">{countLabel} · {updatedLabel}</span>
                 </button>
             )
         }
@@ -481,41 +460,72 @@ export default function MobileHome({
                 key={project.id}
                 className="mobile-page__card mobile-project-card mobile-home-world-card"
                 title={project.name}
-                description={project.description || '你的世界在等你回来，继续补全新的角色、地点和事件。'}
+                description={countLabel}
                 imageSlot={project.cover_path ? (
                     <ProjectCoverImage
                         projectId={project.id}
                         coverPath={project.cover_path}
                         alt={project.name}
-                        fallback={(
-                            <ProjectDefaultCover
-                                projectId={project.id}
-                                projectName={project.name}
-                            />
-                        )}
+                        fallback={<ProjectDefaultCover projectId={project.id} projectName={project.name}/>}
                     />
                 ) : (
-                    <ProjectDefaultCover
-                        projectId={project.id}
-                        projectName={project.name}
-                    />
+                    <ProjectDefaultCover projectId={project.id} projectName={project.name}/>
                 )}
-                imageHeight="8.5rem"
-                extraInfo={<span className="mobile-project-card__meta">{meta}</span>}
+                imageHeight="5rem"
+                extraInfo={recentEntry ? (
+                    <button
+                        type="button"
+                        className="mobile-home-world-card__recent"
+                        onClick={event => {
+                            event.stopPropagation()
+                            openDashboardTarget(recentEntry)
+                        }}
+                        onKeyDown={event => event.stopPropagation()}
+                    >
+                        {recentLabel}
+                    </button>
+                ) : <span className="mobile-home-world-card__recent">{recentLabel}</span>}
                 variant="shadow"
                 hoverable
+                role="button"
+                tabIndex={0}
+                aria-label={`打开世界：${project.name}`}
                 onClick={() => handleOpenProject(project)}
+                onKeyDown={event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    handleOpenProject(project)
+                }}
             />
         )
     }
 
+    const topActions = (
+        <MobileTopActionPill
+            ref={worldActionsRef}
+            actions={[
+                {
+                    key: 'create',
+                    label: '新建世界观',
+                    icon: <MobileAddIcon/>,
+                    kind: 'add',
+                    onClick: () => setCreatorOpen(true),
+                },
+                {
+                    key: 'filter',
+                    label: '世界列表操作',
+                    icon: <MobileMoreIcon/>,
+                    kind: 'more',
+                    ariaHasPopup: 'menu',
+                    ariaExpanded: filterOpen,
+                    onClick: () => setFilterOpen(open => !open),
+                },
+            ]}
+        />
+    )
+
     return (
-        <div
-            ref={homeRef}
-            className={`mobile-page mobile-home mobile-home--${activePanel}`}
-            {...bindPagerDrag()}
-            {...bindPagerWheel()}
-        >
+        <div ref={homeRef} className="mobile-page mobile-home">
             <ProjectCreator
                 open={creatorOpen}
                 onClose={() => setCreatorOpen(false)}
@@ -531,111 +541,64 @@ export default function MobileHome({
                 onRename={projectName => void handleImportConflictRename(projectName)}
                 onOverwrite={() => void handleImportConflictOverwrite()}
             />
-            <FcworldProgressDialog progress={fcworldProgress} />
+            <FcworldProgressDialog progress={fcworldProgress}/>
 
-            <div className="mobile-home__pager">
-                <section className="mobile-home__panel mobile-home__dashboard">
-                    <div className="mobile-home__hero">
-                            <h2 className="mobile-page__hero-title">首页</h2>
-                        <button
-                            type="button"
-                            className="mobile-home__help"
-                            aria-label="帮助"
-                            onClick={handleHelp}
-                        >
-                            ?
-                        </button>
-                    </div>
+            <MobilePageTopBar
+                sticky
+                edgeToEdge
+                className="mobile-home__topbar"
+                ariaLabel="首页操作"
+                left={<h1 className="mobile-page__hero-title mobile-home__title">首页</h1>}
+                right={topActions}
+            />
 
-                    <Input
-                        placeholder="搜索世界观…"
-                        value={searchText}
-                        onValueChange={setSearchText}
-                        className="mobile-page__search mobile-home__search"
-                        radius="full"
-                        size="lg"
-                        allowClear
-                    />
-
-                    <section className="mobile-home__section">
-                        <div className="mobile-home__section-head">
-                            <h3 className="mobile-home__section-title">继续创作</h3>
-                        </div>
+            <main className="mobile-home__content">
+                {continueItem ? (
+                    <section aria-label="继续创作">
                         <MobileHomeContinueCard
                             continueItem={continueItem}
-                            lastSavedAt={dashboard.lastSession?.savedAt}
-                            hasLoadedProjects={hasLoadedProjects}
-                            projectError={error}
-                            projectCount={projects.length}
+                            projectName={continueProjectName}
+                            lastOpenedAt={continueLastOpenedAt}
                             onOpenTarget={openDashboardTarget}
-                            onOpenWorlds={() => onActivePanelChange('worlds')}
-                            onCreateWorld={() => setCreatorOpen(true)}
-                            onRetry={retryWorlds}
                         />
                     </section>
+                ) : null}
 
-                    <section className="mobile-home__section mobile-home__section--recent">
-                        <div className="mobile-home__section-head">
-                            <h3 className="mobile-home__section-title">最近内容</h3>
-                        </div>
-                        {recentItems.length > 0 ? (
-                            <div className="mobile-home__recent-list">
-                                {recentItems.map(renderRecentItem)}
-                            </div>
-                        ) : (
-                            <p className="mobile-home__muted">打开项目或词条后，会在这里保留回到现场的入口。</p>
-                        )}
-                    </section>
-
-                    <button
-                        type="button"
-                        className="mobile-home__project-list-button"
-                        onClick={() => onActivePanelChange('worlds')}
-                    >
-                        项目列表
-                    </button>
+                <section aria-label="灵感速记">
+                    <form className="mobile-home__idea-form" onSubmit={event => void handleIdeaSubmit(event)}>
+                        <Input
+                            value={ideaText}
+                            placeholder="想到什么直接写…"
+                            aria-label="快速记录灵感"
+                            disabled={ideaSaving}
+                            onValueChange={setIdeaText}
+                            onCompositionStart={() => {
+                                ideaComposingRef.current = true
+                            }}
+                            onCompositionEnd={() => {
+                                ideaComposingRef.current = false
+                            }}
+                        />
+                        <Button type="submit" size="sm" variant="ghost" disabled={ideaSaving}>
+                            {ideaSaving ? '保存中…' : '存入'}
+                        </Button>
+                    </form>
                 </section>
 
-                <section
-                    ref={worldPanelRef}
-                    className="mobile-home__panel mobile-home-worlds"
-                    aria-label="世界观列表"
-                >
+                <section className="mobile-home-worlds" aria-labelledby="mobileHomeWorldsTitle">
                     <div className="mobile-home-worlds__head">
-                        <div className="mobile-home-worlds__copy">
-                            <span className="mobile-page__eyebrow">
-                                {loadingWorlds ? '正在同步' : `${worldProjects.length} 个世界`}
-                            </span>
-                            <h2 className="mobile-page__hero-title">世界观</h2>
-                        </div>
-                        <MobileTopActionPill
-                            ref={worldActionsRef}
-                            actions={[
-                                {
-                                    key: 'create',
-                                    label: '新建世界观',
-                                    icon: <MobileAddIcon/>,
-                                    kind: 'add',
-                                    onClick: () => setCreatorOpen(true),
-                                },
-                                {
-                                    key: 'filter',
-                                    label: '筛选与排序',
-                                    icon: <MobileMoreIcon/>,
-                                    kind: 'more',
-                                    ariaHasPopup: 'menu',
-                                    ariaExpanded: filterOpen,
-                                    onClick: () => setFilterOpen(open => !open),
-                                },
-                            ]}
-                        />
+                        <h2 id="mobileHomeWorldsTitle">我的世界</h2>
+                        <span>{loadingWorlds ? '正在同步' : `${worldProjects.length} 个`}</span>
                     </div>
 
                     <Input
-                        placeholder="搜索世界观…"
+                        placeholder="搜索世界"
                         value={searchText}
-                        onValueChange={setSearchText}
-                        className="mobile-page__search mobile-home-worlds__search"
+                        onValueChange={value => {
+                            setSearchText(value)
+                            setWorldPage(1)
+                        }}
+                        className="mobile-home-worlds__search"
                         radius="full"
                         size="lg"
                         allowClear
@@ -650,126 +613,143 @@ export default function MobileHome({
                         <div className="mobile-page__loading mobile-home__state-panel">加载中…</div>
                     ) : projects.length === 0 ? (
                         <div className="mobile-page__empty mobile-home__state-panel">
-                            <p>还没有任何世界观</p>
-                            <Button type="button" onClick={() => setCreatorOpen(true)}>创建第一个世界</Button>
+                            <p>还没有世界。使用右上角“+”新建，或从更多菜单导入。</p>
                         </div>
                     ) : worldProjects.length === 0 ? (
-                        <div className="mobile-page__empty mobile-home__state-panel">没有匹配的世界观</div>
+                        <div className="mobile-page__empty mobile-home__state-panel">没有匹配的世界</div>
                     ) : (
                         <>
-                            {worldError && (
+                            {worldError ? (
                                 <div className="mobile-page__error-banner" role="alert">
-                                    <span>部分世界信息刷新失败：{worldError}</span>
-                                    <Button type="button" size="sm" variant="outline" onClick={retryWorlds}>重试</Button>
+                                    <span>部分词条统计暂不可用：{worldError}</span>
                                 </div>
-                            )}
-                            <div className={`mobile-home-worlds__grid mobile-home-worlds__grid--${displayMode}`}>
-                                {worldProjects.map(renderWorldCard)}
+                            ) : null}
+                            <div
+                                className={`mobile-home-worlds__grid mobile-home-worlds__grid--${displayMode}${worldPageCount > 1 ? ' mobile-home-worlds__grid--paged' : ''}`}
+                            >
+                                {paginatedWorldProjects.map(renderWorldCard)}
                             </div>
+                            {worldPageCount > 1 ? (
+                                <nav className="mobile-home-worlds__pagination" aria-label="世界列表分页">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={currentWorldPage === 1}
+                                        onClick={() => setWorldPage(page => Math.max(1, page - 1))}
+                                    >
+                                        上一页
+                                    </Button>
+                                    <span aria-live="polite">{currentWorldPage} / {worldPageCount}</span>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={currentWorldPage === worldPageCount}
+                                        onClick={() => setWorldPage(page => Math.min(worldPageCount, page + 1))}
+                                    >
+                                        下一页
+                                    </Button>
+                                </nav>
+                            ) : null}
                         </>
                     )}
                 </section>
-            </div>
+
+                <section className="mobile-home__tip" aria-label="使用技巧">
+                    <p>在正文中输入 [[ 可以链接到另一个词条，对方会自动显示反向引用。</p>
+                    <button type="button" onClick={handleHelp}>帮助中心</button>
+                </section>
+            </main>
 
             <MobileAnchoredMenu
                 open={filterOpen}
                 onClose={() => setFilterOpen(false)}
                 anchorRef={worldActionsRef}
                 containerRef={homeRef}
-                ariaLabel="世界观筛选与排序"
+                ariaLabel="世界列表显示与排序"
             >
-                        <div className="mobile-anchored-menu__group" aria-label="显示方式">
-                            {WORLD_DISPLAY_OPTIONS.map(option => {
-                                const active = displayMode === option.key
-                                return (
-                                    <button
-                                        key={option.key}
-                                        type="button"
-                                        role="menuitemradio"
-                                        aria-checked={active}
-                                        className={`mobile-anchored-menu__row${active ? ' is-active' : ''}`}
-                                        onClick={() => setDisplayMode(option.key)}
-                                    >
-                                        <span className="mobile-anchored-menu__check" aria-hidden="true">
-                                            {active ? <FilterCheckIcon/> : null}
-                                        </span>
-                                        <span className="mobile-anchored-menu__icon" aria-hidden="true">
-                                            {renderDisplayIcon(option.key)}
-                                        </span>
-                                        <span className="mobile-anchored-menu__text">
-                                            <span>{option.label}</span>
-                                            <small>{option.desc}</small>
-                                        </span>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                        <div className="mobile-home-filter__divider" role="separator"/>
-                        <div className="mobile-anchored-menu__group" aria-label="排序方式">
-                            {WORLD_SORT_OPTIONS.map(option => {
-                                const active = sortMode === option.key
-                                return (
-                                    <button
-                                        key={option.key}
-                                        type="button"
-                                        role="menuitemradio"
-                                        aria-checked={active}
-                                        className={`mobile-anchored-menu__row${active ? ' is-active' : ''}`}
-                                        onClick={() => setSortMode(option.key)}
-                                    >
-                                        <span className="mobile-anchored-menu__check" aria-hidden="true">
-                                            {active ? <FilterCheckIcon/> : null}
-                                        </span>
-                                        <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
-                                        <span className="mobile-anchored-menu__text">
-                                            <span>{option.label}</span>
-                                            <small>{WORLD_SORT_DETAILS[option.key]}</small>
-                                        </span>
-                                    </button>
-                                )
-                            })}
-                        </div>
-                        <div className="mobile-home-filter__divider" role="separator"/>
-                        <div className="mobile-anchored-menu__group" aria-label="列表操作">
+                <div className="mobile-anchored-menu__group" aria-label="显示方式">
+                    {WORLD_DISPLAY_OPTIONS.map(option => {
+                        const active = displayMode === option.key
+                        return (
                             <button
+                                key={option.key}
                                 type="button"
-                                role="menuitem"
-                                className="mobile-anchored-menu__row"
-                                disabled={importing}
+                                role="menuitemradio"
+                                aria-checked={active}
+                                className={`mobile-anchored-menu__row${active ? ' is-active' : ''}`}
                                 onClick={() => {
+                                    setDisplayMode(option.key)
+                                    setWorldPage(1)
                                     setFilterOpen(false)
-                                    void handleImportProject()
                                 }}
                             >
-                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                                <span className="mobile-anchored-menu__check" aria-hidden="true">
+                                    {active ? <FilterCheckIcon/> : null}
+                                </span>
                                 <span className="mobile-anchored-menu__icon" aria-hidden="true">
-                                    <FilterImportIcon/>
+                                    {renderDisplayIcon(option.key)}
                                 </span>
                                 <span className="mobile-anchored-menu__text">
-                                    <span>{importing ? '导入中…' : '导入世界'}</span>
-                                    <small>从 .fcworld 文件导入</small>
+                                    <span>{option.label}</span>
+                                    <small>{option.desc}</small>
                                 </span>
                             </button>
+                        )
+                    })}
+                </div>
+                <div className="mobile-home-filter__divider" role="separator"/>
+                <div className="mobile-anchored-menu__group" aria-label="排序方式">
+                    {WORLD_SORT_OPTIONS.map(option => {
+                        const active = sortMode === option.key
+                        return (
                             <button
+                                key={option.key}
                                 type="button"
-                                role="menuitem"
-                                className="mobile-anchored-menu__row"
-                                disabled={loading}
+                                role="menuitemradio"
+                                aria-checked={active}
+                                className={`mobile-anchored-menu__row${active ? ' is-active' : ''}`}
                                 onClick={() => {
+                                    setSortMode(option.key)
+                                    setWorldPage(1)
                                     setFilterOpen(false)
-                                    void refreshProjects()
                                 }}
                             >
-                                <span className="mobile-anchored-menu__check" aria-hidden="true"/>
-                                <span className="mobile-anchored-menu__icon" aria-hidden="true">
-                                    <FilterRefreshIcon/>
+                                <span className="mobile-anchored-menu__check" aria-hidden="true">
+                                    {active ? <FilterCheckIcon/> : null}
                                 </span>
+                                <span className="mobile-anchored-menu__icon" aria-hidden="true"/>
                                 <span className="mobile-anchored-menu__text">
-                                    <span>刷新列表</span>
-                                    <small>重新同步世界观</small>
+                                    <span>{option.label}</span>
+                                    <small>{WORLD_SORT_DETAILS[option.key]}</small>
                                 </span>
                             </button>
-                        </div>
+                        )
+                    })}
+                </div>
+                <div className="mobile-home-filter__divider" role="separator"/>
+                <div className="mobile-anchored-menu__group" aria-label="列表操作">
+                    <button
+                        type="button"
+                        role="menuitem"
+                        className="mobile-anchored-menu__row"
+                        disabled={importing}
+                        onClick={() => {
+                            setFilterOpen(false)
+                            void handleImportProject()
+                        }}
+                    >
+                        <span className="mobile-anchored-menu__check" aria-hidden="true"/>
+                        <span className="mobile-anchored-menu__icon" aria-hidden="true">
+                            <FilterImportIcon/>
+                        </span>
+                        <span className="mobile-anchored-menu__text">
+                            <span>{importing ? '导入中…' : '导入世界'}</span>
+                            <small>从 .fcworld 文件导入</small>
+                        </span>
+                    </button>
+                </div>
             </MobileAnchoredMenu>
         </div>
     )
