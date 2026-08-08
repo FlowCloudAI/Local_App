@@ -17,6 +17,7 @@ import {
     db_get_entry,
     db_get_project,
     formatApiError,
+    type Entry,
     type FcworldImportResult,
     type Project,
     toApiError,
@@ -33,6 +34,7 @@ import {
     type HomeActivityTarget,
     useHomeDashboard,
 } from '../../../features/home/homeActivity'
+import HomeContinueCoverImage from '../../../features/home/HomeContinueCoverImage'
 import {refreshIdeas} from '../../../features/ideas/ideaStore'
 import FcworldProgressDialog from '../../../features/projects/components/FcworldProgressDialog'
 import ProjectCoverImage from '../../../features/projects/components/ProjectCoverImage'
@@ -98,7 +100,7 @@ export default function MobileHome({
     const dashboard = useHomeDashboard()
     const [entryCounts, setEntryCounts] = useState<Record<string, number>>({})
     const [countsError, setCountsError] = useState<string | null>(null)
-    const [validEntryTargetKeys, setValidEntryTargetKeys] = useState<Set<string>>(() => new Set())
+    const [entryByTargetKey, setEntryByTargetKey] = useState<Map<string, Entry>>(() => new Map())
     const [invalidHomeTargetKeys, setInvalidHomeTargetKeys] = useState<Set<string>>(() => new Set())
     const [pendingEntryTargetKeys, setPendingEntryTargetKeys] = useState<Set<string>>(() => new Set())
     const [searchText, setSearchText] = useState('')
@@ -167,7 +169,7 @@ export default function MobileHome({
 
         let cancelled = false
         void (async () => {
-            const validKeys = new Set<string>()
+            const validEntries = new Map<string, Entry>()
             const invalidEntryKeys = new Set<string>()
 
             await Promise.all(entryTargets.map(async item => {
@@ -178,7 +180,7 @@ export default function MobileHome({
                         removeHomeActivityTarget(item.target)
                         return
                     }
-                    validKeys.add(item.key)
+                    validEntries.set(item.key, entry)
                 } catch {
                     invalidEntryKeys.add(item.key)
                     removeHomeEntryActivity(item.projectId, item.entryId)
@@ -191,15 +193,15 @@ export default function MobileHome({
                 for (const key of validationKeys) next.delete(key)
                 return next
             })
-            setValidEntryTargetKeys(previous => {
-                const next = new Set(previous)
+            setEntryByTargetKey(previous => {
+                const next = new Map(previous)
                 for (const key of invalidEntryKeys) next.delete(key)
-                for (const key of validKeys) next.add(key)
+                for (const [key, entry] of validEntries) next.set(key, entry)
                 return next
             })
             setInvalidHomeTargetKeys(previous => {
                 const next = new Set(previous)
-                for (const key of validKeys) next.delete(key)
+                for (const key of validEntries.keys()) next.delete(key)
                 for (const key of invalidEntryKeys) next.add(key)
                 return next
             })
@@ -219,10 +221,10 @@ export default function MobileHome({
         }
         if (target.type === 'entry') {
             if (pendingEntryTargetKeys.has(key)) return false
-            return validEntryTargetKeys.has(key)
+            return entryByTargetKey.has(key)
         }
         return true
-    }, [hasLoadedProjects, invalidHomeTargetKeys, pendingEntryTargetKeys, projectIdSet, validEntryTargetKeys])
+    }, [entryByTargetKey, hasLoadedProjects, invalidHomeTargetKeys, pendingEntryTargetKeys, projectIdSet])
 
     const visibleRecentItems = useMemo(() => (
         dashboard.recentItems.filter(item => isVisibleHomeTarget(item))
@@ -235,11 +237,16 @@ export default function MobileHome({
         return visibleRecentItems.find(item => item.type === 'entry') ?? null
     }, [dashboard.continueItem, isVisibleHomeTarget, visibleRecentItems])
 
-    const continueProjectName = useMemo(() => {
+    const continueProject = useMemo(() => {
         if (!continueItem) return null
         const projectId = getHomeTargetProjectId(continueItem)
-        return projects.find(project => project.id === projectId)?.name ?? continueItem.subtitle ?? null
+        return projects.find(project => project.id === projectId) ?? null
     }, [continueItem, projects])
+
+    const continueEntry = useMemo(() => {
+        if (!continueItem) return null
+        return entryByTargetKey.get(getHomeActivityTargetKey(continueItem)) ?? null
+    }, [continueItem, entryByTargetKey])
 
     const continueLastOpenedAt = useMemo(() => {
         if (!continueItem) return null
@@ -560,8 +567,16 @@ export default function MobileHome({
                     <section aria-label="继续创作">
                         <MobileHomeContinueCard
                             continueItem={continueItem}
-                            projectName={continueProjectName}
+                            projectName={continueProject?.name ?? continueItem.subtitle ?? null}
                             lastOpenedAt={continueLastOpenedAt}
+                            imageSlot={(
+                                <HomeContinueCoverImage
+                                    target={continueItem}
+                                    project={continueProject}
+                                    entry={continueEntry}
+                                    eager
+                                />
+                            )}
                             onOpenTarget={openDashboardTarget}
                         />
                     </section>

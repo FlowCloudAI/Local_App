@@ -44,6 +44,7 @@ import {
     type HomeDashboardData,
     useHomeDashboard,
 } from '../features/home/homeActivity'
+import HomeContinueCoverImage from '../features/home/HomeContinueCoverImage'
 import {refreshIdeas, useIdeaInboxRevision} from '../features/ideas/ideaStore'
 import {stripMarkdown} from '../features/entries/lib/entryMarkdown'
 import {FloatingPanel, RenameDialog} from '../shared/ui/overlay'
@@ -629,7 +630,6 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
     const resumeTarget = continueItem
     const resumeProjectId = resumeTarget ? getHomeTargetProjectId(resumeTarget) : null
     const resumeProject = resumeProjectId ? projects.find(project => project.id === resumeProjectId) ?? null : null
-    const resumeCoverPath = asOptionalString(resumeProject?.cover_path)
     const resumeEntry = resumeTarget?.type === 'entry' && continueKey
         ? entryByTargetKey.get(continueKey) ?? null
         : null
@@ -855,25 +855,12 @@ function ProjectList({onOpenProject, onOpenHomeTarget}: ProjectListProps) {
                                         <span className="project-home-eyebrow">{isLastSessionContinue ? '上次停在这里' : '继续创作'}</span>
                                         <Card
                                             className="project-home-resume-card"
-                                            imageSlot={resumeCoverPath ? (
-                                                <ProjectCoverImage
-                                                    projectId={resumeProject?.id ?? resumeProjectId ?? resumeTarget.id}
-                                                    coverPath={resumeCoverPath}
-                                                    alt={resumeProject?.name ?? resumeTarget.title}
+                                            imageSlot={(
+                                                <HomeContinueCoverImage
+                                                    target={resumeTarget}
+                                                    project={resumeProject}
+                                                    entry={resumeEntry}
                                                     eager
-                                                    fallback={(
-                                                        <ProjectDefaultCover
-                                                            projectId={resumeProject?.id ?? resumeTarget.id}
-                                                            projectName={resumeProject?.name ?? resumeTarget.title}
-                                                            variant="hero"
-                                                        />
-                                                    )}
-                                                />
-                                            ) : (
-                                                <ProjectDefaultCover
-                                                    projectId={resumeProject?.id ?? resumeTarget.id}
-                                                    projectName={resumeProject?.name ?? resumeTarget.title}
-                                                    variant="hero"
                                                 />
                                             )}
                                             imageHeight="var(--fc-home-resume-cover-height)"

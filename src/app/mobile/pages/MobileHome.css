@@ -37,6 +37,8 @@
     --mobile-home-continue-start: color-mix(in srgb, var(--fc-color-bg) 14%, var(--fc-color-text) 86%);
     --mobile-home-continue-end: color-mix(in srgb, var(--fc-color-bg) 26%, var(--fc-color-text) 74%);
 
+    position: relative;
+    isolation: isolate;
     display: grid;
     gap: 0.55rem;
     padding: 1.1rem;
@@ -46,6 +48,37 @@
         linear-gradient(140deg, var(--mobile-home-continue-start), var(--mobile-home-continue-end));
     color: var(--fc-color-text-on-primary);
     box-shadow: var(--mobile-shadow-card);
+    overflow: hidden;
+}
+
+.mobile-home__continue--with-cover::after {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--fc-gray-1000) 52%, transparent),
+        color-mix(in srgb, var(--fc-gray-1000) 88%, transparent)
+    );
+    content: '';
+}
+
+.mobile-home__continue-cover {
+    position: absolute;
+    z-index: -2;
+    inset: 0;
+}
+
+.mobile-home__continue-cover > *,
+.mobile-home__continue-cover img,
+.mobile-home__continue-cover .fc-default-cover {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.mobile-home__continue-cover img {
+    object-fit: cover;
 }
 
 :root[data-theme="dark"] .mobile-home__continue {

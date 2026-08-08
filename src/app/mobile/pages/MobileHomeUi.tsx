@@ -3,6 +3,7 @@
  * 数据校验、分页和导航留在 MobileHome，避免展示层反向依赖页面状态。
  */
 /* eslint-disable react-refresh/only-export-components */
+import {type ReactNode} from 'react'
 import {Button} from 'flowcloudai-ui'
 import type {HomeActivityTarget, HomeDashboardData} from '../../../features/home/homeActivity'
 import {formatProjectDate, parseProjectDateMs} from '../../../features/projects/projectDisplay'
@@ -14,6 +15,7 @@ interface MobileHomeContinueCardProps {
     continueItem: HomeActivityTarget
     projectName?: string | null
     lastOpenedAt?: string | null
+    imageSlot?: ReactNode
     onOpenTarget: (target: HomeActivityTarget) => void
 }
 
@@ -21,11 +23,13 @@ export function MobileHomeContinueCard({
     continueItem,
     projectName,
     lastOpenedAt,
+    imageSlot,
     onOpenTarget,
 }: MobileHomeContinueCardProps) {
     const meta = projectName || continueItem.subtitle || '词条'
     return (
-        <article className="mobile-home__continue">
+        <article className={`mobile-home__continue${imageSlot ? ' mobile-home__continue--with-cover' : ''}`}>
+            {imageSlot ? <div className="mobile-home__continue-cover">{imageSlot}</div> : null}
             <span className="mobile-home__eyebrow">继续创作</span>
             <h2 className="mobile-home__continue-title">{continueItem.title}</h2>
             <p className="mobile-home__continue-meta">
