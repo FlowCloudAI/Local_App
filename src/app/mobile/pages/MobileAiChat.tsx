@@ -161,6 +161,7 @@ export default function MobileAiChat({
     const activeModelLabel = activeModelInfo?.name && activeModelInfo.name !== activeModelId
         ? activeModelInfo.name
         : activeModelId || '未选择模型'
+    const modelPillUsesExpandedWidth = activeModelLabel.length >= 12
     const activeModelOptions = useMemo(() => {
         if (!activeLlmPluginInfo) return []
         return activeLlmPluginInfo.models.map(modelId => {
@@ -771,7 +772,7 @@ export default function MobileAiChat({
                 center={<button
                     ref={modelMenuRef}
                     type="button"
-                    className={`mobile-ai-model-pill${modelMenuOpen ? ' mobile-ai-model-pill--expanded' : ''}`}
+                    className={`mobile-ai-model-pill${modelPillUsesExpandedWidth ? ' mobile-ai-model-pill--wide' : ''}${modelMenuOpen ? ' mobile-ai-model-pill--expanded' : ''}`}
                     aria-haspopup="menu"
                     aria-expanded={modelMenuOpen}
                     disabled={pluginsLoading}

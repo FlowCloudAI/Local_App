@@ -218,7 +218,7 @@
 .mobile-ai-model-pill {
     display: inline-flex;
     width: fit-content;
-    max-width: min(11.75rem, 42vw);
+    max-width: 100%;
     min-width: 0;
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
@@ -245,6 +245,14 @@
     overflow: hidden;
     text-overflow: clip;
     white-space: nowrap;
+}
+
+.mobile-ai-model-pill--wide {
+    width: 100%;
+}
+
+.mobile-ai-model-pill--wide span {
+    flex: 1;
     -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.5rem), transparent 100%);
     mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 1.5rem), transparent 100%);
 }
