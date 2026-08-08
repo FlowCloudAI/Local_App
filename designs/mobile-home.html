@@ -219,11 +219,25 @@
         .home-content {
             display: grid;
             gap: 22px;
-            padding: calc(env(safe-area-inset-top) + 18px) 16px 28px;
+            padding: 0 16px 28px;
+        }
+
+        .home-header {
+            position: sticky;
+            top: 0;
+            z-index: 14;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            min-height: 70px;
+            margin: 0 -16px;
+            padding: calc(env(safe-area-inset-top) + 14px) 16px 10px;
+            border-bottom: 1px solid var(--fc-color-border-soft);
+            background: var(--fc-color-bg);
         }
 
         .home-title {
-            margin: 0 2px -2px;
+            margin: 0 auto 0 2px;
             font-size: 27px;
             line-height: 1.2;
             letter-spacing: -.02em;
@@ -312,59 +326,6 @@
             background: var(--fc-color-primary-soft);
         }
 
-        .attention {
-            display: grid;
-            grid-template-columns: 34px minmax(0, 1fr) auto;
-            gap: 10px;
-            align-items: center;
-            min-height: 70px;
-            padding: 11px 12px;
-            border: 1px solid color-mix(in srgb, var(--fc-color-primary) 30%, var(--fc-color-border));
-            border-radius: var(--fc-radius-lg);
-            background: var(--fc-color-primary-soft);
-        }
-
-        .attention__icon {
-            display: grid;
-            width: 34px;
-            height: 34px;
-            place-items: center;
-            color: var(--fc-color-primary);
-            border-radius: 50%;
-            background: color-mix(in srgb, var(--fc-color-primary) 12%, transparent);
-        }
-
-        .attention__icon .icon { width: 19px; height: 19px; }
-
-        .attention__copy { min-width: 0; }
-
-        .attention__copy strong,
-        .attention__copy small { display: block; }
-
-        .attention__copy strong {
-            overflow: hidden;
-            font-size: 14px;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-        }
-
-        .attention__copy small {
-            overflow: hidden;
-            color: var(--fc-color-text-secondary);
-            font-size: 12px;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-        }
-
-        .attention__button {
-            min-height: 44px;
-            padding: 0 8px;
-            color: var(--fc-color-primary);
-            font-weight: 650;
-            border: 0;
-            background: transparent;
-        }
-
         .worlds { display: grid; gap: 12px; }
 
         .section-head {
@@ -425,7 +386,12 @@
 
         body[data-state="many-worlds"] .world-search { display: block; }
 
-        .world-list { display: grid; gap: 12px; }
+        .world-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            align-content: start;
+        }
 
         .world-card {
             position: relative;
@@ -455,7 +421,7 @@
 
         .world-card__cover {
             position: relative;
-            height: 66px;
+            height: 78px;
             overflow: hidden;
             background-color: #5a5141;
         }
@@ -504,12 +470,12 @@
             background: rgb(0 0 0 / 48%);
         }
 
-        .world-card__body { padding: 11px 14px 13px; }
+        .world-card__body { padding: 10px 11px 12px; }
 
         .world-card__name {
             overflow: hidden;
             margin: 0;
-            font-size: 16px;
+            font-size: 15px;
             line-height: 1.3;
             white-space: nowrap;
             text-overflow: ellipsis;
@@ -527,7 +493,10 @@
 
         .world-card__recent { color: var(--fc-color-text-tertiary); }
 
-        .world-list[data-view="compact"] { gap: 8px; }
+        .world-list[data-view="compact"] {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
 
         .world-list[data-view="compact"] .world-card {
             min-height: 70px;
@@ -539,6 +508,48 @@
         .world-list[data-view="compact"] .world-card__body { padding: 12px 14px; }
 
         .world-list[data-view="compact"] .world-card__recent { display: none; }
+
+        body[data-state="many-worlds"] .world-list { min-height: 338px; }
+
+        .world-pagination {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .world-pagination button {
+            min-height: 44px;
+            padding: 0 14px;
+            color: var(--fc-color-primary);
+            font-weight: 650;
+            border: 1px solid var(--fc-color-border);
+            border-radius: var(--fc-radius-md);
+            background: var(--fc-color-bg-elevated);
+        }
+
+        .world-pagination button:disabled {
+            color: var(--fc-color-text-tertiary);
+            opacity: .5;
+            cursor: default;
+        }
+
+        .world-pagination__status {
+            min-width: 52px;
+            color: var(--fc-color-text-secondary);
+            text-align: center;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .world-search-empty {
+            margin: 4px 0;
+            padding: 22px 12px;
+            color: var(--fc-color-text-secondary);
+            text-align: center;
+            border: 1px dashed var(--fc-color-border);
+            border-radius: var(--fc-radius-lg);
+        }
 
         .empty-worlds {
             display: none;
@@ -552,33 +563,9 @@
         .empty-worlds h3 { margin: 0; font-size: 18px; }
 
         .empty-worlds p {
-            margin: 6px 0 18px;
+            margin: 6px 0 0;
             color: var(--fc-color-text-secondary);
             font-size: 13px;
-        }
-
-        .empty-worlds__actions { display: grid; gap: 8px; }
-
-        .primary-button,
-        .secondary-button {
-            min-height: 44px;
-            padding: 0 16px;
-            font-weight: 650;
-            border-radius: var(--fc-radius-md);
-        }
-
-        .primary-button {
-            color: #fff;
-            border: 1px solid var(--fc-color-primary);
-            background: var(--fc-color-primary);
-        }
-
-        .primary-button:hover { background: var(--fc-color-primary-hover); }
-
-        .secondary-button {
-            color: var(--fc-color-primary);
-            border: 1px solid var(--fc-color-border);
-            background: var(--fc-color-bg-elevated);
         }
 
         .tip-card {
@@ -742,18 +729,16 @@
         .toast.show { opacity: 1; transform: translateY(0); }
 
         body[data-state="no-recent"] .continue-module,
-        body[data-state="empty"] .continue-module,
-        body[data-state="quiet"] .attention-module,
-        body[data-state="empty"] .attention-module { display: none; }
+        body[data-state="empty"] .continue-module { display: none; }
 
         body[data-state="empty"] .world-list,
-        body[data-state="empty"] .world-search { display: none; }
+        body[data-state="empty"] .world-search,
+        body[data-state="empty"] .world-pagination,
+        body[data-state="empty"] .world-search-empty { display: none; }
 
         body[data-state="empty"] .empty-worlds { display: block; }
 
         body[data-state="empty"] .section-head__count { display: none; }
-
-        body[data-state="empty"] .section-head .icon-button { display: none; }
 
         @media (max-width: 860px) {
             .workspace { grid-template-columns: 1fr; }
@@ -790,7 +775,6 @@
         <symbol id="icon-import" viewBox="0 0 24 24"><path d="M12 4v10.5"/><path d="M7.8 10.4 12 14.6l4.2-4.2"/><path d="M5.8 18.2h12.4"/></symbol>
         <symbol id="icon-card" viewBox="0 0 24 24"><rect x="4" y="4" width="6.2" height="6.2" rx="1.35"/><rect x="13.8" y="4" width="6.2" height="6.2" rx="1.35"/><rect x="4" y="13.8" width="6.2" height="6.2" rx="1.35"/><rect x="13.8" y="13.8" width="6.2" height="6.2" rx="1.35"/></symbol>
         <symbol id="icon-list" viewBox="0 0 24 24"><circle class="icon--solid" cx="5" cy="6" r="1.25"/><circle class="icon--solid" cx="5" cy="12" r="1.25"/><circle class="icon--solid" cx="5" cy="18" r="1.25"/><path d="M9 6h10"/><path d="M9 12h10"/><path d="M9 18h10"/></symbol>
-        <symbol id="icon-report" viewBox="0 0 24 24"><path d="M7 4.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V6A1.5 1.5 0 0 1 7.5 4.5Z"/><path d="M14 4.5V9h4"/><path d="M8.5 13h7"/><path d="M8.5 16h5"/></symbol>
     </defs>
 </svg>
 
@@ -804,7 +788,6 @@
             <div class="audit-switches" data-switch-group="state">
                 <button type="button" data-state-option="default" aria-pressed="true">常态</button>
                 <button type="button" data-state-option="no-recent" aria-pressed="false">无最近记录</button>
-                <button type="button" data-state-option="quiet" aria-pressed="false">无提醒</button>
                 <button type="button" data-state-option="many-worlds" aria-pressed="false">多个世界</button>
                 <button type="button" data-state-option="empty" aria-pressed="false">空世界</button>
             </div>
@@ -830,9 +813,10 @@
             <h2>本稿已确定</h2>
             <ul class="audit-decisions">
                 <li><strong>继续创作只接受词条记录</strong>没有最近词条记录时整块隐藏，不显示选择世界的占位卡。</li>
-                <li><strong>提醒必须产生实际后果</strong>只展示可处理事件；孤立词条、普通缺摘要不属于系统待办。</li>
+                <li><strong>首页只保留跨项目入口</strong>项目报告、词条待办等内部资产回到对应世界，不挤占公共首页。</li>
                 <li><strong>世界卡整卡可点击</strong>卡片内若出现独立待办入口，应提前截获点击，不触发打开世界。</li>
-                <li><strong>世界数据一次聚合</strong>正式实现应批量返回字数、最近词条和提醒，禁止逐卡追加查询。</li>
+                <li><strong>世界列表双列分页</strong>默认每页 4 个世界，数量增加时只增加页数，不继续拉长首页。</li>
+                <li><strong>世界操作保持吸顶</strong>滚动列表时保留标题、新建与更多入口，避免回到顶部才能操作。</li>
             </ul>
         </section>
     </aside>
@@ -842,7 +826,15 @@
             <div class="app-screen">
                 <div class="home-scroll" id="homeScroll">
                     <div class="home-content">
-                        <h1 class="home-title">首页</h1>
+                        <header class="home-header">
+                            <h1 class="home-title">首页</h1>
+                            <button class="icon-button" type="button" aria-label="新建世界" data-toast="打开新建世界表单">
+                                <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
+                            </button>
+                            <button class="icon-button" id="openWorldActions" type="button" aria-label="世界列表操作" aria-haspopup="dialog" aria-expanded="false">
+                                <svg class="icon" aria-hidden="true"><use href="#icon-more"/></svg>
+                            </button>
+                        </header>
 
                         <section class="module continue-module" aria-labelledby="continueTitle">
                             <div class="continue-card">
@@ -863,29 +855,10 @@
                             </form>
                         </section>
 
-                        <section class="module attention-module" aria-label="需要关注">
-                            <div class="attention">
-                                <span class="attention__icon" aria-hidden="true">
-                                    <svg class="icon"><use href="#icon-report"/></svg>
-                                </span>
-                                <span class="attention__copy">
-                                    <strong>设定检测报告已完成</strong>
-                                    <small>远星大陆 · 2 项待复核 · 8 分钟前</small>
-                                </span>
-                                <button class="attention__button" type="button" data-toast="打开远星大陆设定检测报告">查看</button>
-                            </div>
-                        </section>
-
                         <section class="module worlds" aria-labelledby="worldsTitle">
                             <header class="section-head">
                                 <h2 id="worldsTitle">我的世界</h2>
                                 <span class="section-head__count">2 个</span>
-                                <button class="icon-button" type="button" aria-label="新建世界" data-toast="打开新建世界表单">
-                                    <svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>
-                                </button>
-                                <button class="icon-button" id="openWorldActions" type="button" aria-label="世界列表操作" aria-haspopup="dialog" aria-expanded="false">
-                                    <svg class="icon" aria-hidden="true"><use href="#icon-more"/></svg>
-                                </button>
                             </header>
 
                             <label class="world-search">
@@ -901,8 +874,8 @@
                                     </div>
                                     <div class="world-card__body">
                                         <h3 class="world-card__name">远星大陆</h3>
-                                        <p class="world-card__meta">91 个词条 · 1.5 万字 · 43 分钟前</p>
-                                        <p class="world-card__recent">最近：赤岩峡谷 · 雪港 · 北境议会</p>
+                                        <p class="world-card__meta">91 个词条 · 1.5 万字</p>
+                                        <p class="world-card__recent">43 分钟前 · 赤岩峡谷</p>
                                     </div>
                                 </article>
 
@@ -913,8 +886,8 @@
                                     </div>
                                     <div class="world-card__body">
                                         <h3 class="world-card__name">Test</h3>
-                                        <p class="world-card__meta">4 个词条 · 860 字 · 5 天前</p>
-                                        <p class="world-card__recent">最近：序章</p>
+                                        <p class="world-card__meta">4 个词条 · 860 字</p>
+                                        <p class="world-card__recent">5 天前 · 序章</p>
                                     </div>
                                 </article>
 
@@ -925,8 +898,8 @@
                                     </div>
                                     <div class="world-card__body">
                                         <h3 class="world-card__name">雾海纪行</h3>
-                                        <p class="world-card__meta">18 个词条 · 6,740 字 · 12 天前</p>
-                                        <p class="world-card__recent">最近：浮标城 · 潮汐历 · 领航员</p>
+                                        <p class="world-card__meta">18 个词条 · 6,740 字</p>
+                                        <p class="world-card__recent">12 天前 · 浮标城</p>
                                     </div>
                                 </article>
 
@@ -937,8 +910,8 @@
                                     </div>
                                     <div class="world-card__body">
                                         <h3 class="world-card__name">海渊历</h3>
-                                        <p class="world-card__meta">26 个词条 · 9,210 字 · 18 天前</p>
-                                        <p class="world-card__recent">最近：深潮纪元 · 贝壳议会 · 潜航钟</p>
+                                        <p class="world-card__meta">26 个词条 · 9,210 字</p>
+                                        <p class="world-card__recent">18 天前 · 深潮纪元</p>
                                     </div>
                                 </article>
 
@@ -949,8 +922,8 @@
                                     </div>
                                     <div class="world-card__body">
                                         <h3 class="world-card__name">白昼边境</h3>
-                                        <p class="world-card__meta">12 个词条 · 4,630 字 · 1 个月前</p>
-                                        <p class="world-card__recent">最近：恒光站 · 影商 · 终夜线</p>
+                                        <p class="world-card__meta">12 个词条 · 4,630 字</p>
+                                        <p class="world-card__recent">1 个月前 · 恒光站</p>
                                     </div>
                                 </article>
 
@@ -961,19 +934,23 @@
                                     </div>
                                     <div class="world-card__body">
                                         <h3 class="world-card__name">空港档案</h3>
-                                        <p class="world-card__meta">8 个词条 · 2,180 字 · 2 个月前</p>
-                                        <p class="world-card__recent">最近：第三泊位 · 风塔 · 通行证</p>
+                                        <p class="world-card__meta">8 个词条 · 2,180 字</p>
+                                        <p class="world-card__recent">2 个月前 · 第三泊位</p>
                                     </div>
                                 </article>
                             </div>
 
+                            <p class="world-search-empty" id="worldSearchEmpty" hidden>没有找到匹配的世界</p>
+
+                            <nav class="world-pagination" id="worldPagination" aria-label="世界列表分页" hidden>
+                                <button id="previousWorldPage" type="button">上一页</button>
+                                <span class="world-pagination__status" id="worldPageStatus" aria-live="polite">1 / 1</span>
+                                <button id="nextWorldPage" type="button">下一页</button>
+                            </nav>
+
                             <div class="empty-worlds">
                                 <h3>创建你的第一个世界</h3>
-                                <p>先建立世界容器，再逐步补充人物、地点和事件。</p>
-                                <div class="empty-worlds__actions">
-                                    <button class="primary-button" type="button" data-toast="打开新建世界表单">新建世界</button>
-                                    <button class="secondary-button" type="button" data-toast="选择 .fcworld 文件">导入世界</button>
-                                </div>
+                                <p>使用右上角“+”新建世界，或从更多菜单导入 .fcworld 文件。</p>
                             </div>
                         </section>
 
@@ -1052,11 +1029,20 @@
     const homeScroll = document.getElementById('homeScroll');
     const worldList = document.getElementById('worldList');
     const worldSearchInput = document.getElementById('worldSearchInput');
+    const worldSearchEmpty = document.getElementById('worldSearchEmpty');
+    const worldPagination = document.getElementById('worldPagination');
+    const previousWorldPage = document.getElementById('previousWorldPage');
+    const nextWorldPage = document.getElementById('nextWorldPage');
+    const worldPageStatus = document.getElementById('worldPageStatus');
+    const worldCount = document.querySelector('.section-head__count');
+    const worldCards = [...document.querySelectorAll('[data-world-name]')];
     const sheetLayer = document.getElementById('sheetLayer');
     const openWorldActions = document.getElementById('openWorldActions');
     const toastElement = document.getElementById('toast');
     const quickIdeaForm = document.getElementById('quickIdeaForm');
     const quickIdeaInput = document.getElementById('quickIdeaInput');
+    const worldsPerPage = 4;
+    let currentWorldPage = 1;
     let toastTimer;
 
     function setPressed(group, active) {
@@ -1078,16 +1064,34 @@
         openWorldActions.focus();
     }
 
+    function renderWorlds() {
+        const query = worldSearchInput.value.trim().toLocaleLowerCase('zh-CN');
+        const showAllWorlds = body.dataset.state === 'many-worlds';
+        const stateCards = body.dataset.state === 'empty'
+            ? []
+            : worldCards.filter(card => showAllWorlds || !card.classList.contains('extra-world'));
+        const matchedCards = stateCards.filter(card => card.dataset.worldName.toLocaleLowerCase('zh-CN').includes(query));
+        const pageCount = Math.max(1, Math.ceil(matchedCards.length / worldsPerPage));
+        currentWorldPage = Math.min(currentWorldPage, pageCount);
+        const pageStart = (currentWorldPage - 1) * worldsPerPage;
+        const visibleCards = new Set(matchedCards.slice(pageStart, pageStart + worldsPerPage));
+
+        worldCards.forEach(card => { card.hidden = !visibleCards.has(card); });
+        worldCount.textContent = query ? `${matchedCards.length} 个结果` : `${stateCards.length} 个`;
+        worldSearchEmpty.hidden = !query || matchedCards.length > 0;
+        worldPagination.hidden = pageCount <= 1;
+        worldPageStatus.textContent = `${currentWorldPage} / ${pageCount}`;
+        previousWorldPage.disabled = currentWorldPage === 1;
+        nextWorldPage.disabled = currentWorldPage === pageCount;
+    }
+
     document.querySelectorAll('[data-state-option]').forEach(button => {
         button.addEventListener('click', () => {
             body.dataset.state = button.dataset.stateOption;
             setPressed('[data-state-option]', button);
-            document.querySelectorAll('.extra-world').forEach(card => {
-                card.hidden = button.dataset.stateOption !== 'many-worlds';
-            });
             worldSearchInput.value = '';
-            document.querySelectorAll('[data-world-name]:not(.extra-world)').forEach(card => { card.hidden = false; });
-            document.querySelector('.section-head__count').textContent = button.dataset.stateOption === 'many-worlds' ? '6 个' : '2 个';
+            currentWorldPage = 1;
+            renderWorlds();
             homeScroll.scrollTop = 0;
         });
     });
@@ -1113,10 +1117,18 @@
     });
 
     worldSearchInput.addEventListener('input', () => {
-        const query = worldSearchInput.value.trim().toLocaleLowerCase('zh-CN');
-        document.querySelectorAll('[data-world-name]').forEach(card => {
-            card.hidden = !card.dataset.worldName.toLocaleLowerCase('zh-CN').includes(query);
-        });
+        currentWorldPage = 1;
+        renderWorlds();
+    });
+
+    previousWorldPage.addEventListener('click', () => {
+        currentWorldPage -= 1;
+        renderWorlds();
+    });
+
+    nextWorldPage.addEventListener('click', () => {
+        currentWorldPage += 1;
+        renderWorlds();
     });
 
     quickIdeaForm.addEventListener('submit', event => {
@@ -1174,7 +1186,7 @@
         '在正文中输入 [[ 可以链接到另一个词条，对方会自动显示反向引用。',
         '给事件词条设置开始时间后，它会自动进入时间线。',
         '追加恢复只补回缺失记录，不会覆盖当前世界的内容。',
-        '设定检测完成后，可以把报告直接带入 AI 会话讨论。'
+        '置顶的世界会优先出现在列表第一页。'
     ];
     let tipIndex = 0;
     document.getElementById('nextTip').addEventListener('click', () => {
@@ -1182,7 +1194,7 @@
         document.getElementById('tipText').textContent = tips[tipIndex];
     });
 
-    document.querySelectorAll('.extra-world').forEach(card => { card.hidden = true; });
+    renderWorlds();
 </script>
 </body>
 </html>
