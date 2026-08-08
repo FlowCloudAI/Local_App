@@ -217,7 +217,8 @@
 
 .mobile-ai-model-pill {
     display: inline-flex;
-    width: min(11.75rem, 42vw);
+    width: fit-content;
+    max-width: min(11.75rem, 42vw);
     min-width: 0;
     height: var(--mobile-top-surface-size);
     box-sizing: border-box;
@@ -240,7 +241,7 @@
 
 .mobile-ai-model-pill span {
     min-width: 0;
-    flex: 1;
+    flex: 0 1 auto;
     overflow: hidden;
     text-overflow: clip;
     white-space: nowrap;
