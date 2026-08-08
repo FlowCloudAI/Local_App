@@ -52,6 +52,7 @@ import {
     resolveMarkdownAnchor,
 } from '../../../features/entries/lib/entryMarkdown'
 import {areTagMapsEqual} from '../../../features/entries/lib/entryTag'
+import {recordHomeActivity} from '../../../features/home/homeActivity'
 import {
     buildEntryImageMarkdownRef,
     type EntryImage,
@@ -94,6 +95,7 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
     const topActionsRef = useRef<HTMLDivElement>(null)
     const immersiveContentEditorRef = useRef<MarkdownEditorRef>(null)
     const projectEntriesRequestRef = useRef<Promise<EntryBrief[]> | null>(null)
+    const recordedHomeEntryRef = useRef<string | null>(null)
 
     const [entry, setEntry] = useState<Entry | null>(null)
     const [entryTypes, setEntryTypes] = useState<EntryTypeView[]>([])
@@ -227,6 +229,20 @@ export default function MobileEntryDetail({push, pop, replace, navigateToTab, se
         setEntryRelations(relations)
         setRelationDrafts(relations.map(relation => buildRelationDraft(entryId, relation)))
         syncForm(e)
+        const homeEntryKey = `${projectId}:${e.id}`
+        if (recordedHomeEntryRef.current !== homeEntryKey) {
+            recordedHomeEntryRef.current = homeEntryKey
+            recordHomeActivity({
+                type: 'entry',
+                id: e.id,
+                projectId,
+                entryId: e.id,
+                title: e.title,
+                subtitle: '词条',
+                description: e.summary?.trim() || null,
+                updatedAt: e.updated_at,
+            })
+        }
         return e
     }, [entryId, projectId, syncForm])
 
