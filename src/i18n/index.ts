@@ -6,6 +6,12 @@ import LanguageDetector from 'i18next-browser-languagedetector'
 import zhCN from './locales/zh-CN.json'
 import enUS from './locales/en-US.json'
 
+const syncDocumentLanguage = (language: string) => {
+    document.documentElement.lang = language
+}
+
+i18n.on('languageChanged', syncDocumentLanguage)
+
 i18n
     .use(LanguageDetector)
     .use(initReactI18next)
@@ -27,6 +33,7 @@ i18n
             order: ['localStorage', 'navigator'],
             caches: ['localStorage']
         }
-    }).then()
+    })
+    .then(() => syncDocumentLanguage(i18n.resolvedLanguage ?? i18n.language))
 
 export default i18n

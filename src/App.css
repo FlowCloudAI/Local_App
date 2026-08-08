@@ -11,7 +11,7 @@
 body {
     background: var(--app-shell-bg);
     color: var(--fc-color-text);
-    font-family: "Microsoft YaHei UI", var(--fc-font-family), sans-serif;
+    font-family: var(--fc-font-family);
 }
 
 /* 默认滚动条对齐 RollingBox thin 模式 */

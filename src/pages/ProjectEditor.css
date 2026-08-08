@@ -1770,7 +1770,7 @@
     right: var(--fc-space-xl);
     color: color-mix(in srgb, var(--entry-accent-color) 72%, var(--fc-color-text-on-primary));
     opacity: 0.34;
-    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-family: var(--fc-font-family-art);
     font-size: clamp(6rem, 10vw, 8.5rem);
     font-weight: var(--fc-font-weight-normal);
     line-height: 1;

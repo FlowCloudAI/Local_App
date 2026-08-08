@@ -1,0 +1,82 @@
+/*
+ * 应用内置字体入口：提供简中、繁中、日文与英文所需字体，
+ * 并通过文档语言切换地区字形；授权文本与字体文件放在相邻目录。
+ */
+
+@font-face {
+    font-family: "FC Noto Sans SC";
+    src: url("./noto-sans-cjk/NotoSansSC-VF.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "FC Noto Sans TC";
+    src: url("./noto-sans-cjk/NotoSansTC-VF.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "FC Noto Sans JP";
+    src: url("./noto-sans-cjk/NotoSansJP-VF.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "FC Noto Serif SC";
+    src: url("./noto-serif-cjk/NotoSerifSC-VF.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 200 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "FC Noto Serif TC";
+    src: url("./noto-serif-cjk/NotoSerifTC-VF.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 200 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "FC Noto Serif JP";
+    src: url("./noto-serif-cjk/NotoSerifJP-VF.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 200 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "FC LXGW WenKai";
+    src: url("./lxgw-wenkai/LXGWWenKai-Regular.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
+:root {
+    --fc-font-family-sans: "FC Noto Sans SC";
+    --fc-font-family-serif: "FC Noto Serif SC", serif;
+    --fc-font-family-art: "FC LXGW WenKai", var(--fc-font-family-serif);
+    --fc-font-family: var(--fc-font-family-sans), "Microsoft YaHei UI", "Segoe UI", sans-serif;
+}
+
+:root:lang(zh-Hant),
+:root:lang(zh-TW),
+:root:lang(zh-HK) {
+    --fc-font-family-sans: "FC Noto Sans TC";
+    --fc-font-family-serif: "FC Noto Serif TC", serif;
+    --fc-font-family: var(--fc-font-family-sans), "Microsoft JhengHei UI", "Segoe UI", sans-serif;
+}
+
+:root:lang(ja) {
+    --fc-font-family-sans: "FC Noto Sans JP";
+    --fc-font-family-serif: "FC Noto Serif JP", serif;
+    --fc-font-family-art: var(--fc-font-family-serif);
+    --fc-font-family: var(--fc-font-family-sans), "Yu Gothic UI", Meiryo, sans-serif;
+}

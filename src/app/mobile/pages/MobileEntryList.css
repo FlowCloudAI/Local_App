@@ -157,7 +157,7 @@
     right: var(--fc-space-lg);
     color: color-mix(in srgb, var(--mobile-entry-card-color) 72%, var(--fc-color-text-on-primary));
     opacity: 0.34;
-    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-family: var(--fc-font-family-art);
     font-size: 4.75rem;
     font-weight: var(--fc-font-weight-normal);
     line-height: 1;

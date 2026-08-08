@@ -82,7 +82,7 @@
     height: 100dvh;
     background: var(--fc-color-bg);
     color: var(--fc-color-text);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--fc-font-family), sans-serif;
+    font-family: var(--fc-font-family);
     -webkit-tap-highlight-color: transparent;
     overflow: hidden;
 }

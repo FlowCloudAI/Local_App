@@ -10,6 +10,7 @@ import {resolveDensity} from './shared/formFactor'
 import {applyPersistedThemeColorConfig} from './pages/settings/themeColorPersistence'
 import './i18n' // 初始化 i18n
 import './glassEffect.css'
+import './assets/fonts/fonts.css'
 
 // ── 全局错误捕获（用于打包环境诊断，无 DevTools 时通过后端 log 可见）────────────
 // JS 运行时错误 & 未捕获 Promise rejection

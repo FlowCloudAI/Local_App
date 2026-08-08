@@ -103,7 +103,7 @@
     bottom: calc(var(--fc-space-sm) * -1);
     color: var(--fc-color-text-on-primary);
     opacity: var(--fc-default-cover-mark-opacity);
-    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-family: var(--fc-font-family-art);
     font-size: clamp(3.5rem, 6vw, 5rem);
     font-weight: var(--fc-font-weight-normal);
     line-height: 1;
@@ -133,7 +133,7 @@
 
 .fc-default-cover--hero .fc-default-cover__copy strong {
     overflow: hidden;
-    font-family: "STXingkai", "华文行楷", "KaiTi", "楷体", var(--fc-font-family), serif;
+    font-family: var(--fc-font-family-art);
     font-size: clamp(2rem, 7vw, 3rem);
     font-weight: var(--fc-font-weight-normal);
     line-height: var(--fc-line-height-tight);
